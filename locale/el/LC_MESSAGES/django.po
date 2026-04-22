@@ -9430,6 +9430,10 @@ msgstr "Σάρωση για επαλήθευση"
 msgid "Unnamed product"
 msgstr "Προϊόν χωρίς όνομα"
 
+#: .\core\templates\invoices\invoice.html
+msgid "MARK"
+msgstr "Μ.ΑΡ.Κ"
+
 #~ msgid "We'd love to hear your feedback! How was your shopping experience?"
 #~ msgstr "Θα θέλαμε να ακούσουμε τη γνώμη σας! Πώς ήταν η εμπειρία σας;"
 

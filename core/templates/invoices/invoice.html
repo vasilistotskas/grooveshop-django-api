@@ -171,6 +171,9 @@
     <div class="meta">
       <div class="title">{% trans "INVOICE" %}</div>
       <p class="number">{{ invoice.invoice_number }}</p>
+      {% if mydata_mark %}
+        <p><strong>{% trans "MARK" %}:</strong> {{ mydata_mark }}</p>
+      {% endif %}
       <p>{% trans "Issue date" %}: {{ invoice.issue_date|date:"Y-m-d" }}</p>
       {% if order.created_at and order.created_at.date|date:"Y-m-d" != invoice.issue_date|date:"Y-m-d" %}
         <p>{% trans "Order date" %}: {{ order.created_at|date:"Y-m-d" }}</p>

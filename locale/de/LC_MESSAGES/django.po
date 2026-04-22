@@ -9400,6 +9400,10 @@ msgstr "Zum Überprüfen scannen"
 msgid "Unnamed product"
 msgstr "Unbenanntes Produkt"
 
+#: .\core\templates\invoices\invoice.html
+msgid "MARK"
+msgstr "MARK"
+
 #, fuzzy
 #~| msgid "Order Confirmation"
 #~ msgid "Subscription Confirmation"

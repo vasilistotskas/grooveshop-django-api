@@ -306,8 +306,14 @@ def _build_context(
 
     Kept separate from the render call so tests can assert exact
     content without going through WeasyPrint.
+
+    QR precedence: when the invoice has been registered with myDATA,
+    the QR encodes the **AADE-returned** ``qr_url`` (the legally
+    verifiable one that deep-links into the ΑΑΔΕ portal). Otherwise
+    we fall back to our own order-tracking URL so the PDF still has
+    a useful scan target pre-transmission.
     """
-    verification_url = _verification_url(order)
+    qr_target_url = invoice.mydata_qr_url or _verification_url(order)
     return {
         "invoice": invoice,
         "order": order,
@@ -320,8 +326,11 @@ def _build_context(
         "totals": totals,
         "currency": invoice.currency,
         "pay_way_name": _pay_way_display(order),
-        "verification_url": verification_url,
-        "qr_svg": _build_qr_svg(verification_url),
+        "verification_url": qr_target_url,
+        "qr_svg": _build_qr_svg(qr_target_url),
+        # Surfaced on the PDF when present so auditors / customers can
+        # see the legal registration number next to the invoice number.
+        "mydata_mark": invoice.mydata_mark,
     }
 
 

@@ -546,7 +546,12 @@ class OrderAdmin(ModelAdmin):
         "mark_as_completed",
         "mark_as_canceled",
     ]
-    actions_detail = ["generate_invoice_now", "regenerate_invoice"]
+    actions_detail = [
+        "generate_invoice_now",
+        "regenerate_invoice",
+        "send_invoice_to_mydata_now",
+        "cancel_mydata_invoice_now",
+    ]
     inlines = [OrderItemInline, InvoiceInline, OrderHistoryInline]
     save_on_top = True
     date_hierarchy = "created_at"
@@ -1297,6 +1302,104 @@ class OrderAdmin(ModelAdmin):
         )
         return self._redirect_to_order_change(object_id)
 
+    @action(
+        description=str(_("Send invoice to myDATA")),
+        variant=ActionVariant.PRIMARY,
+        icon="cloud_upload",
+    )
+    def send_invoice_to_mydata_now(self, request, object_id):
+        """Dispatch a manual myDATA submission for this order.
+
+        Fire-and-forget via the Celery task so the admin response
+        returns instantly. Status becomes visible on the Invoice
+        admin's ``myDATA`` column within seconds.
+        """
+        try:
+            order = Order.objects.select_related("invoice").get(pk=object_id)
+        except Order.DoesNotExist:
+            messages.error(request, _("Order not found."))
+            return self._redirect_to_order_change(object_id)
+
+        invoice = getattr(order, "invoice", None)
+        if invoice is None or not invoice.has_document():
+            messages.warning(
+                request,
+                _(
+                    "Order #%(order_id)s has no rendered invoice yet — "
+                    "generate the invoice first, then submit to myDATA."
+                )
+                % {"order_id": order.id},
+            )
+            return self._redirect_to_order_change(object_id)
+
+        from order.mydata.config import load_config
+        from order.tasks import send_invoice_to_mydata
+
+        if not load_config().is_ready():
+            messages.warning(
+                request,
+                _(
+                    "myDATA integration is not ready — check MYDATA_ENABLED "
+                    "and credentials in Settings before retrying."
+                ),
+            )
+            return self._redirect_to_order_change(object_id)
+
+        send_invoice_to_mydata.delay(order.id)
+        messages.success(
+            request,
+            _(
+                "Scheduled myDATA submission for invoice %(num)s "
+                "(order #%(order_id)s). Refresh the Invoice admin to "
+                "see the MARK once AADE responds."
+            )
+            % {"num": invoice.invoice_number, "order_id": order.id},
+        )
+        return self._redirect_to_order_change(object_id)
+
+    @action(
+        description=str(_("Cancel invoice in myDATA")),
+        variant=ActionVariant.DANGER,
+        icon="cancel",
+    )
+    def cancel_mydata_invoice_now(self, request, object_id):
+        """Schedule a ``CancelInvoice`` call for this order's MARK.
+
+        Only valid when the invoice has already been registered. The
+        Greek tax-law cancellation window is tight (same accounting
+        period) — beyond it, issue a credit note (5.1 / 11.4) instead.
+        """
+        try:
+            order = Order.objects.select_related("invoice").get(pk=object_id)
+        except Order.DoesNotExist:
+            messages.error(request, _("Order not found."))
+            return self._redirect_to_order_change(object_id)
+
+        invoice = getattr(order, "invoice", None)
+        if invoice is None or not invoice.mydata_mark:
+            messages.warning(
+                request,
+                _(
+                    "No myDATA MARK on file for order #%(order_id)s — "
+                    "nothing to cancel."
+                )
+                % {"order_id": order.id},
+            )
+            return self._redirect_to_order_change(object_id)
+
+        from order.tasks import cancel_mydata_invoice
+
+        cancel_mydata_invoice.delay(order.id)
+        messages.success(
+            request,
+            _(
+                "Scheduled myDATA cancellation for MARK %(mark)s "
+                "(order #%(order_id)s)."
+            )
+            % {"mark": invoice.mydata_mark, "order_id": order.id},
+        )
+        return self._redirect_to_order_change(object_id)
+
 
 @admin.register(OrderItem)
 class OrderItemAdmin(ModelAdmin):
@@ -1879,10 +1982,12 @@ class InvoiceAdmin(ModelAdmin):
         "total_display",
         "currency",
         "document_badge",
+        "mydata_status_badge",
     )
     list_filter = (
         ("issue_date", RangeDateTimeFilter),
         HasDocumentFilter,
+        "mydata_status",
     )
     search_fields = (
         "invoice_number",
@@ -1890,6 +1995,8 @@ class InvoiceAdmin(ModelAdmin):
         "order__email",
         "order__first_name",
         "order__last_name",
+        "mydata_mark",
+        "mydata_uid",
     )
     ordering = ("-issue_date", "-invoice_number")
     date_hierarchy = "issue_date"
@@ -1909,8 +2016,84 @@ class InvoiceAdmin(ModelAdmin):
         "buyer_snapshot",
         "created_at",
         "updated_at",
+        # myDATA identifiers + status — populated by the submission
+        # pipeline only; never edited by hand (edits would break the
+        # legal paper trail).
+        "mydata_status",
+        "mydata_invoice_type",
+        "mydata_series",
+        "mydata_aa",
+        "mydata_uid",
+        "mydata_mark",
+        "mydata_qr_url",
+        "mydata_authentication_code",
+        "mydata_cancellation_mark",
+        "mydata_error_code",
+        "mydata_error_message",
+        "mydata_submitted_at",
+        "mydata_confirmed_at",
     )
-    fields = readonly_fields
+    fieldsets = (
+        (
+            _("Invoice"),
+            {
+                "fields": (
+                    "invoice_number",
+                    "issue_date",
+                    "order_link",
+                    "document_badge",
+                    "created_at",
+                    "updated_at",
+                )
+            },
+        ),
+        (
+            _("Totals"),
+            {
+                "fields": (
+                    "subtotal",
+                    "total_vat",
+                    "total",
+                    "currency",
+                    "vat_breakdown",
+                )
+            },
+        ),
+        (
+            _("Snapshots"),
+            {
+                "fields": ("seller_snapshot", "buyer_snapshot"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("myDATA (AADE)"),
+            {
+                "fields": (
+                    "mydata_status",
+                    "mydata_invoice_type",
+                    "mydata_series",
+                    "mydata_aa",
+                    "mydata_uid",
+                    "mydata_mark",
+                    "mydata_qr_url",
+                    "mydata_authentication_code",
+                    "mydata_cancellation_mark",
+                    "mydata_error_code",
+                    "mydata_error_message",
+                    "mydata_submitted_at",
+                    "mydata_confirmed_at",
+                ),
+                "classes": ("collapse",),
+                "description": _(
+                    "Populated by the automated submission pipeline "
+                    "(``order.mydata``). Read-only — edit master data "
+                    "(seller / buyer / VAT rates) and use the Order "
+                    "admin's 'Send to myDATA' action to regenerate."
+                ),
+            },
+        ),
+    )
 
     def has_add_permission(self, request):
         return False
@@ -1955,6 +2138,69 @@ class InvoiceAdmin(ModelAdmin):
             'rounded-full hover:underline">'
             "📄 Download"
             "</a>"
+        )
+        return mark_safe(html)
+
+    @admin.display(description=_("myDATA"))
+    def mydata_status_badge(self, obj):
+        """One-glance myDATA lifecycle state — colour-coded."""
+        # Each state maps to a distinct colour so ops can scan the
+        # changelist and spot REJECTED rows instantly. Strings kept
+        # inline (not via a helper) so the HTML is auditable in one
+        # place.
+        from order.models.invoice import MyDataStatus
+
+        state_config = {
+            MyDataStatus.NOT_SENT: {
+                "bg": "bg-gray-50 dark:bg-gray-900",
+                "text": "text-gray-700 dark:text-gray-300",
+                "icon": "—",
+                "label": "—",
+            },
+            MyDataStatus.PENDING: {
+                "bg": "bg-blue-50 dark:bg-blue-900",
+                "text": "text-blue-700 dark:text-blue-300",
+                "icon": "⏳",
+                "label": "Queued",
+            },
+            MyDataStatus.SUBMITTED: {
+                "bg": "bg-indigo-50 dark:bg-indigo-900",
+                "text": "text-indigo-700 dark:text-indigo-300",
+                "icon": "↗",
+                "label": "Submitted",
+            },
+            MyDataStatus.CONFIRMED: {
+                "bg": "bg-green-50 dark:bg-green-900",
+                "text": "text-green-700 dark:text-green-300",
+                "icon": "✓",
+                "label": "Confirmed",
+            },
+            MyDataStatus.REJECTED: {
+                "bg": "bg-red-50 dark:bg-red-900",
+                "text": "text-red-700 dark:text-red-300",
+                "icon": "✗",
+                "label": "Rejected",
+            },
+            MyDataStatus.CANCELED: {
+                "bg": "bg-yellow-50 dark:bg-yellow-900",
+                "text": "text-yellow-700 dark:text-yellow-300",
+                "icon": "🚫",
+                "label": "Canceled",
+            },
+        }
+        cfg = state_config.get(
+            obj.mydata_status, state_config[MyDataStatus.NOT_SENT]
+        )
+        mark_suffix = ""
+        if obj.mydata_mark:
+            mark_suffix = f' <span class="ml-1 text-[10px] opacity-75">#{obj.mydata_mark}</span>'
+        html = (
+            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            f'{cfg["bg"]} {cfg["text"]} rounded-full gap-1">'
+            f"<span>{cfg['icon']}</span>"
+            f"<span>{conditional_escape(cfg['label'])}</span>"
+            f"{mark_suffix}"
+            "</span>"
         )
         return mark_safe(html)
 

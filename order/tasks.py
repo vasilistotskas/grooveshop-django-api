@@ -553,11 +553,22 @@ def generate_order_invoice(self, order_id: int) -> bool:
     logger.info(
         "Invoice %s ready for order #%s", invoice.invoice_number, order_id
     )
-    # Only attempt the email if the PDF was actually rendered — an
-    # Invoice row without a file would just produce an empty
-    # attachment. The email task is itself idempotent via a metadata
-    # flag so chaining here is safe across retries.
-    if invoice.has_document():
+    if not invoice.has_document():
+        # An Invoice row without a file would just produce an empty
+        # attachment / unusable myDATA submission. Bail out — the
+        # next retry or an admin regeneration will re-trigger the chain.
+        return True
+
+    # Chain to myDATA submission when enabled; that task chains the
+    # email itself once the MARK is persisted (so the attached PDF
+    # carries the AADE MARK + QR). When myDATA is off or auto-submit
+    # is disabled, email fires directly as before.
+    from order.mydata.config import load_config as _load_mydata_config
+
+    mydata_config = _load_mydata_config()
+    if mydata_config.is_ready() and mydata_config.auto_submit:
+        send_invoice_to_mydata.delay(order_id)
+    else:
         send_invoice_email.delay(order_id)
     return True
 
@@ -699,6 +710,187 @@ def send_invoice_email(self, order_id: int) -> bool:
         if reserved_this_call:
             _release_invoice_email(order_id)
         return False
+
+
+@shared_task(bind=True, max_retries=5, default_retry_delay=120)
+def send_invoice_to_mydata(self, order_id: int) -> bool:
+    """Submit the order's invoice to AADE myDATA.
+
+    Chained from :func:`generate_order_invoice` once the PDF is
+    rendered AND the myDATA integration is enabled + auto-submit.
+    On success: persists MARK + ``qr_url`` on the invoice, regenerates
+    the PDF (so the final customer artifact carries the MARK + AADE-
+    returned QR code), then chains :func:`send_invoice_email`.
+
+    Retries transport-level failures with the SAME ``uid`` — AADE
+    dedupes via error 228 so retries are idempotent. Terminal
+    validation errors short-circuit to the email step with the
+    pre-transmission PDF so the buyer still gets an invoice even
+    when AADE rejected ours (ops reconciles via the REJECTED state
+    in admin).
+    """
+    from order.invoicing import generate_invoice
+    from order.mydata import (
+        MyDataAuthError,
+        MyDataDuplicateError,
+        MyDataError,
+        MyDataTransportError,
+        MyDataValidationError,
+        submit_invoice,
+    )
+
+    try:
+        order = Order.objects.select_related(
+            "user", "country", "region", "pay_way"
+        ).get(id=order_id)
+    except Order.DoesNotExist:
+        logger.error(
+            "Could not submit invoice to myDATA - Order #%s not found",
+            order_id,
+        )
+        return False
+
+    invoice = getattr(order, "invoice", None)
+    if invoice is None or not invoice.has_document():
+        logger.warning(
+            "myDATA submission skipped for order #%s — invoice PDF not ready",
+            order_id,
+        )
+        send_invoice_email.delay(order_id)
+        return False
+
+    try:
+        response = submit_invoice(invoice)
+    except (MyDataTransportError, MyDataDuplicateError) as exc:
+        # Retryable / reconcilable. Celery's retry raises
+        # ``Retry`` internally so the return below is unreachable on
+        # non-terminal attempts — but keeps the type stable.
+        logger.warning(
+            "myDATA submission retryable failure for order #%s: %s",
+            order_id,
+            exc,
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc) from exc
+        # Out of retries — fall through to email so the buyer still
+        # gets the pre-transmission PDF; REJECTED state already
+        # persisted by ``submit_invoice``.
+        send_invoice_email.delay(order_id)
+        return False
+    except (MyDataValidationError, MyDataAuthError) as exc:
+        logger.error(
+            "myDATA submission terminal failure for order #%s (code=%s): %s",
+            order_id,
+            exc.code,
+            exc.message,
+        )
+        OrderHistory.log_note(
+            order=order,
+            note=f"myDATA rejected invoice {invoice.invoice_number}: "
+            f"{exc.code} {exc.message}",
+        )
+        send_invoice_email.delay(order_id)
+        return False
+    except MyDataError as exc:
+        # Catch-all for future subclasses we haven't branched on yet.
+        logger.error(
+            "myDATA submission unexpected error for order #%s: %s",
+            order_id,
+            exc,
+        )
+        send_invoice_email.delay(order_id)
+        return False
+
+    if response is None:
+        # Integration disabled mid-flight — deliver the pre-transmission
+        # PDF rather than leaving the order stuck.
+        send_invoice_email.delay(order_id)
+        return True
+
+    # Success: MARK + qr_url persisted. Re-render the PDF so the
+    # version the customer downloads carries the authoritative AADE
+    # QR (served from AADE's verification portal). ``force=True``
+    # preserves ``invoice_number`` + ``issue_date`` (no counter gap).
+    try:
+        generate_invoice(order, force=True)
+    except Exception as exc:  # noqa: BLE001 — never block the email
+        logger.error(
+            "Failed to re-render PDF with MARK for order #%s: %s",
+            order_id,
+            exc,
+            exc_info=True,
+        )
+
+    OrderHistory.log_note(
+        order=order,
+        note=f"Invoice {invoice.invoice_number} registered with myDATA "
+        f"(MARK={response.invoice_mark})",
+    )
+    send_invoice_email.delay(order_id)
+    return True
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+def cancel_mydata_invoice(self, order_id: int) -> bool:
+    """Send a ``CancelInvoice`` for the order's registered invoice.
+
+    Fails fast when there is no MARK — cancelling a document that
+    was never transmitted is a no-op, not an error. Only used from
+    the admin action today; automatic cancellation (e.g. on order
+    refund) is not wired until Tier B.
+    """
+    from order.mydata import (
+        MyDataError,
+        MyDataTransportError,
+        cancel_invoice as _cancel,
+    )
+
+    try:
+        order = Order.objects.select_related("user").get(id=order_id)
+    except Order.DoesNotExist:
+        logger.error(
+            "Could not cancel myDATA invoice - Order #%s not found", order_id
+        )
+        return False
+
+    invoice = getattr(order, "invoice", None)
+    if invoice is None or not invoice.mydata_mark:
+        logger.warning(
+            "myDATA cancellation skipped for order #%s — no MARK on file",
+            order_id,
+        )
+        return False
+
+    try:
+        response = _cancel(invoice)
+    except MyDataTransportError as exc:
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc) from exc
+        logger.error(
+            "myDATA cancellation exhausted retries for order #%s: %s",
+            order_id,
+            exc,
+        )
+        return False
+    except MyDataError as exc:
+        logger.error(
+            "myDATA cancellation terminal failure for order #%s: %s",
+            order_id,
+            exc,
+        )
+        return False
+
+    if response is None:
+        # Integration disabled — treat as no-op success so the admin
+        # action doesn't loop on retries.
+        return True
+
+    OrderHistory.log_note(
+        order=order,
+        note=f"Invoice {invoice.invoice_number} cancelled in myDATA "
+        f"(cancellation MARK={response.cancellation_mark})",
+    )
+    return True
 
 
 @shared_task(

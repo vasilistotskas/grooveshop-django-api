@@ -27,6 +27,7 @@ def dashboard_callback(request, context):
     )
     context.update(data)
     context["seller_config_warnings"] = _check_seller_config()
+    context["mydata_warnings"] = _check_mydata_state()
     return context
 
 
@@ -58,6 +59,51 @@ def _check_seller_config() -> list[dict]:
         if not value:
             warnings.append({"key": key, "label": label})
     return warnings
+
+
+def _check_mydata_state() -> dict:
+    """Compile myDATA-specific alert state for the dashboard banner.
+
+    Two conditions we flag loud:
+    1. Integration enabled but credentials missing — submissions will
+       fail on every attempt.
+    2. Recent rejections (last 7 days) — operator needs to reconcile
+       master data. A REJECTED invoice is an unhappy customer + a
+       missing tax registration, so quiet failure is not acceptable.
+    """
+    from datetime import timedelta
+
+    from extra_settings.models import Setting
+
+    from order.models.invoice import Invoice, MyDataStatus
+
+    enabled = bool(Setting.get("MYDATA_ENABLED", default=False))
+    user_id = str(Setting.get("MYDATA_USER_ID", default="") or "")
+    subscription_key = str(
+        Setting.get("MYDATA_SUBSCRIPTION_KEY", default="") or ""
+    )
+    environment = str(Setting.get("MYDATA_ENVIRONMENT", default="dev") or "dev")
+
+    missing_creds: list[str] = []
+    if enabled and not user_id:
+        missing_creds.append("MYDATA_USER_ID")
+    if enabled and not subscription_key:
+        missing_creds.append("MYDATA_SUBSCRIPTION_KEY")
+
+    recent_rejected = 0
+    if enabled:
+        week_ago = timezone.now() - timedelta(days=7)
+        recent_rejected = Invoice.objects.filter(
+            mydata_status=MyDataStatus.REJECTED,
+            updated_at__gte=week_ago,
+        ).count()
+
+    return {
+        "enabled": enabled,
+        "environment": environment,
+        "missing_creds": missing_creds,
+        "recent_rejected": recent_rejected,
+    }
 
 
 def _build_dashboard_data():

@@ -23,6 +23,63 @@
 
 {% block content %}
 <div class="flex flex-col gap-6">
+    {# myDATA alert: integration enabled but misconfigured or recent rejections #}
+    {% if mydata_warnings.enabled %}
+        {% if mydata_warnings.missing_creds %}
+        <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
+            <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-red-600 dark:text-red-300 flex-shrink-0">cloud_off</span>
+                <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
+                        {% trans "myDATA integration is enabled but credentials are missing" %}
+                    </h3>
+                    <p class="text-sm text-red-800 dark:text-red-200 mb-2">
+                        {% trans "Every submission to AADE will fail until these are filled in via Settings." %}
+                    </p>
+                    <ul class="text-sm text-red-800 dark:text-red-200 list-disc ml-5 mb-3">
+                        {% for key in mydata_warnings.missing_creds %}
+                        <li><code class="text-xs px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/60">{{ key }}</code></li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{% url 'admin:extra_settings_setting_changelist' %}?q=MYDATA_"
+                       class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:underline">
+                        {% trans "Fix in Settings" %}
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% if mydata_warnings.recent_rejected %}
+        <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4">
+            <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-amber-600 dark:text-amber-300 flex-shrink-0">warning</span>
+                <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                        {% blocktrans count counter=mydata_warnings.recent_rejected %}{{ counter }} invoice rejected by myDATA in the last 7 days{% plural %}{{ counter }} invoices rejected by myDATA in the last 7 days{% endblocktrans %}
+                    </h3>
+                    <p class="text-sm text-amber-800 dark:text-amber-200 mb-3">
+                        {% trans "Each REJECTED row represents an unshipped tax registration. Open the invoice admin, read the error code, fix the root cause (master data / VAT / buyer ΑΦΜ), and resubmit via the order's 'Send to myDATA' action." %}
+                    </p>
+                    <a href="{% url 'admin:order_invoice_changelist' %}?mydata_status__exact=REJECTED"
+                       class="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 hover:underline">
+                        {% trans "Review rejected invoices" %}
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% if mydata_warnings.environment == 'dev' and not mydata_warnings.missing_creds %}
+        <div class="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-3">
+            <div class="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200">
+                <span class="material-symbols-outlined text-blue-600 dark:text-blue-300 text-base!">science</span>
+                <span>{% trans "myDATA is pointing at the AADE sandbox (dev). Switch MYDATA_ENVIRONMENT to 'prod' when ready." %}</span>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+
     {# Seller-config alert: empty required INVOICE_SELLER_* settings #}
     {% if seller_config_warnings %}
     <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">

@@ -3,6 +3,229 @@
 
 
 
+## v1.105.0 (2026-04-22)
+
+### Bug fixes
+
+* fix(invoicing): register humanize and update stale invoice task tests
+
+Adds django.contrib.humanize to INSTALLED_APPS so the invoice template's
+{% load humanize %} tag resolves. Rewrites two stale tests that asserted
+NotImplementedError against generate_order_invoice — the task is now
+fully implemented, so the tests verify successful PDF generation with
+_render_pdf_bytes mocked out.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0228ac8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0228ac85d91b595c09a351822cbe740d4f26739b))
+
+* fix(auth): pin allauth user code format to 6-digit numeric
+
+django-allauth 65.15.0 changed the default ALLAUTH_USER_CODE_FORMAT to
+8-char dashed alphanumeric (RFC 8628), producing codes like SGKC-HSZJ,
+while the Nuxt frontend's UPinInput is fixed at 6-digit numeric in both
+the verify-email page and the login-by-code confirm form. Emails were
+being sent with the new format and users could not complete signup.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2a5cd33`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2a5cd33501318e612fa0c6369ee4569d2d97270c))
+
+* fix(backend): plaintext notifications + per-action filterset dispatch
+
+Two live-testing bugs fixed:
+
+1. Notification messages leaked HTML (<a href='…'>name</a>) into the
+   bell/page UI because the frontend renders them via text interpolation,
+   not v-html. Dropped the anchor tags from every translation body in
+   product.tasks (RESTOCK_FAVOURITE, PRICE_DROP_FAVOURITE) and
+   blog.tasks (COMMENT_LIKED); navigation uses Notification.link, which
+   the card wraps as a single tap target.
+
+2. UserAccountViewSet's per-action filtersets (orders, favourite
+   products, reviews, addresses, blog comments, liked posts,
+   notifications, subscriptions) were *all* silently unapplied. django-
+   filter's DjangoFilterBackend reads view.filterset_class via getattr,
+   not by calling get_filterset_class(), so an override method bound
+   nothing. Replaced with an _action_filter_map attribute and overrode
+   filter_queryset() to materialise the correct class onto the instance
+   before DRF's filter chain runs. Visible symptom: /account/notifications
+   seen vs unseen tabs returned identical data.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1c62f31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c62f3145053d60f44499ac83b75fc6d5e26402c))
+
+* fix(order): allow null country/region on OrderSerializer, matching the model
+
+``Order.country`` and ``Order.region`` are both ``on_delete=SET_NULL,
+null=True, blank=True``. The serializer's ``PrimaryKeyRelatedField``
+defaults to ``allow_null=False``, which made the generated OpenAPI
+schema type them as required strings. Real orders with a null region
+(e.g. imported from a legacy system with no region linked) then
+tripped the Nuxt layer's Zod validation on ``parseDataAs(response,
+zListMyOrdersResponse)`` with ``Invalid input: expected string,
+received null``, turning the entire orders-list endpoint into a 500 on
+the client side. Surfaced by the chrome-mcp smoke test of the
+/account/orders page.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`85fc282`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85fc28204bdabe2c5c287b380570d8ecd7ce99e4))
+
+### Chores
+
+* chore(dev): add mailpit to infra compose for local email testing
+
+Runs a local SMTP server on :1025 with a web UI at :8025 so developers
+can preview signup/verification/password-reset emails rendered as real
+mail clients would decode them, instead of reading MIME-encoded output
+from the console backend.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d1cd163`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1cd16398786cde78e36996c7711c79ce2a83d14))
+
+### Features
+
+* feat(gdpr): async data export + right-to-erasure with order retention
+
+New UserDataExport model tracks async export jobs. A POST to
+/user/account/{id}/request_data_export queues ``export_user_data_task``
+which compiles every user-linked row into a JSON file and emails a
+one-off 7-day download link (``data_export_ready`` template, rendered
+under the user's preferred locale via translation.override). The
+download endpoint is token-auth'd, not session-auth'd — recipients
+open the link from email clients that may not have cookies.
+
+Right-to-erasure POST to /user/account/{id}/delete_account requires
+``{"confirmation": "DELETE"}`` then queues ``delete_user_account_task``.
+The service anonymises Order rows (email, names, address, phone blanked
+and user FK nulled) so tax/invoice retention survives; everything else
+— product alerts, favourites, reviews, blog comments, Knox tokens,
+allauth EmailAddress/SocialAccount/Authenticator/UserSession, the User
+row itself — is hard-deleted inside a single transaction so a partial
+failure rolls back to a consistent state.
+
+Exports are written to MEDIA_ROOT/_gdpr_exports/ (bind-mounted, shared
+between backend + celery_worker) rather than the sibling _private tree
+the invoice pattern uses — the private tree is not volume-shared in
+dev. Production deploys hitting S3 go through PrivateMediaStorage with
+signed URLs; the download view is still single-scope to one token.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`80eb896`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80eb8960cb47a1dc0e78797a22d1edb7017f3eff))
+
+* feat(invoicing): PDF invoice generation with atomic per-year sequencing
+
+- New Invoice + InvoiceCounter models. The counter hands out the next
+  sequential number per fiscal year under ``select_for_update`` — Greek
+  tax law forbids gaps and the counter is the only source of truth.
+  Invoice stores the PDF in private media plus a frozen vat_breakdown,
+  seller_snapshot, and buyer_snapshot so re-rendering an old invoice
+  in a later year always yields the same VAT table even if product
+  rates or the buyer's profile changed.
+- order/invoicing.py service: _compute_vat_breakdown aggregates items
+  by VAT rate (backs VAT out of gross prices so 24/13/6/0 buckets
+  balance), _build_context isolates template data so tests can assert
+  it without invoking WeasyPrint, and generate_invoice() is
+  idempotent — calling twice returns the existing row.
+- Seller info (AFM / registration / address) comes from
+  extra_settings.Setting keys so ops can configure without a migration.
+- core/templates/invoices/invoice.html — Greek-tax-compliant layout:
+  seller + VAT ID header, buyer block, line items with per-item VAT%,
+  per-rate VAT breakdown table, totals including shipping and payment
+  method fee.
+- generate_order_invoice task reimplemented to call the service;
+  handle_order_completed now dispatches the task on transaction commit
+  when document_type=INVOICE.
+- GET /api/v1/order/{id}/invoice action returns InvoiceDownloadResponse
+  (metadata + short-lived signed URL); 404s when the PDF has not been
+  generated yet. has_invoice flag added to OrderDetail so the frontend
+  can hide the download CTA without an extra round-trip.
+- Dockerfile adds cairo/pango/gdk-pixbuf/libffi to both the builder
+  (build-time) and the production runtime image (dlopen targets).
+- pyproject.toml / uv.lock pick up weasyprint 68.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ef3dd00`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ef3dd00340b3445373bf64e0b2002752364766ad))
+
+* feat(notifications): add live notifications across order, payment, shipment, stock and loyalty events
+
+- notification/services.py helper (create_user_notification) replaces
+  ~30 LOC of boilerplate across blog and product tasks.
+- NotificationTypeEnum catalogues all 14 fine-grained event identifiers
+  so the frontend gets a typed union via OpenAPI — no more hardcoded
+  "order_shipped" / "price_drop_favourite" strings.
+- order/notifications.py covers order_created, status transitions
+  (processing/shipped/delivered/completed/canceled), shipment
+  dispatched, refund, and Stripe payment succeeded/failed — each
+  dispatched via transaction.on_commit from its signal handler.
+- New signals: order_shipment_dispatched (with pre/post-save caching of
+  tracking fields; guards against duplicate fire when an admin clears
+  and re-enters the same tracking number) and loyalty_tier_changed
+  (with direction kwarg so downgrades stay silent).
+- Back-in-stock live fan-out to product favouriters; complements the
+  existing opt-in ProductAlert email path.
+- OrderCancellationError now surfaces as 400 ValidationError so the
+  frontend's conflict-aware retry UX triggers correctly.
+- WebSocket payload carries id/category/priority/notification_type so
+  the client can pick colours and icons without a re-fetch.
+- NotificationUserSerializer split: detail includes nested Notification
+  for list rendering; write path still takes integer FKs.
+- /user/account/{id}/notifications action exposes the ``seen`` filter
+  via @extend_schema so the generated Zod schema advertises it — no
+  local schema overrides in the Nuxt layer.
+- ENUM_NAME_OVERRIDES resolves the NotificationCategory vs
+  SubscriptionTopic.TopicCategory collision that was renaming the
+  latter to CategoryB9dEnum on every regeneration.
+- Abandoned-cart email now links to /cart/recover/{cart.uuid} so the
+  Nuxt side can show a welcome-back banner.
+- Test fixture fix: NotificationStatusFilter lookups assert under
+  translation.override("en") instead of the test env's default Greek.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9989c46`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9989c46092724d861c531884742ea7226f7860fc))
+
+### Testing
+
+* test(order,notifications): tests + two regression fixes surfaced by them
+
+Adds test coverage for the live-notifications + invoicing slices I
+shipped without tests earlier. Two real bugs surfaced and are fixed as
+part of this commit:
+
+- **Loyalty signals referenced ``LoyaltyTier.level``** which doesn't
+  exist — the model field is ``required_level``. Left uncaught, every
+  tier transition would have crashed ``dispatch_tier_changed`` and
+  silently never sent the celebratory notification. Writing the
+  ``test_direction_up_fires_notification_task`` test was how this
+  surfaced.
+- **Dockerfile missing runtime fonts** — WeasyPrint's Pango backend
+  needs actual TTF files on the filesystem. Without them the production
+  image raised ``pango_font_describe: assertion 'font != NULL'``
+  criticals and rendered empty PDFs. Added ``ttf-dejavu``,
+  ``font-noto``, ``font-noto-cjk``, and ``fontconfig`` to the runtime
+  layer. Verified end-to-end via
+  ``docker run ... weasyprint ... Γειά σας`` — 6 KB valid PDF with
+  ``%PDF-1.7`` magic.
+
+New tests:
+- ``tests/unit/notification/test_services.py`` — ``create_user_notification``
+  contract (kind/category/priority/link propagation, unsupported-language
+  skip, empty-copy skip, ``@transaction.atomic`` rollback on mid-loop
+  translation failure, per-language fan-out).
+- ``tests/unit/order/test_invoicing.py`` — ``InvoiceCounter.allocate``
+  sequential + threaded-concurrent allocation (no duplicates, no gaps),
+  ``_compute_vat_breakdown`` single/mixed/no-VAT buckets,
+  ``_order_totals`` shipping + payment-fee addition,
+  ``generate_invoice`` idempotency + force-refresh snapshot behaviour.
+- ``tests/unit/order/test_shipment_signal.py`` — initial null→set dispatch,
+  no-refire on re-save with same tracking (the ``tracking_unchanged``
+  guard), refire after clear-then-set (legitimate new-shipment event),
+  loyalty tier direction up/down/same gating.
+- ``tests/integration/order/test_cancel_and_invoice_views.py`` —
+  ``OrderCancellationError`` → 400 (not 500) contract, invoice endpoint
+  404 when no PDF / row with no file, 200 with signed URL when PDF
+  exists, other-user forbidden.
+
+Other collateral:
+- Added ``invoice`` and ``reorder`` to ``owner_or_admin_actions`` in
+  ``OrderViewSet.get_permissions`` — without this, the new invoice
+  endpoint fell to the ``IsAdminUser`` fallback and returned 403 for
+  legitimate order owners.
+- Ignored ``/mediafiles_private/`` (dev-time fallback for private
+  storage when not using AWS).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e933099`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e93309904ea8e70db93343369d9816b1bbdcd85f))
+
 ## v1.104.1 (2026-04-21)
 
 ### Bug fixes

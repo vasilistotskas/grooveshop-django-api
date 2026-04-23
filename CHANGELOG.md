@@ -3,6 +3,29 @@
 
 
 
+## v1.109.1 (2026-04-23)
+
+### Bug fixes
+
+* fix(schema): resolve documentType enum collision in OpenAPI
+
+Order.document_type (6 values: full OrderDocumentTypeEnum) and
+OrderCreateFromCartSerializer.document_type (2 values: RECEIPT|INVOICE)
+both serialise as ``documentType``, so drf-spectacular was collapsing
+them under an auto-generated ``DocumentType128Enum`` name that churned
+on every regeneration and bled into the frontend types.
+
+- Extract the creation-time subset into a dedicated
+  ``OrderCreateDocumentTypeEnum`` TextChoices class so the two choice
+  sets have distinct source identities.
+- Wire the serializer to the new class (``choices=...`` + default).
+- Add both enums to ``ENUM_NAME_OVERRIDES`` so they surface as the
+  stable ``OrderDocumentType`` / ``OrderCreateDocumentType`` schemas.
+
+``uv run python manage.py spectacular`` now runs with zero warnings.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`8543b10`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8543b103aa6b89468e8d4c442aee47d2d3c9d593))
+
 ## v1.109.0 (2026-04-23)
 
 ### Bug fixes

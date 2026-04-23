@@ -22,6 +22,7 @@ orchestrate those.
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 import uuid
 from datetime import timedelta
@@ -37,6 +38,28 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 EXPORT_TTL = timedelta(days=7)
+
+
+def get_export_location() -> str:
+    """Return the filesystem directory where GDPR export JSONs live.
+
+    Uses the private-media tree (``PRIVATE_MEDIA_ROOT`` or
+    ``MEDIA_ROOT + "_private"``) so the celery worker and backend pods
+    share a writable volume — in the K8s deployment ``mediafiles_private``
+    is the only PVC mounted into both containers. Using the public
+    ``MEDIA_ROOT`` would fail: that path is a container-local, read-only
+    directory on the worker.
+
+    Matches the pattern used by ``order.models.invoice`` for PDFs.
+    """
+    base = getattr(
+        settings,
+        "PRIVATE_MEDIA_ROOT",
+        (settings.MEDIA_ROOT + "_private")
+        if settings.MEDIA_ROOT
+        else "private_media",
+    )
+    return os.path.join(base, "_gdpr_exports")
 
 
 def _serialize_money(value: Any) -> dict[str, Any] | None:

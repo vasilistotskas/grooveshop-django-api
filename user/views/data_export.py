@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import os
 
-from django.conf import settings
 from django.http import FileResponse, Http404
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -21,6 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from user.models.data_export import UserDataExport
+from user.services.gdpr import get_export_location
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +63,7 @@ class UserDataExportDownloadView(APIView):
                 status=410,
             )
 
-        location = os.path.join(
-            settings.MEDIA_ROOT or "mediafiles", "_gdpr_exports"
-        )
-        abs_path = os.path.join(location, export.file_path)
+        abs_path = os.path.join(get_export_location(), export.file_path)
         if not os.path.exists(abs_path):
             logger.error(
                 "Export %s is READY but file missing at %s",

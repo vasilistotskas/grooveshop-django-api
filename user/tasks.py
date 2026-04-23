@@ -107,7 +107,11 @@ def export_user_data_task(self, export_id: int) -> dict:
 
     from core.utils.i18n import get_user_language
     from user.models.data_export import UserDataExport
-    from user.services.gdpr import EXPORT_TTL, compile_user_data
+    from user.services.gdpr import (
+        EXPORT_TTL,
+        compile_user_data,
+        get_export_location,
+    )
 
     try:
         export = UserDataExport.objects.select_related("user").get(id=export_id)
@@ -125,15 +129,15 @@ def export_user_data_task(self, export_id: int) -> dict:
             "utf-8"
         )
 
-        # Write under ``MEDIA_ROOT/_gdpr_exports/`` — the bind-mounted
-        # ``mediafiles`` volume so backend + celery_worker see the same
-        # bytes without adding a separate shared volume. Never served
-        # by the Django media view directly: the only way to reach
-        # these files is through the signed-token download endpoint,
-        # and Django's ``MEDIA_URL`` handler is disabled outside DEBUG.
-        location = os.path.join(
-            settings.MEDIA_ROOT or "mediafiles", "_gdpr_exports"
-        )
+        # Write under ``PRIVATE_MEDIA_ROOT/_gdpr_exports/`` — the
+        # ``mediafiles_private`` shared PVC is the only writable path
+        # mounted into both backend + celery_worker pods. Public
+        # ``MEDIA_ROOT`` is a read-only container-local dir on the
+        # worker, so writing there raises PermissionError. These files
+        # are never served by the Django media view directly: the only
+        # way to reach them is through the signed-token download
+        # endpoint in ``user/views/data_export.py``.
+        location = get_export_location()
         storage = FileSystemStorage(location=location)
 
         rel_path = f"{user.id}/{export.token}.json"

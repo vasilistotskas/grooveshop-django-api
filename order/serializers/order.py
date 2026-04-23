@@ -465,13 +465,25 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         return cleaned
 
     def validate(self, attrs):
-        """Cross-field rule: ``document_type=INVOICE`` ⇒ need
-        ``billing_vat_id``. Enforced here so the API never accepts
-        an invoice-tagged order without the buyer VAT — otherwise
-        the myDATA submission would either silently downgrade to
-        11.1 (tax-fraud-adjacent) or hard-fail at the worker."""
+        """Cross-field rules for B2B invoicing.
+
+        1. ``B2B_INVOICING_ENABLED`` gates the feature site-wide — when
+           off, ``document_type=INVOICE`` is rejected so the API can't
+           be bypassed via direct calls while the UI hides the toggle.
+        2. ``document_type=INVOICE`` ⇒ ``billing_vat_id`` required.
+           Otherwise the myDATA submission would silently downgrade to
+           11.1 (tax-fraud-adjacent) or hard-fail at the worker.
+        """
+        from extra_settings.models import Setting
+
         document_type = attrs.get("document_type", "RECEIPT")
         billing_vat_id = attrs.get("billing_vat_id", "")
+        if document_type == "INVOICE" and not Setting.get(
+            "B2B_INVOICING_ENABLED", default=True
+        ):
+            raise serializers.ValidationError(
+                {"document_type": _("B2B invoicing is currently disabled.")}
+            )
         if document_type == "INVOICE" and not billing_vat_id:
             raise serializers.ValidationError(
                 {

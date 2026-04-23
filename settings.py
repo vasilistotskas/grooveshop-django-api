@@ -908,6 +908,11 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": 30,
     },
     {
+        "name": "B2B_INVOICING_ENABLED",
+        "type": "bool",
+        "value": True,
+    },
+    {
         "name": "ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES",
         "type": "int",
         "value": 30,

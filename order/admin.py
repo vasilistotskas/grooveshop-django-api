@@ -13,6 +13,7 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
+    RangeDateFilter,
     RangeDateTimeFilter,
     RangeNumericListFilter,
     RelatedDropdownFilter,
@@ -1985,7 +1986,10 @@ class InvoiceAdmin(ModelAdmin):
         "mydata_status_badge",
     )
     list_filter = (
-        ("issue_date", RangeDateTimeFilter),
+        # ``Invoice.issue_date`` is a ``DateField`` (no time
+        # component) — ``RangeDateTimeFilter`` raises TypeError on
+        # DateField, hence the Date-only variant here.
+        ("issue_date", RangeDateFilter),
         HasDocumentFilter,
         "mydata_status",
     )

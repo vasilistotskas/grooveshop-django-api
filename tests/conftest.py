@@ -176,6 +176,32 @@ def _django_clear_cache(request):
             pass
 
 
+@pytest.fixture(autouse=True)
+def _reseed_extra_settings(request):
+    """Ensure ``EXTRA_SETTINGS_DEFAULTS`` rows exist before every DB test.
+
+    ``django-extra-settings`` seeds its rows via a ``post_migrate`` signal
+    that only fires at DB creation. Tests marked
+    ``@pytest.mark.django_db(transaction=True)`` (e.g. concurrent stock
+    tests) flush every table on teardown, wiping the ``Setting`` rows.
+    A subsequent test calling ``Setting.get("STOCK_RESERVATION_TTL_MINUTES")``
+    would hit an empty DB and fall back to the code-level default
+    (``StockManager.RESERVATION_TTL_MINUTES_DEFAULT = 15``) instead of
+    the configured 30, producing intermittent assertion failures in
+    ``tests/integration/order/test_stock_reservation_ttl.py``.
+
+    ``set_defaults_from_settings`` calls ``get_or_create`` per entry —
+    cheap no-op when rows are intact, restorative when they are not.
+    """
+    if request.node.get_closest_marker("django_db"):
+        try:
+            from extra_settings.models import Setting
+
+            Setting.set_defaults_from_settings()
+        except Exception:
+            pass
+
+
 @pytest.fixture
 def count_queries():
     class QueryCounter:

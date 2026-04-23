@@ -3,6 +3,104 @@
 
 
 
+## v1.109.0 (2026-04-23)
+
+### Bug fixes
+
+* fix(invoice admin): RangeDateFilter on issue_date (DateField, not DateTimeField)
+
+Invoice list (/admin/order/invoice/) 500'd with
+``TypeError: Class <class 'DateField'> is not supported for
+RangeDateTimeFilter``. Invoice.issue_date is a DateField per
+Greek tax law (no time component — only the fiscal date matters);
+Unfold's RangeDateTimeFilter hard-rejects non-DateTime columns.
+Switched to RangeDateFilter which is the Date-only variant.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9db3bac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9db3bac99f64f57169aba85aa170e67cba807ede))
+
+### Features
+
+* feat(mydata): Tier B — B2B invoiceType 1.1 with buyer ΑΦΜ
+
+Live-verified against AADE dev: submitted a real 1.1 invoice and
+got MARK 400001961706127 back with a working verification QR URL.
+Tier A (11.1 retail) flow is unchanged — all 82 existing tests
+plus 6 new Tier B regressions green.
+
+Scope — domestic Greek B2B only:
+- 1.1 (Τιμολόγιο Πώλησης) when Order.billing_vat_id is set and the
+  counterpart is GR. Intra-EU (1.2) / third-country (1.3) remain
+  out of scope per the agent research — they need reverse-charge
+  VAT exemption handling and distinct classifications.
+- The service layer short-circuits "document_type=INVOICE without a
+  billing_vat_id" with a clear REJECTED state + error code so the
+  admin surfaces the misconfiguration immediately (instead of
+  silently falling back to 11.1, which would be tax-fraud-adjacent).
+
+Data model (migration 0033, additive, blank defaults):
+  Order.billing_vat_id CharField(12)
+  Order.billing_country CharField(2)
+
+Builder:
+- _pick_invoice_type: 11.1 if no buyer VAT, 1.1 if VAT set + buyer
+  country equals issuer country. Non-GR buyer with VAT falls back
+  to 11.1 (service layer rejects upstream anyway).
+- _emit_counterpart: vatNumber + country + branch only. No <name>
+  for GR counterparts (AADE error 220 forbids it).
+- _normalise_buyer_vat strips EL/GR prefix (VIES convention) so
+  AADE doesn't reject with error 104 ("Invalid Greek VAT number").
+- Classification switches from retail pair (E3_561_003 / category1_3)
+  to wholesale (E3_561_001 / category1_1) based on invoiceType —
+  error 313 ("classification forbidden for invoice type") otherwise.
+
+Service layer:
+- New MyDataInactiveCounterpartError subclass of MyDataValidationError.
+  Fires on AADE error 102 ("Vat number is not active corporation")
+  so the Celery task can queue a customer-facing "check your ΑΦΜ"
+  email path in a follow-up, instead of a generic REJECTED notice.
+- _guard_b2b_invoice_integrity pre-check: rejects
+  document_type=INVOICE without billing_vat_id with a clear
+  MISSING_BUYER_VAT code persisted on the Invoice row.
+
+Serializer + OpenAPI:
+- OrderCreateFromCartSerializer gains billing_vat_id +
+  billing_country + document_type fields with validation:
+  - Strip EL/GR prefix, enforce 9-digit Greek ΑΦΜ.
+  - ISO-alpha2 country normalised to uppercase.
+  - Cross-field: INVOICE ⇒ billing_vat_id required.
+- schema.yml regenerated — the Nuxt side picks up billingVatId /
+  billingCountry in the auto-generated zod + types.
+
+Nuxt frontend:
+- useCheckoutForm formState gains billingVatId + billingCountry;
+  superRefine on step1Schema mirrors the Django 9-digit ΑΦΜ rule
+  with an inline error in Greek ("Το ΑΦΜ πρέπει να έχει 9 ψηφία...").
+- StepPersonalInfo.vue exposes a "Θέλω τιμολόγιο (Β2Β)" toggle that
+  reveals the ΑΦΜ field; toggling off clears the field so stray
+  values never reach the API.
+- useCheckoutSubmit forwards billingVatId / billingCountry /
+  documentType in the POST body.
+
+Tests (6 new builder regressions + existing suite updated):
+- 1.1 routing when billing_vat_id set
+- 11.1 stays 11.1 for Tier A orders
+- counterpart block present for 1.1 (vatNumber/country/branch, no name)
+- counterpart absent for 11.1
+- wholesale classification pair (E3_561_001 / category1_1) on 1.1
+- EL/GR prefix stripped before emit
+
+Pre-existing integration tests pin document_type=RECEIPT now so the
+OrderFactory's random-doctype roll doesn't intermittently trip the
+new Tier B guard.
+
+SMTP dev fix (side-item, same commit because it surfaced during
+Tier A UI testing): .env EMAIL_HOST changed from ``localhost`` to
+``mailpit`` so the celery_worker container can reach the mailpit
+SMTP service via its compose-network name. Verified: Django's
+send_mail now lands in Mailpit's http://localhost:8025 UI.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`b9ee44e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9ee44e624fd31d9d084caacda218cdf913973e3))
+
 ## v1.108.1 (2026-04-22)
 
 ### Bug fixes

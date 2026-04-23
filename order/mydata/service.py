@@ -38,10 +38,11 @@ from order.mydata.client import MyDataClient
 from order.mydata.config import load_config
 from order.mydata.exceptions import (
     MyDataDuplicateError,
+    MyDataInactiveCounterpartError,
     MyDataValidationError,
 )
 from order.mydata.parser import ResponseRow, parse_response_doc
-from order.mydata.types import ERROR_DUPLICATE_UID
+from order.mydata.types import ERROR_DUPLICATE_UID, ERROR_INACTIVE_VAT
 from order.mydata.validator import validate_invoice_doc
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,8 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
             "Fill it in via Settings admin first.",
             code="MISSING_SELLER_VAT",
         )
+
+    _guard_b2b_invoice_integrity(invoice)
 
     try:
         built = build_invoice_xml(
@@ -145,6 +148,14 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
         _persist_failure(invoice, code=code, message=message)
         raise MyDataDuplicateError(message, code=code)
 
+    if code == ERROR_INACTIVE_VAT:
+        # Buyer ΑΦΜ is not in AADE's active registry. Customer-fixable
+        # (re-enter the number), so surface a distinct exception so
+        # the task can queue a tailored "your VAT ID is invalid"
+        # email instead of the generic rejection notice.
+        _persist_failure(invoice, code=code, message=message)
+        raise MyDataInactiveCounterpartError(message, code=code)
+
     _persist_failure(invoice, code=code, message=message)
     raise MyDataValidationError(message, code=code)
 
@@ -180,6 +191,43 @@ def cancel_invoice(invoice: Any) -> ResponseRow | None:
     message = first_error.message if first_error else row.status_code
     _persist_failure(invoice, code=code, message=message)
     raise MyDataValidationError(message, code=code)
+
+
+def _guard_b2b_invoice_integrity(invoice: Any) -> None:
+    """Reject the submission early if the order-level document-type
+    and the per-Order billing-VAT fields disagree.
+
+    ``Order.document_type == INVOICE`` is the merchant-facing signal
+    that the buyer asked for a proper Τιμολόγιο Πώλησης. Without a
+    ``billing_vat_id`` we'd silently fall back to 11.1 (retail
+    receipt), which is tax-fraud-adjacent. Fail loud here so the
+    admin sees a REJECTED row with a clear message instead of an
+    11.1 submission that "quietly worked" under the wrong type.
+
+    The API serializer enforces the same rule so this branch only
+    fires when a bad row slips past (e.g. legacy order rows, or an
+    admin bulk edit that flipped ``document_type``)."""
+    from order.enum.document_type import OrderDocumentTypeEnum
+
+    order = invoice.order
+    doc_type = getattr(order, "document_type", None)
+    if doc_type != OrderDocumentTypeEnum.INVOICE.value:
+        return
+    buyer_vat = (getattr(order, "billing_vat_id", "") or "").strip()
+    if not buyer_vat:
+        _persist_failure(
+            invoice,
+            code="MISSING_BUYER_VAT",
+            message=(
+                "Order is marked as INVOICE but no billing_vat_id is set. "
+                "Either populate the buyer VAT (for B2B) or change the "
+                "document_type to RECEIPT."
+            ),
+        )
+        raise MyDataValidationError(
+            "Order requests an invoice but has no buyer VAT.",
+            code="MISSING_BUYER_VAT",
+        )
 
 
 def _resolve_issuer_vat() -> str:

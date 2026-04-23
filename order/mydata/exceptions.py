@@ -53,3 +53,16 @@ class MyDataDuplicateError(MyDataError):
     another MARK. The integration recovers by querying
     ``RequestTransmittedDocs`` and writing the existing MARK back to
     the invoice — it is not a user-facing error."""
+
+
+class MyDataInactiveCounterpartError(MyDataValidationError):
+    """AADE error ``102`` — the buyer VAT number isn't registered, is
+    registered as inactive, or belongs to a business with closed
+    fiscal presence. Distinct from generic validation errors because
+    it has a customer-visible remediation path (ask them to
+    double-check their ΑΦΜ) rather than an ops-data fix.
+
+    Subclass of ``MyDataValidationError`` so existing ``except
+    MyDataValidationError`` handlers still catch it — callers that
+    want the distinct UX branch check for the specific subclass
+    first."""

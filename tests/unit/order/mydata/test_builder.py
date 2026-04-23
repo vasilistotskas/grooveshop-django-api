@@ -279,6 +279,96 @@ class BuildInvoiceXmlTestCase(TestCase):
             zero_rows[0].find(f"{AADE_NS}vatExemptionCategory").text, "30"
         )
 
+    # ── Tier B (invoiceType 1.1 — domestic B2B) ──────────────────
+
+    def _b2b_invoice(self, billing_vat: str = "123456789"):
+        """Build a B2B-flagged invoice for routing tests."""
+        vat = VatFactory(value=24)
+        product = ProductFactory(vat=vat)
+        order = OrderFactory(
+            num_order_items=0,
+            billing_vat_id=billing_vat,
+            billing_country="GR",
+        )
+        OrderItemFactory(
+            order=order,
+            product=product,
+            price=Money(Decimal("50.00"), "EUR"),
+            quantity=1,
+        )
+        with patch(
+            "order.invoicing._render_pdf_bytes",
+            return_value=b"%PDF-1.4 test",
+        ):
+            return generate_invoice(order)
+
+    def test_b2b_order_picks_invoice_type_11(self):
+        """Regression: builder routes to 1.1 when buyer has a GR VAT.
+        Previous (Tier A) behaviour hard-coded 11.1 regardless of
+        buyer identity — flipping to 1.1 is the whole point of Tier B."""
+        built = self._build(self._b2b_invoice())
+        self.assertEqual(built.invoice_type, "1.1")
+        root = fromstring(built.xml_bytes)
+        self.assertEqual(
+            root.find(_localise("invoice/invoiceHeader/invoiceType")).text,
+            "1.1",
+        )
+
+    def test_retail_order_stays_invoice_type_111(self):
+        """Orders without billing_vat_id keep the Tier A 11.1 flow."""
+        built = self._build(self._issued_invoice())
+        self.assertEqual(built.invoice_type, "11.1")
+
+    def test_b2b_emits_counterpart_block(self):
+        """Regression: <counterpart> is REQUIRED for 1.1 (vatNumber +
+        country + branch). 11.1 must NOT emit it (error 220 for GR
+        counterpart name)."""
+        built = self._build(self._b2b_invoice(billing_vat="123456789"))
+        root = fromstring(built.xml_bytes)
+        counterpart = root.find(_localise("invoice/counterpart"))
+        self.assertIsNotNone(counterpart)
+        self.assertEqual(
+            counterpart.find(f"{AADE_NS}vatNumber").text, "123456789"
+        )
+        self.assertEqual(counterpart.find(f"{AADE_NS}country").text, "GR")
+        self.assertEqual(counterpart.find(f"{AADE_NS}branch").text, "0")
+        # AADE error 220 — GR counterpart must NOT carry a name.
+        self.assertIsNone(counterpart.find(f"{AADE_NS}name"))
+
+    def test_retail_omits_counterpart_block(self):
+        built = self._build(self._issued_invoice())
+        root = fromstring(built.xml_bytes)
+        self.assertIsNone(root.find(_localise("invoice/counterpart")))
+
+    def test_b2b_uses_wholesale_classification_combo(self):
+        """Regression: 1.1 must carry ``E3_561_001`` + ``category1_1``
+        (wholesale). The retail pair ``E3_561_003`` + ``category1_3``
+        triggers AADE error 313 on 1.1."""
+        built = self._build(self._b2b_invoice())
+        root = fromstring(built.xml_bytes)
+        cls_ns = "{https://www.aade.gr/myDATA/incomeClassificaton/v1.0}"
+        for row in root.findall(_localise("invoice/invoiceDetails")):
+            cls = row.find(f"{AADE_NS}incomeClassification")
+            self.assertEqual(
+                cls.find(f"{cls_ns}classificationType").text, "E3_561_001"
+            )
+            self.assertEqual(
+                cls.find(f"{cls_ns}classificationCategory").text,
+                "category1_1",
+            )
+
+    def test_normalises_vat_prefix_on_counterpart(self):
+        """Users routinely paste the VIES form (EL137096089) into the
+        VAT field. The builder must strip the prefix before emitting
+        so AADE doesn't reject with error 104 ("Invalid Greek VAT")."""
+        invoice = self._b2b_invoice(billing_vat="EL123456789")
+        built = self._build(invoice)
+        root = fromstring(built.xml_bytes)
+        self.assertEqual(
+            root.find(_localise("invoice/counterpart/vatNumber")).text,
+            "123456789",
+        )
+
     def test_shipping_and_payment_fee_emitted_as_detail_lines(self):
         """Regression: shipping + payment_method_fee contribute to
         invoice.total but were NOT emitted as invoiceDetails rows,

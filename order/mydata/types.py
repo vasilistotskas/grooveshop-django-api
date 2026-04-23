@@ -11,12 +11,14 @@ from __future__ import annotations
 
 # ── invoiceType: the document-kind enum ──────────────────────────
 #
-# This is a narrow whitelist for Tier A (B2C retail only). The full
-# catalogue (1.1 B2B sales, 2.x services, 5.x credit notes, 11.x
-# retail, 13.x expenses, 17.x depreciation) lives in the AADE docs;
-# add entries here as new document types are wired up.
+# Tier A wired 11.1; Tier B adds 1.1 (domestic B2B). Other invoice
+# types live in the AADE catalogue but wait for their own tier:
+# 1.2 (intra-EU), 1.3 (third-country), 2.x (services), 5.x (credit
+# notes), 13.x (expense documents), 17.x (depreciation).
 INVOICE_TYPE_B2C_RETAIL = "11.1"  # Α.Λ.Π. — retail sales receipt
-INVOICE_TYPE_B2B_SALES = "1.1"  # Τιμολόγιο Πώλησης — full invoice
+INVOICE_TYPE_B2B_SALES = "1.1"  # Τιμολόγιο Πώλησης — domestic B2B
+INVOICE_TYPE_B2B_INTRA_EU = "1.2"  # Intra-EU supply (Tier C)
+INVOICE_TYPE_B2B_THIRD_COUNTRY = "1.3"  # Export (Tier C)
 INVOICE_TYPE_CREDIT_LINKED = "5.1"  # Linked credit note
 INVOICE_TYPE_RETAIL_CREDIT = "11.4"  # Retail return / credit element
 
@@ -62,17 +64,21 @@ VAT_EXEMPTION_NO_VAT_ARTICLES = 30  # Λοιπές εξαιρέσεις ΦΠΑ
 # ── Classification types for invoiceDetails + invoiceSummary ─────
 # Every invoice MUST carry either an income or expenses classification
 # (AADE error 314 otherwise). The valid ``type``/``category`` pair is
-# specific to the invoiceType:
-#   * 11.1 (Α.Λ.Π. / retail receipt — Tier A target):
+# specific to the invoiceType; live-verified on AADE dev:
+#   * 11.1 (Α.Λ.Π. / retail receipt):
 #     ``E3_561_003`` (Πωλήσεις Λιανικές — Ιδιωτική Πελατεία) paired
-#     with ``category1_3`` (same label). Verified via AADE dev: the
-#     ``E3_561_001`` / ``category1_1`` pair triggers error 313
-#     because ``category1_1`` is Χονδρικές (wholesale / B2B).
-#   * 1.1 (B2B sales invoice — Tier B):
-#     ``E3_561_001`` + ``category1_1`` (wholesale).
-#   * 5.x / 11.4 credit notes: not implemented yet.
+#     with ``category1_3``. The ``E3_561_001`` / ``category1_1`` pair
+#     fails with error 313 because ``category1_1`` is Χονδρικές.
+#   * 1.1 (B2B sales invoice — domestic):
+#     ``E3_561_001`` (Πωλήσεις Χονδρικές — Επιτηδευματιών) paired
+#     with ``category1_1`` (sale of merchandise).
+#   * 1.2 (intra-EU supply) / 1.3 (third-country): out of Tier B scope;
+#     use ``E3_561_005`` / ``E3_561_006`` respectively when wired.
 CLASSIFICATION_TYPE_RETAIL_GOODS = "E3_561_003"
 CLASSIFICATION_CATEGORY_GOODS_SALES = "category1_3"
+
+CLASSIFICATION_TYPE_B2B_DOMESTIC = "E3_561_001"
+CLASSIFICATION_CATEGORY_B2B_MERCHANDISE = "category1_1"
 
 
 # ── AADE error codes we branch on explicitly ─────────────────────

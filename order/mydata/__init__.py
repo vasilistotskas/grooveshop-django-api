@@ -28,6 +28,7 @@ from order.mydata.exceptions import (
     MyDataAuthError,
     MyDataDuplicateError,
     MyDataError,
+    MyDataInactiveCounterpartError,
     MyDataTransportError,
     MyDataValidationError,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "MyDataAuthError",
     "MyDataDuplicateError",
     "MyDataError",
+    "MyDataInactiveCounterpartError",
     "MyDataTransportError",
     "MyDataValidationError",
     "cancel_invoice",

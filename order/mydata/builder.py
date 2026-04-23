@@ -38,8 +38,12 @@ from typing import Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 from order.mydata.types import (
+    CLASSIFICATION_CATEGORY_B2B_MERCHANDISE,
     CLASSIFICATION_CATEGORY_GOODS_SALES,
+    CLASSIFICATION_TYPE_B2B_DOMESTIC,
     CLASSIFICATION_TYPE_RETAIL_GOODS,
+    INVOICE_TYPE_B2B_SALES,
+    INVOICE_TYPE_B2C_RETAIL,
     PAYMENT_METHOD_CASH,
     PAYMENT_METHOD_POS_CARD,
     PAYMENT_METHOD_WEB_BANKING,
@@ -119,11 +123,13 @@ def _emit_detail(
     line_net: Decimal,
     line_vat: Decimal,
     rate: Decimal,
+    classification_type: str,
+    classification_category: str,
 ) -> None:
     """Append one fully-populated ``<invoiceDetails>`` row.
 
     Includes the mandatory ``<incomeClassification>`` per AADE error
-    314 (every 11.1 line needs a classification) and the
+    314 (every 11.1/1.1 line needs a classification) and the
     ``<vatExemptionCategory>`` disambiguator required when
     ``vatCategory=7`` (error 217)."""
     row = SubElement(parent, "invoiceDetails")
@@ -135,7 +141,12 @@ def _emit_detail(
         SubElement(row, "vatExemptionCategory").text = str(
             VAT_EXEMPTION_NO_VAT_ARTICLES
         )
-    _emit_income_classification(row, amount=line_net)
+    _emit_income_classification(
+        row,
+        amount=line_net,
+        classification_type=classification_type,
+        classification_category=classification_category,
+    )
 
 
 # AADE hosts the classification type + category + amount in a
@@ -145,18 +156,27 @@ def _emit_detail(
 _INCLS_NS = "https://www.aade.gr/myDATA/incomeClassificaton/v1.0"
 
 
-def _emit_income_classification(parent: Element, *, amount: Decimal) -> None:
+def _emit_income_classification(
+    parent: Element,
+    *,
+    amount: Decimal,
+    classification_type: str,
+    classification_category: str,
+) -> None:
     """Append a ``<incomeClassification>`` block. Its inner elements
     live under ``_INCLS_NS`` per AADE's schema — the outer element
     itself stays in the invoice namespace.
+
+    The ``type`` / ``category`` pair is invoiceType-specific; pass
+    the correct values from :func:`_classification_pair_for`.
     """
     cls = SubElement(parent, "incomeClassification")
     SubElement(
         cls, f"{{{_INCLS_NS}}}classificationType"
-    ).text = CLASSIFICATION_TYPE_RETAIL_GOODS
+    ).text = classification_type
     SubElement(
         cls, f"{{{_INCLS_NS}}}classificationCategory"
-    ).text = CLASSIFICATION_CATEGORY_GOODS_SALES
+    ).text = classification_category
     SubElement(cls, f"{{{_INCLS_NS}}}amount").text = _money(amount)
 
 
@@ -183,6 +203,81 @@ class BuiltInvoice:
     invoice_type: str
     series: str
     aa: int
+
+
+def _normalise_buyer_vat(raw: str) -> str:
+    """Strip optional ``EL`` / ``GR`` prefix from a Greek ΑΦΜ.
+
+    AADE rejects prefixed VATs with error 104 ("Invalid Greek VAT
+    number"), but users routinely enter the VIES form. Normalising
+    once here keeps the rest of the pipeline assumption-free."""
+    cleaned = (raw or "").strip().upper()
+    if cleaned.startswith(("EL", "GR")):
+        cleaned = cleaned[2:]
+    return cleaned.strip()
+
+
+def _pick_invoice_type(order: Any, issuer_country: str) -> str:
+    """Determine the AADE ``invoiceType`` from Order state.
+
+    Tier B supports only 11.1 (B2C retail) and 1.1 (domestic B2B).
+    Intra-EU (1.2) and third-country (1.3) are deferred to Tier C
+    because they additionally need reverse-charge VAT exemption
+    handling and classification swaps (``E3_561_005`` / ``006``).
+    """
+    buyer_vat = _normalise_buyer_vat(getattr(order, "billing_vat_id", "") or "")
+    if not buyer_vat:
+        return INVOICE_TYPE_B2C_RETAIL
+    buyer_country = (
+        (getattr(order, "billing_country", "") or "").strip().upper()
+    )
+    # An empty buyer_country defaults to the issuer's country — most
+    # GR e-commerce B2B orders leave it blank and are domestic by
+    # default.
+    effective_buyer_country = buyer_country or issuer_country.upper()
+    if effective_buyer_country == issuer_country.upper():
+        return INVOICE_TYPE_B2B_SALES
+    # Non-domestic B2B: out of scope for Tier B. Fall back to 11.1
+    # (receipt) rather than guessing 1.2/1.3 wrong. The service layer
+    # blocks ``document_type=INVOICE + foreign VAT`` upstream so this
+    # branch is defence in depth only.
+    return INVOICE_TYPE_B2C_RETAIL
+
+
+def _classification_pair_for(invoice_type: str) -> tuple[str, str]:
+    """Return the ``(classificationType, classificationCategory)``
+    that AADE requires for the given ``invoiceType``."""
+    if invoice_type == INVOICE_TYPE_B2B_SALES:
+        return (
+            CLASSIFICATION_TYPE_B2B_DOMESTIC,
+            CLASSIFICATION_CATEGORY_B2B_MERCHANDISE,
+        )
+    # Default: 11.1 retail.
+    return (
+        CLASSIFICATION_TYPE_RETAIL_GOODS,
+        CLASSIFICATION_CATEGORY_GOODS_SALES,
+    )
+
+
+def _emit_counterpart(
+    parent: Element,
+    *,
+    vat_number: str,
+    country: str,
+    issuer_country: str,
+    branch: int = 0,
+) -> None:
+    """Append a ``<counterpart>`` block for B2B invoices.
+
+    Per AADE v1.0.10 §5.1 + error 220: ``<name>`` is FORBIDDEN when
+    the counterpart country equals the issuer's (Greek party
+    emitting to a Greek party). Only vatNumber/country/branch are
+    sent for domestic B2B. Tier C will extend this for non-GR
+    counterparts that need ``<name>`` and ``<address>``."""
+    counterpart = SubElement(parent, "counterpart")
+    SubElement(counterpart, "vatNumber").text = vat_number
+    SubElement(counterpart, "country").text = country.upper()
+    SubElement(counterpart, "branch").text = str(branch)
 
 
 def _pick_payment_type(invoice: Any) -> int:
@@ -228,7 +323,8 @@ def build_invoice_xml(
     :param series_prefix: Configured series prefix; combined with the
         invoice year to form ``series``.
     """
-    invoice_type = "11.1"
+    order = invoice.order
+    invoice_type = _pick_invoice_type(order, issuer_country=issuer_country)
     year = invoice.issue_date.year
     series = f"{series_prefix}-{year}"
     # ``aa`` is the per-year sequential integer; ``InvoiceCounter``
@@ -265,8 +361,24 @@ def build_invoice_xml(
     SubElement(issuer, "country").text = issuer_country
     SubElement(issuer, "branch").text = str(branch)
 
-    # (counterpart is omitted for 11.1 retail — AADE errors 223/224
-    # forbid populating buyer identity on an ΑΛΠ.)
+    # ── counterpart (B2B only) ──────────────────────────────────
+    # 11.1 retail must NOT emit counterpart (AADE error 220 for
+    # Greek counterpart name, plus "forbidden for invoice type"
+    # errors on other counterpart fields). 1.1 B2B REQUIRES it
+    # — without vatNumber + country the invoice is malformed.
+    if invoice_type == INVOICE_TYPE_B2B_SALES:
+        buyer_vat = _normalise_buyer_vat(
+            getattr(order, "billing_vat_id", "") or ""
+        )
+        buyer_country = (
+            getattr(order, "billing_country", "") or ""
+        ).strip().upper() or issuer_country.upper()
+        _emit_counterpart(
+            invoice_el,
+            vat_number=buyer_vat,
+            country=buyer_country,
+            issuer_country=issuer_country,
+        )
 
     # ── invoiceHeader ───────────────────────────────────────────
     # Actual XSD sequence (verified via live AADE dev response): the
@@ -299,6 +411,7 @@ def build_invoice_xml(
     classification_totals: dict[tuple[str, str], Decimal] = defaultdict(
         lambda: Decimal("0")
     )
+    cls_type, cls_category = _classification_pair_for(invoice_type)
 
     line_number = 0
     for item in invoice.order.items.select_related("product__vat").all():
@@ -316,20 +429,17 @@ def build_invoice_xml(
             line_net=line_net,
             line_vat=line_vat,
             rate=rate,
+            classification_type=cls_type,
+            classification_category=cls_category,
         )
         summed_net += line_net
         summed_vat += line_vat
         summed_gross += line_net + line_vat
-        classification_totals[
-            (
-                CLASSIFICATION_TYPE_RETAIL_GOODS,
-                CLASSIFICATION_CATEGORY_GOODS_SALES,
-            )
-        ] += line_net
+        classification_totals[(cls_type, cls_category)] += line_net
 
     # Shipping + payment-method fee — customer-paid amounts that sit
     # outside ``OrderItem`` rows. Treated as VAT 24% (standard GR
-    # domestic rate). Tier B will thread through per-order overrides
+    # domestic rate). Tier C will thread through per-order overrides
     # for exports / island rates.
     for gross_decimal in _ancillary_charges(invoice.order):
         line_net, line_vat = _split_gross(gross_decimal, Decimal("24"))
@@ -340,16 +450,13 @@ def build_invoice_xml(
             line_net=line_net,
             line_vat=line_vat,
             rate=Decimal("24"),
+            classification_type=cls_type,
+            classification_category=cls_category,
         )
         summed_net += line_net
         summed_vat += line_vat
         summed_gross += line_net + line_vat
-        classification_totals[
-            (
-                CLASSIFICATION_TYPE_RETAIL_GOODS,
-                CLASSIFICATION_CATEGORY_GOODS_SALES,
-            )
-        ] += line_net
+        classification_totals[(cls_type, cls_category)] += line_net
 
     # (taxesTotals is omitted for 11.1 — only non-VAT document-level
     # taxes populate it. Leaving it out means AADE derives document-
@@ -367,11 +474,17 @@ def build_invoice_xml(
     SubElement(summary, "totalGrossValue").text = _money(summed_gross)
     # Aggregate classification block MUST mirror the sums of the
     # per-line entries by (classificationType, classificationCategory).
-    # Tier A only emits the retail-goods / category1_1 combo, so the
-    # summary has a single row — Tier B extends this when we have
-    # multiple classification buckets.
-    for _key, amount in classification_totals.items():
-        _emit_income_classification(summary, amount=amount)
+    # Tier B still emits a single combo per invoice (retail OR B2B),
+    # so this loop runs once; the data structure is ready for Tier C
+    # where mixed baskets (e.g. goods + services) will produce
+    # multiple rows.
+    for (type_code, category_code), amount in classification_totals.items():
+        _emit_income_classification(
+            summary,
+            amount=amount,
+            classification_type=type_code,
+            classification_category=category_code,
+        )
 
     xml_bytes = tostring(root, encoding="utf-8", xml_declaration=True)
     return BuiltInvoice(

@@ -69,9 +69,19 @@ def _enable_mydata() -> None:
 
 
 def _make_invoice():
+    # Pin document_type=RECEIPT so the Tier B guard (B2B requires
+    # billing_vat_id) doesn't kick in — OrderFactory otherwise rolls
+    # a random document type and would intermittently flag orders as
+    # INVOICE without a buyer VAT. These tests exercise the 11.1
+    # retail path; Tier B B2B flows have their own fixtures.
+    from order.enum.document_type import OrderDocumentTypeEnum
+
     vat = VatFactory(value=24)
     product = ProductFactory(vat=vat)
-    order = OrderFactory(num_order_items=0)
+    order = OrderFactory(
+        num_order_items=0,
+        document_type=OrderDocumentTypeEnum.RECEIPT,
+    )
     OrderItemFactory(
         order=order,
         product=product,
@@ -391,9 +401,14 @@ class MydataEmailWithMarkTestCase(TestCase):
         with patch(
             "order.invoicing._render_pdf_bytes", side_effect=fake_render
         ):
+            from order.enum.document_type import OrderDocumentTypeEnum
+
             vat = VatFactory(value=24)
             product = ProductFactory(vat=vat)
-            order = OrderFactory(num_order_items=0)
+            order = OrderFactory(
+                num_order_items=0,
+                document_type=OrderDocumentTypeEnum.RECEIPT,
+            )
             OrderItemFactory(
                 order=order,
                 product=product,

@@ -374,6 +374,43 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         help_text=_("Customer notes or special instructions"),
     )
 
+    # B2B billing identity — required only when the buyer wants a
+    # proper Τιμολόγιο Πώλησης (document_type=INVOICE). Normalised and
+    # cross-validated in ``validate()`` so the Order row always has a
+    # consistent (document_type, VAT) pair.
+    billing_vat_id = serializers.CharField(
+        max_length=12,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Buyer tax number (ΑΦΜ). Required when ``document_type`` "
+            "is INVOICE; 9 digits for Greek ΑΦΜ, leading EL/GR "
+            "prefix is stripped automatically."
+        ),
+    )
+    billing_country = serializers.CharField(
+        max_length=2,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "ISO 3166-1 alpha-2 country code for the buyer's tax "
+            "identity. Defaults to the order country when blank."
+        ),
+    )
+    document_type = serializers.ChoiceField(
+        choices=[
+            ("RECEIPT", "Receipt"),
+            ("INVOICE", "Invoice"),
+        ],
+        required=False,
+        default="RECEIPT",
+        help_text=_(
+            "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο "
+            "Πώλησης, Tier B — B2B). Selecting INVOICE requires a "
+            "valid ``billing_vat_id``."
+        ),
+    )
+
     # Loyalty points redemption (optional)
     loyalty_points_to_redeem = serializers.IntegerField(
         required=False,
@@ -395,6 +432,58 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                 _("Try using a different email address.")
             )
         return value
+
+    def validate_billing_vat_id(self, value: str) -> str:
+        """Strip ``EL`` / ``GR`` prefix then enforce 9-digit Greek ΑΦΜ.
+
+        The prefix is VIES-convention but AADE's ``vatNumber`` field
+        is unprefixed (error 104 otherwise). Normalising at the API
+        boundary means both the admin and the PDF see the canonical
+        value and we don't scatter normalisation across the pipeline.
+        """
+        if not value:
+            return ""
+        cleaned = value.strip().upper()
+        if cleaned.startswith(("EL", "GR")):
+            cleaned = cleaned[2:].strip()
+        if not cleaned.isdigit() or len(cleaned) != 9:
+            raise serializers.ValidationError(
+                _(
+                    "Greek ΑΦΜ must be exactly 9 digits "
+                    "(optionally prefixed with EL or GR)."
+                )
+            )
+        return cleaned
+
+    def validate_billing_country(self, value: str) -> str:
+        """Normalise to uppercase ISO-alpha2; allow empty."""
+        if not value:
+            return ""
+        cleaned = value.strip().upper()
+        if len(cleaned) != 2 or not cleaned.isalpha():
+            raise serializers.ValidationError(
+                _("Country must be a 2-letter ISO code (e.g. GR).")
+            )
+        return cleaned
+
+    def validate(self, attrs):
+        """Cross-field rule: ``document_type=INVOICE`` ⇒ need
+        ``billing_vat_id``. Enforced here so the API never accepts
+        an invoice-tagged order without the buyer VAT — otherwise
+        the myDATA submission would either silently downgrade to
+        11.1 (tax-fraud-adjacent) or hard-fail at the worker."""
+        document_type = attrs.get("document_type", "RECEIPT")
+        billing_vat_id = attrs.get("billing_vat_id", "")
+        if document_type == "INVOICE" and not billing_vat_id:
+            raise serializers.ValidationError(
+                {
+                    "billing_vat_id": _(
+                        "A valid ΑΦΜ is required when requesting an "
+                        "invoice (document_type=INVOICE)."
+                    )
+                }
+            )
+        return attrs
 
 
 class OrderWriteSerializer(serializers.ModelSerializer[Order]):

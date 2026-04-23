@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
+from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     InsufficientStockError,
@@ -320,6 +321,16 @@ class OrderService:
                 "region_id": shipping_address.get("region_id"),
                 "phone": shipping_address.get("phone"),
                 "customer_notes": shipping_address.get("customer_notes", ""),
+                # B2B billing identity — empty for retail (Tier A),
+                # populated for Τιμολόγιο Πώλησης (Tier B). The
+                # serializer already normalised these (stripped
+                # EL/GR prefix, uppercased country).
+                "billing_vat_id": shipping_address.get("billing_vat_id", ""),
+                "billing_country": shipping_address.get("billing_country", ""),
+                "document_type": (
+                    shipping_address.get("document_type")
+                    or OrderDocumentTypeEnum.RECEIPT
+                ),
             }
 
             # Calculate shipping cost
@@ -710,6 +721,16 @@ class OrderService:
                 "region_id": shipping_address.get("region_id"),
                 "phone": shipping_address.get("phone"),
                 "customer_notes": shipping_address.get("customer_notes", ""),
+                # B2B billing identity — empty for retail (Tier A),
+                # populated for Τιμολόγιο Πώλησης (Tier B). The
+                # serializer already normalised these (stripped
+                # EL/GR prefix, uppercased country).
+                "billing_vat_id": shipping_address.get("billing_vat_id", ""),
+                "billing_country": shipping_address.get("billing_country", ""),
+                "document_type": (
+                    shipping_address.get("document_type")
+                    or OrderDocumentTypeEnum.RECEIPT
+                ),
             }
 
             # Calculate shipping cost

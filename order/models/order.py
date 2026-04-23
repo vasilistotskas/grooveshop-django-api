@@ -178,6 +178,36 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     payment_method = models.CharField(
         _("Payment Method"), max_length=50, blank=True, default=""
     )
+    # ── B2B billing identity (snapshotted on the order) ──────────
+    # Populated only when the buyer is issuing a proper ``Τιμολόγιο
+    # Πώλησης`` (``document_type=INVOICE`` + a real VAT number).
+    # Kept as denormalised columns here rather than FK'd to
+    # ``UserAddress`` because: (a) guests have no UserAccount, (b) the
+    # invoice snapshot must survive later profile edits, (c) the tax
+    # register is attached to the Order row, not the user.
+    billing_vat_id = models.CharField(
+        _("Billing VAT ID"),
+        max_length=12,
+        blank=True,
+        default="",
+        help_text=_(
+            "Buyer's tax number (ΑΦΜ) — required when issuing an "
+            "invoice (vs. a retail receipt). 9 digits for Greek ΑΦΜ, "
+            "no ``EL`` / ``GR`` prefix."
+        ),
+    )
+    billing_country = models.CharField(
+        _("Billing Country"),
+        max_length=2,
+        blank=True,
+        default="",
+        help_text=_(
+            "ISO 3166-1 alpha-2 country code of the buyer for tax "
+            "purposes. Pairs with ``billing_vat_id``; determines "
+            "which AADE invoice type (1.1 domestic, 1.2 intra-EU, "
+            "1.3 third-country) applies."
+        ),
+    )
     tracking_number = models.CharField(
         _("Tracking Number"), max_length=255, blank=True, default=""
     )

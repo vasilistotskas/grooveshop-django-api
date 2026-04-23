@@ -1865,6 +1865,15 @@ SPECTACULAR_SETTINGS = {
         # regeneration.
         "TopicCategory": "user.models.subscription.SubscriptionTopic.TopicCategory",
         "NotificationCategory": "notification.enum.NotificationCategoryEnum",
+        # ``Order.document_type`` (6 values — includes fulfilment
+        # documents like shipping labels / credit notes) and the
+        # creation-time subset (``OrderCreateFromCartSerializer`` —
+        # only RECEIPT/INVOICE) share the ``documentType`` field name.
+        # Without these overrides, drf-spectacular auto-renames the
+        # collider to ``DocumentType128Enum`` which bleeds into
+        # generated frontend types on every regeneration.
+        "OrderDocumentType": "order.enum.document_type.OrderDocumentTypeEnum",
+        "OrderCreateDocumentType": "order.enum.document_type.OrderCreateDocumentTypeEnum",
     },
 }
 

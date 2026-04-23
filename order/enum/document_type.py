@@ -11,6 +11,11 @@ class OrderDocumentTypeEnum(models.TextChoices):
     RETURN_LABEL = "RETURN_LABEL", _("Return Label")
     CREDIT_NOTE = "CREDIT_NOTE", _("Credit Note")
 
+
+class OrderCreateDocumentTypeEnum(models.TextChoices):
+    RECEIPT = "RECEIPT", _("Receipt")
+    INVOICE = "INVOICE", _("Invoice")
+
     @classmethod
     def get_document_types_for_status(cls, status: str) -> list[str]:
         from order.enum.status import OrderStatus  # noqa: PLC0415

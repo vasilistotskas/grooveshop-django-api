@@ -30169,22 +30169,6 @@ components:
           type: string
       required:
       - detail
-    DocumentType128Enum:
-      enum:
-      - RECEIPT
-      - INVOICE
-      - PROFORMA
-      - SHIPPING_LABEL
-      - RETURN_LABEL
-      - CREDIT_NOTE
-      type: string
-      description: |-
-        * `RECEIPT` - Receipt
-        * `INVOICE` - Invoice
-        * `PROFORMA` - Proforma Invoice
-        * `SHIPPING_LABEL` - Shipping Label
-        * `RETURN_LABEL` - Return Label
-        * `CREDIT_NOTE` - Credit Note
     ErrorResponse:
       type: object
       properties:
@@ -30938,7 +30922,7 @@ components:
           exclusiveMinimum: true
           readOnly: true
         documentType:
-          $ref: '#/components/schemas/DocumentType128Enum'
+          $ref: '#/components/schemas/OrderDocumentType'
         createdAt:
           type: string
           format: date-time
@@ -31015,7 +30999,7 @@ components:
       - updatedAt
       - uuid
       - zipcode
-    OrderCreateFromCartDocumentTypeEnum:
+    OrderCreateDocumentType:
       enum:
       - RECEIPT
       - INVOICE
@@ -31105,7 +31089,7 @@ components:
           maxLength: 2
         documentType:
           allOf:
-          - $ref: '#/components/schemas/OrderCreateFromCartDocumentTypeEnum'
+          - $ref: '#/components/schemas/OrderCreateDocumentType'
           default: RECEIPT
           description: |-
             RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Selecting INVOICE requires a valid ``billing_vat_id``.
@@ -31226,7 +31210,7 @@ components:
           exclusiveMinimum: true
           readOnly: true
         documentType:
-          $ref: '#/components/schemas/DocumentType128Enum'
+          $ref: '#/components/schemas/OrderDocumentType'
         createdAt:
           type: string
           format: date-time
@@ -31395,6 +31379,22 @@ components:
       - updatedAt
       - uuid
       - zipcode
+    OrderDocumentType:
+      enum:
+      - RECEIPT
+      - INVOICE
+      - PROFORMA
+      - SHIPPING_LABEL
+      - RETURN_LABEL
+      - CREDIT_NOTE
+      type: string
+      description: |-
+        * `RECEIPT` - Receipt
+        * `INVOICE` - Invoice
+        * `PROFORMA` - Proforma Invoice
+        * `SHIPPING_LABEL` - Shipping Label
+        * `RETURN_LABEL` - Return Label
+        * `CREDIT_NOTE` - Credit Note
     OrderItem:
       type: object
       properties:
@@ -31709,7 +31709,7 @@ components:
           items:
             $ref: '#/components/schemas/OrderItemCreateRequest'
         documentType:
-          $ref: '#/components/schemas/DocumentType128Enum'
+          $ref: '#/components/schemas/OrderDocumentType'
         paymentId:
           type: string
           minLength: 1
@@ -33289,7 +33289,7 @@ components:
           items:
             $ref: '#/components/schemas/OrderItemCreateRequest'
         documentType:
-          $ref: '#/components/schemas/DocumentType128Enum'
+          $ref: '#/components/schemas/OrderDocumentType'
         paymentId:
           type: string
           minLength: 1

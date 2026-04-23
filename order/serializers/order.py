@@ -7,6 +7,7 @@ from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.utils.email import is_disposable_domain
 from country.models import Country
+from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -398,12 +399,9 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         ),
     )
     document_type = serializers.ChoiceField(
-        choices=[
-            ("RECEIPT", "Receipt"),
-            ("INVOICE", "Invoice"),
-        ],
+        choices=OrderCreateDocumentTypeEnum.choices,
         required=False,
-        default="RECEIPT",
+        default=OrderCreateDocumentTypeEnum.RECEIPT,
         help_text=_(
             "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο "
             "Πώλησης, Tier B — B2B). Selecting INVOICE requires a "

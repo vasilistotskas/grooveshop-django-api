@@ -3,6 +3,61 @@
 
 
 
+## v1.110.0 (2026-04-23)
+
+### Features
+
+* feat(admin): gate B2B invoicing + fix GDPR export shared volume
+
+Three independent admin/reliability fixes bundled together.
+
+**B2B_INVOICING_ENABLED extra setting** lets the owner hide the
+"Θέλω τιμολόγιο (Β2Β)" toggle on checkout from admin without a
+deploy. Setting defaults to True. Whitelisted in PUBLIC_SETTING_KEYS
+so the Nuxt checkout can read it anonymously.
+OrderCreateFromCartSerializer.validate() now rejects
+document_type=INVOICE when the setting is off — closes the direct-
+API bypass that would otherwise defeat the UI gate. Regression test
+covers all three branches (INVOICE off → reject, INVOICE on →
+accept, RECEIPT → always accept).
+
+**GDPR export PermissionError fix** — celery_worker was writing
+exports under MEDIA_ROOT (/home/app/web/mediafiles), which doesn't
+exist on the worker pod and whose parent is not writable by the
+unprivileged app user. Moved to PRIVATE_MEDIA_ROOT/_gdpr_exports/
+via new get_export_location() helper — same mediafiles_private PVC
+(mode 777) that invoice PDFs already share between backend and
+celery_worker. Download view reads from the same helper.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`86b6cd9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/86b6cd9d668804ffbdc7fe642906cbbece279476))
+
+### Testing
+
+* test(conftest): reseed extra_settings before every DB test
+
+Fixes intermittent ``test_stock_reservation_ttl.py`` failures where
+the configured TTL (30 min from ``EXTRA_SETTINGS_DEFAULTS``) was
+replaced by the code-level fallback (15 min) under xdist parallel
+runs.
+
+Root cause: ``django-extra-settings`` seeds its ``Setting`` rows via
+a ``post_migrate`` signal that only fires once at DB creation. Any
+test marked ``@pytest.mark.django_db(transaction=True)`` (three in
+the suite — concurrent stock tests + one stock manager case) flushes
+all tables on teardown, wiping those rows. The next test's
+``Setting.get("STOCK_RESERVATION_TTL_MINUTES", default=15)`` hits an
+empty DB and falls back to the ``default=`` arg, returning 15 while
+``StockManager.reserve_stock`` internally reads the (now-cached) 15
+→ assertion ``created_at + 30min`` fails against ``created_at + 15min``.
+
+``set_defaults_from_settings`` is a per-entry ``get_or_create``, so
+the fixture is a no-op when seeds are intact and restorative only
+after a transactional teardown. Verified with a previously-flaky
+run of ttl + concurrent_stock_operations + concurrent_stock +
+stock_manager + expired_reservations: 187/187 pass under ``-n auto``.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0a9055a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a9055a07d27e24b4ae577b63fb55296e3b8586c))
+
 ## v1.109.1 (2026-04-23)
 
 ### Bug fixes

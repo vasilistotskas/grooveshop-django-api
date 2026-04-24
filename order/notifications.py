@@ -22,6 +22,7 @@ import logging
 from celery import shared_task
 from django.conf import settings
 from django.utils.translation import gettext as _
+from django.utils.translation import gettext_noop
 from django.utils.translation import override as translation_override
 
 from notification.enum import (
@@ -57,9 +58,11 @@ _ORDER_STATUS_COPY: dict[str, tuple[str, str, str, tuple[str, str]]] = {
         NotificationKindEnum.INFO,
         NotificationTypeEnum.ORDER_PROCESSING,
         (
-            "Order #{order_id} is being prepared",
-            "We're getting your items ready — you'll hear from us again once "
-            "they're on the way.",
+            gettext_noop("Order #{order_id} is being prepared"),
+            gettext_noop(
+                "We're getting your items ready — you'll hear from us "
+                "again once they're on the way."
+            ),
         ),
     ),
     OrderStatus.SHIPPED.value: (
@@ -67,9 +70,11 @@ _ORDER_STATUS_COPY: dict[str, tuple[str, str, str, tuple[str, str]]] = {
         NotificationKindEnum.INFO,
         NotificationTypeEnum.ORDER_SHIPPED,
         (
-            "Order #{order_id} is on its way!",
-            "Your order has shipped. Tracking details will appear in the "
-            "order page shortly.",
+            gettext_noop("Order #{order_id} is on its way!"),
+            gettext_noop(
+                "Your order has shipped. Tracking details will appear in "
+                "the order page shortly."
+            ),
         ),
     ),
     OrderStatus.DELIVERED.value: (
@@ -77,9 +82,11 @@ _ORDER_STATUS_COPY: dict[str, tuple[str, str, str, tuple[str, str]]] = {
         NotificationKindEnum.SUCCESS,
         NotificationTypeEnum.ORDER_DELIVERED,
         (
-            "Order #{order_id} delivered",
-            "Your order has arrived. We'd love to hear what you think — "
-            "reviews help other shoppers.",
+            gettext_noop("Order #{order_id} delivered"),
+            gettext_noop(
+                "Your order has arrived. We'd love to hear what you think "
+                "— reviews help other shoppers."
+            ),
         ),
     ),
     OrderStatus.COMPLETED.value: (
@@ -87,9 +94,11 @@ _ORDER_STATUS_COPY: dict[str, tuple[str, str, str, tuple[str, str]]] = {
         NotificationKindEnum.SUCCESS,
         NotificationTypeEnum.ORDER_COMPLETED,
         (
-            "Order #{order_id} complete",
-            "Thanks for shopping with us. Your loyalty points have been "
-            "credited to your account.",
+            gettext_noop("Order #{order_id} complete"),
+            gettext_noop(
+                "Thanks for shopping with us. Your loyalty points have "
+                "been credited to your account."
+            ),
         ),
     ),
     OrderStatus.CANCELED.value: (
@@ -97,9 +106,11 @@ _ORDER_STATUS_COPY: dict[str, tuple[str, str, str, tuple[str, str]]] = {
         NotificationKindEnum.WARNING,
         NotificationTypeEnum.ORDER_CANCELED,
         (
-            "Order #{order_id} canceled",
-            "Your order has been canceled. Any payment taken will be "
-            "refunded to the original method.",
+            gettext_noop("Order #{order_id} canceled"),
+            gettext_noop(
+                "Your order has been canceled. Any payment taken will be "
+                "refunded to the original method."
+            ),
         ),
     ),
 }
@@ -173,9 +184,11 @@ def notify_order_created_live(self, order_id: int) -> dict:
         notification_type=NotificationTypeEnum.ORDER_CREATED,
         link=_order_link(order),
         translations=_render_translations(
-            "Order #{order_id} placed",
-            "Thanks — we've received your order and will keep you posted "
-            "as it progresses.",
+            gettext_noop("Order #{order_id} placed"),
+            gettext_noop(
+                "Thanks — we've received your order and will keep you "
+                "posted as it progresses."
+            ),
             order_id=order.id,
         ),
     )
@@ -229,9 +242,11 @@ def notify_order_shipment_dispatched_live(self, order_id: int) -> dict:
         notification_type=NotificationTypeEnum.SHIPMENT_DISPATCHED,
         link=_order_link(order),
         translations=_render_translations(
-            "Tracking available for order #{order_id}",
-            "Your package is being handled by {carrier}. Tracking number: "
-            "{tracking_number}.",
+            gettext_noop("Tracking available for order #{order_id}"),
+            gettext_noop(
+                "Your package is being handled by {carrier}. Tracking "
+                "number: {tracking_number}."
+            ),
             order_id=order.id,
             carrier=order.shipping_carrier or "",
             tracking_number=order.tracking_number or "",
@@ -254,8 +269,10 @@ def notify_payment_confirmed_live(self, order_id: int) -> dict:
         notification_type=NotificationTypeEnum.PAYMENT_CONFIRMED,
         link=_order_link(order),
         translations=_render_translations(
-            "Payment confirmed for order #{order_id}",
-            "Your payment went through. We're preparing your order now.",
+            gettext_noop("Payment confirmed for order #{order_id}"),
+            gettext_noop(
+                "Your payment went through. We're preparing your order now."
+            ),
             order_id=order.id,
         ),
     )
@@ -276,9 +293,11 @@ def notify_payment_failed_live(self, order_id: int) -> dict:
         notification_type=NotificationTypeEnum.PAYMENT_FAILED,
         link=_order_link(order),
         translations=_render_translations(
-            "Payment failed for order #{order_id}",
-            "We couldn't process your payment. Tap to retry with a "
-            "different method.",
+            gettext_noop("Payment failed for order #{order_id}"),
+            gettext_noop(
+                "We couldn't process your payment. Tap to retry with a "
+                "different method."
+            ),
             order_id=order.id,
         ),
     )
@@ -299,9 +318,11 @@ def notify_order_refunded_live(self, order_id: int) -> dict:
         notification_type=NotificationTypeEnum.ORDER_REFUNDED,
         link=_order_link(order),
         translations=_render_translations(
-            "Refund processed for order #{order_id}",
-            "Your refund is on its way back to the original payment "
-            "method. It can take 3–5 business days to land.",
+            gettext_noop("Refund processed for order #{order_id}"),
+            gettext_noop(
+                "Your refund is on its way back to the original payment "
+                "method. It can take 3–5 business days to land."
+            ),
             order_id=order.id,
         ),
     )

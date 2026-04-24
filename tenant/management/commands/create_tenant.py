@@ -70,6 +70,12 @@ class Command(BaseCommand):
             f"  Schema '{schema_name}' created with migrations applied."
         )
 
+        # Provision an OWNER membership for the tenant owner (creating
+        # the UserAccount row if they don't already exist in the shared
+        # user table). Without this the owner cannot log into the new
+        # tenant — the pre_login adapter would reject the credentials.
+        self._provision_owner_membership(tenant, options["owner_email"])
+
         # Seed default data in tenant schema
         with schema_context(schema_name):
             self._seed_defaults(tenant)
@@ -78,6 +84,43 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"Tenant '{options['name']}' created successfully."
             )
+        )
+
+    def _provision_owner_membership(self, tenant, owner_email: str):
+        from django.contrib.auth import get_user_model
+
+        from tenant.models import (
+            TenantMembershipRole,
+            UserTenantMembership,
+        )
+
+        User = get_user_model()
+        user = User.objects.filter(email__iexact=owner_email).first()
+        if user is None:
+            # Owner hasn't registered yet; emit a hint and move on. A
+            # follow-up membership will be created when they first log
+            # in via the admin or when an operator runs a backfill.
+            self.stdout.write(
+                self.style.WARNING(
+                    f"  No UserAccount for owner {owner_email}; skipping "
+                    "membership. Create the user, then grant OWNER "
+                    "membership via the admin."
+                )
+            )
+            return
+
+        membership, created = UserTenantMembership.objects.update_or_create(
+            user=user,
+            tenant=tenant,
+            defaults={
+                "role": TenantMembershipRole.OWNER,
+                "is_active": True,
+            },
+        )
+        verb = "Created" if created else "Updated"
+        self.stdout.write(
+            f"  {verb} OWNER membership for {owner_email} on "
+            f"{tenant.schema_name}."
         )
 
     def _seed_defaults(self, tenant):

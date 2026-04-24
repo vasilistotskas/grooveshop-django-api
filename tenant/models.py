@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -172,3 +173,95 @@ class TenantDomain(DomainMixin):
 
     def __str__(self):
         return self.domain
+
+
+class TenantMembershipRole(models.TextChoices):
+    """Role a user holds inside a specific tenant.
+
+    The global ``User.is_staff`` / ``is_superuser`` flags keep their
+    platform-wide meaning (platform operators who manage Tenant rows in
+    the public-schema admin). These per-tenant roles govern what a user
+    can do *inside* a tenant they belong to:
+
+    - MEMBER  — ordinary shopper, no admin surface.
+    - STAFF   — can view the tenant's operational admin (orders,
+                products) but cannot change tenant settings or invite
+                other staff.
+    - ADMIN   — full admin within the tenant (settings, team).
+    - OWNER   — same as ADMIN plus cannot be demoted/removed by other
+                admins; the tenant must always have at least one owner.
+    """
+
+    MEMBER = "member", _("Member")
+    STAFF = "staff", _("Staff")
+    ADMIN = "admin", _("Admin")
+    OWNER = "owner", _("Owner")
+
+
+class UserTenantMembership(TimeStampMixinModel):
+    """Join between a global user and a tenant they can access.
+
+    ``UserAccount`` lives in SHARED_APPS — there is one platform-wide
+    identity per email. Membership in a tenant is an explicit row here,
+    so the same person can have a ``webside`` membership as MEMBER and
+    a ``tenant-b`` membership as ADMIN without duplicating the user
+    record. Any API or admin path that is tenant-scoped MUST verify an
+    active membership for the requesting user + the current
+    ``connection.tenant`` — otherwise a user authenticated on one
+    tenant's domain could read another tenant's data by swapping the
+    ``X-Forwarded-Host`` header.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tenant_memberships",
+        verbose_name=_("User"),
+    )
+    tenant = models.ForeignKey(
+        "tenant.Tenant",
+        on_delete=models.CASCADE,
+        related_name="user_memberships",
+        verbose_name=_("Tenant"),
+    )
+    role = models.CharField(
+        _("Role"),
+        max_length=20,
+        choices=TenantMembershipRole.choices,
+        default=TenantMembershipRole.MEMBER,
+    )
+    is_active = models.BooleanField(_("Active"), default=True)
+
+    class Meta:
+        verbose_name = _("User Tenant Membership")
+        verbose_name_plural = _("User Tenant Memberships")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "tenant"],
+                name="unique_user_tenant_membership",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["tenant", "is_active"]),
+            models.Index(fields=["user", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user} @ {self.tenant} ({self.role})"
+
+    @property
+    def can_manage_tenant(self) -> bool:
+        """True if this membership may change tenant-level settings."""
+        return self.role in (
+            TenantMembershipRole.ADMIN,
+            TenantMembershipRole.OWNER,
+        )
+
+    @property
+    def is_tenant_staff(self) -> bool:
+        """True if this membership grants access to the tenant admin."""
+        return self.role in (
+            TenantMembershipRole.STAFF,
+            TenantMembershipRole.ADMIN,
+            TenantMembershipRole.OWNER,
+        )

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.db import connection
 
-from tenant.models import Tenant, TenantDomain
+from tenant.models import Tenant, TenantDomain, UserTenantMembership
 
 
 class TenantDomainInline(admin.TabularInline):
@@ -93,4 +93,18 @@ class TenantDomainAdmin(admin.ModelAdmin):
     search_fields = ["domain"]
 
     def has_module_permission(self, request):
+        return connection.schema_name == "public"
+
+
+@admin.register(UserTenantMembership)
+class UserTenantMembershipAdmin(admin.ModelAdmin):
+    list_display = ["user", "tenant", "role", "is_active", "created_at"]
+    list_filter = ["role", "is_active", "tenant"]
+    search_fields = ["user__email", "user__username", "tenant__name"]
+    autocomplete_fields = ["user", "tenant"]
+    readonly_fields = ["created_at", "updated_at"]
+
+    def has_module_permission(self, request):
+        # Membership admin is a platform-wide surface — like Tenant and
+        # TenantDomain, it must not leak into tenant-scoped admin.
         return connection.schema_name == "public"

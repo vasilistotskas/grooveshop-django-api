@@ -1112,7 +1112,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "1.109.1"
+version = "1.110.0"
 source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },

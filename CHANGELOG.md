@@ -3,6 +3,42 @@
 
 
 
+## v1.110.1 (2026-04-24)
+
+### Bug fixes
+
+* fix: uv lock update ([`0deaf60`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0deaf604146643c3ff0b37131d2aac0a0bc89ddd))
+
+* fix(order): translate live cancel/refund notifications to Greek
+
+On the Greek storefront, the WebSocket toasts fired by
+``notify_order_status_changed_live`` and ``notify_order_refunded_live``
+rendered as English source strings (e.g. "Order #34 canceled",
+"Refund processed for order #34"), because:
+
+1. The msgid literals in ``order/notifications.py`` were never
+   wrapped with a gettext marker, so ``makemessages`` never extracted
+   them into the .po file.
+2. At runtime ``_render_translations`` calls ``_(title_msgid)`` which
+   returns the input unchanged when the msgid is absent from the
+   catalog — regardless of which locale is active.
+
+Wraps every notification msgid (5 status-copy entries + 5 dedicated
+live tasks — order placed / tracking / payment confirmed / payment
+failed / refund processed) with ``gettext_noop`` so xgettext picks
+them up, then fills in proper Greek translations.
+
+Shipped end-to-end: Dockerfile already runs ``compilemessages`` at
+build time (django-api/Dockerfile:48), so the new .mo lands in the
+image and ``apply_db_overlay`` keeps the baseline as the fallthrough
+when no Rosetta DB row exists.
+
+Verified in prod ``deploy/backend`` via ``gettext()`` under
+``override('el')``: all 3 target strings returned English before this
+change; now they'll return proper Greek on next image deploy.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3cd8623`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3cd8623f912b43559b41ef1fad1a861b164bd0bf))
+
 ## v1.110.0 (2026-04-23)
 
 ### Features

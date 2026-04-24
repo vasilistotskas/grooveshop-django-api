@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import uuid
 from decimal import Decimal
 
@@ -333,7 +332,10 @@ class Product(
             ).first()
         if not product_image:
             return ""
-        return f"media/uploads/products/{os.path.basename(product_image.image.name)}"
+        # Delegates to ProductImage.main_image_path which respects
+        # TenantFileSystemStorage — the schema-prefixed path is needed
+        # so the media-stream UPLOADED_MEDIA route can resolve it.
+        return product_image.main_image_path
 
     @property
     def colored_stock(self) -> SafeString:

@@ -54,7 +54,7 @@ def active_tenant(tenant):
 
 
 @pytest.fixture
-def user(db) -> User:
+def user(db):
     return User.objects.create_user(
         username="alice-membership",
         email="alice-membership@example.com",

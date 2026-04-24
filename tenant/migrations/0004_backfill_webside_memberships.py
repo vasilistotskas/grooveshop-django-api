@@ -11,6 +11,7 @@ gets MEMBER. New tenants get memberships via ``create_tenant`` /
 the tenant admin — this migration only rescues the pre-existing data.
 """
 
+from django.conf import settings
 from django.db import migrations
 
 
@@ -67,6 +68,10 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("tenant", "0003_add_user_tenant_membership"),
+        # We touch the swappable user model in ``create_webside_memberships``
+        # so Django's migration executor needs the dependency to ensure
+        # the historical ``UserAccount`` model is loaded before we run.
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [

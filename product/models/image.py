@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -10,6 +8,7 @@ from parler.models import TranslatableModel, TranslatedFields
 
 from core.fields.image import ImageAndSvgField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
+from core.utils.image_paths import image_to_media_path
 from product.managers.image import ProductImageManager
 
 
@@ -66,6 +65,7 @@ class ProductImage(
 
     @property
     def main_image_path(self) -> str:
-        if self.image and hasattr(self.image, "name"):
-            return f"media/uploads/products/{os.path.basename(str(self.image.name))}"
-        return ""
+        # Returns ``media/{schema}/uploads/products/{filename}`` under
+        # TenantFileSystemStorage so media-stream + Nuxt can resolve
+        # the file on any tenant. See core.utils.image_paths.
+        return image_to_media_path(self.image)

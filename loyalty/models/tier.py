@@ -60,11 +60,9 @@ class LoyaltyTier(
 
     @property
     def main_image_path(self) -> str:
-        if self.icon and hasattr(self.icon, "name"):
-            return (
-                f"media/uploads/loyalty/{os.path.basename(str(self.icon.name))}"
-            )
-        return ""
+        from core.utils.image_paths import image_to_media_path
+
+        return image_to_media_path(self.icon)
 
     @property
     def icon_filename(self) -> str:

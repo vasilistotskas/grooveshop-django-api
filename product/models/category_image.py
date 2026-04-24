@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
@@ -79,9 +78,9 @@ class ProductCategoryImage(
 
     @property
     def image_path(self) -> str:
-        if self.image and hasattr(self.image, "name"):
-            return f"media/uploads/categories/{os.path.basename(str(self.image.name))}"
-        return ""
+        from core.utils.image_paths import image_to_media_path
+
+        return image_to_media_path(self.image)
 
     @property
     def image_url(self) -> str:

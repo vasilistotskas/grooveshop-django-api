@@ -1,4 +1,3 @@
-import os
 
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.validators import RegexValidator
@@ -76,6 +75,6 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
 
     @property
     def main_image_path(self) -> str:
-        if self.image_flag and hasattr(self.image_flag, "name"):
-            return f"media/uploads/country/{os.path.basename(str(self.image_flag.name))}"
-        return ""
+        from core.utils.image_paths import image_to_media_path
+
+        return image_to_media_path(self.image_flag)

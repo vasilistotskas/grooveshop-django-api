@@ -53,6 +53,18 @@ class TenantAccountAdapter(UserAccountAdapter):
         domain = tenant.domains.filter(is_primary=True).first()
         return domain.domain if domain else None
 
+    def _scheme(self) -> str:
+        """Return the right URL scheme for this deployment.
+
+        Defaults to ``https`` for production and anything else that
+        doesn't override. Falls back to ``ACCOUNT_DEFAULT_HTTP_PROTOCOL``
+        so dev environments running on plain HTTP don't email users a
+        link they cannot open.
+        """
+        from django.conf import settings
+
+        return getattr(settings, "ACCOUNT_DEFAULT_HTTP_PROTOCOL", "https")
+
     def get_email_confirmation_url(self, request, emailconfirmation):
         # Accept either a full HMAC emailconfirmation model or the raw
         # key string depending on caller; allauth's headless stack
@@ -60,13 +72,13 @@ class TenantAccountAdapter(UserAccountAdapter):
         key = getattr(emailconfirmation, "key", None) or str(emailconfirmation)
         domain = self._get_tenant_domain()
         if domain:
-            return f"https://{domain}/account/verify-email/{key}"
+            return f"{self._scheme()}://{domain}/account/verify-email/{key}"
         return super().get_email_confirmation_url(request, emailconfirmation)
 
     def get_reset_password_url(self, request):
         domain = self._get_tenant_domain()
         if domain:
-            return f"https://{domain}/account/password/reset"
+            return f"{self._scheme()}://{domain}/account/password/reset"
         return super().get_reset_password_url(request)
 
     def pre_login(self, request, user, **kwargs):

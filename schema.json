@@ -19628,7 +19628,6 @@
                         "name": "paymentStatus",
                         "schema": {
                             "type": "string",
-                            "title": "Κατάσταση πληρωμής",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -19639,7 +19638,7 @@
                                 "REFUNDED"
                             ]
                         },
-                        "description": "Filter by payment status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `COMPLETED` - Ολοκληρώθηκε\n* `FAILED` - Failed\n* `REFUNDED` - Επεστράφη\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Ακυρώθηκε"
+                        "description": "Filter by payment status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `REFUNDED` - Refunded\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Canceled"
                     },
                     {
                         "in": "query",
@@ -19820,7 +19819,6 @@
                         "name": "status",
                         "schema": {
                             "type": "string",
-                            "title": "Κατάσταση",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -19832,7 +19830,7 @@
                                 "SHIPPED"
                             ]
                         },
-                        "description": "Filter by order status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `SHIPPED` - Απεστάλη\n* `DELIVERED` - Παραδόθηκε\n* `COMPLETED` - Ολοκληρώθηκε\n* `CANCELED` - Ακυρώθηκε\n* `RETURNED` - Επιστράφηκε\n* `REFUNDED` - Επεστράφη"
+                        "description": "Filter by order status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `SHIPPED` - Shipped\n* `DELIVERED` - Delivered\n* `COMPLETED` - Completed\n* `CANCELED` - Canceled\n* `RETURNED` - Returned\n* `REFUNDED` - Refunded"
                     },
                     {
                         "in": "query",
@@ -20154,8 +20152,8 @@
             },
             "post": {
                 "operationId": "createOrder",
-                "description": "Create a new Παραγγελία. Requires authentication.",
-                "summary": "Create a Παραγγελία",
+                "description": "Create a new Ταξινόμηση. Requires authentication.",
+                "summary": "Create a Ταξινόμηση",
                 "parameters": [
                     {
                         "in": "query",
@@ -20270,8 +20268,8 @@
         "/api/v1/order-items": {
             "get": {
                 "operationId": "listOrderItem",
-                "description": "Retrieve a list of Προϊόντα Παραγγελίας with filtering and search capabilities. Supports multiple pagination strategies: pageNumber (default), cursor, and limitOffset.",
-                "summary": "List Προϊόντα Παραγγελίας",
+                "description": "Retrieve a list of Order Items with filtering and search capabilities. Supports multiple pagination strategies: pageNumber (default), cursor, and limitOffset.",
+                "summary": "List Order Items",
                 "parameters": [
                     {
                         "in": "query",
@@ -20588,7 +20586,6 @@
                         "name": "order_PaymentStatus",
                         "schema": {
                             "type": "string",
-                            "title": "Κατάσταση πληρωμής",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -20599,7 +20596,7 @@
                                 "REFUNDED"
                             ]
                         },
-                        "description": "Filter by order payment status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `COMPLETED` - Ολοκληρώθηκε\n* `FAILED` - Failed\n* `REFUNDED` - Επεστράφη\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Ακυρώθηκε"
+                        "description": "Filter by order payment status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `REFUNDED` - Refunded\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Canceled"
                     },
                     {
                         "in": "query",
@@ -20614,7 +20611,6 @@
                         "name": "order_Status",
                         "schema": {
                             "type": "string",
-                            "title": "Κατάσταση",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -20626,7 +20622,7 @@
                                 "SHIPPED"
                             ]
                         },
-                        "description": "Filter by order status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `SHIPPED` - Απεστάλη\n* `DELIVERED` - Παραδόθηκε\n* `COMPLETED` - Ολοκληρώθηκε\n* `CANCELED` - Ακυρώθηκε\n* `RETURNED` - Επιστράφηκε\n* `REFUNDED` - Επεστράφη"
+                        "description": "Filter by order status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `SHIPPED` - Shipped\n* `DELIVERED` - Delivered\n* `COMPLETED` - Completed\n* `CANCELED` - Canceled\n* `RETURNED` - Returned\n* `REFUNDED` - Refunded"
                     },
                     {
                         "in": "query",
@@ -22028,8 +22024,8 @@
         "/api/v1/order/{id}": {
             "get": {
                 "operationId": "retrieveOrder",
-                "description": "Get detailed information about a specific Παραγγελία.",
-                "summary": "Retrieve a Παραγγελία",
+                "description": "Get detailed information about a specific Ταξινόμηση.",
+                "summary": "Retrieve a Ταξινόμηση",
                 "parameters": [
                     {
                         "in": "path",
@@ -22128,8 +22124,8 @@
             },
             "put": {
                 "operationId": "updateOrder",
-                "description": "Update Παραγγελία information. Requires authentication.",
-                "summary": "Update a Παραγγελία",
+                "description": "Update Ταξινόμηση information. Requires authentication.",
+                "summary": "Update a Ταξινόμηση",
                 "parameters": [
                     {
                         "in": "path",
@@ -22258,8 +22254,8 @@
             },
             "patch": {
                 "operationId": "partialUpdateOrder",
-                "description": "Partially update Παραγγελία information. Requires authentication.",
-                "summary": "Partially update a Παραγγελία",
+                "description": "Partially update Ταξινόμηση information. Requires authentication.",
+                "summary": "Partially update a Ταξινόμηση",
                 "parameters": [
                     {
                         "in": "path",
@@ -22387,8 +22383,8 @@
             },
             "delete": {
                 "operationId": "destroyOrder",
-                "description": "Delete a Παραγγελία. Requires authentication.",
-                "summary": "Delete a Παραγγελία",
+                "description": "Delete a Ταξινόμηση. Requires authentication.",
+                "summary": "Delete a Ταξινόμηση",
                 "parameters": [
                     {
                         "in": "path",
@@ -22928,7 +22924,7 @@
         "/api/v1/order/{id}/invoice": {
             "get": {
                 "operationId": "retrieveOrderInvoice",
-                "description": "Return the order's invoice metadata and a short-lived signed URL to download the PDF. 404 if the invoice has not been generated yet (e.g. order not completed).",
+                "description": "Return the order's invoice metadata and an absolute URL to the streaming download endpoint (``/order/{id}/invoice/download``). The URL is gated by the same owner/admin permission check as this metadata endpoint — no raw storage URLs are exposed to the client. 404 if the invoice has not been generated yet (e.g. order not completed).",
                 "summary": "Get invoice download metadata for an order",
                 "parameters": [
                     {
@@ -23019,6 +23015,50 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/order/{id}/invoice/download": {
+            "get": {
+                "operationId": "downloadOrderInvoice",
+                "description": "Streams the rendered PDF through Django auth. 404 when the invoice has not been generated yet. Same ownership check as the metadata endpoint — returns a signed S3 stream on prod and a filesystem stream in dev without exposing the storage URL to the client.",
+                "summary": "Download the invoice PDF",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    },
+                    "404": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -24106,7 +24146,6 @@
                         "name": "paymentStatus",
                         "schema": {
                             "type": "string",
-                            "title": "Κατάσταση πληρωμής",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -24117,7 +24156,7 @@
                                 "REFUNDED"
                             ]
                         },
-                        "description": "Filter by payment status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `COMPLETED` - Ολοκληρώθηκε\n* `FAILED` - Failed\n* `REFUNDED` - Επεστράφη\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Ακυρώθηκε"
+                        "description": "Filter by payment status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `REFUNDED` - Refunded\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Canceled"
                     },
                     {
                         "in": "query",
@@ -24298,7 +24337,6 @@
                         "name": "status",
                         "schema": {
                             "type": "string",
-                            "title": "Κατάσταση",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -24310,7 +24348,7 @@
                                 "SHIPPED"
                             ]
                         },
-                        "description": "Filter by order status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `SHIPPED` - Απεστάλη\n* `DELIVERED` - Παραδόθηκε\n* `COMPLETED` - Ολοκληρώθηκε\n* `CANCELED` - Ακυρώθηκε\n* `RETURNED` - Επιστράφηκε\n* `REFUNDED` - Επεστράφη"
+                        "description": "Filter by order status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `SHIPPED` - Shipped\n* `DELIVERED` - Delivered\n* `COMPLETED` - Completed\n* `CANCELED` - Canceled\n* `RETURNED` - Returned\n* `REFUNDED` - Refunded"
                     },
                     {
                         "in": "query",
@@ -24718,6 +24756,480 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/page-config/{page_type}": {
+            "get": {
+                "operationId": "page_config_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "pageType",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Page Config"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PageLayout"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/page-config/admin": {
+            "get": {
+                "operationId": "page_config_admin_list",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "cursor",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Cursor for pagination"
+                    },
+                    {
+                        "in": "query",
+                        "name": "languageCode",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "de",
+                                "el",
+                                "en"
+                            ],
+                            "default": "el"
+                        },
+                        "description": "Language code for translations (el, en, de)"
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "pageSize",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "description": "Number of results to return per page"
+                    },
+                    {
+                        "in": "query",
+                        "name": "pagination",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "false",
+                                "true"
+                            ],
+                            "default": "true"
+                        },
+                        "description": "Enable or disable pagination"
+                    },
+                    {
+                        "in": "query",
+                        "name": "paginationType",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "cursor",
+                                "limitOffset",
+                                "pageNumber"
+                            ],
+                            "default": "pageNumber"
+                        },
+                        "description": "Pagination strategy type"
+                    },
+                    {
+                        "name": "search",
+                        "required": false,
+                        "in": "query",
+                        "description": "A search term.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "tags": [
+                    "page-config"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedPageLayoutList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "page_config_admin_create",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "languageCode",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "de",
+                                "el",
+                                "en"
+                            ],
+                            "default": "el"
+                        },
+                        "description": "Language code for translations (el, en, de)"
+                    }
+                ],
+                "tags": [
+                    "page-config"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PageLayoutRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PageLayoutRequest"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PageLayoutRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PageLayout"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/page-config/admin/{id}": {
+            "get": {
+                "operationId": "page_config_admin_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "languageCode",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "de",
+                                "el",
+                                "en"
+                            ],
+                            "default": "el"
+                        },
+                        "description": "Language code for translations (el, en, de)"
+                    }
+                ],
+                "tags": [
+                    "page-config"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PageLayout"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "operationId": "page_config_admin_update",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "languageCode",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "de",
+                                "el",
+                                "en"
+                            ],
+                            "default": "el"
+                        },
+                        "description": "Language code for translations (el, en, de)"
+                    }
+                ],
+                "tags": [
+                    "page-config"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PageLayoutRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PageLayoutRequest"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PageLayoutRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PageLayout"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "page_config_admin_partial_update",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "languageCode",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "de",
+                                "el",
+                                "en"
+                            ],
+                            "default": "el"
+                        },
+                        "description": "Language code for translations (el, en, de)"
+                    }
+                ],
+                "tags": [
+                    "page-config"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedPageLayoutRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedPageLayoutRequest"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedPageLayoutRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PageLayout"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "page_config_admin_destroy",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "page-config"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -26771,8 +27283,8 @@
             },
             "post": {
                 "operationId": "createProduct",
-                "description": "Create a new Προϊόν. Requires authentication.",
-                "summary": "Create a Προϊόν",
+                "description": "Create a new Product. Requires authentication.",
+                "summary": "Create a Product",
                 "parameters": [
                     {
                         "in": "query",
@@ -26887,8 +27399,8 @@
         "/api/v1/product/{id}": {
             "get": {
                 "operationId": "retrieveProduct",
-                "description": "Get detailed information about a specific Προϊόν.",
-                "summary": "Retrieve a Προϊόν",
+                "description": "Get detailed information about a specific Product.",
+                "summary": "Retrieve a Product",
                 "parameters": [
                     {
                         "in": "path",
@@ -26988,8 +27500,8 @@
             },
             "put": {
                 "operationId": "updateProduct",
-                "description": "Update Προϊόν information. Requires authentication.",
-                "summary": "Update a Προϊόν",
+                "description": "Update Product information. Requires authentication.",
+                "summary": "Update a Product",
                 "parameters": [
                     {
                         "in": "path",
@@ -27118,8 +27630,8 @@
             },
             "patch": {
                 "operationId": "partialUpdateProduct",
-                "description": "Partially update Προϊόν information. Requires authentication.",
-                "summary": "Partially update a Προϊόν",
+                "description": "Partially update Product information. Requires authentication.",
+                "summary": "Partially update a Product",
                 "parameters": [
                     {
                         "in": "path",
@@ -27247,8 +27759,8 @@
             },
             "delete": {
                 "operationId": "destroyProduct",
-                "description": "Delete a Προϊόν. Requires authentication.",
-                "summary": "Delete a Προϊόν",
+                "description": "Delete a Product. Requires authentication.",
+                "summary": "Delete a Product",
                 "parameters": [
                     {
                         "in": "path",
@@ -35707,7 +36219,6 @@
                         "name": "status",
                         "schema": {
                             "type": "string",
-                            "title": "Κατάσταση",
                             "enum": [
                                 "FALSE",
                                 "NEW",
@@ -40465,6 +40976,100 @@
                 }
             }
         },
+        "/api/v1/tenant/memberships/mine": {
+            "get": {
+                "operationId": "tenant_memberships_mine_retrieve",
+                "description": "List the tenants the authenticated user has active access to.\n\nThe storefront uses this to decide which tenant admin links to\nrender (OWNER/ADMIN/STAFF roles unlock different surfaces) and to\nbuild a tenant switcher for users who belong to multiple stores.\nAlways queried from the public schema — memberships are platform-\nwide data.",
+                "tags": [
+                    "Tenant"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "schemaName": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "storeName": {
+                                                "type": "string"
+                                            },
+                                            "primaryDomain": {
+                                                "type": "string"
+                                            },
+                                            "role": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "member",
+                                                    "staff",
+                                                    "admin",
+                                                    "owner"
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/tenant/resolve": {
+            "get": {
+                "operationId": "tenant_resolve_retrieve",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "domain",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Tenant"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TenantConfig"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/user/account": {
             "get": {
                 "operationId": "listUserAccount",
@@ -41612,6 +42217,275 @@
                 }
             }
         },
+        "/api/v1/user/account/{id}/data_exports": {
+            "get": {
+                "operationId": "listUserAccountDataExports",
+                "description": "List recent data-export requests for this user so the UI can show progress and the last download link.",
+                "summary": "List GDPR data exports",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    },
+                    {
+                        "name": "ordering",
+                        "in": "query",
+                        "required": false,
+                        "description": "Which field(s) to use when ordering the results. Multiple fields can be combined with commas (e.g. ``-isMain,-createdAt``). Available fields: id, -id, email, -email, username, -username, createdAt, -createdAt, updatedAt, -updatedAt",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^(?:id|\\-id|email|\\-email|username|\\-username|createdAt|\\-createdAt|updatedAt|\\-updatedAt)(?:,(?:id|\\-id|email|\\-email|username|\\-username|createdAt|\\-createdAt|updatedAt|\\-updatedAt))*$"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "required": false,
+                        "in": "query",
+                        "description": "A search term.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "tags": [
+                    "User Accounts"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedUserDataExportList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/user/account/{id}/delete_account": {
+            "post": {
+                "operationId": "deleteUserAccountGdpr",
+                "description": "Anonymises the user's orders (kept for tax/accounting) and hard-deletes every other linked record. Irreversible. Caller must have re-authenticated via allauth within the window configured by ``ACCOUNT_REAUTHENTICATION_TIMEOUT``.",
+                "summary": "Delete account (GDPR right-to-erasure)",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "User Accounts"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeleteAccountRequestRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeleteAccountRequestRequest"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeleteAccountRequestRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeleteAccountResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/user/account/{id}/favourite_products": {
             "get": {
                 "operationId": "getUserAccountFavouriteProducts",
@@ -42380,6 +43254,104 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/PaginatedProductReviewList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/user/account/{id}/request_data_export": {
+            "post": {
+                "operationId": "requestUserAccountDataExport",
+                "description": "Queue a job that compiles the user's personal data and emails a one-off download link. Returns the new UserDataExport record.",
+                "summary": "Request GDPR data export",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "User Accounts"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserDataExport"
                                 }
                             }
                         },
@@ -43688,6 +44660,40 @@
                 }
             }
         },
+        "/api/v1/user/data_export/{token}/download": {
+            "get": {
+                "operationId": "downloadUserDataExport",
+                "description": "Returns the JSON bundle produced by the export task. The token is single-scope, tied to one UserDataExport row, and expires 7 days after the export was produced.",
+                "summary": "Download a GDPR data export bundle",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "token",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "User Accounts"
+                ],
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    },
+                    "404": {
+                        "description": "No response body"
+                    },
+                    "410": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/v1/user/subscription": {
             "get": {
                 "operationId": "listUserSubscription",
@@ -43920,7 +44926,6 @@
                         "name": "status",
                         "schema": {
                             "type": "string",
-                            "title": "Κατάσταση",
                             "enum": [
                                 "ACTIVE",
                                 "BOUNCED",
@@ -43928,7 +44933,7 @@
                                 "UNSUBSCRIBED"
                             ]
                         },
-                        "description": "Filter by subscription status\n\n* `ACTIVE` - Ενεργή\n* `PENDING` - Pending Confirmation\n* `UNSUBSCRIBED` - Unsubscribed\n* `BOUNCED` - Bounced"
+                        "description": "Filter by subscription status\n\n* `ACTIVE` - Active\n* `PENDING` - Pending Confirmation\n* `UNSUBSCRIBED` - Unsubscribed\n* `BOUNCED` - Bounced"
                     },
                     {
                         "in": "query",
@@ -43993,7 +44998,6 @@
                         "name": "topicCategory",
                         "schema": {
                             "type": "string",
-                            "title": "Κατηγορία",
                             "enum": [
                                 "ACCOUNT",
                                 "MARKETING",
@@ -44004,7 +45008,7 @@
                                 "SYSTEM"
                             ]
                         },
-                        "description": "Filter by topic category\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "description": "Filter by topic category\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     {
                         "in": "query",
@@ -45043,7 +46047,6 @@
                         "name": "category",
                         "schema": {
                             "type": "string",
-                            "title": "Κατηγορία",
                             "enum": [
                                 "ACCOUNT",
                                 "MARKETING",
@@ -45054,7 +46057,7 @@
                                 "SYSTEM"
                             ]
                         },
-                        "description": "Filter by topic category\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "description": "Filter by topic category\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     {
                         "in": "query",
@@ -46609,8 +47612,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -46698,8 +47700,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -48361,8 +49362,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -48438,8 +49438,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -48511,8 +49510,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -48789,8 +49787,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0,
-                        "title": "Ποσότητα"
+                        "minimum": 0
                     },
                     "weightInfo": {
                         "type": "object",
@@ -48926,8 +49923,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0,
-                        "title": "Ποσότητα"
+                        "minimum": 0
                     }
                 },
                 "required": [
@@ -48956,8 +49952,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0,
-                        "title": "Ποσότητα"
+                        "minimum": 0
                     },
                     "weightInfo": {
                         "type": "object",
@@ -49099,8 +50094,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0,
-                        "title": "Ποσότητα"
+                        "minimum": 0
                     }
                 }
             },
@@ -49112,6 +50106,28 @@
                         "nullable": true
                     }
                 }
+            },
+            "ComponentTypeEnum": {
+                "enum": [
+                    "hero_banner",
+                    "hero_carousel",
+                    "products_slider",
+                    "products_grid",
+                    "featured_products",
+                    "product_categories",
+                    "blog_posts_carousel",
+                    "blog_posts_grid",
+                    "rich_text",
+                    "cta_banner",
+                    "newsletter_signup",
+                    "testimonials",
+                    "spacer",
+                    "divider",
+                    "loyalty_hero",
+                    "search_bar"
+                ],
+                "type": "string",
+                "description": "* `hero_banner` - Hero Banner\n* `hero_carousel` - Hero Carousel\n* `products_slider` - Products Slider\n* `products_grid` - Products Grid\n* `featured_products` - Featured Products\n* `product_categories` - Product Categories\n* `blog_posts_carousel` - Blog Posts Carousel\n* `blog_posts_grid` - Blog Posts Grid\n* `rich_text` - Rich Text Block\n* `cta_banner` - Call to Action Banner\n* `newsletter_signup` - Newsletter Signup\n* `testimonials` - Testimonials\n* `spacer` - Spacer\n* `divider` - Divider\n* `loyalty_hero` - Loyalty Program Hero\n* `search_bar` - Search Bar"
             },
             "ConfirmResponse": {
                 "type": "object",
@@ -49629,7 +50645,21 @@
                     "start"
                 ]
             },
-            "Detail": {
+            "DeleteAccountRequestRequest": {
+                "type": "object",
+                "description": "Body for ``POST user/account/{id}/delete_account``.\n\nRequires the user to re-type ``DELETE`` as a guardrail. The allauth\nre-authentication happens outside this serializer via the session\nmiddleware's ``X-Session-Token`` header before the task is queued.",
+                "properties": {
+                    "confirmation": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Must equal the literal string \"DELETE\"."
+                    }
+                },
+                "required": [
+                    "confirmation"
+                ]
+            },
+            "DeleteAccountResponse": {
                 "type": "object",
                 "properties": {
                     "detail": {
@@ -49640,17 +50670,16 @@
                     "detail"
                 ]
             },
-            "DocumentTypeEnum": {
-                "enum": [
-                    "RECEIPT",
-                    "INVOICE",
-                    "PROFORMA",
-                    "SHIPPING_LABEL",
-                    "RETURN_LABEL",
-                    "CREDIT_NOTE"
-                ],
-                "type": "string",
-                "description": "* `RECEIPT` - Receipt\n* `INVOICE` - Invoice\n* `PROFORMA` - Proforma Invoice\n* `SHIPPING_LABEL` - Shipping Label\n* `RETURN_LABEL` - Return Label\n* `CREDIT_NOTE` - Credit Note"
+            "Detail": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
             },
             "ErrorResponse": {
                 "type": "object",
@@ -49903,7 +50932,7 @@
             },
             "InvoiceDownloadResponse": {
                 "type": "object",
-                "description": "Invoice metadata plus a short-lived signed download URL.",
+                "description": "Invoice metadata plus an absolute URL to the streaming endpoint.",
                 "properties": {
                     "invoiceNumber": {
                         "type": "string",
@@ -49919,7 +50948,7 @@
                     "downloadUrl": {
                         "type": "string",
                         "nullable": true,
-                        "description": "Return a signed, short-lived URL for the PDF.\n\nOn S3 backends django-storages already signs the URL when\n``default_acl='private'`` and ``AWS_QUERYSTRING_AUTH=True`` —\notherwise the storage backend's ``.url()`` returns the relative\npath which the Nuxt layer can still fetch through its own\nauthenticated proxy.",
+                        "description": "Absolute URL to ``OrderViewSet.invoice_download``.\n\nRoutes every client click through Django so the same\n``IsOwnerOrAdmin`` check applies to the bytes as to the\nmetadata — avoids the pre-existing leak where\n``document_file.url`` returned either an unsigned S3 URL\n(403s without IAM) or a broken ``/media/...`` path (not\nserved in dev).",
                         "readOnly": true
                     },
                     "subtotal": {
@@ -50151,12 +51180,7 @@
                         "$ref": "#/components/schemas/NotificationKindEnum"
                     },
                     "category": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/NotificationCategory"
-                            }
-                        ],
-                        "title": "Κατηγορία"
+                        "$ref": "#/components/schemas/NotificationCategory"
                     },
                     "priority": {
                         "$ref": "#/components/schemas/PriorityEnum"
@@ -50220,7 +51244,7 @@
                     "RECOMMENDATION"
                 ],
                 "type": "string",
-                "description": "* `ORDER` - Παραγγελία\n* `PAYMENT` - Payment\n* `SHIPPING` - Μεταφορικά\n* `CART` - Cart\n* `PRODUCT` - Προϊόν\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SECURITY` - Security\n* `PROMOTION` - Promotion\n* `SYSTEM` - System\n* `REVIEW` - Review\n* `WISHLIST` - Wishlist\n* `SUPPORT` - Support\n* `NEWSLETTER` - Newsletter\n* `RECOMMENDATION` - Recommendation"
+                "description": "* `ORDER` - Ταξινόμηση\n* `PAYMENT` - Payment\n* `SHIPPING` - Shipping\n* `CART` - Cart\n* `PRODUCT` - Product\n* `ACCOUNT` - Account\n* `SECURITY` - Security\n* `PROMOTION` - Promotion\n* `SYSTEM` - System\n* `REVIEW` - Review\n* `WISHLIST` - Wishlist\n* `SUPPORT` - Support\n* `NEWSLETTER` - Newsletter\n* `RECOMMENDATION` - Recommendation"
             },
             "NotificationCountResponse": {
                 "type": "object",
@@ -50477,12 +51501,7 @@
                         "nullable": true
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/OrderStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/OrderStatus"
                     },
                     "statusDisplay": {
                         "type": "string",
@@ -50559,7 +51578,7 @@
                         "readOnly": true
                     },
                     "documentType": {
-                        "$ref": "#/components/schemas/DocumentTypeEnum"
+                        "$ref": "#/components/schemas/OrderDocumentType"
                     },
                     "createdAt": {
                         "type": "string",
@@ -50604,7 +51623,6 @@
                         "maxLength": 255
                     },
                     "paymentStatus": {
-                        "title": "Κατάσταση πληρωμής",
                         "oneOf": [
                             {
                                 "$ref": "#/components/schemas/PaymentStatusEnum"
@@ -50655,6 +51673,14 @@
                     "uuid",
                     "zipcode"
                 ]
+            },
+            "OrderCreateDocumentType": {
+                "enum": [
+                    "RECEIPT",
+                    "INVOICE"
+                ],
+                "type": "string",
+                "description": "* `RECEIPT` - Receipt\n* `INVOICE` - Invoice"
             },
             "OrderCreateFromCartRequest": {
                 "type": "object",
@@ -50730,6 +51756,25 @@
                         "description": "Customer notes or special instructions",
                         "maxLength": 500
                     },
+                    "billingVatId": {
+                        "type": "string",
+                        "description": "Buyer tax number (ΑΦΜ). Required when ``document_type`` is INVOICE; 9 digits for Greek ΑΦΜ, leading EL/GR prefix is stripped automatically.",
+                        "maxLength": 12
+                    },
+                    "billingCountry": {
+                        "type": "string",
+                        "description": "ISO 3166-1 alpha-2 country code for the buyer's tax identity. Defaults to the order country when blank.",
+                        "maxLength": 2
+                    },
+                    "documentType": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/OrderCreateDocumentType"
+                            }
+                        ],
+                        "default": "RECEIPT",
+                        "description": "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Selecting INVOICE requires a valid ``billing_vat_id``.\n\n* `RECEIPT` - Receipt\n* `INVOICE` - Invoice"
+                    },
                     "loyaltyPointsToRedeem": {
                         "type": "integer",
                         "minimum": 0,
@@ -50803,12 +51848,7 @@
                         "nullable": true
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/OrderStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/OrderStatus"
                     },
                     "statusDisplay": {
                         "type": "string",
@@ -50886,7 +51926,7 @@
                         "readOnly": true
                     },
                     "documentType": {
-                        "$ref": "#/components/schemas/DocumentTypeEnum"
+                        "$ref": "#/components/schemas/OrderDocumentType"
                     },
                     "createdAt": {
                         "type": "string",
@@ -50931,7 +51971,6 @@
                         "maxLength": 255
                     },
                     "paymentStatus": {
-                        "title": "Κατάσταση πληρωμής",
                         "oneOf": [
                             {
                                 "$ref": "#/components/schemas/PaymentStatusEnum"
@@ -51049,7 +52088,6 @@
                     },
                     "trackingNumber": {
                         "type": "string",
-                        "title": "Αριθμός Παρακολούθησης",
                         "maxLength": 255
                     },
                     "shippingCarrier": {
@@ -51105,6 +52143,18 @@
                     "zipcode"
                 ]
             },
+            "OrderDocumentType": {
+                "enum": [
+                    "RECEIPT",
+                    "INVOICE",
+                    "PROFORMA",
+                    "SHIPPING_LABEL",
+                    "RETURN_LABEL",
+                    "CREDIT_NOTE"
+                ],
+                "type": "string",
+                "description": "* `RECEIPT` - Receipt\n* `INVOICE` - Invoice\n* `PROFORMA` - Proforma Invoice\n* `SHIPPING_LABEL` - Shipping Label\n* `RETURN_LABEL` - Return Label\n* `CREDIT_NOTE` - Credit Note"
+            },
             "OrderItem": {
                 "type": "object",
                 "properties": {
@@ -51135,8 +52185,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648,
-                        "title": "Ποσότητα"
+                        "minimum": -2147483648
                     },
                     "isRefunded": {
                         "type": "boolean",
@@ -51193,8 +52242,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648,
-                        "title": "Ποσότητα"
+                        "minimum": -2147483648
                     },
                     "notes": {
                         "type": "string"
@@ -51239,8 +52287,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648,
-                        "title": "Ποσότητα"
+                        "minimum": -2147483648
                     },
                     "isRefunded": {
                         "type": "boolean",
@@ -51374,8 +52421,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648,
-                        "title": "Ποσότητα"
+                        "minimum": -2147483648
                     },
                     "notes": {
                         "type": "string"
@@ -51398,7 +52444,7 @@
                     "REFUNDED"
                 ],
                 "type": "string",
-                "description": "* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `SHIPPED` - Απεστάλη\n* `DELIVERED` - Παραδόθηκε\n* `COMPLETED` - Ολοκληρώθηκε\n* `CANCELED` - Ακυρώθηκε\n* `RETURNED` - Επιστράφηκε\n* `REFUNDED` - Επεστράφη"
+                "description": "* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `SHIPPED` - Shipped\n* `DELIVERED` - Delivered\n* `COMPLETED` - Completed\n* `CANCELED` - Canceled\n* `RETURNED` - Returned\n* `REFUNDED` - Refunded"
             },
             "OrderWriteRequest": {
                 "type": "object",
@@ -51455,12 +52501,7 @@
                         "nullable": true
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/OrderStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/OrderStatus"
                     },
                     "firstName": {
                         "type": "string",
@@ -51506,7 +52547,7 @@
                         }
                     },
                     "documentType": {
-                        "$ref": "#/components/schemas/DocumentTypeEnum"
+                        "$ref": "#/components/schemas/OrderDocumentType"
                     },
                     "paymentId": {
                         "type": "string",
@@ -51522,7 +52563,6 @@
                     },
                     "trackingNumber": {
                         "type": "string",
-                        "title": "Αριθμός Παρακολούθησης",
                         "maxLength": 255
                     },
                     "shippingCarrier": {
@@ -51540,6 +52580,132 @@
                     "street",
                     "streetNumber",
                     "zipcode"
+                ]
+            },
+            "PageLayout": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "uuid": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "pageType": {
+                        "type": "string",
+                        "description": "Identifier for the page (e.g. \"home\", \"products\", \"blog\").",
+                        "maxLength": 50
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Admin display name for this layout.",
+                        "maxLength": 200
+                    },
+                    "isPublished": {
+                        "type": "boolean"
+                    },
+                    "metadata": {},
+                    "sections": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PageSection"
+                        },
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "pageType",
+                    "sections",
+                    "title",
+                    "uuid"
+                ]
+            },
+            "PageLayoutRequest": {
+                "type": "object",
+                "properties": {
+                    "pageType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Identifier for the page (e.g. \"home\", \"products\", \"blog\").",
+                        "maxLength": 50
+                    },
+                    "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Admin display name for this layout.",
+                        "maxLength": 200
+                    },
+                    "isPublished": {
+                        "type": "boolean"
+                    },
+                    "metadata": {}
+                },
+                "required": [
+                    "pageType",
+                    "title"
+                ]
+            },
+            "PageSection": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "uuid": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "componentType": {
+                        "$ref": "#/components/schemas/ComponentTypeEnum"
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "isVisible": {
+                        "type": "boolean"
+                    },
+                    "props": {
+                        "description": "Component-specific configuration as JSON."
+                    },
+                    "sortOrder": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "componentType",
+                    "id",
+                    "sortOrder",
+                    "uuid"
+                ]
+            },
+            "PageSectionRequest": {
+                "type": "object",
+                "properties": {
+                    "componentType": {
+                        "$ref": "#/components/schemas/ComponentTypeEnum"
+                    },
+                    "title": {
+                        "type": "string",
+                        "maxLength": 200
+                    },
+                    "isVisible": {
+                        "type": "boolean"
+                    },
+                    "props": {
+                        "description": "Component-specific configuration as JSON."
+                    }
+                },
+                "required": [
+                    "componentType"
                 ]
             },
             "PaginatedAttributeList": {
@@ -52322,6 +53488,58 @@
                     }
                 }
             },
+            "PaginatedPageLayoutList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "links": {
+                        "type": "object",
+                        "properties": {
+                            "next": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uri",
+                                "example": "http://api.example.org/accounts/?page=4"
+                            },
+                            "previous": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uri",
+                                "example": "http://api.example.org/accounts/?page=2"
+                            }
+                        }
+                    },
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "totalPages": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "pageSize": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "pageTotalResults": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "page": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PageLayout"
+                        }
+                    }
+                }
+            },
             "PaginatedPayWayList": {
                 "type": "object",
                 "required": [
@@ -53050,6 +54268,58 @@
                     }
                 }
             },
+            "PaginatedUserDataExportList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "links": {
+                        "type": "object",
+                        "properties": {
+                            "next": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uri",
+                                "example": "http://api.example.org/accounts/?page=4"
+                            },
+                            "previous": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uri",
+                                "example": "http://api.example.org/accounts/?page=2"
+                            }
+                        }
+                    },
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "totalPages": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "pageSize": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "pageTotalResults": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "page": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UserDataExport"
+                        }
+                    }
+                }
+            },
             "PaginatedUserDetailsList": {
                 "type": "object",
                 "required": [
@@ -53422,8 +54692,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     }
                 }
             },
@@ -53433,8 +54702,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0,
-                        "title": "Ποσότητα"
+                        "minimum": 0
                     }
                 }
             },
@@ -53535,8 +54803,7 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648,
-                        "title": "Ποσότητα"
+                        "minimum": -2147483648
                     },
                     "notes": {
                         "type": "string"
@@ -53598,12 +54865,7 @@
                         "nullable": true
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/OrderStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/OrderStatus"
                     },
                     "firstName": {
                         "type": "string",
@@ -53649,7 +54911,7 @@
                         }
                     },
                     "documentType": {
-                        "$ref": "#/components/schemas/DocumentTypeEnum"
+                        "$ref": "#/components/schemas/OrderDocumentType"
                     },
                     "paymentId": {
                         "type": "string",
@@ -53665,13 +54927,33 @@
                     },
                     "trackingNumber": {
                         "type": "string",
-                        "title": "Αριθμός Παρακολούθησης",
                         "maxLength": 255
                     },
                     "shippingCarrier": {
                         "type": "string",
                         "maxLength": 255
                     }
+                }
+            },
+            "PatchedPageLayoutRequest": {
+                "type": "object",
+                "properties": {
+                    "pageType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Identifier for the page (e.g. \"home\", \"products\", \"blog\").",
+                        "maxLength": 50
+                    },
+                    "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Admin display name for this layout.",
+                        "maxLength": 200
+                    },
+                    "isPublished": {
+                        "type": "boolean"
+                    },
+                    "metadata": {}
                 }
             },
             "PatchedPayWayWriteRequest": {
@@ -53726,8 +55008,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "cost": {
                         "type": "number",
@@ -53808,8 +55089,7 @@
                         "default": "MAIN"
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "translations": {
                         "type": "object",
@@ -53900,8 +55180,7 @@
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "parent": {
                         "type": "integer",
@@ -54126,8 +55405,7 @@
                         "maxLength": 255
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     }
                 }
             },
@@ -54232,12 +55510,11 @@
                                 "$ref": "#/components/schemas/TopicCategory"
                             }
                         ],
-                        "title": "Κατηγορία",
-                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     "isActive": {
                         "type": "boolean",
-                        "title": "Ενεργή",
+                        "title": "Active",
                         "description": "Whether this topic is currently available for subscription"
                     },
                     "isDefault": {
@@ -54285,8 +55562,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     }
                 }
             },
@@ -54398,12 +55674,7 @@
                         "type": "integer"
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/SubscriptionStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/SubscriptionStatus"
                     },
                     "metadata": {
                         "description": "Additional subscription preferences or data"
@@ -54596,8 +55867,7 @@
                         "readOnly": true
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "cost": {
                         "type": "number",
@@ -54731,8 +56001,7 @@
                         "readOnly": true
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "cost": {
                         "type": "number",
@@ -54866,8 +56135,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "cost": {
                         "type": "number",
@@ -54925,7 +56193,7 @@
                     "CANCELED"
                 ],
                 "type": "string",
-                "description": "* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `COMPLETED` - Ολοκληρώθηκε\n* `FAILED` - Failed\n* `REFUNDED` - Επεστράφη\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Ακυρώθηκε"
+                "description": "* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `REFUNDED` - Refunded\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Canceled"
             },
             "PaymentStatusResponse": {
                 "type": "object",
@@ -55127,8 +56395,7 @@
                         "description": "Stock level at or below which admins get a low-stock alert. Set to 0 to disable alerts for this product."
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "weight": {
                         "type": "object",
@@ -55502,8 +56769,7 @@
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "parent": {
                         "type": "integer",
@@ -55596,8 +56862,7 @@
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "parent": {
                         "type": "integer",
@@ -55692,8 +56957,7 @@
                         "default": "MAIN"
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -55824,8 +57088,7 @@
                         "default": "MAIN"
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -55929,8 +57192,7 @@
                         "default": "MAIN"
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "translations": {
                         "type": "object",
@@ -56026,8 +57288,7 @@
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "parent": {
                         "type": "integer",
@@ -56131,8 +57392,7 @@
                         "description": "Stock level at or below which admins get a low-stock alert. Set to 0 to disable alerts for this product."
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "weight": {
                         "type": "object",
@@ -56354,8 +57614,7 @@
                         "description": "Stock level at or below which admins get a low-stock alert. Set to 0 to disable alerts for this product."
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "weight": {
                         "type": "object",
@@ -57147,12 +58406,7 @@
                         "maximum": 32767
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/ReviewStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/ReviewStatus"
                     },
                     "isPublished": {
                         "type": "boolean"
@@ -57254,12 +58508,7 @@
                         "maximum": 32767
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/ReviewStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/ReviewStatus"
                     },
                     "isPublished": {
                         "type": "boolean"
@@ -57483,8 +58732,7 @@
                         "maxLength": 255
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -58023,7 +59271,7 @@
                     "BOUNCED"
                 ],
                 "type": "string",
-                "description": "* `ACTIVE` - Ενεργή\n* `PENDING` - Pending Confirmation\n* `UNSUBSCRIBED` - Unsubscribed\n* `BOUNCED` - Bounced"
+                "description": "* `ACTIVE` - Active\n* `PENDING` - Pending Confirmation\n* `UNSUBSCRIBED` - Unsubscribed\n* `BOUNCED` - Bounced"
             },
             "SubscriptionTopic": {
                 "type": "object",
@@ -58088,12 +59336,11 @@
                                 "$ref": "#/components/schemas/TopicCategory"
                             }
                         ],
-                        "title": "Κατηγορία",
-                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     "isActive": {
                         "type": "boolean",
-                        "title": "Ενεργή",
+                        "title": "Active",
                         "description": "Whether this topic is currently available for subscription"
                     },
                     "isDefault": {
@@ -58181,12 +59428,11 @@
                                 "$ref": "#/components/schemas/TopicCategory"
                             }
                         ],
-                        "title": "Κατηγορία",
-                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     "isActive": {
                         "type": "boolean",
-                        "title": "Ενεργή",
+                        "title": "Active",
                         "description": "Whether this topic is currently available for subscription"
                     },
                     "isDefault": {
@@ -58278,12 +59524,11 @@
                                 "$ref": "#/components/schemas/TopicCategory"
                             }
                         ],
-                        "title": "Κατηγορία",
-                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     "isActive": {
                         "type": "boolean",
-                        "title": "Ενεργή",
+                        "title": "Active",
                         "description": "Whether this topic is currently available for subscription"
                     },
                     "isDefault": {
@@ -58339,8 +59584,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -58416,8 +59660,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -58495,8 +59738,7 @@
                         }
                     },
                     "active": {
-                        "type": "boolean",
-                        "title": "Ενεργή"
+                        "type": "boolean"
                     }
                 },
                 "required": [
@@ -58694,6 +59936,125 @@
                     "tagId"
                 ]
             },
+            "TenantConfig": {
+                "type": "object",
+                "properties": {
+                    "schemaName": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "storeName": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "storeDescription": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "logoLightUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true
+                    },
+                    "logoDarkUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true
+                    },
+                    "faviconUrl": {
+                        "type": "string",
+                        "format": "uri",
+                        "readOnly": true
+                    },
+                    "primaryColor": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "neutralColor": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "accentHex": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "successHex": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "warningHex": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "errorHex": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "infoHex": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "themePreset": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "themeMetadata": {
+                        "readOnly": true
+                    },
+                    "defaultLocale": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "defaultCurrency": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "primaryDomain": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "loyaltyEnabled": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "blogEnabled": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "plan": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "accentHex",
+                    "blogEnabled",
+                    "defaultCurrency",
+                    "defaultLocale",
+                    "errorHex",
+                    "faviconUrl",
+                    "infoHex",
+                    "logoDarkUrl",
+                    "logoLightUrl",
+                    "loyaltyEnabled",
+                    "name",
+                    "neutralColor",
+                    "plan",
+                    "primaryColor",
+                    "primaryDomain",
+                    "schemaName",
+                    "storeDescription",
+                    "storeName",
+                    "successHex",
+                    "themeMetadata",
+                    "themePreset",
+                    "warningHex"
+                ]
+            },
             "TopQuery": {
                 "type": "object",
                 "description": "Serializer for top query analytics.",
@@ -58735,7 +60096,7 @@
                     "OTHER"
                 ],
                 "type": "string",
-                "description": "* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                "description": "* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
             },
             "TransactionTypeEnum": {
                 "enum": [
@@ -59155,6 +60516,54 @@
                     "zipcode"
                 ]
             },
+            "UserDataExport": {
+                "type": "object",
+                "description": "Read-only view of a UserDataExport row for the privacy UI.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "token": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "fileSize": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "downloadUrl": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "createdAt",
+                    "downloadUrl",
+                    "expiresAt",
+                    "fileSize",
+                    "id",
+                    "status",
+                    "token"
+                ]
+            },
             "UserDetails": {
                 "type": "object",
                 "properties": {
@@ -59286,7 +60695,7 @@
                     "isActive": {
                         "type": "boolean",
                         "readOnly": true,
-                        "title": "Ενεργή"
+                        "title": "Active"
                     },
                     "isStaff": {
                         "type": "boolean",
@@ -59363,12 +60772,7 @@
                         "readOnly": true
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/SubscriptionStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/SubscriptionStatus"
                     },
                     "subscribedAt": {
                         "type": "string",
@@ -59430,12 +60834,7 @@
                         "readOnly": true
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/SubscriptionStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/SubscriptionStatus"
                     },
                     "subscribedAt": {
                         "type": "string",
@@ -59486,12 +60885,7 @@
                         "type": "integer"
                     },
                     "status": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/SubscriptionStatus"
-                            }
-                        ],
-                        "title": "Κατάσταση"
+                        "$ref": "#/components/schemas/SubscriptionStatus"
                     },
                     "metadata": {
                         "description": "Additional subscription preferences or data"

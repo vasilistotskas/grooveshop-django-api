@@ -27,12 +27,19 @@ def get_tenant_base_url() -> str:
        ``TenantMainMiddleware`` or ``TenantTask`` in Celery).
     2. ``settings.NUXT_BASE_URL`` as a platform-wide fallback.
 
-    Always returns a URL without trailing slash.
+    Always returns a URL without trailing slash. Defensive against
+    tenants that don't expose ``.domains`` (e.g. test fakes, or
+    transient states during tenant creation) — falls through to the
+    settings value in that case rather than raising.
     """
     tenant = getattr(connection, "tenant", None)
-    if tenant is not None:
-        domain_obj = tenant.domains.filter(is_primary=True).first()
-        if domain_obj and domain_obj.domain:
+    domains_manager = getattr(tenant, "domains", None) if tenant else None
+    if domains_manager is not None:
+        try:
+            domain_obj = domains_manager.filter(is_primary=True).first()
+        except Exception:  # noqa: BLE001 — any failure falls through to fallback
+            domain_obj = None
+        if domain_obj and getattr(domain_obj, "domain", ""):
             return f"https://{domain_obj.domain}"
 
     fallback = getattr(settings, "NUXT_BASE_URL", "") or ""

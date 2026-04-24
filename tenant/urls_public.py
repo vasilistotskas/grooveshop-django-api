@@ -14,7 +14,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from core.urls import urlpatterns as core_urlpatterns
-from tenant.views import TenantAdminViewSet, tenant_resolve
+from tenant.views import TenantAdminViewSet, my_memberships, tenant_resolve
 
 router = DefaultRouter()
 router.register(
@@ -25,5 +25,10 @@ router.register(
 
 urlpatterns = [
     path("api/v1/tenant/resolve", tenant_resolve, name="tenant-resolve"),
+    path(
+        "api/v1/tenant/memberships/mine",
+        my_memberships,
+        name="tenant-memberships-mine",
+    ),
     path("", include(router.urls)),
 ] + core_urlpatterns

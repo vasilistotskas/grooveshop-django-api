@@ -10,6 +10,7 @@ from blog.serializers.category import (
     BlogCategorySerializer,
 )
 from core.utils.testing import TestURLFixerMixin
+from user.factories.account import UserAccountFactory
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -19,6 +20,11 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 
 class BlogCategoryViewSetTestCase(TestURLFixerMixin, APITestCase):
     def setUp(self):
+        self.admin_user = UserAccountFactory(
+            num_addresses=0, is_superuser=True, is_staff=True
+        )
+        self.client.force_authenticate(user=self.admin_user)
+
         self.category = BlogCategoryFactory(slug="test-category")
         self.parent_category = BlogCategoryFactory(slug="parent-category")
         self.child_category = BlogCategoryFactory(

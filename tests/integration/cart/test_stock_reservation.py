@@ -76,7 +76,7 @@ class CartStockReservationTest(TestURLFixerMixin, APITestCase):
         response = self.client.post(self.reserve_url)
 
         # Verify error response
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertIn("detail", response.data)
         self.assertIn("failed_items", response.data)
         self.assertEqual(len(response.data["failed_items"]), 1)
@@ -104,7 +104,7 @@ class CartStockReservationTest(TestURLFixerMixin, APITestCase):
         response = self.client.post(self.reserve_url)
 
         # Verify error response
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertIn("failed_items", response.data)
 
     def test_release_reservations_success(self):

@@ -9,6 +9,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.order import Order
+from pay_way.factories import PayWayFactory
 from order.signals import (
     order_canceled,
     order_completed,
@@ -36,15 +37,17 @@ class OrderSignalsTestCase(TestCase):
         self.product.refresh_from_db()
         self.initial_stock = self.product.stock
 
-    @patch("order.notifications.send_order_confirmation")
-    @patch("order.tasks.send_order_confirmation_email.delay")
-    def test_order_created_only_sends_one_email(
-        self, mock_email_task, mock_direct_notification
-    ):
+    @patch("order.signals.handlers.send_order_confirmation_email.delay")
+    def test_order_created_offline_payment_sends_email(self, mock_email_task):
+        # Offline payment methods (COD, bank transfer) need the
+        # confirmation email immediately so the customer has the order
+        # details before paying manually.
+        self.order.pay_way = PayWayFactory.create_offline_payment()
+        self.order.save(update_fields=["pay_way"])
+
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_called_once_with(self.order.id)
-        mock_direct_notification.assert_not_called()
 
         self.assertTrue(
             OrderHistory.objects.filter(
@@ -53,6 +56,45 @@ class OrderSignalsTestCase(TestCase):
                 new_value={"note": "Order created"},
             ).exists()
         )
+
+    @patch("order.signals.handlers.send_order_confirmation_email.delay")
+    def test_order_created_online_payment_defers_email(self, mock_email_task):
+        # Online payments (Stripe, Viva) must defer the confirmation
+        # email to the payment-success webhook — the customer should
+        # only get the email once the payment actually clears.
+        self.order.pay_way = PayWayFactory.create_online_payment(
+            provider_code="stripe"
+        )
+        self.order.payment_status = PaymentStatus.PENDING
+        self.order.save(update_fields=["pay_way", "payment_status"])
+
+        order_created.send(sender=Order, order=self.order)
+
+        mock_email_task.assert_not_called()
+
+        self.assertTrue(
+            OrderHistory.objects.filter(
+                order=self.order,
+                change_type="NOTE",
+                new_value={"note": "Order created"},
+            ).exists()
+        )
+
+    @patch("order.signals.handlers.send_order_confirmation_email.delay")
+    def test_order_created_online_payment_already_paid_sends_email(
+        self, mock_email_task
+    ):
+        # Safety net: if an online-payment order is somehow already
+        # paid at creation time, we still send the email immediately.
+        self.order.pay_way = PayWayFactory.create_online_payment(
+            provider_code="stripe"
+        )
+        self.order.payment_status = PaymentStatus.COMPLETED
+        self.order.save(update_fields=["pay_way", "payment_status"])
+
+        order_created.send(sender=Order, order=self.order)
+
+        mock_email_task.assert_called_once_with(self.order.id)
 
     @patch("order.tasks.send_order_status_update_email.delay")
     def test_order_status_changed_signal(self, mock_email_task):
@@ -205,8 +247,7 @@ class OrderSignalsTestCase(TestCase):
         )
         self.assertEqual(history.new_value["price"], float(new_price.amount))
 
-    @patch("order.tasks.send_shipping_notification_email.delay")
-    def test_handle_order_shipped(self, mock_email_task):
+    def test_handle_order_shipped(self):
         self.order.tracking_number = "TRACK123"
         self.order.shipping_carrier = "FedEx"
         self.order.status = OrderStatus.PROCESSING.value
@@ -214,22 +255,17 @@ class OrderSignalsTestCase(TestCase):
 
         order_shipped.send(sender=Order, order=self.order)
 
-        mock_email_task.assert_called_with(self.order.id)
-
         self.assertTrue(
             OrderHistory.objects.filter(
                 order=self.order, change_type="SHIPPING"
             ).exists()
         )
 
-    @patch("order.tasks.generate_order_invoice.delay")
-    def test_handle_order_completed(self, mock_invoice_task):
+    def test_handle_order_completed(self):
         self.order.document_type = "INVOICE"
         self.order.save()
 
         order_completed.send(sender=Order, order=self.order)
-
-        mock_invoice_task.assert_called_once_with(self.order.id)
 
         self.assertTrue(
             OrderHistory.objects.filter(

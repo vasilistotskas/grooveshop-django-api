@@ -1,4 +1,5 @@
 from django.apps import apps
+from django.core.cache import cache
 from django.db.models import Count, Sum, Avg
 from django.db.models.functions import TruncDay
 from django.utils import timezone
@@ -6,12 +7,107 @@ from django.utils.html import format_html, escape
 from django.urls import reverse
 from datetime import timedelta
 
+DASHBOARD_CACHE_KEY = "admin:dashboard:data:v1"
+DASHBOARD_CACHE_TTL = 300  # 5 minutes
+
 
 def dashboard_callback(request, context):
     """
     Enhanced dashboard callback for Unfold admin.
     Provides KPIs, chart data, and table data for the admin dashboard.
+
+    The underlying data is request-independent (admin-only URLs from
+    ``reverse()`` + DB aggregates) so we cache the full payload in Redis
+    for 5 minutes and invalidate on domain model writes via signals.
+    Seller-config warnings are computed fresh (not cached) so fixing
+    the setting is reflected on the admin's next page load.
     """
+    data = cache.get_or_set(
+        DASHBOARD_CACHE_KEY, _build_dashboard_data, DASHBOARD_CACHE_TTL
+    )
+    context.update(data)
+    context["seller_config_warnings"] = _check_seller_config()
+    context["mydata_warnings"] = _check_mydata_state()
+    return context
+
+
+# Tax-mandatory seller fields. Missing values produce a red dashboard
+# alert — a fresh install MUST fill these in before issuing real
+# invoices, otherwise the PDF renders with no legal identity and
+# would not pass a tax audit.
+_REQUIRED_SELLER_SETTINGS = (
+    ("INVOICE_SELLER_NAME", "Company name"),
+    ("INVOICE_SELLER_VAT_ID", "VAT ID (ΑΦΜ)"),
+    ("INVOICE_SELLER_TAX_OFFICE", "Tax office (ΔΟΥ)"),
+)
+
+
+def _check_seller_config() -> list[dict]:
+    """Return a list of warning rows for empty required seller settings.
+
+    Empty string means "present in DB but never filled" — the
+    ``EXTRA_SETTINGS_DEFAULTS`` seed creates the row with a blank
+    value so ops can find it in the Settings admin. Non-critical
+    fields (address, phone) aren't surfaced here to avoid nagging
+    for strictly-optional info.
+    """
+    from extra_settings.models import Setting
+
+    warnings = []
+    for key, label in _REQUIRED_SELLER_SETTINGS:
+        value = Setting.get(key, default="")
+        if not value:
+            warnings.append({"key": key, "label": label})
+    return warnings
+
+
+def _check_mydata_state() -> dict:
+    """Compile myDATA-specific alert state for the dashboard banner.
+
+    Two conditions we flag loud:
+    1. Integration enabled but credentials missing — submissions will
+       fail on every attempt.
+    2. Recent rejections (last 7 days) — operator needs to reconcile
+       master data. A REJECTED invoice is an unhappy customer + a
+       missing tax registration, so quiet failure is not acceptable.
+    """
+    from datetime import timedelta
+
+    from extra_settings.models import Setting
+
+    from order.models.invoice import Invoice, MyDataStatus
+
+    enabled = bool(Setting.get("MYDATA_ENABLED", default=False))
+    user_id = str(Setting.get("MYDATA_USER_ID", default="") or "")
+    subscription_key = str(
+        Setting.get("MYDATA_SUBSCRIPTION_KEY", default="") or ""
+    )
+    environment = str(Setting.get("MYDATA_ENVIRONMENT", default="dev") or "dev")
+
+    missing_creds: list[str] = []
+    if enabled and not user_id:
+        missing_creds.append("MYDATA_USER_ID")
+    if enabled and not subscription_key:
+        missing_creds.append("MYDATA_SUBSCRIPTION_KEY")
+
+    recent_rejected = 0
+    if enabled:
+        week_ago = timezone.now() - timedelta(days=7)
+        recent_rejected = Invoice.objects.filter(
+            mydata_status=MyDataStatus.REJECTED,
+            updated_at__gte=week_ago,
+        ).count()
+
+    return {
+        "enabled": enabled,
+        "environment": environment,
+        "missing_creds": missing_creds,
+        "recent_rejected": recent_rejected,
+    }
+
+
+def _build_dashboard_data():
+    """Compute every KPI/chart/table block in a single pass."""
     User = apps.get_model("user", "UserAccount")
     Product = apps.get_model("product", "Product")
     Order = apps.get_model("order", "Order")
@@ -20,7 +116,6 @@ def dashboard_callback(request, context):
     ProductReview = apps.get_model("product", "ProductReview")
     UserSubscription = apps.get_model("user", "UserSubscription")
     Contact = apps.get_model("contact", "Contact")
-    Cart = apps.get_model("cart", "Cart")
     Cart = apps.get_model("cart", "Cart")
     ProductCategory = apps.get_model("product", "ProductCategory")
     BlogCategory = apps.get_model("blog", "BlogCategory")
@@ -466,7 +561,9 @@ def dashboard_callback(request, context):
     }
 
     # Top Products Table
-    top_products = Product.objects.order_by("-view_count")[:5]
+    top_products = Product.objects.prefetch_related("translations").order_by(
+        "-view_count"
+    )[:5]
     products_table_rows = []
     for product in top_products:
         name = (
@@ -494,9 +591,11 @@ def dashboard_callback(request, context):
     }
 
     # Recent Reviews Table
-    recent_reviews = ProductReview.objects.select_related(
-        "product", "user"
-    ).order_by("-created_at")[:5]
+    recent_reviews = (
+        ProductReview.objects.select_related("product", "user")
+        .prefetch_related("product__translations")
+        .order_by("-created_at")[:5]
+    )
     reviews_table_rows = []
     for review in recent_reviews:
         product_name = (
@@ -545,9 +644,11 @@ def dashboard_callback(request, context):
     }
 
     # Low Stock Products Table
-    low_stock_products = Product.objects.filter(
-        active=True, stock__lt=10
-    ).order_by("stock")[:5]
+    low_stock_products = (
+        Product.objects.filter(active=True, stock__lt=10)
+        .prefetch_related("translations")
+        .order_by("stock")[:5]
+    )
     low_stock_rows = []
     for product in low_stock_products:
         name = (
@@ -572,9 +673,11 @@ def dashboard_callback(request, context):
     }
 
     # Recent Stock Logs Table
-    recent_stock_logs = StockLog.objects.select_related(
-        "product", "performed_by"
-    ).order_by("-created_at")[:5]
+    recent_stock_logs = (
+        StockLog.objects.select_related("product", "performed_by")
+        .prefetch_related("product__translations")
+        .order_by("-created_at")[:5]
+    )
     stock_log_rows = []
     for log in recent_stock_logs:
         product_name = (
@@ -612,18 +715,16 @@ def dashboard_callback(request, context):
 
     # ========== PROGRESS BARS ==========
 
-    # Inventory health (percentage of products in stock)
-    total_active_products = Product.objects.filter(active=True).count()
+    # Inventory health (percentage of products in stock).
+    # ``total_products`` counted active products above — reuse it.
     in_stock_products = Product.objects.filter(active=True, stock__gt=0).count()
     inventory_health = (
-        (in_stock_products / total_active_products * 100)
-        if total_active_products > 0
-        else 0
+        (in_stock_products / total_products * 100) if total_products > 0 else 0
     )
 
     inventory_progress = {
         "title": "Inventory Health",
-        "description": f"{in_stock_products}/{total_active_products} products in stock",
+        "description": f"{in_stock_products}/{total_products} products in stock",
         "value": round(inventory_health, 1),
     }
 
@@ -651,69 +752,65 @@ def dashboard_callback(request, context):
         },
     ]
 
-    # ========== UPDATE CONTEXT ==========
-    context.update(
-        {
-            # Core KPIs
-            "kpi": {
-                "users": total_users,
-                "new_users_today": new_users_today,
-                "products": total_products,
-                "orders": total_orders,
-                "revenue": total_revenue,
-                "pending_orders": pending_orders_count,
-                "blog_views": total_blog_views,
-                "pending_reviews": pending_reviews_count,
-                "avg_rating": round(avg_rating, 1) if avg_rating else 0,
-                "subscribers": total_subscribers,
-                "low_stock": low_stock_count,
-                "active_carts": active_carts_count,
-                "messages": total_messages,
-                "orders_this_month": orders_this_month,
-                "avg_order_value": round(avg_order_value, 2),
-                "total_blog_likes": total_blog_likes,
-                # Blog KPIs
-                "blog_posts": total_blog_posts,
-                "published_posts": published_posts,
-                "featured_posts": featured_posts,
-                "pending_comments": pending_blog_comments,
-                "total_comments": total_blog_comments,
-                # Categories
-                "categories": total_categories,
-            },
-            # Charts (JSON strings for Chart.js)
-            "performance_chart": performance_chart,
-            "users_chart": users_chart,
-            "status_chart": status_chart,
-            "payment_chart": payment_chart,
-            "country_chart": country_chart,
-            "blog_category_chart": blog_category_chart,
-            "product_category_chart": product_category_chart,
-            "subscription_chart": subscription_chart,
-            "cart_chart": cart_chart,
-            # Tables (Unfold format)
-            "orders_table": orders_table,
-            "products_table": products_table,
-            "reviews_table": reviews_table,
-            "messages_table": messages_table,
-            "low_stock_table": low_stock_table,
-            "stock_log_table": stock_log_table,
-            # Progress bars
-            "inventory_progress": inventory_progress,
-            # Quick links
-            "quick_links": quick_links,
-            "active_users": active_users_count,
-            "inactive_users": inactive_users_count,
-            "abandoned_carts": abandoned_carts_count,
-            "discounted_products": discounted_products_count,
-            "recent_orders": recent_orders,
-            "top_products": top_products,
-            "recent_reviews": recent_reviews,
-            "recent_messages": recent_messages,
-        }
-    )
-
-    return context
+    # ========== ASSEMBLE PAYLOAD ==========
+    return {
+        # Core KPIs
+        "kpi": {
+            "users": total_users,
+            "new_users_today": new_users_today,
+            "products": total_products,
+            "orders": total_orders,
+            "revenue": total_revenue,
+            "pending_orders": pending_orders_count,
+            "blog_views": total_blog_views,
+            "pending_reviews": pending_reviews_count,
+            "avg_rating": round(avg_rating, 1) if avg_rating else 0,
+            "subscribers": total_subscribers,
+            "low_stock": low_stock_count,
+            "active_carts": active_carts_count,
+            "messages": total_messages,
+            "orders_this_month": orders_this_month,
+            "avg_order_value": round(avg_order_value, 2),
+            "total_blog_likes": total_blog_likes,
+            # Blog KPIs
+            "blog_posts": total_blog_posts,
+            "published_posts": published_posts,
+            "featured_posts": featured_posts,
+            "pending_comments": pending_blog_comments,
+            "total_comments": total_blog_comments,
+            # Categories
+            "categories": total_categories,
+        },
+        # Charts (JSON strings for Chart.js)
+        "performance_chart": performance_chart,
+        "users_chart": users_chart,
+        "status_chart": status_chart,
+        "payment_chart": payment_chart,
+        "country_chart": country_chart,
+        "blog_category_chart": blog_category_chart,
+        "product_category_chart": product_category_chart,
+        "subscription_chart": subscription_chart,
+        "cart_chart": cart_chart,
+        # Tables (Unfold format)
+        "orders_table": orders_table,
+        "products_table": products_table,
+        "reviews_table": reviews_table,
+        "messages_table": messages_table,
+        "low_stock_table": low_stock_table,
+        "stock_log_table": stock_log_table,
+        # Progress bars
+        "inventory_progress": inventory_progress,
+        # Quick links
+        "quick_links": quick_links,
+        "active_users": active_users_count,
+        "inactive_users": inactive_users_count,
+        "abandoned_carts": abandoned_carts_count,
+        "discounted_products": discounted_products_count,
+        # The ``*_table`` entries above carry fully rendered rows — raw
+        # queryset results are intentionally omitted from the cache payload
+        # so the Unfold template can't trigger surprise ORM fetches
+        # (e.g. lazy `.user` / `.translations` lookups) on a cache hit.
+    }
 
 
 def _get_status_badge(status):
@@ -741,7 +838,8 @@ def _get_stock_badge(stock):
     """Generate HTML badge for stock level."""
     if stock == 0:
         return format_html(
-            '<span class="px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">Out of Stock</span>'
+            '<span class="px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">{}</span>',
+            "Out of Stock",
         )
     elif stock < 10:
         return format_html(
@@ -756,27 +854,47 @@ def _get_stock_badge(stock):
 
 
 def _get_rating_stars(rate):
-    """Generate star rating display."""
-    filled = "★" * rate
-    empty = "☆" * (5 - rate)
+    """Render a 5-star display from a 1-10 rate field."""
+    stars = max(0, min(5, round((rate or 0) / 2)))
+    filled = "★" * stars
+    empty = "☆" * (5 - stars)
     return format_html(
-        '<span class="text-yellow-500 font-mono">{}{}</span>', filled, empty
+        '<span class="inline-flex items-center gap-1 font-mono">'
+        '<span class="text-amber-500">{}</span>'
+        '<span class="text-base-300 dark:text-base-600">{}</span>'
+        '<span class="text-xs text-base-500 dark:text-base-400 ml-1">{}/10</span>'
+        "</span>",
+        filled,
+        empty,
+        rate or 0,
     )
 
 
 def _get_review_status_badge(status):
-    """Generate HTML badge for review status."""
-    colors = {
-        "NEW": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-        "APPROVED": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-        "REJECTED": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    """Generate HTML badge for review status (NEW / TRUE / FALSE)."""
+    styles = {
+        "NEW": (
+            "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+            "New",
+        ),
+        "TRUE": (
+            "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+            "Approved",
+        ),
+        "FALSE": (
+            "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
+            "Rejected",
+        ),
     }
-    color_class = colors.get(
-        status, "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+    color_class, label = styles.get(
+        status,
+        (
+            "bg-base-100 text-base-700 dark:bg-base-800 dark:text-base-300",
+            str(status).title() if status else "—",
+        ),
     )
-    label = status.replace("_", " ").title()
     return format_html(
-        '<span class="px-2 py-1 text-xs font-semibold rounded-full {}">{}</span>',
+        '<span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full {}">{}</span>',
         color_class,
         label,
     )

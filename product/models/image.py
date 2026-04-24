@@ -54,15 +54,18 @@ class ProductImage(
         return self.product.images.all()
 
     def save(self, *args, **kwargs):
-        if self.is_main and self.product_id:
-            ProductImage.objects.filter(
-                product_id=self.product_id, is_main=True
-            ).exclude(pk=self.pk).update(is_main=False)
+        from django.db import transaction
 
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            if self.is_main and self.product_id:
+                ProductImage.objects.filter(
+                    product_id=self.product_id, is_main=True
+                ).exclude(pk=self.pk).update(is_main=False)
+
+            super().save(*args, **kwargs)
 
     @property
     def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return f"media/uploads/products/{os.path.basename(self.image.name)}"
+            return f"media/uploads/products/{os.path.basename(str(self.image.name))}"
         return ""

@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 import uuid
 
-from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.http import FileResponse
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
-from drf_spectacular.utils import extend_schema_view
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import (
@@ -19,25 +20,32 @@ from rest_framework.exceptions import (
 )
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from core.api.permissions import IsOwnerOrAdmin, IsOwnerOrAdminOrGuest
 from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import (
+    PaymentAttemptAnonThrottle,
+    PaymentAttemptThrottle,
+)
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
     create_schema_view_config,
 )
-from core.utils.views import cache_methods
 from order.exceptions import (
     InsufficientStockError,
     InvalidOrderDataError,
     InvalidStatusTransitionError,
+    OrderCancellationError,
     PaymentNotFoundError,
 )
 from order.filters import OrderFilter
+from order.models.history import OrderHistory
 from order.models.order import Order
 from order.payment import get_payment_provider
+from order.serializers.invoice import InvoiceDownloadResponseSerializer
 from order.serializers.order import (
     AddTrackingSerializer,
     CancelOrderRequestSerializer,
@@ -52,6 +60,7 @@ from order.serializers.order import (
     PaymentStatusResponseSerializer,
     RefundOrderRequestSerializer,
     RefundOrderResponseSerializer,
+    ReorderResponseSerializer,
     UpdateStatusSerializer,
 )
 from order.services import OrderService
@@ -155,6 +164,44 @@ serializers_config: SerializersConfig = {
         ),
         tags=["Orders"],
     ),
+    "retry_payment": ActionConfig(
+        request=CreatePaymentIntentRequestSerializer,
+        response=CreatePaymentIntentResponseSerializer,
+        operation_id="retryOrderPayment",
+        summary=_("Retry payment for a failed or pending order"),
+        description=_(
+            "Create a fresh Stripe PaymentIntent for an order whose previous "
+            "payment failed or was never completed, so the customer can try again "
+            "without starting a new order."
+        ),
+        tags=["Orders"],
+    ),
+    "reorder": ActionConfig(
+        response=ReorderResponseSerializer,
+        operation_id="reorderOrder",
+        summary=_("Reorder the items from a past order"),
+        description=_(
+            "Copy each item from a past order back into the authenticated "
+            "user's active cart. Items whose products are inactive or out "
+            "of stock are returned in skipped_items; quantities are capped "
+            "at current stock."
+        ),
+        tags=["Orders"],
+    ),
+    "invoice": ActionConfig(
+        response=InvoiceDownloadResponseSerializer,
+        operation_id="retrieveOrderInvoice",
+        summary=_("Get invoice download metadata for an order"),
+        description=_(
+            "Return the order's invoice metadata and an absolute URL to "
+            "the streaming download endpoint (``/order/{id}/invoice/"
+            "download``). The URL is gated by the same owner/admin "
+            "permission check as this metadata endpoint — no raw "
+            "storage URLs are exposed to the client. 404 if the invoice "
+            "has not been generated yet (e.g. order not completed)."
+        ),
+        tags=["Orders"],
+    ),
 }
 
 
@@ -166,7 +213,6 @@ serializers_config: SerializersConfig = {
         error_serializer=ErrorResponseSerializer,
     ),
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class OrderViewSet(BaseModelViewSet):
     queryset = Order.objects.all()
     serializers_config = serializers_config
@@ -222,6 +268,9 @@ class OrderViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
             "my_orders",
+            "reorder",
+            "invoice",
+            "invoice_download",
         }
         guest_allowed_actions = {
             "retrieve_by_uuid",
@@ -229,6 +278,7 @@ class OrderViewSet(BaseModelViewSet):
             "payment_status",
             "create_payment_intent",
             "create_checkout_session",
+            "retry_payment",
         }
         admin_only_actions = {"add_tracking", "update_status", "refund_order"}
         public_actions = {"create"}
@@ -262,6 +312,7 @@ class OrderViewSet(BaseModelViewSet):
                 "payment_status",
                 "create_payment_intent",
                 "create_checkout_session",
+                "retry_payment",
             }
             if self.action not in guest_allowed_actions:
                 raise PermissionDenied(
@@ -530,9 +581,11 @@ class OrderViewSet(BaseModelViewSet):
         self, request, pay_way: PayWay
     ) -> Response:
         """
-        Create order with order-first flow (offline payments).
+        Create order with order-first flow.
 
-        No payment_intent_id required. Order created with PENDING status.
+        Used for offline payments and redirect-based online providers
+        (e.g. Viva Wallet). No payment_intent_id required.
+        Order created with PENDING status.
         """
 
         # Step 1: Get cart from request
@@ -574,8 +627,9 @@ class OrderViewSet(BaseModelViewSet):
         )
 
         logger.info(
-            "Order %s created successfully (offline payment) for user %s",
+            "Order %s created successfully (order-first, %s) for user %s",
             order.id,
+            pay_way.provider_code or "offline",
             user.id if user else "guest",
         )
 
@@ -654,7 +708,20 @@ class OrderViewSet(BaseModelViewSet):
             "customer_notes": request.data.get("customer_notes", ""),
         }
 
-    @action(detail=True, methods=["POST"])
+    # Payment endpoints are expensive and abuse-prone (Stripe PaymentIntent
+    # creation, Viva Wallet checkout session). Stack the global anon/user caps
+    # with tight per-IP / per-user burst throttles. Guest orders can hit these
+    # via uuid query param, so both anon and user throttles are needed.
+    @action(
+        detail=True,
+        methods=["POST"],
+        throttle_classes=[
+            AnonRateThrottle,
+            UserRateThrottle,
+            PaymentAttemptThrottle,
+            PaymentAttemptAnonThrottle,
+        ],
+    )
     def create_payment_intent(self, request, *args, **kwargs):
         """Create a payment intent for an order."""
         order = self.get_object()
@@ -711,7 +778,136 @@ class OrderViewSet(BaseModelViewSet):
 
         return Response(response_serializer.validated_data)
 
-    @action(detail=True, methods=["POST"])
+    @action(detail=True, methods=["POST"], url_path="retry-payment")
+    def retry_payment(self, request, *args, **kwargs):
+        """Create a fresh Stripe PaymentIntent for a failed/pending order.
+
+        The customer retains the same order, the same items, and the
+        same reserved stock (already decremented at order creation).
+        We just mint a new PaymentIntent, store its id on the order,
+        reset the payment status to PENDING, and return the client
+        secret so the frontend can re-mount Stripe Elements.
+        """
+        from order.enum.status import PaymentStatus
+
+        order = self.get_object()
+
+        if order.is_paid:
+            return Response(
+                {"detail": _("This order has already been paid.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        retryable_statuses = {
+            PaymentStatus.FAILED,
+            PaymentStatus.PENDING,
+            PaymentStatus.CANCELED,
+        }
+        if order.payment_status not in retryable_statuses:
+            return Response(
+                {
+                    "detail": _(
+                        "This order's payment status does not allow a retry."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not order.pay_way or order.pay_way.provider_code != "stripe":
+            return Response(
+                {"detail": _("Retry is only supported for Stripe payments.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+        validated_data = request_serializer.validated_data
+
+        payment_data = dict(validated_data.get("payment_data") or {})
+        for key in ("payment_method_id", "customer_id", "return_url"):
+            value = validated_data.get(key)
+            if value:
+                payment_data[key] = value
+
+        previous_payment_id = order.payment_id
+        previous_payment_status = order.payment_status
+        success, payment_response = PayWayService.process_payment(
+            pay_way=order.pay_way, order=order, **payment_data
+        )
+
+        if not success:
+            return Response(
+                {
+                    "detail": _("Failed to create payment intent."),
+                    "error": payment_response,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        new_payment_id = payment_response.get("payment_id")
+
+        # Lock the order row while we swap in the new payment intent.
+        # A late `payment_intent.payment_failed` webhook for the OLD
+        # intent could otherwise land between read and save, flip
+        # payment_status to FAILED, and enqueue a duplicate failure
+        # email concurrently with this retry flow.
+        with transaction.atomic():
+            locked_order = Order.objects.select_for_update().get(pk=order.pk)
+            if new_payment_id:
+                locked_order.payment_id = new_payment_id
+            locked_order.payment_status = PaymentStatus.PENDING
+            if not locked_order.metadata:
+                locked_order.metadata = {}
+            retry_history = locked_order.metadata.setdefault(
+                "payment_retries", []
+            )
+            retry_history.append(
+                {
+                    "at": timezone.now().isoformat(),
+                    "previous_payment_id": previous_payment_id or "",
+                    "new_payment_id": new_payment_id or "",
+                }
+            )
+            # Reset per-flow idempotency flags so the confirmation
+            # email can fire again on the (expected) new
+            # payment_intent.succeeded, and the customer can be
+            # re-notified of any new failure.
+            locked_order.metadata.pop("confirmation_email_sent", None)
+            locked_order.metadata.pop("payment_failed_email_sent", None)
+            locked_order.save(
+                update_fields=["payment_id", "payment_status", "metadata"]
+            )
+        order = locked_order
+
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={
+                "payment_status": str(previous_payment_status),
+                "payment_id": previous_payment_id or "",
+            },
+            new_value={
+                "payment_status": "pending",
+                "payment_id": new_payment_id or "",
+                "retry": True,
+            },
+        )
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(data=payment_response)
+        response_serializer.is_valid(raise_exception=True)
+        return Response(response_serializer.validated_data)
+
+    @action(
+        detail=True,
+        methods=["POST"],
+        throttle_classes=[
+            AnonRateThrottle,
+            UserRateThrottle,
+            PaymentAttemptThrottle,
+            PaymentAttemptAnonThrottle,
+        ],
+    )
     def create_checkout_session(self, request, *args, **kwargs):
         """Create a hosted checkout session for an order."""
         order = self.get_object()
@@ -757,12 +953,13 @@ class OrderViewSet(BaseModelViewSet):
         provider_code = order.pay_way.provider_code
         provider = get_payment_provider(provider_code)
 
-        # For Stripe, pass only items total so Stripe can add shipping separately
-        # For Viva Wallet, pass the full order total (shipping included)
+        # Pass the full order total for all providers.
+        # Stripe also receives shipping_price separately for
+        # a proper line-item breakdown on the checkout page.
+        amount = order.total_price
+
         if provider_code == "stripe":
-            amount = order.total_price_items
-        else:
-            amount = order.total_price
+            checkout_params["shipping_price"] = order.shipping_price
 
         success, checkout_response = provider.create_checkout_session(
             amount=amount,
@@ -783,7 +980,17 @@ class OrderViewSet(BaseModelViewSet):
             order.metadata = {}
 
         if provider_code == "viva_wallet":
-            order.metadata["viva_order_code"] = checkout_response["session_id"]
+            existing_code = order.metadata.get("viva_order_code")
+            new_code = checkout_response["session_id"]
+            if existing_code and existing_code != new_code:
+                logger.warning(
+                    "Order %s Viva order code replaced: %s → %s "
+                    "(retry or duplicate checkout session creation)",
+                    order.id,
+                    existing_code,
+                    new_code,
+                )
+            order.metadata["viva_order_code"] = new_code
         else:
             order.metadata["stripe_checkout_session_id"] = checkout_response[
                 "session_id"
@@ -865,6 +1072,14 @@ class OrderViewSet(BaseModelViewSet):
 
             return Response(response_data)
 
+        except OrderCancellationError as e:
+            # The service raises this for expected state-transition
+            # failures (order already shipped, already canceled, stale
+            # status, etc.). Surface it as a 400 so the frontend can
+            # treat it as a conflict (refresh + toast) rather than the
+            # generic "unexpected error" branch.
+            logger.warning("Order %s cancel rejected: %s", order.id, e.reason)
+            raise ValidationError({"detail": str(e.reason)}) from e
         except ValueError as e:
             logger.warning("Error canceling order: %s", e)
             raise ValidationError(
@@ -889,15 +1104,99 @@ class OrderViewSet(BaseModelViewSet):
 
         filtered_qs = self.filter_queryset(user_orders)
 
-        page = self.paginate_queryset(filtered_qs)
         response_serializer_class = self.get_response_serializer()
-        if page is not None:
-            return self.paginate_and_serialize(
-                page, request, serializer_class=response_serializer_class
+        return self.paginate_and_serialize(
+            filtered_qs,
+            request,
+            serializer_class=response_serializer_class,
+        )
+
+    @action(detail=True, methods=["GET"])
+    def invoice(self, request, *args, **kwargs):
+        """Return invoice metadata + download URL for an order.
+
+        404 when the invoice has not been generated yet (e.g. order
+        still PENDING). Permission check is done via the viewset's
+        standard ``get_object`` flow which already covers owner/admin
+        and guest-via-uuid access.
+        """
+        order = self.get_object()
+        invoice = getattr(order, "invoice", None)
+        if invoice is None or not invoice.has_document():
+            raise NotFound(
+                _("Invoice has not been generated for this order yet.")
+            )
+        serializer = InvoiceDownloadResponseSerializer(
+            invoice, context={"request": request}
+        )
+        return Response(serializer.data)
+
+    @extend_schema(
+        operation_id="downloadOrderInvoice",
+        tags=["Orders"],
+        summary=_("Download the invoice PDF"),
+        description=_(
+            "Streams the rendered PDF through Django auth. 404 when "
+            "the invoice has not been generated yet. Same ownership "
+            "check as the metadata endpoint — returns a signed S3 "
+            "stream on prod and a filesystem stream in dev without "
+            "exposing the storage URL to the client."
+        ),
+        responses={200: None, 404: None},
+    )
+    @action(detail=True, methods=["GET"], url_path="invoice/download")
+    def invoice_download(self, request, *args, **kwargs):
+        """Stream the invoice PDF through Django auth.
+
+        Why this exists instead of redirecting to ``document_file.url``:
+        - FileSystem backend: ``url()`` returns ``/media/...`` which
+          isn't actually served (private files live under a separate
+          ``mediafiles_private/`` root).
+        - S3 backend: ``AWS_QUERYSTRING_AUTH`` is ``False`` globally
+          for static / public media; ``PrivateMediaStorage`` overrides
+          it locally but even then direct S3 URLs leak the bucket layout.
+        - Streaming through Django keeps the download gated by the
+          same ``IsOwnerOrAdmin`` check as the metadata endpoint, works
+          identically on every backend, and the customer's browser
+          sees a clean ``api.webside.gr`` URL in history.
+
+        Uses ``storage.open('rb')`` rather than ``open(abs_path, 'rb')``
+        so it works on S3 without downloading the file to disk first
+        (django-storages' S3 file object streams chunks).
+        """
+        order = self.get_object()
+        invoice = getattr(order, "invoice", None)
+        if invoice is None or not invoice.has_document():
+            raise NotFound(
+                _("Invoice has not been generated for this order yet.")
+            )
+        return FileResponse(
+            invoice.document_file.open("rb"),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"{invoice.invoice_number}.pdf",
+        )
+
+    @action(detail=True, methods=["POST"])
+    def reorder(self, request, *args, **kwargs):
+        """Clone a past order's items back into the user's active cart."""
+        order = self.get_object()
+
+        user = request.user
+        if not user or not user.is_authenticated:
+            raise NotAuthenticated(
+                _("Authentication is required to reorder a past order.")
+            )
+        if order.user_id != user.id and not user.is_staff:
+            raise PermissionDenied(
+                _("You can only reorder your own past orders.")
             )
 
-        serializer = response_serializer_class(filtered_qs, many=True)
-        return Response(serializer.data)
+        result = OrderService.reorder_to_cart(order=order, user=user)
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(data=result)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data)
 
     @action(detail=True, methods=["POST"])
     def add_tracking(self, request, *args, **kwargs):

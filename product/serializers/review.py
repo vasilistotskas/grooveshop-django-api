@@ -7,6 +7,7 @@ from rest_framework import serializers
 from user.serializers.account import UserDetailsSerializer
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
+from product.enum.review import RateEnum
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
@@ -19,12 +20,26 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
+class ProductBriefSerializer(serializers.ModelSerializer[Product]):
+    """Minimal product representation for use in list-level review serializer."""
+
+    name = serializers.SerializerMethodField()
+    main_image_path = serializers.ReadOnlyField()
+
+    def get_name(self, obj) -> str | None:
+        return obj.safe_translation_getter("name", any_language=True)
+
+    class Meta:
+        model = Product
+        fields = ("id", "name", "slug", "main_image_path")
+
+
 class ProductReviewSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductReview]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductReview)
     user = UserDetailsSerializer(read_only=True)
-    product = ProductSerializer(read_only=True)
+    product = ProductBriefSerializer(read_only=True)
 
     class Meta:
         model = ProductReview
@@ -96,9 +111,10 @@ class ProductReviewWriteSerializer(
             "is_published",
             "translations",
         )
+        read_only_fields = ("status", "is_published")
 
     def validate_rate(self, value: int) -> int:
-        valid_rates = [choice[0] for choice in ProductReview.rate.field.choices]  # type: ignore[not-iterable]
+        valid_rates = [choice[0] for choice in RateEnum.choices]
         if value not in valid_rates:
             raise serializers.ValidationError(_("Invalid rate value."))
         return value

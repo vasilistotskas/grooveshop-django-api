@@ -1,24 +1,33 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import unquote
 
+from django.conf import settings as django_settings
+from django.core.cache import caches
 from django.db.models import Avg, Count
+from extra_settings.models import Setting
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAdminUser
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    throttle_classes,
+)
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from blog.models.post import BlogPostTranslation
 from core.api.serializers import ErrorResponseSerializer
-from search.greeklish import expand_greeklish_query
+from core.api.throttling import SearchThrottle
 from meili._client import client as meili_client
 from product.models.product import ProductTranslation
+from search.greeklish import expand_greeklish_query
 from search.models import SearchClick, SearchQuery
 from search.serializers import (
     BlogPostMeiliSearchResponseSerializer,
@@ -27,9 +36,33 @@ from search.serializers import (
     ProductMeiliSearchResponseSerializer,
     ProductTranslationSerializer,
     SearchAnalyticsResponseSerializer,
+    TrendingSearchResponseSerializer,
 )
 
 logger = logging.getLogger(__name__)
+
+_VALID_LANGUAGE_CODES = frozenset(
+    code for code, _name in django_settings.LANGUAGES
+)
+
+
+def _get_max_search_limit() -> int:
+    return Setting.get("SEARCH_MAX_LIMIT", default=100)
+
+
+def _parse_int(value: str | None, default: int, name: str) -> int:
+    if value is None:
+        return default
+    try:
+        return max(0, int(value))
+    except (ValueError, TypeError):
+        raise ValidationError({name: _("Must be a valid integer.")})
+
+
+def _validate_language_code(language_code: str | None) -> str | None:
+    if language_code and language_code not in _VALID_LANGUAGE_CODES:
+        raise ValidationError({"language_code": _("Invalid language code.")})
+    return language_code
 
 
 @extend_schema(
@@ -84,9 +117,14 @@ def blog_post_meili_search(request):
     if not query:
         raise ValidationError({"error": _("A search query is required.")})
 
-    limit = int(request.query_params.get("limit", 10))
-    offset = int(request.query_params.get("offset", 0))
-    language_code = request.query_params.get("language_code")
+    limit = min(
+        _parse_int(request.query_params.get("limit"), 10, "limit"),
+        _get_max_search_limit(),
+    )
+    offset = _parse_int(request.query_params.get("offset"), 0, "offset")
+    language_code = _validate_language_code(
+        request.query_params.get("language_code")
+    )
 
     decoded_query = unquote(query)
 
@@ -243,9 +281,14 @@ def product_meili_search(request):
 
     # Parse query parameters
     query = request.query_params.get("query", "")
-    limit = int(request.query_params.get("limit", 20))
-    offset = int(request.query_params.get("offset", 0))
-    language_code = request.query_params.get("language_code")
+    limit = min(
+        _parse_int(request.query_params.get("limit"), 20, "limit"),
+        _get_max_search_limit(),
+    )
+    offset = _parse_int(request.query_params.get("offset"), 0, "offset")
+    language_code = _validate_language_code(
+        request.query_params.get("language_code")
+    )
 
     # Parse filter parameters
     price_min = request.query_params.get("price_min")
@@ -414,9 +457,14 @@ def federated_search(request):
     if not query:
         raise ValidationError({"error": _("A search query is required.")})
 
-    limit = int(request.query_params.get("limit", 20))
-    offset = int(request.query_params.get("offset", 0))
-    language_code = request.query_params.get("language_code")
+    limit = min(
+        _parse_int(request.query_params.get("limit"), 20, "limit"),
+        _get_max_search_limit(),
+    )
+    offset = _parse_int(request.query_params.get("offset"), 0, "offset")
+    language_code = _validate_language_code(
+        request.query_params.get("language_code")
+    )
 
     # Decode and expand query for Greek language
     decoded_query = unquote(query)
@@ -424,8 +472,7 @@ def federated_search(request):
         decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
 
     # Calculate result allocation (70% products, 30% blog posts)
-    product_limit = int(limit * 0.7)
-    limit - product_limit
+    product_limit = int(limit * 0.7)  # noqa: F841
 
     # Build filters for language and content filtering
     product_filters = []
@@ -487,56 +534,73 @@ def federated_search(request):
     hits = results.get("hits", [])
     estimated_total_hits = results.get("estimatedTotalHits", 0)
 
-    # Enrich results with Django ORM objects and add content_type
-    enriched_results = []
+    # Collect IDs by model type for bulk fetching
+    product_ids = []
+    blog_ids = []
+    hit_metadata = []  # Parallel list of (index_type, obj_id, hit)
 
     for hit in hits:
+        federation_metadata = hit.get("_federation", {})
+        index_uid = federation_metadata.get("indexUid", "")
+        obj_id = hit.get("id")
+        if not obj_id:
+            continue
+
+        if "ProductTranslation" in index_uid:
+            product_ids.append(obj_id)
+            hit_metadata.append(("product", obj_id, hit))
+        elif "BlogPostTranslation" in index_uid:
+            blog_ids.append(obj_id)
+            hit_metadata.append(("blog", obj_id, hit))
+        else:
+            logger.warning("Unknown index UID: %s", index_uid)
+
+    # Bulk fetch all objects (2 queries instead of N)
+    product_map = {}
+    blog_map = {}
+    if product_ids:
+        product_map = {
+            obj.pk: obj
+            for obj in ProductTranslation.objects.filter(
+                pk__in=product_ids
+            ).select_related("master__category", "master__vat")
+        }
+    if blog_ids:
+        blog_map = {
+            obj.pk: obj
+            for obj in BlogPostTranslation.objects.filter(
+                pk__in=blog_ids
+            ).select_related("master")
+        }
+
+    # Enrich results preserving original order
+    enriched_results = []
+    for index_type, obj_id, hit in hit_metadata:
         try:
-            # Get federation metadata
-            federation_metadata = hit.get("_federation", {})
-            index_uid = federation_metadata.get("indexUid", "")
-
-            # Determine content type from index
-            if "ProductTranslation" in index_uid:
-                model = ProductTranslation
+            # Meilisearch returns string IDs; map keys are int PKs
+            int_id = int(obj_id)
+            if index_type == "product":
+                obj = product_map.get(int_id)
                 serializer_class = ProductTranslationSerializer
-            elif "BlogPostTranslation" in index_uid:
-                model = BlogPostTranslation
-                serializer_class = BlogPostTranslationSerializer
             else:
-                logger.warning(f"Unknown index UID: {index_uid}")
+                obj = blog_map.get(int_id)
+                serializer_class = BlogPostTranslationSerializer
+
+            if not obj:
                 continue
 
-            # Fetch Django object
-            obj_id = hit.get("id")
-            if not obj_id:
-                continue
-
-            try:
-                obj = model.objects.get(pk=obj_id)
-            except model.DoesNotExist:
-                logger.warning(
-                    f"{model.__name__} with id {obj_id} not found in database"
-                )
-                continue
-
-            # Prepare context with Meilisearch metadata
             context = {
                 "_formatted": hit.get("_formatted", {}),
                 "_matchesPosition": hit.get("_matchesPosition", {}),
                 "_rankingScore": hit.get("_rankingScore", None),
             }
 
-            # Serialize object
             obj_data = serializer_class(obj, context=context).data
-
-            # Add federation metadata
-            obj_data["_federation"] = federation_metadata
-
+            obj_data["_federation"] = hit.get("_federation", {})
             enriched_results.append(obj_data)
 
         except Exception as e:
-            logger.error(f"Error enriching result: {str(e)}")
+            logger.error("Error enriching result: %s", e)
             continue
 
     # Return response
@@ -671,31 +735,27 @@ def search_analytics(request):
     # Calculate total search count
     total_searches = queries_qs.count()
 
-    # Aggregate top queries (top 20 by frequency)
-    top_queries_data = (
+    # Calculate click-through rate for each top query (single annotated query)
+    top_queries_with_clicks = (
         queries_qs.values("query")
-        .annotate(count=Count("id"), avg_results=Avg("results_count"))
+        .annotate(
+            count=Count("id"),
+            avg_results=Avg("results_count"),
+            clicks_count=Count("clicks"),
+        )
         .order_by("-count")[:20]
     )
 
-    # Calculate click-through rate for each top query
     top_queries = []
-    for query_data in top_queries_data:
-        query_text = query_data["query"]
+    for query_data in top_queries_with_clicks:
         query_count = query_data["count"]
         avg_results = query_data["avg_results"]
-
-        # Count clicks for this query
-        clicks_count = SearchClick.objects.filter(
-            search_query__query=query_text
-        ).count()
-
-        # Calculate CTR (clicks / searches)
+        clicks_count = query_data["clicks_count"]
         ctr = (clicks_count / query_count) if query_count > 0 else 0.0
 
         top_queries.append(
             {
-                "query": query_text,
+                "query": query_data["query"],
                 "count": query_count,
                 "avg_results": round(avg_results, 2) if avg_results else 0.0,
                 "click_through_rate": round(ctr, 4),
@@ -774,3 +834,114 @@ def search_analytics(request):
     }
 
     return Response(response_data, status=status.HTTP_200_OK)
+
+
+_TRENDING_CACHE_TTL_SECONDS = 300  # 5 minutes
+_TRENDING_MIN_QUERY_LENGTH = 2
+_TRENDING_DEFAULT_LIMIT = 8
+_TRENDING_MAX_LIMIT = 20
+_TRENDING_WINDOW_HOURS = 24
+
+
+@extend_schema(
+    operation_id="listTrendingSearches",
+    tags=["Search"],
+    summary=_("List trending search queries"),
+    description=_(
+        "Return the most popular search queries from the last 24 hours, "
+        "suitable for surfacing in the search modal empty state. Cached "
+        "for 5 minutes per (language_code, content_type, limit)."
+    ),
+    responses={200: TrendingSearchResponseSerializer},
+    parameters=[
+        OpenApiParameter(
+            name="language_code",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description=_("Filter queries by language (e.g. 'el')."),
+            required=False,
+        ),
+        OpenApiParameter(
+            name="content_type",
+            type=str,
+            location=OpenApiParameter.QUERY,
+            description=_(
+                "Filter by content type: product, blog_post, federated. "
+                "Defaults to product."
+            ),
+            required=False,
+        ),
+        OpenApiParameter(
+            name="limit",
+            type=int,
+            location=OpenApiParameter.QUERY,
+            description=_("Max results. Default 8, cap 20."),
+            required=False,
+        ),
+    ],
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
+def search_trending(request):
+    """Return top search queries over the last 24h (Redis-cached)."""
+    language_code = request.query_params.get("language_code") or ""
+    content_type = request.query_params.get("content_type") or "product"
+
+    try:
+        limit = int(request.query_params.get("limit", _TRENDING_DEFAULT_LIMIT))
+    except (TypeError, ValueError):
+        limit = _TRENDING_DEFAULT_LIMIT
+    limit = max(1, min(limit, _TRENDING_MAX_LIMIT))
+
+    if (
+        language_code
+        and _VALID_LANGUAGE_CODES
+        and language_code not in _VALID_LANGUAGE_CODES
+    ):
+        raise ValidationError({"language_code": _("Unsupported language.")})
+
+    cache_key = f"search:trending:{content_type}:{language_code}:{limit}"
+    cached = caches["default"].get(cache_key)
+    if cached is not None:
+        return Response(cached, status=status.HTTP_200_OK)
+
+    cutoff = timezone.now() - timedelta(hours=_TRENDING_WINDOW_HOURS)
+    qs = (
+        SearchQuery.objects.filter(
+            timestamp__gte=cutoff,
+            results_count__gt=0,
+            content_type=content_type,
+        )
+        .exclude(query__isnull=True)
+        .exclude(query__exact="")
+    )
+    if language_code:
+        qs = qs.filter(language_code=language_code)
+
+    top = (
+        qs.values("query")
+        .annotate(count=Count("id"))
+        .order_by("-count")[: limit * 2]
+    )
+
+    results: list[dict] = []
+    for row in top:
+        query_text = (row.get("query") or "").strip()
+        if len(query_text) < _TRENDING_MIN_QUERY_LENGTH:
+            continue
+        results.append({"query": query_text, "count": row["count"]})
+        if len(results) >= limit:
+            break
+
+    payload = {
+        "window_hours": _TRENDING_WINDOW_HOURS,
+        "content_type": content_type,
+        "language_code": language_code or None,
+        "results": results,
+    }
+
+    caches["default"].set(
+        cache_key, payload, timeout=_TRENDING_CACHE_TTL_SECONDS
+    )
+    return Response(payload, status=status.HTTP_200_OK)

@@ -3,9 +3,12 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from user.views.account import UserAccountViewSet
 from user.views.address import UserAddressViewSet
+from user.views.data_export import UserDataExportDownloadView
 from user.views.subscription import (
+    ConfirmSubscriptionByTokenView,
     SubscriptionTopicViewSet,
-    UnsubscribeView,
+    UnsubscribeAllView,
+    UnsubscribeTopicView,
     UserSubscriptionViewSet,
 )
 
@@ -73,9 +76,36 @@ urlpatterns = [
         name="user-account-change-username",
     ),
     path(
+        "user/account/<int:pk>/data_exports",
+        UserAccountViewSet.as_view({"get": "data_exports"}),
+        name="user-account-data-exports",
+    ),
+    path(
+        "user/account/<int:pk>/request_data_export",
+        UserAccountViewSet.as_view({"post": "request_data_export"}),
+        name="user-account-request-data-export",
+    ),
+    path(
+        "user/account/<int:pk>/delete_account",
+        UserAccountViewSet.as_view({"post": "delete_account"}),
+        name="user-account-delete-account",
+    ),
+    path(
+        "user/data_export/<str:token>/download",
+        UserDataExportDownloadView.as_view(),
+        name="user-data-export-download",
+    ),
+    path(
         "user/address",
         UserAddressViewSet.as_view({"get": "list", "post": "create"}),
         name="user-address-list",
+    ),
+    # ``get_main`` must be declared BEFORE the ``<int:pk>`` catch-all so
+    # Django's URL resolver doesn't try to parse "get_main" as an integer id.
+    path(
+        "user/address/get_main",
+        UserAddressViewSet.as_view({"get": "get_main"}),
+        name="user-address-get-main",
     ),
     path(
         "user/address/<int:pk>",
@@ -155,8 +185,18 @@ urlpatterns = [
     ),
     path(
         "user/unsubscribe/<str:uidb64>/<str:token>/<str:topic_slug>",
-        UnsubscribeView.as_view(),
+        UnsubscribeTopicView.as_view(),
+        name="user-unsubscribe-topic",
+    ),
+    path(
+        "user/unsubscribe/<str:uidb64>/<str:token>",
+        UnsubscribeAllView.as_view(),
         name="user-unsubscribe",
+    ),
+    path(
+        "user/subscription/confirm/<str:token>",
+        ConfirmSubscriptionByTokenView.as_view(),
+        name="user-subscription-confirm-by-token",
     ),
 ]
 

@@ -45,13 +45,11 @@ class ProductFavourite(TimeStampMixinModel, UUIDModel):
         return f"{self.user.email} - {product_name}"
 
     def save(self, *args, **kwargs):
-        if (
-            not self.pk
-            and ProductFavourite.objects.filter(
-                user=self.user, product=self.product
-            ).exists()
-        ):
+        from django.db import IntegrityError
+
+        try:
+            super().save(*args, **kwargs)
+        except IntegrityError:
             raise ValidationError(
                 _("This product is already in the user's favorites.")
             )
-        super().save(*args, **kwargs)

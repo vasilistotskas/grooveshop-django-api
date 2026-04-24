@@ -52,6 +52,15 @@ class PayWaySerializer(
 
 
 class PayWayDetailSerializer(PayWaySerializer):
+    configuration = serializers.JSONField(read_only=True)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get("request")
+        if not request or not getattr(request.user, "is_staff", False):
+            ret.pop("configuration", None)
+        return ret
+
     class Meta(PayWaySerializer.Meta):
         fields = (
             *PayWaySerializer.Meta.fields,

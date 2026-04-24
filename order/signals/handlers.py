@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from djstripe.event_handlers import djstripe_receiver
@@ -11,11 +12,6 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
-from order.notifications import (
-    send_order_canceled_notification,
-    send_order_delivered_notification,
-    send_order_shipped_notification,
-)
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -25,27 +21,34 @@ from order.signals import (
     order_paid,
     order_refunded,
     order_returned,
+    order_shipment_dispatched,
     order_shipped,
     order_status_changed,
+)
+from order.notifications import (
+    notify_order_created_live,
+    notify_order_refunded_live,
+    notify_order_shipment_dispatched_live,
+    notify_order_status_changed_live,
+    notify_payment_confirmed_live,
+    notify_payment_failed_live,
 )
 from order.tasks import (
     generate_order_invoice,
     send_order_confirmation_email,
     send_order_status_update_email,
-    send_shipping_notification_email,
+    send_payment_failed_email,
 )
 
 logger = logging.getLogger(__name__)
 
 
-@receiver(post_save, sender=Order)
+@receiver(post_save, sender=Order, dispatch_uid="order.handle_order_post_save")
 def handle_order_post_save(
     sender: type[Order], instance: Order, created: bool, **kwargs: Any
 ) -> None:
     """Handle order post-save signal."""
     if created:
-        # Send signal after transaction commits to avoid race conditions
-        from django.db import transaction
 
         def send_created_signal():
             order_created.send(sender=sender, order=instance)
@@ -53,38 +56,105 @@ def handle_order_post_save(
                 "Sent order_created signal for new order %s", instance.id
             )
 
+        # Defer to on_commit so the Celery task sees the committed row.
         transaction.on_commit(send_created_signal)
         return
 
     if (
-        hasattr(instance, "_previous_status")
-        and instance._previous_status != instance.status
+        hasattr(instance, "_original_status")
+        and instance._original_status != instance.status
     ):
         order_status_changed.send(
             sender=sender,
             order=instance,
-            old_status=instance._previous_status,
+            old_status=instance._original_status,
             new_status=instance.status,
         )
         logger.debug(
             "Sent order_status_changed signal for order %s (%s -> %s)",
             instance.id,
-            instance._previous_status,
+            instance._original_status,
             instance.status,
         )
 
+    # Detect the null → set transition on tracking info. We treat an
+    # empty string the same as None because the field is declared with
+    # ``blank=True`` and Django serializers happily round-trip "" as
+    # "no value". Fire on commit to avoid a race where the Celery task
+    # reads a not-yet-visible row.
+    #
+    # Additionally require the *value* to have actually changed between
+    # original and current — protects against the clear-then-reset case
+    # where an admin blanks the tracking, saves (post_save refreshes
+    # the ``_original_*`` snapshot to ""), then re-enters the same
+    # tracking number. Without the equality check the signal would
+    # fire a second time and the shopper would get a duplicate
+    # "Tracking available" notification.
+    tracking_unchanged = (
+        (
+            instance.tracking_number == instance._original_tracking_number
+            and instance.shipping_carrier == instance._original_shipping_carrier
+        )
+        if hasattr(instance, "_original_tracking_number")
+        else False
+    )
 
-@receiver(order_created)
+    if (
+        hasattr(instance, "_original_tracking_number")
+        and hasattr(instance, "_original_shipping_carrier")
+        and not (
+            instance._original_tracking_number
+            and instance._original_shipping_carrier
+        )
+        and instance.tracking_number
+        and instance.shipping_carrier
+        and not tracking_unchanged
+    ):
+
+        def send_shipment_dispatched() -> None:
+            order_shipment_dispatched.send(
+                sender=sender,
+                order=instance,
+                tracking_number=instance.tracking_number,
+                shipping_carrier=instance.shipping_carrier,
+            )
+            logger.debug(
+                "Sent order_shipment_dispatched signal for order %s",
+                instance.id,
+            )
+
+        transaction.on_commit(send_shipment_dispatched)
+
+
+@receiver(order_created, dispatch_uid="order.handle_order_created")
 def handle_order_created(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
     """Handle order creation."""
-    send_order_confirmation_email.delay(order.id)
+    # Offline payments (COD, bank transfer) and already-paid orders get the
+    # confirmation email immediately. Online payments (Stripe, Viva Wallet)
+    # defer it to the payment-success webhook so the email only goes out
+    # once the payment actually succeeds. Missing pay_way is treated as
+    # offline to preserve the legacy fallback behavior.
+    pay_way = order.pay_way
+    is_online_pending = (
+        pay_way is not None
+        and pay_way.is_online_payment
+        and order.payment_status != PaymentStatus.COMPLETED
+    )
+    if not is_online_pending:
+        send_order_confirmation_email.delay(order.id)
     OrderHistory.log_note(order=order, note="Order created")
+
+    # Live in-app notification for authenticated shoppers. The task
+    # itself drops guests silently, so there's no is_guest check here.
+    if order.user_id:
+        transaction.on_commit(
+            lambda oid=order.id: notify_order_created_live.delay(oid)
+        )
 
     # Clear cart after successful order creation (both user and guest)
     from cart.models import Cart
-    from django.db import transaction
 
     def clear_cart():
         """Clear cart after transaction commits."""
@@ -132,7 +202,9 @@ def handle_order_created(
     transaction.on_commit(clear_cart)
 
 
-@receiver(order_status_changed)
+@receiver(
+    order_status_changed, dispatch_uid="order.handle_order_status_changed"
+)
 def handle_order_status_changed(
     sender: type[Order],
     order: Order,
@@ -149,6 +221,18 @@ def handle_order_status_changed(
     )
 
     send_order_status_update_email.delay(order.id, new_status)
+
+    # Live in-app notification. ``notify_order_status_changed_live``
+    # filters internally for statuses we actually want to surface in the
+    # bell (PROCESSING, SHIPPED, DELIVERED, COMPLETED, CANCELED), so
+    # dispatching unconditionally is safe and centralises the policy in
+    # one place (``order/notifications.py::_ORDER_STATUS_COPY``).
+    if order.user_id:
+        transaction.on_commit(
+            lambda oid=order.id, s=new_status: (
+                notify_order_status_changed_live.delay(oid, s)
+            )
+        )
 
     if new_status == OrderStatus.SHIPPED.value:
         order_shipped.send(sender=sender, order=order)
@@ -168,7 +252,7 @@ def handle_order_status_changed(
         and not hasattr(order, "_paid_signal_sent")
     ):
         order_paid.send(sender=sender, order=order)
-        order._paid_signal_sent = True  # type: ignore[invalid-assignment]
+        object.__setattr__(order, "_paid_signal_sent", True)
         logger.debug("Sent order_paid signal for order %s", order.id)
 
     logger.info(
@@ -179,21 +263,27 @@ def handle_order_status_changed(
     )
 
 
-@receiver(pre_save, sender=Order)
-def handle_order_pre_save(
-    sender: type[Order], instance: Order, **kwargs: Any
+@receiver(
+    order_shipment_dispatched,
+    dispatch_uid="order.notify_shipment_dispatched",
+)
+def notify_shipment_dispatched(
+    sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Store previous order status before save."""
-    try:
-        if instance.pk:
-            instance._previous_status = Order.objects.get(pk=instance.pk).status
-        else:
-            instance._previous_status = None
-    except Order.DoesNotExist:
-        instance._previous_status = None
+    """Forward the shipment-dispatched signal to the live notification task.
+
+    The signal is already fired via ``transaction.on_commit`` in
+    ``handle_order_post_save``, so we can call ``.delay`` directly — the
+    row is guaranteed committed by the time we run.
+    """
+    if not order.user_id:
+        return
+    notify_order_shipment_dispatched_live.delay(order.id)
 
 
-@receiver(pre_save, sender=OrderItem)
+@receiver(
+    pre_save, sender=OrderItem, dispatch_uid="order.handle_order_item_pre_save"
+)
 def handle_order_item_pre_save(
     sender: Any, instance: Any, **kwargs: Any
 ) -> None:
@@ -219,7 +309,11 @@ def handle_order_item_pre_save(
         instance._original_price = None
 
 
-@receiver(post_save, sender=OrderItem)
+@receiver(
+    post_save,
+    sender=OrderItem,
+    dispatch_uid="order.handle_order_item_post_save",
+)
 def handle_order_item_post_save(
     sender: type[OrderItem], instance: OrderItem, created: bool, **kwargs: Any
 ) -> None:
@@ -248,11 +342,14 @@ def handle_order_item_post_save(
         hasattr(instance, "_original_quantity")
         and instance._original_quantity != instance.quantity
     ):
+        from django.db.models import F, Value
+        from django.db.models.functions import Greatest
+
         product = instance.product
         stock_difference = instance._original_quantity - instance.quantity
-        new_stock = product.stock + stock_difference
-        product.stock = max(0, new_stock)
-        product.save(update_fields=["stock"])
+        type(product).objects.filter(pk=product.pk).update(
+            stock=Greatest(F("stock") + stock_difference, Value(0))
+        )
 
         OrderItemHistory.log_quantity_change(
             order_item=instance,
@@ -303,7 +400,7 @@ def handle_order_item_post_save(
             )
 
 
-@receiver(order_shipped)
+@receiver(order_shipped, dispatch_uid="order.handle_order_shipped")
 def handle_order_shipped(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -317,32 +414,25 @@ def handle_order_shipped(
         previous_value={"status": OrderStatus.PENDING.value},
         new_value={"status": OrderStatus.SHIPPED.value},
     )
-
-    send_order_shipped_notification(order)
-
-    task = send_shipping_notification_email.delay(order.id)
-    logger.info(
-        "Order %s shipment notification email queued (task_id: %s)",
-        order.id,
-        task.id,
-    )
+    # Email is sent by handle_order_status_changed via
+    # send_order_status_update_email (uses the shipped template)
 
 
-@receiver(order_delivered)
+@receiver(order_delivered, dispatch_uid="order.handle_order_delivered")
 def handle_order_delivered(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
     """Handle order delivered signal."""
-    send_order_delivered_notification(order)
-
     OrderHistory.log_shipping_update(
         order=order,
         previous_value={"status": OrderStatus.SHIPPED.value},
         new_value={"status": OrderStatus.DELIVERED.value},
     )
+    # Email is sent by handle_order_status_changed via
+    # send_order_status_update_email (uses the delivered template)
 
 
-@receiver(order_canceled)
+@receiver(order_canceled, dispatch_uid="order.handle_order_canceled")
 def handle_order_canceled(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -356,11 +446,13 @@ def handle_order_canceled(
                 order=order,
                 note=f"Order canceled. Reason: {cancellation_reason}",
             )
-
-        send_order_canceled_notification(order)
+        # Email is sent by handle_order_status_changed via
+        # send_order_status_update_email (uses the canceled template)
 
         logger.info(
-            "Order %s canceled (previous status: %s)", order.id, previous_status
+            "Order %s canceled (previous status: %s)",
+            order.id,
+            previous_status,
         )
 
     except Exception as e:
@@ -369,18 +461,19 @@ def handle_order_canceled(
         )
 
 
-@receiver(order_completed)
+@receiver(order_completed, dispatch_uid="order.handle_order_completed")
 def handle_order_completed(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
     """Handle order completed signal."""
     try:
         if order.document_type == OrderDocumentTypeEnum.INVOICE.value:
-            task = generate_order_invoice.delay(order.id)
-            logger.info(
-                "Invoice generation queued for order %s (task_id: %s)",
-                order.id,
-                task.id,
+            # Generate the PDF invoice asynchronously. ``generate_order_invoice``
+            # is idempotent via ``order.invoicing.generate_invoice`` — calling
+            # twice returns the existing Invoice row, so the fact that
+            # ``order_completed`` might fire again on a re-save is safe.
+            transaction.on_commit(
+                lambda oid=order.id: generate_order_invoice.delay(oid)
             )
 
         OrderHistory.log_note(order=order, note="Order completed")
@@ -393,7 +486,7 @@ def handle_order_completed(
         )
 
 
-@receiver(order_refunded)
+@receiver(order_refunded, dispatch_uid="order.handle_order_refunded")
 def handle_order_refunded(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -412,6 +505,14 @@ def handle_order_refunded(
             },
         )
 
+        # Live notification so the shopper learns about the refund without
+        # having to check email. ``notify_order_refunded_live`` silently
+        # drops guest orders.
+        if order.user_id:
+            transaction.on_commit(
+                lambda oid=order.id: notify_order_refunded_live.delay(oid)
+            )
+
         logger.info("Order %s refunded", order.id)
 
     except Exception as e:
@@ -420,7 +521,7 @@ def handle_order_refunded(
         )
 
 
-@receiver(order_returned)
+@receiver(order_returned, dispatch_uid="order.handle_order_returned")
 def handle_order_returned(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
@@ -465,24 +566,33 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
 
         logger.info("Stripe payment succeeded: %s", payment_intent_id)
 
-        # Check idempotency to prevent duplicate processing
-        order = Order.objects.filter(payment_id=payment_intent_id).first()
-        if order:
-            if order.metadata and order.metadata.get(
-                f"webhook_processed_{event_id}"
-            ):
-                logger.info(
-                    "Webhook %s already processed for order %s, skipping",
-                    event_id,
-                    order.id,
-                )
-                return
+        # Atomic idempotency check-and-mark with row lock to prevent
+        # duplicate processing from parallel webhook deliveries.
+        already_processed = False
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .filter(payment_id=payment_intent_id)
+                .first()
+            )
+            if order:
+                if order.metadata and order.metadata.get(
+                    f"webhook_processed_{event_id}"
+                ):
+                    logger.info(
+                        "Webhook %s already processed for order %s, skipping",
+                        event_id,
+                        order.id,
+                    )
+                    already_processed = True
+                else:
+                    if not order.metadata:
+                        order.metadata = {}
+                    order.metadata[f"webhook_processed_{event_id}"] = True
+                    order.save(update_fields=["metadata"])
 
-            # Mark webhook as processed
-            if not order.metadata:
-                order.metadata = {}
-            order.metadata[f"webhook_processed_{event_id}"] = True
-            order.save(update_fields=["metadata"])
+        if already_processed:
+            return
 
         order = OrderService.handle_payment_succeeded(payment_intent_id)
 
@@ -495,6 +605,24 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
                     "payment_id": payment_intent_id,
                 },
             )
+            # Payment is confirmed — now the customer gets the
+            # confirmation email. The task itself is idempotent via a
+            # metadata reservation, so parallel webhook deliveries or a
+            # subsequent checkout.session.completed event cannot cause
+            # a duplicate send.
+            send_order_confirmation_email.delay(order.id)
+
+            # Live notification for the same event. The event-level
+            # idempotency guard above (webhook_processed_{event_id})
+            # already prevents duplicate dispatches from Stripe
+            # redeliveries; the task itself is a single INSERT, so this
+            # is safe at-most-once per event.
+            if order.user_id:
+                transaction.on_commit(
+                    lambda oid=order.id: notify_payment_confirmed_live.delay(
+                        oid
+                    )
+                )
 
     except Exception as e:
         logger.error(
@@ -510,8 +638,41 @@ def handle_stripe_payment_failed(sender, **kwargs):
     try:
         event: Event = kwargs["event"]
         payment_intent_id = event.data["object"]["id"]
+        event_id = event.id
 
         logger.info("Stripe payment failed: %s", payment_intent_id)
+
+        # Event-level idempotency: Stripe may redeliver the same event.
+        # A customer who has moved on to a retry (payment_id already
+        # overwritten with the new intent) must not get a second
+        # failure email from a late redelivery of the old one.
+        already_processed = False
+        with transaction.atomic():
+            order_lookup = (
+                Order.objects.select_for_update()
+                .filter(payment_id=payment_intent_id)
+                .first()
+            )
+            if order_lookup:
+                if order_lookup.metadata and order_lookup.metadata.get(
+                    f"webhook_processed_{event_id}"
+                ):
+                    logger.info(
+                        "Webhook %s already processed for order %s, skipping",
+                        event_id,
+                        order_lookup.id,
+                    )
+                    already_processed = True
+                else:
+                    if not order_lookup.metadata:
+                        order_lookup.metadata = {}
+                    order_lookup.metadata[f"webhook_processed_{event_id}"] = (
+                        True
+                    )
+                    order_lookup.save(update_fields=["metadata"])
+
+        if already_processed:
+            return
 
         order = OrderService.handle_payment_failed(payment_intent_id)
 
@@ -524,6 +685,17 @@ def handle_stripe_payment_failed(sender, **kwargs):
                     "payment_id": payment_intent_id,
                 },
             )
+            # Notify the customer so they can retry instead of silently
+            # sitting on a broken order.
+            send_payment_failed_email.delay(order.id)
+
+            # Parallel live notification — same idempotency story as
+            # the succeeded branch above (guarded by the event-level
+            # metadata flag).
+            if order.user_id:
+                transaction.on_commit(
+                    lambda oid=order.id: notify_payment_failed_live.delay(oid)
+                )
 
     except Exception as e:
         logger.error(
@@ -605,71 +777,87 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             logger.warning("No order_id in session metadata: %s", session_id)
             return
 
-        try:
-            order = Order.objects.get(id=order_id)
-        except Order.DoesNotExist:
-            logger.error(
-                "Order %s not found for session %s", order_id, session_id
-            )
-            return
+        # Atomic idempotency check-and-mark with row lock, then perform all
+        # state mutations inside the same transaction to prevent double-save
+        # and parallel duplicate processing.
+        with transaction.atomic():
+            try:
+                order = Order.objects.select_for_update().get(id=order_id)
+            except Order.DoesNotExist:
+                logger.error(
+                    "Order %s not found for session %s", order_id, session_id
+                )
+                return
 
-        # Check idempotency
-        if order.metadata and order.metadata.get(
-            f"webhook_processed_{event_id}"
-        ):
-            logger.info(
-                "Webhook %s already processed for order %s, skipping",
-                event_id,
-                order.id,
-            )
-            return
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                return
 
-        # Mark webhook as processed
-        if not order.metadata:
-            order.metadata = {}
-        order.metadata[f"webhook_processed_{event_id}"] = True
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata[f"webhook_processed_{event_id}"] = True
 
-        if payment_status == "paid" and payment_intent_id:
-            order.mark_as_paid(
-                payment_id=payment_intent_id, payment_method="stripe"
-            )
+            if payment_status == "paid" and payment_intent_id:
+                from order.payment_events import publish_payment_status
 
-            if order.status == OrderStatus.PENDING:
-                OrderService.update_order_status(order, OrderStatus.PROCESSING)
+                order.mark_as_paid(
+                    payment_id=payment_intent_id, payment_method="stripe"
+                )
 
-            order.metadata["stripe_checkout_session_id"] = session_id
-            order.metadata["stripe_payment_intent_id"] = payment_intent_id
-            order.save(update_fields=["metadata"])
+                if order.status == OrderStatus.PENDING:
+                    OrderService.update_order_status(
+                        order, OrderStatus.PROCESSING
+                    )
 
-            OrderHistory.log_payment_update(
-                order=order,
-                previous_value={"payment_status": "pending"},
-                new_value={
-                    "payment_status": "completed",
-                    "payment_id": payment_intent_id,
-                    "checkout_session_id": session_id,
-                },
-            )
+                order.metadata["stripe_checkout_session_id"] = session_id
+                order.metadata["stripe_payment_intent_id"] = payment_intent_id
+                order.save(update_fields=["metadata"])
 
-            logger.info(
-                "Order %s marked as paid via checkout session %s",
-                order_id,
-                session_id,
-            )
+                publish_payment_status(order)
 
-        elif payment_status == "unpaid":
-            order.payment_status = PaymentStatus.PENDING
-            order.save(update_fields=["payment_status", "metadata"])
+                OrderHistory.log_payment_update(
+                    order=order,
+                    previous_value={"payment_status": "pending"},
+                    new_value={
+                        "payment_status": "completed",
+                        "payment_id": payment_intent_id,
+                        "checkout_session_id": session_id,
+                    },
+                )
 
-            OrderHistory.log_note(
-                order=order,
-                note=f"Checkout session completed but payment is unpaid: {session_id}",
-            )
+                logger.info(
+                    "Order %s marked as paid via checkout session %s",
+                    order_id,
+                    session_id,
+                )
 
-            logger.warning(
-                "Checkout session completed but payment is unpaid: %s",
-                session_id,
-            )
+                # Payment confirmed via Stripe Checkout — send the
+                # confirmation email now (idempotent).
+                transaction.on_commit(
+                    lambda oid=order.id: send_order_confirmation_email.delay(
+                        oid
+                    )
+                )
+
+            elif payment_status == "unpaid":
+                order.payment_status = PaymentStatus.PENDING
+                order.save(update_fields=["payment_status", "metadata"])
+
+                OrderHistory.log_note(
+                    order=order,
+                    note=f"Checkout session completed but payment is unpaid: {session_id}",
+                )
+
+                logger.warning(
+                    "Checkout session completed but payment is unpaid: %s",
+                    session_id,
+                )
 
     except Exception as e:
         logger.error(

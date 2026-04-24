@@ -11,8 +11,9 @@ from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.utils.crypto import get_random_string
 
+from django.db import transaction
+
 from user.models.subscription import SubscriptionTopic, UserSubscription
-from user.utils.subscription import send_subscription_confirmation
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialLogin
@@ -23,7 +24,9 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-@receiver(password_changed)
+@receiver(
+    password_changed, dispatch_uid="user.revoke_knox_tokens_on_password_change"
+)
 def revoke_knox_tokens_on_password_change(request, user, **kwargs):
     """
     Revoke all Knox access tokens when the user changes their password.
@@ -40,7 +43,7 @@ def revoke_knox_tokens_on_password_change(request, user, **kwargs):
     )
 
 
-@receiver(user_signed_up)
+@receiver(user_signed_up, dispatch_uid="user.populate_profile")
 def populate_profile(
     sociallogin: SocialLogin | None = None, user=None, **kwargs
 ):
@@ -80,7 +83,9 @@ def populate_profile(
         )
 
 
-@receiver(post_save, sender=User)
+@receiver(
+    post_save, sender=User, dispatch_uid="user.create_default_subscriptions"
+)
 def create_default_subscriptions(sender, instance, created, **kwargs):
     if created:
         default_topics = SubscriptionTopic.objects.filter(
@@ -101,4 +106,12 @@ def create_default_subscriptions(sender, instance, created, **kwargs):
             if topic.requires_confirmation:
                 subscription.confirmation_token = get_random_string(64)
                 subscription.save()
-                send_subscription_confirmation(subscription, instance)
+                # Dispatch only after the outer transaction commits so the
+                # worker can't read the row before it's persisted.
+                from user.tasks import send_subscription_confirmation_email_task
+
+                transaction.on_commit(
+                    lambda s=subscription: (
+                        send_subscription_confirmation_email_task.delay(s.id)
+                    )
+                )

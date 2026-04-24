@@ -78,6 +78,6 @@
 </div>
 <p class="text-muted mt-2" style="font-size: 12px;">
     {% trans "Don't want to receive these emails?" %}
-    <a href="{{ SITE_URL }}/unsubscribe?email={{ user.email }}">{% trans "Unsubscribe here" %}</a>
+    <a href="{{ unsubscribe_url|default:SITE_URL }}">{% trans "Unsubscribe here" %}</a>
 </p>
 {% endblock %}

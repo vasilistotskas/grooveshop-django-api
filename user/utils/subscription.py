@@ -3,16 +3,21 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from datetime import timedelta
+
 from extra_settings.models import Setting
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from django.utils import timezone, translation
 from django.utils.encoding import force_bytes
-from django.utils.html import strip_tags
 from django.utils.http import urlsafe_base64_encode
 from django.utils.translation import gettext as _
+
+from core.utils.i18n import get_user_language
 
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
@@ -49,38 +54,40 @@ def send_subscription_confirmation(
 
     try:
         confirmation_url = Setting.get("SUBSCRIPTION_CONFIRMATION_URL")
+        user = subscription.user
+        language = get_user_language(user)
 
         context = {
-            "user": subscription.user,
+            "user": user,
             "topic": subscription.topic,
             "subscription": subscription,
             "confirmation_url": confirmation_url.format(
                 token=subscription.confirmation_token
             ),
-            "SITE_NAME": getattr(settings, "SITE_NAME", "Website"),
-            "SITE_URL": getattr(settings, "SITE_URL", ""),
-            "INFO_EMAIL": getattr(
-                settings, "INFO_EMAIL", settings.DEFAULT_FROM_EMAIL
-            ),
-            "STATIC_BASE_URL": getattr(settings, "STATIC_BASE_URL", ""),
-            "LANGUAGE_CODE": getattr(settings, "LANGUAGE_CODE", "el"),
+            "SITE_NAME": settings.SITE_NAME,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "LANGUAGE_CODE": language,
         }
 
-        subject = _("Confirm your subscription to {topic}").format(
-            topic=subscription.topic.name
-        )
-
-        html_message = render_to_string(
-            "emails/subscription/confirmation.html", context
-        )
-
-        text_message = strip_tags(html_message)
+        with translation.override(language):
+            subject = _("Confirm your subscription to {topic}").format(
+                topic=subscription.topic.name
+            )
+            html_message = render_to_string(
+                "emails/subscription/confirmation.html", context
+            )
+            text_message = render_to_string(
+                "emails/subscription/confirmation.txt", context
+            )
 
         email = EmailMultiAlternatives(
             subject=subject,
             body=text_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[subscription.user.email],
+            to=[user.email],
+            reply_to=[settings.INFO_EMAIL],
         )
         email.attach_alternative(html_message, "text/html")
         email.send()
@@ -109,8 +116,10 @@ def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
     token = default_token_generator.make_token(user)
     uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-    base_url = getattr(settings, "SITE_URL", "https://example.com")
-    unsubscribe_url = f"{base_url}/unsubscribe/{uid}/{token}/{topic.slug}/"
+    base_url = settings.API_BASE_URL.rstrip("/")
+    unsubscribe_url = (
+        f"{base_url}/api/v1/user/unsubscribe/{uid}/{token}/{topic.slug}"
+    )
 
     return unsubscribe_url
 
@@ -118,47 +127,86 @@ def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
 def send_newsletter(
     topic: SubscriptionTopic,
     subject: str,
-    template_name: str,
+    template_base: str,
     context: dict[str, Any],
     batch_size: int = 100,
+    force: bool = False,
+    dedup_window_hours: int = 24,
 ) -> dict[str, int]:
+    """Send a newsletter to every ACTIVE subscriber of `topic`.
+
+    The HTML/TXT body is rendered per-user under `translation.override(user.language_code)`;
+    subject is caller-resolved (translate it in the caller if needed).
+
+    Dedup: a Redis key `newsletter:sent:{slug}:{uid}:{date}` holds a flag for
+    `dedup_window_hours`; set `force=True` to bypass (e.g. intentional re-send
+    after a content fix).
+    """
     stats = {"sent": 0, "failed": 0, "skipped": 0}
 
     active_subscriptions = UserSubscription.objects.filter(
         topic=topic, status=UserSubscription.SubscriptionStatus.ACTIVE
     ).select_related("user")
 
+    today = timezone.now().date().isoformat()
+    dedup_ttl_seconds = int(timedelta(hours=dedup_window_hours).total_seconds())
+
     for subscription in active_subscriptions.iterator(chunk_size=batch_size):
         user = subscription.user
 
-        if not user.is_active:
+        if not user.is_active or not user.email:
             stats["skipped"] += 1
             continue
 
+        cache_key = f"newsletter:sent:{topic.slug}:{user.pk}:{today}"
+        if not force and cache.get(cache_key):
+            stats["skipped"] += 1
+            continue
+
+        unsubscribe_url = generate_unsubscribe_link(user, topic)
         user_context = context.copy()
         user_context.update(
             {
                 "user": user,
                 "topic": topic,
                 "subscription": subscription,
-                "unsubscribe_url": generate_unsubscribe_link(user, topic),
-                "preferences_url": f"{getattr(settings, 'SITE_URL', '')}/account/subscriptions/",
+                "unsubscribe_url": unsubscribe_url,
+                "preferences_url": f"{settings.NUXT_BASE_URL}/account/subscriptions/",
+                "SITE_NAME": settings.SITE_NAME,
+                "SITE_URL": settings.NUXT_BASE_URL,
+                "INFO_EMAIL": settings.INFO_EMAIL,
+                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
         )
 
         try:
-            html_message = render_to_string(template_name, user_context)
-            text_message = strip_tags(html_message)
+            with translation.override(get_user_language(user)):
+                html_message = render_to_string(
+                    f"{template_base}.html", user_context
+                )
+                text_message = render_to_string(
+                    f"{template_base}.txt", user_context
+                )
 
             email = EmailMultiAlternatives(
                 subject=subject,
                 body=text_message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
+                reply_to=[settings.INFO_EMAIL],
+                headers={
+                    "List-Unsubscribe": (
+                        f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
+                        f"<{unsubscribe_url}>"
+                    ),
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                    "List-ID": f"{topic.slug}.{settings.SITE_NAME}",
+                },
             )
             email.attach_alternative(html_message, "text/html")
             email.send()
 
+            cache.set(cache_key, True, timeout=dedup_ttl_seconds)
             stats["sent"] += 1
 
         except Exception as e:

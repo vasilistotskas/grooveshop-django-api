@@ -1,17 +1,20 @@
-{% load i18n %}{% trans "SUBSCRIPTION CONFIRMED" %}
+{% load i18n %}{% trans "CONFIRM YOUR SUBSCRIPTION" %}
 {{ SITE_NAME }}
 ================================================================================
 
 {% blocktrans with first_name=user.first_name|default:user.username %}Hi {{ first_name }},{% endblocktrans %}
 
-{% blocktrans with topic_name=topic.name %}Your subscription to {{ topic_name }} has been successfully confirmed! We're excited to have you on board.{% endblocktrans %}
+{% blocktrans with topic_name=topic.name %}Please confirm you'd like to subscribe to {{ topic_name }}. Your subscription isn't active yet — open the link below to complete it.{% endblocktrans %}
+
+{% trans "CONFIRM HERE" %}
+--------------------------------------------------------------------------------
+{{ confirmation_url }}
 
 {% trans "SUBSCRIPTION DETAILS" %}
 --------------------------------------------------------------------------------
-{% trans "Topic" %}:           {{ topic.name }}
-{% trans "Category" %}:        {{ topic.get_category_display }}
-{% trans "Status" %}:          {% trans "Active" %}
-{% trans "Subscribed On" %}:   {{ subscription.subscribed_at|date:"SHORT_DATE_FORMAT" }}
+{% trans "Topic" %}:         {{ topic.name }}
+{% trans "Category" %}:      {{ topic.get_category_display }}
+{% trans "Requested On" %}:  {{ subscription.subscribed_at|date:"SHORT_DATE_FORMAT" }}
 
 {% if topic.description %}
 {% trans "WHAT YOU'LL RECEIVE" %}
@@ -19,19 +22,10 @@
 {{ topic.description }}
 {% endif %}
 
-{% trans "WHAT'S NEXT?" %}
---------------------------------------------------------------------------------
-{% trans "You'll start receiving updates based on your subscription preferences. You can manage your subscriptions anytime from your account settings." %}
+{% trans "If you didn't request this subscription, you can safely ignore this email — nothing will happen." %}
 
-{% trans "MANAGE YOUR SUBSCRIPTIONS" %}
---------------------------------------------------------------------------------
-{% trans "Visit" %}: {{ SITE_URL }}/account/subscriptions
-
-{% trans "UNSUBSCRIBE" %}
---------------------------------------------------------------------------------
-{% trans "If you didn't request this subscription or want to unsubscribe, you can do so at any time from your account settings." %}
-
-{% blocktrans with site_name=SITE_NAME %}Thank you for staying connected with {{ site_name }}!{% endblocktrans %}
+{% blocktrans with site_name=SITE_NAME %}Thanks,
+The {{ site_name }} team{% endblocktrans %}
 
 ================================================================================
 {{ SITE_NAME }} - {{ SITE_URL }}

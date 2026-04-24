@@ -1,0 +1,28 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Your Invoice" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<div style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); padding: 32px 24px; text-align: center; border-radius: 8px; margin-bottom: 24px;">
+    <h2 style="color: white; font-size: 28px; margin: 0 0 12px 0;">{% trans "Your Invoice" %}</h2>
+    <p style="color: white; font-size: 16px; margin: 0;">
+        {% blocktrans with invoice_number=invoice.invoice_number order_id=order.id %}Invoice {{ invoice_number }} for order #{{ order_id }} is attached.{% endblocktrans %}
+    </p>
+</div>
+
+<p>{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}</p>
+
+<p>{% trans "Please find the invoice for your order attached to this email as a PDF." %}</p>
+
+<div class="email-card">
+    <h2>{% trans "Invoice Details" %}</h2>
+    <p><strong>{% trans "Invoice number" %}:</strong> {{ invoice.invoice_number }}</p>
+    <p><strong>{% trans "Issue date" %}:</strong> {{ invoice.issue_date|date:"SHORT_DATE_FORMAT" }}</p>
+    <p><strong>{% trans "Order" %}:</strong> #{{ order.id }}</p>
+</div>
+
+<p>{% trans "This invoice is your proof of purchase — please keep it for your records." %}</p>
+
+<p>{% trans "If you have any questions, please contact our customer service team." %}</p>
+{% endblock %}

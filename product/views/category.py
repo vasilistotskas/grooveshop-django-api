@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
@@ -56,6 +57,17 @@ class ProductCategoryViewSet(BaseModelViewSet):
     queryset = ProductCategory.objects.all()
     filterset_class = ProductCategoryFilter
     serializers_config = serializers_config
+
+    def get_permissions(self):
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ):
+            return [IsAdminUser()]
+        return [AllowAny()]
+
     ordering_fields = [
         "id",
         "sort_order",

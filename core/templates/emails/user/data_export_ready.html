@@ -1,0 +1,23 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Your data export is ready" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% blocktrans with name=user.first_name|default:user.username %}Hi {{ name }},{% endblocktrans %}</h1>
+
+<p>{% trans "Your personal data export is ready to download. The archive contains every record we hold that relates to you: profile, addresses, orders, favourites, reviews, blog comments, loyalty activity, notifications, and subscriptions." %}</p>
+
+<div class="text-center mt-3 mb-3">
+    <a href="{{ download_url }}" class="email-button">{% trans "Download your export" %}</a>
+</div>
+
+<p style="color: #666; font-size: 14px;">
+    {% blocktrans with size=file_size_kb %}File size: {{ size }} KB{% endblocktrans %}<br>
+    {% blocktrans with expires=expires_at|date:"SHORT_DATETIME_FORMAT" %}Link expires on {{ expires }}.{% endblocktrans %}
+</p>
+
+<p>{% trans "This is a one-off download link. Save the file somewhere safe — we don't keep a copy after the link expires." %}</p>
+
+<p style="color: #b00; font-size: 13px;">{% trans "If you did not request this export, please contact support right away." %}</p>
+{% endblock %}

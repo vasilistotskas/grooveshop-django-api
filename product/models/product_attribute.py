@@ -25,7 +25,7 @@ class ProductAttribute(TimeStampMixinModel):
         related_name="product_attributes",
     )
 
-    objects: ProductAttributeManager = ProductAttributeManager()
+    objects = ProductAttributeManager()
 
     class Meta(TypedModelMeta):
         verbose_name = _("Product Attribute")

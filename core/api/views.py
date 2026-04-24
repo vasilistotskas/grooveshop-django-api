@@ -1,16 +1,10 @@
-import base64
-import hashlib
 import logging
-import os
 from django.core.exceptions import ImproperlyConfigured
 from celery.exceptions import CeleryError
 from core.celery import celery_app
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from django.conf import settings
 from django.db import DatabaseError, connection
 from django.middleware.csrf import get_token
-from django.shortcuts import redirect
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
     extend_schema,
@@ -22,7 +16,9 @@ from rest_framework import status
 from rest_framework.decorators import (
     action,
     api_view,
+    permission_classes,
 )
+from rest_framework.permissions import IsAdminUser
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -340,59 +336,51 @@ class BaseModelViewSet(
     metadata_class = Metadata
 
     def create(self, request, *args, **kwargs):
-        try:
-            with transaction.atomic():
-                req_serializer = self.get_request_serializer()
-                request_serializer = req_serializer(
-                    data=request.data, context=self.get_serializer_context()
-                )
-                request_serializer.is_valid(raise_exception=True)
-                self.perform_create(request_serializer)
+        with transaction.atomic():
+            req_serializer = self.get_request_serializer()
+            request_serializer = req_serializer(
+                data=request.data, context=self.get_serializer_context()
+            )
+            request_serializer.is_valid(raise_exception=True)
+            self.perform_create(request_serializer)
 
-                response_serializer_class = self.get_response_serializer()
-                response_serializer = response_serializer_class(
-                    request_serializer.instance,
-                    context=self.get_serializer_context(),
-                )
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(
+                request_serializer.instance,
+                context=self.get_serializer_context(),
+            )
 
-                headers = self.get_success_headers(response_serializer.data)
-                return Response(
-                    response_serializer.data,
-                    status=status.HTTP_201_CREATED,
-                    headers=headers,
-                )
-        except Exception as e:
-            logger.error(f"Error in create: {e}", exc_info=True)
-            raise
+            headers = self.get_success_headers(response_serializer.data)
+            return Response(
+                response_serializer.data,
+                status=status.HTTP_201_CREATED,
+                headers=headers,
+            )
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
 
-        try:
-            with transaction.atomic():
-                req_serializer = self.get_request_serializer()
-                request_serializer = req_serializer(
-                    instance,
-                    data=request.data,
-                    partial=partial,
-                    context=self.get_serializer_context(),
-                )
-                request_serializer.is_valid(raise_exception=True)
-                self.perform_update(request_serializer)
+        with transaction.atomic():
+            req_serializer = self.get_request_serializer()
+            request_serializer = req_serializer(
+                instance,
+                data=request.data,
+                partial=partial,
+                context=self.get_serializer_context(),
+            )
+            request_serializer.is_valid(raise_exception=True)
+            self.perform_update(request_serializer)
 
-                if getattr(instance, "_prefetched_objects_cache", None):
-                    instance._prefetched_objects_cache = {}
+            if getattr(instance, "_prefetched_objects_cache", None):
+                instance._prefetched_objects_cache = {}
 
-                response_serializer_class = self.get_response_serializer()
-                response_serializer = response_serializer_class(
-                    request_serializer.instance,
-                    context=self.get_serializer_context(),
-                )
-                return Response(response_serializer.data)
-        except Exception as e:
-            logger.error(f"Error in update: {e}", exc_info=True)
-            raise
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(
+                request_serializer.instance,
+                context=self.get_serializer_context(),
+            )
+            return Response(response_serializer.data)
 
     def partial_update(self, request, *args, **kwargs):
         kwargs["partial"] = True
@@ -436,7 +424,8 @@ def health_check(request):
     }
 
     try:
-        connection.cursor()
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
         health_status["database"] = True
     except DatabaseError:
         health_status["database"] = False
@@ -462,43 +451,6 @@ def health_check(request):
     return response
 
 
-def encrypt_token(token: str, secret_key: str) -> str:
-    key = hashlib.sha256(secret_key.encode()).digest()
-    nonce = os.urandom(16)
-    cipher = Cipher(
-        algorithms.AES(key), modes.GCM(nonce), backend=default_backend()
-    )
-    encryptor = cipher.encryptor()
-    ciphertext = encryptor.update(token.encode()) + encryptor.finalize()
-    encrypted_token = base64.urlsafe_b64encode(
-        nonce + encryptor.tag + ciphertext
-    ).decode("utf-8")
-    return encrypted_token
-
-
-def redirect_to_frontend(request, *args, **kwargs):
-    from knox.models import get_token_model  # noqa: PLC0415
-
-    AuthToken = get_token_model()
-    user = request.user
-
-    if user.is_authenticated:
-        _, token = AuthToken.objects.create(user)
-        encrypted_token = encrypt_token(token, settings.SECRET_KEY)
-    else:
-        encrypted_token = ""
-
-    frontend_url = settings.NUXT_BASE_URL
-    redirect_path = "/account/provider/callback"
-    response = redirect(
-        f"{frontend_url}{redirect_path}?encrypted_token={encrypted_token}"
-    )
-
-    response.headers["X-Encrypted-Token"] = encrypted_token
-
-    return response
-
-
 @extend_schema(
     summary=_("List all available settings"),
     description=_("Retrieve all settings with their names, values, and types"),
@@ -509,6 +461,7 @@ def redirect_to_frontend(request, *args, **kwargs):
     },
 )
 @api_view(["GET"])
+@permission_classes([IsAdminUser])
 def list_settings(request):
     """List all available settings with their values."""
     try:
@@ -540,6 +493,23 @@ def list_settings(request):
         )
 
 
+PUBLIC_SETTING_KEYS = frozenset(
+    {
+        "CHECKOUT_SHIPPING_PRICE",
+        "FREE_SHIPPING_THRESHOLD",
+        "LOYALTY_ENABLED",
+        "LOYALTY_REDEMPTION_RATIO_EUR",
+        "LOYALTY_POINTS_FACTOR",
+        "LOYALTY_TIER_MULTIPLIER_ENABLED",
+        "LOYALTY_POINTS_EXPIRATION_DAYS",
+        "LOYALTY_NEW_CUSTOMER_BONUS_ENABLED",
+        "LOYALTY_NEW_CUSTOMER_BONUS_POINTS",
+        "LOYALTY_XP_PER_LEVEL",
+        "B2B_INVOICING_ENABLED",
+    }
+)
+
+
 @extend_schema(
     summary=_("Get setting by key"),
     description=_("Retrieve a specific setting value by its key name"),
@@ -561,7 +531,11 @@ def list_settings(request):
 )
 @api_view(["GET"])
 def get_setting_by_key(request):
-    """Get a specific setting by its key name."""
+    """Get a specific setting by its key name.
+
+    Public (whitelisted) keys are accessible without authentication.
+    All other keys require admin access.
+    """
     try:
         from extra_settings.models import Setting
 
@@ -576,6 +550,17 @@ def get_setting_by_key(request):
                 error_data,
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        if key not in PUBLIC_SETTING_KEYS:
+            if not (
+                request.user
+                and request.user.is_authenticated
+                and request.user.is_staff
+            ):
+                return Response(
+                    {"detail": _("Setting not found or access denied.")},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
         try:
             setting_value = Setting.get(key)

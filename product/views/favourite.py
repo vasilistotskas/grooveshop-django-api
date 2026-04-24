@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
@@ -77,6 +77,17 @@ serializers_config: SerializersConfig = {
 class ProductFavouriteViewSet(BaseModelViewSet):
     queryset = ProductFavourite.objects.all()
     filterset_class = ProductFavouriteFilter
+
+    def get_permissions(self):
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ):
+            return [IsAuthenticated()]
+        return [AllowAny()]
+
     ordering_fields = [
         "id",
         "user_id",
@@ -130,7 +141,12 @@ class ProductFavouriteViewSet(BaseModelViewSet):
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=["POST"], pagination_class=None)
+    @action(
+        detail=False,
+        methods=["POST"],
+        pagination_class=None,
+        permission_classes=[IsAuthenticated],
+    )
     def favourites_by_products(self, request, *args, **kwargs):
         user = request.user
         request_serializer_class = self.get_request_serializer()

@@ -15,15 +15,18 @@ from core.api.views import (
     get_setting_by_key,
     health_check,
     list_settings,
-    redirect_to_frontend,
 )
+from core.rosetta_views import DBBackedTranslationFormView
 from core.views import (
     HomeView,
     ManageTOTPSvgView,
     robots_txt,
     upload_image,
 )
-from order.views.viva_webhook import viva_wallet_webhook
+from order.views.viva_webhook import (
+    resolve_viva_order_code,
+    viva_wallet_webhook,
+)
 
 import core.filters.camel_case_filters  # noqa
 import core.filters.camel_case_ordering  # noqa
@@ -39,6 +42,11 @@ urlpatterns = [
         viva_wallet_webhook,
         name="viva-wallet-webhook",
     ),
+    path(
+        "viva-wallet/resolve-order",
+        resolve_viva_order_code,
+        name="viva-wallet-resolve-order",
+    ),
 ]
 
 urlpatterns += i18n_patterns(
@@ -50,16 +58,19 @@ urlpatterns += i18n_patterns(
     path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
-    path(
-        "account/provider/callback",
-        redirect_to_frontend,
-        name="provider-callback",
-    ),
     path("_allauth/", include("allauth.headless.urls")),
     path(
         "_allauth/app/v1/account/authenticators/totp/svg",
         ManageTOTPSvgView.as_api_view(client="app"),
         name="manage_totp_svg",
+    ),
+    # Our DBBackedTranslationFormView overrides the same URL that rosetta.urls
+    # registers for the translation form; Django resolves the first match
+    # so this override takes priority over the default `TranslationFormView`.
+    path(
+        "rosetta/files/<str:po_filter>/<str:lang_id>/<int:idx>/",
+        DBBackedTranslationFormView.as_view(),
+        name="rosetta-form",
     ),
     path("rosetta/", include("rosetta.urls")),
     path("tinymce/", include("tinymce.urls")),

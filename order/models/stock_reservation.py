@@ -69,6 +69,13 @@ class StockReservation(TimeStampMixinModel):
         blank=True,
         help_text=_("Order created from this reservation (set when consumed)"),
     )
+    abandonment_notified = models.BooleanField(
+        _("Abandonment Notified"),
+        default=False,
+        help_text=_(
+            "True if the customer has been emailed about this abandoned reservation"
+        ),
+    )
 
     # Manager
     objects: StockReservationManager = StockReservationManager()

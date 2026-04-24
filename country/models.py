@@ -77,5 +77,5 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     @property
     def main_image_path(self) -> str:
         if self.image_flag and hasattr(self.image_flag, "name"):
-            return f"media/uploads/country/{os.path.basename(self.image_flag.name)}"
+            return f"media/uploads/country/{os.path.basename(str(self.image_flag.name))}"
         return ""

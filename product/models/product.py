@@ -74,6 +74,20 @@ class Product(
     )
     active = models.BooleanField(_("Active"), default=True)
     stock = models.PositiveIntegerField(_("Stock"), default=0)
+    low_stock_threshold = models.PositiveIntegerField(
+        _("Low Stock Threshold"),
+        default=10,
+        help_text=_(
+            "Stock level at or below which admins get a low-stock alert. Set to 0 to disable alerts for this product."
+        ),
+    )
+    low_stock_alert_sent = models.BooleanField(
+        _("Low Stock Alert Sent"),
+        default=False,
+        help_text=_(
+            "Internal flag — prevents duplicate alerts. Automatically cleared when stock rises above the threshold."
+        ),
+    )
     discount_percent = models.DecimalField(
         _("Discount Percent"),
         max_digits=11,
@@ -195,10 +209,7 @@ class Product(
             raise ValidationError({"stock": _("Stock cannot be negative.")})
 
     def generate_unique_sku(self) -> str:
-        while True:
-            unique_code = uuid.uuid4()
-            if not self.objects.filter(sku=unique_code).exists():
-                return str(unique_code)
+        return str(uuid.uuid4())
 
     def increment_stock(self, quantity: int) -> None:
         if quantity < 0:
@@ -346,6 +357,13 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
     name = models.CharField(_("Name"), max_length=255, blank=True, default="")
     description = HTMLField(_("Description"), blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        from core.utils.sanitize import sanitize_html
+
+        if self.description:
+            self.description = sanitize_html(self.description)
+        super().save(*args, **kwargs)
+
     class Meta:
         app_label = "product"
         db_table = "product_product_translation"
@@ -358,12 +376,19 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
         """Return optimized queryset for bulk indexing."""
         from django.db.models import Count
 
-        return cls.objects.select_related(
-            "master", "master__category", "master__vat"
-        ).annotate(
-            _likes_count=Count("master__favourited_by", distinct=True),
-            _review_average=Avg("master__reviews__rate"),
-            _reviews_count=Count("master__reviews", distinct=True),
+        return (
+            cls.objects.select_related(
+                "master", "master__category", "master__vat"
+            )
+            .prefetch_related(
+                "master__product_attributes__attribute_value__attribute__translations",
+                "master__product_attributes__attribute_value__translations",
+            )
+            .annotate(
+                _likes_count=Count("master__favourited_by", distinct=True),
+                _review_average=Avg("master__reviews__rate"),
+                _reviews_count=Count("master__reviews", distinct=True),
+            )
         )
 
     def meili_filter(self) -> bool:
@@ -502,54 +527,63 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
                     "attribute_value_id", flat=True
                 )
             ),
-            "attribute_names": lambda obj: " ".join(
-                [
-                    pa.attribute_value.attribute.safe_translation_getter(
-                        "name",
-                        language_code=obj.language_code,
-                        any_language=True,
-                    )
-                    for pa in obj.master.product_attributes.select_related(
+            **cls._attribute_meili_fields(),
+        }
+
+    @staticmethod
+    def _attribute_meili_fields():
+        _cache = {}
+
+        def _fetch(obj):
+            obj_id = id(obj)
+            if obj_id not in _cache:
+                attrs = list(
+                    obj.master.product_attributes.select_related(
                         "attribute_value__attribute"
                     ).prefetch_related(
-                        "attribute_value__attribute__translations"
+                        "attribute_value__translations",
+                        "attribute_value__attribute__translations",
                     )
-                ]
-            ),
-            "attribute_values_text": lambda obj: " ".join(
-                [
-                    pa.attribute_value.safe_translation_getter(
-                        "value",
-                        language_code=obj.language_code,
-                        any_language=True,
-                    )
-                    for pa in obj.master.product_attributes.select_related(
-                        "attribute_value"
-                    ).prefetch_related("attribute_value__translations")
-                ]
-            ),
-            "attribute_data": lambda obj: [
-                {
-                    "attribute_id": pa.attribute_value.attribute_id,
-                    "attribute_name": pa.attribute_value.attribute.safe_translation_getter(
-                        "name",
-                        language_code=obj.language_code,
-                        any_language=True,
-                    ),
-                    "value_id": pa.attribute_value_id,
-                    "value": pa.attribute_value.safe_translation_getter(
-                        "value",
-                        language_code=obj.language_code,
-                        any_language=True,
-                    ),
-                }
-                for pa in obj.master.product_attributes.select_related(
-                    "attribute_value__attribute"
-                ).prefetch_related(
-                    "attribute_value__translations",
-                    "attribute_value__attribute__translations",
                 )
-            ],
+                names = []
+                values_text = []
+                data = []
+                for pa in attrs:
+                    attr_name = (
+                        pa.attribute_value.attribute.safe_translation_getter(
+                            "name",
+                            language_code=obj.language_code,
+                            any_language=True,
+                        )
+                    )
+                    attr_value = pa.attribute_value.safe_translation_getter(
+                        "value",
+                        language_code=obj.language_code,
+                        any_language=True,
+                    )
+                    if attr_name:
+                        names.append(attr_name)
+                    if attr_value:
+                        values_text.append(attr_value)
+                    data.append(
+                        {
+                            "attribute_id": pa.attribute_value.attribute_id,
+                            "attribute_name": attr_name,
+                            "value_id": pa.attribute_value_id,
+                            "value": attr_value,
+                        }
+                    )
+                _cache[obj_id] = (
+                    " ".join(names),
+                    " ".join(values_text),
+                    data,
+                )
+            return _cache[obj_id]
+
+        return {
+            "attribute_names": lambda obj: _fetch(obj)[0],
+            "attribute_values_text": lambda obj: _fetch(obj)[1],
+            "attribute_data": lambda obj: _fetch(obj)[2],
         }
 
     def __str__(self):

@@ -23,11 +23,12 @@ User = get_user_model()
 
 class ProductImageViewSetTestCase(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
+        self.user = User.objects.create_superuser(
             email="test@example.com",
             username="testuser",
             password="testpass123",
         )
+        self.client.force_authenticate(user=self.user)
         self.product = ProductFactory()
         self.product_image = ProductImageFactory(product=self.product)
         self.secondary_image = ProductImageFactory(

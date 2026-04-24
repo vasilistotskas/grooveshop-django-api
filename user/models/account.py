@@ -90,12 +90,29 @@ class UserAccount(
     github = models.URLField(_("Github Profile"), blank=True, null=True)
     bio = models.TextField(_("Bio"), blank=True, default="")
     total_xp = models.PositiveBigIntegerField(_("Total XP"), default=0)
+    reengagement_email_count = models.PositiveSmallIntegerField(
+        _("Re-engagement Email Count"),
+        default=0,
+        help_text=_("Number of re-engagement emails sent to this user."),
+    )
+    last_reengagement_email_at = models.DateTimeField(
+        _("Last Re-engagement Email At"),
+        null=True,
+        blank=True,
+        help_text=_("Timestamp of the most recent re-engagement email."),
+    )
     loyalty_tier = models.ForeignKey(
         "loyalty.LoyaltyTier",
         related_name="users",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+    )
+    language_code = models.CharField(
+        _("Language"),
+        max_length=10,
+        default=settings.LANGUAGE_CODE,
+        help_text=_("Preferred language for emails and UI messages."),
     )
 
     objects: UserAccountManager = UserAccountManager()
@@ -173,5 +190,7 @@ class UserAccount(
     @property
     def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return f"media/uploads/users/{os.path.basename(self.image.name)}"
+            return (
+                f"media/uploads/users/{os.path.basename(str(self.image.name))}"
+            )
         return ""

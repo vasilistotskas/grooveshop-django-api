@@ -84,7 +84,9 @@ class BlogPost(
     @property
     def main_image_path(self) -> str:
         if self.image and hasattr(self.image, "name"):
-            return f"media/uploads/blog/{os.path.basename(self.image.name)}"
+            return (
+                f"media/uploads/blog/{os.path.basename(str(self.image.name))}"
+            )
         return ""
 
     @property
@@ -143,6 +145,13 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
         _("Subtitle"), max_length=255, blank=True, default=""
     )
     body = HTMLField(_("Body"), blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        from core.utils.sanitize import sanitize_html
+
+        if self.body:
+            self.body = sanitize_html(self.body)
+        super().save(*args, **kwargs)
 
     class Meta:
         app_label = "blog"

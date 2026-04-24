@@ -1,4 +1,5 @@
 from django.urls import path
+from rest_framework.urlpatterns import format_suffix_patterns
 
 from order.views.item import OrderItemViewSet
 from order.views.order import OrderViewSet
@@ -33,14 +34,39 @@ urlpatterns = [
         name="order-create-payment-intent",
     ),
     path(
+        "order/<int:pk>/retry-payment",
+        OrderViewSet.as_view({"post": "retry_payment"}),
+        name="order-retry-payment",
+    ),
+    path(
         "order/<int:pk>/create_checkout_session",
         OrderViewSet.as_view({"post": "create_checkout_session"}),
         name="order-create-checkout-session",
     ),
     path(
+        "order/<int:pk>/payment_status",
+        OrderViewSet.as_view({"get": "payment_status"}),
+        name="order-payment-status",
+    ),
+    path(
         "order/<int:pk>/cancel",
         OrderViewSet.as_view({"post": "cancel"}),
         name="order-cancel",
+    ),
+    path(
+        "order/<int:pk>/invoice",
+        OrderViewSet.as_view({"get": "invoice"}),
+        name="order-invoice",
+    ),
+    path(
+        "order/<int:pk>/invoice/download",
+        OrderViewSet.as_view({"get": "invoice_download"}),
+        name="order-invoice-download",
+    ),
+    path(
+        "order/<int:pk>/reorder",
+        OrderViewSet.as_view({"post": "reorder"}),
+        name="order-reorder",
     ),
     path(
         "order/<int:pk>/add_tracking",
@@ -80,3 +106,5 @@ urlpatterns = [
         name="order-item-refund",
     ),
 ]
+
+urlpatterns = format_suffix_patterns(urlpatterns)

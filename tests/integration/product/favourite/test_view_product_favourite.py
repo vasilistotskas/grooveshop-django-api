@@ -55,6 +55,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_invalid(self):
+        self.client.force_authenticate(user=self.user)
         payload = {
             "product": "invalid_product",
             "user": "invalid_user",
@@ -349,6 +350,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
         )
 
     def test_destroy_invalid(self):
+        self.client.force_authenticate(user=self.user)
         invalid_product_favourite_id = 999999
         url = self.get_product_favourite_detail_url(
             invalid_product_favourite_id

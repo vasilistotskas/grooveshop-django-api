@@ -120,8 +120,11 @@ def index_document_task(
         index_name = type(instance).get_meili_index_name()
         task = _client.get_index(index_name).add_documents([document])
 
-        # Wait for task completion
-        finished = _client.wait_for_task(task.task_uid)
+        # Bounded wait — don't hold the Celery worker slot indefinitely
+        # when Meilisearch queues are backlogged. A timeout here raises,
+        # which MeiliTask.autoretry_for catches and reschedules with
+        # exponential backoff.
+        finished = _client.wait_for_task(task.task_uid, timeout_in_ms=5000)
 
         if finished.status == "failed":
             raise Exception(f"Meilisearch indexing failed: {finished.error}")
@@ -352,11 +355,14 @@ def reindex_model_task(
                 raise Exception(f"Failed to clear index: {finished.error}")
             logger.info(f"Cleared index {index_name}")
 
-        # Get queryset
+        # Get queryset — force pk ordering so PostgreSQL slicing is
+        # deterministic across batches. Without an explicit ORDER BY,
+        # rows can be skipped or duplicated between slices.
         if hasattr(model_class, "get_meilisearch_queryset"):
             queryset = model_class.get_meilisearch_queryset()
         else:
             queryset = model_class.objects.all()
+        queryset = queryset.order_by("pk")
 
         total_count = queryset.count()
         total_indexed = 0

@@ -60,7 +60,11 @@ class CreateDefaultSubscriptionsSignalTest(TransactionTestCase):
             )
 
     def test_existing_user_no_subscriptions(self):
-        post_save.disconnect(create_default_subscriptions, sender=User)
+        post_save.disconnect(
+            create_default_subscriptions,
+            sender=User,
+            dispatch_uid="user.create_default_subscriptions",
+        )
 
         user = User.objects.create_user(
             email="existing@test.com",
@@ -68,7 +72,11 @@ class CreateDefaultSubscriptionsSignalTest(TransactionTestCase):
             username="existing",
         )
 
-        post_save.connect(create_default_subscriptions, sender=User)
+        post_save.connect(
+            create_default_subscriptions,
+            sender=User,
+            dispatch_uid="user.create_default_subscriptions",
+        )
 
         self.assertEqual(UserSubscription.objects.filter(user=user).count(), 0)
 
@@ -174,7 +182,11 @@ class SignalDisconnectionTest(TestCase):
         )
 
     def test_user_creation_without_signal(self):
-        post_save.disconnect(create_default_subscriptions, sender=User)
+        post_save.disconnect(
+            create_default_subscriptions,
+            sender=User,
+            dispatch_uid="user.create_default_subscriptions",
+        )
 
         try:
             user = User.objects.create_user(
@@ -188,10 +200,18 @@ class SignalDisconnectionTest(TestCase):
             )
 
         finally:
-            post_save.connect(create_default_subscriptions, sender=User)
+            post_save.connect(
+                create_default_subscriptions,
+                sender=User,
+                dispatch_uid="user.create_default_subscriptions",
+            )
 
     def test_manual_subscription_creation(self):
-        post_save.disconnect(create_default_subscriptions, sender=User)
+        post_save.disconnect(
+            create_default_subscriptions,
+            sender=User,
+            dispatch_uid="user.create_default_subscriptions",
+        )
 
         try:
             user = User.objects.create_user(
@@ -217,7 +237,11 @@ class SignalDisconnectionTest(TestCase):
             )
 
         finally:
-            post_save.connect(create_default_subscriptions, sender=User)
+            post_save.connect(
+                create_default_subscriptions,
+                sender=User,
+                dispatch_uid="user.create_default_subscriptions",
+            )
 
     def tearDown(self):
         UserSubscription.objects.all().delete()

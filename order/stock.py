@@ -521,7 +521,11 @@ class StockManager:
         )
 
     @classmethod
-    def get_available_stock(cls, product_id: int) -> int:
+    def get_available_stock(
+        cls,
+        product_id: int,
+        exclude_session_id: Optional[str] = None,
+    ) -> int:
         """
         Calculate available stock for a product.
 
@@ -547,25 +551,15 @@ class StockManager:
 
         Args:
             product_id: ID of the product to check
+            exclude_session_id: Optional session ID whose reservations should
+                be excluded from the calculation. Used during order creation
+                to avoid counting the cart's own reservations against itself.
 
         Returns:
             int: Number of units available for reservation or purchase
 
         Raises:
             ProductNotFoundError: If product doesn't exist
-
-        Example:
-            >>> # Product has 100 units in stock
-            >>> # 20 units are reserved (active reservations)
-            >>> # 10 units are in expired reservations (not counted)
-            >>> available = StockManager.get_available_stock(product_id=123)
-            >>> print(available)
-            80  # 100 - 20 = 80 units available
-
-            >>> # Check before attempting to reserve
-            >>> if StockManager.get_available_stock(product_id) >= quantity:
-            ...     # Proceed with reservation
-            ...     reservation = StockManager.reserve_stock(...)
         """
         # Fetch the product to get total stock
         # We don't use select_for_update here because this is a read-only operation
@@ -584,6 +578,13 @@ class StockManager:
         active_reservations = StockReservation.objects.filter(
             product=product, consumed=False, expires_at__gt=now
         )
+
+        # Exclude reservations belonging to a specific session (e.g. the
+        # cart that already reserved this stock during checkout)
+        if exclude_session_id:
+            active_reservations = active_reservations.exclude(
+                session_id=exclude_session_id
+            )
 
         # Sum up all active reservation quantities
         # If no active reservations exist, sum returns 0
@@ -640,46 +641,45 @@ class StockManager:
             ...     logger.info(f"Cleaned up {count} expired reservations")
             ...     return count
         """
-        # Get current time for expiration check
         now = timezone.now()
 
-        # Find all expired reservations that haven't been consumed
-        # These are reservations where:
-        # 1. expires_at < now (past the 15-minute TTL)
-        # 2. consumed = False (not yet converted to sale or released)
-        expired_reservations = StockReservation.objects.filter(
-            expires_at__lt=now, consumed=False
-        ).select_related("product", "reserved_by")
+        # Fetch expired reservations (with related data) before marking them,
+        # so we can build the audit logs using the original field values.
+        expired_reservations = list(
+            StockReservation.objects.filter(
+                expires_at__lt=now, consumed=False
+            ).select_related("product", "reserved_by")
+        )
 
-        # Count the reservations before processing
-        # We do this before the loop to avoid issues with queryset evaluation
-        count = expired_reservations.count()
+        count = len(expired_reservations)
+        if count == 0:
+            return 0
 
-        # Process each expired reservation
-        for reservation in expired_reservations:
-            # Mark reservation as released (consumed=True indicates it's no longer active)
-            # Note: We use consumed=True to mark it as released because the reservation
-            # is no longer active. This is consistent with release_reservation() method.
-            reservation.consumed = True
-            reservation.save(update_fields=["consumed", "updated_at"])
+        # Bulk-mark all expired reservations as consumed in a single UPDATE.
+        reservation_ids = [r.id for r in expired_reservations]
+        StockReservation.objects.filter(id__in=reservation_ids).update(
+            consumed=True, updated_at=now
+        )
 
-            # Get current product stock for logging
-            product = reservation.product
-
-            # Log the cleanup operation for audit trail
-            # Note: stock_before and stock_after are the same because releasing a
-            # reservation doesn't change physical stock - it only makes reserved
-            # stock available again for other customers
-            StockLog.objects.create(
-                product=product,
-                order=reservation.order,  # Will be None for expired reservations
+        # Build StockLog entries for the audit trail.
+        # Releasing a reservation does not change physical stock — stock_before
+        # and stock_after are identical for each entry.
+        logs = [
+            StockLog(
+                product=reservation.product,
+                order=reservation.order,
                 operation_type=StockLog.OPERATION_RELEASE,
-                quantity_delta=reservation.quantity,  # Positive because stock is being freed
-                stock_before=product.stock,
-                stock_after=product.stock,  # Physical stock unchanged
-                reason=f"Expired reservation {reservation.id} auto-released (expired at {reservation.expires_at})",
+                quantity_delta=reservation.quantity,
+                stock_before=reservation.product.stock,
+                stock_after=reservation.product.stock,
+                reason=(
+                    f"Expired reservation {reservation.id} auto-released"
+                    f" (expired at {reservation.expires_at})"
+                ),
                 performed_by=reservation.reserved_by,
             )
+            for reservation in expired_reservations
+        ]
+        StockLog.objects.bulk_create(logs)
 
-        # Return count of cleaned reservations
         return count

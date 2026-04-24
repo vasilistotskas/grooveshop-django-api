@@ -28,6 +28,10 @@ User = get_user_model()
 class ProductViewSetTestCase(APITestCase):
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0)
+        self.admin_user = UserAccountFactory(
+            num_addresses=0, is_superuser=True, is_staff=True
+        )
+        self.client.force_authenticate(user=self.admin_user)
         self.category = ProductCategoryFactory()
         self.vat = VatFactory()
         self.product = ProductFactory(

@@ -106,8 +106,10 @@ class ExportActionMixin:
         header = [str(field.verbose_name) for field in base_fields]
 
         translated_field_names = []
-        is_translatable = issubclass(self.model, TranslatableModel) and hasattr(  # type: ignore[invalid-argument-type]
-            self.model, "_parler_meta"
+        is_translatable = (
+            self.model is not None
+            and issubclass(self.model, TranslatableModel)
+            and hasattr(self.model, "_parler_meta")
         )
         if is_translatable:
             translated_field_names = list(
@@ -275,10 +277,11 @@ class ExportActionMixin:
             base_fields = self._get_exportable_fields(opts)
 
             translated_field_names = []
-            is_translatable = issubclass(
-                self.model,  # type: ignore[invalid-argument-type]
-                TranslatableModel,
-            ) and hasattr(self.model, "_parler_meta")
+            is_translatable = (
+                self.model is not None
+                and issubclass(self.model, TranslatableModel)
+                and hasattr(self.model, "_parler_meta")
+            )
             if is_translatable:
                 translated_field_names = list(
                     self.model._parler_meta.get_translated_fields()

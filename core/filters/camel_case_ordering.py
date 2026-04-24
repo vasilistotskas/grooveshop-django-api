@@ -1,3 +1,4 @@
+import re
 from collections.abc import Sequence
 
 from drf_spectacular.extensions import OpenApiFilterExtension
@@ -6,6 +7,18 @@ from rest_framework.request import Request
 from rest_framework.views import APIView
 
 from core.utils.string_case import camel_to_snake, snake_to_camel
+
+
+def _ordering_csv_pattern(camel_fields: list[str]) -> str:
+    """Build a regex matching a comma-separated list of ordering keys.
+
+    ``camel_fields`` already contains both directions (e.g. ``name`` AND
+    ``-name``), so the regex is simply ``(<a>|<b>|...)`` repeated with
+    comma separators. Fields are ``re.escape``-d so hyphens and other
+    metacharacters in the generated list can't break the pattern.
+    """
+    alternation = "|".join(re.escape(field) for field in camel_fields)
+    return rf"^(?:{alternation})(?:,(?:{alternation}))*$"
 
 
 class CamelCaseOrderingFilter(OrderingFilter):
@@ -80,16 +93,27 @@ class CamelCaseOrderingFilterExtension(OpenApiFilterExtension):
                 param.get("name") == "ordering" for param in parameters
             )
 
+            description = (
+                "Which field(s) to use when ordering the results. "
+                "Multiple fields can be combined with commas (e.g. "
+                "``-isMain,-createdAt``). Available fields: "
+                f"{', '.join(camel_fields)}"
+            )
+            pattern = _ordering_csv_pattern(camel_fields)
+
             if ordering_param_exists:
                 for param in parameters:
                     if param.get("name") == "ordering":
-                        param["description"] = (
-                            f"Which field to use when ordering the results. "
-                            f"Available fields: {', '.join(camel_fields)}"
-                        )
-                        if "schema" not in param:
-                            param["schema"] = {}
-                        param["schema"]["enum"] = camel_fields
+                        param["description"] = description
+                        # Replace the single-value ``enum`` with a
+                        # ``type: string`` + regex so the schema matches
+                        # the wire format (CSV). openapi-ts turns this
+                        # into ``z.string().regex(...)`` which accepts
+                        # both single-sort and multi-sort values.
+                        param["schema"] = {
+                            "type": "string",
+                            "pattern": pattern,
+                        }
             else:
                 filter_instance = None
                 if hasattr(view, "filter_backends"):
@@ -108,11 +132,11 @@ class CamelCaseOrderingFilterExtension(OpenApiFilterExtension):
                             "name": ordering_param_name,
                             "in": "query",
                             "required": False,
-                            "description": (
-                                f"Which field to use when ordering the results. "
-                                f"Available fields: {', '.join(camel_fields)}"
-                            ),
-                            "schema": {"type": "string", "enum": camel_fields},
+                            "description": description,
+                            "schema": {
+                                "type": "string",
+                                "pattern": pattern,
+                            },
                         }
                     )
 

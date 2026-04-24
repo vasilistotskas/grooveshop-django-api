@@ -27,9 +27,13 @@ def send_notification_task(self, data: dict, *args, **kwargs):
         {
             "type": "send_notification",
             "user": user_id,
+            "id": data.get("id"),
             "seen": data.get("seen", False),
             "link": data.get("link", ""),
             "kind": data.get("kind", ""),
+            "category": data.get("category", ""),
+            "priority": data.get("priority", ""),
+            "notification_type": data.get("notification_type", ""),
             "translations": data.get("translations", {}),
         },
     )

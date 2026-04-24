@@ -55,7 +55,7 @@ class UserAddressDetailSerializer(UserAddressSerializer):
 
 
 class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
-    user = PrimaryKeyRelatedField(queryset=User.objects.all())
+    user = PrimaryKeyRelatedField(read_only=True)
     country = PrimaryKeyRelatedField(queryset=Country.objects.all())
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
     phone = PhoneNumberField()

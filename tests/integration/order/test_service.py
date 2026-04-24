@@ -87,6 +87,7 @@ class OrderServiceTestCase(TestCase):
 
     def test_create_order_insufficient_stock(self):
         self.product1.stock = 1
+        self.product1.save(update_fields=["stock"])
 
         with self.assertRaises(InsufficientStockError) as context:
             OrderService.create_order(
@@ -158,7 +159,9 @@ class OrderServiceTestCase(TestCase):
         self.assertEqual(order.status, OrderStatus.PENDING)
         self.assertTrue(order.can_be_canceled)
 
-        # Store initial stock levels
+        # Store stock levels AFTER order creation (stock has been decremented)
+        self.product1.refresh_from_db()
+        self.product2.refresh_from_db()
         initial_stock_1 = self.product1.stock
         initial_stock_2 = self.product2.stock
 

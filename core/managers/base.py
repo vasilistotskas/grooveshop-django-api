@@ -183,5 +183,5 @@ try:
 
 except ImportError:
     # Parler not installed, provide stub classes
-    TranslatableOptimizedQuerySet = OptimizedQuerySet  # type: ignore[misc]
-    TranslatableOptimizedManager = OptimizedManager  # type: ignore[misc]
+    TranslatableOptimizedQuerySet = OptimizedQuerySet  # type: ignore[misc]  # ty: ignore[invalid-assignment]
+    TranslatableOptimizedManager = OptimizedManager  # type: ignore[misc]  # ty: ignore[invalid-assignment]

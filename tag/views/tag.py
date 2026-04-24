@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
+from rest_framework.permissions import AllowAny, IsAdminUser
 
 from tag.filters.tag import TagFilter
 from tag.models.tag import Tag
@@ -44,6 +45,17 @@ class TagViewSet(BaseModelViewSet):
     queryset = Tag.objects.all()
     serializers_config = serializers_config
     filterset_class = TagFilter
+
+    def get_permissions(self):
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ):
+            return [IsAdminUser()]
+        return [AllowAny()]
+
     ordering_fields = [
         "id",
         "active",

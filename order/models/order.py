@@ -1,4 +1,3 @@
-from functools import cached_property
 from typing import Any, cast
 
 from django.conf import settings
@@ -179,6 +178,36 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     payment_method = models.CharField(
         _("Payment Method"), max_length=50, blank=True, default=""
     )
+    # ── B2B billing identity (snapshotted on the order) ──────────
+    # Populated only when the buyer is issuing a proper ``Τιμολόγιο
+    # Πώλησης`` (``document_type=INVOICE`` + a real VAT number).
+    # Kept as denormalised columns here rather than FK'd to
+    # ``UserAddress`` because: (a) guests have no UserAccount, (b) the
+    # invoice snapshot must survive later profile edits, (c) the tax
+    # register is attached to the Order row, not the user.
+    billing_vat_id = models.CharField(
+        _("Billing VAT ID"),
+        max_length=12,
+        blank=True,
+        default="",
+        help_text=_(
+            "Buyer's tax number (ΑΦΜ) — required when issuing an "
+            "invoice (vs. a retail receipt). 9 digits for Greek ΑΦΜ, "
+            "no ``EL`` / ``GR`` prefix."
+        ),
+    )
+    billing_country = models.CharField(
+        _("Billing Country"),
+        max_length=2,
+        blank=True,
+        default="",
+        help_text=_(
+            "ISO 3166-1 alpha-2 country code of the buyer for tax "
+            "purposes. Pairs with ``billing_vat_id``; determines "
+            "which AADE invoice type (1.1 domestic, 1.2 intra-EU, "
+            "1.3 third-country) applies."
+        ),
+    )
     tracking_number = models.CharField(
         _("Tracking Number"), max_length=255, blank=True, default=""
     )
@@ -192,6 +221,25 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         help_text=_(
             "List of stock reservation IDs that were converted to this order. "
             "Provides audit trail linking reservations to final orders."
+        ),
+    )
+    reminder_count = models.PositiveSmallIntegerField(
+        _("Reminder Count"),
+        default=0,
+        help_text=_("Number of pending-order reminder emails sent."),
+    )
+    last_reminder_sent_at = models.DateTimeField(
+        _("Last Reminder Sent At"),
+        null=True,
+        blank=True,
+        help_text=_("Timestamp of the most recent reminder email."),
+    )
+    language_code = models.CharField(
+        _("Language"),
+        max_length=10,
+        default=settings.LANGUAGE_CODE,
+        help_text=_(
+            "Language captured at order creation, used when rendering order emails."
         ),
     )
 
@@ -217,8 +265,16 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             BTreeIndex(fields=["region"], name="order_region_ix"),
             BTreeIndex(fields=["user", "status"], name="order_user_status_ix"),
             BTreeIndex(
+                fields=["user", "-created_at"],
+                name="order_user_created_ix",
+            ),
+            BTreeIndex(
                 fields=["status", "payment_status"],
                 name="order_status_payment_ix",
+            ),
+            BTreeIndex(
+                fields=["payment_status", "-created_at"],
+                name="order_paystatus_created_ix",
             ),
             BTreeIndex(
                 fields=["tracking_number"], name="order_tracking_num_ix"
@@ -249,6 +305,12 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._original_status = self.status
+        # Cache tracking state so the post_save handler can detect the
+        # null → set transition that fires ``order_shipment_dispatched``.
+        # Using the field values (not pk) covers both fresh instances
+        # and refreshed-from-DB ones without a second query.
+        self._original_tracking_number = self.tracking_number
+        self._original_shipping_carrier = self.shipping_carrier
 
     def __str__(self) -> str:
         return f"Order {self.id} - {self.first_name} {self.last_name}"
@@ -271,6 +333,8 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
         super().save(*args, **kwargs)
         self._original_status = self.status
+        self._original_tracking_number = self.tracking_number
+        self._original_shipping_carrier = self.shipping_carrier
 
     def clean(self) -> None:
         errors: dict[str, list] = {}
@@ -301,22 +365,40 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def total_price_items(self) -> Money:
-        items_total = self.items.aggregate(
-            total=Sum(F("price") * F("quantity"))
-        ).get("total")
+        """
+        Return the sum of (price * quantity) for all order items.
+
+        Uses the ``items_total`` annotation from ``with_total_amounts()``
+        when available (set by ``for_list()`` and related querysets) to
+        avoid issuing extra DB queries.  Falls back to an aggregation query
+        only when the annotation is absent (e.g. ad-hoc lookups).
+        """
+        default_currency = getattr(settings, "DEFAULT_CURRENCY", "EUR")
+
+        # Use pre-computed annotation when present (avoids 2 extra queries).
+        annotated = self.__dict__.get("items_total")
+        if annotated is not None:
+            currency = (
+                self.shipping_price.currency
+                if self.shipping_price
+                else default_currency
+            )
+            return Money(amount=annotated, currency=currency)
+
+        # Fallback: aggregate from the related manager (2 queries).
+        result = self.items.aggregate(total=Sum(F("price") * F("quantity")))
+        items_total = result.get("total")
 
         if not items_total:
-            default_currency = getattr(settings, "DEFAULT_CURRENCY", "EUR")
             if self.shipping_price:
                 return Money(0, self.shipping_price.currency)
             return Money(0, default_currency)
 
-        first_item = self.items.first()
-        currency = (
-            first_item.price.currency
-            if first_item
-            else getattr(settings, "DEFAULT_CURRENCY", "EUR")
-        )
+        # Get currency from the price_currency field via a single query.
+        currency_row = self.items.values_list(
+            "price_currency", flat=True
+        ).first()
+        currency = currency_row or default_currency
 
         return Money(amount=items_total, currency=currency)
 
@@ -380,7 +462,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     def is_canceled(self) -> bool:
         return self.status == OrderStatus.CANCELED
 
-    @cached_property
+    @property
     def total_price(self) -> Money:
         items_total = self.total_price_items
         extras_total = self.total_price_extra
@@ -417,6 +499,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
                 "payment_id",
                 "payment_method",
                 "paid_amount",
+                "paid_amount_currency",
             ]
         )
 

@@ -12,6 +12,14 @@ x-common-vols: &common-vols
   - type: bind
     source: ./mediafiles
     target: /home/app/mediafiles
+  # Private storage (invoices) must be SHARED between backend + celery
+  # workers — otherwise the worker regenerates the PDF with MARK+QR
+  # into its own container-local filesystem and the backend keeps
+  # serving the pre-myDATA version. Named volume here mirrors what
+  # S3 provides in prod.
+  - type: volume
+    source: mediafiles_private
+    target: /home/app/mediafiles_private
   - type: volume
     source: backups
     target: /home/app/backups
@@ -36,8 +44,8 @@ services:
       context: .
       dockerfile: ./dev.Dockerfile
     command: >
-      uv run python manage.py migrate &&
-      uv run python manage.py collectstatic --noinput
+      sh -c "uv run python manage.py migrate &&
+      uv run python manage.py collectstatic --noinput"
     env_file:
       - ./.env
     environment:
@@ -159,5 +167,6 @@ services:
 volumes:
   staticfiles:
   mediafiles:
+  mediafiles_private:
   backups:
   logs:

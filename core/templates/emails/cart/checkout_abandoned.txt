@@ -1,0 +1,18 @@
+{% load i18n %}{% trans "YOU LEFT SOMETHING BEHIND" %}
+
+{% trans "It looks like you started a checkout but didn't complete it. Your items are no longer reserved, but they're still waiting in your cart." %}
+
+{% trans "YOUR CART" %}
+{% for item in items %}- {{ item.product.name }} x {{ item.quantity }}
+{% endfor %}
+{% if cart_url %}{% trans "Return to your cart:" %}
+{{ cart_url }}
+{% endif %}
+{% trans "Hurry — popular items may sell out quickly!" %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}
+
+{% trans "Don't want to receive these reminders?" %}
+{% trans "Manage your preferences" %}: {{ preferences_url|default:SITE_URL }}

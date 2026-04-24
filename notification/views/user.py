@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
@@ -17,7 +16,6 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
-from core.utils.views import cache_methods
 from notification.filters import NotificationUserFilter
 from notification.models.user import NotificationUser
 from notification.serializers.user import (
@@ -95,10 +93,17 @@ serializers_config: SerializersConfig = {
         error_serializer=ErrorResponseSerializer,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class NotificationUserViewSet(BaseModelViewSet):
     queryset = NotificationUser.objects.for_list()
     serializers_config = serializers_config
+
+    def get_permissions(self):
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return super().get_queryset()
+        return super().get_queryset().filter(user=self.request.user)
 
     filterset_class = NotificationUserFilter
     ordering_fields = [

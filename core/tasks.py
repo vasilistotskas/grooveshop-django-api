@@ -9,11 +9,22 @@ from django.contrib.auth import get_user_model
 from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives, send_mail
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from django.db import connections, transaction
+from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+
+# See order/tasks.py for rationale — eager gettext over lazy for email subjects.
+from django.utils import translation
+from django.utils.translation import gettext as _
+
+from core.utils.i18n import get_user_language
+
+from extra_settings.models import Setting
 
 from cart.models import Cart
 from core import celery_app
@@ -129,8 +140,6 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
             management.call_command(*command_args)
 
         logger.info("Successfully cleaned duplicate history entries")
-        # Release lock on success
-        cache.delete(lock_id)
         return {
             "status": "success",
             "message": "Duplicate history entries cleaned",
@@ -142,19 +151,16 @@ def clear_duplicate_history_task(excluded_fields=None, minutes=None):
 
     except management.CommandError as e:
         logger.error(f"Django command error in clear_duplicate_history: {e}")
-        # Release lock on permanent failure (won't be retried)
-        cache.delete(lock_id)
         return {
             "status": "error",
             "message": str(e),
             "error_type": "CommandError",
         }
     except Exception:
-        # Don't release lock here — autoretry will re-raise and the
-        # lock timeout (5 min) ensures it's eventually released if
-        # all retries fail
         logger.exception("Unexpected error in clear_duplicate_history")
         raise
+    finally:
+        cache.delete(lock_id)
 
 
 @celery_app.task(
@@ -239,17 +245,18 @@ def clear_expired_notifications_task(days=365):
 )
 def cleanup_abandoned_carts():
     try:
-        cutoff_date = timezone.now() - timedelta(days=7)
+        days = Setting.get("ABANDONED_CART_CLEANUP_DAYS", default=7)
+        cutoff_date = timezone.now() - timedelta(days=days)
 
         with transaction.atomic():
             count, _ = Cart.objects.filter(
                 user__isnull=True,
-                items__isnull=True,
                 last_activity__lt=cutoff_date,
+                items__isnull=True,
             ).delete()
 
         message = (
-            f"Cleaned up {count} abandoned empty guest carts"
+            f"Cleaned up {count} abandoned guest carts"
             if count > 0
             else "No abandoned carts to clean up"
         )
@@ -275,7 +282,8 @@ def cleanup_abandoned_carts():
 )
 def cleanup_old_guest_carts():
     try:
-        cutoff_date = timezone.now() - timedelta(days=30)
+        days = Setting.get("OLD_GUEST_CART_CLEANUP_DAYS", default=30)
+        cutoff_date = timezone.now() - timedelta(days=days)
 
         count, _ = Cart.objects.filter(
             user__isnull=True,
@@ -283,7 +291,7 @@ def cleanup_old_guest_carts():
         ).delete()
 
         message = (
-            f"Cleaned up {count} old guest carts (30+ days inactive)"
+            f"Cleaned up {count} old guest carts ({days}+ days inactive)"
             if count > 0
             else "No old guest carts to clean up"
         )
@@ -413,20 +421,32 @@ def send_inactive_user_notifications() -> dict[str, Any]:
     """
     Send re-engagement emails to inactive users.
 
-    Uses iterator() for memory-efficient processing of large user sets.
+    Limits to MAX_REENGAGEMENT_EMAILS per user with a 90-day cooldown
+    between sends.  Uses iterator() for memory-efficient processing.
 
     Returns:
         Dictionary with task execution statistics
     """
-    cutoff_date = timezone.now() - timedelta(days=60)
+    now = timezone.now()
+    max_emails = Setting.get("REENGAGEMENT_EMAIL_MAX_COUNT", default=3)
+    cooldown_days = Setting.get("REENGAGEMENT_EMAIL_COOLDOWN_DAYS", default=90)
+    inactive_days = Setting.get("INACTIVE_USER_THRESHOLD_DAYS", default=60)
+    cutoff_date = now - timedelta(days=inactive_days)
+    cooldown_cutoff = now - timedelta(days=cooldown_days)
 
-    # Use iterator() for memory efficiency instead of list()
-    inactive_users_qs = User.objects.filter(
-        last_login__lt=cutoff_date,
-        is_active=True,
-        email__isnull=False,
-        email__gt="",
-    ).values_list("id", "email", "first_name", "username")[:1000]
+    inactive_users_qs = (
+        User.objects.filter(
+            last_login__lt=cutoff_date,
+            is_active=True,
+            email__isnull=False,
+            email__gt="",
+            reengagement_email_count__lt=max_emails,
+        )
+        .exclude(
+            last_reengagement_email_at__gt=cooldown_cutoff,
+        )
+        .only("id", "email", "first_name", "username")
+    )
 
     success_count = 0
     failed_emails: list[dict[str, Any]] = []
@@ -434,40 +454,60 @@ def send_inactive_user_notifications() -> dict[str, Any]:
 
     logger.info("Starting to send emails to inactive users")
 
-    # Use iterator() to avoid loading all users into memory
-    for user_id, email, first_name, username in inactive_users_qs.iterator():
+    for user in inactive_users_qs.iterator(chunk_size=200):
         total_users += 1
 
         try:
-            mail_subject = _("We miss you!")
-
-            context = {
-                "user_id": user_id,
-                "first_name": first_name or username,
-                "app_base_url": settings.NUXT_BASE_URL,
-                "SITE_NAME": getattr(settings, "SITE_NAME", "Our Shop"),
-                "INFO_EMAIL": getattr(
-                    settings, "INFO_EMAIL", "support@example.com"
-                ),
-                "SITE_URL": getattr(
-                    settings, "SITE_URL", "https://example.com"
-                ),
-                "STATIC_BASE_URL": getattr(
-                    settings, "STATIC_BASE_URL", "https://example.com"
-                ),
-            }
-
-            message = render_to_string(
-                "emails/user/inactive_user_email_template.html", context
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            unsubscribe_url = (
+                f"{settings.API_BASE_URL}/api/v1/user/unsubscribe/{uid}/{token}"
             )
 
-            send_mail(
+            context = {
+                "user": {
+                    "id": user.id,
+                    "first_name": user.first_name,
+                    "username": user.username,
+                    "email": user.email,
+                },
+                "unsubscribe_url": unsubscribe_url,
+                "SITE_NAME": settings.SITE_NAME,
+                "INFO_EMAIL": settings.INFO_EMAIL,
+                "SITE_URL": settings.NUXT_BASE_URL,
+                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            }
+
+            with translation.override(get_user_language(user)):
+                mail_subject = _("We miss you!")
+                html_body = render_to_string(
+                    "emails/user/inactive_user_email_template.html", context
+                )
+                text_body = render_to_string(
+                    "emails/user/inactive_user_email_template.txt", context
+                )
+
+            email_msg = EmailMultiAlternatives(
                 subject=mail_subject,
-                message=message,
+                body=text_body,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=False,
-                html_message=message,
+                to=[user.email],
+                reply_to=[settings.INFO_EMAIL],
+                headers={
+                    "List-Unsubscribe": (
+                        f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
+                        f"<{unsubscribe_url}>"
+                    ),
+                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                    "List-ID": f"reengagement.{settings.SITE_NAME}",
+                },
+            )
+            email_msg.attach_alternative(html_body, "text/html")
+            email_msg.send(fail_silently=False)
+
+            User.objects.filter(pk=user.pk).update(
+                reengagement_email_count=F("reengagement_email_count") + 1,
+                last_reengagement_email_at=now,
             )
 
             success_count += 1
@@ -477,13 +517,13 @@ def send_inactive_user_notifications() -> dict[str, Any]:
 
         except Exception as e:
             logger.error(
-                f"Failed to send email to user {user_id}",
-                extra={"user_id": user_id, "error": str(e)},
+                f"Failed to send email to user {user.pk}",
+                extra={"user_id": user.pk, "error": str(e)},
             )
             failed_emails.append(
                 {
-                    "user_id": user_id,
-                    "email": email[:3] + "***",
+                    "user_id": user.pk,
+                    "email": (user.email or "")[:3] + "***",
                     "error": str(e),
                 }
             )
@@ -716,50 +756,25 @@ def scheduled_database_backup():
 
         logger.info("Starting scheduled database backup")
 
-        # Call backup_database_task asynchronously instead of blocking
-        # the current worker with .apply()
-        async_result = backup_database_task.apply_async(
-            kwargs={
-                "output_dir": "backups/scheduled",
-                "filename": filename,
-                "compress": True,
-                "format_type": "custom",
-            }
-        )
+        # Use Celery chain to avoid blocking the worker with .get()
+        from celery import chain
 
-        # Wait for the result with a timeout to avoid blocking forever
-        result = async_result.get(timeout=300)
+        chain(
+            backup_database_task.s(
+                output_dir="backups/scheduled",
+                filename=filename,
+                compress=True,
+                format_type="custom",
+            ),
+            cleanup_old_backups.si(days=7, backup_dir="backups/scheduled"),
+        ).apply_async()
 
-        if result.get("status") == "success":
-            safe_logging_extra = {
-                "backup_status": result.get("status"),
-                "backup_duration": result.get("duration"),
-                "backup_file_size": result.get("file_size"),
-                "backup_timestamp": result.get("timestamp"),
-            }
-
-            logger.info(
-                "Scheduled database backup completed successfully",
-                extra=safe_logging_extra,
-            )
-
-            # Extract the actual backup directory from the result
-            backup_file = result.get("backup_file")
-            if backup_file:
-                logger.info(f"Backup file: {backup_file}")
-                actual_backup_dir = str(Path(backup_file).parent)
-                cleanup_old_backups.delay(days=7, backup_dir=actual_backup_dir)
-            else:
-                # Fallback to relative path
-                cleanup_old_backups.delay(
-                    days=7, backup_dir="backups/scheduled"
-                )
-
-            return result
-        else:
-            raise Exception(
-                f"Backup failed: {result.get('result_message', 'Unknown error')}"
-            )
+        logger.info("Scheduled database backup chain dispatched")
+        return {
+            "status": "dispatched",
+            "message": "Backup task chain started",
+            "filename": filename,
+        }
 
     except Exception as e:
         logger.error(f"Scheduled backup failed: {e}")

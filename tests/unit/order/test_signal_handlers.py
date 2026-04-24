@@ -10,7 +10,7 @@ class OrderSignalHandlersTestCase(TestCase):
         self.order = Mock()
         self.order.id = 1
         self.order.status = OrderStatus.PENDING
-        self.order._previous_status = None
+        self.order._original_status = None
 
         self.sender = MagicMock()
 
@@ -42,7 +42,7 @@ class OrderSignalHandlersTestCase(TestCase):
     @patch("order.signals.order_status_changed.send")
     def test_handle_order_post_save_status_unchanged(self, mock_signal):
         self.order.status = OrderStatus.PENDING
-        self.order._previous_status = OrderStatus.PENDING
+        self.order._original_status = OrderStatus.PENDING
 
         handle_order_post_save(
             sender=self.sender, instance=self.order, created=False
@@ -53,7 +53,7 @@ class OrderSignalHandlersTestCase(TestCase):
     @patch("order.signals.order_status_changed.send")
     def test_handle_order_post_save_status_changed(self, mock_signal):
         self.order.status = OrderStatus.PROCESSING
-        self.order._previous_status = OrderStatus.PENDING
+        self.order._original_status = OrderStatus.PENDING
 
         handle_order_post_save(
             sender=self.sender, instance=self.order, created=False
@@ -68,7 +68,7 @@ class OrderSignalHandlersTestCase(TestCase):
 
     @patch("order.signals.order_status_changed.send")
     def test_handle_order_post_save_no_previous_status(self, mock_signal):
-        delattr(self.order, "_previous_status")
+        delattr(self.order, "_original_status")
 
         handle_order_post_save(
             sender=self.sender, instance=self.order, created=False

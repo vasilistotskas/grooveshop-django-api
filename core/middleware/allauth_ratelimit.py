@@ -7,6 +7,7 @@ Uses Django's Redis cache for counters (already configured in settings).
 """
 
 import hashlib
+import ipaddress
 import logging
 from typing import Callable
 
@@ -21,6 +22,7 @@ _ALLAUTH_RATE_LIMITS: list[tuple[str, int | None, int | None]] = [
     ("/_allauth/app/v1/auth/login", 10, 60),
     ("/_allauth/app/v1/auth/signup", 5, 20),
     ("/_allauth/app/v1/auth/password/request", 5, 10),
+    ("/_allauth/app/v1/auth/password/reset", 5, 20),
     ("/_allauth/app/v1/auth/code/request", 5, 10),
     ("/_allauth/app/v1/auth/code/confirm", 10, 30),
     ("/_allauth/app/v1/auth/2fa/authenticate", 10, 30),
@@ -29,12 +31,36 @@ _ALLAUTH_RATE_LIMITS: list[tuple[str, int | None, int | None]] = [
 ]
 
 
+def _is_private_ip(ip: str) -> bool:
+    """Return True if the IP is a loopback or private/link-local address."""
+    try:
+        addr = ipaddress.ip_address(ip)
+        return addr.is_loopback or addr.is_private or addr.is_link_local
+    except ValueError:
+        return False
+
+
 def _client_key(request: HttpRequest) -> str:
-    """Return a stable, non-reversible identifier for the requesting client."""
-    # Prefer real IP (behind proxy), fall back to REMOTE_ADDR.
-    ip = request.META.get("HTTP_X_FORWARDED_FOR", "").split(",")[
-        0
-    ].strip() or request.META.get("REMOTE_ADDR", "unknown")
+    """Return a stable, non-reversible identifier for the requesting client.
+
+    The app runs behind a single trusted reverse proxy (Traefik in K8s).
+    REMOTE_ADDR is always the proxy's address (a private/loopback IP), so we
+    use the *rightmost* (last) entry in X-Forwarded-For — the one appended by
+    our trusted proxy — rather than the leftmost, which an attacker can spoof.
+    If REMOTE_ADDR is not a private IP, we trust it directly and ignore the
+    X-Forwarded-For header entirely.
+    """
+    remote_addr = request.META.get("REMOTE_ADDR", "")
+
+    if _is_private_ip(remote_addr):
+        # We're behind a trusted proxy — use the last XFF entry set by the proxy.
+        xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        entries = [e.strip() for e in xff.split(",") if e.strip()]
+        ip = entries[-1] if entries else remote_addr
+    else:
+        # Direct connection (or proxy is not on a private range) — trust as-is.
+        ip = remote_addr
+
     return hashlib.sha256(ip.encode()).hexdigest()[:32]
 
 

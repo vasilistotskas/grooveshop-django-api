@@ -1,4 +1,5 @@
 import logging
+from os import getenv
 
 from django import forms
 from django.contrib import messages
@@ -25,6 +26,10 @@ class ClearCacheForm(forms.Form):
 
 
 class MyAdminSite(UnfoldAdminSite):
+    site_header = getenv("UNFOLD_SITE_HEADER", "Webside")
+    site_title = getenv("UNFOLD_SITE_TITLE", "Webside Admin")
+    index_title = _("Dashboard")
+
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [

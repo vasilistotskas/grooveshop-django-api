@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from django.utils.translation import gettext_lazy as _
+from djmoney.money import Money
 from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -10,7 +11,7 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import AllowAny, IsAdminUser
 
 from rest_framework.response import Response
 
@@ -24,8 +25,14 @@ from cart.serializers.cart import (
     ReleaseReservationsResponseSerializer,
     ReserveStockResponseSerializer,
 )
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+
 from cart.services import CartService
 from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import (
+    CartMutationAnonThrottle,
+    CartMutationThrottle,
+)
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
@@ -34,6 +41,7 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from order.exceptions import InsufficientStockError, StockReservationError
+from order.services import OrderService
 from order.stock import StockManager
 
 logger = logging.getLogger(__name__)
@@ -174,16 +182,43 @@ class CartViewSet(BaseModelViewSet):
     ordering = ["-last_activity", "-created_at"]
     search_fields = ["user__email", "user__first_name", "user__last_name"]
 
+    _MUTATION_ACTIONS = frozenset(
+        {
+            "update",
+            "partial_update",
+            "destroy",
+            "reserve_stock",
+            "release_reservations",
+            "create_payment_intent",
+        }
+    )
+
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         self.cart_service = CartService(request=request)
 
     def get_permissions(self):
-        if self.action in [
-            "list",
-        ]:
+        if self.action == "list":
             self.permission_classes = [IsAdminUser]
+        else:
+            # All other cart actions (retrieve, update, destroy, reserve_stock,
+            # release_reservations, create_payment_intent) support guest users
+            # via X-Cart-Id header — anonymous requests must be permitted.
+            self.permission_classes = [AllowAny]
         return super().get_permissions()
+
+    def get_throttles(self):
+        if self.action in self._MUTATION_ACTIONS:
+            # Per-minute burst limits layered ON TOP of the global daily caps
+            # (DEFAULT_THROTTLE_CLASSES) — include the defaults explicitly so
+            # the override supplements rather than replaces them.
+            return [
+                CartMutationThrottle(),
+                CartMutationAnonThrottle(),
+                AnonRateThrottle(),
+                UserRateThrottle(),
+            ]
+        return super().get_throttles()
 
     def get_queryset(self):
         """
@@ -324,7 +359,7 @@ class CartViewSet(BaseModelViewSet):
                     "detail": "Insufficient stock for one or more items",
                     "failed_items": failed_items,
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_409_CONFLICT,
             )
 
         # Return success with reservation IDs
@@ -383,7 +418,7 @@ class CartViewSet(BaseModelViewSet):
 
         # Return success even if some releases failed
         # (they may have already been released or expired)
-        response_data = {
+        response_data: dict[str, str | int | list] = {
             "message": f"Released {released_count} of {len(reservation_ids)} reservations",
             "released_count": released_count,
         }
@@ -463,9 +498,21 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Calculate cart total (this will include shipping and fees when order is created)
-        # For now, use cart total as base amount
+        # Calculate cart total including shipping and payment method fee
+        # to match the final order total that will be created later
         cart_total = cart.total_price
+        shipping_cost = OrderService.calculate_shipping_cost(cart_total)
+        order_subtotal = Money(
+            cart_total.amount + shipping_cost.amount,
+            cart_total.currency,
+        )
+        payment_fee = OrderService.calculate_payment_method_fee(
+            pay_way, order_subtotal
+        )
+        cart_total = Money(
+            order_subtotal.amount + payment_fee.amount,
+            cart_total.currency,
+        )
 
         # Get Stripe payment provider
         provider = PayWayService.get_provider_for_pay_way(pay_way)

@@ -1,65 +1,51 @@
-"""
-Middleware that reloads gettext translation catalogs when Rosetta
-saves new translations in a multi-replica deployment.
+"""Cross-pod translation refresh middleware.
 
-Each pod keeps a local copy of the translation version. On every
-request the middleware compares it against the shared version stored
-in Redis (set by CacheClearingRosettaStorage). When they differ the
-pod writes fresh .po/.mo files from Redis to disk (overwriting any
-NFS-stale copies) and then reloads the gettext catalogs.
+Each pod compares the shared `TRANSLATION_VERSION_CACHE_KEY` in Redis
+against its own in-process counter. When they diverge (another pod
+saved via Rosetta and bumped the key), this middleware re-applies
+the DB overlay and evicts the gettext caches so subsequent lookups
+return the fresh msgstrs.
+
+The DB is the source of truth — we never read .po bytes from Redis
+or touch disk from here.
 """
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from django.core.cache import cache
 from django.utils.deprecation import MiddlewareMixin
 
-from core.rosetta_storage import TRANSLATION_VERSION_CACHE_KEY
-from core.rosetta_storage import _reload_translations
-from core.signals.rosetta import ROSETTA_FILE_PATHS_KEY
-from core.signals.rosetta import ROSETTA_MO_SYNC_PREFIX
-from core.signals.rosetta import ROSETTA_PO_SYNC_PREFIX
+from core.rosetta_storage import (
+    TRANSLATION_VERSION_CACHE_KEY,
+    _reload_translations,
+    apply_db_overlay,
+)
 
 logger = logging.getLogger(__name__)
 
-# Module-level: each pod process tracks its own known version.
+# Per-process counter; sentinel None forces the first request to sync
+# when the remote version key exists (e.g. after a Rosetta save or
+# after import_po_to_translations bumped it at deploy time).
 _local_translation_version: float | None = None
 
 
-def _sync_files_from_redis():
-    """Write cached .po/.mo file contents from Redis to the local filesystem."""
-    file_paths = cache.get(ROSETTA_FILE_PATHS_KEY)
-    if not file_paths:
-        return
-
-    for path_hash, po_path in file_paths.items():
-        mo_path = po_path.replace(".po", ".mo")
-
-        po_content = cache.get(f"{ROSETTA_PO_SYNC_PREFIX}{path_hash}")
-        if po_content:
-            try:
-                Path(po_path).write_bytes(po_content)
-                logger.debug("Wrote synced .po: %s", po_path)
-            except OSError:
-                logger.error("Failed to write .po: %s", po_path)
-
-        mo_content = cache.get(f"{ROSETTA_MO_SYNC_PREFIX}{path_hash}")
-        if mo_content:
-            try:
-                Path(mo_path).write_bytes(mo_content)
-                logger.debug("Wrote synced .mo: %s", mo_path)
-            except OSError:
-                logger.error("Failed to write .mo: %s", mo_path)
-
-
 class TranslationReloadMiddleware(MiddlewareMixin):
-    """
-    On each request, check whether the shared translation version in
-    Redis has changed. If so, sync .po/.mo files from Redis to disk
-    and reload the gettext catalogs so this pod serves fresh translations.
+    """Refresh in-memory catalogs when Rosetta edits land on another pod.
+
+    Bootstrap flow: the `import_po_to_translations` management command
+    bumps the Redis version key as part of PreSync, so every pod boots,
+    mismatches its local counter (None) against the remote tick, and
+    applies the DB overlay on its first real request. Every subsequent
+    Rosetta save re-bumps the key via `bump_translation_version_on_save`.
+
+    Fresh clusters with no tick yet: middleware returns early, the pod
+    serves whatever msgstrs the image baked into the .mo files until
+    the first overlay fires.
+
+    Safe no-op when the cache or DB is unreachable — failures are
+    logged and the request proceeds without overlay.
     """
 
     def process_request(self, request):
@@ -74,9 +60,18 @@ class TranslationReloadMiddleware(MiddlewareMixin):
             return None
 
         if _local_translation_version != remote_version:
-            _sync_files_from_redis()
-            _reload_translations()
+            try:
+                apply_db_overlay()
+                _reload_translations()
+            except Exception:
+                logger.exception(
+                    "Failed to refresh translations after version tick %s",
+                    remote_version,
+                )
+                return None
             _local_translation_version = remote_version
-            logger.info("Reloaded translations (version %s)", remote_version)
+            logger.info(
+                "Refreshed translations from DB (version %s)", remote_version
+            )
 
         return None

@@ -149,7 +149,6 @@ class SampleOrderDataGenerator:
                     "price_formatted": f"€{price:.2f}",
                     "total_price": total_price,
                     "total_price_formatted": f"€{total_price:.2f}",
-                    "get_total_price": f"€{total_price:.2f}",
                 }
             )
 

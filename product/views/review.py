@@ -119,12 +119,6 @@ class ProductReviewViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["GET"])
     def user_product_review(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return Response(
-                {"detail": _("User is not authenticated")},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
         user_id = request.user.id
 
         try:

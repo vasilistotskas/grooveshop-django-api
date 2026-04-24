@@ -24,7 +24,9 @@ User = get_user_model()
 class BlogAuthorViewSetTestCase(TestURLFixerMixin, APITestCase):
     def setUp(self):
         self.user = UserAccountFactory(num_addresses=0, is_superuser=False)
-        self.admin_user = UserAccountFactory(num_addresses=0, is_superuser=True)
+        self.admin_user = UserAccountFactory(
+            num_addresses=0, is_superuser=True, is_staff=True
+        )
         self.author_user = UserAccountFactory(
             num_addresses=0, is_superuser=False
         )
@@ -33,7 +35,7 @@ class BlogAuthorViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.blog_post_1 = BlogPostFactory(author=self.blog_author)
         self.blog_post_2 = BlogPostFactory(author=self.blog_author)
 
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.admin_user)
 
     def get_blog_author_detail_url(self, pk):
         return reverse("blog-author-detail", args=[pk])

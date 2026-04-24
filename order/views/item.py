@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from rest_framework.response import Response
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
@@ -21,7 +20,6 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
-from core.utils.views import cache_methods
 from order.enum.status import OrderStatus
 from order.filters import OrderItemFilter
 from order.models.item import OrderItem
@@ -60,7 +58,6 @@ serializers_config: SerializersConfig = {
         error_serializer=ErrorResponseSerializer,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class OrderItemViewSet(BaseModelViewSet):
     queryset = OrderItem.objects.none()
     serializers_config = serializers_config

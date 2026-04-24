@@ -5,7 +5,28 @@ from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import cache
 from django.db import connection, connections, reset_queries
+from hypothesis import HealthCheck
+from hypothesis import settings as hypothesis_settings
 
+# Hypothesis profiles for different environments
+hypothesis_settings.register_profile(
+    "ci",
+    max_examples=50,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+    derandomize=True,
+)
+hypothesis_settings.register_profile(
+    "dev",
+    max_examples=10,
+    deadline=None,
+)
+hypothesis_settings.register_profile(
+    "default",
+    max_examples=100,
+    deadline=None,
+)
+hypothesis_settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "default"))
 
 settings.PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
@@ -14,6 +35,18 @@ settings.PASSWORD_HASHERS = [
 settings.DISABLE_CACHE = True
 settings.MEILISEARCH["OFFLINE"] = True
 settings.SESSION_ENGINE = "django.contrib.sessions.backends.db"
+
+# Strip unnecessary middleware for test performance
+settings.MIDDLEWARE = [
+    m
+    for m in settings.MIDDLEWARE
+    if m
+    not in {
+        "django.middleware.gzip.GZipMiddleware",
+        "core.middleware.stripe_webhook.StripeWebhookDebugMiddleware",
+        "core.middleware.asgi_compat.ASGICompatMiddleware",
+    }
+]
 
 # Use process-local in-memory cache instead of Redis for test isolation.
 # With pytest-xdist (-n auto), each worker is a separate process with its own
@@ -155,6 +188,32 @@ def _django_clear_cache(request):
     if request.node.get_closest_marker("django_db"):
         try:
             cache.clear()
+        except Exception:
+            pass
+
+
+@pytest.fixture(autouse=True)
+def _reseed_extra_settings(request):
+    """Ensure ``EXTRA_SETTINGS_DEFAULTS`` rows exist before every DB test.
+
+    ``django-extra-settings`` seeds its rows via a ``post_migrate`` signal
+    that only fires at DB creation. Tests marked
+    ``@pytest.mark.django_db(transaction=True)`` (e.g. concurrent stock
+    tests) flush every table on teardown, wiping the ``Setting`` rows.
+    A subsequent test calling ``Setting.get("STOCK_RESERVATION_TTL_MINUTES")``
+    would hit an empty DB and fall back to the code-level default
+    (``StockManager.RESERVATION_TTL_MINUTES_DEFAULT = 15``) instead of
+    the configured 30, producing intermittent assertion failures in
+    ``tests/integration/order/test_stock_reservation_ttl.py``.
+
+    ``set_defaults_from_settings`` calls ``get_or_create`` per entry —
+    cheap no-op when rows are intact, restorative when they are not.
+    """
+    if request.node.get_closest_marker("django_db"):
+        try:
+            from extra_settings.models import Setting
+
+            Setting.set_defaults_from_settings()
         except Exception:
             pass
 

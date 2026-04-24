@@ -2,9 +2,10 @@ from django.conf import settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from core.utils.testing import TestURLFixerMixin
 from tag.factories.tag import TagFactory
 from tag.models.tag import Tag
-from core.utils.testing import TestURLFixerMixin
+from user.factories.account import UserAccountFactory
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
@@ -17,6 +18,12 @@ class TagViewSetTestCase(TestURLFixerMixin, APITestCase):
     def setUpTestData(cls):
         cls.tag = TagFactory(active=True)
         cls.inactive_tag = TagFactory(active=False)
+
+    def setUp(self):
+        self.admin_user = UserAccountFactory(
+            num_addresses=0, is_superuser=True, is_staff=True
+        )
+        self.client.force_authenticate(user=self.admin_user)
 
     def get_tag_detail_url(self, pk):
         return reverse("tag-detail", args=[pk])

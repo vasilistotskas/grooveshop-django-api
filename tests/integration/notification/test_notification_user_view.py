@@ -31,6 +31,7 @@ class NotificationUserViewSetTestCase(TestURLFixerMixin, APITestCase):
         cls.other_notification = NotificationFactory()
 
     def setUp(self):
+        self.client.force_authenticate(user=self.user)
         self.list_url = reverse("notification-user-list")
 
     def test_list_uses_correct_serializer(self):
@@ -411,6 +412,7 @@ class NotificationUserViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertIn("count", response.data)
 
     def test_unseen_count_unauthenticated(self):
+        self.client.force_authenticate(user=None)
         url = reverse("notification-user-unseen-count")
         response = self.client.get(url)
 

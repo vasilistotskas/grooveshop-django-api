@@ -164,21 +164,19 @@ class ProductFilter(
         }
 
     def filter_category(self, queryset, name, value):
-        """Filter by category including descendant categories"""
-        category_ids = value.split("_")
-        all_relevant_category_ids = []
+        """Filter by category including descendant categories."""
+        category_ids = [cid.strip() for cid in value.split("_") if cid.strip()]
+        if not category_ids:
+            return queryset
 
-        for category_id in category_ids:
-            try:
-                category = ProductCategory.objects.get(id=category_id)
-                descendant_ids = category.get_descendants(
-                    include_self=True
-                ).values_list("id", flat=True)
-                all_relevant_category_ids.extend(descendant_ids)
-            except ProductCategory.DoesNotExist:
-                pass
+        categories = ProductCategory.objects.filter(id__in=category_ids)
+        if not categories.exists():
+            return queryset.none()
 
-        return queryset.filter(category__id__in=all_relevant_category_ids)
+        all_ids = ProductCategory.objects.get_queryset_descendants(
+            categories, include_self=True
+        ).values_list("id", flat=True)
+        return queryset.filter(category__id__in=all_ids)
 
     def filter_in_stock(self, queryset, name, value):
         """Filter products that are in stock"""

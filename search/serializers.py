@@ -388,3 +388,34 @@ class SearchAnalyticsResponseSerializer(serializers.Serializer):
     click_through_rate = serializers.FloatField(
         help_text="Overall click-through rate (total clicks / total searches)"
     )
+
+
+class TrendingSearchItemSerializer(serializers.Serializer):
+    """One trending search result: a query string + its occurrence count."""
+
+    query = serializers.CharField(help_text="The user-entered search term.")
+    count = serializers.IntegerField(
+        help_text="Number of times this query ran in the trending window."
+    )
+
+
+class TrendingSearchResponseSerializer(serializers.Serializer):
+    """Response payload for ``listTrendingSearches``.
+
+    The shape mirrors what the view caches in Redis so drf-spectacular
+    can resolve a concrete schema (otherwise it falls back to
+    ``unable to guess serializer`` and emits a W002 warning).
+    """
+
+    window_hours = serializers.IntegerField(
+        help_text="Trailing window size the results were aggregated over."
+    )
+    content_type = serializers.CharField(
+        help_text="Content namespace the queries were scoped to."
+    )
+    language_code = serializers.CharField(
+        allow_null=True,
+        required=False,
+        help_text="BCP-47 filter applied; null when the caller didn't pass one.",
+    )
+    results = TrendingSearchItemSerializer(many=True)

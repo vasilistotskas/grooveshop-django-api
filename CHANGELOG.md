@@ -3,6 +3,2383 @@
 
 
 
+## v1.110.1 (2026-04-24)
+
+### Bug fixes
+
+* fix: uv lock update ([`0deaf60`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0deaf604146643c3ff0b37131d2aac0a0bc89ddd))
+
+* fix(order): translate live cancel/refund notifications to Greek
+
+On the Greek storefront, the WebSocket toasts fired by
+``notify_order_status_changed_live`` and ``notify_order_refunded_live``
+rendered as English source strings (e.g. "Order #34 canceled",
+"Refund processed for order #34"), because:
+
+1. The msgid literals in ``order/notifications.py`` were never
+   wrapped with a gettext marker, so ``makemessages`` never extracted
+   them into the .po file.
+2. At runtime ``_render_translations`` calls ``_(title_msgid)`` which
+   returns the input unchanged when the msgid is absent from the
+   catalog — regardless of which locale is active.
+
+Wraps every notification msgid (5 status-copy entries + 5 dedicated
+live tasks — order placed / tracking / payment confirmed / payment
+failed / refund processed) with ``gettext_noop`` so xgettext picks
+them up, then fills in proper Greek translations.
+
+Shipped end-to-end: Dockerfile already runs ``compilemessages`` at
+build time (django-api/Dockerfile:48), so the new .mo lands in the
+image and ``apply_db_overlay`` keeps the baseline as the fallthrough
+when no Rosetta DB row exists.
+
+Verified in prod ``deploy/backend`` via ``gettext()`` under
+``override('el')``: all 3 target strings returned English before this
+change; now they'll return proper Greek on next image deploy.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3cd8623`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3cd8623f912b43559b41ef1fad1a861b164bd0bf))
+
+## v1.110.0 (2026-04-23)
+
+### Features
+
+* feat(admin): gate B2B invoicing + fix GDPR export shared volume
+
+Three independent admin/reliability fixes bundled together.
+
+**B2B_INVOICING_ENABLED extra setting** lets the owner hide the
+"Θέλω τιμολόγιο (Β2Β)" toggle on checkout from admin without a
+deploy. Setting defaults to True. Whitelisted in PUBLIC_SETTING_KEYS
+so the Nuxt checkout can read it anonymously.
+OrderCreateFromCartSerializer.validate() now rejects
+document_type=INVOICE when the setting is off — closes the direct-
+API bypass that would otherwise defeat the UI gate. Regression test
+covers all three branches (INVOICE off → reject, INVOICE on →
+accept, RECEIPT → always accept).
+
+**GDPR export PermissionError fix** — celery_worker was writing
+exports under MEDIA_ROOT (/home/app/web/mediafiles), which doesn't
+exist on the worker pod and whose parent is not writable by the
+unprivileged app user. Moved to PRIVATE_MEDIA_ROOT/_gdpr_exports/
+via new get_export_location() helper — same mediafiles_private PVC
+(mode 777) that invoice PDFs already share between backend and
+celery_worker. Download view reads from the same helper.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`86b6cd9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/86b6cd9d668804ffbdc7fe642906cbbece279476))
+
+### Testing
+
+* test(conftest): reseed extra_settings before every DB test
+
+Fixes intermittent ``test_stock_reservation_ttl.py`` failures where
+the configured TTL (30 min from ``EXTRA_SETTINGS_DEFAULTS``) was
+replaced by the code-level fallback (15 min) under xdist parallel
+runs.
+
+Root cause: ``django-extra-settings`` seeds its ``Setting`` rows via
+a ``post_migrate`` signal that only fires once at DB creation. Any
+test marked ``@pytest.mark.django_db(transaction=True)`` (three in
+the suite — concurrent stock tests + one stock manager case) flushes
+all tables on teardown, wiping those rows. The next test's
+``Setting.get("STOCK_RESERVATION_TTL_MINUTES", default=15)`` hits an
+empty DB and falls back to the ``default=`` arg, returning 15 while
+``StockManager.reserve_stock`` internally reads the (now-cached) 15
+→ assertion ``created_at + 30min`` fails against ``created_at + 15min``.
+
+``set_defaults_from_settings`` is a per-entry ``get_or_create``, so
+the fixture is a no-op when seeds are intact and restorative only
+after a transactional teardown. Verified with a previously-flaky
+run of ttl + concurrent_stock_operations + concurrent_stock +
+stock_manager + expired_reservations: 187/187 pass under ``-n auto``.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0a9055a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a9055a07d27e24b4ae577b63fb55296e3b8586c))
+
+## v1.109.1 (2026-04-23)
+
+### Bug fixes
+
+* fix(schema): resolve documentType enum collision in OpenAPI
+
+Order.document_type (6 values: full OrderDocumentTypeEnum) and
+OrderCreateFromCartSerializer.document_type (2 values: RECEIPT|INVOICE)
+both serialise as ``documentType``, so drf-spectacular was collapsing
+them under an auto-generated ``DocumentType128Enum`` name that churned
+on every regeneration and bled into the frontend types.
+
+- Extract the creation-time subset into a dedicated
+  ``OrderCreateDocumentTypeEnum`` TextChoices class so the two choice
+  sets have distinct source identities.
+- Wire the serializer to the new class (``choices=...`` + default).
+- Add both enums to ``ENUM_NAME_OVERRIDES`` so they surface as the
+  stable ``OrderDocumentType`` / ``OrderCreateDocumentType`` schemas.
+
+``uv run python manage.py spectacular`` now runs with zero warnings.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`8543b10`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8543b103aa6b89468e8d4c442aee47d2d3c9d593))
+
+## v1.109.0 (2026-04-23)
+
+### Bug fixes
+
+* fix(invoice admin): RangeDateFilter on issue_date (DateField, not DateTimeField)
+
+Invoice list (/admin/order/invoice/) 500'd with
+``TypeError: Class <class 'DateField'> is not supported for
+RangeDateTimeFilter``. Invoice.issue_date is a DateField per
+Greek tax law (no time component — only the fiscal date matters);
+Unfold's RangeDateTimeFilter hard-rejects non-DateTime columns.
+Switched to RangeDateFilter which is the Date-only variant.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9db3bac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9db3bac99f64f57169aba85aa170e67cba807ede))
+
+### Features
+
+* feat(mydata): Tier B — B2B invoiceType 1.1 with buyer ΑΦΜ
+
+Live-verified against AADE dev: submitted a real 1.1 invoice and
+got MARK 400001961706127 back with a working verification QR URL.
+Tier A (11.1 retail) flow is unchanged — all 82 existing tests
+plus 6 new Tier B regressions green.
+
+Scope — domestic Greek B2B only:
+- 1.1 (Τιμολόγιο Πώλησης) when Order.billing_vat_id is set and the
+  counterpart is GR. Intra-EU (1.2) / third-country (1.3) remain
+  out of scope per the agent research — they need reverse-charge
+  VAT exemption handling and distinct classifications.
+- The service layer short-circuits "document_type=INVOICE without a
+  billing_vat_id" with a clear REJECTED state + error code so the
+  admin surfaces the misconfiguration immediately (instead of
+  silently falling back to 11.1, which would be tax-fraud-adjacent).
+
+Data model (migration 0033, additive, blank defaults):
+  Order.billing_vat_id CharField(12)
+  Order.billing_country CharField(2)
+
+Builder:
+- _pick_invoice_type: 11.1 if no buyer VAT, 1.1 if VAT set + buyer
+  country equals issuer country. Non-GR buyer with VAT falls back
+  to 11.1 (service layer rejects upstream anyway).
+- _emit_counterpart: vatNumber + country + branch only. No <name>
+  for GR counterparts (AADE error 220 forbids it).
+- _normalise_buyer_vat strips EL/GR prefix (VIES convention) so
+  AADE doesn't reject with error 104 ("Invalid Greek VAT number").
+- Classification switches from retail pair (E3_561_003 / category1_3)
+  to wholesale (E3_561_001 / category1_1) based on invoiceType —
+  error 313 ("classification forbidden for invoice type") otherwise.
+
+Service layer:
+- New MyDataInactiveCounterpartError subclass of MyDataValidationError.
+  Fires on AADE error 102 ("Vat number is not active corporation")
+  so the Celery task can queue a customer-facing "check your ΑΦΜ"
+  email path in a follow-up, instead of a generic REJECTED notice.
+- _guard_b2b_invoice_integrity pre-check: rejects
+  document_type=INVOICE without billing_vat_id with a clear
+  MISSING_BUYER_VAT code persisted on the Invoice row.
+
+Serializer + OpenAPI:
+- OrderCreateFromCartSerializer gains billing_vat_id +
+  billing_country + document_type fields with validation:
+  - Strip EL/GR prefix, enforce 9-digit Greek ΑΦΜ.
+  - ISO-alpha2 country normalised to uppercase.
+  - Cross-field: INVOICE ⇒ billing_vat_id required.
+- schema.yml regenerated — the Nuxt side picks up billingVatId /
+  billingCountry in the auto-generated zod + types.
+
+Nuxt frontend:
+- useCheckoutForm formState gains billingVatId + billingCountry;
+  superRefine on step1Schema mirrors the Django 9-digit ΑΦΜ rule
+  with an inline error in Greek ("Το ΑΦΜ πρέπει να έχει 9 ψηφία...").
+- StepPersonalInfo.vue exposes a "Θέλω τιμολόγιο (Β2Β)" toggle that
+  reveals the ΑΦΜ field; toggling off clears the field so stray
+  values never reach the API.
+- useCheckoutSubmit forwards billingVatId / billingCountry /
+  documentType in the POST body.
+
+Tests (6 new builder regressions + existing suite updated):
+- 1.1 routing when billing_vat_id set
+- 11.1 stays 11.1 for Tier A orders
+- counterpart block present for 1.1 (vatNumber/country/branch, no name)
+- counterpart absent for 11.1
+- wholesale classification pair (E3_561_001 / category1_1) on 1.1
+- EL/GR prefix stripped before emit
+
+Pre-existing integration tests pin document_type=RECEIPT now so the
+OrderFactory's random-doctype roll doesn't intermittently trip the
+new Tier B guard.
+
+SMTP dev fix (side-item, same commit because it surfaced during
+Tier A UI testing): .env EMAIL_HOST changed from ``localhost`` to
+``mailpit`` so the celery_worker container can reach the mailpit
+SMTP service via its compose-network name. Verified: Django's
+send_mail now lands in Mailpit's http://localhost:8025 UI.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`b9ee44e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b9ee44e624fd31d9d084caacda218cdf913973e3))
+
+## v1.108.1 (2026-04-22)
+
+### Bug fixes
+
+* fix(invoicing): share mediafiles_private across containers + drop orphan PDFs
+
+Two dev-parity fixes surfaced while verifying the myDATA chain end-to-
+end with real AADE dev:
+
+1. **``mediafiles_private`` now a shared named volume** across backend
+   + celery_worker + celery_beat. Without it the worker regenerated
+   the post-MARK PDF into its own container-local FS while the
+   backend kept serving the pre-myDATA version — fine in prod
+   (S3 is shared) but a broken experience in dev. Named volume
+   mirrors the S3 behaviour.
+
+2. **Force-regen deletes the stale PDF before writing the new one.**
+   Django's ``FileSystemStorage.get_available_name`` (and ``S3Boto3Storage``
+   with ``file_overwrite=False``) appends a random suffix when a file
+   with the same name exists. That left every regeneration with an
+   orphan ``invoice_number.pdf`` + the real ``invoice_number_<hash>.pdf``
+   the DB pointed at — accumulating junk and costing an extra S3
+   object per force=True call. Now ``generate_invoice`` deletes the
+   old ``document_file`` before saving; the regenerated PDF lands
+   at the same storage key every time.
+
+Verified end-to-end: after this change, chain run #11 produced a
+single ``INV-2026-000011.pdf`` (34kB) with MARK 400001961694800 +
+AADE QR embedded; no orphan on disk.
+
+Full suite 267/267.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3e7a11d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3e7a11d715d1847464d07097530618ba73330300))
+
+* fix(mydata): AADE dev roundtrip now succeeds end-to-end
+
+Integration tests passed locally but the real AADE dev sandbox
+rejected every submission. Live roundtrip revealed six bugs the
+authoritative PDF didn't flag clearly. All fixed and pinned with
+regression tests; a real invoice now posts successfully (MARK
+400001961694181 returned on the final smoke run).
+
+What broke and how it's fixed:
+
+1. **Wrong payment codes in types.py** — every submission sent the
+   wrong ``paymentMethodDetails.type``. AADE v1.0.10 annex 8.12
+   numbers: 1=domestic bank, 2=foreign bank, 3=cash, 4=cheque,
+   5=on credit, 6=web banking, 7=POS / e-POS, 8=IRIS. My constants
+   had 3=web_banking, 4=POS, 7=cash (shifted by one). Fixed.
+
+2. **Wrong XSD element order** — thought ``paymentMethods`` had to
+   come BEFORE ``invoiceHeader`` (misreading the PDF's field-list
+   table). AADE's live error response is the only authoritative
+   source: ``issuer, counterpart, invoiceHeader, paymentMethods,
+   invoiceDetails, taxesTotals, invoiceSummary``. Fixed.
+
+3. **Missing AADE default namespace** — without
+   ``xmlns="http://www.aade.gr/myDATA/invoice/v1.0"`` on the root,
+   AADE returns error 101 for every element ("Could not find
+   schema information"). Added.
+
+4. **Classification children in wrong namespace** — the
+   ``<incomeClassification>`` outer element stays in the invoice
+   namespace but its children (``classificationType``,
+   ``classificationCategory``, ``amount``) must sit under
+   ``https://www.aade.gr/myDATA/incomeClassificaton/v1.0`` (yes,
+   AADE's URI has a typo: "Classificaton" missing an ``i`` — keep it).
+   Added _emit_income_classification helper that does both.
+
+5. **Wrong classification pair for 11.1** — ``E3_561_001`` +
+   ``category1_1`` is for B2B wholesale, not retail. AADE error
+   313 ("forbidden for invoiceType Item11_1"). Correct pair for
+   retail is ``E3_561_003`` + ``category1_3`` (Λιανικές — Ιδιωτική
+   Πελατεία). Fixed.
+
+6. **Strict VAT validation** — unknown rates used to silently
+   fall through to vatCategory=7 and trigger AADE error 217
+   downstream. Now raises ValueError in the builder; the service
+   layer catches it and persists a readable error code so ops
+   sees "Unsupported VAT rate 10.0%" in admin instead of a
+   misleading AADE error.
+
+Also closed out from the agent review:
+
+- **MyDataDuplicateError retry loop**: AADE error 228 was in the
+  same retry branch as transport errors → 5 wasted round-trips
+  returning 228 every time. Now treated as terminal (logs loud,
+  chains email, flags for manual reconciliation via
+  RequestTransmittedDocs when Tier A.5 lands).
+- **Empty ResponseDoc crash**: parser.first() raised IndexError
+  on empty docs (rare AADE gateway fault) bypassing all error
+  handling. Now returns a synthetic TechnicalError row.
+- **XSD validation error uncaught**: XMLSchemaValidationError from
+  the optional validator bypassed MyDataError taxonomy. Now wrapped
+  and converted to MyDataValidationError so the invoice ends up
+  REJECTED in admin, not zombied in SUBMITTED.
+- **Summary/line rounding drift**: summary used the bucket-rounded
+  invoice.subtotal/total_vat while lines were rounded independently
+  — multi-item mixed-VAT orders hit AADE error 203/207-210. Now
+  summary derives from the rounded line values accumulated during
+  emit.
+- **Shipping + payment_method_fee missing from XML**: caused
+  paymentMethods.amount != totalGrossValue. Now emitted as extra
+  invoiceDetails rows (VAT 24% — Greek standard for domestic
+  shipping/fees; Tier B extends per export / island overrides).
+
+New / updated tests (~10 regression tests total):
+- payment codes: type=7 for card, type=3 for COD (was the inverse)
+- element order: invoiceHeader precedes paymentMethods
+- AADE namespace present on root
+- incomeClassification present on every detail + aggregated summary
+- classification children in the separate AADE namespace
+- summary == rounded line sum
+- unknown VAT rate raises ValueError
+- 0% VAT emits vatExemptionCategory
+- shipping + fee become detail lines so paymentMethods.amount
+  matches totalGrossValue
+- duplicate-uid error terminates immediately (not retried 5x)
+- empty ResponseDoc returns synthetic error row (no IndexError)
+
+Full suite 267/267 green.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`03c9f70`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03c9f705d4f8ed5955d961de053edcd8be2d8089))
+
+## v1.108.0 (2026-04-22)
+
+### Bug fixes
+
+* fix(mydata): ty diagnostics on client status narrowing + parser cast
+
+ty's inference is stricter than mypy for two spots the first commit
+slipped past:
+
+client.py — ``requests.Response.status_code`` is typed ``int | None``;
+chained comparisons (200 <= x < 300, x >= 500) don't narrow through
+the Optional, so ty flags them as unsupported operators on None.
+Coerce once to ``status = response.status_code or 0`` and use that
+throughout the method.
+
+parser.py — ``# type: ignore[arg-type]`` on the Literal narrowing
+isn't honoured by ty. Replace with a dedicated ``_coerce_status``
+helper that whitelists via ``get_args(StatusCode)`` and uses
+``typing.cast`` for the final narrowing. More honest + testable
+than the ignore anyway: unknown strings now deterministically fall
+back to ``TechnicalError`` instead of being silently typed-as-correct.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`96daed1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96daed177617520720bb56425f47c4af1fdcd03f))
+
+* fix: update uv lock ([`045a1ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/045a1ed30feb401f05d881e61d168ed08d0f5ab0))
+
+### Features
+
+* feat(mydata): task wiring + admin actions + PDF MARK/QR + dashboard alerts
+
+Completes Tier A — Celery chain submits invoices to AADE on order
+completion, customer receives a PDF carrying the legal MARK + AADE-
+returned QR code, admin can submit/cancel manually, dashboard flags
+misconfiguration and rejections. Still feature-flagged via
+MYDATA_ENABLED — flip it on after sandbox smoke test.
+
+Task chain (order/tasks.py):
+- send_invoice_to_mydata: new task. Runs the service-layer submit,
+  classifies exceptions (Transport/Duplicate → retry, Validation/
+  Auth → terminal), on success regenerates the PDF with force=True
+  (so the customer's PDF embeds the MARK + AADE qr_url), then chains
+  send_invoice_email. On terminal failure still chains the email so
+  the customer isn't left empty-handed while ops reconciles.
+- cancel_mydata_invoice: new task. Routes through service.cancel_invoice;
+  retries on transport, gives up terminal, logs OrderHistory on success.
+- generate_order_invoice now routes to send_invoice_to_mydata when
+  MyDataConfig.is_ready() and auto_submit is on; otherwise retains
+  the original direct-to-email path.
+
+PDF (order/invoicing.py + template):
+- _build_context now prefers invoice.mydata_qr_url over the
+  order-tracking URL — the QR points at AADE's verification portal
+  once the MARK is assigned (the legally-compliant scan target).
+- Template renders a MARK line in the header meta when present. "MARK"
+  translated to Μ.ΑΡ.Κ (el), kept as "MARK" (de).
+
+Admin:
+- InvoiceAdmin: mydata_status_badge column (colour-coded per state
+  with the MARK number inlined when present), mydata_status in
+  list_filter, mydata_mark/mydata_uid in search_fields, new "myDATA
+  (AADE)" fieldset grouping the 13 integration fields as read-only.
+- OrderAdmin: two new detail actions — "Send invoice to myDATA"
+  (primary, cloud_upload icon) and "Cancel invoice in myDATA" (danger,
+  cancel icon). Both dispatch the Celery tasks fire-and-forget with
+  clear success / warning messages surfaced via the admin messages
+  framework.
+
+Dashboard banners (admin/dashboard.py + index.html):
+- _check_mydata_state: fresh (un-cached) query of MYDATA_ENABLED +
+  credentials + rejections in the last 7 days.
+- Template renders three conditional banners: red when enabled but
+  credentials missing, amber when recent rejections exist (deep-links
+  to the filtered Invoice changelist), blue info when pointing at the
+  dev sandbox. Fresh per page load — fixing the setting is visible
+  on the next refresh.
+
+Tests (9 new): test_mydata_submission.py covers the chain decision
+(enabled vs disabled), success path (MARK + qr_url persisted, email
+chained, PDF re-rendered with MARK), validation error path (REJECTED
+state + email still sent with pre-transmission PDF), transport retry
+fallback (max retries exhausted → fall back to email), cancellation
+persists cancellation_mark, no-MARK cancellation skip. Full invoice
+test suite remains green (256/256).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d41b067`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d41b0678008f80bea4526e85594806491e309bc9))
+
+* feat(mydata): foundation — models + builder + client + service (Tier A scaffold)
+
+Scope: Greek IAPR / AADE myDATA integration for B2C retail sales
+(invoiceType 11.1). Feature-flagged off — toggle MYDATA_ENABLED in
+Settings admin after sandbox validation. Full submission + cancellation
+flow lands end-to-end; Celery task wiring + admin UI + PDF template
+changes follow in a separate commit.
+
+New package order/mydata/:
+- config.py: MyDataConfig snapshot resolved from extra_settings. Hard-
+  coded dev/prod base URLs (AADE publishes them) so a typo in the env
+  setting can't misroute prod traffic.
+- uid.py: deterministic SHA-1(issuer_vat, issueDate, branch, invoiceType,
+  series, aa, deviationType) over ISO-8859-7 per AADE v1.0.10 §5. This
+  is the idempotency anchor — retries MUST hash identically so AADE
+  dedupes via error 228.
+- builder.py: Invoice → InvoicesDoc XML. 2dp ROUND_HALF_UP money,
+  sum-then-round line totals (avoids errors 203/207–210), Greek text
+  emitted as native UTF-8 (double-escape → schema rejection).
+- client.py: requests.Session wrapper; classifies 401/403 as
+  MyDataAuthError (not retryable), 429/5xx as MyDataTransportError
+  (retryable). No retry policy here — that's the service/Celery layer.
+- parser.py: ResponseDoc → typed ResponseRow. Namespace-tolerant (AADE
+  ships both prefixed and bare); handles partial-success batches.
+- validator.py: OPTIONAL XSD pre-validation. No-op until ops drops the
+  official AADE XSDs into xsd/ (they're behind portal auth — we can't
+  ship them). AADE validates server-side too, so this is fail-fast
+  not correctness.
+- service.py: public submit_invoice / cancel_invoice. select_for_update
+  persists UID + identity fields BEFORE the HTTP call so transport
+  failures leave recoverable state. Error 228 → MyDataDuplicateError
+  (Tier A.5 will recover via RequestTransmittedDocs); all other
+  ValidationError/XMLSyntaxError → REJECTED state + typed exception.
+- exceptions.py: 4-class taxonomy driving retry policy (Transport vs
+  Auth vs Validation vs Duplicate).
+- types.py: AADE enum constants (invoiceType, paymentMethodDetails.type,
+  vatCategory, known errorCodes) — no IntEnum wrapping since AADE
+  ships plain ints/strings in the XSD.
+
+Invoice model additions (migration 0032):
+  mydata_status, mydata_invoice_type, mydata_series, mydata_aa,
+  mydata_uid, mydata_mark (unique, bigint), mydata_authentication_code,
+  mydata_qr_url, mydata_cancellation_mark, mydata_error_code,
+  mydata_error_message, mydata_submitted_at, mydata_confirmed_at.
+  All nullable/blank-default so pre-myDATA invoices migrate cleanly
+  (the "leave existing invoices alone" policy). BTreeIndex on
+  mydata_status for admin filters.
+
+Settings (EXTRA_SETTINGS_DEFAULTS): MYDATA_ENABLED, MYDATA_AUTO_SUBMIT,
+MYDATA_ENVIRONMENT (dev/prod), MYDATA_USER_ID, MYDATA_SUBSCRIPTION_KEY,
+MYDATA_INVOICE_SERIES_PREFIX (default 'GRVP'), MYDATA_ISSUER_BRANCH
+(default 0), MYDATA_REQUEST_TIMEOUT_SECONDS.
+
+Dependencies: requests (already transitive, now explicit),
+xmlschema==4.2.0 (only for the optional XSD validator).
+
+Tests (19 new):
+- test_uid.py (6): determinism, distinct-inputs-distinct-outputs, ISO-
+  8859-7 encoding pin, B1/B2 receiver-VAT inclusion.
+- test_parser.py (5): success, ValidationError, namespaced response,
+  partial-success batch, cancellation mark.
+- test_builder.py (8): InvoicesDoc root, issuer fields, header
+  (invoiceType=11.1, series={prefix}-{year}, aa as plain int),
+  line-sum == summary (errors 203/207–210), payment amount ==
+  totalGrossValue, uid deterministic.
+
+Authoritative source: myDATA API Documentation v1.0.10 (AADE
+pre-official ERP, Nov 2024) — dropped in docs/ by the user.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`76a885d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76a885d0ac8b442996693dc53d233375680fa75e))
+
+* feat(invoicing): email PDF on completion + seller-unconfigured banner + misc polish
+
+Email:
+- New send_invoice_email task chained from generate_order_invoice once
+  the PDF is ready. Attaches the rendered PDF (streamed from storage
+  via storage.open('rb') — works on S3 and FS), renders under the
+  buyer's language, and is idempotent via INVOICE_EMAIL_SENT_FLAG in
+  Order.metadata (same pattern as the existing confirmation-email
+  reservation). Templates at emails/order/invoice_issued.{txt,html}.
+
+Admin banner:
+- dashboard_callback now computes seller_config_warnings fresh on
+  every load (not cached — fixing the setting should be reflected
+  immediately) and flags empty INVOICE_SELLER_NAME / VAT_ID /
+  TAX_OFFICE. The index.html template renders a red alert at the
+  top with a "Fix in Settings" link that pre-filters the settings
+  admin to the INVOICE_SELLER_ prefix. Non-critical fields (address,
+  phone) don't trigger the warning to avoid nagging.
+
+generate_invoice force=True preserves the original invoice_number
+and issue_date — allocating a fresh counter slot on regeneration
+was leaving gaps in the sequential register (Greek tax law forbids
+gaps). Admin "Regenerate invoice" action message and variant updated
+to reflect the new no-gap behaviour.
+
+Doc drift:
+- serializers_config['invoice'] description no longer says "short-lived
+  signed URL" (it's now an absolute URL to a Django-gated endpoint).
+- Invoice.document_file.help_text and order.invoicing module docstring
+  describe the actual flow (Django-gated streaming, storage URLs as
+  defence-in-depth).
+
+Tests: +3 new (send_invoice_email attaches PDF, idempotency flag
+prevents double-send, missing PDF skips & releases flag), existing
+force-regeneration test tightened to assert invoice_number + issue_date
+preservation and unchanged counter. Full invoice suite 52/52.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`92a61db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/92a61db27ee8f73e744f9951b3336ba2b971b7ea))
+
+## v1.107.0 (2026-04-22)
+
+### Features
+
+* feat(invoicing): streaming download endpoint + de locale + seller defaults
+
+Customer-facing invoice download was silently broken in both modes:
+- S3 prod: AWS_QUERYSTRING_AUTH=False global meant document_file.url
+  returned unsigned S3 URLs that 403 without IAM.
+- FS dev: url() returned /media/... which isn't served (private files
+  live under mediafiles_private/).
+
+New flow:
+- Added OrderViewSet.invoice_download action (GET
+  /api/v1/order/<id>/invoice/download) that streams the PDF via
+  FileResponse + storage.open('rb'). Works identically on S3 and FS,
+  gated by the same IsOwnerOrAdmin check as the metadata endpoint.
+- InvoiceDownloadResponseSerializer.download_url now builds an
+  absolute URL to that endpoint via request.build_absolute_uri —
+  no raw storage URLs ever reach the client.
+- PrivateMediaStorage sets querystring_auth=True so any future direct-
+  storage consumer gets a presigned URL (defensive, not relied on).
+
+extra_settings:
+- EXTRA_SETTINGS_DEFAULTS gains 12 INVOICE_SELLER_* entries so the
+  rows exist in the Settings admin for ops to fill in. Defaults are
+  empty strings — a fresh install renders an obviously-incomplete
+  invoice rather than one with a plausible-but-wrong legal identity.
+
+German locale:
+- Added 21 invoice-specific msgid/msgstr entries to de/django.po
+  (RECHNUNG, USt-IdNr., Finanzamt, MwSt., etc.) and filled 4
+  pre-existing empty entries (Payment, Description, Qty, Rate).
+  English falls through to msgids, no en changes needed.
+
+Cleanup:
+- Dropped the dead InvoiceAlreadyExists class and its now-false
+  docstring reference in generate_invoice.
+
+Tests: 7 new — download URL points at the streaming endpoint, the
+endpoint serves application/pdf, 404 when no invoice / no PDF, 403
+for other users. Full suite still 13/13 in the invoice modules.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`47f9b0e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/47f9b0e88583c7669b0ff5c2b68347cbd755103b))
+
+## v1.106.0 (2026-04-22)
+
+### Features
+
+* feat(invoicing): admin actions + QR/Greek-localised PDF
+
+Admin:
+- OrderAdmin gains "Generate invoice" (synchronous, idempotent) and
+  "Regenerate invoice" (force=True, with counter-gap warning) detail
+  actions, plus an InvoiceInline surfacing the current invoice on the
+  order page. New InvoiceAdmin / InvoiceCounterAdmin give a read-mostly
+  browser with per-row PDF download streamed via admin auth — works on
+  every storage backend, not just S3.
+- user/admin.py: adjust_loyalty_points used (self, request, queryset)
+  while being declared in actions_detail. Unfold routes detail actions
+  as <path:object_id>/..., so queryset was the user-id string; iterating
+  it awarded points to each digit as a separate user. Fixed to the
+  correct (self, request, object_id) signature.
+
+PDF:
+- Product name was rendering as the product ID — safe_translation_getter
+  was called without the "name" arg, returned None, and |default:id fired.
+  Fixed by resolving names in Python (_render_items) since Django
+  templates can't pass kwargs to methods.
+- Unified decimal formatting (locale-aware floatformat everywhere; VAT
+  breakdown rows now render as Decimals, stored JSON still strings so
+  the idempotency contract + tests stay intact).
+- Unified VAT % format (floatformat:"-1" drops trailing ".0" only when
+  the rate is integer).
+- Added QR code (inline SVG via qrcode.image.svg.SvgPathImage — zero
+  PIL on render path) pointing at the frontend order page.
+- Greek compliance: tax_office (ΔΟΥ) + business_activity seller settings,
+  buyer VAT ID field in the template (snapshot plumbing to follow).
+- Shows order date when it differs from issue date.
+- Pay-way display uses translated PayWay.name; payment_id falls under a
+  "Ref:" label instead of being the primary payment line.
+- Running footer with seller legal line on every page.
+- Full Greek translation pass (.po updated, compilemessages run).
+
+Notable gotcha caught during QA: Django's {% trans %} silently skips
+msgids containing '%' — the trans tag post-processes as a format string
+and a bare '%' swallows output. Keep '%' outside the tag.
+
+dev.Dockerfile:
+- Added gettext (msgfmt/xgettext) for makemessages/compilemessages.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`72593da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/72593daa592fc36803020d4e9d99a0477d1009b1))
+
+## v1.105.0 (2026-04-22)
+
+### Bug fixes
+
+* fix(invoicing): register humanize and update stale invoice task tests
+
+Adds django.contrib.humanize to INSTALLED_APPS so the invoice template's
+{% load humanize %} tag resolves. Rewrites two stale tests that asserted
+NotImplementedError against generate_order_invoice — the task is now
+fully implemented, so the tests verify successful PDF generation with
+_render_pdf_bytes mocked out.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0228ac8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0228ac85d91b595c09a351822cbe740d4f26739b))
+
+* fix(auth): pin allauth user code format to 6-digit numeric
+
+django-allauth 65.15.0 changed the default ALLAUTH_USER_CODE_FORMAT to
+8-char dashed alphanumeric (RFC 8628), producing codes like SGKC-HSZJ,
+while the Nuxt frontend's UPinInput is fixed at 6-digit numeric in both
+the verify-email page and the login-by-code confirm form. Emails were
+being sent with the new format and users could not complete signup.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2a5cd33`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2a5cd33501318e612fa0c6369ee4569d2d97270c))
+
+* fix(backend): plaintext notifications + per-action filterset dispatch
+
+Two live-testing bugs fixed:
+
+1. Notification messages leaked HTML (<a href='…'>name</a>) into the
+   bell/page UI because the frontend renders them via text interpolation,
+   not v-html. Dropped the anchor tags from every translation body in
+   product.tasks (RESTOCK_FAVOURITE, PRICE_DROP_FAVOURITE) and
+   blog.tasks (COMMENT_LIKED); navigation uses Notification.link, which
+   the card wraps as a single tap target.
+
+2. UserAccountViewSet's per-action filtersets (orders, favourite
+   products, reviews, addresses, blog comments, liked posts,
+   notifications, subscriptions) were *all* silently unapplied. django-
+   filter's DjangoFilterBackend reads view.filterset_class via getattr,
+   not by calling get_filterset_class(), so an override method bound
+   nothing. Replaced with an _action_filter_map attribute and overrode
+   filter_queryset() to materialise the correct class onto the instance
+   before DRF's filter chain runs. Visible symptom: /account/notifications
+   seen vs unseen tabs returned identical data.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1c62f31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c62f3145053d60f44499ac83b75fc6d5e26402c))
+
+* fix(order): allow null country/region on OrderSerializer, matching the model
+
+``Order.country`` and ``Order.region`` are both ``on_delete=SET_NULL,
+null=True, blank=True``. The serializer's ``PrimaryKeyRelatedField``
+defaults to ``allow_null=False``, which made the generated OpenAPI
+schema type them as required strings. Real orders with a null region
+(e.g. imported from a legacy system with no region linked) then
+tripped the Nuxt layer's Zod validation on ``parseDataAs(response,
+zListMyOrdersResponse)`` with ``Invalid input: expected string,
+received null``, turning the entire orders-list endpoint into a 500 on
+the client side. Surfaced by the chrome-mcp smoke test of the
+/account/orders page.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`85fc282`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85fc28204bdabe2c5c287b380570d8ecd7ce99e4))
+
+### Chores
+
+* chore(dev): add mailpit to infra compose for local email testing
+
+Runs a local SMTP server on :1025 with a web UI at :8025 so developers
+can preview signup/verification/password-reset emails rendered as real
+mail clients would decode them, instead of reading MIME-encoded output
+from the console backend.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d1cd163`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1cd16398786cde78e36996c7711c79ce2a83d14))
+
+### Features
+
+* feat(gdpr): async data export + right-to-erasure with order retention
+
+New UserDataExport model tracks async export jobs. A POST to
+/user/account/{id}/request_data_export queues ``export_user_data_task``
+which compiles every user-linked row into a JSON file and emails a
+one-off 7-day download link (``data_export_ready`` template, rendered
+under the user's preferred locale via translation.override). The
+download endpoint is token-auth'd, not session-auth'd — recipients
+open the link from email clients that may not have cookies.
+
+Right-to-erasure POST to /user/account/{id}/delete_account requires
+``{"confirmation": "DELETE"}`` then queues ``delete_user_account_task``.
+The service anonymises Order rows (email, names, address, phone blanked
+and user FK nulled) so tax/invoice retention survives; everything else
+— product alerts, favourites, reviews, blog comments, Knox tokens,
+allauth EmailAddress/SocialAccount/Authenticator/UserSession, the User
+row itself — is hard-deleted inside a single transaction so a partial
+failure rolls back to a consistent state.
+
+Exports are written to MEDIA_ROOT/_gdpr_exports/ (bind-mounted, shared
+between backend + celery_worker) rather than the sibling _private tree
+the invoice pattern uses — the private tree is not volume-shared in
+dev. Production deploys hitting S3 go through PrivateMediaStorage with
+signed URLs; the download view is still single-scope to one token.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`80eb896`](https://github.com/vasilistotskas/grooveshop-django-api/commit/80eb8960cb47a1dc0e78797a22d1edb7017f3eff))
+
+* feat(invoicing): PDF invoice generation with atomic per-year sequencing
+
+- New Invoice + InvoiceCounter models. The counter hands out the next
+  sequential number per fiscal year under ``select_for_update`` — Greek
+  tax law forbids gaps and the counter is the only source of truth.
+  Invoice stores the PDF in private media plus a frozen vat_breakdown,
+  seller_snapshot, and buyer_snapshot so re-rendering an old invoice
+  in a later year always yields the same VAT table even if product
+  rates or the buyer's profile changed.
+- order/invoicing.py service: _compute_vat_breakdown aggregates items
+  by VAT rate (backs VAT out of gross prices so 24/13/6/0 buckets
+  balance), _build_context isolates template data so tests can assert
+  it without invoking WeasyPrint, and generate_invoice() is
+  idempotent — calling twice returns the existing row.
+- Seller info (AFM / registration / address) comes from
+  extra_settings.Setting keys so ops can configure without a migration.
+- core/templates/invoices/invoice.html — Greek-tax-compliant layout:
+  seller + VAT ID header, buyer block, line items with per-item VAT%,
+  per-rate VAT breakdown table, totals including shipping and payment
+  method fee.
+- generate_order_invoice task reimplemented to call the service;
+  handle_order_completed now dispatches the task on transaction commit
+  when document_type=INVOICE.
+- GET /api/v1/order/{id}/invoice action returns InvoiceDownloadResponse
+  (metadata + short-lived signed URL); 404s when the PDF has not been
+  generated yet. has_invoice flag added to OrderDetail so the frontend
+  can hide the download CTA without an extra round-trip.
+- Dockerfile adds cairo/pango/gdk-pixbuf/libffi to both the builder
+  (build-time) and the production runtime image (dlopen targets).
+- pyproject.toml / uv.lock pick up weasyprint 68.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ef3dd00`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ef3dd00340b3445373bf64e0b2002752364766ad))
+
+* feat(notifications): add live notifications across order, payment, shipment, stock and loyalty events
+
+- notification/services.py helper (create_user_notification) replaces
+  ~30 LOC of boilerplate across blog and product tasks.
+- NotificationTypeEnum catalogues all 14 fine-grained event identifiers
+  so the frontend gets a typed union via OpenAPI — no more hardcoded
+  "order_shipped" / "price_drop_favourite" strings.
+- order/notifications.py covers order_created, status transitions
+  (processing/shipped/delivered/completed/canceled), shipment
+  dispatched, refund, and Stripe payment succeeded/failed — each
+  dispatched via transaction.on_commit from its signal handler.
+- New signals: order_shipment_dispatched (with pre/post-save caching of
+  tracking fields; guards against duplicate fire when an admin clears
+  and re-enters the same tracking number) and loyalty_tier_changed
+  (with direction kwarg so downgrades stay silent).
+- Back-in-stock live fan-out to product favouriters; complements the
+  existing opt-in ProductAlert email path.
+- OrderCancellationError now surfaces as 400 ValidationError so the
+  frontend's conflict-aware retry UX triggers correctly.
+- WebSocket payload carries id/category/priority/notification_type so
+  the client can pick colours and icons without a re-fetch.
+- NotificationUserSerializer split: detail includes nested Notification
+  for list rendering; write path still takes integer FKs.
+- /user/account/{id}/notifications action exposes the ``seen`` filter
+  via @extend_schema so the generated Zod schema advertises it — no
+  local schema overrides in the Nuxt layer.
+- ENUM_NAME_OVERRIDES resolves the NotificationCategory vs
+  SubscriptionTopic.TopicCategory collision that was renaming the
+  latter to CategoryB9dEnum on every regeneration.
+- Abandoned-cart email now links to /cart/recover/{cart.uuid} so the
+  Nuxt side can show a welcome-back banner.
+- Test fixture fix: NotificationStatusFilter lookups assert under
+  translation.override("en") instead of the test env's default Greek.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9989c46`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9989c46092724d861c531884742ea7226f7860fc))
+
+### Testing
+
+* test(order,notifications): tests + two regression fixes surfaced by them
+
+Adds test coverage for the live-notifications + invoicing slices I
+shipped without tests earlier. Two real bugs surfaced and are fixed as
+part of this commit:
+
+- **Loyalty signals referenced ``LoyaltyTier.level``** which doesn't
+  exist — the model field is ``required_level``. Left uncaught, every
+  tier transition would have crashed ``dispatch_tier_changed`` and
+  silently never sent the celebratory notification. Writing the
+  ``test_direction_up_fires_notification_task`` test was how this
+  surfaced.
+- **Dockerfile missing runtime fonts** — WeasyPrint's Pango backend
+  needs actual TTF files on the filesystem. Without them the production
+  image raised ``pango_font_describe: assertion 'font != NULL'``
+  criticals and rendered empty PDFs. Added ``ttf-dejavu``,
+  ``font-noto``, ``font-noto-cjk``, and ``fontconfig`` to the runtime
+  layer. Verified end-to-end via
+  ``docker run ... weasyprint ... Γειά σας`` — 6 KB valid PDF with
+  ``%PDF-1.7`` magic.
+
+New tests:
+- ``tests/unit/notification/test_services.py`` — ``create_user_notification``
+  contract (kind/category/priority/link propagation, unsupported-language
+  skip, empty-copy skip, ``@transaction.atomic`` rollback on mid-loop
+  translation failure, per-language fan-out).
+- ``tests/unit/order/test_invoicing.py`` — ``InvoiceCounter.allocate``
+  sequential + threaded-concurrent allocation (no duplicates, no gaps),
+  ``_compute_vat_breakdown`` single/mixed/no-VAT buckets,
+  ``_order_totals`` shipping + payment-fee addition,
+  ``generate_invoice`` idempotency + force-refresh snapshot behaviour.
+- ``tests/unit/order/test_shipment_signal.py`` — initial null→set dispatch,
+  no-refire on re-save with same tracking (the ``tracking_unchanged``
+  guard), refire after clear-then-set (legitimate new-shipment event),
+  loyalty tier direction up/down/same gating.
+- ``tests/integration/order/test_cancel_and_invoice_views.py`` —
+  ``OrderCancellationError`` → 400 (not 500) contract, invoice endpoint
+  404 when no PDF / row with no file, 200 with signed URL when PDF
+  exists, other-user forbidden.
+
+Other collateral:
+- Added ``invoice`` and ``reorder`` to ``owner_or_admin_actions`` in
+  ``OrderViewSet.get_permissions`` — without this, the new invoice
+  endpoint fell to the ``IsAdminUser`` fallback and returned 403 for
+  legitimate order owners.
+- Ignored ``/mediafiles_private/`` (dev-time fallback for private
+  storage when not using AWS).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e933099`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e93309904ea8e70db93343369d9816b1bbdcd85f))
+
+## v1.104.1 (2026-04-21)
+
+### Bug fixes
+
+* fix(filters): emit CSV-aware schema for camel-case ordering
+
+DRF's ``OrderingFilter`` accepts a comma-separated list of keys (the
+backend ``get_ordering_param`` already splits on ``,``), but the
+spectacular extension for ``CamelCaseOrderingFilter`` emitted a
+single-value ``enum`` — so every generated Zod consumer (openapi-ts)
+rejected any multi-sort value. Concrete symptom: the checkout sent
+``ordering=-isMain,-createdAt`` and Nuxt's Zod query validator
+returned 400 before the request reached Django.
+
+Replace the ``enum`` with a ``type: string, pattern: ...`` regex
+that matches any comma-separated combination of the allowed camelCase
+keys. ``re.escape`` guards against metacharacters so a future field
+name like ``-createdAt`` doesn't corrupt the alternation. openapi-ts
+regenerates as ``z.string().regex(...)`` — single-key sorts still
+match trivially, multi-key sorts now validate, and the pattern keeps
+the same allow-list protection the enum provided.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6b9a2ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6b9a2ab72933f90b14ebd33ac1361452e6914914))
+
+## v1.104.0 (2026-04-20)
+
+### Features
+
+* feat(api): light up orphaned endpoints — address prefill, reorder, alert filters
+
+- user/address: register the previously-orphaned ``get_main`` action so
+  the checkout UI can prefill its form from the user's saved default
+- order: register the ``reorder`` action so past orders can feed their
+  items back into the active cart in one POST
+- product/alert: expose ``product`` / ``kind`` / ``is_active`` via
+  filterset_fields so the PDP can pre-answer "am I already subscribed?"
+  and render the active state instead of a duplicate-submit path
+- product/ProductAlertSerializer: map the ``EmailField(blank=True)`` to
+  ``allow_null=True`` + normalise ``""`` to ``None`` in
+  ``to_representation`` so round-trips aren't broken by Zod's
+  email-format check over a default-empty string; drop the auto
+  UniqueTogetherValidators that (as a side-effect) were forcing email
+  to be required on input — DB-level UniqueConstraint + the view's
+  IntegrityError → 409 already covers uniqueness
+- search/listTrendingSearches: add concrete response serializers and
+  typed query parameters so drf-spectacular emits a real schema instead
+  of the graceful-fallback warning (0 errors now)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`bee8568`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bee8568556fb7019fc1788530256411908ad4306))
+
+## v1.103.0 (2026-04-20)
+
+### Features
+
+* feat(hardening): cache admin dashboard, throttle cart/search, add correlation IDs
+
+- admin: cache full dashboard_callback payload in Redis (5 min TTL),
+  extract into _build_dashboard_data(), prefetch translations on
+  top-products/low-stock/stock-log loops, and invalidate via
+  post_save/post_delete signals on ten domain models
+- throttling: new CartMutationThrottle, CartMutationAnonThrottle and
+  SearchThrottle (layered on top of global daily caps) applied to
+  CartViewSet/CartItemViewSet write actions and search_trending
+- observability: CorrelationIdMiddleware + CorrelationIdFilter inject
+  an X-Correlation-ID per request into log records (JSON + dev verbose)
+- order: composite indexes on (user, -created_at) and
+  (payment_status, -created_at) via migration 0030
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4c99e04`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c99e04b14651582babc50c05d7467ddd008b128))
+
+## v1.102.0 (2026-04-20)
+
+### Features
+
+* feat: Bump Meilisearch ([`c976cdf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c976cdfedcd3bcaf8119f277517e52970732fd26))
+
+## v1.101.0 (2026-04-19)
+
+### Bug fixes
+
+* fix: update uv lock ([`3878e38`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3878e3829d602fb47826a48b90959061986b5bb8))
+
+### Features
+
+* feat: quick-win feature batch — reorder, alerts, trending, idempotency
+
+* order reorder: OrderService.reorder_to_cart + POST /orders/{id}/reorder
+  clones past-order items into the user's cart, capping qty at current
+  stock and returning added/skipped breakdowns so the frontend can
+  surface partial-success toasts.
+* product alerts: new ProductAlert model (RESTOCK + PRICE_DROP), guest
+  or user subscriptions, single-shot fire-and-deactivate semantics.
+  product_back_in_stock signal + notify_product_back_in_stock receiver
+  dispatch Celery send_product_alert_restock on 0→positive transitions,
+  and the existing price_lowered signal now also fans out to
+  send_product_alert_price_drop for subscribers whose target_price
+  threshold is met.
+* trending searches: new /search/trending aggregates SearchQuery top
+  queries over a 24h window, Redis-cached 5 minutes per
+  (content_type, language_code, limit) tuple.
+* idempotency: IdempotencyMiddleware replays cached 2xx/4xx JSON
+  responses for retried POST/PUT/PATCH/DELETE when the client sends
+  Idempotency-Key (RFC draft behavior, scoped by user/session, 24h).
+* low-stock threshold: expose Product.low_stock_threshold on the
+  product serializer so the frontend can show accurate "only N left"
+  scarcity badges instead of a hardcoded threshold.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a33f183`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a33f1833d78fe81c9c9b778e9d16e5384fa80fa9))
+
+## v1.100.2 (2026-04-19)
+
+### Bug fixes
+
+* fix: lint ([`04c0c13`](https://github.com/vasilistotskas/grooveshop-django-api/commit/04c0c132d8420bfbe4fc0e53d952162c1a0aeda0))
+
+* fix(throttle): add per-endpoint rate limits on contact and payment actions
+
+Stacks ScopedRateThrottle-style subclasses on ContactCreateView (AllowAny)
+and the create_payment_intent / create_checkout_session @actions so a single
+IP/user cannot brute-force or abuse expensive payment provider calls past
+5-10 requests/minute, while the global anon/user daily caps still apply.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9ba370a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ba370ad4c64f0739c476a3b41359fc9f888b252))
+
+## v1.100.1 (2026-04-19)
+
+### Bug fixes
+
+* fix: update uv lock ([`01de097`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01de09724117861e28515db86bb699a8291fe7fa))
+
+## v1.100.0 (2026-04-19)
+
+### Bug fixes
+
+* fix: lint ([`989623f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/989623fcc9894f81ca73f1b0009f23cdff9d2f3b))
+
+* fix(auth): override get_client_ip in adapter instead of trusting single header
+
+The previous ALLAUTH_TRUSTED_CLIENT_IP_HEADER = "X-Real-IP" setting
+made allauth's get_client_ip() read only that header and raise
+PermissionDenied when missing. Combined with USERSESSIONS_TRACK_ACTIVITY
+(which runs on every authenticated request via UserSessionsMiddleware),
+any direct-to-Django caller without the header got 403 — health probes,
+Celery-triggered HTTP, and the integration test suite all broke (17
+analytics tests were failing with "Unable to determine client IP address").
+
+Drop the setting and override UserAccountAdapter.get_client_ip to prefer
+X-Real-IP (set by the Nuxt proxy from h3 getRequestIP) with a
+REMOTE_ADDR fallback. Keeps the spoof-safe priority while staying
+functional on proxy-less paths.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3af4300`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3af4300d214b2866de1a5f49c793b2a4ab4e53ea))
+
+* fix(auth): trust X-Real-IP for allauth session IP tracking
+
+allauth 65.14.2 removed default X-Forwarded-For trust (anti-spoofing +
+rate-limit-bypass protection), so get_client_ip() now falls back to
+REMOTE_ADDR unless a trusted header or proxy count is configured. In
+K8s that means UserSession.ip recorded the Nuxt pod cluster IP on
+every request (USERSESSIONS_TRACK_ACTIVITY=True) instead of the real
+client.
+
+Nuxt sets X-Real-IP from h3 getRequestIP(event, { xForwardedFor: true })
+and Django now reads it via ALLAUTH_TRUSTED_CLIENT_IP_HEADER.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`bd31805`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd3180503340f8d674c5b57ab948a3ec3bcca678))
+
+### Chores
+
+* chore: sync uv.lock to pyproject version 1.99.1 ([`b10d3b8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b10d3b8d1259a4b1a5bd88f7811223fb134c92e0))
+
+### Features
+
+* feat(admin): revamp Unfold theme with oklch palette, dashboard badges, env banner
+
+- Move SITE_TITLE/HEADER/SUBHEADER/SYMBOL to env-overridable strings,
+  add SITE_URL, BORDER_RADIUS, SHOW_HISTORY/VIEW_ON_SITE/BACK_BUTTON,
+  ENVIRONMENT callback, and LOGIN.redirect_after.
+- Replace indigo RGB palette with zinc-based oklch base + primary scales
+  and matching font semantic tokens.
+- Add pending-review / pending-order / pending-comment / unread-message
+  badges in the sidebar via admin/badges.py.
+- Add admin/environment.py for the Unfold environment banner.
+- Polish dashboard rating stars (5-of-10 display) and review status
+  badges (NEW / TRUE / FALSE mapped to amber / emerald / rose).
+- Sync static CSS + tailwind input to match new palette.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0b82aa4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0b82aa40fc42f2e5c30ec75a848fdfd2f9a1b1c5))
+
+### Unknown
+
+* i18n(el): seed 41 missing msgstrs for order / cart / subscription / inactive-user email chrome
+
+"Payment Status" arrived in English on a live test order even though
+the operator had saved "Κατάσταση πληρωμής" via Rosetta. Two causes,
+one fixed per-edit and one fixed at the baseline:
+
+1. The Celery worker rendering the email may have been running an
+   image that pre-dates the worker_process_init / task_prerun overlay
+   wiring (f2498c71). Fresh worker pods on the latest image now pull
+   DB-backed Rosetta edits on boot and refresh on the Redis version
+   tick — if "Κατάσταση πληρωμής" is in core_translation, it WILL
+   reach the next email.
+
+2. The .po baseline had msgstr "" for ~40 strings across order_received,
+   order_payment_confirmed, payment_failed, order_shipped,
+   order_pending_reminder, checkout_abandoned, subscription/confirmation,
+   and inactive_user templates. Seeded the obvious translations with
+   a polib pass that only fills entries whose current msgstr is empty
+   — any Rosetta edit already on disk is preserved (strict additive).
+
+After deploy, even a worker that can't reach the Translation table at
+boot (or with an empty overlay) serves Greek correctly from the .mo
+fallback. The overlay still wins when it's present. ([`eb56a13`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb56a13ec6d4192bf669004de2cd77d6a1dd2f0a))
+
+## v1.99.1 (2026-04-18)
+
+### Bug fixes
+
+* fix: update uv lock ([`446ec89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/446ec896a74db31a4d92830035d4ad4f6fd43760))
+
+* fix(i18n): make import_po_to_translations additive by default so Rosetta edits survive
+
+The command's old behaviour was update_or_create for every row parsed
+from .po, which silently overwrote every Rosetta edit with whatever was
+committed in the image's .po file. PreSync doesn't call this command
+today, but the ergonomics were a trap: any operator running it manually
+after a makemessages run or merge conflict would wipe every translation
+an editor had ever touched via Rosetta.
+
+The DB Translation table is the durable source of truth (per the
+overlay architecture in core/rosetta_storage.py). .po files are only
+the schema seed. Align the command with that guarantee:
+
+- Default is now additive: rows that already exist for (language_code,
+  msgid, plural_index) are preserved; only missing msgids are imported.
+- New --force flag restores the destructive behaviour for the rare case
+  where the operator really does want to overwrite from disk (e.g.
+  reseeding a freshly cloned DB from .po). Emits a prominent WARNING
+  when set.
+- Summary line now reports imported + preserved + skipped counts.
+
+Tests cover all three paths: additive preserves Rosetta rows, additive
+seeds missing msgids, and --force overwrites. 3/3 pass. ([`8ff2cb1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ff2cb1c1fd6ac19de395ed52d00638bde171891))
+
+* fix(i18n): translate email subjects for el + apply Translation overlay to Celery workers
+
+Two bugs surfaced together when a live test order landed with
+`Order Received - #38` in English despite a Greek msgstr existing in
+Rosetta/Postgres:
+
+1. .po msgids were fuzzy or empty for every transactional-email subject
+   I added in the email overhaul. Django's gettext skips fuzzy entries
+   unconditionally, so Rosetta saves that looked landed on disk never
+   actually reached runtime lookups. Removed the fuzzy flag and wrote
+   proper, non-fuzzy Greek translations for:
+
+- Payment Confirmed - Order #{order_id}
+- Order Received - #{order_id} (was fuzzy-carried from "Order Delivered")
+- Payment Failed - Order #{order_id}
+- Order #{order_id} Status Update - {status}
+- Your Order #{order_id} Has Shipped
+- Reminder: Complete Your Order #{order_id}
+- Did you forget something? — {site_name}
+- We miss you!
+- Confirm your subscription (template heading)
+- Confirm your subscription to {topic} (subject)
+- Order Received (template heading; was fuzzy)
+
+Verified via django.utils.translation.gettext under
+translation.override('el') that each key resolves to the new msgstr.
+
+2. Celery workers never applied the DB-backed translation overlay.
+   core.middleware.translation_reload seeds and refreshes gettext
+   catalogs on every web request, but workers never see middleware —
+   so a long-lived worker serves whatever .po/.mo was baked into the
+   deployed image and stays blind to every Rosetta edit until the pod
+   is rolled. That's the architectural reason the Greek msgstr the
+   operator had already saved in Rosetta never reached the email send.
+
+Two new signal handlers in core/celery.py:
+- worker_process_init → apply_db_overlay() once at boot, so fresh
+  workers have DB-backed msgstrs in their in-memory catalog.
+- task_prerun → compare TRANSLATION_VERSION_CACHE_KEY against a
+  per-process counter; re-apply overlay + clear gettext caches when
+  another pod bumped the tick. Mirrors the web-side middleware with
+  the same single-Redis-round-trip cost per task.
+
+On next deploy PreSync runs import_po_to_translations which seeds the DB
+from these corrected .po msgstrs, bumps the version tick, and every web
+pod refreshes on its next request; worker pods refresh on their next
+task. Future Rosetta edits propagate the same way without a redeploy. ([`f2498c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2498c716b2e583709d3dd68fc2287593c0fe164))
+
+## v1.99.0 (2026-04-18)
+
+### Bug fixes
+
+* fix(test): pin payment_status in email-sequence test to avoid factory randomness
+
+OrderFactory.payment_status uses random.choice across every PaymentStatus
+value (factories/order.py:180). When that randomly produced COMPLETED,
+send_order_status_update_email's intentional dedup — skip the PROCESSING
+email because the payment-confirmed email already fired — kicked in and
+mock_email.send.call_count landed at 2 instead of 3.
+
+Pin payment_status=PENDING in the test's OrderFactory.create to guarantee
+the PROCESSING branch runs. ([`5c67883`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c67883c328367986d419665f1efca3abeaca4fd))
+
+* fix(test): update subscription tests for dedicated .txt render and API-based unsubscribe URL
+
+- test_send_subscription_confirmation_success: send_subscription_confirmation
+  now renders both .html and .txt (no more strip_tags fallback), so assert
+  render_to_string was called twice with the expected template names.
+- test_generate_unsubscribe_link: unsubscribe URL points at API_BASE_URL
+  (the Django unsubscribe endpoint) not NUXT_BASE_URL, and no longer has a
+  trailing slash. Rewrite the "no_site_url" case as "strips_trailing_slash"
+  since API_BASE_URL is always set in real deployments and the old empty
+  fallback produced an unreachable URL anyway. ([`3d19cd8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d19cd8483434500c1fabb962e33ce160d752920))
+
+* fix(schema): split UnsubscribeView into topic-scoped and all-topics variants
+
+drf-spectacular was emitting "operationId unsubscribeViaLink has collisions"
+and the same for unsubscribeOneClick because a single UnsubscribeView served
+two URL paths (/<uid>/<token>/<slug> and /<uid>/<token>) — drf-spectacular
+generates one operation per (path, method) pair but could only see one set
+of @extend_schema decorators on the shared view.
+
+Split into two thin classes so each URL has its own operation:
+- UnsubscribeTopicView → unsubscribeFromTopicViaLink / …OneClick
+- UnsubscribeAllView → unsubscribeFromAllViaLink / …OneClick
+
+Shared logic lives in module-level helpers (_validate_unsubscribe_token,
+_apply_unsubscribe, _unsubscribe_get_response, _unsubscribe_post_response)
+so both classes stay thin and the DRF contract stays identical.
+
+urls.py points at the two new classes via their existing route names so no
+email URLs or external callers change.
+
+Verified: `uv run python manage.py spectacular --file schema.yml` now emits
+no warnings; schema.yml checked in. ([`25b07fe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/25b07fe6dd26b17abbfab8e12c2866c79f64e7c2))
+
+* fix: schema ([`5d6d131`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5d6d13140a8d3ee7bed583f2ff50171bbc4df4ea))
+
+* fix(test): rename missed template_name to template_base in newsletter test
+
+The send_newsletter() signature was renamed (template_name → template_base)
+but one test still passed the old kwarg, which ty check flagged as an
+unknown-argument. Matches the rename applied in the previous commit. ([`c1653c0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1653c02d39a6f259ea5ef43ba35074682e73474))
+
+* fix: remove order delivered email section ([`76afd27`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76afd27ad36871e53feab3b10f5dcc72ef0a5125))
+
+### Features
+
+* feat(email): overhaul transactional email, add per-user language and one-click unsubscribe
+
+Broken flows fixed:
+- subscription confirmation template never rendered the {{ confirmation_url }} button, so opt-in was impossible; template now leads with the CTA.
+- UserSubscriptionViewSet.confirm required IsOwnerOrAdmin but was reached from unauthenticated email clicks; new public ConfirmSubscriptionByTokenView at /api/v1/user/subscription/confirm/<token> uses the 64-char random token as sole auth.
+- SUBSCRIPTION_CONFIRMATION_URL default pointed at example.com; now {API_BASE_URL}/api/v1/user/subscription/confirm/{token}.
+- UnsubscribeView: added POST handler for RFC 8058 one-click compliance (returns 200 per spec) and made topic_slug optional so inactive-user / abandoned-cart links work without a topic.
+- Newsletter management command referenced a non-existent template path; now points at emails/marketing/newsletter and renders both .html and .txt.
+- Inactive-user task rendered HTML as plain text via send_mail(message=html_message=html); switched to EmailMultiAlternatives with a separate .txt render and a signed uid/token unsubscribe link (no more ?email= leak).
+- Abandoned-cart email had no unsubscribe footer/header; added preferences link + tokenized unsubscribe URL.
+- Contact signal sanitizes user-supplied name before it lands in Subject (CRLF injection guard).
+
+Per-user language:
+- UserAccount.language_code + Order.language_code fields (migrations 0023/0029); default settings.LANGUAGE_CODE.
+- core.utils.i18n helpers: get_user_language, get_order_language, resolve_request_language (X-Language/X-Locale/Accept-Language).
+- UserAccountAdapter.save_user + SocialAccountAdapter.save_user capture language on signup from the forwarded header.
+- UserAccountAdapter.send_mail wraps allauth email rendering in translation.override(user.language_code) so verification/password-reset/MFA mails respect the stored preference.
+- Every customer-facing Celery email task wraps subject + body rendering in translation.override(...): order confirmation, payment failed, status updates, shipping, pending-order reminders, checkout abandonment, inactive-user re-engagement, subscription confirmation, newsletter.
+- UserWriteSerializer / UserDetailsSerializer expose language_code with validation against settings.LANGUAGES.
+
+Email deliverability:
+- List-Unsubscribe + List-Unsubscribe-Post: List-Unsubscribe=One-Click headers on newsletter, inactive-user, and abandoned-cart emails (RFC 8058).
+- List-ID header per email category for Gmail grouping.
+- reply_to=[INFO_EMAIL] set consistently.
+- ACCOUNT_EMAIL_SUBJECT_PREFIX = "[{SITE_NAME}] " so every allauth mail is branded.
+
+Background tasks and async:
+- send_subscription_confirmation_email_task (3 retries, 300s backoff) replaces the sync util call from user.signals; dispatched via transaction.on_commit so the worker never reads a row before commit.
+- Newsletter dedup via Redis SETNX key newsletter:sent:{slug}:{uid}:{date} with configurable window; manage command gained --force and --dedup-window.
+
+Cleanup:
+- Removed dead order/notifications.py EmailNotifier/OrderNotificationManager (replaced by order.tasks long ago); removed the dead test_notifications.py and the assert_not_called patch in test_signals.py.
+- Updated inactive-user task tests to mock EmailMultiAlternatives (was mocking the old send_mail); updated newsletter tests for the template_name -> template_base rename.
+- makemessages run for el/en/de. ([`45400bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/45400bca826a8f729b82398f52b35b3af90cf8da))
+
+## v1.98.0 (2026-04-18)
+
+### Bug fixes
+
+* fix: lint ([`eebf501`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eebf5018e073367aca351d338b410375391dfe04))
+
+* fix(i18n): stop hitting DB at import/boot time, bootstrap overlay via seed cmd
+
+tests/unit/wsgi/test_*.py kept ERRORing with "Database access not
+allowed, use the 'django_db' mark" on CI. Root cause:
+
+wsgi/__init__.py line 20 invokes the full WSGI application at module
+import time as a startup warmup (application({"PATH_INFO": "/"}, ...))
+
+That runs the entire middleware stack, which during test collection
+happens inside pytest-django's DB-access block. The previous design
+had two places that could hit the DB during that warmup:
+
+- CoreConfig.ready() → apply_db_overlay()
+- TranslationReloadMiddleware.process_request → first-request overlay
+
+Both were wrapped in try/except Exception, but pytest-django's
+RuntimeError surfaced through the test collection anyway (likely via
+logging or a secondary teardown path). Catching after the fact wasn't
+enough — the only reliable fix is to not touch the DB during the
+warmup.
+
+Both hooks removed. Bootstrap flow is now:
+
+1. PreSync: migrate (creates Translation table)
+2. PreSync: uv run python manage.py import_po_to_translations
+   — seeds the table AND bumps the shared Redis version tick
+3. Pods boot; on first real request, middleware sees
+   `_local_translation_version (None) != remote_version` and applies
+   the overlay. Subsequent requests no-op.
+4. Every Rosetta save re-bumps the tick via
+   core.signals.rosetta.bump_translation_version_on_save.
+
+Fresh cluster with no tick yet: middleware returns early, pod serves
+the .mo msgstrs baked into the image until the first bump lands.
+Acceptable starting state — the image already ships the committed
+translations from the repo's .po files.
+
+The management command now bumps the version on successful imports
+(not on --dry-run), so both the first-deploy seed and any manual
+reconciliation run propagate to running pods without restart.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2934d3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2934d3a9511e31a82ddb803ab4143a91d9586cdd))
+
+* fix(i18n): preserve TranslationCatalog wrapper in DB overlay + harden tests
+
+Three CI regressions from the prior feat(i18n) commit, all tied to the
+shape of Django 6.0's in-memory translation catalog:
+
+1. Admin actions calling ngettext (tag/product admin) blew up with
+   "'dict' object has no attribute 'plural'". Django 6.0 wraps
+   DjangoTranslation._catalog in a `TranslationCatalog` helper class
+   (trans_real.py:73) rather than a plain dict — its `.plural(msgid, n)`
+   method is used by `GNUTranslations.ngettext` (trans_real.py:278) to
+   resolve plural forms across merged sub-catalogs. The previous
+   implementation replaced `_catalog` with `dict(...)`, which is still
+   subscriptable but loses `.plural`, so every ngettext call crashed.
+
+apply_db_overlay now mutates the existing TranslationCatalog via its
+`__setitem__` (which writes to `_catalogs[0]`) instead of replacing
+it. Works identically for the plain-dict fallback on older Django
+versions.
+
+2. `tests/unit/core/test_translation_overlay.py::test_apply_db_overlay_
+   tolerates_missing_translation_table` previously mocked the private
+   `_overlay_rows` helper with `side_effect=ProgrammingError`, which
+   bypassed the real helper's exception handler. Rewritten to patch
+   `Translation.objects.filter` directly so the test actually exercises
+   the swallow-and-return-[] branch inside `_overlay_rows`.
+
+`_overlay_rows` also widened its `except` clause to catch `Exception`
+rather than only `(OperationalError, ProgrammingError)` so pytest-
+django's `RuntimeError("Database access not allowed, use the
+django_db mark")` is handled gracefully in tests that don't have
+the mark (unblocks tests/unit/wsgi/* collection errors).
+
+3. `test_send_order_status_update_email_template_fallback` flaked
+   after `fix(order): suppress duplicate status-update email on paid
+   transitions` landed — OrderFactory's default payment_status is a
+   random choice across every PaymentStatus value, so ~1 in 6 runs
+   rolled COMPLETED, tripped the new "skip PROCESSING email when
+   already paid" short-circuit, and never reached the template-
+   fallback code the test was checking. Pinning `payment_status=
+   PaymentStatus.PENDING` in `setUp` makes every test in that class
+   exercise the intended email code path deterministically.
+
+Also added a positive assertion in the singular-overlay test that
+`catalog._catalog.plural` remains callable after the overlay, so any
+future regression that swaps the TranslationCatalog wrapper for a
+plain dict fails loudly.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`f497ea0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f497ea03cd8c1133d61f5ab5da11227caa8c5efb))
+
+* fix: lint ([`0c7a402`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c7a402393fbf71d4429529ef6415442072982d4))
+
+### Build system
+
+* build(docker): compile gettext .mo at build time, untrack compiled catalogs
+
+Added `gettext` to the builder stage's apk install (ships the
+`msgfmt` binary Django's `compilemessages` needs) and a
+`compilemessages --ignore=.venv` step after `uv sync`. The final
+production image reads .mo files at runtime via Python's stdlib
+`gettext`, which has no external dependency, so no apk install is
+needed in the production stage — .mo files flow through the existing
+builder→production COPY.
+
+`*.mo` is now in `.gitignore` so the compiled catalogs don't diverge
+from their `.po` sources between local edits and CI builds. The
+three previously-tracked `.mo` files (de/el/en) were untracked in
+the companion dedupe commit.
+
+Eliminates a long-standing class of "msgids are in the .po but
+translations aren't rendering" bugs caused by developers forgetting
+to run compilemessages before committing.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e25ac18`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e25ac18930d58074f58b723ae36fcf7e36ffba6c))
+
+### Chores
+
+* chore(i18n): dedupe de/en .po files and refresh makemessages
+
+A manually-appended email-template block at the tail of
+locale/de/LC_MESSAGES/django.po and locale/en/LC_MESSAGES/django.po
+introduced 11 duplicate msgid entries per file. msgmerge flagged them
+as "fatal errors" and refused to extract new strings from code —
+which is why de and en had been frozen for weeks while el kept
+growing. scripts/dedupe_po.py walks each .po with polib, keeps the
+entry whose msgstr is non-empty, and merges both entries' source
+references so nothing is lost.
+
+After dedup, makemessages -a picked up:
+- 344+ msgids now extracted cleanly across all three locales
+- "Payment Confirmed" / "Thank you! Your payment has been received…"
+  / "Payment Confirmed - Order #{order_id}" now present in de + en too
+- per-locale translated counts: el=116, de=73, en=73
+
+The script is idempotent — re-running against a clean file does
+nothing.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`903a1d3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/903a1d30801480ac2ad217dd79eaa23223b93f21))
+
+### Features
+
+* feat(i18n): make Rosetta view DB-only, no disk writes on save
+
+Forced po_file_is_writable=False on DBBackedTranslationFormView so
+Rosetta's save path never calls polib.POFile.save() to touch the
+image-baked locale directory. That path would have failed on the
+read-only image layer anyway, and in the prior shared-PVC setup it
+raced with NFS cache invalidation. With this override:
+
+- Rosetta uses its CacheRosettaStorage for the edit session only
+  (Redis-backed, 24h working-copy cache).
+- Our rosetta.signals.entry_changed receiver persists every edit
+  directly to the Translation table — the durable source of truth.
+- Our rosetta.signals.post_save receiver bumps the shared version
+  key so other pods' TranslationReloadMiddleware re-applies the DB
+  overlay within one request.
+
+Net effect: the .po/.mo on disk is purely the msgid schema baked
+from the image; msgstrs live and breathe in Postgres. The
+grooveshop-backend-locale-pvc becomes redundant (kept for now as a
+Stage 2 infrastructure cleanup — removing it prematurely would
+conflict with rolling-deploy pods still mounting the PVC).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6af1fcc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6af1fccbbf678702c178d9849cda8eb6b2726fe0))
+
+* feat(i18n): database-backed Rosetta translations survive deploys
+
+Rosetta edits previously lived on pod-local disk and were synced
+across replicas via .po/.mo bytes in Redis with a 24 h TTL. Every
+deploy overwrote /app/locale with the image, and anyone who saved a
+translation ≥ 24 h ago lost their work. The cross-pod sync was also
+fragile: a pod that booted with stale bytes could overwrite a fresh
+image's .po mid-request.
+
+This commit moves the source of truth to Postgres.
+
+Architecture:
+
+- `core.models.Translation` — language_code × msgid × plural_index with
+  msgstr. Unique per (lang, msgid, plural_index). Plurals and
+  pgettext contexts are represented natively (msgid_plural separate
+  column, context embedded in msgid via \x04 like stdlib gettext).
+
+- `core.rosetta_storage.apply_db_overlay(language_code=None)` reads
+  the Translation table and mutates `trans_real.translation(lang)._catalog`
+  in place. Atomic single-attribute rebind under the GIL; no lock
+  needed. Handles both singular (string key) and plural (tuple key)
+  gettext catalog entries.
+
+- `core.signals.rosetta.persist_rosetta_entry_to_db` hooks the
+  Rosetta `entry_changed` signal and upserts each edited msgstr
+  (singular or plural form) into the Translation table.
+
+- `core.signals.rosetta.bump_translation_version_on_save` keeps the
+  existing Redis version-tick for cross-pod invalidation, but now
+  calls `apply_db_overlay` + `_reload_translations` locally instead
+  of reading .po bytes off disk/Redis.
+
+- `TranslationReloadMiddleware` re-applies the DB overlay when the
+  version key changes. The old `_sync_files_from_redis` disk-writer
+  is gone — no more disk mutation at runtime.
+
+- `CoreConfig.ready` calls `apply_db_overlay` at startup so every pod
+  serves DB values from its first request. Guarded against
+  OperationalError/ProgrammingError so `migrate` before the new
+  table exists does not raise.
+
+- `core.rosetta_views.DBBackedTranslationFormView` overrides
+  Rosetta's `po_file` property so the editor form displays current
+  DB msgstrs (and rehashes entries so POST round-trips still match).
+  Registered on the same `rosetta-form` URL path before `rosetta.urls`
+  is included — Django's first-match resolution picks it up.
+
+- New command `import_po_to_translations` seeds the Translation table
+  from whatever .po files are on disk (run once after migrate, or
+  after a manual .po merge to reconcile).
+
+Deploy flow (after this lands + `import_po_to_translations` runs
+once):
+
+1. New image boots with whatever .po is in the repo (msgid schema).
+2. AppConfig.ready applies the DB overlay → in-memory catalog has
+   correct msgstrs before first request.
+3. Rosetta save → writes to disk + Redis version tick + Translation
+   row upsert.
+4. Other pods' middleware notices the tick, re-applies DB overlay.
+5. Next deploy → image again carries only msgids; DB still wins.
+   No more kubectl rescue.
+
+Tests (9) cover: apply_db_overlay for singular + plural + empty
+msgstr paths, persist signal for create/update/plural entries,
+version bump integration, middleware's once-per-tick refresh logic,
+and the migrate-phase guard when the Translation table doesn't
+exist yet.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a3828d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3828d230902d994d40293cb1c0047842d1fad16))
+
+## v1.97.1 (2026-04-17)
+
+### Bug fixes
+
+* fix: update uv lock ([`1893579`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1893579e4c83c70965daf73d21ed7814be81f863))
+
+* fix(order): suppress duplicate status-update email on paid transitions
+
+When an online payment succeeded the customer received two emails in
+quick succession:
+  1. "Order #N Status Update - Σε επεξεργασία" (from the PROCESSING
+     transition fired by OrderService.update_order_status)
+  2. "Payment Confirmed" (from send_order_confirmation_email dispatched
+     by the Stripe / Viva webhook handler)
+
+Both carry the same "your payment went through, we're now processing
+your order" message. The confirmation email is the authoritative one —
+it has the itemised order summary, payment ID, and dedicated template.
+
+send_order_status_update_email now short-circuits when new_status is
+PROCESSING and payment_status is already COMPLETED (i.e. the PENDING →
+PROCESSING transition was triggered by a paid webhook). The same logic
+guards offline-to-paid admin transitions too.
+
+For manual admin moves to PROCESSING on an unpaid order the status
+email still fires, since payment_status won't be COMPLETED yet.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`64287d7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64287d7db596c30406d075f45534a5acc879c5ff))
+
+### Chores
+
+* chore(i18n): merge production Rosetta edits with regenerated msgids
+
+Pulled locale/el/LC_MESSAGES/django.po off a live backend pod
+(backend-5fcb5c67c7-w24ts) and ran msgmerge --no-fuzzy-matching with
+the prior makemessages output:
+
+msgmerge prod-el.po locale/el/LC_MESSAGES/django.po -o merged-el.po
+
+Result: 116 translated msgstrs — prod translations take priority,
+new msgids from the audit (Payment Confirmed, Thank you! Your payment
+has been received…, Payment Confirmed - Order #{order_id}, plus ~350
+others) remain as empty msgstrs ready for Rosetta.
+
+17 msgids that existed only in prod were dropped; 16 of them were
+whitespace-only placeholders ("" / " " / " ") and the remaining one
+used an obsolete %(site_name)s format no longer in the codebase.
+Nothing meaningful lost.
+
+This merge is a one-time rescue. The prod sync-via-Redis middleware
+has a 24h TTL that races with deploys — see follow-up discussion for
+a durable fix.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`f24ba9b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f24ba9b24ece592381802fb33a7d9e915336517f))
+
+* chore(i18n): refresh Greek translations with makemessages
+
+Ran django-admin makemessages -l el to pick up newly-added translatable
+strings. The extraction surfaces 354 new msgids that weren't in the
+.po file yet — most notably:
+  - "Payment Confirmed"
+  - "Thank you! Your payment has been received and your order is now
+    being processed."
+  - "Payment Confirmed - Order #{order_id}"
+
+Without this refresh, the strings exist in the email templates and
+code but are invisible to Rosetta, so translators can't add Greek
+versions through the /rosetta/ admin UI.
+
+Existing translations are preserved; this commit only adds empty
+msgstr entries for new strings and refreshes source-location comments.
+German and English .po files are untouched — de extraction currently
+fails due to pre-existing duplicate msgid entries that belong in a
+separate cleanup pass.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`582d33f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/582d33f6fd44573d9819ecbb29e87a567be54c48))
+
+## v1.97.0 (2026-04-17)
+
+### Bug fixes
+
+* fix: update uv lock ([`6d832b3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d832b3aff9f648e91e95d3eada76e074a3752bf))
+
+* fix: correctness and performance audit fixes across signals, tasks, and Meili
+
+- add dispatch_uid to every @receiver to prevent duplicate handler firing
+  if an app module is re-imported (tests, shell reloads, WSGI workers)
+- product.post_create_historical_record_callback scoped to
+  Product.history.model so other audited models don't dispatch wasted work
+- product.signals async reindex paths fetch pks via values_list instead of
+  running .exists() followed by a full instance iteration — one query,
+  not two
+- notification.handle_notification_created caches serialized translations
+  in Django cache for 60s so a fanout to N users issues one translation
+  SELECT instead of N
+- 5 bare @shared_task decorators in order.tasks gain autoretry_for,
+  max_retries, retry_backoff, retry_jitter (check_pending_orders,
+  update_order_statuses_from_shipping, cleanup_expired_stock_reservations,
+  auto_cancel_stuck_pending_orders, send_checkout_abandonment_emails)
+- order.auto_cancel_stuck_pending_orders wraps each cancel in
+  transaction.atomic + select_for_update(skip_locked) so concurrent beat
+  workers can't both cancel the same order
+- order.tasks + core.tasks email subjects use gettext (eager) over
+  gettext_lazy so resolution timing is deterministic at the call site
+- meili.reindex_model_task adds order_by("pk") before batch slicing —
+  PostgreSQL slicing on an unordered queryset can skip or duplicate rows
+- meili._client.wait_for_task accepts optional timeout_in_ms; the per-
+  document indexing task uses 5000ms so Celery workers aren't held
+  indefinitely when Meili queues are backlogged
+- settings: DJSTRIPE_WEBHOOK_SECRET raises ImproperlyConfigured in
+  production if the placeholder leaks through — prevents silent signature
+  verification against a known literal
+- settings: pin STRIPE_API_VERSION (not DJSTRIPE_-prefixed per dj-stripe
+docs) so library upgrades can't silently shift webhook payload shapes
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`171f00e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/171f00ed42fc503f545d4adb10feee8d472ea75f))
+
+### Features
+
+* feat(order): SSE payment-status events via Redis pub/sub
+
+Payment status updates are now pushed to subscribers instead of polled.
+A new helper (order.payment_events.publish_payment_status) emits to
+Redis channel payment:status:{order_id} after transaction.on_commit, so
+downstream subscribers never read a pre-commit snapshot.
+
+Wired into every authoritative payment-status transition:
+- OrderService.handle_payment_succeeded / handle_payment_failed
+- Stripe checkout.session.completed webhook
+- Viva Wallet _handle_payment_succeeded / _handle_payment_failed
+
+The Nuxt side subscribes via h3 createEventStream and forwards messages
+to the browser as SSE, replacing the 10-attempt × 2s poll loop
+(pollPaymentStatus) in the checkout flow.
+
+Publish failures are swallowed — the payment state itself is already
+in Postgres, and the Nuxt client falls back to polling if the stream
+drops.
+
+Tests cover channel format, payload shape (orderId, orderUuid, status,
+paymentStatus, paymentId), and the Redis-down error path.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`766ad27`](https://github.com/vasilistotskas/grooveshop-django-api/commit/766ad270f68e6b74cb26687e0f2c6a35b34235ee))
+
+* feat(auth): ticket-based WebSocket authentication
+
+Knox tokens previously rode in the WebSocket URL as access_token query
+params. URL strings are logged by every proxy, CDN, and browser history —
+shipping a 7-day credential through that surface was unsafe.
+
+New flow:
+- POST /api/v1/websocket/ticket mints a single-use ticket (secrets.token_urlsafe)
+  stored in Redis with 60s TTL, keyed to request.user.pk
+- core.middleware.channels.TokenAuthMiddleware now prefers ?ticket=<value>
+  on /ws/ URLs; the consumer middleware deletes the key on first read,
+  so an intercepted ticket becomes useless after one use or 60s
+- Legacy ?access_token= path kept as fallback for the migration window;
+  remove it once all clients are shipping tickets
+
+Tickets are authorization-only — the Knox token still lives in the
+encrypted Nuxt session cookie for HTTP auth.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2c45906`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2c45906ce9b653e840ad11ea24f355555d3179a8))
+
+### Testing
+
+* test: align signal disconnects with dispatch_uid and fix lazy-Redis patch
+
+CI picked up two regressions from the prior audit commits:
+
+- tests/integration/user/test_signals.py connected/disconnected
+  create_default_subscriptions without dispatch_uid, so after the
+  audit added dispatch_uid="user.create_default_subscriptions" to the
+  receiver, the disconnect() calls silently no-opped. The signal kept
+  firing during the test body and the IntegrityError surfaced from
+  double-creating the default subscriptions. Pass dispatch_uid on all
+  three connect/disconnect pairs so the registry keys match.
+
+- tests/unit/order/test_payment_events.py patched Redis as an
+  attribute of order.payment_events, but Redis is imported lazily
+  inside _publish (it never becomes a module attribute). Patch redis.Redis
+  at the source instead. Error-path test patches redis.Redis.from_url
+  directly.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`85c0e90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85c0e90325ec80d8a3da570bd91ffcffd4091ce9))
+
+## v1.96.0 (2026-04-17)
+
+### Bug fixes
+
+* fix(order): close retry-payment race + quiet stale-cancel reservation logs
+
+Three fixes from a follow-up review pass on the stock/payment hardening:
+
+1. **Retry-payment race** — wrap the new-intent write in
+   `transaction.atomic() + select_for_update()`. A late
+   `payment_intent.payment_failed` webhook delivery for the OLD intent
+   could otherwise land in the ~50ms window between our read and save,
+   flip `payment_status` to FAILED, and enqueue a second failure email
+   concurrently with the retry flow.
+2. **Failed-webhook event-level idempotency** — mirror the guard
+   already present on `payment_intent.succeeded`: store
+   `metadata["webhook_processed_<event_id>"]` inside an atomic
+   `select_for_update` check so Stripe redeliveries of the same failed
+   event cannot double-fire the failure email.
+3. **Stale-cancel log noise** — `auto_cancel_stuck_pending_orders`
+   targets orders that are 30 min to 24 h old, by which point the
+   5-minute `cleanup_expired_stock_reservations` task has already
+   flipped their reservations to `consumed=True`.
+   `cancel_order()` now catches `StockReservationError("already
+   consumed")` at DEBUG level instead of emitting a warning per
+   reservation for every legitimate stale cancellation.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`43b7a1b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/43b7a1bc7f78c633275bd947c0219f0077b05fd4))
+
+### Features
+
+* feat(order, product): stock safety nets, retry payment, and stock-history admin view
+
+Broad hardening pass on the order/payment/stock pipeline plus operator
+tooling. Every new moving part is idempotent via row-locked metadata
+flags or per-model booleans so concurrent webhook deliveries, Celery
+retries, and HA beat workers cannot emit duplicates.
+
+Order + payment
+- POST /order/{id}/retry-payment mints a fresh Stripe PaymentIntent on
+  an order whose payment previously failed, preserving stock already
+  decremented at order creation. Clears confirmation/failed-email
+  idempotency flags so the new attempt can re-notify on success/failure.
+  Guests are allowed via UUID.
+- Payment-failed emails now trigger from both Stripe
+  payment_intent.payment_failed and Viva Wallet's failed-event webhook,
+  with a row-locked reserve-before-send pattern that prevents the
+  double-delivery exposed by the code review.
+- Confirmation email picks between order_received.html (offline, with
+  pay_way.instructions) and order_payment_confirmed.html (online post-
+  payment) based on pay_way.is_online_payment + payment_status.
+
+Scheduled cleanup
+- auto_cancel_stuck_pending_orders (every 15 min) cancels PENDING
+  orders with FAILED payment older than 30 min, and PENDING orders
+  older than 24h — but only for pay_way.is_online_payment=True, so
+  COD/bank transfer orders are left alone. Delegates to
+  OrderService.cancel_order which already restores stock atomically.
+- check_low_stock_products (hourly) emits a single consolidated admin
+  alert for products at/under the per-product low_stock_threshold,
+  claiming rows under select_for_update(skip_locked=True) before
+  sending and auto-clearing the flag when stock recovers.
+- send_checkout_abandonment_emails (daily) emails authenticated
+  customers whose StockReservations expired without a sale, gated by
+  the new StockReservation.abandonment_notified flag. The query
+  deliberately ignores `consumed` because the 5-minute cleanup task
+  flips it before this task runs.
+
+Configuration
+- STOCK_RESERVATION_TTL_MINUTES default raised 15 → 30 to reduce
+  false-expiries on slow checkouts.
+- New extra_settings: ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES (30),
+  ORDER_AUTO_CANCEL_PENDING_HOURS (24), LOW_STOCK_THRESHOLD (10),
+  CHECKOUT_ABANDONMENT_HOURS (2).
+
+Stock history admin
+- New per-product view at /admin/product/product/{id}/stock-history/
+  renders a Chart.js stacked bar chart (7/30/60/90/180/365 day
+  windows) of daily StockLog activity, split by
+  RESERVE/RELEASE/DECREMENT/INCREMENT, plus a 50-row recent-activity
+  table. Linked from the stock_reservation_summary card on the
+  product change page.
+
+Schema
+- Product gains low_stock_threshold + low_stock_alert_sent (plus the
+  auto-generated HistoricalProduct mirror).
+- StockReservation gains abandonment_notified.
+- Both migrations are additive with DB defaults; safe under the
+  project's PreSync-hook migration ordering.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3f78d43`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f78d4328717b249209ed5a9d6d1de30a00aca8d))
+
+### Testing
+
+* test(order): unpin TTL tests from 15 min + mock email task in failed-webhook history test
+
+Two CI regressions from the stock/email hardening pass:
+
+1. test_stock_reservation_ttl.py hard-coded 15-minute TTL assertions
+   against the new STOCK_RESERVATION_TTL_MINUTES default of 30.
+   Replace the literal `15` with a pytest fixture that reads
+   StockManager.get_reservation_ttl_minutes() at test time, so tuning
+   the extra-setting does not require edits here. The final
+   "constant-backed" test now checks type/positivity rather than an
+   exact value.
+2. test_failed_payment_logs_order_history asserted exactly one new
+   OrderHistory entry, but send_payment_failed_email.delay now runs
+   eagerly under CELERY_TASK_ALWAYS_EAGER and adds its own "email
+   sent" note — pushing the count to +2. Patch the email task in that
+test so the assertion only measures the webhook's own entry
+   (same fix previously applied to the sibling succeeded test).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4006c89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4006c894c6bd48a69d11846815a2a0bb42922533))
+
+## v1.95.0 (2026-04-17)
+
+### Bug fixes
+
+* fix(order): isolate email task in webhook history test
+
+test_successful_payment_logs_order_history asserts exactly one new
+OrderHistory entry after the Stripe webhook runs, but the new
+send_order_confirmation_email.delay call now fires eagerly under
+CELERY_TASK_ALWAYS_EAGER and adds its own "email sent" note, pushing
+the count to +2. Patch the email task in this test so the assertion
+only measures the webhook's own history entry.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`25815bc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/25815bc30a8d8a7d2ee41a2dc676bb09ed18c9c0))
+
+### Features
+
+* feat(order): defer confirmation email until payment succeeds for online payments
+
+Previously the order confirmation email was sent unconditionally on order
+creation, which meant customers paying with Stripe or Viva Wallet received
+the email before their payment had actually cleared. Offline methods (COD,
+bank transfer) still get the email immediately since the customer needs
+order details to pay manually.
+
+- order_created signal now only enqueues the email when pay_way is offline,
+  missing, or the order is already paid at creation time
+- Stripe payment_intent.succeeded and checkout.session.completed webhooks
+  now enqueue the email after mark_as_paid; checkout.session.completed
+  uses transaction.on_commit so a rolled-back handler cannot send
+- Viva Wallet _handle_payment_created enqueues the email after the
+  transaction is verified as completed
+- send_order_confirmation_email is now idempotent via a metadata
+  reservation (confirmation_email_sent flag + select_for_update), so
+  overlapping triggers (e.g. payment_intent.succeeded + checkout.session.completed)
+  or retried webhooks cannot cause duplicate sends; the flag is released
+  on permanent failure so admins can resend
+- Tests updated to cover offline-immediate, online-deferred, idempotency,
+  and webhook-triggered email paths
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e8d10df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8d10dfe242c85538596eadc12ab10a8f95c6e10))
+
+## v1.94.0 (2026-04-17)
+
+### Features
+
+* feat: Bump Versions ([`a512f93`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a512f9315ab3b61deb0914dbeef605c6de5bdb32))
+
+## v1.93.8 (2026-04-14)
+
+### Bug fixes
+
+* fix: update uv lock ([`7174597`](https://github.com/vasilistotskas/grooveshop-django-api/commit/717459749bce83d7984fc8dda9c0d550d2160f38))
+
+* fix: rosetta ([`503c22b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/503c22b5b0762eca8c0ff69e135d882e2d08552a))
+
+## v1.93.7 (2026-04-14)
+
+### Bug fixes
+
+* fix: update uv lock ([`5f907b9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f907b99cc8da5e879c3e3b89c55f22816c7f970))
+
+* fix(viva): make IP check non-blocking + extensive debug logging
+
+The IP whitelist hard-rejected webhooks because behind K3s Traefik with
+externalTrafficPolicy=Cluster, the source IP is SNAT-ed to a node/pod IP
+(10.42.x.x) and the original Viva IP is lost. Every real webhook was being
+rejected with 403, payment status never updated.
+
+Changes:
+- _verify_source_ip → _check_source_ip: returns (matches, observed_ip)
+  as informational signal. Does NOT block the request.
+- _handle_webhook_event: log IP outcome but always proceed. The Retrieve
+  Transaction API call (which uses our OAuth2 credentials and confirms
+  the transaction exists in Viva's system) is the real authentication.
+- Try every entry in X-Forwarded-For chain (not just rightmost), since
+  proxies can SNAT at multiple levels.
+
+Extensive debug logging added throughout the webhook flow:
+- Request headers (REMOTE_ADDR, X-Forwarded-For, X-Real-IP, host, etc.)
+- Full webhook payload
+- IP check result (matched/observed)
+- Order lookup (matched order id, current status)
+- Idempotency hits
+- Event dispatch
+- Retrieve Transaction API call args + result
+- Payment update success
+- GET verification flow
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`b501a02`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b501a027266dae0375ad41e4ea783200f3a0c313))
+
+## v1.93.6 (2026-04-14)
+
+### Bug fixes
+
+* fix: update uv lock ([`5a07428`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a0742896ceff47acae9929c2f3e0644e0e15dfc))
+
+* fix(viva): audit fixes — scoped token cache, accurate audit history, safer reversal
+
+- viva_webhook: H1 — _handle_reversal_created now persists status_updated_at
+  (was mutating in memory but missing from update_fields)
+- viva_webhook: H2/H3 — _handle_payment_failed and _handle_payment_created
+  capture previous_payment_status before mutating so OrderHistory records
+  the actual prior state instead of hardcoded "pending"
+- payment: M2 — scope token cache key by live/demo mode to prevent demo
+  tokens leaking into live API calls (or vice versa) after mode switch
+- payment: M3 — remove dead viva_order_code key from create_checkout_session
+  return dict (was never consumed by caller)
+- order.views.order.create_checkout_session: log warning when an existing
+  viva_order_code is replaced (aids debugging retry/duplicate sessions)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`8a13169`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8a1316943a05a95ba6b4350652d8d9d64f26ee2b))
+
+## v1.93.5 (2026-04-14)
+
+### Bug fixes
+
+* fix: update uv.lock ([`164321f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/164321f554d80e52b7b9b884a5636616a990b4c6))
+
+* fix(viva): replace broken HMAC with IP whitelisting, add StatusId + verification guards
+
+Viva dashboard webhooks do NOT use HMAC signing — the old code checked
+for X-Viva-Signature that Viva never sends, rejecting every webhook
+with 403. Payment status never updated from "Pending".
+
+Per https://developer.viva.com/webhooks-for-payments/:
+- Replace _verify_hmac_signature with _verify_source_ip (IP whitelisting
+  against Viva's published production/demo IP ranges)
+- Add StatusId == "F" check from webhook payload before processing
+- Require TransactionId on event 1796 — reject events without it to
+  prevent unverified payment completions
+- On Retrieve Transaction API failure: raise RuntimeError to roll back
+  the event_key and return 500, so Viva retries the webhook fresh
+- Wrap handler in try/except RuntimeError for the retry-on-failure flow
+- Remove unused VIVA_WALLET_WEBHOOK_SECRET setting and hashlib/hmac imports
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`8f3b593`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8f3b59358bd7bef790fc48c13fbd0b4c5db4f238))
+
+### Documentation
+
+* docs: update CLAUDE.md with permission, stock, and Celery task changes
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`be78210`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be782100c0ac52652af2990836063265d2a3f2b0))
+
+## v1.93.4 (2026-04-13)
+
+### Bug fixes
+
+* fix: update uv lock ([`cda90d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cda90d0c290d2927620769a3aacdeac95f6fc4f8))
+
+* fix(cache): remove @cache_methods from BlogCommentViewSet (staff data leak)
+
+BlogCommentViewSet cached list/retrieve responses but its get_queryset
+branches on is_staff — staff users see unapproved comments while non-staff
+only see approved ones. The URL-keyed cache served whichever response was
+cached first to all users, leaking unapproved comments to non-staff.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`40173f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40173f83b5d72b9a4660beed945ac74785689bec))
+
+## v1.93.3 (2026-04-13)
+
+### Bug fixes
+
+* fix: generate schema ([`4f27a6a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4f27a6a676f97bf083fdf22150f5bae7eab77821))
+
+## v1.93.2 (2026-04-13)
+
+### Bug fixes
+
+* fix(security): resolve critical cache leaks, permission gaps, race conditions, and signal performance
+
+- Remove @cache_methods from user-scoped viewsets (Order, Address, Notification, OrderItem)
+  preventing cross-user data leakage via URL-keyed cache
+- Add user-scoped get_queryset to NotificationUserViewSet
+- Add permission_classes to BlogTagViewSet and ProductImageViewSet (admin for writes)
+- Fix IsOwnerOrAdminOrGuest to require UUID verification for guest order access
+- Change DRF default permission from AllowAny to IsAuthenticatedOrReadOnly
+- Fix Stripe webhook TOCTOU with select_for_update + transaction.atomic (both handlers)
+- Fix stock race condition in legacy create_order path
+- Fix username change race with IntegrityError handling
+- Bulk-optimize cleanup_expired_reservations (N+1 → 2 queries)
+- Move price-drop, blog comment, and search analytics to Celery tasks
+- Migrate loyalty tasks to MonitoredTask with autoretry
+- Fix SMSNotifier stubs to return False, carrier-aware tracking URLs
+- Fix SearchAnalyticsMiddleware IP spoofing, deprecated extra() in admin
+- Fix Viva webhook missing paid_amount_currency in update_fields
+- Add explicit AllowAny to cart viewsets for guest checkout
+- Fix health_check to execute SQL, consolidate order status tracking
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`a5eb218`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5eb2188982767b9a420ea510586d64ad77c0098))
+
+* fix(email): prevent duplicate and unlimited order reminder emails
+
+- Fix daily pending order reminder spam: add reminder_count and
+  last_reminder_sent_at tracking to Order model, cap at 3 reminders
+  with escalating intervals (1, 3, 7 days) via django-extra-settings
+- Fix duplicate emails on SHIPPED (3→1): consolidate to single email
+  path through handle_order_status_changed signal, remove redundant
+  sync notifications.py calls and async task from handle_order_shipped
+- Fix duplicate emails on DELIVERED (2-3→1): remove sync notification
+  from handle_order_delivered, remove explicit email from shipping task
+- Fix duplicate emails on CANCELED (2→1): remove sync notification
+  from handle_order_canceled
+- Fix monthly inactive user "We miss you!" spam: add
+  reengagement_email_count and last_reengagement_email_at to
+  UserAccount, cap at 3 emails with 90-day cooldown
+- Move hardcoded task constants to django-extra-settings for runtime
+  configuration: reminder limits, cart cleanup days, search limits,
+  reengagement thresholds, notification expiration
+- Fix flaky concurrent stock tests: add connection.close() in finally
+  blocks, classify DB pool exhaustion errors separately from business
+  logic failures
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`1d5a1cb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d5a1cb8770278619752b59c356a5f72e2e9f5f7))
+
+## v1.93.1 (2026-04-10)
+
+### Bug fixes
+
+* fix(email): revert item price formatting in sample data generator
+
+The formatting loop added in the previous commit converted Decimal item
+prices to formatted strings, breaking 3 unit tests that assert item
+prices are Decimal values. Item prices must stay as Decimals since tests
+and the total calculation depend on numeric types.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`5c301a6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c301a63396c1916012b8303e4e19f74e2e15aca))
+
+* fix: update uv lock ([`e2ed438`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e2ed4388eb7ea8f4ae1485400ee345cbde5d00ba))
+
+* fix(email): use correct Django settings for site name, URLs, and email context
+
+SITE_NAME and SITE_URL were never defined in settings.py, so every email
+task/notification always fell back to "Our Shop" and "https://example.com".
+This meant all customer-facing emails had wrong branding and broken links.
+
+- Add SITE_NAME to settings.py (from SITE_NAME env var)
+- Replace all getattr(settings, "SITE_URL", ...) with settings.NUXT_BASE_URL
+- Replace all getattr(settings, "SITE_NAME", "Our Shop") with settings.SITE_NAME
+- Fix order_confirmation template using non-existent item.get_total_price
+  (model property is total_price — item totals were silently empty in real emails)
+- Fix inactive user email task passing scalar fields instead of user dict
+  (template expects user.first_name/user.email which rendered empty)
+- Fix order_pending_reminder dark mode: add inline text color on yellow card
+- Fix order_delivered link from /orders/ID/review to /account/orders/ID
+- Fix email_base.html hardcoded "GrooveShop" title to use {{ SITE_NAME }}
+- Update tests to override NUXT_BASE_URL instead of non-existent SITE_URL
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`26ff724`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26ff7247fc1868a0928eceeb8a877f3bdfbcf5db))
+
+## v1.93.0 (2026-04-10)
+
+### Documentation
+
+* docs: update Django version references from 5.2 to 6.0
+
+The project upgraded to Django 6.0.x but CLAUDE.md and README.md
+still cited 5.2. Migration file headers are auto-generated and left
+as-is (historical record).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`e272bd4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e272bd40671168882a0a11abbc06e7c5aeb26b8b))
+
+### Features
+
+* feat: Bump Versions ([`701ec00`](https://github.com/vasilistotskas/grooveshop-django-api/commit/701ec002b663979e91c29188e923f8bdeca383ec))
+
+## v1.92.4 (2026-04-06)
+
+### Bug fixes
+
+* fix(deps): sync lockfile with v1.92.3 version bump
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`be20ad3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be20ad31a1a45f2196d6976605aa87277ab3aa81))
+
+* fix(db): set CONN_MAX_AGE to 0 when psycopg pool is enabled
+
+Django's postgresql backend raises ImproperlyConfigured("Pooling
+doesn't support persistent connections.") when CONN_MAX_AGE is
+non-zero AND the pool is enabled. The check is `!= 0`, so None is
+also rejected.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`85cb79e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/85cb79e4d542fb9bda6fa1da3b926827543ef723))
+
+## v1.92.3 (2026-04-06)
+
+### Bug fixes
+
+* fix(deps): sync lockfile with v1.92.2 version bump
+
+The v1.92.2 release commit bumped pyproject.toml but not uv.lock,
+causing uv sync --locked to fail in CI.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`3cd79fe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3cd79fe7e616b46560738aeb38682a9fe2e5a491))
+
+* fix(db): enable psycopg connection pool to bound ASGI DB connections
+
+Django docs explicitly recommend disabling persistent connections
+(CONN_MAX_AGE) when running under ASGI and using the database backend's
+built-in pool instead. Without this, asgiref's per-request
+ThreadPoolExecutor leaks Django thread-local connections that are only
+released when the worker thread is GC'd, exhausting Postgres
+max_connections under load.
+
+Switches DATABASES.default.OPTIONS to use psycopg_pool (Django 5.1+
+native support) with a bounded pool (default min_size=2, max_size=8,
+timeout=10s). All knobs are env-var configurable. CONN_MAX_AGE is set
+to None when the pool is enabled because the pool manages connection
+lifetimes itself.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`8041546`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8041546ce19e73909f61e9bce556c768580c8d76))
+
+## v1.92.2 (2026-04-05)
+
+### Bug fixes
+
+* fix(deps): sync lockfile with v1.92.1 version bump
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`52cd75a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/52cd75a9f0f3c379bd35665bd58ef75d0f268967))
+
+* fix(asgi): move TokenAuthMiddlewareStack import after django.setup()
+
+The import triggered AnonymousUser model loading before
+get_asgi_application() called django.setup(), causing
+AppRegistryNotReady on daphne startup.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`8fcd225`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8fcd225969a2ac7827422f293b5e44557afeb38d))
+
+## v1.92.1 (2026-04-05)
+
+### Bug fixes
+
+* fix(deps): move pyjwt from dev to production dependencies
+
+allauth's Facebook provider imports jwt at runtime (jwtkit module),
+but pyjwt was only in dev dependencies. Production Docker images built
+with --no-dev crash with ModuleNotFoundError: No module named 'jwt'.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`fca792a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fca792aa5532c3c51d0413b94f79288574611a03))
+
+## v1.92.0 (2026-04-05)
+
+### Bug fixes
+
+* fix(test): update review test for read-only status field
+
+The status field is now read-only in ProductReviewWriteSerializer
+(security fix). Update test to assert the original status is preserved
+when a user sends a status value.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`75b9892`](https://github.com/vasilistotskas/grooveshop-django-api/commit/75b9892ecc4a577c71a9fd2ceab50f1170654fe5))
+
+* fix(ci): set DEBUG=True in CI environment variables
+
+When DEBUG defaults to False (our security fix), SECURE_SSL_REDIRECT
+becomes True and STATIC_URL changes, causing 301 redirects on every
+test request in CI. CI needs DEBUG=True at settings load time —
+conftest.py already overrides it to False for actual test execution.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`61a46ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/61a46ff323cf48b80f834e9771e2c143f43a8570))
+
+* fix(ci): remove --no-migrations and fix coverage source for parallel
+
+--no-migrations breaks CI because pg_trgm extension is installed via
+migrations. Also fix coverage source from ["*"] to ["."] and add
+thread concurrency for correct parallel coverage collection with xdist.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`b7fc190`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b7fc1906e34fc1f15aa8d542e0a5306ba599e3a6))
+
+* fix(settings): add public whitelist for get_setting_by_key endpoint
+
+The frontend needs access to checkout and loyalty settings without
+admin auth. Instead of making the endpoint fully public, introduce
+a PUBLIC_SETTING_KEYS whitelist — only whitelisted keys are accessible
+without authentication, all other keys require admin access.
+list_settings remains admin-only.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`cbefa22`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cbefa22b8df001343ad52a8b6b2b1031742300a8))
+
+* fix(docker): use daphne instead of uvicorn for production CMD
+
+Daphne is the official recommended ASGI server for Django Channels
+per both Django and Channels documentation. The previous change
+incorrectly used uvicorn which is not the recommended server for
+Channels WebSocket support.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`a542e67`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a542e6706da3ace09c22bc8bd7ec7ce9b65d626b))
+
+* fix: resolve critical security, data integrity, and performance issues
+
+Security:
+- Default DEBUG to False, crash on missing SECRET_KEY in production
+- Add auth to list_settings, get_setting_by_key, notifications_by_ids
+- Make review status/is_published, comment user, paid_amount read-only
+- Validate search language_code to prevent Meilisearch filter injection
+- Fix open redirect in SocialAccountAdapter via URL allowlist
+
+Data integrity:
+- Remove duplicate order_canceled signal (double emails/loyalty reversals)
+- Guard post_create_historical_record for Product instances only
+- Change OrderItem.product on_delete from CASCADE to PROTECT
+- Add paid_amount_currency to all update_fields for django-money
+- Skip pre_save DB query when update_fields excludes status
+- Fix federated search string-to-int ID conversion for result enrichment
+
+Performance & CI:
+- Enable parallel coverage in CI (-n auto instead of -n0)
+- Add --no-migrations, --dist worksteal, hypothesis CI profile
+- Reduce test timeout 600s to 120s, strip test middleware
+- Set CONN_MAX_AGE=600, session backend to cached_db
+- Fix Dockerfile CMD to uvicorn, add --no-dev, fix compose && bug
+
+Correctness:
+- Fix my_orders double-pagination, meilisearch --batch_size arg type
+- Reorder Celery config_from_object before conf.update for time limits
+- Fix LoyaltyTierTranslation to use TranslationsForeignKey
+- Fix NotificationUser related_names and admin references
+- Remove uv add lockfile mutation from CI
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`0182b5c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0182b5cfa5c0e006453d0d6ba70d3b26b4a8b95d))
+
+### Features
+
+* feat: Update schema.yml ([`7c44fec`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c44feccd8868b79cc6ad54d02f47f29a23e6b27))
+
+## v1.91.1 (2026-04-04)
+
+### Bug fixes
+
+* fix(ci): use full semver tag for setup-uv v8 (immutable releases)
+
+setup-uv v8 removed major/minor tags (@v8, @v8.0) for supply chain
+security. Must use full semver @v8.0.0 per GitHub immutable releases.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`b5c1476`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5c1476a6b46a915beae04354521f05fb31b0ede))
+
+* fix(ci): revert setup-uv to v7 (v8 does not exist yet)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`10990ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10990ee1174fe483c4374644119963d362e1a795))
+
+* fix: uv lock ([`a6e5b03`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6e5b03a63020adc29e7b6416c3eea9525ca55a2))
+
+### Continuous integration
+
+* ci: optimize CI/CD workflows for speed and best practices
+
+- Add concurrency groups to cancel stale runs on new pushes
+- Add paths-ignore to skip CI on docs-only changes
+- Run quality and testing jobs in parallel (was sequential)
+- Bump astral-sh/setup-uv v7 → v8
+- Consolidate env vars at job level (remove per-step repetition)
+- Add timeout-minutes to all jobs
+- Remove broken coverage comment artifact upload
+- Remove single-entry matrix strategy
+- Add SBOM and provenance attestations to Docker builds
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`b4467e8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b4467e8ec7892e8f80b592522b1bbc6c9f2eb224))
+
+## v1.91.0 (2026-04-04)
+
+### Bug fixes
+
+* fix(tests): update integration tests for new viewset permissions
+
+Align test authentication with permission classes added in bd2cddbb.
+Admin-required viewsets now authenticate as staff/superuser, auth-required
+viewsets authenticate as regular user. Also fix cart stock reservation
+expected status (409 Conflict) and order signal test (invoice generation
+disabled).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`814a609`](https://github.com/vasilistotskas/grooveshop-django-api/commit/814a609cb901caba10b65c4257f0cd2217aae1d1))
+
+### Chores
+
+* chore: Bump Versions ([`50c9520`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50c9520398aded248782c550b33323652680ffee))
+
+### Features
+
+* feat: harden API security and optimize queries
+
+Add explicit ViewSet permissions (IsAdminUser for writes, AllowAny/
+IsAuthenticated for reads), HTML sanitization via nh3 on rich-text
+fields, HMAC signature verification on Viva Wallet webhooks, and
+rightmost-XFF IP extraction in rate limiting middleware.
+
+Optimize order querysets with pre-aggregated totals and prefetched
+history to eliminate N+1 queries. Batch-fetch products in order
+validation. Consolidate product attribute Meilisearch indexing.
+
+Remove dead redirect_to_frontend code, redundant exception wrappers
+in BaseModelViewSet, and echo behavior in WebSocket consumer. Bump
+uv to 0.11.3 and update dependency versions.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`bd2cddb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd2cddbb3a095e00b06ff47774ae45f921b0843f))
+
+## v1.90.0 (2026-03-26)
+
+### Features
+
+* feat: Bump Versions, type fixes ([`f016c78`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f016c78f6ec9de07c7cc437030edc33692ead7a7))
+
+## v1.89.3 (2026-03-23)
+
+### Bug fixes
+
+* fix(checkout): include shipping and fees in payment amount
+
+Cart checkout now calculates shipping cost and payment method fee
+before initiating Stripe/Viva checkout, ensuring the payment amount
+matches the final order total. Stripe receives shipping as a separate
+line item for proper breakdown on the checkout page.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`577e078`](https://github.com/vasilistotskas/grooveshop-django-api/commit/577e078761ed9944bf0b3c8279e9b37e2f1610ae))
+
+## v1.89.2 (2026-03-23)
+
+### Bug fixes
+
+* fix: viva webhook ([`673a706`](https://github.com/vasilistotskas/grooveshop-django-api/commit/673a70667969a4e81ac875dac26a2b7159f777c8))
+
+## v1.89.1 (2026-03-23)
+
+### Bug fixes
+
+* fix: redis cache and exclude_session_id from get_available_stock ([`7a7d58c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7a7d58c52bc58f6454d4d59441da5a16f45c950b))
+
+## v1.89.0 (2026-03-22)
+
+### Features
+
+* feat: Bump Versions ([`a26c951`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a26c95187a0e9c1ca6bc47152d342bfcc39f613a))
+
+## v1.88.3 (2026-03-18)
+
+### Bug fixes
+
+* fix: Remove viva-payment-api.yaml ([`6d92314`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6d923144bfb8ee9df8019858b24dd535d13f2310))
+
+### Refactoring
+
+* refactor: optimize task execution and database queries
+
+- Replace blocking async_result.get() calls with Celery chains
+  to improve worker concurrency
+- Add select_related/prefetch_related to order task queries to
+  reduce N+1 queries
+- Move cache lock cleanup to finally block for reliable cleanup
+- Add db_index=True to is_deleted field for soft delete queries
+- Replace f-string logging with parameterized logging in search
+  middleware
+- Remove unnecessary refresh_from_db() calls from metadata methods
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com> ([`691041d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/691041defc57ec4c36215321bcabf84e43c0ac04))
+
+## v1.88.2 (2026-03-17)
+
+### Bug fixes
+
+* fix: uv lock ([`9690b22`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9690b225eae47dce0e4ce5b0e47b5875206e375f))
+
+* fix: ci ([`9383c0b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9383c0b2c4da2f1ac8be7bcc946691ca55158451))
+
+## v1.88.1 (2026-03-17)
+
+### Bug fixes
+
+* fix: ci ([`8b9096b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b9096b7f30007403235ee7ca1d20f41e935a5a7))
+
+## v1.88.0 (2026-03-17)
+
+### Features
+
+* feat: Bump Versions ([`3b7c520`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3b7c520679dd974e09da30864b283115f8aa2488))
+
+## v1.87.0 (2026-03-06)
+
+### Features
+
+* feat: Bump Versions, type fixes ([`74d339d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74d339d51bf3121d2f844aca9dede0a3666c0fcc))
+
+* feat(order): add viva wallet payment support
+
+Extend order-first flow to handle redirect-based online providers
+(Viva Wallet) alongside offline payments. Add resolve-order endpoint
+for frontend redirect after payment. Refactor webhook handler to
+batch field updates in a single save. Bump python-dotenv and ty.
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com> ([`50d797d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50d797d98600dcf3f92cc8b20ae28cb317886591))
+
+## v1.86.2 (2026-03-02)
+
+### Bug fixes
+
+* fix: uv lock ([`5396e55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5396e5552eb125503c84885eb3fa808668aac4b6))
+
+* fix: dashboard ([`55bde03`](https://github.com/vasilistotskas/grooveshop-django-api/commit/55bde030758f5db56f7fc89a0734d7f0d97e366d))
+
 ## v1.86.1 (2026-03-01)
 
 ### Bug fixes

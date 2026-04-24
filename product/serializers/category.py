@@ -31,7 +31,6 @@ class ProductCategorySerializer(
             "created_at",
             "updated_at",
             "uuid",
-            "recursive_product_count",
         )
         read_only_fields = (
             "id",
@@ -40,7 +39,6 @@ class ProductCategorySerializer(
             "created_at",
             "updated_at",
             "uuid",
-            "recursive_product_count",
         )
 
 
@@ -53,9 +51,10 @@ class ProductCategoryDetailSerializer(ProductCategorySerializer):
         )(many=True)
     )
     def get_children(self, obj: ProductCategory):
-        if obj.get_children().exists():
+        children = list(obj.get_children())
+        if children:
             return ProductCategorySerializer(
-                obj.get_children(), many=True, context=self.context
+                children, many=True, context=self.context
             ).data
         return []
 
@@ -63,6 +62,7 @@ class ProductCategoryDetailSerializer(ProductCategorySerializer):
         fields = (
             *ProductCategorySerializer.Meta.fields,
             "children",
+            "recursive_product_count",
             "seo_title",
             "seo_description",
             "seo_keywords",

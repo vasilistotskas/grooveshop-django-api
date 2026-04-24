@@ -22,7 +22,7 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
     product = models.ForeignKey(
         "product.Product",
         related_name="order_items",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
     )
     price = MoneyField(_("Price"), max_digits=11, decimal_places=2)
     quantity = models.IntegerField(_("Quantity"), default=1)
@@ -126,8 +126,11 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             )
 
         if hasattr(self.product, "stock"):
-            self.product.stock += refund_qty
-            self.product.save(update_fields=["stock"])
+            from django.db.models import F
+
+            type(self.product).objects.filter(pk=self.product.pk).update(
+                stock=F("stock") + refund_qty
+            )
 
         self.refunded_quantity += refund_qty
         if self.refunded_quantity == self.quantity:

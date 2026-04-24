@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
+from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     InsufficientStockError,
@@ -18,11 +19,12 @@ from order.exceptions import (
     PaymentError,
     PaymentNotFoundError,
     ProductNotFoundError,
+    StockReservationError,
 )
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.stock_reservation import StockReservation
-from order.signals import order_canceled, order_refunded
+from order.signals import order_refunded
 from order.stock import StockManager
 
 logger = logging.getLogger(__name__)
@@ -80,12 +82,14 @@ class OrderService:
                         )
                     )
 
-                if product.stock < quantity:
-                    raise InsufficientStockError(
-                        product_id=product.id,
-                        available=product.stock,
-                        requested=quantity,
-                    )
+                # Atomic stock decrement via StockManager (uses
+                # select_for_update() to prevent race conditions).
+                StockManager.decrement_stock(
+                    product_id=product.id,
+                    quantity=quantity,
+                    order_id=order.id,
+                    reason="order_created",
+                )
 
                 item_to_create = item_data.copy()
 
@@ -100,7 +104,7 @@ class OrderService:
                 OrderItem.objects.create(order=order, **item_to_create)
 
             order.paid_amount = order.calculate_order_total_amount()
-            order.save(update_fields=["paid_amount"])
+            order.save(update_fields=["paid_amount", "paid_amount_currency"])
 
             logger.info(
                 "Order %s created successfully with %s items",
@@ -317,6 +321,16 @@ class OrderService:
                 "region_id": shipping_address.get("region_id"),
                 "phone": shipping_address.get("phone"),
                 "customer_notes": shipping_address.get("customer_notes", ""),
+                # B2B billing identity — empty for retail (Tier A),
+                # populated for Τιμολόγιο Πώλησης (Tier B). The
+                # serializer already normalised these (stripped
+                # EL/GR prefix, uppercased country).
+                "billing_vat_id": shipping_address.get("billing_vat_id", ""),
+                "billing_country": shipping_address.get("billing_country", ""),
+                "document_type": (
+                    shipping_address.get("document_type")
+                    or OrderDocumentTypeEnum.RECEIPT
+                ),
             }
 
             # Calculate shipping cost
@@ -448,7 +462,7 @@ class OrderService:
                         raise
 
             # Store reservation IDs in order metadata
-            order.metadata["stock_reservation_ids"] = reservation_ids
+            order.metadata["stock_reservation_ids"] = reservation_ids  # type: ignore[invalid-assignment]  # ty: ignore[invalid-assignment]
 
             # Step 7.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
@@ -505,7 +519,13 @@ class OrderService:
                 max(0, order_total.amount - loyalty_discount.amount),
                 order_total.currency,
             )
-            order.save(update_fields=["paid_amount", "metadata"])
+            order.save(
+                update_fields=[
+                    "paid_amount",
+                    "paid_amount_currency",
+                    "metadata",
+                ]
+            )
 
             # Step 8: Clear cart
             cart.items.all().delete()
@@ -550,24 +570,24 @@ class OrderService:
         loyalty_points_to_redeem: int | None = None,
     ) -> Order:
         """
-        Create order from cart for offline payment methods (order-first flow).
+        Create order from cart using the order-first flow.
 
-        This method implements the order-first approach for offline payment methods
-        like Cash on Delivery and Bank Transfer. It performs the following steps:
+        Used for offline payments (COD, Bank Transfer) and redirect-based
+        online providers (Viva Wallet). It performs the following steps:
         1. Validates cart items still exist and prices match
         2. Validates shipping address completeness
         3. Gets or creates stock reservations for cart session
         4. Creates Order with status=PENDING, payment_status=PENDING
         5. Creates OrderItems from CartItems
         6. Converts stock reservations to decrements via StockManager
-        7. Sets payment_id = f"offline_{order.uuid}"
+        7. Sets payment_id for offline payments (skipped for online providers)
         8. Clears cart
         9. Returns order in PENDING status
 
         Args:
             cart: Cart object containing items to order
             shipping_address: Dictionary with shipping address fields
-            pay_way: PayWay object for payment method (must have is_online_payment=False)
+            pay_way: PayWay object for payment method
             user: Optional UserAccount (None for guest orders)
 
         Returns:
@@ -701,6 +721,16 @@ class OrderService:
                 "region_id": shipping_address.get("region_id"),
                 "phone": shipping_address.get("phone"),
                 "customer_notes": shipping_address.get("customer_notes", ""),
+                # B2B billing identity — empty for retail (Tier A),
+                # populated for Τιμολόγιο Πώλησης (Tier B). The
+                # serializer already normalised these (stripped
+                # EL/GR prefix, uppercased country).
+                "billing_vat_id": shipping_address.get("billing_vat_id", ""),
+                "billing_country": shipping_address.get("billing_country", ""),
+                "document_type": (
+                    shipping_address.get("document_type")
+                    or OrderDocumentTypeEnum.RECEIPT
+                ),
             }
 
             # Calculate shipping cost
@@ -727,9 +757,12 @@ class OrderService:
             # Create the order
             order = Order.objects.create(**order_data)
 
-            # Set payment_id for offline payments
-            order.payment_id = f"offline_{order.uuid}"
-            order.save(update_fields=["payment_id"])
+            # Set payment_id for offline payments only.
+            # Online redirect providers (Viva Wallet) get payment_id
+            # from the webhook after payment completes.
+            if not pay_way.is_online_payment:
+                order.payment_id = f"offline_{order.uuid}"
+                order.save(update_fields=["payment_id"])
 
             # Initialize metadata with cart snapshot
             order.metadata = {
@@ -819,7 +852,7 @@ class OrderService:
                             product_id=order_item.product.id,
                             quantity=order_item.quantity,
                             order_id=order.id,
-                            reason=f"Order {order.id} created from cart {cart.uuid} (offline payment)",
+                            reason=f"Order {order.id} created from cart {cart.uuid}",
                         )
                         logger.info(
                             "Decremented stock for product %s by %s units",
@@ -836,7 +869,7 @@ class OrderService:
                         raise
 
             # Store reservation IDs in order metadata
-            order.metadata["stock_reservation_ids"] = reservation_ids
+            order.metadata["stock_reservation_ids"] = reservation_ids  # type: ignore[invalid-assignment]  # ty: ignore[invalid-assignment]
 
             # Step 6.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
@@ -893,7 +926,13 @@ class OrderService:
                 max(0, order_total.amount - loyalty_discount.amount),
                 order_total.currency,
             )
-            order.save(update_fields=["paid_amount", "metadata"])
+            order.save(
+                update_fields=[
+                    "paid_amount",
+                    "paid_amount_currency",
+                    "metadata",
+                ]
+            )
 
             # Step 7: Clear cart
             cart.items.all().delete()
@@ -901,9 +940,10 @@ class OrderService:
 
             # Step 8: Return order in PENDING status
             logger.info(
-                "Order %s created successfully from cart %s (offline payment)",
+                "Order %s created successfully from cart %s (order-first, %s)",
                 order.id,
                 cart.uuid,
+                pay_way.provider_code or "offline",
             )
 
             return order
@@ -916,7 +956,7 @@ class OrderService:
             raise
         except Exception as e:
             logger.error(
-                "Unexpected error creating order from cart (offline): %s",
+                "Unexpected error creating order from cart (order-first): %s",
                 e,
                 exc_info=True,
             )
@@ -976,8 +1016,12 @@ class OrderService:
                 errors.append(_("Product in cart no longer exists"))
                 continue
 
-            # Check product is in stock
-            available_stock = StockManager.get_available_stock(product.id)
+            # Check product is in stock (exclude this cart's own
+            # reservations so they don't count against itself)
+            available_stock = StockManager.get_available_stock(
+                product.id,
+                exclude_session_id=str(cart.uuid),
+            )
             if available_stock < cart_item.quantity:
                 errors.append(
                     _(
@@ -1139,7 +1183,10 @@ class OrderService:
                 raise InvalidStatusTransitionError(
                     current_status=order.status,
                     new_status=new_status,
-                    allowed=allowed_transitions.get(order.status, []),
+                    allowed=[
+                        str(s)
+                        for s in allowed_transitions.get(order.status, [])
+                    ],
                 )
 
             old_status = order.status
@@ -1171,6 +1218,78 @@ class OrderService:
             .filter(user_id=user_id)
             .order_by("-created_at")
         )
+
+    @classmethod
+    @transaction.atomic
+    def reorder_to_cart(cls, order: Order, user) -> dict[str, Any]:
+        """Add each item from a past order back into the user's active cart.
+
+        Items with insufficient stock or inactive products are recorded in
+        `skipped_items` rather than rejecting the whole reorder. Quantities
+        are capped at current stock.
+        """
+        from cart.models import Cart, CartItem
+
+        cart, _created = Cart.objects.get_or_create(user=user)
+
+        added: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+
+        for item in order.items.select_related("product").all():
+            product = item.product
+            requested = item.quantity
+
+            if not getattr(product, "active", True):
+                skipped.append(
+                    {
+                        "product_id": product.id,
+                        "requested_quantity": requested,
+                        "added_quantity": 0,
+                        "reason": "inactive",
+                    }
+                )
+                continue
+
+            available = getattr(product, "stock", 0) or 0
+            if available <= 0:
+                skipped.append(
+                    {
+                        "product_id": product.id,
+                        "requested_quantity": requested,
+                        "added_quantity": 0,
+                        "reason": "out_of_stock",
+                    }
+                )
+                continue
+
+            to_add = min(requested, available)
+
+            existing = CartItem.objects.filter(
+                cart=cart, product=product
+            ).first()
+            if existing:
+                existing.quantity += to_add
+                existing.save(update_fields=["quantity"])
+            else:
+                CartItem.objects.create(
+                    cart=cart, product=product, quantity=to_add
+                )
+
+            entry = {
+                "product_id": product.id,
+                "requested_quantity": requested,
+                "added_quantity": to_add,
+                "reason": "partial" if to_add < requested else "",
+            }
+            if to_add < requested:
+                skipped.append(entry)
+            added.append(entry)
+
+        return {
+            "cart_id": cart.id,
+            "added_items": added,
+            "skipped_items": skipped,
+        }
 
     @classmethod
     @transaction.atomic
@@ -1212,6 +1331,24 @@ class OrderService:
                         reservation_id,
                         order.id,
                     )
+                except StockReservationError as e:
+                    # The periodic cleanup task runs every 5 min and
+                    # flips expired reservations to consumed=True. On
+                    # stale cancels (e.g. auto_cancel_stuck_pending_orders
+                    # on 24h-old PENDING orders) this is the normal
+                    # happy path, not an error — log at DEBUG.
+                    if "already consumed" in str(e):
+                        logger.debug(
+                            "Reservation %s already consumed for order %s (expected for stale cancels)",
+                            reservation_id,
+                            order.id,
+                        )
+                    else:
+                        logger.warning(
+                            "Failed to release reservation %s: %s",
+                            reservation_id,
+                            e,
+                        )
                 except Exception as e:
                     logger.warning(
                         "Failed to release reservation %s: %s",
@@ -1264,12 +1401,9 @@ class OrderService:
                 update_fields=["status", "status_updated_at", "metadata"]
             )
 
-            order_canceled.send(
-                sender=cls,
-                order=order,
-                previous_status=old_status,
-                reason=reason,
-            )
+            # order_canceled signal is dispatched by
+            # handle_order_status_changed via the post_save chain.
+            # Do not send it manually here to avoid double-firing.
 
             logger.info(
                 "Order %s canceled successfully (previous status: %s)",
@@ -1486,6 +1620,8 @@ class OrderService:
     @classmethod
     @transaction.atomic
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
+        from order.payment_events import publish_payment_status
+
         try:
             order = Order.objects.for_detail().get(payment_id=payment_intent_id)
         except Order.DoesNotExist:
@@ -1501,12 +1637,15 @@ class OrderService:
         if order.status == OrderStatus.PENDING:
             cls.update_order_status(order, OrderStatus.PROCESSING)
 
+        publish_payment_status(order)
         logger.info("Order %s marked as paid successfully", order.id)
         return order
 
     @classmethod
     @transaction.atomic
     def handle_payment_failed(cls, payment_intent_id: str) -> Order | None:
+        from order.payment_events import publish_payment_status
+
         try:
             order = Order.objects.for_detail().get(payment_id=payment_intent_id)
         except Order.DoesNotExist:
@@ -1518,6 +1657,7 @@ class OrderService:
         order.payment_status = PaymentStatus.FAILED
         order.save(update_fields=["payment_status"])
 
+        publish_payment_status(order)
         logger.info("Order %s payment marked as failed", order.id)
         return order
 

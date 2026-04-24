@@ -1,81 +1,27 @@
-.dark a:hover,
-.dark a:hover span {
-    color: inherit !important;
-}
-
-.dark nav a:hover span,
-.dark [data-sidebar] a:hover span,
-.dark aside a:hover span {
-    color: inherit !important;
-}
-
-.dark .group:hover span,
-.dark .group:hover .material-symbols-outlined {
-    color: inherit !important;
-}
-
-.dark a:hover .text-base-500,
-.dark a:hover .text-base-400,
-.dark a:hover .dark\:text-base-400,
-.dark a:hover .dark\:text-base-300 {
-    color: var(--color-base-100) !important;
-}
-
-.dark aside a:hover,
-.dark [class*="sidebar"] a:hover,
-.dark [class*="nav"] a:hover {
-    color: #fff !important;
-}
-
-.dark aside a:hover *,
-.dark [class*="sidebar"] a:hover *,
-.dark [class*="nav"] a:hover * {
-    color: inherit !important;
-}
-
+/* Material Symbols sizing — the font ships at a default 24px that misaligns
+   with Unfold's compact UI density. Keep this small tweak. */
 .material-symbols-outlined {
     font-size: 20px;
-    width: auto;
-    height: auto;
     line-height: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
-header .material-symbols-outlined,
-.header .material-symbols-outlined,
-[class*="header"] .material-symbols-outlined {
-    font-size: 20px;
-    width: auto;
-    height: auto;
-}
-
-button .material-symbols-outlined {
-    font-size: 20px;
-}
-
-/* Enhanced Dark Mode Hover Visibility */
-.dark a[class*='bg-base-']:hover {
-    color: #fff !important;
-}
-
-/* Table Row Hover */
-.dark tr:hover td,
-.dark tr:hover td a {
-    color: #fff !important;
-}
-
-/* Forced High Contrast for Dark Mode Hover */
-.dark a.inline-flex:hover,
-.dark .flex-wrap > a:hover {
-    color: #ffffff !important;
-    background-color: #4b5563 !important; /* Ensure clear background */
-}
-
+/* Dashboard hover rows: ensure foreground stays readable in dark mode when the
+   row background shifts. Uses design tokens instead of hardcoded hex. */
 .dark table tbody tr:hover td,
 .dark table tbody tr:hover th,
-.dark table tbody tr:hover a {
-    color: #ffffff !important;
-    background-color: #374151 !important; /* Ensure clear row background */
+.dark table tbody tr:hover a:not(.no-hover-override) {
+    color: var(--color-base-50);
+}
+.dark table tbody tr:hover {
+    background-color: color-mix(in oklch, var(--color-base-700) 50%, transparent);
+}
+
+/* Dashboard card links/buttons — preserve token colors on hover so nested
+   <span class="text-primary-500"> etc. don't get stomped by generic `a:hover`. */
+.dark aside a:hover,
+.dark aside a:hover * {
+    color: inherit;
 }

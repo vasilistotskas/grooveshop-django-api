@@ -6,24 +6,21 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
 
-from notification.enum import NotificationKindEnum
-from notification.models.notification import Notification
-from notification.models.user import NotificationUser
-from product.models.favourite import ProductFavourite
 from product.models.product import Product, ProductTranslation
 from product.models.product_attribute import ProductAttribute
 
 logger = logging.getLogger(__name__)
 
-languages = [
-    lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
-]
-
 product_price_lowered = django.dispatch.Signal()
 product_price_increased = django.dispatch.Signal()
+product_back_in_stock = django.dispatch.Signal()
 
 
-@receiver(post_create_historical_record)
+@receiver(
+    post_create_historical_record,
+    sender=Product.history.model,
+    dispatch_uid="product.post_create_historical_record_callback",
+)
 def post_create_historical_record_callback(
     sender, instance, history_instance, **kwargs
 ):
@@ -55,6 +52,16 @@ def post_create_historical_record_callback(
     # Track stock changes
     old_stock = prev_record.stock
     new_stock = instance.stock
+
+    # Back-in-stock transition (0 → positive). Emitted before StockLog
+    # writes below so subscribers observe the freshly-restocked product.
+    if old_stock <= 0 and new_stock > 0:
+        product_back_in_stock.send(
+            sender=Product,
+            instance=instance,
+            old_stock=old_stock,
+            new_stock=new_stock,
+        )
 
     if old_stock != new_stock:
         # Detect if this is a programmatic stock operation from order/stock.py
@@ -92,7 +99,11 @@ def post_create_historical_record_callback(
         )
 
 
-@receiver(post_save, sender=Product)
+@receiver(
+    post_save,
+    sender=Product,
+    dispatch_uid="product.reindex_product_translations",
+)
 def reindex_product_translations(sender, instance, **kwargs):
     """
     Reindex all ProductTranslation instances when the master Product is saved.
@@ -112,9 +123,6 @@ def reindex_product_translations(sender, instance, **kwargs):
         master=instance
     )
 
-    if not translations.exists():
-        return
-
     # Check if async indexing is enabled
     try:
         from meili.tasks import index_document_task
@@ -130,15 +138,22 @@ def reindex_product_translations(sender, instance, **kwargs):
     )
 
     if use_async:
+        # Fetch only PKs — we dispatch by PK, so fully loading each
+        # translation instance is wasted work. The early-return check
+        # and the dispatch loop share a single DB round-trip.
+        translation_pks = list(translations.values_list("pk", flat=True))
+        if not translation_pks:
+            return
         logger.debug("Reindexing ProductTranslation Async")
-        # Queue reindex tasks for each translation
-        for translation in translations:
+        for pk in translation_pks:
             index_document_task.delay(
                 app_label="product",
                 model_name="producttranslation",
-                pk=translation.pk,
+                pk=pk,
             )
     else:
+        if not translations.exists():
+            return
         logger.debug("Reindexing ProductTranslation Sync")
         # Synchronous reindexing for DEBUG mode
         from meili._client import client as _client
@@ -183,50 +198,49 @@ def reindex_product_translations(sender, instance, **kwargs):
                 )
 
 
-@receiver(product_price_lowered)
+@receiver(
+    product_price_lowered, dispatch_uid="product.notify_product_price_lowered"
+)
 def notify_product_price_lowered(
     sender, instance, old_price, new_price, **kwargs
 ):
-    favorite_users = list(
-        ProductFavourite.objects.filter(product=instance).select_related("user")
+    from product.tasks import (
+        send_price_drop_notifications,
+        send_product_alert_price_drop,
     )
 
-    product_url = (
-        f"{settings.NUXT_BASE_URL}/products/{instance.id}/{instance.slug}"
+    send_price_drop_notifications.delay(
+        product_id=instance.id,
+        old_price=float(old_price),
+        new_price=float(new_price),
+    )
+    send_product_alert_price_drop.delay(
+        product_id=instance.id,
+        new_price=float(new_price),
     )
 
-    instance_name = (
-        instance.safe_translation_getter("name", any_language=True)
-        or f"Product {instance.slug or instance.id}"
+
+@receiver(
+    product_back_in_stock,
+    dispatch_uid="product.notify_product_back_in_stock",
+)
+def notify_product_back_in_stock(sender, instance, **kwargs):
+    from product.tasks import (
+        notify_back_in_stock_favourites_live,
+        send_product_alert_restock,
     )
 
-    for favorite in favorite_users:
-        user = favorite.user
-
-        notification = Notification.objects.create(
-            kind=NotificationKindEnum.INFO,
-        )
-
-        for language in languages:
-            notification.set_current_language(language)
-            if language == "en":
-                notification.title = "Price Drop!"
-                notification.message = (
-                    f"The price of <a href='{product_url}'>{instance_name}</a> has dropped"
-                    f" from {old_price} to {new_price}. Check it out now!"
-                )
-            elif language == "el":
-                notification.title = "Μείωση Τιμής!"  # noqa: RUF001
-                notification.message = (
-                    f"Η τιμή του <a href='{product_url}'>{instance_name}</a> μειώθηκε"  # noqa: RUF001
-                    f" από {old_price} σε {new_price}. Δείτε το τώρα!"
-                )
-            notification.save()
-
-        NotificationUser.objects.create(user=user, notification=notification)
+    # Explicit opt-in subscribers get an email (ProductAlert RESTOCK).
+    send_product_alert_restock.delay(product_id=instance.id)
+    # Implicit interest (favouriters) gets a live in-app notification.
+    notify_back_in_stock_favourites_live.delay(product_id=instance.id)
 
 
-@receiver([post_save, post_delete], sender=ProductAttribute)
+@receiver(
+    [post_save, post_delete],
+    sender=ProductAttribute,
+    dispatch_uid="product.update_product_search_index_on_attribute_change",
+)
 def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
     """
     Update search index when product attributes are added, updated, or deleted.
@@ -243,9 +257,6 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
         master=instance.product
     )
 
-    if not translations.exists():
-        return
-
     # Check if async indexing is enabled
     try:
         from meili.tasks import index_document_task
@@ -261,17 +272,22 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
     )
 
     if use_async:
+        # Fetch only PKs — see reindex_product_translations above.
+        translation_pks = list(translations.values_list("pk", flat=True))
+        if not translation_pks:
+            return
         logger.debug(
             f"Reindexing ProductTranslation Async due to ProductAttribute change for product {instance.product_id}"
         )
-        # Queue reindex tasks for each translation
-        for translation in translations:
+        for pk in translation_pks:
             index_document_task.delay(
                 app_label="product",
                 model_name="producttranslation",
-                pk=translation.pk,
+                pk=pk,
             )
     else:
+        if not translations.exists():
+            return
         logger.debug(
             f"Reindexing ProductTranslation Sync due to ProductAttribute change for product {instance.product_id}"
         )

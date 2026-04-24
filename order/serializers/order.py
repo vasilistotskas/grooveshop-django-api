@@ -7,8 +7,8 @@ from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.utils.email import is_disposable_domain
 from country.models import Country
+from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus
-from order.models.history import OrderHistory
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.serializers.item import (
@@ -19,12 +19,26 @@ from pay_way.models import PayWay
 from product.models.product import Product
 from region.models import Region
 
+CARRIER_TRACKING_URLS: dict[str, str] = {
+    "elta": "https://www.elta.gr/en/tracking?code={number}",
+    "acs": "https://www.acscourier.net/el/track-and-trace/?p={number}",
+    "speedex": "https://www.speedex.gr/en/track-and-trace/?p_code={number}",
+    "dhl": "https://www.dhl.com/en/express/tracking.html?AWB={number}",
+    "fedex": "https://www.fedex.com/fedextrack/?trknbr={number}",
+}
+
 
 class OrderSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemDetailSerializer(many=True)
-    country = PrimaryKeyRelatedField(queryset=Country.objects.all())
-    region = PrimaryKeyRelatedField(queryset=Region.objects.all())
-    pay_way = PrimaryKeyRelatedField(queryset=PayWay.objects.all())
+    country = PrimaryKeyRelatedField(
+        queryset=Country.objects.all(), allow_null=True
+    )
+    region = PrimaryKeyRelatedField(
+        queryset=Region.objects.all(), allow_null=True
+    )
+    pay_way = PrimaryKeyRelatedField(
+        queryset=PayWay.objects.all(), allow_null=True
+    )
     paid_amount = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     payment_method_fee = MoneyField(
@@ -111,7 +125,19 @@ class OrderDetailSerializer(OrderSerializer):
     tracking_details = serializers.SerializerMethodField(
         help_text="Tracking and shipping details"
     )
+    has_invoice = serializers.SerializerMethodField(
+        help_text=(
+            "True when a PDF invoice has been generated — the frontend "
+            "can show the download CTA without issuing a separate "
+            "request to the invoice endpoint to find out."
+        )
+    )
     phone = PhoneNumberField(read_only=True)
+
+    @extend_schema_field({"type": "boolean"})
+    def get_has_invoice(self, obj: Order) -> bool:
+        invoice = getattr(obj, "invoice", None)
+        return bool(invoice and invoice.has_document())
 
     @extend_schema_field(
         {
@@ -143,9 +169,8 @@ class OrderDetailSerializer(OrderSerializer):
             }
         )
 
-        history_records = OrderHistory.objects.filter(order=obj).order_by(
-            "created_at"
-        )
+        # Uses prefetched data from for_detail() — no extra query
+        history_records = obj.history.all()
 
         for history in history_records:
             timeline.append(
@@ -233,14 +258,18 @@ class OrderDetailSerializer(OrderSerializer):
         }
     )
     def get_tracking_details(self, obj) -> dict | None:
+        tracking_url = None
+        if obj.tracking_number and obj.shipping_carrier:
+            template = CARRIER_TRACKING_URLS.get(obj.shipping_carrier.lower())
+            if template:
+                tracking_url = template.format(number=obj.tracking_number)
+
         return {
             "tracking_number": obj.tracking_number,
             "shipping_carrier": obj.shipping_carrier,
             "has_tracking": bool(obj.tracking_number),
-            "estimated_delivery": "",  # @TODO - Would be calculated based on shipping method
-            "tracking_url": f"https://track.carrier.com/{obj.tracking_number}"
-            if obj.tracking_number
-            else None,
+            "estimated_delivery": None,
+            "tracking_url": tracking_url,
         }
 
     class Meta(OrderSerializer.Meta):
@@ -253,6 +282,7 @@ class OrderDetailSerializer(OrderSerializer):
             "order_timeline",
             "pricing_breakdown",
             "tracking_details",
+            "has_invoice",
             "phone",
             "document_type",
             "payment_id",
@@ -270,6 +300,7 @@ class OrderDetailSerializer(OrderSerializer):
             "order_timeline",
             "pricing_breakdown",
             "tracking_details",
+            "has_invoice",
         )
 
 
@@ -344,6 +375,40 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         help_text=_("Customer notes or special instructions"),
     )
 
+    # B2B billing identity — required only when the buyer wants a
+    # proper Τιμολόγιο Πώλησης (document_type=INVOICE). Normalised and
+    # cross-validated in ``validate()`` so the Order row always has a
+    # consistent (document_type, VAT) pair.
+    billing_vat_id = serializers.CharField(
+        max_length=12,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Buyer tax number (ΑΦΜ). Required when ``document_type`` "
+            "is INVOICE; 9 digits for Greek ΑΦΜ, leading EL/GR "
+            "prefix is stripped automatically."
+        ),
+    )
+    billing_country = serializers.CharField(
+        max_length=2,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "ISO 3166-1 alpha-2 country code for the buyer's tax "
+            "identity. Defaults to the order country when blank."
+        ),
+    )
+    document_type = serializers.ChoiceField(
+        choices=OrderCreateDocumentTypeEnum.choices,
+        required=False,
+        default=OrderCreateDocumentTypeEnum.RECEIPT,
+        help_text=_(
+            "RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο "
+            "Πώλησης, Tier B — B2B). Selecting INVOICE requires a "
+            "valid ``billing_vat_id``."
+        ),
+    )
+
     # Loyalty points redemption (optional)
     loyalty_points_to_redeem = serializers.IntegerField(
         required=False,
@@ -366,10 +431,74 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             )
         return value
 
+    def validate_billing_vat_id(self, value: str) -> str:
+        """Strip ``EL`` / ``GR`` prefix then enforce 9-digit Greek ΑΦΜ.
+
+        The prefix is VIES-convention but AADE's ``vatNumber`` field
+        is unprefixed (error 104 otherwise). Normalising at the API
+        boundary means both the admin and the PDF see the canonical
+        value and we don't scatter normalisation across the pipeline.
+        """
+        if not value:
+            return ""
+        cleaned = value.strip().upper()
+        if cleaned.startswith(("EL", "GR")):
+            cleaned = cleaned[2:].strip()
+        if not cleaned.isdigit() or len(cleaned) != 9:
+            raise serializers.ValidationError(
+                _(
+                    "Greek ΑΦΜ must be exactly 9 digits "
+                    "(optionally prefixed with EL or GR)."
+                )
+            )
+        return cleaned
+
+    def validate_billing_country(self, value: str) -> str:
+        """Normalise to uppercase ISO-alpha2; allow empty."""
+        if not value:
+            return ""
+        cleaned = value.strip().upper()
+        if len(cleaned) != 2 or not cleaned.isalpha():
+            raise serializers.ValidationError(
+                _("Country must be a 2-letter ISO code (e.g. GR).")
+            )
+        return cleaned
+
+    def validate(self, attrs):
+        """Cross-field rules for B2B invoicing.
+
+        1. ``B2B_INVOICING_ENABLED`` gates the feature site-wide — when
+           off, ``document_type=INVOICE`` is rejected so the API can't
+           be bypassed via direct calls while the UI hides the toggle.
+        2. ``document_type=INVOICE`` ⇒ ``billing_vat_id`` required.
+           Otherwise the myDATA submission would silently downgrade to
+           11.1 (tax-fraud-adjacent) or hard-fail at the worker.
+        """
+        from extra_settings.models import Setting
+
+        document_type = attrs.get("document_type", "RECEIPT")
+        billing_vat_id = attrs.get("billing_vat_id", "")
+        if document_type == "INVOICE" and not Setting.get(
+            "B2B_INVOICING_ENABLED", default=True
+        ):
+            raise serializers.ValidationError(
+                {"document_type": _("B2B invoicing is currently disabled.")}
+            )
+        if document_type == "INVOICE" and not billing_vat_id:
+            raise serializers.ValidationError(
+                {
+                    "billing_vat_id": _(
+                        "A valid ΑΦΜ is required when requesting an "
+                        "invoice (document_type=INVOICE)."
+                    )
+                }
+            )
+        return attrs
+
 
 class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     items = OrderItemCreateSerializer(many=True)
-    paid_amount = MoneyField(max_digits=11, decimal_places=2, required=False)
+    paid_amount = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     payment_method_fee = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
@@ -412,45 +541,55 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
 
     def validate(self, data):
         items_data = data.get("items", [])
+
+        # Batch-fetch all products in a single query to avoid N+1.
+        product_ids = []
         for item_data in items_data:
-            product_id = item_data.get("product")
+            product = item_data.get("product")
+            pid = product.id if hasattr(product, "id") else product
+            product_ids.append(pid)
+
+        products_map = {
+            p.pk: p for p in Product.objects.filter(pk__in=product_ids)
+        }
+
+        for item_data in items_data:
+            raw = item_data.get("product")
+            product_id = raw.id if hasattr(raw, "id") else raw
             quantity = item_data.get("quantity", 0)
 
-            try:
-                if hasattr(product_id, "id"):
-                    product = product_id
-                else:
-                    product = Product.objects.get(id=product_id)
-
-                if not product.active:
-                    raise serializers.ValidationError(
-                        _(
-                            "Product with id '{product_name}' is not available."
-                        ).format(
-                            product_name=product.safe_translation_getter(
-                                "name", any_language=True
-                            )
-                        )
-                    )
-
-                if product.stock < quantity:
-                    raise serializers.ValidationError(
-                        _(
-                            "Not enough stock for '{product_name}'. Available: {product_stock}, Requested: {quantity}"
-                        ).format(
-                            product_name=product.safe_translation_getter(
-                                "name", any_language=True
-                            ),
-                            product_stock=product.stock,
-                            quantity=quantity,
-                        )
-                    )
-            except Product.DoesNotExist:
+            product = products_map.get(product_id)
+            if product is None:
                 raise serializers.ValidationError(
                     _("Product with id '{product_id}' does not exist.").format(
                         product_id=product_id
                     )
-                ) from None
+                )
+
+            if not product.active:
+                raise serializers.ValidationError(
+                    _(
+                        "Product with id '{product_name}' is not available."
+                    ).format(
+                        product_name=product.safe_translation_getter(
+                            "name", any_language=True
+                        )
+                    )
+                )
+
+            if product.stock < quantity:
+                raise serializers.ValidationError(
+                    _(
+                        "Not enough stock for '{product_name}'."
+                        " Available: {product_stock}, Requested: {quantity}"
+                    ).format(
+                        product_name=product.safe_translation_getter(
+                            "name", any_language=True
+                        ),
+                        product_stock=product.stock,
+                        quantity=quantity,
+                    )
+                )
 
         return data
 
@@ -544,7 +683,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             OrderItem._skip_stock_deduction = False
 
         order.paid_amount = order.calculate_order_total_amount()
-        order.save(update_fields=["paid_amount"])
+        order.save(update_fields=["paid_amount", "paid_amount_currency"])
 
         # Mark order to send signal after transaction commits
         order._send_created_signal = True
@@ -630,6 +769,7 @@ class CreatePaymentIntentRequestSerializer(serializers.Serializer):
     payment_data = serializers.DictField(
         required=False,
         default=dict,
+        child=serializers.CharField(max_length=500),
         help_text=_("Additional payment data required by the payment provider"),
     )
 
@@ -762,3 +902,16 @@ class CancelOrderRequestSerializer(serializers.Serializer):
         default=True,
         help_text="Whether to automatically refund the payment if the order is paid",
     )
+
+
+class ReorderItemSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField()
+    requested_quantity = serializers.IntegerField()
+    added_quantity = serializers.IntegerField(required=False, default=0)
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class ReorderResponseSerializer(serializers.Serializer):
+    cart_id = serializers.IntegerField(allow_null=True)
+    added_items = ReorderItemSerializer(many=True)
+    skipped_items = ReorderItemSerializer(many=True)

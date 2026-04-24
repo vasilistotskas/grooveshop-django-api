@@ -4,7 +4,6 @@ from typing import Any
 
 import stripe
 from django.conf import settings
-from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
@@ -112,8 +111,6 @@ class StripePaymentProvider(PaymentProvider):
     def create_checkout_session(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
-        from extra_settings.models import Setting
-
         try:
             logger.info(
                 "Creating Stripe Checkout Session",
@@ -124,15 +121,17 @@ class StripePaymentProvider(PaymentProvider):
                 },
             )
 
-            base_shipping_cost = Setting.get(
-                "CHECKOUT_SHIPPING_PRICE", default=3.00
-            )
-            free_shipping_threshold = Setting.get(
-                "FREE_SHIPPING_THRESHOLD", default=50.00
-            )
-
-            stripe_amount = int(amount.amount * 100)
             currency_code = str(amount.currency).lower()
+
+            # Separate shipping from the total so Stripe can display
+            # it as a distinct line on the checkout page
+            shipping_price = kwargs.pop("shipping_price", None)
+            if shipping_price and shipping_price.amount > 0:
+                line_item_amount = int(
+                    (amount.amount - shipping_price.amount) * 100
+                )
+            else:
+                line_item_amount = int(amount.amount * 100)
 
             success_url = kwargs.get("success_url")
             cancel_url = kwargs.get("cancel_url")
@@ -148,7 +147,7 @@ class StripePaymentProvider(PaymentProvider):
                     {
                         "price_data": {
                             "currency": currency_code,
-                            "unit_amount": stripe_amount,
+                            "unit_amount": line_item_amount,
                             "product_data": {
                                 "name": f"Order #{order_id}",
                                 "description": kwargs.get(
@@ -170,19 +169,26 @@ class StripePaymentProvider(PaymentProvider):
                 },
             }
 
-            if amount.amount < free_shipping_threshold:
+            # Add shipping as a separate line for UX breakdown
+            if shipping_price and shipping_price.amount > 0:
                 checkout_session_data["shipping_options"] = [
                     {
                         "shipping_rate_data": {
                             "type": "fixed_amount",
                             "fixed_amount": {
-                                "amount": int(float(base_shipping_cost) * 100),
+                                "amount": int(shipping_price.amount * 100),
                                 "currency": currency_code,
                             },
-                            "display_name": _("Standard shipping"),
+                            "display_name": "Standard shipping",
                             "delivery_estimate": {
-                                "minimum": {"unit": "business_day", "value": 5},
-                                "maximum": {"unit": "business_day", "value": 7},
+                                "minimum": {
+                                    "unit": "business_day",
+                                    "value": 5,
+                                },
+                                "maximum": {
+                                    "unit": "business_day",
+                                    "value": 7,
+                                },
                             },
                         },
                     },
@@ -314,7 +320,7 @@ class StripePaymentProvider(PaymentProvider):
                 )
             else:
                 stripe_pi = stripe.PaymentIntent.create(**payment_intent_data)
-            print("Stripe PaymentIntent created successfully", stripe_pi)
+            logger.info("Stripe PaymentIntent created: %s", stripe_pi.id)
 
             try:
                 djstripe_pi = PaymentIntent.sync_from_stripe_data(stripe_pi)
@@ -375,7 +381,7 @@ class StripePaymentProvider(PaymentProvider):
                 },
             )
 
-            refund_params = {"payment_intent": payment_id}
+            refund_params: dict[str, str | int] = {"payment_intent": payment_id}
             if amount:
                 refund_params["amount"] = int(amount.amount * 100)
             stripe_refund = stripe.Refund.create(**refund_params)
@@ -468,9 +474,9 @@ class VivaWalletPaymentProvider(PaymentProvider):
     LIVE_API_URL = "https://api.vivapayments.com"
     DEMO_CHECKOUT_URL = "https://demo.vivapayments.com"
     LIVE_CHECKOUT_URL = "https://www.vivapayments.com"
+    # Refund (DELETE /api/transactions/{id}) uses the checkout domain per Viva docs.
     DEMO_TRANSACTIONS_URL = "https://demo.vivapayments.com"
     LIVE_TRANSACTIONS_URL = "https://www.vivapayments.com"
-    TOKEN_CACHE_KEY = "viva_wallet_access_token"
 
     def __init__(self):
         self.merchant_id = getattr(settings, "VIVA_WALLET_MERCHANT_ID", "")
@@ -493,13 +499,20 @@ class VivaWalletPaymentProvider(PaymentProvider):
             self.checkout_url = self.DEMO_CHECKOUT_URL
             self.transactions_url = self.DEMO_TRANSACTIONS_URL
 
+        # Scope the token cache key by environment so switching
+        # VIVA_WALLET_LIVE_MODE does not leak a demo token into live calls
+        # (or vice versa) for the remaining TTL window.
+        self.token_cache_key = (
+            f"viva_wallet_access_token_{'live' if self.live_mode else 'demo'}"
+        )
+
     def _get_access_token(self) -> str:
         from base64 import b64encode
 
         import requests
         from django.core.cache import cache
 
-        cached_token = cache.get(self.TOKEN_CACHE_KEY)
+        cached_token = cache.get(self.token_cache_key)
         if cached_token:
             return cached_token
 
@@ -524,7 +537,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
         access_token = token_data["access_token"]
         expires_in = token_data.get("expires_in", 3600)
         cache.set(
-            self.TOKEN_CACHE_KEY,
+            self.token_cache_key,
             access_token,
             timeout=max(expires_in - 60, 60),
         )
@@ -617,7 +630,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "amount": str(amount.amount),
                 "currency": str(amount.currency),
                 "provider": "viva_wallet",
-                "viva_order_code": order_code,
             }
 
         except requests.HTTPError as e:

@@ -87,24 +87,5 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps(event))
 
     async def receive(self, text_data=None, bytes_data=None):
-        logger.debug(f"Received message: {text_data}")
-        try:
-            data = json.loads(text_data or "")
-            await self.send(
-                text_data=json.dumps(
-                    {
-                        "type": "echo.message",
-                        "message": data,
-                        "from": self.user.username
-                        if self.user and not self.user.is_anonymous
-                        else "anonymous",
-                    }
-                )
-            )
-        except json.JSONDecodeError:
-            logger.error(f"Invalid JSON received: {text_data}")
-            await self.send(
-                text_data=json.dumps(
-                    {"type": "error", "message": "Invalid JSON format"}
-                )
-            )
+        # This is a server-push-only channel; client messages are ignored.
+        logger.debug("Client message received and discarded (server-push only)")

@@ -322,7 +322,7 @@ class IndexQuerySet[T: Model]:
 
     def attributes_to_search_on(self, *attributes: str) -> Self:
         """Limit search to specific attributes."""
-        self._state.attributes_to_search_on.append(*attributes)
+        self._state.attributes_to_search_on.extend(attributes)
         return self
 
     def locales(self, *locales: str) -> Self:

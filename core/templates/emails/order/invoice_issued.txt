@@ -1,0 +1,22 @@
+{% load i18n %}
+========================================
+{% trans "YOUR INVOICE" %}
+========================================
+
+{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}
+
+{% blocktrans with invoice_number=invoice.invoice_number order_id=order.id %}Please find attached the invoice ({{ invoice_number }}) for your order #{{ order_id }}.{% endblocktrans %}
+
+{% trans "Invoice Details" %}
+----------------------------------------
+{% trans "Invoice number" %}: {{ invoice.invoice_number }}
+{% trans "Issue date" %}: {{ invoice.issue_date|date:"SHORT_DATE_FORMAT" }}
+{% trans "Order" %} #{{ order.id }}
+
+{% trans "This invoice is your proof of purchase — please keep it for your records." %}
+
+{% trans "If you have any questions, please contact our customer service team." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

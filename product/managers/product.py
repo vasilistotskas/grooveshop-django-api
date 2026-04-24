@@ -89,6 +89,22 @@ class ProductQuerySet(
         """Prefetch product tags with translations."""
         return self.prefetch_related("tags__tag__translations")
 
+    def with_product_attributes(self) -> Self:
+        """Prefetch product attributes with values and translations."""
+        return self.prefetch_related(
+            Prefetch(
+                "product_attributes",
+                queryset=(
+                    self.model.product_attributes.rel.related_model.objects.select_related(
+                        "attribute_value__attribute"
+                    ).prefetch_related(
+                        "attribute_value__translations",
+                        "attribute_value__attribute__translations",
+                    )
+                ),
+            )
+        )
+
     def with_discount_value_annotation(self) -> Self:
         return self.annotate(
             discount_value_annotation=F("price")
@@ -143,7 +159,7 @@ class ProductQuerySet(
         """
         Optimized queryset for list views.
 
-        Includes translations, category, and counts but not images/tags.
+        Includes translations, category, counts, and product attributes.
         Only returns active, non-deleted products.
         """
         return (
@@ -152,6 +168,7 @@ class ProductQuerySet(
             .with_category()
             .with_counts()
             .with_main_image()
+            .with_product_attributes()
         )
 
     def for_detail(self) -> Self:

@@ -45,7 +45,7 @@ def metadata(request: HttpRequest) -> dict[str, Any]:
     Returns:
         Dictionary with site metadata and optional request details
     """
-    site_name = os.getenv("SITE_NAME", "Grooveshop")
+    site_name = settings.SITE_NAME
     site_description = os.getenv("SITE_DESCRIPTION", "Grooveshop Description")
     site_keywords = os.getenv("SITE_KEYWORDS", "Grooveshop Keywords")
     site_author = os.getenv("SITE_AUTHOR", "Grooveshop Author")

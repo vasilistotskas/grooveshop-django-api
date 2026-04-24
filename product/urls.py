@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework.urlpatterns import format_suffix_patterns
 
+from product.views.alert import ProductAlertViewSet
 from product.views.attribute import AttributeViewSet
 from product.views.attribute_value import AttributeValueViewSet
 from product.views.category import ProductCategoryViewSet
@@ -206,6 +207,16 @@ urlpatterns = [
             }
         ),
         name="product-attribute-value-detail",
+    ),
+    path(
+        "product/alert",
+        ProductAlertViewSet.as_view({"get": "list", "post": "create"}),
+        name="product-alert-list",
+    ),
+    path(
+        "product/alert/<int:pk>",
+        ProductAlertViewSet.as_view({"get": "retrieve", "delete": "destroy"}),
+        name="product-alert-detail",
     ),
 ]
 

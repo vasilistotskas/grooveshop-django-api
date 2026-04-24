@@ -28,9 +28,17 @@ load_dotenv_file()
 
 SYSTEM_ENV = getenv("SYSTEM_ENV", "dev")
 
-SECRET_KEY = getenv("SECRET_KEY", "changeme")
+SECRET_KEY = getenv("SECRET_KEY", "")
+if not SECRET_KEY:
+    if SYSTEM_ENV == "production":
+        from django.core.exceptions import ImproperlyConfigured
 
-DEBUG = getenv("DEBUG", "True") == "True"
+        raise ImproperlyConfigured(
+            "SECRET_KEY environment variable is required in production."
+        )
+    SECRET_KEY = "insecure-dev-key-do-not-use-in-production"
+
+DEBUG = getenv("DEBUG", "False") == "True"
 
 DJANGO_ADMIN_FORCE_ALLAUTH = (
     getenv("DJANGO_ADMIN_FORCE_ALLAUTH", "True") == "True"
@@ -58,6 +66,7 @@ NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
 STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
+SITE_NAME = getenv("SITE_NAME", "Grooveshop")
 
 # django-tenants rejects unregistered domains before Django's host
 # validation, so ALLOWED_HOSTS=["*"] is safe. Dynamic tenant domains
@@ -83,6 +92,7 @@ SHARED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.sites",
     "django.contrib.postgres",
+    "django.contrib.humanize",
     # Admin UI
     "unfold.apps.BasicAppConfig",
     "unfold.contrib.filters",
@@ -159,6 +169,7 @@ INSTALLED_APPS = list(SHARED_APPS) + [
 MIDDLEWARE = [
     "django_tenants.middleware.main.TenantMainMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "core.middleware.correlation_id.CorrelationIdMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -168,6 +179,7 @@ MIDDLEWARE = [
     "tenant.middleware.TenantCsrfMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "core.middleware.allauth_ratelimit.AllAuthRateLimitMiddleware",
+    "core.middleware.idempotency.IdempotencyMiddleware",  # Idempotency-Key header replay protection
     "search.middleware.SearchAnalyticsMiddleware",  # Search analytics tracking
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -217,9 +229,6 @@ TIME_ZONE = getenv("TIME_ZONE", "Europe/Athens")
 USE_I18N = getenv("USE_I18N", "True") == "True"
 USE_TZ = getenv("USE_TZ", "True") == "True"
 
-# Forms URL field configuration (Django 6.0 compatibility)
-FORMS_URLFIELD_ASSUME_HTTPS = not DEBUG
-
 SITE_ID = int(getenv("SITE_ID", "1"))
 
 LANGUAGES = (
@@ -227,8 +236,6 @@ LANGUAGES = (
     ("en", _("English")),
     ("de", _("German")),
 )
-
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -252,7 +259,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
@@ -262,6 +269,16 @@ REST_FRAMEWORK = {
         "anon": None if DEBUG else "100000/day",
         "user": None if DEBUG else "150000/day",
         "burst": None if DEBUG else "5/minute",
+        # Per-endpoint scopes. Applied via throttle_classes on specific views
+        # (ContactCreateThrottle, PaymentAttemptThrottle, PaymentAttemptAnonThrottle
+        # in core.api.throttling) — the global anon/user throttles continue to
+        # apply on top.
+        "contact": None if DEBUG else "5/minute",
+        "payment": None if DEBUG else "10/minute",
+        "payment_anon": None if DEBUG else "5/minute",
+        "cart_mutation": None if DEBUG else "60/minute",
+        "cart_mutation_anon": None if DEBUG else "30/minute",
+        "search": None if DEBUG else "120/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -309,7 +326,6 @@ if ENABLE_DEBUG_TOOLBAR:
         "debug_toolbar.panels.headers.HeadersPanel",
         "debug_toolbar.panels.staticfiles.StaticFilesPanel",
         "debug_toolbar.panels.templates.TemplatesPanel",
-        "debug_toolbar.panels.cache.CachePanel",
         "debug_toolbar.panels.signals.SignalsPanel",
         "debug_toolbar.panels.redirects.RedirectsPanel",
         "debug_toolbar.panels.profiling.ProfilingPanel",
@@ -401,12 +417,21 @@ ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = True
 ACCOUNT_EMAIL_VERIFICATION_BY_CODE_TIMEOUT = 300
 ACCOUNT_LOGIN_BY_CODE_MAX_ATTEMPTS = 3
 ACCOUNT_LOGIN_BY_CODE_TIMEOUT = 300
+ALLAUTH_USER_CODE_FORMAT = {"numeric": True, "dashed": False, "length": 6}
 ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = "email_confirm"
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http" if DEBUG else "https"
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
+ACCOUNT_EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
 
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
 USERSESSIONS_TRACK_ACTIVITY = True
+
+# Client IP resolution for allauth's session/rate-limit machinery is handled
+# by UserAccountAdapter.get_client_ip, which prefers X-Real-IP (set by the
+# Nuxt proxy from h3 getRequestIP) and falls back to REMOTE_ADDR. We override
+# the adapter instead of setting ALLAUTH_TRUSTED_CLIENT_IP_HEADER because the
+# latter hard-requires the header — direct-to-Django paths (health probes,
+# Celery-triggered HTTP calls, tests) would otherwise 403 on every hit.
 
 HEADLESS_TOKEN_STRATEGY = "core.api.tokens.SessionTokenStrategy"
 HEADLESS_FRONTEND_URLS = {
@@ -639,9 +664,39 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_cleanup_expired_stock_reservations",
             "schedule": SCHEDULE_PRESETS["every_hour"],
         },
+        # TODO(multi-tenant): these came from main in the 2026-04 merge.
+        # They currently run once against the public schema. Wrap them in
+        # tenant.tasks.fanout_* variants so they iterate tenant schemas
+        # like cleanup-expired-stock-reservations above.
+        "check-pending-orders": {
+            "task": "order.tasks.check_pending_orders",
+            "schedule": SCHEDULE_PRESETS["daily_7am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "update-order-statuses-from-shipping": {
+            "task": "order.tasks.update_order_statuses_from_shipping",
+            "schedule": crontab(hour="*/6", minute="0")
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "process-loyalty-points-expiration": {
             "task": "tenant.tasks.fanout_process_points_expiration",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "auto-cancel-stuck-pending-orders": {
+            "task": "order.tasks.auto_cancel_stuck_pending_orders",
+            "schedule": crontab(minute="*/15"),
+        },
+        "check-low-stock-products": {
+            "task": "product.tasks.check_low_stock_products",
+            "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
+        "send-checkout-abandonment-emails": {
+            "task": "order.tasks.send_checkout_abandonment_emails",
+            "schedule": SCHEDULE_PRESETS["daily_6am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
@@ -756,27 +811,52 @@ SECURE_SSL_REDIRECT = (
 SECURE_PROXY_SSL_HEADER = (
     ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
 )
-SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 3600
-SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
-SECURE_HSTS_PRELOAD = not DEBUG
+_default_hsts = 0 if not DEBUG else 3600
+SECURE_HSTS_SECONDS = int(getenv("SECURE_HSTS_SECONDS", str(_default_hsts)))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0 and not DEBUG
+SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0 and not DEBUG
 
 # Currency
 DEFAULT_CURRENCY = getenv("DEFAULT_CURRENCY", "EUR")
 CURRENCIES = ("EUR", "USD")
 CURRENCY_CHOICES = [("EUR", "EUR €"), ("USD", "USD $")]
 
-CONN_HEALTH_CHECKS = False
+CONN_HEALTH_CHECKS = True
 ATOMIC_REQUESTS = False
-CONN_MAX_AGE = 0
 INDEX_MAXIMUM_EXPR_COUNT = 8000
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+
+# Use psycopg connection pool to bound DB connections per process. Each
+# process maintains a pool of <DB_POOL_MAX_SIZE> connections regardless of
+# the number of threads opened by the ASGI handler. Without this, asgiref's
+# per-request ThreadPoolExecutor leaks Django thread-local connections that
+# are only released when the worker thread is GC'd, which can exhaust
+# Postgres max_connections under load.
+DB_POOL_ENABLED = getenv("DB_POOL_ENABLED", "True") == "True"
+DB_POOL_MIN_SIZE = int(getenv("DB_POOL_MIN_SIZE", "2"))
+DB_POOL_MAX_SIZE = int(getenv("DB_POOL_MAX_SIZE", "8"))
+DB_POOL_TIMEOUT = float(getenv("DB_POOL_TIMEOUT", "10"))
+
+_db_options: dict = {
+    "connect_timeout": 5,
+    "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
+}
+if DB_POOL_ENABLED:
+    _db_options["pool"] = {
+        "min_size": DB_POOL_MIN_SIZE,
+        "max_size": DB_POOL_MAX_SIZE,
+        "timeout": DB_POOL_TIMEOUT,
+    }
 
 DATABASES = {
     "default": {
         "ATOMIC_REQUESTS": False,
         "AUTOCOMMIT": True,
         "CONN_HEALTH_CHECKS": True,
-        "CONN_MAX_AGE": 0,
+        # When OPTIONS["pool"] is set, the pool manages connection
+        # lifetimes itself; Django requires CONN_MAX_AGE == 0 in this
+        # mode (raises ImproperlyConfigured otherwise).
+        "CONN_MAX_AGE": 0 if DB_POOL_ENABLED else 600,
         "TIME_ZONE": getenv("TIME_ZONE", "Europe/Athens"),
         "ENGINE": "django_tenants.postgresql_backend",
         "HOST": getenv("DB_HOST", "db"),
@@ -784,10 +864,7 @@ DATABASES = {
         "USER": getenv("DB_USER", "postgres"),
         "PASSWORD": getenv("DB_PASSWORD", "postgres"),
         "PORT": getenv("DB_PORT", "5432"),
-        "OPTIONS": {
-            "connect_timeout": 5,
-            "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
-        },
+        "OPTIONS": _db_options,
     },
 }
 
@@ -850,12 +927,37 @@ EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "SUBSCRIPTION_CONFIRMATION_URL",
         "type": "string",
-        "value": "https://example.com/confirm/{token}/",
+        "value": f"{API_BASE_URL}/api/v1/user/subscription/confirm/{{token}}",
     },
     {
         "name": "STOCK_RESERVATION_TTL_MINUTES",
         "type": "int",
-        "value": 15,
+        "value": 30,
+    },
+    {
+        "name": "B2B_INVOICING_ENABLED",
+        "type": "bool",
+        "value": True,
+    },
+    {
+        "name": "ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES",
+        "type": "int",
+        "value": 30,
+    },
+    {
+        "name": "ORDER_AUTO_CANCEL_PENDING_HOURS",
+        "type": "int",
+        "value": 24,
+    },
+    {
+        "name": "LOW_STOCK_THRESHOLD",
+        "type": "int",
+        "value": 10,
+    },
+    {
+        "name": "CHECKOUT_ABANDONMENT_HOURS",
+        "type": "int",
+        "value": 2,
     },
     # Loyalty system settings
     {
@@ -907,6 +1009,197 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "LOYALTY_TIER_MULTIPLIER_ENABLED",
         "type": "bool",
         "value": False,
+    },
+    # Order reminder settings
+    {
+        "name": "PENDING_ORDER_REMINDER_MAX_COUNT",
+        "type": "int",
+        "value": 3,
+    },
+    {
+        "name": "PENDING_ORDER_REMINDER_INTERVAL_DAYS_1",
+        "type": "int",
+        "value": 1,
+    },
+    {
+        "name": "PENDING_ORDER_REMINDER_INTERVAL_DAYS_2",
+        "type": "int",
+        "value": 3,
+    },
+    {
+        "name": "PENDING_ORDER_REMINDER_INTERVAL_DAYS_3",
+        "type": "int",
+        "value": 7,
+    },
+    # Re-engagement email settings
+    {
+        "name": "REENGAGEMENT_EMAIL_MAX_COUNT",
+        "type": "int",
+        "value": 3,
+    },
+    {
+        "name": "REENGAGEMENT_EMAIL_COOLDOWN_DAYS",
+        "type": "int",
+        "value": 90,
+    },
+    {
+        "name": "INACTIVE_USER_THRESHOLD_DAYS",
+        "type": "int",
+        "value": 60,
+    },
+    # Cart cleanup settings
+    {
+        "name": "ABANDONED_CART_CLEANUP_DAYS",
+        "type": "int",
+        "value": 7,
+    },
+    {
+        "name": "OLD_GUEST_CART_CLEANUP_DAYS",
+        "type": "int",
+        "value": 30,
+    },
+    # Notification settings
+    {
+        "name": "NOTIFICATION_EXPIRATION_DAYS",
+        "type": "int",
+        "value": 180,
+    },
+    # Search settings
+    {
+        "name": "SEARCH_MAX_LIMIT",
+        "type": "int",
+        "value": 100,
+    },
+    # Invoice seller info — surfaced on the generated PDF via
+    # ``order.invoicing._seller_snapshot``. Defaults land blank so
+    # a fresh install doesn't silently ship a plausible-but-wrong
+    # legal identity; ops must fill them in via the admin Settings
+    # page before issuing the first invoice in production. Keys are
+    # documented in ``INVOICE_SELLER_SETTING_KEYS``.
+    {
+        "name": "INVOICE_SELLER_NAME",
+        "type": "string",
+        "value": "",
+        "description": "Legal company name shown at the top of the invoice.",
+    },
+    {
+        "name": "INVOICE_SELLER_VAT_ID",
+        "type": "string",
+        "value": "",
+        "description": "Seller tax/VAT identifier (ΑΦΜ in Greece). Required by Greek tax law.",
+    },
+    {
+        "name": "INVOICE_SELLER_TAX_OFFICE",
+        "type": "string",
+        "value": "",
+        "description": "Seller tax office (ΔΟΥ in Greece). Required by Greek tax law.",
+    },
+    {
+        "name": "INVOICE_SELLER_REGISTRATION_NUMBER",
+        "type": "string",
+        "value": "",
+        "description": "Business registry number (Αρ. Γ.Ε.ΜΗ. in Greece).",
+    },
+    {
+        "name": "INVOICE_SELLER_BUSINESS_ACTIVITY",
+        "type": "string",
+        "value": "",
+        "description": "Primary business activity / trade (Επάγγελμα in Greece).",
+    },
+    {
+        "name": "INVOICE_SELLER_ADDRESS_LINE_1",
+        "type": "string",
+        "value": "",
+        "description": "First line of the seller's registered address.",
+    },
+    {
+        "name": "INVOICE_SELLER_ADDRESS_LINE_2",
+        "type": "string",
+        "value": "",
+        "description": "Second line of the seller's registered address (optional).",
+    },
+    {
+        "name": "INVOICE_SELLER_CITY",
+        "type": "string",
+        "value": "",
+        "description": "City of the seller's registered address.",
+    },
+    {
+        "name": "INVOICE_SELLER_POSTAL_CODE",
+        "type": "string",
+        "value": "",
+        "description": "Postal code of the seller's registered address.",
+    },
+    {
+        "name": "INVOICE_SELLER_COUNTRY",
+        "type": "string",
+        "value": "",
+        "description": "Country of the seller's registered address.",
+    },
+    {
+        "name": "INVOICE_SELLER_PHONE",
+        "type": "string",
+        "value": "",
+        "description": "Seller contact phone number (optional).",
+    },
+    {
+        "name": "INVOICE_SELLER_EMAIL",
+        "type": "string",
+        "value": "",
+        "description": "Seller contact email (falls back to INFO_EMAIL).",
+    },
+    # myDATA (AADE / IAPR) integration. Credentials come from the
+    # AADE developer portal after subscription approval — separate
+    # accounts for dev and prod. Keep ``MYDATA_ENABLED`` off and
+    # ``MYDATA_ENVIRONMENT=dev`` until a real submission round-trips
+    # successfully against the sandbox.
+    {
+        "name": "MYDATA_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": "Master toggle. When off the integration is a pure no-op.",
+    },
+    {
+        "name": "MYDATA_AUTO_SUBMIT",
+        "type": "bool",
+        "value": False,
+        "description": "If true, submit the invoice automatically once the PDF is rendered. Otherwise submission happens only via the admin action.",
+    },
+    {
+        "name": "MYDATA_ENVIRONMENT",
+        "type": "string",
+        "value": "dev",
+        "description": "Target environment: 'dev' (mydataapidev.aade.gr) or 'prod' (mydatapi.aade.gr/myDATA). Dev and prod are separate portals with separate credentials.",
+    },
+    {
+        "name": "MYDATA_USER_ID",
+        "type": "string",
+        "value": "",
+        "description": "aade-user-id header — TAXISnet developer account username issued via the myDATA portal.",
+    },
+    {
+        "name": "MYDATA_SUBSCRIPTION_KEY",
+        "type": "string",
+        "value": "",
+        "description": "Ocp-Apim-Subscription-Key header — Azure APIM key from the myDATA developer portal.",
+    },
+    {
+        "name": "MYDATA_INVOICE_SERIES_PREFIX",
+        "type": "string",
+        "value": "GRVP",
+        "description": "Prefix for the AADE series code. Combined with the issuer VAT + year to form e.g. 'GRVP-2026'.",
+    },
+    {
+        "name": "MYDATA_ISSUER_BRANCH",
+        "type": "int",
+        "value": 0,
+        "description": "AADE branch code — 0 for main branch. Change only if invoicing from a registered secondary establishment.",
+    },
+    {
+        "name": "MYDATA_REQUEST_TIMEOUT_SECONDS",
+        "type": "int",
+        "value": 30,
+        "description": "HTTP request timeout in seconds. AADE endpoints are sometimes slow under load — 30s is the usual sweet spot.",
     },
 ]
 
@@ -1219,10 +1512,11 @@ ROSETTA_CACHE_NAME = "default"
 ROSETTA_STORAGE_CLASS = "core.rosetta_storage.CacheClearingRosettaStorage"
 
 UNFOLD = {
-    "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "GrooveShop Title"),
-    "SITE_HEADER": getenv("UNFOLD_SITE_HEADER", "GrooveShop Header"),
-    "SITE_SUBHEADER": getenv("UNFOLD_SITE_SUBHEADER", "GrooveShop SubHeader"),
-    "SITE_SYMBOL": "speed",
+    "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "Webside Admin"),
+    "SITE_HEADER": getenv("UNFOLD_SITE_HEADER", "Webside"),
+    "SITE_SUBHEADER": getenv("UNFOLD_SITE_SUBHEADER", "Commerce control"),
+    "SITE_SYMBOL": "storefront",
+    "SITE_URL": "/",
     "SITE_ICON": {
         "light": lambda request: static("icon-light.svg"),
         "dark": lambda request: static("icon-dark.svg"),
@@ -1239,22 +1533,51 @@ UNFOLD = {
             "href": lambda request: static("favicon/favicon.svg"),
         },
     ],
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": True,
+    "SHOW_BACK_BUTTON": True,
+    "BORDER_RADIUS": "0.625rem",
+    "ENVIRONMENT": "admin.environment.environment_callback",
     "COLORS": {
+        "base": {
+            "50": "oklch(98.5% 0.002 247.839)",
+            "100": "oklch(96.7% 0.003 264.542)",
+            "200": "oklch(92.8% 0.006 264.531)",
+            "300": "oklch(87.2% 0.010 258.338)",
+            "400": "oklch(70.7% 0.022 261.325)",
+            "500": "oklch(55.1% 0.027 264.364)",
+            "600": "oklch(44.6% 0.030 256.802)",
+            "700": "oklch(37.3% 0.034 259.733)",
+            "800": "oklch(27.8% 0.033 256.848)",
+            "900": "oklch(21.0% 0.034 264.665)",
+            "950": "oklch(13.0% 0.028 261.692)",
+        },
         "primary": {
-            "50": "238 242 255",
-            "100": "224 231 255",
-            "200": "199 210 254",
-            "300": "165 180 252",
-            "400": "129 140 248",
-            "500": "99 102 241",
-            "600": "79 70 229",
-            "700": "67 56 202",
-            "800": "55 48 163",
-            "900": "49 46 129",
-            "950": "30 27 75",
+            "50": "oklch(96.2% 0.018 272.314)",
+            "100": "oklch(93.0% 0.034 272.788)",
+            "200": "oklch(87.0% 0.065 274.039)",
+            "300": "oklch(78.5% 0.115 274.713)",
+            "400": "oklch(67.3% 0.182 276.935)",
+            "500": "oklch(58.5% 0.233 277.117)",
+            "600": "oklch(51.1% 0.262 276.966)",
+            "700": "oklch(45.7% 0.240 277.023)",
+            "800": "oklch(39.8% 0.195 277.366)",
+            "900": "oklch(35.9% 0.144 278.697)",
+            "950": "oklch(25.7% 0.090 281.288)",
+        },
+        "font": {
+            "subtle-light": "var(--color-base-500)",
+            "subtle-dark": "var(--color-base-400)",
+            "default-light": "var(--color-base-700)",
+            "default-dark": "var(--color-base-200)",
+            "important-light": "var(--color-base-900)",
+            "important-dark": "var(--color-base-50)",
         },
     },
     "SHOW_LANGUAGES": True,
+    "LOGIN": {
+        "redirect_after": lambda request: reverse_lazy("admin:index"),
+    },
     "STYLES": [
         lambda request: static("css/styles.css"),
         lambda request: static("css/admin.css"),
@@ -1301,6 +1624,7 @@ UNFOLD = {
                         "link": reverse_lazy(
                             "admin:product_productreview_changelist"
                         ),
+                        "badge": "admin.badges.pending_reviews_badge",
                     },
                     {
                         "title": _("Tags"),
@@ -1332,6 +1656,7 @@ UNFOLD = {
                         "title": _("Orders"),
                         "icon": "receipt_long",
                         "link": reverse_lazy("admin:order_order_changelist"),
+                        "badge": "admin.badges.pending_orders_badge",
                     },
                     {
                         "title": _("Carts"),
@@ -1413,6 +1738,7 @@ UNFOLD = {
                         "link": reverse_lazy(
                             "admin:blog_blogcomment_changelist"
                         ),
+                        "badge": "admin.badges.pending_comments_badge",
                     },
                     {
                         "title": _("Blog Tags"),
@@ -1439,6 +1765,7 @@ UNFOLD = {
                         "link": reverse_lazy(
                             "admin:contact_contact_changelist"
                         ),
+                        "badge": "admin.badges.unread_messages_badge",
                     },
                 ],
             },
@@ -1525,7 +1852,7 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_SAVE_EVERY_REQUEST = False
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_ENGINE = "django.contrib.sessions.backends.cached_db"
 SESSION_FILE_PATH = None
 SESSION_SERIALIZER = "django.contrib.sessions.serializers.JSONSerializer"
 
@@ -1565,6 +1892,24 @@ SPECTACULAR_SETTINGS = {
         "OrderStatus": "order.enum.status.OrderStatus",
         "ReviewStatus": "product.enum.review.ReviewStatus",
         "SubscriptionStatus": "user.models.subscription.UserSubscription.SubscriptionStatus",
+        # Both ``SubscriptionTopic.category`` and ``Notification.category``
+        # expose a ``category`` field, and they use different enum sets
+        # (SubscriptionTopic.TopicCategory vs NotificationCategoryEnum).
+        # Without these overrides, drf-spectacular auto-renames the
+        # colliding enum to ``CategoryXYZEnum`` which bleeds into
+        # generated frontend types and breaks consumer imports on every
+        # regeneration.
+        "TopicCategory": "user.models.subscription.SubscriptionTopic.TopicCategory",
+        "NotificationCategory": "notification.enum.NotificationCategoryEnum",
+        # ``Order.document_type`` (6 values — includes fulfilment
+        # documents like shipping labels / credit notes) and the
+        # creation-time subset (``OrderCreateFromCartSerializer`` —
+        # only RECEIPT/INVOICE) share the ``documentType`` field name.
+        # Without these overrides, drf-spectacular auto-renames the
+        # collider to ``DocumentType128Enum`` which bleeds into
+        # generated frontend types on every regeneration.
+        "OrderDocumentType": "order.enum.document_type.OrderDocumentTypeEnum",
+        "OrderCreateDocumentType": "order.enum.document_type.OrderCreateDocumentTypeEnum",
     },
 }
 
@@ -1690,17 +2035,20 @@ if IS_KUBERNETES:
         "disable_existing_loggers": False,
         "formatters": {
             "json": {
-                "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d, "process": "%(process)d", "thread": "%(thread)d", "pod": "%(hostname)s", "message": "%(message)s"}',
+                "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d, "process": "%(process)d", "thread": "%(thread)d", "pod": "%(hostname)s", "correlation_id": "%(correlation_id)s", "message": "%(message)s"}',
                 "datefmt": "%Y-%m-%dT%H:%M:%S",
             },
             "console": {
-                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(funcName)s: %(message)s",
+                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] %(funcName)s: %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
         },
         "filters": {
             "add_hostname": {
                 "()": "core.logging.HostnameFilter",
+            },
+            "add_correlation_id": {
+                "()": "core.logging.CorrelationIdFilter",
             },
         },
         "handlers": {
@@ -1710,7 +2058,7 @@ if IS_KUBERNETES:
                 if SYSTEM_ENV == "production"
                 else "console",
                 "level": logging_level,
-                "filters": ["add_hostname"],
+                "filters": ["add_hostname", "add_correlation_id"],
             },
         },
         "root": {
@@ -1743,12 +2091,17 @@ elif IS_DOCKER or IS_DEVELOPMENT:
         "disable_existing_loggers": False,
         "formatters": {
             "verbose": {
-                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(funcName)s: %(message)s",
+                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] %(funcName)s: %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
             "simple": {
                 "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s",
                 "datefmt": "%H:%M:%S",
+            },
+        },
+        "filters": {
+            "add_correlation_id": {
+                "()": "core.logging.CorrelationIdFilter",
             },
         },
         "handlers": {
@@ -1764,6 +2117,7 @@ elif IS_DOCKER or IS_DEVELOPMENT:
                 "backupCount": backup_count,
                 "level": logging_level,
                 "formatter": "verbose",
+                "filters": ["add_correlation_id"],
             },
         },
         "root": {
@@ -1811,7 +2165,22 @@ STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "sk_test_...")
 STRIPE_LIVE_MODE = not DEBUG
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
 DJSTRIPE_WEBHOOK_VALIDATION = "verify_signature"
-DJSTRIPE_WEBHOOK_SECRET = getenv("DJSTRIPE_WEBHOOK_SECRET", "whsec_...")
+DJSTRIPE_WEBHOOK_SECRET = getenv("DJSTRIPE_WEBHOOK_SECRET", "")
+if not DJSTRIPE_WEBHOOK_SECRET or DJSTRIPE_WEBHOOK_SECRET == "whsec_...":
+    if SYSTEM_ENV == "production":
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured(
+            "DJSTRIPE_WEBHOOK_SECRET must be set to a real Stripe webhook "
+            "secret in production (DJSTRIPE_WEBHOOK_VALIDATION=verify_signature)."
+        )
+    DJSTRIPE_WEBHOOK_SECRET = "whsec_dev_placeholder_not_used_for_verification"
+
+# Pin the Stripe API version so library upgrades can't silently shift
+# webhook payload shapes or idempotency keys. Update this in lockstep
+# with the version configured in the Stripe Dashboard. The dj-stripe
+# docs name this setting STRIPE_API_VERSION (not DJSTRIPE_-prefixed).
+STRIPE_API_VERSION = getenv("STRIPE_API_VERSION", "2024-04-10")
 STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 
 # Viva Wallet Configuration
@@ -1833,7 +2202,7 @@ VIVA_WALLET_WEBHOOK_VERIFICATION_KEY = getenv(
 
 
 # SHIPPING SETTINGS
-FEDEX_API_KEY = "fedex_api_key_example"
-FEDEX_ACCOUNT_NUMBER = "fedex_account_number_example"
-UPS_API_KEY = "ups_api_key_example"
-UPS_ACCOUNT_NUMBER = "ups_account_number_example"
+FEDEX_API_KEY = getenv("FEDEX_API_KEY", "")
+FEDEX_ACCOUNT_NUMBER = getenv("FEDEX_ACCOUNT_NUMBER", "")
+UPS_API_KEY = getenv("UPS_API_KEY", "")
+UPS_ACCOUNT_NUMBER = getenv("UPS_ACCOUNT_NUMBER", "")

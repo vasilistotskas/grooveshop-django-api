@@ -40,9 +40,4 @@ class ProductAttributeQuerySet(models.QuerySet):
         ).select_related("product", "attribute_value")
 
 
-class ProductAttributeManager(
-    models.Manager.from_queryset(ProductAttributeQuerySet)  # type: ignore[unsupported-base]
-):
-    """Custom manager for ProductAttribute model with optimized queries."""
-
-    pass
+ProductAttributeManager = models.Manager.from_queryset(ProductAttributeQuerySet)

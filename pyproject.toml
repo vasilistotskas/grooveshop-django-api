@@ -1,5 +1,5 @@
 [project]
-version = "1.86.1"
+version = "1.110.1"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -14,53 +14,58 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.11.1",
-  "boto3==1.42.59",
-  "charset_normalizer==3.4.4",
+  "boto3==1.42.90",
+  "charset_normalizer==3.4.7",
   "channels[daphne]==4.3.2",
   "channels-redis==4.3.0",
-  "cryptography==46.0.5",
-  "django==6.0.2",
+  "cryptography==46.0.7",
+  "django==6.0.4",
   "django-admin-thumbnails==1.0.0",
-  "django-allauth==65.14.3",
+  "django-allauth==65.16.0",
   "django-extra-settings==0.14.1",
   "django-celery-beat==2.9.0",
   "django-celery-results==2.6.0",
   "django-cors-headers==4.9.0",
   "django-simple-history==3.11.0",
   "django-filter==25.2",
-  "django-unfold==0.81.0",
+  "django-unfold==0.90.0",
   "django-money==3.6.0",
   "django-mptt==0.18.0",
   "django-parler==2.3.0",
   "django-parler-rest==2.2.0",
   "django-phonenumber-field==8.4.0",
   "django-rosetta==0.10.3",
-  "django-rest-knox==5.0.2",
+  "django-rest-knox==5.0.4",
   "django-storages==1.14.6",
   "django-tinymce==5.0.0",
-  "djangorestframework==3.16.1",
+  "djangorestframework==3.17.1",
   "djangorestframework-camel-case==1.4.2",
   "drf-spectacular==0.29.0",
-  "fido2==2.1.1",
+  "fido2==2.2.0",
   "flower==2.0.1",
-  "gunicorn==25.1.0",
+  "gunicorn==25.3.0",
   "importlib-resources==6.5.2",
   "measurement==3.2.2",
   "meilisearch==0.40.0",
-  "phonenumbers==9.0.25",
-  "pillow==12.1.1",
+  "phonenumbers==9.0.28",
+  "pillow==12.2.0",
   "psycopg[binary,pool] == 3.3.3",
   "python-dotenv==1.2.2",
   "qrcode==8.2",
   "urllib3==2.6.3",
-  "uvicorn==0.41.0",
-  "celery[redis] >=5.6.2,<6.0.0",
-  "disposable-email-domains==0.0.165",
-  "django-stubs-ext==5.2.9",
+  "uvicorn==0.44.0",
+  "celery[redis] >=5.6.3,<6.0.0",
+  "disposable-email-domains==0.0.170",
+  "django-stubs-ext==6.0.2",
   "twisted[http2,tls]==25.5.0",
   "dj-stripe==2.10.3",
   "defusedxml>=0.7.1",
   "django-tenants>=3.7.0,<4.0.0",
+  "nh3>=0.3.4",
+  "pyjwt==2.12.1",
+  "weasyprint>=68.1",
+  "requests==2.32.5",
+  "xmlschema==4.2.0",
 ]
 
 [project.urls]
@@ -71,33 +76,32 @@ repository = "https://github.com/vasilistotskas/grooveshop-django-api"
 # ─────────────────────────────────────────────────────────
 [dependency-groups]
 dev = [
-    "coverage[toml]==7.13.4",
-    "djangorestframework-stubs==3.16.8",
-    "django-debug-toolbar==6.2.0",
-    "django-stubs==5.2.9",
-    "Faker==40.5.1",
+    "coverage[toml]==7.13.5",
+    "djangorestframework-stubs==3.16.9",
+    "django-debug-toolbar==6.3.0",
+    "django-stubs==6.0.2",
+    "Faker==40.13.0",
     "factory-boy==3.3.3",
     "gitpython==3.1.46",
-    "types-setuptools==82.0.0.20260210",
+    "types-setuptools==82.0.0.20260408",
     "pre-commit==4.5.1",
-    "pip-upgrader==1.4.15",
-    "pydantic==2.12.5",
+    "pip-upgrader==2.4.4",
+    "pydantic==2.13.2",
     "pylint==4.0.5",
-    "pyjwt==2.11.0",
-    "pytest==9.0.2",
+    "pytest==9.0.3",
     "pytest-asyncio==1.3.0",
     "pytest-django==4.12.0",
     "pytest-xdist==3.8.0",
     "pytest-timeout==2.4.0",
-    "pytest-cov==7.0.0",
+    "pytest-cov==7.1.0",
     "python-semantic-release==10.5.3",
-    "ruff==0.15.4",
+    "ruff==0.15.11",
     "rpds-py==0.30.0",
     "celery-stubs==0.1.3",
     "psutil==7.2.2",
     "msgpack==1.1.2",
-    "hypothesis==6.151.9",
-    "ty==0.0.19",
+    "hypothesis==6.152.1",
+    "ty==0.0.31",
 ]
 
 # ─────────────────────────────────────────────────────────
@@ -115,7 +119,7 @@ source = ["."]
 [tool.coverage.run]
 branch = true
 parallel = true
-concurrency = ["multiprocessing"]
+concurrency = ["multiprocessing", "thread"]
 omit = [
     "*/tests/*",
     "*/migrations/*",
@@ -128,7 +132,7 @@ omit = [
     "core/storages.py",
     "*/wsgi/*",
 ]
-source = ["*"]
+source = ["."]
 relative_files = true
 
 [tool.coverage.report]
@@ -219,7 +223,7 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 timeout = 600
-addopts = "--tb=short --maxfail=0 -n auto"
+addopts = "--tb=short --maxfail=0 -n auto --dist worksteal"
 
 # ─────────────────────────────────────────────────────────
 # Django-stubs configuration
@@ -261,7 +265,9 @@ exclude = [
     "search/views.py",
 ]
 
-# Tests: factory_boy, DRF test client, Celery eager tasks, Mock/patch
+# Tests: factory_boy, DRF test client, Celery eager tasks, Mock/patch.
+# missing-typed-dict-key: tests intentionally pass partial dicts to
+# exercise validation error paths.
 [[tool.ty.overrides]]
 include = ["tests/**", "**/tests/**", "**/test_*.py"]
 
@@ -274,6 +280,19 @@ too-many-positional-arguments = "ignore"
 not-subscriptable = "ignore"
 not-iterable = "ignore"
 no-matching-overload = "ignore"
+missing-typed-dict-key = "ignore"
+
+# factory_boy stubs: class-level SubFactory/LazyFunction descriptors
+# are typed as the wrapper, not the resolved model attribute, so
+# reassigning them on instances trips invalid-assignment.
+[[tool.ty.overrides]]
+include = [
+    "**/factories/**",
+    "**/factories.py",
+]
+
+[tool.ty.overrides.rules]
+invalid-assignment = "ignore"
 
 # Library type stub limitations: measurement, ASGI, drf-spectacular,
 # django-money, factory_boy, meilisearch SDK

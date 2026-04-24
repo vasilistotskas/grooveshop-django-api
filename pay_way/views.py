@@ -3,7 +3,6 @@ from __future__ import annotations
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 
-
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -62,6 +61,18 @@ class PayWayViewSet(BaseModelViewSet):
         "translations__description",
         "translations__instructions",
     ]
+
+    def get_permissions(self):
+        from rest_framework.permissions import IsAdminUser
+
+        if self.action in [
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ]:
+            return [IsAdminUser()]
+        return super().get_permissions()
 
     def get_queryset(self):
         if self.action == "list":

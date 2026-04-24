@@ -3,12 +3,18 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from notification.views.notification import notifications_by_ids
 from notification.views.user import NotificationUserViewSet
+from notification.views.websocket import create_websocket_ticket
 
 urlpatterns = [
     path(
         "notification/ids",
         notifications_by_ids,
         name="notifications-by-ids",
+    ),
+    path(
+        "websocket/ticket",
+        create_websocket_ticket,
+        name="websocket-ticket",
     ),
     path(
         "notification/user/unseen_count",

@@ -8,7 +8,7 @@
 <p>{% blocktrans with first_name=order.first_name last_name=order.last_name %}Dear {{ first_name }} {{ last_name }},{% endblocktrans %}</p>
 
 <div class="email-card" style="border-color: #ffe58f; background-color: #fffbe6;">
-    <p><strong>{% blocktrans with order_id=order.id order_date=order.created_at|date:"SHORT_DATE_FORMAT" %}We noticed that your order #{{ order_id }} placed on {{ order_date }} is still in pending status.{% endblocktrans %}</strong></p>
+    <p style="color: #92400e; margin-bottom: 0;"><strong>{% blocktrans with order_id=order.id order_date=order.created_at|date:"SHORT_DATE_FORMAT" %}We noticed that your order #{{ order_id }} placed on {{ order_date }} is still in pending status.{% endblocktrans %}</strong></p>
 </div>
 
 <div class="email-card">

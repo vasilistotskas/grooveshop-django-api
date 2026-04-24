@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
@@ -16,7 +15,6 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
-from core.utils.views import cache_methods
 from user.filters.address import UserAddressFilter
 from user.models.address import UserAddress
 from user.serializers.address import (
@@ -58,7 +56,6 @@ serializers_config: SerializersConfig = {
         error_serializer=ErrorResponseSerializer,
     )
 )
-@cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
 class UserAddressViewSet(BaseModelViewSet):
     queryset = UserAddress.objects.none()
     serializers_config = serializers_config
@@ -88,6 +85,9 @@ class UserAddressViewSet(BaseModelViewSet):
         if self.action == "list":
             return UserAddress.objects.for_list().filter(user=self.request.user)
         return UserAddress.objects.for_detail().filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
     @action(detail=True, methods=["POST"])
     def set_main(self, request, pk=None):

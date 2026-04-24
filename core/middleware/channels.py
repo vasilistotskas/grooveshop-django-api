@@ -8,9 +8,12 @@ from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
 from django.utils import timezone
 from knox.crypto import hash_token
 from knox.settings import CONSTANTS, knox_settings
+
+from notification.views.websocket import build_ticket_cache_key
 
 if TYPE_CHECKING:
     from knox.models import AuthToken
@@ -18,6 +21,31 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
+
+@database_sync_to_async
+def authenticate_ticket(ticket: str):
+    """Consume a single-use WebSocket ticket and return the owning user.
+
+    The ticket is deleted on first read so intercepted values can't be
+    replayed — a legitimate client never sends the same ticket twice
+    because tickets map 1:1 to connection attempts.
+    """
+    if not ticket:
+        return AnonymousUser()
+
+    key = build_ticket_cache_key(ticket)
+    user_id = cache.get(key)
+    if user_id is None:
+        return AnonymousUser()
+    cache.delete(key)
+
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return AnonymousUser()
+
+    return user if user.is_active else AnonymousUser()
 
 
 @database_sync_to_async
@@ -75,9 +103,15 @@ class TokenAuthMiddleware(BaseMiddleware):
         query_string = scope.get("query_string", b"").decode()
         query_params = parse_qs(query_string)
 
+        # Prefer single-use ticket (short-lived, can't be replayed).
+        # `access_token` remains as a fallback for internal/test callers
+        # that can't fetch a ticket; remove once all clients migrate.
+        ticket = query_params.get("ticket", [None])[0]
         access_token = query_params.get("access_token", [None])[0]
 
-        if access_token:
+        if ticket:
+            scope["user"] = await authenticate_ticket(ticket)
+        elif access_token:
             scope["user"] = await authenticate_token(access_token)
         else:
             scope["user"] = AnonymousUser()

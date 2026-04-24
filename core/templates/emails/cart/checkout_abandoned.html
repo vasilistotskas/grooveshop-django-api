@@ -1,0 +1,54 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "You left something behind" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "You left something behind" %}</h1>
+<p>{% trans "It looks like you started a checkout but didn't complete it. Your items are no longer reserved, but they're still waiting in your cart." %}</p>
+
+<div class="email-card">
+    <h3>{% trans "Your Cart" %}</h3>
+    <table class="email-table">
+        <thead>
+            <tr>
+                <th>{% trans "Product" %}</th>
+                <th>{% trans "Quantity" %}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.product.name }}</td>
+                <td>{{ item.quantity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if cart_url %}
+<p class="mt-3">
+    <a href="{{ cart_url }}" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: bold;">
+        {% trans "Return to my cart" %}
+    </a>
+</p>
+{% endif %}
+
+<p class="mt-3">{% trans "Hurry — popular items may sell out quickly!" %}</p>
+{% endblock %}
+
+{% block email_footer %}
+<p class="text-bold">{{ SITE_NAME }}</p>
+<p>
+    {% trans "Questions?" %}
+    <a href="mailto:{{ INFO_EMAIL }}">{% trans "Contact us" %}</a>
+</p>
+<p class="text-muted">
+    &copy; {% now "Y" %} {{ SITE_NAME }}. {% trans "All rights reserved." %}
+</p>
+<p class="text-muted mt-2" style="font-size: 12px;">
+    {% trans "Don't want to receive these reminders?" %}
+    <a href="{{ preferences_url|default:SITE_URL }}">{% trans "Manage your email preferences" %}</a>
+</p>
+{% endblock %}

@@ -13,6 +13,7 @@ from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,
     NotificationPriorityEnum,
+    NotificationTypeEnum,
 )
 from notification.managers import NotificationManager
 
@@ -43,7 +44,12 @@ class Notification(TranslatableModel, TimeStampMixinModel, UUIDModel):
         _("Notification Type"),
         max_length=100,
         blank=True,
-        help_text=_("Specific type of notification for categorization"),
+        choices=NotificationTypeEnum,
+        help_text=_(
+            "Fine-grained event identifier. See "
+            "``notification.enum.NotificationTypeEnum`` for the full "
+            "catalogue. Left blank for ad-hoc admin broadcasts."
+        ),
     )
     expiry_date = models.DateTimeField(
         _("Expiry Date"),

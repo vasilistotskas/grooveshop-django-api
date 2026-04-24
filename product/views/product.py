@@ -9,6 +9,7 @@ from drf_spectacular.utils import (
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
@@ -148,6 +149,16 @@ class ProductViewSet(BaseModelViewSet):
     queryset = Product.objects.all()
     serializers_config = serializers_config
 
+    def get_permissions(self):
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ):
+            return [IsAdminUser()]
+        return [AllowAny()]
+
     ordering_fields = [
         "price",
         "created_at",
@@ -200,9 +211,13 @@ class ProductViewSet(BaseModelViewSet):
         methods=["POST"],
     )
     def update_view_count(self, request, pk=None):
+        from django.db.models import F
+
         product = self.get_object()
-        product.view_count += 1
-        product.save(update_fields=["view_count"])
+        Product.objects.filter(pk=product.pk).update(
+            view_count=F("view_count") + 1
+        )
+        product.refresh_from_db(fields=["view_count"])
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(

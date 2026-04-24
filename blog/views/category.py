@@ -7,6 +7,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
 from blog.filters.category import BlogCategoryFilter
@@ -130,6 +131,17 @@ serializers_config: SerializersConfig = {
 class BlogCategoryViewSet(BaseModelViewSet):
     queryset = BlogCategory.objects.all()
     serializers_config = serializers_config
+
+    def get_permissions(self):
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+            "reorder",
+        ):
+            return [IsAdminUser()]
+        return [AllowAny()]
 
     def get_filterset_class(self):
         if self.action == "posts":

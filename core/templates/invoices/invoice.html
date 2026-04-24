@@ -1,0 +1,293 @@
+{% load i18n %}
+{% load humanize %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:'el' }}">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ invoice.invoice_number }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm 16mm 28mm 16mm;
+      @bottom-center {
+        content: "{% trans 'Page' %} " counter(page) " / " counter(pages);
+        font-size: 8.5pt;
+        color: #777;
+      }
+      @bottom-left {
+        content: element(seller-footer);
+        font-size: 8pt;
+        color: #888;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Helvetica", "Arial", sans-serif;
+      font-size: 10pt;
+      color: #222;
+      line-height: 1.4;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2px solid #111;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+      gap: 16px;
+    }
+    .header .seller h1 {
+      margin: 0 0 4px;
+      font-size: 16pt;
+    }
+    .header .seller p,
+    .header .meta p {
+      margin: 0;
+      font-size: 9.5pt;
+    }
+    .header .meta {
+      text-align: right;
+    }
+    .header .meta .title {
+      font-size: 18pt;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    .header .meta .number {
+      font-size: 12pt;
+      font-weight: bold;
+    }
+    .qr {
+      text-align: center;
+      margin-top: 8px;
+    }
+    .qr svg {
+      width: 72px;
+      height: 72px;
+      display: block;
+      margin: 0 auto;
+    }
+    .qr .qr-caption {
+      font-size: 7.5pt;
+      color: #666;
+      margin-top: 2px;
+    }
+    .parties {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+    .parties .block {
+      flex: 1;
+      border: 1px solid #ddd;
+      padding: 10px 12px;
+      border-radius: 4px;
+      background: #fafafa;
+    }
+    .parties h2 {
+      margin: 0 0 6px;
+      font-size: 10pt;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #555;
+    }
+    .parties p { margin: 0; }
+    .parties small { color: #666; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+    th, td {
+      padding: 6px 8px;
+      text-align: left;
+      font-size: 9.5pt;
+    }
+    thead th {
+      background: #111;
+      color: #fff;
+      font-weight: 600;
+      border: 1px solid #111;
+    }
+    tbody td {
+      border-bottom: 1px solid #eee;
+    }
+    .num { text-align: right; white-space: nowrap; }
+    .item-sku { color: #888; font-size: 8.5pt; }
+    .summary {
+      float: right;
+      min-width: 260px;
+    }
+    .summary table { margin-bottom: 0; }
+    .summary td { border: none; padding: 3px 8px; }
+    .summary .total td {
+      border-top: 2px solid #111;
+      font-weight: bold;
+      font-size: 11pt;
+      padding-top: 6px;
+    }
+    .vat-breakdown {
+      clear: both;
+      margin-top: 32px;
+    }
+    .vat-breakdown h2 {
+      font-size: 10pt;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #555;
+      margin: 0 0 8px;
+    }
+    .seller-footer {
+      position: running(seller-footer);
+      font-size: 8pt;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="seller-footer">
+    {{ seller.name }}
+    {% if seller.vat_id %} • {% trans "VAT ID" %}: {{ seller.vat_id }}{% endif %}
+    {% if seller.tax_office %} • {% trans "Tax office" %}: {{ seller.tax_office }}{% endif %}
+    {% if seller.city %} • {{ seller.postal_code }} {{ seller.city }}{% endif %}
+  </div>
+
+  <div class="header">
+    <div class="seller">
+      <h1>{{ seller.name }}</h1>
+      {% if seller.business_activity %}<p>{{ seller.business_activity }}</p>{% endif %}
+      {% if seller.address_line_1 %}<p>{{ seller.address_line_1 }}</p>{% endif %}
+      {% if seller.address_line_2 %}<p>{{ seller.address_line_2 }}</p>{% endif %}
+      {% if seller.postal_code or seller.city %}
+        <p>{{ seller.postal_code }} {{ seller.city }}{% if seller.country %}, {{ seller.country }}{% endif %}</p>
+      {% endif %}
+      {% if seller.vat_id %}<p><strong>{% trans "VAT ID" %}:</strong> {{ seller.vat_id }}</p>{% endif %}
+      {% if seller.tax_office %}<p><strong>{% trans "Tax office" %}:</strong> {{ seller.tax_office }}</p>{% endif %}
+      {% if seller.registration_number %}<p><strong>{% trans "Reg. No." %}:</strong> {{ seller.registration_number }}</p>{% endif %}
+      {% if seller.phone %}<p>{% trans "Phone" %}: {{ seller.phone }}</p>{% endif %}
+      {% if seller.email %}<p>{% trans "Email" %}: {{ seller.email }}</p>{% endif %}
+    </div>
+    <div class="meta">
+      <div class="title">{% trans "INVOICE" %}</div>
+      <p class="number">{{ invoice.invoice_number }}</p>
+      {% if mydata_mark %}
+        <p><strong>{% trans "MARK" %}:</strong> {{ mydata_mark }}</p>
+      {% endif %}
+      <p>{% trans "Issue date" %}: {{ invoice.issue_date|date:"Y-m-d" }}</p>
+      {% if order.created_at and order.created_at.date|date:"Y-m-d" != invoice.issue_date|date:"Y-m-d" %}
+        <p>{% trans "Order date" %}: {{ order.created_at|date:"Y-m-d" }}</p>
+      {% endif %}
+      <p>{% trans "Order" %} #{{ order.id }}</p>
+      {% if qr_svg %}
+        <div class="qr">
+          {{ qr_svg|safe }}
+          <div class="qr-caption">{% trans "Scan to verify" %}</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="parties">
+    <div class="block">
+      <h2>{% trans "Bill to" %}</h2>
+      <p><strong>{{ buyer.name }}</strong></p>
+      {% if buyer.vat_id %}<p><strong>{% trans "VAT ID" %}:</strong> {{ buyer.vat_id }}</p>{% endif %}
+      {% if buyer.address_line_1 %}<p>{{ buyer.address_line_1 }}</p>{% endif %}
+      {% if buyer.address_line_2 %}<p>{{ buyer.address_line_2 }}</p>{% endif %}
+      {% if buyer.postal_code or buyer.city %}
+        <p>{{ buyer.postal_code }} {{ buyer.city }}{% if buyer.country %}, {{ buyer.country }}{% endif %}</p>
+      {% endif %}
+      {% if buyer.email %}<p>{{ buyer.email }}</p>{% endif %}
+      {% if buyer.phone %}<p>{{ buyer.phone }}</p>{% endif %}
+    </div>
+    <div class="block">
+      <h2>{% trans "Payment" %}</h2>
+      {% if pay_way_name %}<p>{% trans "Method" %}: {{ pay_way_name }}</p>{% endif %}
+      <p>{% trans "Status" %}: {{ order.payment_status }}</p>
+      {% if order.payment_id %}<p><small>{% trans "Ref" %}: {{ order.payment_id }}</small></p>{% endif %}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>{% trans "Description" %}</th>
+        <th class="num">{% trans "Qty" %}</th>
+        <th class="num">{% trans "Unit (gross)" %}</th>
+        <th class="num">{% trans "VAT" %} %</th>
+        <th class="num">{% trans "Line total" %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+        <tr>
+          <td>
+            {{ item.name|default:_("Unnamed product") }}
+            {% if item.sku %}<div class="item-sku">SKU {{ item.sku }}</div>{% endif %}
+          </td>
+          <td class="num">{{ item.quantity }}</td>
+          <td class="num">{{ item.unit_gross|floatformat:2 }}</td>
+          <td class="num">{% if item.vat_rate is not None %}{{ item.vat_rate|floatformat:"-1" }}%{% else %}0%{% endif %}</td>
+          <td class="num">{{ item.line_total|floatformat:2 }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="summary">
+    <table>
+      <tr>
+        <td>{% trans "Subtotal (excl. VAT)" %}</td>
+        <td class="num">{{ totals.subtotal|floatformat:2 }} {{ currency }}</td>
+      </tr>
+      {% for row in vat_breakdown %}
+        <tr>
+          <td>{% trans "VAT" %} {{ row.rate|floatformat:"-1" }}%</td>
+          <td class="num">{{ row.vat|floatformat:2 }} {{ currency }}</td>
+        </tr>
+      {% endfor %}
+      {% if totals.shipping %}
+        <tr>
+          <td>{% trans "Shipping" %}</td>
+          <td class="num">{{ totals.shipping|floatformat:2 }} {{ currency }}</td>
+        </tr>
+      {% endif %}
+      {% if totals.payment_fee %}
+        <tr>
+          <td>{% trans "Payment fee" %}</td>
+          <td class="num">{{ totals.payment_fee|floatformat:2 }} {{ currency }}</td>
+        </tr>
+      {% endif %}
+      <tr class="total">
+        <td>{% trans "Total" %}</td>
+        <td class="num">{{ totals.total|floatformat:2 }} {{ currency }}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="vat-breakdown">
+    <h2>{% trans "VAT breakdown" %}</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="num">{% trans "Rate" %}</th>
+          <th class="num">{% trans "Net" %}</th>
+          <th class="num">{% trans "VAT" %}</th>
+          <th class="num">{% trans "Gross" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in vat_breakdown %}
+          <tr>
+            <td class="num">{{ row.rate|floatformat:"-1" }}%</td>
+            <td class="num">{{ row.subtotal|floatformat:2 }} {{ currency }}</td>
+            <td class="num">{{ row.vat|floatformat:2 }} {{ currency }}</td>
+            <td class="num">{{ row.gross|floatformat:2 }} {{ currency }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

@@ -7,7 +7,6 @@ from django.urls import path
 
 from asgi.cors_handler import cors_handler
 from asgi.health_check import health_check
-from core.middleware.channels import TokenAuthMiddlewareStack
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -16,6 +15,7 @@ django_asgi_app = health_check(
     django_asgi_app, "/health/"
 )  # Django's ASGI app is less strict than the spec
 
+from core.middleware.channels import TokenAuthMiddlewareStack  # noqa: E402
 from notification.consumers import NotificationConsumer  # noqa: E402
 from tenant.middleware_ws import TenantWebsocketMiddleware  # noqa: E402
 

@@ -108,6 +108,16 @@ SHARED_APPS = [
     "storages",
     "core",
     "devtools",
+    # Celery infrastructure — beat scheduler runs in public schema
+    # (DatabaseScheduler reads PeriodicTask from public). Task results
+    # use CELERY_RESULT_BACKEND="django-db"; results are written in
+    # whichever schema the task runs in, so django_celery_results is
+    # also in TENANT_APPS to ensure its tables exist there too.
+    "django_celery_beat",
+    "django_celery_results",
+    # Platform-wide Setting table — read by admin dashboard in public
+    # schema. Also in TENANT_APPS so per-tenant settings can override.
+    "extra_settings",
     # Global reference data (identical across ALL tenants)
     "country",
     "region",
@@ -154,8 +164,11 @@ TENANT_APPS = [
     "djmoney",
     "phonenumber_field",
     "tinymce",
-    "django_celery_beat",
+    # Task result storage — mirrored in SHARED_APPS. Kept here too so
+    # tasks running in a tenant schema can write their TaskResult rows
+    # to that tenant's schema rather than spilling into public.
     "django_celery_results",
+    # Per-tenant setting overrides — mirrored in SHARED_APPS.
     "extra_settings",
     "simple_history",
     "djstripe",
@@ -664,18 +677,18 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_cleanup_expired_stock_reservations",
             "schedule": SCHEDULE_PRESETS["every_hour"],
         },
-        # TODO(multi-tenant): these came from main in the 2026-04 merge.
-        # They currently run once against the public schema. Wrap them in
-        # tenant.tasks.fanout_* variants so they iterate tenant schemas
-        # like cleanup-expired-stock-reservations above.
+        # All five scheduled domain tasks below run via tenant fanout
+        # wrappers — the beat scheduler dispatches once against public,
+        # the fanout helper then re-dispatches the underlying task into
+        # every active tenant schema with the right _schema_name header.
         "check-pending-orders": {
-            "task": "order.tasks.check_pending_orders",
+            "task": "tenant.tasks.fanout_check_pending_orders",
             "schedule": SCHEDULE_PRESETS["daily_7am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
         "update-order-statuses-from-shipping": {
-            "task": "order.tasks.update_order_statuses_from_shipping",
+            "task": "tenant.tasks.fanout_update_order_statuses_from_shipping",
             "schedule": crontab(hour="*/6", minute="0")
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
@@ -687,15 +700,15 @@ def get_celery_beat_schedule():
             else SCHEDULE_PRESETS["every_hour"],
         },
         "auto-cancel-stuck-pending-orders": {
-            "task": "order.tasks.auto_cancel_stuck_pending_orders",
+            "task": "tenant.tasks.fanout_auto_cancel_stuck_pending_orders",
             "schedule": crontab(minute="*/15"),
         },
         "check-low-stock-products": {
-            "task": "product.tasks.check_low_stock_products",
+            "task": "tenant.tasks.fanout_check_low_stock_products",
             "schedule": SCHEDULE_PRESETS["every_hour"],
         },
         "send-checkout-abandonment-emails": {
-            "task": "order.tasks.send_checkout_abandonment_emails",
+            "task": "tenant.tasks.fanout_send_checkout_abandonment_emails",
             "schedule": SCHEDULE_PRESETS["daily_6am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],

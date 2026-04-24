@@ -41,6 +41,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import override as translation_override
 
+from core.utils.tenant_urls import get_tenant_frontend_url
 from extra_settings.models import Setting
 
 from core.utils.i18n import get_order_language
@@ -213,8 +214,7 @@ def _verification_url(order: Order) -> str:
     the invoice download button. Guests hit the login wall; once the
     order is claimed via its UUID the Nuxt page re-renders.
     """
-    base = getattr(settings, "NUXT_BASE_URL", "").rstrip("/")
-    return f"{base}/account/orders/{order.id}"
+    return get_tenant_frontend_url(f"/account/orders/{order.id}")
 
 
 def _build_qr_svg(url: str) -> str:

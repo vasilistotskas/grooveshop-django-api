@@ -2,13 +2,16 @@ import logging
 from tempfile import NamedTemporaryFile
 
 import requests
-from celery import shared_task
 from django.core.files import File
+
+from core import celery_app
+from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     bind=True,
     name="Download Social Avatar",
     max_retries=3,
@@ -44,7 +47,9 @@ def download_social_avatar_task(self, user_id: int, picture_url: str):
         user.image.save(image_filename, File(img_temp))
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def send_subscription_confirmation_email_task(
     self, subscription_id: int
 ) -> bool:
@@ -80,7 +85,8 @@ def send_subscription_confirmation_email_task(
         return False
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     bind=True,
     name="export_user_data",
     max_retries=3,
@@ -106,6 +112,10 @@ def export_user_data_task(self, export_id: int) -> dict:
     from django.utils.translation import override
 
     from core.utils.i18n import get_user_language
+    from core.utils.tenant_urls import (
+        get_tenant_base_url,
+        get_tenant_frontend_url,
+    )
     from user.models.data_export import UserDataExport
     from user.services.gdpr import (
         EXPORT_TTL,
@@ -160,9 +170,8 @@ def export_user_data_task(self, export_id: int) -> dict:
             ]
         )
 
-        download_url = (
-            f"{settings.NUXT_BASE_URL}/account/settings/privacy"
-            f"?export={export.token}"
+        download_url = get_tenant_frontend_url(
+            f"/account/settings/privacy?export={export.token}"
         )
 
         context = {
@@ -172,7 +181,7 @@ def export_user_data_task(self, export_id: int) -> dict:
             "file_size_kb": round(export.file_size / 1024, 1),
             "SITE_NAME": settings.SITE_NAME,
             "INFO_EMAIL": settings.INFO_EMAIL,
-            "SITE_URL": settings.NUXT_BASE_URL,
+            "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
@@ -220,7 +229,8 @@ def export_user_data_task(self, export_id: int) -> dict:
         raise
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     bind=True,
     name="delete_user_account",
     max_retries=2,

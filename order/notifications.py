@@ -19,12 +19,14 @@ from __future__ import annotations
 
 import logging
 
-from celery import shared_task
 from django.conf import settings
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_noop
 from django.utils.translation import override as translation_override
 
+from core import celery_app
+from core.tasks import MonitoredTask
+from core.utils.tenant_urls import get_tenant_frontend_url
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,
@@ -38,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 TASK_DEFAULTS = {
+    "base": MonitoredTask,
     "bind": True,
     "max_retries": 3,
     "autoretry_for": (Exception,),
@@ -118,8 +121,7 @@ _ORDER_STATUS_COPY: dict[str, tuple[str, str, str, tuple[str, str]]] = {
 
 def _order_link(order: Order) -> str:
     """Absolute URL pointing at the shopper's order detail page."""
-    base = (settings.NUXT_BASE_URL or "").rstrip("/")
-    return f"{base}/account/orders/{order.id}"
+    return get_tenant_frontend_url(f"/account/orders/{order.id}")
 
 
 def _render_translations(
@@ -170,7 +172,7 @@ def _load_order(order_id: int) -> Order | None:
     return order
 
 
-@shared_task(name="notify_order_created_live", **TASK_DEFAULTS)
+@celery_app.task(name="notify_order_created_live", **TASK_DEFAULTS)
 def notify_order_created_live(self, order_id: int) -> dict:
     """Fire the initial 'order placed' live notification."""
     order = _load_order(order_id)
@@ -195,7 +197,7 @@ def notify_order_created_live(self, order_id: int) -> dict:
     return {"status": "sent", "order_id": order.id}
 
 
-@shared_task(name="notify_order_status_changed_live", **TASK_DEFAULTS)
+@celery_app.task(name="notify_order_status_changed_live", **TASK_DEFAULTS)
 def notify_order_status_changed_live(
     self, order_id: int, new_status: str
 ) -> dict:
@@ -228,7 +230,7 @@ def notify_order_status_changed_live(
     return {"status": "sent", "order_id": order.id, "new_status": new_status}
 
 
-@shared_task(name="notify_order_shipment_dispatched_live", **TASK_DEFAULTS)
+@celery_app.task(name="notify_order_shipment_dispatched_live", **TASK_DEFAULTS)
 def notify_order_shipment_dispatched_live(self, order_id: int) -> dict:
     """Fire when tracking info is attached (carrier + number present)."""
     order = _load_order(order_id)
@@ -255,7 +257,7 @@ def notify_order_shipment_dispatched_live(self, order_id: int) -> dict:
     return {"status": "sent", "order_id": order.id}
 
 
-@shared_task(name="notify_payment_confirmed_live", **TASK_DEFAULTS)
+@celery_app.task(name="notify_payment_confirmed_live", **TASK_DEFAULTS)
 def notify_payment_confirmed_live(self, order_id: int) -> dict:
     """Fire once the payment provider confirms the charge."""
     order = _load_order(order_id)
@@ -279,7 +281,7 @@ def notify_payment_confirmed_live(self, order_id: int) -> dict:
     return {"status": "sent", "order_id": order.id}
 
 
-@shared_task(name="notify_payment_failed_live", **TASK_DEFAULTS)
+@celery_app.task(name="notify_payment_failed_live", **TASK_DEFAULTS)
 def notify_payment_failed_live(self, order_id: int) -> dict:
     """Fire when the payment provider rejects the charge."""
     order = _load_order(order_id)
@@ -304,7 +306,7 @@ def notify_payment_failed_live(self, order_id: int) -> dict:
     return {"status": "sent", "order_id": order.id}
 
 
-@shared_task(name="notify_order_refunded_live", **TASK_DEFAULTS)
+@celery_app.task(name="notify_order_refunded_live", **TASK_DEFAULTS)
 def notify_order_refunded_live(self, order_id: int) -> dict:
     """Fire once a refund has been recorded against the order."""
     order = _load_order(order_id)

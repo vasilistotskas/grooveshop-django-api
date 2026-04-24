@@ -12,6 +12,7 @@ from django.utils import translation
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from core.utils.i18n import resolve_request_language
+from core.utils.tenant_urls import get_tenant_frontend_url
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialAccount
@@ -75,4 +76,4 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
             url, allowed_hosts=allowed_hosts
         ):
             return url
-        return f"{settings.NUXT_BASE_URL}/account"
+        return get_tenant_frontend_url("/account")

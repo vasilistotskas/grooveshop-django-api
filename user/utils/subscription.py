@@ -7,6 +7,8 @@ from datetime import timedelta
 
 from extra_settings.models import Setting
 from django.conf import settings
+
+from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
@@ -65,7 +67,7 @@ def send_subscription_confirmation(
                 token=subscription.confirmation_token
             ),
             "SITE_NAME": settings.SITE_NAME,
-            "SITE_URL": settings.NUXT_BASE_URL,
+            "SITE_URL": get_tenant_base_url(),
             "INFO_EMAIL": settings.INFO_EMAIL,
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             "LANGUAGE_CODE": language,
@@ -171,9 +173,11 @@ def send_newsletter(
                 "topic": topic,
                 "subscription": subscription,
                 "unsubscribe_url": unsubscribe_url,
-                "preferences_url": f"{settings.NUXT_BASE_URL}/account/subscriptions/",
+                "preferences_url": get_tenant_frontend_url(
+                    "/account/subscriptions/"
+                ),
                 "SITE_NAME": settings.SITE_NAME,
-                "SITE_URL": settings.NUXT_BASE_URL,
+                "SITE_URL": get_tenant_base_url(),
                 "INFO_EMAIL": settings.INFO_EMAIL,
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }

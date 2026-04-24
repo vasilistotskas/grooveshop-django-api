@@ -57,3 +57,30 @@ def fanout_cleanup_expired_stock_reservations():
 @celery_app.task(base=TenantTask)
 def fanout_process_points_expiration():
     return run_for_all_tenants("loyalty.tasks.process_points_expiration")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_check_pending_orders():
+    return run_for_all_tenants("order.tasks.check_pending_orders")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_update_order_statuses_from_shipping():
+    return run_for_all_tenants(
+        "order.tasks.update_order_statuses_from_shipping"
+    )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_auto_cancel_stuck_pending_orders():
+    return run_for_all_tenants("order.tasks.auto_cancel_stuck_pending_orders")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_send_checkout_abandonment_emails():
+    return run_for_all_tenants("order.tasks.send_checkout_abandonment_emails")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_check_low_stock_products():
+    return run_for_all_tenants("product.tasks.check_low_stock_products")

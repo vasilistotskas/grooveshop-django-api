@@ -1,8 +1,9 @@
 import logging
 
-from celery import shared_task
 from django.contrib.auth import get_user_model
 
+from core import celery_app
+from core.tasks import MonitoredTask
 from notification.enum import (
     NotificationCategoryEnum,
     NotificationKindEnum,
@@ -15,7 +16,8 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     bind=True,
     name="notify_comment_liked",
     max_retries=3,

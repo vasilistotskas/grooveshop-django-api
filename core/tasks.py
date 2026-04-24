@@ -23,6 +23,7 @@ from django.utils import translation
 from django.utils.translation import gettext as _
 
 from core.utils.i18n import get_user_language
+from core.utils.tenant_urls import get_tenant_base_url
 
 from extra_settings.models import Setting
 
@@ -474,7 +475,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                 "unsubscribe_url": unsubscribe_url,
                 "SITE_NAME": settings.SITE_NAME,
                 "INFO_EMAIL": settings.INFO_EMAIL,
-                "SITE_URL": settings.NUXT_BASE_URL,
+                "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
 

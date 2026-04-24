@@ -1,10 +1,10 @@
 import logging
 
-from django.conf import settings
 from django.db.models.signals import m2m_changed
 from django.dispatch import receiver
 
 from blog.models import BlogComment
+from core.utils.tenant_urls import get_tenant_frontend_url
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +30,8 @@ def notify_comment_liked_receiver(
     if not post:
         return
 
-    blog_post_url = (
-        f"{settings.NUXT_BASE_URL}/blog/post/{post.id}/{post.slug}"
-        "#blog-post-comments"
+    blog_post_url = get_tenant_frontend_url(
+        f"/blog/post/{post.id}/{post.slug}#blog-post-comments"
     )
 
     notify_comment_liked_task.delay(

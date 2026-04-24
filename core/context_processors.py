@@ -8,6 +8,8 @@ from typing import Any
 from django.conf import settings
 from django.http import HttpRequest
 
+from core.utils.tenant_urls import get_tenant_base_url
+
 
 @lru_cache(maxsize=1)
 def get_version_from_toml() -> str:
@@ -68,7 +70,7 @@ def metadata(request: HttpRequest) -> dict[str, Any]:
         "SITE_DESCRIPTION": site_description,
         "SITE_KEYWORDS": site_keywords,
         "SITE_AUTHOR": site_author,
-        "SITE_URL": settings.NUXT_BASE_URL,
+        "SITE_URL": get_tenant_base_url(),
         "INFO_EMAIL": settings.INFO_EMAIL,
         "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         "REQUEST_DETAILS": request_details,

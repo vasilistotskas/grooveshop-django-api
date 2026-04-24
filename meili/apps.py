@@ -203,23 +203,25 @@ class MeiliConfig(AppConfig):
 
             logger.debug(f"Initialized _meilisearch for {model.__name__}")
 
-            # Skip index creation in offline mode
-            if settings.MEILISEARCH.get("OFFLINE", False):
-                return
-
-            # Create index and apply settings
-            try:
-                _client.create_index(index_name, primary_key).with_settings(
-                    index_name=index_name,
-                    index_settings=index_settings,
-                )
-
-                # Store tasks for reference
-                model._meilisearch["tasks"] = list(_client.tasks)
-                _client.flush_tasks()
-
-            except Exception as e:
-                logger.warning(f"Failed to initialize index {index_name}: {e}")
+            # IMPORTANT: we do NOT create the Meilisearch index here.
+            #
+            # `ready()` runs during Django startup in the public schema, so
+            # `get_meili_index_name()` would return the bare (un-prefixed)
+            # base name — e.g. "ProductTranslation" — and create it, which
+            # is wrong under multi-tenancy: every tenant needs its own
+            # `{schema}__ProductTranslation` index, and the public schema
+            # itself does not store tenant-scoped documents at all.
+            #
+            # Per-tenant indexes are provisioned at the correct tenant
+            # boundaries instead:
+            #   * `tenant/management/commands/create_tenant.py` creates them
+            #     when a new Tenant row is added.
+            #   * `meili/management/commands/meilisearch_sync_all_indexes.py`
+            #     and `meilisearch_sync_index.py` create + re-settings any
+            #     missing indexes.
+            #   * The signal handlers below call `add_documents`, which
+            #     auto-creates the index on first write as a last-resort
+            #     safety net.
 
         # Discover and connect signals for all indexable models
         indexable_models = _discover_indexable_models()

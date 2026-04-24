@@ -139,6 +139,10 @@ class StripePaymentProvider(PaymentProvider):
             if not success_url or not cancel_url:
                 raise ValueError("success_url and cancel_url are required")
 
+            from django.db import connection as _connection
+
+            tenant_schema = getattr(_connection, "schema_name", "public")
+
             checkout_session_data = {
                 "mode": "payment",
                 "success_url": success_url,
@@ -161,10 +165,15 @@ class StripePaymentProvider(PaymentProvider):
                 "metadata": {
                     "order_id": order_id,
                     "source": "django_app",
+                    # Tag the session with the owning tenant so finance
+                    # can attribute revenue when multiple tenants share
+                    # one platform Stripe account.
+                    "tenant_schema": tenant_schema,
                 },
                 "payment_intent_data": {
                     "metadata": {
                         "order_id": order_id,
+                        "tenant_schema": tenant_schema,
                     }
                 },
             }
@@ -265,11 +274,30 @@ class StripePaymentProvider(PaymentProvider):
             stripe_amount = int(amount.amount * 100)
             currency_code = str(amount.currency).lower()
 
-            # Build comprehensive metadata for tracking
+            # Build comprehensive metadata for tracking. `tenant_schema`
+            # lets finance attribute each Stripe charge to the originating
+            # tenant when they all share one platform Stripe account —
+            # without it, webside.gr and tenant-b revenue are indistinguishable
+            # in the Stripe dashboard. The Tenant model carries an optional
+            # `stripe_connect_account_id`; when it's set and full Stripe
+            # Connect is wired up, we'll also pass `stripe_account=...` on
+            # every Stripe call to route charges to the tenant's own account.
+            from django.db import connection as _connection
+
+            tenant_schema = getattr(_connection, "schema_name", "public")
             metadata = {
                 "order_id": order_id,
                 "source": "django_app",
+                "tenant_schema": tenant_schema,
             }
+            tenant = getattr(_connection, "tenant", None)
+            tenant_connect_id = (
+                getattr(tenant, "stripe_connect_account_id", None)
+                if tenant
+                else None
+            )
+            if tenant_connect_id:
+                metadata["tenant_stripe_account"] = tenant_connect_id
 
             # Add cart_item_ids if provided
             cart_item_ids = kwargs.get("cart_item_ids")
@@ -381,7 +409,14 @@ class StripePaymentProvider(PaymentProvider):
                 },
             )
 
-            refund_params: dict[str, str | int] = {"payment_intent": payment_id}
+            from django.db import connection as _connection
+
+            tenant_schema = getattr(_connection, "schema_name", "public")
+            refund_params: dict[str, Any] = {
+                "payment_intent": payment_id,
+                # Echo the tenant back on the refund for finance reconciliation.
+                "metadata": {"tenant_schema": tenant_schema},
+            }
             if amount:
                 refund_params["amount"] = int(amount.amount * 100)
             stripe_refund = stripe.Refund.create(**refund_params)

@@ -1,7 +1,6 @@
 import logging
 from decimal import Decimal
 
-from celery import shared_task
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db import models
@@ -11,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core import celery_app
 from core.tasks import MonitoredTask
+from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +50,8 @@ def notify_back_in_stock_favourites_live(product_id: int) -> dict:
         )
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_url = (
-        f"{settings.NUXT_BASE_URL}/products/{product.id}/{product.slug}"
+    product_url = get_tenant_frontend_url(
+        f"/products/{product.id}/{product.slug}"
     )
     product_name = (
         product.safe_translation_getter("name", any_language=True)
@@ -143,8 +143,8 @@ def send_price_drop_notifications(
         )
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_url = (
-        f"{settings.NUXT_BASE_URL}/products/{product.id}/{product.slug}"
+    product_url = get_tenant_frontend_url(
+        f"/products/{product.id}/{product.slug}"
     )
     instance_name = (
         product.safe_translation_getter("name", any_language=True)
@@ -199,7 +199,7 @@ def send_price_drop_notifications(
     }
 
 
-@shared_task
+@celery_app.task(base=MonitoredTask)
 def check_low_stock_products() -> dict:
     """Send a single consolidated low-stock alert to the admin.
 
@@ -274,7 +274,7 @@ def check_low_stock_products() -> dict:
         "products": rows,
         "SITE_NAME": settings.SITE_NAME,
         "INFO_EMAIL": settings.INFO_EMAIL,
-        "SITE_URL": settings.NUXT_BASE_URL,
+        "SITE_URL": get_tenant_base_url(),
         "STATIC_BASE_URL": settings.STATIC_BASE_URL,
     }
     subject = _("[{site}] Low stock alert — {n} product(s)").format(
@@ -373,8 +373,8 @@ def send_product_alert_restock(product_id: int) -> dict:
     except Product.DoesNotExist:
         return {"status": "skipped", "reason": "product_not_found"}
 
-    product_url = (
-        f"{settings.NUXT_BASE_URL}/products/{product.id}/{product.slug}"
+    product_url = get_tenant_frontend_url(
+        f"/products/{product.id}/{product.slug}"
     )
     product_name = (
         product.safe_translation_getter("name", any_language=True)
@@ -441,8 +441,8 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
         return {"status": "skipped", "reason": "product_not_found"}
 
     new_price_dec = Decimal(str(new_price))
-    product_url = (
-        f"{settings.NUXT_BASE_URL}/products/{product.id}/{product.slug}"
+    product_url = get_tenant_frontend_url(
+        f"/products/{product.id}/{product.slug}"
     )
     product_name = (
         product.safe_translation_getter("name", any_language=True)

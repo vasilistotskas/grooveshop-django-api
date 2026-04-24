@@ -1,7 +1,6 @@
 import logging
 from datetime import timedelta
 
-from celery import shared_task
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import EmailMultiAlternatives
@@ -16,7 +15,10 @@ from django.utils import translation
 
 from extra_settings.models import Setting
 
+from core import celery_app
+from core.tasks import MonitoredTask
 from core.utils.i18n import get_order_language, get_user_language
+from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.services import OrderService
@@ -58,7 +60,9 @@ def _release_confirmation_email(order_id: int) -> None:
             order.save(update_fields=["metadata"])
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def send_order_confirmation_email(self, order_id: int) -> bool:
     reserved_this_call = False
     try:
@@ -120,7 +124,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                 "is_paid": is_paid,
                 "SITE_NAME": settings.SITE_NAME,
                 "INFO_EMAIL": settings.INFO_EMAIL,
-                "SITE_URL": settings.NUXT_BASE_URL,
+                "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
 
@@ -214,7 +218,9 @@ def _release_payment_failed_email(order_id: int) -> None:
             order.save(update_fields=["metadata"])
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def send_payment_failed_email(self, order_id: int) -> bool:
     """Notify the customer that their payment failed.
 
@@ -239,18 +245,14 @@ def send_payment_failed_email(self, order_id: int) -> bool:
             .get(id=order_id)
         )
 
-        retry_url = (
-            f"{settings.NUXT_BASE_URL.rstrip('/')}/account/orders/{order.id}"
-            if getattr(settings, "NUXT_BASE_URL", None)
-            else ""
-        )
+        retry_url = get_tenant_frontend_url(f"/account/orders/{order.id}")
 
         context = {
             "order": order,
             "retry_url": retry_url,
             "SITE_NAME": settings.SITE_NAME,
             "INFO_EMAIL": settings.INFO_EMAIL,
-            "SITE_URL": settings.NUXT_BASE_URL,
+            "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
@@ -306,7 +308,9 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         return False
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def send_order_status_update_email(
     self, order_id: int, status: OrderStatus
 ) -> bool:
@@ -345,7 +349,7 @@ def send_order_status_update_email(
             "status_display": OrderStatus(status).label,
             "SITE_NAME": settings.SITE_NAME,
             "INFO_EMAIL": settings.INFO_EMAIL,
-            "SITE_URL": settings.NUXT_BASE_URL,
+            "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
@@ -427,7 +431,9 @@ def send_order_status_update_email(
         return False
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def send_shipping_notification_email(self, order_id: int) -> bool:
     try:
         order = (
@@ -449,7 +455,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             "carrier": order.shipping_carrier,
             "SITE_NAME": settings.SITE_NAME,
             "INFO_EMAIL": settings.INFO_EMAIL,
-            "SITE_URL": settings.NUXT_BASE_URL,
+            "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
@@ -511,7 +517,9 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         return False
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def generate_order_invoice(self, order_id: int) -> bool:
     """Generate a PDF invoice for an order and persist it.
 
@@ -604,7 +612,9 @@ def _release_invoice_email(order_id: int) -> None:
             order.save(update_fields=["metadata"])
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def send_invoice_email(self, order_id: int) -> bool:
     """Email the rendered invoice PDF to the buyer.
 
@@ -647,7 +657,7 @@ def send_invoice_email(self, order_id: int) -> bool:
                 "invoice": invoice,
                 "SITE_NAME": settings.SITE_NAME,
                 "INFO_EMAIL": settings.INFO_EMAIL,
-                "SITE_URL": settings.NUXT_BASE_URL,
+                "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
             text_content = render_to_string(
@@ -712,7 +722,9 @@ def send_invoice_email(self, order_id: int) -> bool:
         return False
 
 
-@shared_task(bind=True, max_retries=5, default_retry_delay=120)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=5, default_retry_delay=120
+)
 def send_invoice_to_mydata(self, order_id: int) -> bool:
     """Submit the order's invoice to AADE myDATA.
 
@@ -855,7 +867,9 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
     return True
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@celery_app.task(
+    base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
 def cancel_mydata_invoice(self, order_id: int) -> bool:
     """Send a ``CancelInvoice`` for the order's registered invoice.
 
@@ -918,7 +932,8 @@ def cancel_mydata_invoice(self, order_id: int) -> bool:
     return True
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     autoretry_for=(Exception,),
     max_retries=3,
     retry_backoff=True,
@@ -959,7 +974,7 @@ def check_pending_orders() -> int:
                 "order": order,
                 "SITE_NAME": settings.SITE_NAME,
                 "INFO_EMAIL": settings.INFO_EMAIL,
-                "SITE_URL": settings.NUXT_BASE_URL,
+                "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
 
@@ -1014,7 +1029,8 @@ def check_pending_orders() -> int:
         return 0
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     autoretry_for=(Exception,),
     max_retries=3,
     retry_backoff=True,
@@ -1060,7 +1076,8 @@ def update_order_statuses_from_shipping() -> int:
         return 0
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     autoretry_for=(Exception,),
     max_retries=3,
     retry_backoff=True,
@@ -1103,7 +1120,8 @@ def cleanup_expired_stock_reservations() -> int:
         return 0
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     autoretry_for=(Exception,),
     max_retries=3,
     retry_backoff=True,
@@ -1220,7 +1238,8 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     }
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     autoretry_for=(Exception,),
     max_retries=3,
     retry_backoff=True,
@@ -1290,20 +1309,16 @@ def send_checkout_abandonment_emails() -> int:
                 # global auth middleware) and forwards to /cart with a
                 # ``recovered=1`` flag so the shopper sees a welcome
                 # banner instead of landing silently on their items.
-                "cart_url": (
-                    f"{settings.NUXT_BASE_URL.rstrip('/')}/cart/recover/{cart.uuid}"
-                    if getattr(settings, "NUXT_BASE_URL", None)
-                    else ""
+                "cart_url": get_tenant_frontend_url(
+                    f"/cart/recover/{cart.uuid}"
                 ),
-                "preferences_url": (
-                    f"{settings.NUXT_BASE_URL.rstrip('/')}/account/subscriptions/"
-                    if getattr(settings, "NUXT_BASE_URL", None)
-                    else ""
+                "preferences_url": get_tenant_frontend_url(
+                    "/account/subscriptions/"
                 ),
                 "unsubscribe_url": unsubscribe_url,
                 "SITE_NAME": settings.SITE_NAME,
                 "INFO_EMAIL": settings.INFO_EMAIL,
-                "SITE_URL": settings.NUXT_BASE_URL,
+                "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
             with translation.override(get_user_language(cart.user)):

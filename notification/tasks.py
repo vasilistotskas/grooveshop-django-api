@@ -1,13 +1,16 @@
 import logging
 
 from asgiref.sync import async_to_sync
-from celery import shared_task
 from channels.layers import get_channel_layer
+
+from core import celery_app
+from core.tasks import MonitoredTask
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(
+@celery_app.task(
+    base=MonitoredTask,
     bind=True,
     name="Send Notification Task",
     max_retries=3,

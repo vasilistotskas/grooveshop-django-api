@@ -2,6 +2,7 @@ import logging
 
 from core import celery_app
 from core.tasks import MonitoredTask
+from core.utils.tenant_urls import get_tenant_frontend_url
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,6 @@ def notify_loyalty_tier_up_live(self, user_id: int) -> dict:
     here to get a fresh tier name for the message body without trusting
     a stale name that was captured at dispatch time.
     """
-    from django.conf import settings
 
     from loyalty.models.tier import LoyaltyTier
     from notification.enum import (
@@ -160,7 +160,7 @@ def notify_loyalty_tier_up_live(self, user_id: int) -> dict:
         tier.safe_translation_getter("name", any_language=True) if tier else ""
     ) or ""
 
-    loyalty_url = f"{settings.NUXT_BASE_URL or ''}/account/loyalty"
+    loyalty_url = get_tenant_frontend_url("/account/loyalty")
 
     create_user_notification(
         user,

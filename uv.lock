@@ -873,6 +873,18 @@ wheels = [
 ]
 
 [[package]]
+name = "django-tenants"
+version = "3.10.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b8/b8/24200c02a3ec2922ff012544a92278631750380fda5f4ff89f8b985365a3/django_tenants-3.10.1.tar.gz", hash = "sha256:cf3ea79a23a6df8db3ed24d4220a1c037749e6070a36864f5f9d50550c2a4fa7", size = 154294, upload-time = "2026-03-17T16:03:21.606Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/de/2f/309ab84126582f92d137e49c3df1ee9cc05b56e3b32428130138f5263036/django_tenants-3.10.1-py3-none-any.whl", hash = "sha256:01b4fb6754ac1e77d7f6a21f43b92149fecbdf7ea9dd91d73ec9c43e11967c40", size = 216574, upload-time = "2026-03-17T16:03:16.372Z" },
+]
+
+[[package]]
 name = "django-timezone-field"
 version = "7.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1112,7 +1124,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "1.110.0"
+version = "1.110.1"
 source = { virtual = "." }
 dependencies = [
     { name = "asgiref" },
@@ -1143,6 +1155,7 @@ dependencies = [
     { name = "django-simple-history" },
     { name = "django-storages" },
     { name = "django-stubs-ext" },
+    { name = "django-tenants" },
     { name = "django-tinymce" },
     { name = "django-unfold" },
     { name = "djangorestframework" },
@@ -1229,6 +1242,7 @@ requires-dist = [
     { name = "django-simple-history", specifier = "==3.11.0" },
     { name = "django-storages", specifier = "==1.14.6" },
     { name = "django-stubs-ext", specifier = "==6.0.2" },
+    { name = "django-tenants", specifier = ">=3.7.0,<4.0.0" },
     { name = "django-tinymce", specifier = "==5.0.0" },
     { name = "django-unfold", specifier = "==0.90.0" },
     { name = "djangorestframework", specifier = "==3.17.1" },

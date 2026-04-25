@@ -3,6 +3,41 @@
 
 
 
+## v1.112.0 (2026-04-25)
+
+### Features
+
+* feat(product): per-product price-drop notification flag
+
+Admins can now opt individual SKUs into the "Notify me when price
+drops" feature on the PDP. Default off — existing products keep the
+CTA hidden until an admin flips the flag.
+
+Why: price-drop alerts make implicit promises. For products whose
+pricing is volatile, manually managed, or runs frequent flash
+discounts, every alert dispatch is noise. Gating per SKU lets the
+business choose which products are stable enough to advertise the
+feature on.
+
+Changes:
+- Product.price_drop_alerts_enabled BooleanField(default=False) +
+  migration 0032.
+- ProductDetailSerializer: new field exposed read-only (list payload
+  unchanged — the CTA only renders on the PDP, no need to bloat
+  search/listing rows).
+- ProductAdmin: new "Customer Alerts" fieldset + list_filter for
+  bulk toggling.
+- product/views/alert.py::create(): when kind=price_drop and the
+  product's flag is False, return 403 with a clear detail. Existing
+  subscriptions keep working when an admin disables a previously-
+  enabled SKU — only NEW subscriptions are blocked.
+- 7 new integration tests in tests/integration/product/alert/
+  covering: the gate (enabled vs disabled), the field on the detail
+  payload, and that disabling doesn't break existing subscribers.
+- schema.yml regenerated.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`cf30ecc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf30eccf005a22c7e8f6ccb3ba137e4e3c558ad1))
+
 ## v1.111.0 (2026-04-25)
 
 ### Features

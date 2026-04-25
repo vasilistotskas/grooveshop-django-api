@@ -88,6 +88,15 @@ class Product(
             "Internal flag — prevents duplicate alerts. Automatically cleared when stock rises above the threshold."
         ),
     )
+    price_drop_alerts_enabled = models.BooleanField(
+        _("Price-drop Alerts Enabled"),
+        default=False,
+        help_text=_(
+            "When enabled, customers can subscribe to a one-time email when "
+            "this product's price drops below a target. Disabled by default — "
+            "admins opt products in per SKU."
+        ),
+    )
     discount_percent = models.DecimalField(
         _("Discount Percent"),
         max_digits=11,

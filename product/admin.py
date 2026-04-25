@@ -1221,6 +1221,7 @@ class ProductAdmin(
         ("updated_at", RangeDateTimeFilter),
         LikesCountFilter,
         ReviewAverageFilter,
+        "price_drop_alerts_enabled",
     ]
     inlines = [
         ProductAttributeInline,
@@ -1301,6 +1302,18 @@ class ProductAdmin(
                     "weight",
                 ),
                 "classes": ("wide",),
+            },
+        ),
+        (
+            _("Customer Alerts"),
+            {
+                "fields": ("price_drop_alerts_enabled",),
+                "classes": ("wide",),
+                "description": _(
+                    "Control which self-service alert features customers "
+                    "can subscribe to for this product. Disabled by default "
+                    "— admins opt products in per SKU."
+                ),
             },
         ),
         (

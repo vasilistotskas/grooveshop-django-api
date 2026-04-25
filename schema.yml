@@ -35156,6 +35156,12 @@ components:
           items:
             $ref: '#/components/schemas/ProductAttribute'
           readOnly: true
+        priceDropAlertsEnabled:
+          type: boolean
+          readOnly: true
+          description: When enabled, customers can subscribe to a one-time email when
+            this product's price drops below a target. Disabled by default — admins
+            opt products in per SKU.
       required:
       - attributes
       - category
@@ -35167,6 +35173,7 @@ components:
       - lowStockThreshold
       - mainImagePath
       - price
+      - priceDropAlertsEnabled
       - priceSavePercent
       - reviewAverage
       - reviewCount
@@ -35330,6 +35337,12 @@ components:
           items:
             $ref: '#/components/schemas/ProductAttribute'
           readOnly: true
+        priceDropAlertsEnabled:
+          type: boolean
+          readOnly: true
+          description: When enabled, customers can subscribe to a one-time email when
+            this product's price drops below a target. Disabled by default — admins
+            opt products in per SKU.
       required:
       - attributes
       - category
@@ -35341,6 +35354,7 @@ components:
       - lowStockThreshold
       - mainImagePath
       - price
+      - priceDropAlertsEnabled
       - priceSavePercent
       - reviewAverage
       - reviewCount

@@ -93,7 +93,11 @@ class ProductSerializer(
 
 class ProductDetailSerializer(ProductSerializer):
     class Meta(ProductSerializer.Meta):
-        fields = (*ProductSerializer.Meta.fields,)
+        fields = (*ProductSerializer.Meta.fields, "price_drop_alerts_enabled")
+        read_only_fields = (
+            *ProductSerializer.Meta.read_only_fields,
+            "price_drop_alerts_enabled",
+        )
 
 
 class ProductWriteSerializer(

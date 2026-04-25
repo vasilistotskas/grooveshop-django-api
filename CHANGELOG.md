@@ -3,6 +3,60 @@
 
 
 
+## v1.111.0 (2026-04-25)
+
+### Features
+
+* feat: hardening pass — auth, tests, shipping docs, and stability
+
+Backend hardening across multiple concerns plus the test-suite
+stability work that took 4228 tests deterministic under -n auto.
+
+Auth & login:
+- Add argon2-cffi dependency so admin (Argon2-hashed) accounts can log in.
+  Login was 500-ing with "No module named 'argon2'" until this lands.
+
+Test-suite stability (-n auto / -n 4 / -n 12 deterministic):
+- Switch to --dist loadfile in pyproject pytest addopts. Module-level
+  singletons (translation_reload._local_translation_version,
+  extra-settings cache, factory random state) were leaking between
+  unrelated tests under worksteal.
+- conftest: route django-extra-settings through DummyCache via direct
+  monkey-patch of extra_settings.cache._get_cache (NOT a CACHES alias —
+  resetting the caches registry breaks Channels middleware tests that
+  patch cache._cache.get_client).
+- conftest: drop statement_timeout / idle_in_transaction_session_timeout
+  for tests; pytest-timeout=600 still bounds real hangs.
+- conftest: disable psycopg pool for tests so conn.close() actually
+  terminates Postgres sessions (otherwise TruncateTables stalls behind
+  pooled async-test connections, leaking InvoiceCounter rows).
+- conftest: close non-atomic DB connections after every test (was
+  TransactionTestCase-only).
+- Pin OrderFactory(status=PENDING, payment_status=PENDING) in
+  test_mydata_submission helpers so EAGER signal cascades don't
+  pollute mock_email before the test body runs.
+
+Shipping (FedExCarrier / UPSCarrier):
+- Replace stale "@TODO - Mock implementation" markers with proper
+  class docstrings documenting the intentional stub (production routes
+  through ELTA at the order level; carrier classes exist so the
+  ShippingOption / get_tracking_info shape is in place when a real SDK
+  ships). Add (stub) markers to logger.info calls so synthesised paths
+  are visible at runtime.
+- get_tracking_info logs now call out "always returns IN_TRANSIT" so
+  the operational consequence (orders never auto-promote to DELIVERED
+  via this path) is obvious in logs.
+
+Schema regen + migrations:
+- Order/SearchQuery user_agent column max-length migrations.
+- schema.yml regenerated from spectacular.
+
+Plus broader hardening across blog, cart, contact, core, meili,
+notification, order, product, search, user (admin/serializers/signals/
+views), see individual file diffs.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`df50a61`](https://github.com/vasilistotskas/grooveshop-django-api/commit/df50a617a30c47b576bd9cb098fc96320a2f01a1))
+
 ## v1.110.1 (2026-04-24)
 
 ### Bug fixes

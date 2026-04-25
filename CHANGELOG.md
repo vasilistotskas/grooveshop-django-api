@@ -3,6 +3,28 @@
 
 
 
+## v1.113.0 (2026-04-25)
+
+### Features
+
+* feat(storefront): admin-toggleable RECENTLY_VIEWED_ENABLED setting
+
+Lets admins enable/disable the home page "Είδες Πρόσφατα" rail
+without a deploy. The viewing history itself stays in client-side
+localStorage; this flag only controls whether the rail renders.
+
+- settings.py: add RECENTLY_VIEWED_ENABLED to EXTRA_SETTINGS_DEFAULTS
+  (type=bool, default=True) so legacy behaviour is preserved on first
+  upgrade.
+- core/api/views.py: whitelist the key in PUBLIC_SETTING_KEYS so the
+  unauthenticated home page can read it via /settings/get.
+
+Toggle path for admins: Django admin → Extra Settings → Settings →
+flip the value_bool column on the RECENTLY_VIEWED_ENABLED row. Effect
+is immediate via the existing post_save → cache-update signal.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`b12c07b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b12c07bbf82f67153a8a4663df4b971aeb4c3664))
+
 ## v1.112.0 (2026-04-25)
 
 ### Features

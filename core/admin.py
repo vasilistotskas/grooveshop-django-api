@@ -77,6 +77,15 @@ class ExportActionMixin:
         ]
 
     def export_csv(self, request: HttpRequest, queryset: QuerySet):
+        MAX_EXPORT_ROWS = 10_000
+        if queryset.count() > MAX_EXPORT_ROWS:
+            self.message_user(
+                request,
+                _("Export capped — refine filter to ≤ %(max)d rows")
+                % {"max": MAX_EXPORT_ROWS},
+                level=messages.ERROR,
+            )
+            return
         opts = self.model._meta
         model_verbose_name_str = str(opts.verbose_name)
         response = HttpResponse(content_type="text/csv; charset=utf-8")
@@ -252,6 +261,15 @@ class ExportActionMixin:
         return response
 
     def export_xml(self, request: HttpRequest, queryset: QuerySet):
+        MAX_EXPORT_ROWS = 10_000
+        if queryset.count() > MAX_EXPORT_ROWS:
+            self.message_user(
+                request,
+                _("Export capped — refine filter to ≤ %(max)d rows")
+                % {"max": MAX_EXPORT_ROWS},
+                level=messages.ERROR,
+            )
+            return
         try:
             opts = self.model._meta
             model_verbose_name_str = str(opts.verbose_name)

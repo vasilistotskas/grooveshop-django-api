@@ -253,7 +253,8 @@ class IndexQuerySet[T: Model]:
         elif value is None:
             self._state.filters.append(f"{field_name} IS NULL")
         elif isinstance(value, str):
-            self._state.filters.append(f"{field_name} = '{value}'")
+            escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+            self._state.filters.append(f"{field_name} = '{escaped}'")
         else:
             self._state.filters.append(f"{field_name} = {value}")
 
@@ -305,7 +306,8 @@ class IndexQuerySet[T: Model]:
                 f"CONTAINS operator only supports string values, not {type(value).__name__}. "
                 f"Ensure the field '{field_name}' is a string field and the value is a string."
             )
-        self._state.filters.append(f'{field_name} CONTAINS "{value}"')
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        self._state.filters.append(f'{field_name} CONTAINS "{escaped}"')
 
     def matching_strategy(
         self, strategy: Literal["last", "all", "frequency"]

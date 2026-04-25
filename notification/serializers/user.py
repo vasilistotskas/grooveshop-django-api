@@ -1,4 +1,3 @@
-from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
@@ -7,14 +6,14 @@ from user.serializers.account import UserDetailsSerializer
 from notification.models.user import NotificationUser
 from notification.serializers.notification import NotificationSerializer
 
-User = get_user_model()
-
 
 class NotificationUserSerializer(serializers.ModelSerializer[NotificationUser]):
-    user = PrimaryKeyRelatedField(queryset=User.objects.all())
-    notification = PrimaryKeyRelatedField(
-        queryset=NotificationUser.objects.none()
-    )
+    # `user` is exposed read-only on the read serializer so clients can
+    # see which user owns each row; writes must NOT accept a user FK from
+    # the client — that's done via NotificationUserWriteSerializer which
+    # uses HiddenField(CurrentUserDefault).
+    user = PrimaryKeyRelatedField(read_only=True)
+    notification = PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = NotificationUser
@@ -29,30 +28,28 @@ class NotificationUserSerializer(serializers.ModelSerializer[NotificationUser]):
             "uuid",
         )
         read_only_fields = (
+            "user",
+            "notification",
             "created_at",
             "updated_at",
             "uuid",
         )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        from notification.models.notification import Notification  # noqa: PLC0415, I001
-
-        self.fields["notification"].queryset = Notification.objects.all()
-
 
 class NotificationUserDetailSerializer(NotificationUserSerializer):
+    # Detail view replaces the read-only PK `user` on the base serializer
+    # with the nested UserDetailsSerializer for richer output.
     user = UserDetailsSerializer(read_only=True)
     notification = NotificationSerializer(read_only=True)
 
     class Meta(NotificationUserSerializer.Meta):
-        fields = (*NotificationUserSerializer.Meta.fields,)
+        pass
 
 
 class NotificationUserWriteSerializer(
     serializers.ModelSerializer[NotificationUser]
 ):
-    user = PrimaryKeyRelatedField(queryset=User.objects.all())
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
     notification = PrimaryKeyRelatedField(
         queryset=NotificationUser.objects.none()
     )

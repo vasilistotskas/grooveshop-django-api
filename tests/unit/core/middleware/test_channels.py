@@ -1,360 +1,230 @@
-from datetime import timedelta
+"""Tests for the Channels WebSocket auth middleware.
+
+The ``access_token`` / ``authenticate_token`` / ``_renew_token`` /
+``_cleanup_token`` path was removed in favour of the ticket-only flow.
+These tests cover:
+- ``authenticate_ticket``: atomic GETDEL, Knox live-token check, user
+  active/inactive, missing user, empty/missing ticket.
+- ``TokenAuthMiddleware.__call__``: ticket path, no-ticket → AnonymousUser.
+- ``TokenAuthMiddlewareStack``.
+"""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import TransactionTestCase
-from django.utils import timezone
 from knox.models import get_token_model
 
 from core.middleware.channels import (
     TokenAuthMiddleware,
     TokenAuthMiddlewareStack,
-    _cleanup_token,
-    _renew_token,
-    authenticate_token,
+    authenticate_ticket,
 )
 
 User = get_user_model()
 Token = get_token_model()
 
 
-class TestChannelsMiddleware(TransactionTestCase):
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_getdel_patcher(return_value):
+    """Return a context manager that patches the raw Redis GETDEL call."""
+    mock_redis = MagicMock()
+    mock_redis.getdel.return_value = return_value
+    return patch(
+        "core.middleware.channels.cache._cache.get_client",
+        return_value=mock_redis,
+    )
+
+
+# ---------------------------------------------------------------------------
+# authenticate_ticket unit tests
+# ---------------------------------------------------------------------------
+
+
+class TestAuthenticateTicket(TransactionTestCase):
     @database_sync_to_async
-    def create_test_user(self):
-        return User.objects.create_user(
-            username="testuser",
-            email="test@test.com",
-            password="password123",
+    def _create_user(self, *, active=True):
+        user = User.objects.create_user(
+            username=f"ws_test_{User.objects.count()}",
+            email=f"ws_{User.objects.count()}@example.com",
+            password="hunter2",
         )
+        if not active:
+            user.is_active = False
+            user.save(update_fields=["is_active"])
+        return user
 
     @database_sync_to_async
-    def create_test_token(
-        self,
-        user,
-        token_key="test_token_key",
-        digest="test_digest",
-        expiry=None,
-    ):
-        if expiry is None:
-            expiry = timezone.now() + timedelta(hours=1)
-        elif isinstance(expiry, timedelta):
-            expiry = timezone.now() + expiry
-        token_instance = Token(
-            user=user,
-            token_key=token_key,
-            digest=digest,
-            expiry=expiry,
-        )
-        token_instance.save()
-        return token_instance
+    def _create_token(self, user):
+        token_obj, _ = Token.objects.create(user=user)
+        return token_obj
 
-    async def test_authenticate_token_invalid_input(self):
-        result = await authenticate_token(None)
+    # -- empty / None ticket -------------------------------------------------
+
+    async def test_empty_string_returns_anonymous(self):
+        result = await authenticate_ticket("")
         self.assertIsInstance(result, AnonymousUser)
 
-        result = await authenticate_token(123)
+    async def test_none_ticket_returns_anonymous(self):
+        result = await authenticate_ticket(None)  # type: ignore[arg-type]
         self.assertIsInstance(result, AnonymousUser)
 
-    async def test_authenticate_token_no_matching_tokens(self):
-        result = await authenticate_token("non_existent_token")
-        self.assertIsInstance(result, AnonymousUser)
+    # -- GETDEL returns None (ticket not in cache or already consumed) -------
 
-    @patch("core.middleware.channels.logger")
-    @patch("core.middleware.channels.hash_token")
-    async def test_authenticate_token_hash_error(
-        self, mock_hash_token, mock_logger
-    ):
-        user = await self.create_test_user()
-        token_string = "test_key123456789abcdef"
-        token_key = token_string[:15]
-        await self.create_test_token(user, token_key=token_key)
-
-        error = TypeError("Hash error")
-        mock_hash_token.side_effect = error
-
-        result = await authenticate_token(token_string)
-
-        self.assertIsInstance(result, AnonymousUser)
-        mock_logger.debug.assert_any_call(
-            "Error hashing WebSocket token: %s", error
-        )
-
-    @patch("core.middleware.channels.hash_token")
-    @patch("core.middleware.channels.compare_digest")
-    async def test_authenticate_token_digest_mismatch(
-        self, mock_compare_digest, mock_hash_token
-    ):
-        user = await self.create_test_user()
-        token_string = "test_key123456789abcdef"
-        token_key = token_string[:15]
-        await self.create_test_token(
-            user, token_key=token_key, digest="correct_digest"
-        )
-
-        mock_hash_token.return_value = "wrong_digest"
-        mock_compare_digest.return_value = False
-
-        result = await authenticate_token(token_string)
-
-        self.assertIsInstance(result, AnonymousUser)
-
-    @patch("core.middleware.channels.hash_token")
-    @patch("core.middleware.channels.compare_digest")
-    async def test_authenticate_token_success(
-        self, mock_compare_digest, mock_hash_token
-    ):
-        user = await self.create_test_user()
-        token_string = "test_key123456789abcdef"
-        token_key = token_string[:15]
-        await self.create_test_token(
-            user, token_key=token_key, digest="correct_digest"
-        )
-
-        mock_hash_token.return_value = "correct_digest"
-        mock_compare_digest.return_value = True
-
-        result = await authenticate_token(token_string)
-
-        self.assertEqual(result.id, user.id)
-
-    @patch("core.middleware.channels.hash_token")
-    @patch("core.middleware.channels.compare_digest")
-    async def test_authenticate_token_inactive_user(
-        self, mock_compare_digest, mock_hash_token
-    ):
-        user = await self.create_test_user()
-        user.is_active = False
-        await database_sync_to_async(user.save)()
-
-        token_string = "test_key123456789abcdef"
-        token_key = token_string[:15]
-        await self.create_test_token(
-            user, token_key=token_key, digest="correct_digest"
-        )
-
-        mock_hash_token.return_value = "correct_digest"
-        mock_compare_digest.return_value = True
-
-        result = await authenticate_token(token_string)
-
-        self.assertIsInstance(result, AnonymousUser)
-
-    @patch("core.middleware.channels.knox_settings")
-    async def test_authenticate_token_with_auto_refresh(
-        self, mock_knox_settings
-    ):
-        mock_knox_settings.AUTO_REFRESH = True
-
-        user = await self.create_test_user()
-        token_string = "test_key123456789abcdef"
-        token_key = token_string[:15]
-        expiry_time = timezone.now() + timedelta(hours=1)
-        token = await self.create_test_token(
-            user,
-            token_key=token_key,
-            digest="correct_digest",
-            expiry=expiry_time,
-        )
-
-        with (
-            patch("core.middleware.channels.hash_token") as mock_hash_token,
-            patch(
-                "core.middleware.channels.compare_digest"
-            ) as mock_compare_digest,
-            patch("core.middleware.channels._renew_token") as mock_renew_token,
+    async def test_missing_cache_entry_returns_anonymous(self):
+        with patch(
+            "core.middleware.channels.cache.make_and_validate_key",
+            return_value="ws:ticket:abc",
         ):
-            mock_hash_token.return_value = "correct_digest"
-            mock_compare_digest.return_value = True
+            with _make_getdel_patcher(None):
+                result = await authenticate_ticket("abc")
+        self.assertIsInstance(result, AnonymousUser)
 
-            result = await authenticate_token(token_string)
+    # -- GETDEL returns garbled value ----------------------------------------
 
-            self.assertEqual(result.id, user.id)
-            mock_renew_token.assert_called_once_with(token)
+    async def test_invalid_cache_value_returns_anonymous(self):
+        with patch(
+            "core.middleware.channels.cache.make_and_validate_key",
+            return_value="ws:ticket:abc",
+        ):
+            with _make_getdel_patcher(b"not-an-int"):
+                result = await authenticate_ticket("abc")
+        self.assertIsInstance(result, AnonymousUser)
 
-    async def test_cleanup_token_expired(self):
-        user = await self.create_test_user()
-        expired_time = timezone.now() - timedelta(hours=1)
-        token = await self.create_test_token(user, expiry=expired_time)
+    # -- user does not exist -------------------------------------------------
 
-        result = await database_sync_to_async(_cleanup_token)(token)
+    async def test_nonexistent_user_returns_anonymous(self):
+        with patch(
+            "core.middleware.channels.cache.make_and_validate_key",
+            return_value="ws:ticket:abc",
+        ):
+            with _make_getdel_patcher(b"99999999"):
+                result = await authenticate_ticket("abc")
+        self.assertIsInstance(result, AnonymousUser)
 
-        self.assertTrue(result)
-        with self.assertRaises(Token.DoesNotExist):
-            await database_sync_to_async(Token.objects.get)(pk=token.pk)
+    # -- inactive user -------------------------------------------------------
 
-    async def test_cleanup_token_not_expired(self):
-        user = await self.create_test_user()
-        future_time = timezone.now() + timedelta(hours=1)
-        token = await self.create_test_token(user, expiry=future_time)
+    async def test_inactive_user_returns_anonymous(self):
+        user = await self._create_user(active=False)
+        await self._create_token(user)
 
-        result = await database_sync_to_async(_cleanup_token)(token)
+        with patch(
+            "core.middleware.channels.cache.make_and_validate_key",
+            return_value="ws:ticket:abc",
+        ):
+            with _make_getdel_patcher(str(user.pk).encode()):
+                result = await authenticate_ticket("abc")
+        self.assertIsInstance(result, AnonymousUser)
 
-        self.assertFalse(result)
-        existing_token = await database_sync_to_async(Token.objects.get)(
-            pk=token.pk
-        )
-        self.assertEqual(existing_token.pk, token.pk)
+    # -- no live Knox tokens -------------------------------------------------
 
-    async def test_cleanup_token_no_expiry(self):
-        user = await self.create_test_user()
-        token = await self.create_test_token(user, expiry=None)
+    async def test_no_knox_token_returns_anonymous(self):
+        user = await self._create_user()
+        # Deliberately do NOT create a Knox token.
+        with patch(
+            "core.middleware.channels.cache.make_and_validate_key",
+            return_value="ws:ticket:abc",
+        ):
+            with _make_getdel_patcher(str(user.pk).encode()):
+                result = await authenticate_ticket("abc")
+        self.assertIsInstance(result, AnonymousUser)
 
-        result = await database_sync_to_async(_cleanup_token)(token)
+    # -- happy path ----------------------------------------------------------
 
-        self.assertFalse(result)
-        existing_token = await database_sync_to_async(Token.objects.get)(
-            pk=token.pk
-        )
-        self.assertEqual(existing_token.pk, token.pk)
+    async def test_valid_ticket_returns_user(self):
+        user = await self._create_user()
+        await self._create_token(user)
 
-    @patch("core.middleware.channels.knox_settings")
-    async def test_renew_token_significant_delta(self, mock_knox_settings):
-        mock_knox_settings.TOKEN_TTL = timedelta(hours=24)
-        mock_knox_settings.MIN_REFRESH_INTERVAL = 300
+        with patch(
+            "core.middleware.channels.cache.make_and_validate_key",
+            return_value="ws:ticket:abc",
+        ):
+            with _make_getdel_patcher(str(user.pk).encode()):
+                result = await authenticate_ticket("abc")
 
-        user = await self.create_test_user()
-        old_expiry = timezone.now() + timedelta(hours=1)
-        token = await self.create_test_token(user, expiry=old_expiry)
+        self.assertEqual(result.pk, user.pk)
 
-        await database_sync_to_async(_renew_token)(token)
+    # -- GETDEL is called with the prefixed key ------------------------------
 
-        await database_sync_to_async(token.refresh_from_db)()
+    async def test_getdel_uses_prefixed_key(self):
+        user = await self._create_user()
+        await self._create_token(user)
 
-        self.assertGreater(token.expiry, old_expiry)
+        prefixed = "redis:1:ws:ticket:myticket"
+        mock_redis = MagicMock()
+        mock_redis.getdel.return_value = str(user.pk).encode()
 
-    @patch("core.middleware.channels.logger")
-    @patch("core.middleware.channels.knox_settings")
-    async def test_renew_token_small_delta(
-        self, mock_knox_settings, mock_logger
-    ):
-        mock_knox_settings.TOKEN_TTL = timedelta(seconds=1)
-        mock_knox_settings.MIN_REFRESH_INTERVAL = 300
+        with patch(
+            "core.middleware.channels.cache.make_and_validate_key",
+            return_value=prefixed,
+        ):
+            with patch(
+                "core.middleware.channels.cache._cache.get_client",
+                return_value=mock_redis,
+            ):
+                await authenticate_ticket("myticket")
 
-        user = await self.create_test_user()
-        old_expiry = timezone.now() + timedelta(hours=1)
-        token = await self.create_test_token(user, expiry=old_expiry)
+        mock_redis.getdel.assert_called_once_with(prefixed)
 
-        await database_sync_to_async(_renew_token)(token)
 
-        await database_sync_to_async(token.refresh_from_db)()
+# ---------------------------------------------------------------------------
+# TokenAuthMiddleware.__call__
+# ---------------------------------------------------------------------------
 
-        self.assertEqual(token.expiry, old_expiry)
 
-    async def test_token_auth_middleware_with_access_token(self):
-        async def mock_inner(scope, receive, send):
+class TestTokenAuthMiddleware(TransactionTestCase):
+    async def _middleware(self):
+        async def inner(scope, receive, send):
             pass
 
-        middleware = TokenAuthMiddleware(mock_inner)
+        return TokenAuthMiddleware(inner)
 
-        scope = {
-            "query_string": b"access_token=test_access_token&other_param=value",
-            "user": None,
-        }
+    async def test_ticket_param_calls_authenticate_ticket(self):
+        middleware = await self._middleware()
+        scope = {"query_string": b"ticket=myticket", "user": None}
 
-        with patch("core.middleware.channels.authenticate_token") as mock_auth:
-            mock_user = MagicMock()
-            mock_user.is_anonymous = False
-            mock_user.username = "testuser"
-            mock_auth.return_value = mock_user
+        mock_user = MagicMock()
+        mock_user.is_anonymous = False
 
+        with patch(
+            "core.middleware.channels.authenticate_ticket",
+            AsyncMock(return_value=mock_user),
+        ) as mock_auth:
             await middleware(scope, AsyncMock(), AsyncMock())
 
-            mock_auth.assert_called_once_with("test_access_token")
-            self.assertEqual(scope["user"], mock_user)
+        mock_auth.assert_called_once_with("myticket")
+        self.assertEqual(scope["user"], mock_user)
 
-    async def test_token_auth_middleware_with_session_token(self):
-        """session_token is not supported; only access_token is used."""
-
-        async def mock_inner(scope, receive, send):
-            pass
-
-        middleware = TokenAuthMiddleware(mock_inner)
-
-        scope = {
-            "query_string": b"session_token=test_session_token",
-            "user": None,
-        }
+    async def test_no_ticket_produces_anonymous(self):
+        middleware = await self._middleware()
+        scope = {"query_string": b"other=value", "user": None}
 
         await middleware(scope, AsyncMock(), AsyncMock())
 
         self.assertIsInstance(scope["user"], AnonymousUser)
 
-    async def test_token_auth_middleware_with_user_id_ignored(self):
-        async def mock_inner(scope, receive, send):
-            pass
-
-        middleware = TokenAuthMiddleware(mock_inner)
-
-        scope = {"query_string": b"user_id=123", "user": None}
+    async def test_access_token_param_is_ignored(self):
+        """The legacy access_token query param is no longer accepted."""
+        middleware = await self._middleware()
+        scope = {"query_string": b"access_token=legacytoken", "user": None}
 
         await middleware(scope, AsyncMock(), AsyncMock())
 
         self.assertIsInstance(scope["user"], AnonymousUser)
 
-    async def test_token_auth_middleware_access_token_priority(self):
-        async def mock_inner(scope, receive, send):
-            pass
-
-        middleware = TokenAuthMiddleware(mock_inner)
-
-        scope = {
-            "query_string": b"access_token=access_token_value&session_token=session_token_value",
-            "user": None,
-        }
-
-        with patch("core.middleware.channels.authenticate_token") as mock_auth:
-            mock_user = MagicMock()
-            mock_user.is_anonymous = False
-            mock_user.username = "testuser"
-            mock_auth.return_value = mock_user
-
-            await middleware(scope, AsyncMock(), AsyncMock())
-
-            mock_auth.assert_called_once_with("access_token_value")
-
-    async def test_token_auth_middleware_no_auth(self):
-        async def mock_inner(scope, receive, send):
-            pass
-
-        middleware = TokenAuthMiddleware(mock_inner)
-
-        scope = {"query_string": b"other_param=value", "user": None}
-
-        await middleware(scope, AsyncMock(), AsyncMock())
-
-        self.assertIsInstance(scope["user"], AnonymousUser)
-
-    async def test_token_auth_middleware_no_query_string(self):
-        async def mock_inner(scope, receive, send):
-            pass
-
-        middleware = TokenAuthMiddleware(mock_inner)
-
+    async def test_empty_query_string_produces_anonymous(self):
+        middleware = await self._middleware()
         scope = {"user": None}
 
         await middleware(scope, AsyncMock(), AsyncMock())
 
         self.assertIsInstance(scope["user"], AnonymousUser)
-
-    async def test_token_auth_middleware_anonymous_result(self):
-        async def mock_inner(scope, receive, send):
-            pass
-
-        middleware = TokenAuthMiddleware(mock_inner)
-
-        scope = {
-            "query_string": b"access_token=invalid_token",
-            "user": None,
-        }
-
-        with patch("core.middleware.channels.authenticate_token") as mock_auth:
-            mock_auth.return_value = AnonymousUser()
-
-            await middleware(scope, AsyncMock(), AsyncMock())
-
-            self.assertIsInstance(scope["user"], AnonymousUser)
 
     def test_token_auth_middleware_stack(self):
         mock_inner = MagicMock()
@@ -362,43 +232,3 @@ class TestChannelsMiddleware(TransactionTestCase):
 
         self.assertIsInstance(result, TokenAuthMiddleware)
         self.assertEqual(result.inner, mock_inner)
-
-    async def test_authenticate_token_expired_cleanup(self):
-        user = await self.create_test_user()
-        token_string = "test_key123456789abcdef"
-        token_key = token_string[:15]
-        expired_time = timezone.now() - timedelta(hours=1)
-        token = await self.create_test_token(
-            user, token_key=token_key, expiry=expired_time
-        )
-
-        result = await authenticate_token(token_string)
-
-        self.assertIsInstance(result, AnonymousUser)
-
-        with self.assertRaises(Token.DoesNotExist):
-            await database_sync_to_async(Token.objects.get)(pk=token.pk)
-
-    async def test_token_auth_middleware_logging_flow(self):
-        """Verify access_token is used and user is set in scope."""
-
-        async def mock_inner(scope, receive, send):
-            pass
-
-        middleware = TokenAuthMiddleware(mock_inner)
-
-        scope = {
-            "query_string": b"access_token=test_token&session_token=session_token",
-            "user": None,
-        }
-
-        with patch("core.middleware.channels.authenticate_token") as mock_auth:
-            mock_user = MagicMock()
-            mock_user.is_anonymous = False
-            mock_user.username = "testuser"
-            mock_auth.return_value = mock_user
-
-            await middleware(scope, AsyncMock(), AsyncMock())
-
-            mock_auth.assert_called_once_with("test_token")
-            self.assertEqual(scope["user"], mock_user)

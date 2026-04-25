@@ -1,4 +1,5 @@
 from django.contrib.postgres.indexes import BTreeIndex
+from django.core.validators import MaxLengthValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -69,6 +70,7 @@ class OrderHistory(TranslatableModel, TimeStampMixinModel, UUIDModel):
         _("User Agent"),
         blank=True,
         help_text=_("User agent of the browser/client that made the change."),
+        validators=[MaxLengthValidator(512)],
     )
 
     objects: OrderHistoryManager = OrderHistoryManager()

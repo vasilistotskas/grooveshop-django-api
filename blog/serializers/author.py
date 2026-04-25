@@ -1,5 +1,3 @@
-from django.contrib.auth import get_user_model
-from django.contrib.auth.base_user import AbstractBaseUser
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.helpers import lazy_serializer
@@ -13,8 +11,6 @@ from blog.models.author import BlogAuthor
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 
-User = get_user_model()
-
 
 @extend_schema_field(generate_schema_multi_lang(BlogAuthor))
 class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
@@ -25,7 +21,7 @@ class BlogAuthorSerializer(
     TranslatableModelSerializer,
     serializers.ModelSerializer[BlogAuthor],
 ):
-    user = PrimaryKeyRelatedField(queryset=User.objects.all())
+    user = PrimaryKeyRelatedField(read_only=True)
     translations = TranslatedFieldsFieldExtend(shared_model=BlogAuthor)
     website = serializers.SerializerMethodField()
 
@@ -103,7 +99,10 @@ class BlogAuthorWriteSerializer(
     TranslatableModelSerializer,
     serializers.ModelSerializer[BlogAuthor],
 ):
-    user = PrimaryKeyRelatedField(queryset=User.objects.all())
+    # `user` is admin-assigned: BlogAuthorViewSet gates create/update/destroy
+    # behind IsAdminUser, so admins legitimately need to pick which user
+    # owns each author profile. (Mass-assignment is not a risk here because
+    # only admins reach the write path.)
     translations = TranslatedFieldsFieldExtend(shared_model=BlogAuthor)
 
     class Meta:
@@ -114,16 +113,6 @@ class BlogAuthorWriteSerializer(
             "website",
         )
 
-    def validate_user(self, value: AbstractBaseUser) -> AbstractBaseUser:
-        if (
-            self.instance is None
-            and BlogAuthor.objects.filter(user=value).exists()
-        ):
-            raise serializers.ValidationError(
-                _("This user already has an author profile.")
-            )
-        return value
-
     def validate_website(self, value: str) -> str:
         if value and not (
             value.startswith("http://") or value.startswith("https://")
@@ -132,3 +121,18 @@ class BlogAuthorWriteSerializer(
                 _("Website must start with http:// or https://")
             )
         return value
+
+    def validate(self, attrs):
+        # Reject duplicates explicitly so callers get a clean 400 — the
+        # model's unique=True on `user` would otherwise produce a 500
+        # from an IntegrityError on save.
+        user = attrs.get("user")
+        if (
+            user is not None
+            and self.instance is None
+            and BlogAuthor.objects.filter(user=user).exists()
+        ):
+            raise serializers.ValidationError(
+                {"user": _("This user already has an author profile.")}
+            )
+        return attrs

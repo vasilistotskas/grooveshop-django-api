@@ -13,6 +13,8 @@ or touch disk from here.
 from __future__ import annotations
 
 import logging
+import threading
+import time
 
 from django.core.cache import cache
 from django.utils.deprecation import MiddlewareMixin
@@ -25,10 +27,16 @@ from core.rosetta_storage import (
 
 logger = logging.getLogger(__name__)
 
-# Per-process counter; sentinel None forces the first request to sync
-# when the remote version key exists (e.g. after a Rosetta save or
-# after import_po_to_translations bumped it at deploy time).
+# Per-process translation version counter; sentinel None forces the first
+# request to sync when the remote version key exists (e.g. after a Rosetta
+# save or after import_po_to_translations bumped it at deploy time).
 _local_translation_version: float | None = None
+
+# Debounce: check Redis at most once every 30 seconds per process to avoid
+# a cache round-trip on every single request.
+_CHECK_INTERVAL_SECONDS = 30.0
+_last_check_monotonic: float = 0.0
+_check_lock = threading.Lock()
 
 
 class TranslationReloadMiddleware(MiddlewareMixin):
@@ -44,12 +52,22 @@ class TranslationReloadMiddleware(MiddlewareMixin):
     serves whatever msgstrs the image baked into the .mo files until
     the first overlay fires.
 
+    The Redis check is debounced to at most once per 30 seconds per process
+    (guarded by a threading.Lock) so high-traffic pods do not spam Redis.
+
     Safe no-op when the cache or DB is unreachable — failures are
     logged and the request proceeds without overlay.
     """
 
     def process_request(self, request):
-        global _local_translation_version
+        global _local_translation_version, _last_check_monotonic
+
+        now = time.monotonic()
+
+        with _check_lock:
+            if now - _last_check_monotonic < _CHECK_INTERVAL_SECONDS:
+                return None
+            _last_check_monotonic = now
 
         try:
             remote_version = cache.get(TRANSLATION_VERSION_CACHE_KEY)

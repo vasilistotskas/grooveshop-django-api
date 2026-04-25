@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import Group
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, Q
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -373,11 +373,13 @@ class UserAdmin(ModelAdmin):
             active_subscription_count=Count(
                 "subscriptions",
                 filter=Q(
-                    subscriptions__status=UserSubscription.SubscriptionStatus.ACTIVE
+                    subscriptions__status=(
+                        UserSubscription.SubscriptionStatus.ACTIVE
+                    )
                 ),
                 distinct=True,
             ),
-        )
+        ).prefetch_related("subscriptions__topic", "addresses")
 
     @admin.display(description=_("Profile"))
     def user_profile_display(self, obj):
@@ -613,6 +615,7 @@ class UserAdmin(ModelAdmin):
 
     @action(
         description=str(_("Adjust loyalty points for this user")),
+        permissions=("change",),
         variant=ActionVariant.INFO,
         icon="loyalty",
     )
@@ -624,10 +627,48 @@ class UserAdmin(ModelAdmin):
         took ``queryset`` and iterated it, which silently iterated the
         id string character-by-character and awarded points to the
         wrong users.
+
+        ``points_amount`` may be provided via POST or GET; defaults to
+        100 when absent. Only superusers may call this action.
         """
-        points_amount = 100
-        description = "Manual admin adjustment"
         change_url = reverse("admin:user_useraccount_change", args=[object_id])
+
+        if not request.user.is_superuser:
+            messages.error(
+                request,
+                _("Only superusers may adjust loyalty points directly."),
+            )
+            return redirect(change_url)
+
+        raw_amount = (
+            request.POST.get("points_amount")
+            or request.GET.get("points_amount")
+            or "100"
+        )
+        description = (
+            request.POST.get("description")
+            or request.GET.get("description")
+            or "Manual admin adjustment"
+        )
+        try:
+            points_amount = int(raw_amount)
+        except (ValueError, TypeError):
+            messages.error(
+                request,
+                _("Invalid points amount: %(val)s") % {"val": raw_amount},
+            )
+            return redirect(change_url)
+
+        if not (-10000 <= points_amount <= 10000):
+            messages.error(
+                request,
+                _(
+                    "Points amount %(val)d is out of range "
+                    "(must be between -10000 and 10000)."
+                )
+                % {"val": points_amount},
+            )
+            return redirect(change_url)
 
         try:
             user = UserAccount.objects.get(pk=object_id)
@@ -641,6 +682,14 @@ class UserAdmin(ModelAdmin):
             transaction_type=TransactionType.ADJUST,
             description=description,
             created_by=request.user,
+        )
+        messages.warning(
+            request,
+            _(
+                "Admin adjustment of %(points)d points applied to %(user)s. "
+                "This action is logged and cannot be undone."
+            )
+            % {"points": points_amount, "user": user},
         )
         self.message_user(
             request,
@@ -956,6 +1005,7 @@ class UserSubscriptionAdmin(ModelAdmin):
         "unsubscribed_at",
         "created_at",
         "updated_at",
+        "confirmation_token",
     ]
     raw_id_fields = ["user"]
     autocomplete_fields = ["topic"]
@@ -1057,15 +1107,18 @@ class UserSubscriptionAdmin(ModelAdmin):
         icon="check_circle",
     )
     def activate_subscriptions(self, request, queryset):
-        updated = queryset.filter(
-            status__in=[
-                UserSubscription.SubscriptionStatus.PENDING,
-                UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
-            ]
-        ).update(
-            status=UserSubscription.SubscriptionStatus.ACTIVE,
-            unsubscribed_at=None,
-        )
+        # Bulk update is intentional here: no per-instance signals fire
+        # on UserSubscription.save(), so .update() is safe and efficient.
+        with transaction.atomic():
+            updated = queryset.filter(
+                status__in=[
+                    UserSubscription.SubscriptionStatus.PENDING,
+                    UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
+                ]
+            ).update(
+                status=UserSubscription.SubscriptionStatus.ACTIVE,
+                unsubscribed_at=None,
+            )
         self.message_user(
             request,
             _("%(count)d subscriptions were activated.") % {"count": updated},
@@ -1077,12 +1130,15 @@ class UserSubscriptionAdmin(ModelAdmin):
         icon="cancel",
     )
     def deactivate_subscriptions(self, request, queryset):
-        updated = queryset.filter(
-            status=UserSubscription.SubscriptionStatus.ACTIVE
-        ).update(
-            status=UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
-            unsubscribed_at=timezone.now(),
-        )
+        # Bulk update is intentional here: no per-instance signals fire
+        # on UserSubscription.save(), so .update() is safe and efficient.
+        with transaction.atomic():
+            updated = queryset.filter(
+                status=UserSubscription.SubscriptionStatus.ACTIVE
+            ).update(
+                status=UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
+                unsubscribed_at=timezone.now(),
+            )
         self.message_user(
             request,
             _("%(count)d subscriptions were deactivated.") % {"count": updated},

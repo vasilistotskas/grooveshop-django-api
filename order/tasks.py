@@ -179,6 +179,148 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         return False
 
 
+STATUS_UPDATE_EMAIL_SENT_FLAG = "status_update_email_sent"
+# TTL to hold the reservation after a successful send, so retry cycles
+# triggered by transient ack failures don't re-send to the customer.
+FINAL_RESERVATION_TTL = 86_400  # 24 hours
+
+
+def _status_update_reservation_key(order_id: int, new_status: str) -> str:
+    """Build the metadata key for a specific order+status combination.
+
+    Different status transitions for the same order are independent —
+    the PROCESSING email must not block the SHIPPED email.
+    """
+    return f"{STATUS_UPDATE_EMAIL_SENT_FLAG}_{new_status}"
+
+
+def _reserve_status_update_email(order_id: int, new_status: str) -> bool:
+    """Atomically claim the status-update-email slot for (order, status).
+
+    Returns True if this caller won the race and should proceed with the
+    send, False if another caller has already sent (or is sending) the
+    email. The reservation includes BOTH order_id AND new_status so
+    different status transitions remain independent.
+    Raises Order.DoesNotExist if the order is missing.
+    """
+    flag_key = _status_update_reservation_key(order_id, new_status)
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.metadata and order.metadata.get(flag_key):
+            return False
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[flag_key] = True
+        order.save(update_fields=["metadata"])
+    return True
+
+
+def _release_status_update_email(order_id: int, new_status: str) -> None:
+    """Clear the status-update-email reservation on permanent failure."""
+    flag_key = _status_update_reservation_key(order_id, new_status)
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None or not order.metadata:
+            return
+        if order.metadata.pop(flag_key, None) is not None:
+            order.save(update_fields=["metadata"])
+
+
+@shared_task(
+    bind=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_dispute_notification_email(
+    self, order_id: int, dispute_id: str
+) -> bool:
+    """Notify staff that a Stripe dispute has been opened for an order.
+
+    Sends to the staff group email configured via ``INFO_EMAIL``.  Does NOT
+    change order status — that is a manual decision.  Includes structured
+    log fields so ops can correlate the Celery log line with the Stripe
+    dashboard entry.
+    """
+    try:
+        order = Order.objects.select_related("user", "pay_way").get(id=order_id)
+
+        reason = (order.metadata or {}).get("dispute_reason", "unknown")
+
+        context = {
+            "order": order,
+            "dispute_id": dispute_id,
+            "reason": reason,
+            "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+        }
+
+        subject = (
+            f"[{settings.SITE_NAME}] Stripe dispute opened — Order #{order_id}"
+        )
+
+        try:
+            text_content = render_to_string(
+                "emails/order/dispute_notification.txt", context
+            )
+            html_content = render_to_string(
+                "emails/order/dispute_notification.html", context
+            )
+        except Exception:
+            # Fallback plain-text if template not yet authored
+            text_content = (
+                f"A Stripe dispute has been opened for Order #{order_id}.\n"
+                f"Dispute ID: {dispute_id}\n"
+                f"Reason: {reason}\n\n"
+                f"Please review this dispute in the Stripe dashboard and take action."
+            )
+            html_content = (
+                f"<p>A Stripe dispute has been opened for "
+                f"<strong>Order #{order_id}</strong>.</p>"
+                f"<ul>"
+                f"<li>Dispute ID: {dispute_id}</li>"
+                f"<li>Reason: {reason}</li>"
+                f"</ul>"
+                f"<p>Please review this dispute in the Stripe dashboard.</p>"
+            )
+
+        staff_email = getattr(settings, "INFO_EMAIL", None)
+        if not staff_email:
+            logger.warning(
+                "send_dispute_notification_email: no INFO_EMAIL configured — skipping",
+                extra={"order_id": order_id, "dispute_id": dispute_id},
+            )
+            return False
+
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            settings.DEFAULT_FROM_EMAIL,
+            [staff_email],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+        logger.info(
+            "Dispute notification email sent for order #%s (dispute=%s)",
+            order_id,
+            dispute_id,
+            extra={"order_id": order_id, "dispute_id": dispute_id},
+        )
+        return True
+
+    except Order.DoesNotExist:
+        logger.error(
+            "Could not send dispute notification — Order #%s not found",
+            order_id,
+            extra={"order_id": order_id, "dispute_id": dispute_id},
+        )
+        return False
+
+
 PAYMENT_FAILED_EMAIL_SENT_FLAG = "payment_failed_email_sent"
 
 
@@ -306,11 +448,38 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         return False
 
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+    retry_backoff=True,
+    retry_jitter=True,
+)
 def send_order_status_update_email(
     self, order_id: int, status: OrderStatus
 ) -> bool:
+    """Send a status-update email for an order.
+
+    Idempotent via a per-(order, status) metadata reservation so concurrent
+    retries and signal re-fires cannot double-send for the same transition.
+    On permanent failure the reservation is released so an admin can
+    trigger a manual resend.
+    """
+    reserved_this_call = False
     try:
+        # Only reserve on the first attempt to prevent the flag from
+        # blocking legitimate retries after a transient failure.
+        if self.request.retries == 0:
+            if not _reserve_status_update_email(order_id, status):
+                logger.info(
+                    "Status update email already sent (or reserved) "
+                    "for order #%s status=%s, skipping",
+                    order_id,
+                    status,
+                )
+                return True
+            reserved_this_call = True
+
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
             .prefetch_related("items__product__translations")
@@ -423,6 +592,9 @@ def send_order_status_update_email(
                 f"(attempt {self.request.retries + 1}/{self.max_retries + 1})"
             )
             raise self.retry(exc=e) from e
+
+        if reserved_this_call:
+            _release_status_update_email(order_id, status)
 
         return False
 

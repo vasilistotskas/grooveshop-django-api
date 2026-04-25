@@ -160,11 +160,19 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         "id",
         "created_at",
         "updated_at",
+        "configuration",
         "configuration_preview",
         "effective_cost_display",
         "is_configured_status",
         "sort_order",
     ]
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        # Superusers may edit the raw configuration JSON directly.
+        if request.user.is_superuser and "configuration" in fields:
+            fields.remove("configuration")
+        return fields
 
     ordering = ["sort_order", "id"]
 

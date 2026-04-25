@@ -132,18 +132,21 @@ class CheckoutAPITestCase(APITestCase):
 
         self.client.force_authenticate(user=self.user)
 
-        # Create a cart for the authenticated user
-        cart = CartFactory(user=self.user)
-        CartItemFactory(cart=cart, product=self.product1, quantity=2)
-        CartItemFactory(cart=cart, product=self.product2, quantity=1)
-
-        # Create mock order to return
+        # Create the mock order FIRST: OrderFactory triggers the
+        # order_created signal which schedules clear_cart for self.user
+        # via transaction.on_commit. In tests that callback fires before
+        # the POST, deleting any cart the test had pre-created.
         mock_order = OrderFactory(
             user=self.user,
             email=self.checkout_data["email"],
             payment_id="pi_test123",
         )
         mock_create_order.return_value = mock_order
+
+        # Now create the cart that the request will actually use.
+        cart = CartFactory(user=self.user)
+        CartItemFactory(cart=cart, product=self.product1, quantity=2)
+        CartItemFactory(cart=cart, product=self.product2, quantity=1)
 
         # Add payment_intent_id to checkout data
         checkout_data = self.checkout_data.copy()

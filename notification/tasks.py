@@ -21,6 +21,9 @@ def send_notification_task(self, data: dict, *args, **kwargs):
         return
 
     channel_layer = get_channel_layer()
+    if not channel_layer:
+        logger.error("send_notification_task: channel layer is not configured")
+        return
 
     async_to_sync(channel_layer.group_send)(
         f"user_{user_id}",

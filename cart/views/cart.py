@@ -19,6 +19,7 @@ from cart.filters.cart import CartFilter
 from cart.models import Cart
 from cart.serializers.cart import (
     CartDetailSerializer,
+    CartPaymentIntentResponseSerializer,
     CartSerializer,
     CartWriteSerializer,
     ReleaseReservationsRequestSerializer,
@@ -141,6 +142,7 @@ serializers_config: SerializersConfig = {
         parameters=GUEST_CART_HEADERS,
     ),
     "create_payment_intent": ActionConfig(
+        response=CartPaymentIntentResponseSerializer,
         operation_id="createCartPaymentIntent",
         summary=_("Create payment intent from cart"),
         description=_(

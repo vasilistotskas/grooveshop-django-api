@@ -26,6 +26,7 @@ from django.test import TestCase, override_settings
 from djmoney.money import Money
 
 from extra_settings.models import Setting
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
@@ -74,6 +75,18 @@ def _make_invoice():
     # a random document type and would intermittently flag orders as
     # INVOICE without a buyer VAT. These tests exercise the 11.1
     # retail path; Tier B B2B flows have their own fixtures.
+    #
+    # Pin status=PENDING + payment_status=PENDING so OrderFactory's
+    # random rolls cannot trip ``handle_order_completed`` /
+    # ``handle_order_status_changed`` during the .create() call. Under
+    # ``CELERY_TASK_ALWAYS_EAGER=True`` + the on_commit-immediate
+    # fixture, those handlers fire ``generate_order_invoice.delay`` and
+    # ``send_order_status_update_email.delay`` synchronously inside the
+    # factory call, which both pollutes mocks (mock_email called from
+    # the chain before the test body runs) and renders the invoice
+    # ahead of the test's own ``generate_invoice`` (changing
+    # ``captured_contexts`` length). Pinning here keeps the test
+    # body's signals deterministic.
     from order.enum.document_type import OrderDocumentTypeEnum
 
     vat = VatFactory(value=24)
@@ -81,6 +94,8 @@ def _make_invoice():
     order = OrderFactory(
         num_order_items=0,
         document_type=OrderDocumentTypeEnum.RECEIPT,
+        status=OrderStatus.PENDING,
+        payment_status=PaymentStatus.PENDING,
     )
     OrderItemFactory(
         order=order,
@@ -152,7 +167,11 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
     def test_falls_back_to_email_when_mydata_disabled(
         self, mock_email, mock_submit, _mock_render
     ):
-        order = OrderFactory(num_order_items=0)
+        order = OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
         OrderItemFactory(
             order=order,
             product=ProductFactory(vat=VatFactory(value=24)),
@@ -172,7 +191,11 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
         self, mock_email, mock_submit, _mock_render
     ):
         _enable_mydata()
-        order = OrderFactory(num_order_items=0)
+        order = OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
         OrderItemFactory(
             order=order,
             product=ProductFactory(vat=VatFactory(value=24)),
@@ -311,7 +334,11 @@ class SendInvoiceToMydataTestCase(TestCase):
         """An order without an Invoice row (e.g. document_type ≠
         INVOICE) must short-circuit to the email chain, not crash."""
         _enable_mydata()
-        order = OrderFactory(num_order_items=0)
+        order = OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
         OrderItemFactory(
             order=order,
             product=ProductFactory(vat=VatFactory(value=24)),
@@ -355,7 +382,11 @@ class CancelMydataInvoiceTestCase(TestCase):
 
     def test_no_mark_skips_without_error(self):
         _enable_mydata()
-        order = OrderFactory(num_order_items=0)
+        order = OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
         OrderItemFactory(
             order=order,
             product=ProductFactory(vat=VatFactory(value=24)),
@@ -408,6 +439,8 @@ class MydataEmailWithMarkTestCase(TestCase):
             order = OrderFactory(
                 num_order_items=0,
                 document_type=OrderDocumentTypeEnum.RECEIPT,
+                status=OrderStatus.PENDING,
+                payment_status=PaymentStatus.PENDING,
             )
             OrderItemFactory(
                 order=order,
@@ -416,6 +449,11 @@ class MydataEmailWithMarkTestCase(TestCase):
                 quantity=1,
             )
             generate_invoice(order)
+            # Clear any emails the order_created signal already sent
+            # (confirmation email runs eagerly under
+            # CELERY_TASK_ALWAYS_EAGER + on_commit-immediate fixture).
+            # Only the invoice email is under test here.
+            mail.outbox = []
             send_invoice_to_mydata(order.id)
 
         # First render = pre-transmission (no MARK). Second render =

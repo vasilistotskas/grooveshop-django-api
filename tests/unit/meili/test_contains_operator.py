@@ -221,7 +221,12 @@ class TestContainsOperator:
         queryset = IndexQuerySet(MockModel)
         queryset.filter(name__contains=special_string)
 
-        expected_filter = f'name CONTAINS "{special_string}"'
+        # _add_contains_filter escapes backslashes and double-quotes before
+        # interpolating, mirroring _add_exact_filter — so a substring like
+        # `test"quote` becomes `test\"quote` inside the quoted CONTAINS
+        # operand. Build the expected filter the same way.
+        escaped = special_string.replace("\\", "\\\\").replace('"', '\\"')
+        expected_filter = f'name CONTAINS "{escaped}"'
         assert expected_filter in queryset.filters
 
     @patch("meili.querysets.client")

@@ -133,7 +133,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
             mock_provider = mock_get_provider.return_value
             mock_provider.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,
-                {"status": "succeeded", "amount": 5000},
+                {"status": "succeeded"},
             )
 
             response = self.client.post(self.list_url, payload, format="json")
@@ -238,7 +238,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
             mock_provider = mock_get_provider.return_value
             mock_provider.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,
-                {"status": "succeeded", "amount": 5000},
+                {"status": "succeeded"},
             )
 
             response = self.client.post(self.list_url, payload, format="json")

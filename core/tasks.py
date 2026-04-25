@@ -35,6 +35,24 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+_SECRET_KEYS = frozenset(
+    {"password", "token", "key", "secret", "auth", "credential", "passwd"}
+)
+_ARG_TRUNCATE = 500
+
+
+def _safe_repr(value: Any, key: str | None = None) -> str:
+    """Return a truncated repr of *value*, masking secret-looking keys."""
+    if key is not None:
+        lower = str(key).lower()
+        if any(sk in lower for sk in _SECRET_KEYS):
+            return "***"
+    text = repr(value)
+    if len(text) > _ARG_TRUNCATE:
+        return text[:_ARG_TRUNCATE] + "…"
+    return text
+
+
 class MonitoredTask(Task):
     def on_success(self, retval, task_id, args, kwargs):
         logger.info(
@@ -42,9 +60,24 @@ class MonitoredTask(Task):
         )
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
+        safe_args = [_safe_repr(a) for a in (args or [])]
+        safe_kwargs = {
+            k: _safe_repr(v, key=k) for k, v in (kwargs or {}).items()
+        }
         logger.error(
-            f"Task {self.name} failed. Task ID: {task_id}, Error: {exc}"
+            "Task %s failed. Task ID: %s, Error: %s, args=%s, kwargs=%s",
+            self.name,
+            task_id,
+            exc,
+            safe_args,
+            safe_kwargs,
         )
+        if einfo is not None:
+            logger.debug(
+                "Task %s traceback:\n%s",
+                self.name,
+                einfo.traceback,
+            )
 
 
 @celery_app.task(

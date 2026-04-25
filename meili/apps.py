@@ -1,6 +1,7 @@
 import logging
 
 from django.apps import AppConfig
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -41,53 +42,61 @@ class MeiliConfig(AppConfig):
             use_async = (
                 not settings.DEBUG
                 and celery_available
-                and settings.MEILISEARCH.get("ASYNC_INDEXING", True)
+                and settings.MEILISEARCH["ASYNC_INDEXING"]
             )
             if use_async:
-                logger.debug("Indexing Document Async")
-                index_document_task.delay(
-                    app_label=model._meta.app_label,
-                    model_name=model._meta.model_name,
-                    pk=model.pk,
-                )
+
+                def _dispatch_index():
+                    logger.debug("Indexing Document Async")
+                    index_document_task.delay(
+                        app_label=model._meta.app_label,
+                        model_name=model._meta.model_name,
+                        pk=model.pk,
+                    )
+
+                transaction.on_commit(_dispatch_index)
                 return
 
             # Synchronous indexing for DEBUG mode or when Celery unavailable
-            try:
-                logger.debug("Indexing Document Sync")
-                serialized = model.meili_serialize()
-                pk = _get_document_pk(model)
-                geo = (
-                    model.meili_geo()
-                    if model._meilisearch["supports_geo"]
-                    else None
-                )
+            def _do_sync_index():
+                try:
+                    logger.debug("Indexing Document Sync")
+                    serialized = model.meili_serialize()
+                    pk = _get_document_pk(model)
+                    geo = (
+                        model.meili_geo()
+                        if model._meilisearch["supports_geo"]
+                        else None
+                    )
 
-                document = {
-                    **serialized,
-                    "id": pk,
-                    "pk": model._meta.pk.value_to_string(model),
-                }
-                if geo:
-                    document["_geo"] = geo
+                    document = {
+                        **serialized,
+                        "id": pk,
+                        "pk": model._meta.pk.value_to_string(model),
+                    }
+                    if geo:
+                        document["_geo"] = geo
 
-                task = _client.get_index(
-                    model._meilisearch["index_name"]
-                ).add_documents([document])
+                    task = _client.get_index(
+                        model._meilisearch["index_name"]
+                    ).add_documents([document])
 
-                if settings.DEBUG:
-                    finished = _client.wait_for_task(task.task_uid)
-                    if finished.status == "failed":
-                        logger.error(
-                            f"Failed to index {model._meta.label} pk={model.pk}: {finished.error}"
-                        )
-                        raise Exception(finished.error)
-            except Exception as e:
-                logger.error(
-                    f"Error indexing {model._meta.label} pk={model.pk}: {e}"
-                )
-                if settings.DEBUG:
-                    raise
+                    if settings.DEBUG:
+                        finished = _client.wait_for_task(task.task_uid)
+                        if finished.status == "failed":
+                            logger.error(
+                                f"Failed to index {model._meta.label} "
+                                f"pk={model.pk}: {finished.error}"
+                            )
+                            raise Exception(finished.error)
+                except Exception as e:
+                    logger.error(
+                        f"Error indexing {model._meta.label} pk={model.pk}: {e}"
+                    )
+                    if settings.DEBUG:
+                        raise
+
+            transaction.on_commit(_do_sync_index)
 
         def delete_model(**kwargs):
             """Signal handler for removing documents on delete."""
@@ -103,37 +112,45 @@ class MeiliConfig(AppConfig):
             use_async = (
                 not settings.DEBUG
                 and celery_available
-                and settings.MEILISEARCH.get("ASYNC_INDEXING", True)
+                and settings.MEILISEARCH["ASYNC_INDEXING"]
             )
             if use_async:
-                logger.debug("Deleting Document Async")
-                delete_document_task.delay(
-                    index_name=model._meilisearch["index_name"],
-                    document_pk=_get_document_pk(model),
-                )
+
+                def _dispatch_delete():
+                    logger.debug("Deleting Document Async")
+                    delete_document_task.delay(
+                        index_name=model._meilisearch["index_name"],
+                        document_pk=_get_document_pk(model),
+                    )
+
+                transaction.on_commit(_dispatch_delete)
                 return
 
             # Synchronous deletion for DEBUG mode or when Celery unavailable
-            try:
-                logger.debug("Deleting Document Sync")
-                pk = _get_document_pk(model)
-                task = _client.get_index(
-                    model._meilisearch["index_name"]
-                ).delete_document(pk)
+            def _do_sync_delete():
+                try:
+                    logger.debug("Deleting Document Sync")
+                    pk = _get_document_pk(model)
+                    task = _client.get_index(
+                        model._meilisearch["index_name"]
+                    ).delete_document(pk)
 
-                if settings.DEBUG:
-                    finished = _client.wait_for_task(task.task_uid)
-                    if finished.status == "failed":
-                        logger.error(
-                            f"Failed to delete {model._meta.label} pk={model.pk}: {finished.error}"
-                        )
-                        raise Exception(finished.error)
-            except Exception as e:
-                logger.error(
-                    f"Error deleting {model._meta.label} pk={model.pk}: {e}"
-                )
-                if settings.DEBUG:
-                    raise
+                    if settings.DEBUG:
+                        finished = _client.wait_for_task(task.task_uid)
+                        if finished.status == "failed":
+                            logger.error(
+                                f"Failed to delete {model._meta.label} "
+                                f"pk={model.pk}: {finished.error}"
+                            )
+                            raise Exception(finished.error)
+                except Exception as e:
+                    logger.error(
+                        f"Error deleting {model._meta.label} pk={model.pk}: {e}"
+                    )
+                    if settings.DEBUG:
+                        raise
+
+            transaction.on_commit(_do_sync_delete)
 
         def _get_document_pk(model: IndexMixin) -> str:
             """Extract the document primary key based on model configuration."""

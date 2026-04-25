@@ -35,6 +35,7 @@ from order.notifications import (
 )
 from order.tasks import (
     generate_order_invoice,
+    send_dispute_notification_email,
     send_order_confirmation_email,
     send_order_status_update_email,
     send_payment_failed_email,
@@ -64,18 +65,32 @@ def handle_order_post_save(
         hasattr(instance, "_original_status")
         and instance._original_status != instance.status
     ):
-        order_status_changed.send(
-            sender=sender,
-            order=instance,
-            old_status=instance._original_status,
-            new_status=instance.status,
-        )
-        logger.debug(
-            "Sent order_status_changed signal for order %s (%s -> %s)",
-            instance.id,
-            instance._original_status,
-            instance.status,
-        )
+        # Defer to on_commit so the Celery task dispatched by the
+        # signal handler sees the committed row (same pattern as
+        # the `created` branch above).
+        _old = instance._original_status
+        _new = instance.status
+
+        def send_status_changed_signal(
+            _sender=sender,
+            _instance=instance,
+            _old=_old,
+            _new=_new,
+        ):
+            order_status_changed.send(
+                sender=_sender,
+                order=_instance,
+                old_status=_old,
+                new_status=_new,
+            )
+            logger.debug(
+                "Sent order_status_changed signal for order %s (%s -> %s)",
+                _instance.id,
+                _old,
+                _new,
+            )
+
+        transaction.on_commit(send_status_changed_signal)
 
     # Detect the null → set transition on tracking info. We treat an
     # empty string the same as None because the field is declared with
@@ -220,7 +235,11 @@ def handle_order_status_changed(
         order=order, previous_status=old_status, new_status=new_status
     )
 
-    send_order_status_update_email.delay(order.id, new_status)
+    transaction.on_commit(
+        lambda oid=order.id, s=new_status: send_order_status_update_email.delay(
+            oid, s
+        )
+    )
 
     # Live in-app notification. ``notify_order_status_changed_live``
     # filters internally for statuses we actually want to surface in the
@@ -740,15 +759,80 @@ def handle_stripe_payment_requires_action(sender, **kwargs):
 
 @djstripe_receiver("charge.dispute.created")
 def handle_stripe_dispute_created(sender, **kwargs):
-    """Handle Stripe dispute creation webhook."""
+    """Handle Stripe dispute creation webhook.
+
+    Looks up the order by charge/payment_id, flags it in metadata so
+    staff can see the dispute state in the admin, and dispatches a staff
+    notification email.  Order status is NOT changed automatically —
+    that is a manual staff decision.
+    """
     logger.debug("Processing charge.dispute.created webhook")
 
     try:
         event: Event = kwargs["event"]
         dispute_data = event.data["object"]
-        charge_id = dispute_data["charge"]
+        charge_id = dispute_data.get("charge", "")
+        dispute_id = dispute_data.get("id", "")
+        reason = dispute_data.get("reason", "")
 
-        logger.warning("Stripe dispute created for charge: %s", charge_id)
+        logger.warning(
+            "Stripe dispute created",
+            extra={
+                "charge_id": charge_id,
+                "dispute_id": dispute_id,
+                "reason": reason,
+            },
+        )
+
+        if not charge_id:
+            logger.error(
+                "charge.dispute.created event missing charge id: %s",
+                event.id,
+            )
+            return
+
+        order = Order.objects.filter(payment_id=charge_id).first()
+        if order is None:
+            logger.warning(
+                "No order found for disputed charge %s (dispute=%s)",
+                charge_id,
+                dispute_id,
+            )
+            return
+
+        # Flag the order for staff review. Do NOT change order status —
+        # refund/acceptance is a manual decision.
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata["disputed"] = True
+        order.metadata["dispute_id"] = dispute_id
+        order.metadata["dispute_reason"] = reason
+        order.save(update_fields=["metadata"])
+
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"Stripe dispute created: dispute_id={dispute_id}, "
+                f"charge_id={charge_id}, reason={reason}"
+            ),
+        )
+
+        logger.warning(
+            "Order #%s flagged as disputed",
+            order.id,
+            extra={
+                "order_id": order.id,
+                "dispute_id": dispute_id,
+                "charge_id": charge_id,
+                "reason": reason,
+            },
+        )
+
+        transaction.on_commit(
+            lambda oid=order.id, did=dispute_id: (
+                send_dispute_notification_email.delay(oid, did)
+            )
+        )
 
     except Exception as e:
         logger.error(

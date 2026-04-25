@@ -1,6 +1,8 @@
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.helpers import lazy_serializer
+from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -24,6 +26,15 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     total_vat_value = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
     )
+    currency = serializers.SerializerMethodField(
+        help_text=_(
+            "ISO 4217 currency code for all monetary values in this cart"
+        ),
+    )
+
+    @extend_schema_field(OpenApiTypes.STR)
+    def get_currency(self, obj: Cart) -> str:
+        return str(settings.DEFAULT_CURRENCY)
 
     class Meta:
         model = Cart
@@ -37,6 +48,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "total_vat_value",
             "total_items",
             "total_items_unique",
+            "currency",
             "created_at",
             "updated_at",
             "last_activity",
@@ -127,4 +139,26 @@ class ReserveStockResponseSerializer(serializers.Serializer):
     )
     message = serializers.CharField(
         help_text=_("Success message"),
+    )
+
+
+class CartPaymentIntentResponseSerializer(serializers.Serializer):
+    """Response body returned by the create-payment-intent cart action."""
+
+    client_secret = serializers.CharField(
+        help_text=_(
+            "Stripe PaymentIntent client secret for frontend confirmation"
+        ),
+    )
+    payment_intent_id = serializers.CharField(
+        help_text=_("Stripe PaymentIntent ID to be stored on the order"),
+    )
+    amount = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text=_("Total charge amount (cart + shipping + payment fee)"),
+    )
+    currency = serializers.CharField(
+        max_length=3,
+        help_text=_("ISO 4217 currency code (e.g. EUR)"),
     )

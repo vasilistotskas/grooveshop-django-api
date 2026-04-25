@@ -355,10 +355,14 @@ class PayWayAdminTestCase(TestCase):
         self.assertEqual(self.admin.search_fields, expected_fields)
 
     def test_readonly_fields(self):
+        # `configuration` is in the base readonly_fields because it holds
+        # payment-provider secrets; get_readonly_fields() removes it for
+        # superusers (see test_get_readonly_fields_*).
         expected_fields = [
             "id",
             "created_at",
             "updated_at",
+            "configuration",
             "configuration_preview",
             "effective_cost_display",
             "is_configured_status",

@@ -56,6 +56,9 @@ class ExportActionMixinTest(TestCase):
         self.request._messages = messages
 
         self.queryset = MagicMock()
+        # export_csv/export_xml enforce a MAX_EXPORT_ROWS cap via
+        # queryset.count(); default to 0 so mocked querysets pass the guard.
+        self.queryset.count.return_value = 0
 
         self.test_model_instance = MagicMock(spec=MockAdminModel)
         self.test_model_instance.name = "Test Model"

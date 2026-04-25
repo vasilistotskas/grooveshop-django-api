@@ -510,9 +510,6 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         max_digits=11, decimal_places=2, read_only=True
     )
     phone = PhoneNumberField()
-    payment_id = serializers.CharField(required=False)
-    payment_status = serializers.CharField(required=False)
-    payment_method = serializers.CharField(required=False)
 
     def validate_items(self, value: list[dict]) -> list[dict]:
         if not value:
@@ -746,6 +743,12 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "payment_method_fee",
             "total_price_items",
             "total_price_extra",
+            "status",
+            "payment_id",
+            "payment_status",
+            "payment_method",
+            "tracking_number",
+            "shipping_carrier",
         )
         extra_kwargs = {
             "user": {

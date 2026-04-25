@@ -51,7 +51,10 @@ def notifications_by_ids(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    notifications = Notification.objects.filter(id__in=notification_ids)
+    notifications = Notification.objects.filter(
+        id__in=notification_ids,
+        notificationuser__user=request.user,
+    ).distinct()
 
     if seen_query is not None:
         user = request.user

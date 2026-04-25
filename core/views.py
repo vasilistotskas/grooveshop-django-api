@@ -14,8 +14,6 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.utils.translation import gettext_lazy as _
 from django.views import View
-from django.views.decorators.csrf import csrf_exempt
-
 from core.storages import TinymceS3Storage
 from core.utils.files import sanitize_filename
 
@@ -49,7 +47,6 @@ class HomeView(View):
         return render(request, self.template_name, {})
 
 
-@csrf_exempt
 @login_required
 def upload_image(request):
     USE_AWS = os.getenv("USE_AWS", "False") == "True"

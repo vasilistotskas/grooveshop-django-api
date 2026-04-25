@@ -43,22 +43,24 @@ def _is_private_ip(ip: str) -> bool:
 def _client_key(request: HttpRequest) -> str:
     """Return a stable, non-reversible identifier for the requesting client.
 
-    The app runs behind a single trusted reverse proxy (Traefik in K8s).
-    REMOTE_ADDR is always the proxy's address (a private/loopback IP), so we
-    use the *rightmost* (last) entry in X-Forwarded-For — the one appended by
-    our trusted proxy — rather than the leftmost, which an attacker can spoof.
-    If REMOTE_ADDR is not a private IP, we trust it directly and ignore the
-    X-Forwarded-For header entirely.
+    Prefers ``X-Real-IP`` set by Traefik (consistent with
+    ``user/adapter.py::get_client_ip`` and allauth's
+    ``ALLAUTH_TRUSTED_CLIENT_IP_HEADER``).  Falls back to the rightmost
+    ``X-Forwarded-For`` entry when REMOTE_ADDR is a private/proxy address,
+    and finally to REMOTE_ADDR itself for direct connections.
     """
     remote_addr = request.META.get("REMOTE_ADDR", "")
 
-    if _is_private_ip(remote_addr):
-        # We're behind a trusted proxy — use the last XFF entry set by the proxy.
+    real_ip = request.META.get("HTTP_X_REAL_IP", "").strip()
+    if real_ip:
+        ip = real_ip
+    elif _is_private_ip(remote_addr):
+        # Behind a trusted proxy without X-Real-IP — use the last XFF entry.
         xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
         entries = [e.strip() for e in xff.split(",") if e.strip()]
         ip = entries[-1] if entries else remote_addr
     else:
-        # Direct connection (or proxy is not on a private range) — trust as-is.
+        # Direct connection — trust REMOTE_ADDR as-is.
         ip = remote_addr
 
     return hashlib.sha256(ip.encode()).hexdigest()[:32]

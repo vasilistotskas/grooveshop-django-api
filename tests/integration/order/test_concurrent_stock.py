@@ -4,6 +4,7 @@ import pytest
 from django.db import connection
 
 from cart.factories import CartFactory, CartItemFactory
+from country.factories import CountryFactory
 from order.exceptions import InsufficientStockError
 from order.services import OrderService
 from order.stock import StockManager
@@ -298,6 +299,9 @@ class TestConcurrentStockOperationsPreventOverselling:
         # Create payment way for orders
         pay_way = PayWayFactory()
 
+        # Create a real country for shipping address (avoids relying on pk=1)
+        country = CountryFactory()
+
         # Track results from each thread
         results = []
         lock = threading.Lock()
@@ -335,7 +339,7 @@ class TestConcurrentStockOperationsPreventOverselling:
                         "street_number": "123",
                         "city": "Test City",
                         "zipcode": "12345",
-                        "country_id": 1,
+                        "country_id": country.pk,
                         "phone": "+1234567890",
                     },
                     payment_intent_id=f"pi_test_{thread_id}",

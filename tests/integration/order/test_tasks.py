@@ -10,6 +10,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.tasks import (
+    _release_confirmation_email,
     check_pending_orders,
     generate_order_invoice,
     send_invoice_email,
@@ -38,6 +39,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
         )
+        # Order creation fires the order_created signal → the confirmation
+        # email task runs eagerly (CELERY_TASK_ALWAYS_EAGER + on_commit fires
+        # immediately in tests) and reserves the dedupe flag. Release it so
+        # tests that call the task directly see a fresh run.
+        _release_confirmation_email(self.order.id)
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
@@ -273,6 +279,10 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         generate_invoice(self.order)
 
+        # Clear any emails the order_created signal already sent so we
+        # only assert on the invoice email below.
+        mail.outbox = []
+
         result = send_invoice_email(self.order.id)
         self.assertTrue(result)
         self.assertEqual(len(mail.outbox), 1)
@@ -362,6 +372,10 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             reminder_count=3,
             last_reminder_sent_at=timezone.now() - timedelta(days=8),
         )
+        # Reset — OrderFactory.create fires order_created which eagerly
+        # runs the confirmation-email task. We're asserting on
+        # check_pending_orders behaviour, not factory side-effects.
+        mock_email.reset_mock()
 
         result = check_pending_orders()
 
@@ -388,6 +402,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             reminder_count=1,
             last_reminder_sent_at=timezone.now() - timedelta(hours=12),
         )
+        # Reset the mock — OrderFactory.create fires order_created which
+        # eagerly runs the confirmation-email task (CELERY_TASK_ALWAYS_EAGER
+        # + on_commit-immediate fixture). We're asserting on what
+        # check_pending_orders does, not on order creation side-effects.
+        mock_email.reset_mock()
 
         result = check_pending_orders()
 
@@ -479,6 +498,11 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
             tracking_number="INT123",
             shipping_carrier="FedEx",
         )
+        # Order creation triggered the order_created signal which already
+        # ran the confirmation-email task eagerly and set the dedupe flag.
+        # Release it so the test calling send_order_confirmation_email
+        # directly sees a fresh run.
+        _release_confirmation_email(self.order.id)
 
     @patch("order.tasks.EmailMultiAlternatives")
     @patch("order.tasks.render_to_string")

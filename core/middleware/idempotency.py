@@ -44,6 +44,24 @@ MAX_CACHED_BODY_BYTES = 256 * 1024  # 256 KB — responses larger than this
 # (e.g. streaming file downloads) are not worth caching for idempotency.
 
 
+def _get_real_ip(request: HttpRequest) -> str:
+    """Return the real client IP, respecting X-Real-IP set by Traefik.
+
+    Preference order:
+    1. ``X-Real-IP`` header injected by our trusted reverse proxy (Traefik).
+    2. Rightmost entry in ``X-Forwarded-For`` (the one the proxy appended).
+    3. ``REMOTE_ADDR`` as final fallback for direct / test connections.
+    """
+    real_ip = request.META.get("HTTP_X_REAL_IP", "").strip()
+    if real_ip:
+        return real_ip
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    entries = [e.strip() for e in xff.split(",") if e.strip()]
+    if entries:
+        return entries[-1]  # rightmost (trusted proxy)
+    return request.META.get("REMOTE_ADDR", "unknown")
+
+
 def _scope_id(request: HttpRequest) -> str:
     user = getattr(request, "user", None)
     if user is not None and getattr(user, "is_authenticated", False):
@@ -53,9 +71,9 @@ def _scope_id(request: HttpRequest) -> str:
     )
     if session_key:
         return f"s:{session_key}"
-    # Last-resort fallback — keyed to remote addr. Weaker guarantee but
+    # Last-resort fallback — keyed to real client IP. Weaker guarantee but
     # still prevents accidental cross-client aliasing on retries.
-    return f"ip:{request.META.get('REMOTE_ADDR', 'unknown')}"
+    return f"ip:{_get_real_ip(request)}"
 
 
 def _cache_key(request: HttpRequest, idempotency_key: str) -> str:

@@ -38,6 +38,9 @@ if not SECRET_KEY:
         )
     SECRET_KEY = "insecure-dev-key-do-not-use-in-production"
 
+_fallback = getenv("SECRET_KEY_FALLBACK", "")
+SECRET_KEY_FALLBACKS = [_fallback] if _fallback else []
+
 DEBUG = getenv("DEBUG", "False") == "True"
 
 DJANGO_ADMIN_FORCE_ALLAUTH = (
@@ -77,7 +80,14 @@ ALLOWED_HOSTS.extend(filter(None, additional_hosts))
 if "testserver" not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append("testserver")
 
-USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "False") == "True"
+USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "True") == "True"
+if SYSTEM_ENV == "production" and not USE_X_FORWARDED_HOST:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "USE_X_FORWARDED_HOST must be True in production — the Nuxt proxy always "
+        "sets the X-Forwarded-Host header and DRF pagination links rely on it."
+    )
 
 DJANGO_APPS = [
     "daphne",
@@ -117,6 +127,7 @@ LOCAL_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
+    "channels",
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
@@ -151,9 +162,9 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "core.middleware.correlation_id.CorrelationIdMiddleware",
     "django.middleware.gzip.GZipMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
     "core.middleware.translation_reload.TranslationReloadMiddleware",
@@ -234,6 +245,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+]
+
 # Rest Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -272,7 +291,13 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 12,
     "DEFAULT_RENDERER_CLASSES": (
         "djangorestframework_camel_case.render.CamelCaseJSONRenderer",
-        "djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer",
+        *(
+            (
+                "djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer",
+            )
+            if DEBUG
+            else ()
+        ),
     ),
     "DEFAULT_PARSER_CLASSES": (
         "djangorestframework_camel_case.parser.CamelCaseFormParser",
@@ -286,6 +311,13 @@ REST_FRAMEWORK = {
 APPEND_SLASH = getenv("APPEND_SLASH", "False") == "True"
 
 DEEPL_AUTH_KEY = getenv("DEEPL_AUTH_KEY", "changeme")
+if DEEPL_AUTH_KEY == "changeme" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "DEEPL_AUTH_KEY must be set in production "
+        "(current value is the insecure default 'changeme')."
+    )
 
 LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 
@@ -466,9 +498,15 @@ if SYSTEM_ENV == "ci":
 
 
 # Broker & Results
-CELERY_BROKER_URL = getenv(
-    "CELERY_BROKER_URL", "amqp://guest:guest@rabbitmq:5672//"
-)
+CELERY_BROKER_URL = getenv("CELERY_BROKER_URL", "")
+if not CELERY_BROKER_URL:
+    if SYSTEM_ENV == "production":
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured(
+            "CELERY_BROKER_URL must be set in production."
+        )
+    CELERY_BROKER_URL = "amqp://guest:guest@rabbitmq:5672//"
 CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
 CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 
@@ -703,7 +741,11 @@ CELERY_BEAT_SCHEDULE = get_celery_beat_schedule()
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [REDIS_URL]},
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+            "capacity": 1500,
+            "expiry": 300,
+        },
     },
 }
 
@@ -711,6 +753,13 @@ CHANNEL_LAYERS = {
 APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
 API_BASE_URL = getenv("API_BASE_URL", "http://localhost:8000")
 AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME", "changeme")
+if AWS_STORAGE_BUCKET_NAME == "changeme" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "AWS_STORAGE_BUCKET_NAME must be set in production "
+        "(current value is the insecure default 'changeme')."
+    )
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
 CORS_EXPOSE_HEADERS = [
@@ -725,10 +774,6 @@ CORS_ALLOWED_ORIGINS = [
     MEDIA_STREAM_BASE_URL,
     STATIC_BASE_URL,
     f"https://{AWS_S3_CUSTOM_DOMAIN}",
-    "http://backend-service:80",
-    "http://frontend-nuxt-service:80",
-    "http://media-stream-service:80",
-    "http://localhost:1337",
 ]
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 CORS_ALLOW_CREDENTIALS = True
@@ -750,7 +795,14 @@ CORS_ALLOW_HEADERS = (
 CSRF_USE_SESSIONS = False
 CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52  # 1 year
-CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN", "localhost")
+_csrf_cookie_domain = getenv("CSRF_COOKIE_DOMAIN", "") or None
+if SYSTEM_ENV == "production" and not _csrf_cookie_domain:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "CSRF_COOKIE_DOMAIN must be set in production (e.g. .webside.gr)."
+    )
+CSRF_COOKIE_DOMAIN = _csrf_cookie_domain
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_SECURE = (
     not DEBUG
@@ -769,15 +821,15 @@ CSRF_TRUSTED_ORIGINS = [
     MEDIA_STREAM_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     STATIC_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     f"https://{AWS_S3_CUSTOM_DOMAIN}",
-    "http://backend-service:80",
-    "http://frontend-nuxt-service:80",
-    "http://media-stream-service:80",
 ]
 
-# Local development URLs should only be in the list if in DEBUG mode
+# Internal K8s service URLs and local dev origins are only valid in non-production
 if DEBUG:
     CSRF_TRUSTED_ORIGINS.extend(
         [
+            "http://backend-service:80",
+            "http://frontend-nuxt-service:80",
+            "http://media-stream-service:80",
             "http://localhost:3000",
         ]
     )
@@ -789,10 +841,10 @@ SECURE_SSL_REDIRECT = (
 SECURE_PROXY_SSL_HEADER = (
     ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
 )
-_default_hsts = 0 if not DEBUG else 3600
+_default_hsts = 0 if DEBUG else 31536000
 SECURE_HSTS_SECONDS = int(getenv("SECURE_HSTS_SECONDS", str(_default_hsts)))
-SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0 and not DEBUG
-SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0 and not DEBUG
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
+SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
 
 # Currency
 DEFAULT_CURRENCY = getenv("DEFAULT_CURRENCY", "EUR")
@@ -803,6 +855,7 @@ CONN_HEALTH_CHECKS = True
 ATOMIC_REQUESTS = False
 INDEX_MAXIMUM_EXPR_COUNT = 8000
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+DATA_UPLOAD_MAX_MEMORY_SIZE = 2621440  # 2.5 MB (Django default, made explicit)
 
 # Use psycopg connection pool to bound DB connections per process. Each
 # process maintains a pool of <DB_POOL_MAX_SIZE> connections regardless of
@@ -818,6 +871,7 @@ DB_POOL_TIMEOUT = float(getenv("DB_POOL_TIMEOUT", "10"))
 _db_options: dict = {
     "connect_timeout": 5,
     "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
+    "sslmode": getenv("DB_SSLMODE", "prefer"),
 }
 if DB_POOL_ENABLED:
     _db_options["pool"] = {
@@ -825,6 +879,15 @@ if DB_POOL_ENABLED:
         "max_size": DB_POOL_MAX_SIZE,
         "timeout": DB_POOL_TIMEOUT,
     }
+
+DB_PASSWORD = getenv("DB_PASSWORD", "postgres")
+if DB_PASSWORD == "postgres" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "DB_PASSWORD must be set in production "
+        "(current value is the insecure default 'postgres')."
+    )
 
 DATABASES = {
     "default": {
@@ -840,7 +903,7 @@ DATABASES = {
         "HOST": getenv("DB_HOST", "db"),
         "NAME": getenv("DB_NAME", "postgres"),
         "USER": getenv("DB_USER", "postgres"),
-        "PASSWORD": getenv("DB_PASSWORD", "postgres"),
+        "PASSWORD": DB_PASSWORD,
         "PORT": getenv("DB_PORT", "5432"),
         "OPTIONS": _db_options,
     },
@@ -852,23 +915,31 @@ if SYSTEM_ENV == "ci":
             "ENGINE": "django.db.backends.postgresql",
             "NAME": "postgres",
             "USER": getenv("DB_USER", "postgres"),
-            "PASSWORD": getenv("DB_PASSWORD", "postgres"),
+            "PASSWORD": DB_PASSWORD,
             "HOST": "127.0.0.1",
             "PORT": "5432",
         }
     }
 
 # Maili settings
+_meili_master_key = getenv("MEILI_MASTER_KEY", "changeme")
+if _meili_master_key == "changeme" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "MEILI_MASTER_KEY must be set in production "
+        "(current value is the insecure default 'changeme')."
+    )
 MEILISEARCH = {
     "HTTPS": getenv("MEILI_HTTPS", "False") == "True",
     "HOST": getenv("MEILI_HOST", "localhost"),
-    "MASTER_KEY": getenv("MEILI_MASTER_KEY", "changeme"),
+    "MASTER_KEY": _meili_master_key,
     "PORT": int(getenv("MEILI_PORT", "7700")),
     "TIMEOUT": int(getenv("MEILI_TIMEOUT", "30")),
     "CLIENT_AGENTS": None,
     "DEBUG": DEBUG,
     "SYNC": DEBUG,
-    "ASYNC_INDEXING": getenv("MEILI_ASYNC_INDEXING", "False") == "True",
+    "ASYNC_INDEXING": getenv("MEILI_ASYNC_INDEXING", "True") == "True",
     "OFFLINE": getenv("MEILI_OFFLINE", "False") == "True",
     "DEFAULT_BATCH_SIZE": int(getenv("MEILI_DEFAULT_BATCH_SIZE", "5000")),
 }
@@ -1183,7 +1254,14 @@ EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = getenv("EMAIL_PORT", "25")
 EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")
 EMAIL_HOST_PASSWORD = getenv("EMAIL_HOST_PASSWORD", "changeme")
-EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "False") == "True"
+if EMAIL_HOST_PASSWORD == "changeme" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "EMAIL_HOST_PASSWORD must be set in production "
+        "(current value is the insecure default 'changeme')."
+    )
+EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "True") == "True"
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 ADMIN_EMAIL = getenv("ADMIN_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
@@ -1193,6 +1271,7 @@ REST_KNOX = {
     "AUTH_HEADER_PREFIX": "Bearer",
     "AUTO_REFRESH": True,
     "MIN_REFRESH_INTERVAL": 86400,  # Only extend TTL if token is >1 day old
+    "TOKEN_LIMIT_PER_USER": 10,  # Prevent unbounded token accumulation per user
 }
 KNOX_TOKEN_MODEL = "knox.AuthToken"
 
@@ -1816,7 +1895,14 @@ UNFOLD = {
 SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_NAME = "sessionid"
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 * 2
-SESSION_COOKIE_DOMAIN = getenv("SESSION_COOKIE_DOMAIN", "localhost")
+_session_cookie_domain = getenv("SESSION_COOKIE_DOMAIN", "") or None
+if SYSTEM_ENV == "production" and not _session_cookie_domain:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "SESSION_COOKIE_DOMAIN must be set in production (e.g. .webside.gr)."
+    )
+SESSION_COOKIE_DOMAIN = _session_cookie_domain
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_PATH = "/"
 SESSION_COOKIE_HTTPONLY = True
@@ -1965,6 +2051,11 @@ TINYMCE_DEFAULT_CONFIG = {
     "fullscreen  preview save print | insertfile image media pageembed template link anchor codesample | "
     "a11ycheck ltr rtl | showcomments addcomment code",
     "images_upload_url": "/upload_image",
+    # Send cookies with the image upload request so Django can verify
+    # the CSRF token from the csrftoken cookie.  Without this flag
+    # TinyMCE makes a cross-origin (credentialless) fetch and Django's
+    # CsrfViewMiddleware rejects the request with 403.
+    "images_upload_credentials": True,
     "relative_urls": False,
     "remove_script_host": False,
     "entity_encoding": "raw",
@@ -2129,8 +2220,8 @@ else:
 
 # PAYMENT SETTINGS
 # Stripe Configuration (dj-stripe format)
-STRIPE_LIVE_SECRET_KEY = getenv("STRIPE_LIVE_SECRET_KEY", "sk_live_...")
-STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "sk_test_...")
+STRIPE_LIVE_SECRET_KEY = getenv("STRIPE_LIVE_SECRET_KEY", "")
+STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "")
 STRIPE_LIVE_MODE = not DEBUG
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
 DJSTRIPE_WEBHOOK_VALIDATION = "verify_signature"

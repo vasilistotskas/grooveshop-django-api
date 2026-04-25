@@ -61,11 +61,6 @@ urlpatterns = [
         name="user-account-liked-blog-posts",
     ),
     path(
-        "user/account/<int:pk>/liked_blog_posts",
-        UserAccountViewSet.as_view({"get": "liked_blog_posts"}),
-        name="user-account-liked-blog-posts",
-    ),
-    path(
         "user/account/<int:pk>/notifications",
         UserAccountViewSet.as_view({"get": "notifications"}),
         name="user-account-notifications",

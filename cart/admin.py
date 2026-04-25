@@ -1,6 +1,8 @@
 from datetime import timedelta
 
 from django.contrib import admin
+from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
@@ -208,6 +210,7 @@ class CartAdmin(ModelAdmin):
         "user__last_name",
     )
     date_hierarchy = "last_activity"
+    raw_id_fields = ["user"]
     list_select_related = ["user"]
     readonly_fields = [
         "id",
@@ -616,13 +619,12 @@ class CartItemAdmin(ModelAdmin):
         icon="add",
     )
     def increase_quantity(self, request, queryset):
-        for item in queryset:
-            item.quantity += 1
-            item.save()
+        count = queryset.count()
+        with transaction.atomic():
+            queryset.update(quantity=F("quantity") + 1)
         self.message_user(
             request,
-            _("Quantity increased for %(count)d items.")
-            % {"count": queryset.count()},
+            _("Quantity increased for %(count)d items.") % {"count": count},
         )
 
     @action(
@@ -631,16 +633,15 @@ class CartItemAdmin(ModelAdmin):
         icon="remove",
     )
     def decrease_quantity(self, request, queryset):
-        for item in queryset:
-            if item.quantity > 1:
-                item.quantity -= 1
-                item.save()
-            else:
-                item.delete()
+        count = queryset.count()
+        with transaction.atomic():
+            # Delete items that are already at quantity 1 (would reach 0)
+            queryset.filter(quantity__lte=1).delete()
+            # Decrease the rest
+            queryset.filter(quantity__gt=1).update(quantity=F("quantity") - 1)
         self.message_user(
             request,
-            _("Quantity decreased for %(count)d items.")
-            % {"count": queryset.count()},
+            _("Quantity decreased for %(count)d items.") % {"count": count},
         )
 
     @action(

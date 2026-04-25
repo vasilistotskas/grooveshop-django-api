@@ -56,8 +56,15 @@ class TestMonitoredTask:
             exc=exception, task_id="12345", args=(), kwargs={}, einfo=None
         )
 
+        # MonitoredTask.on_failure logs args/kwargs for debuggability; mask
+        # is applied per-key by _safe_repr.
         mock_logger.error.assert_called_once_with(
-            "Task test_task failed. Task ID: 12345, Error: Test error"
+            "Task %s failed. Task ID: %s, Error: %s, args=%s, kwargs=%s",
+            "test_task",
+            "12345",
+            exception,
+            [],
+            {},
         )
 
 

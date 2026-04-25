@@ -99,7 +99,7 @@ class TestOrderServiceCreateOrderFromCart:
         mock_provider = Mock()
         mock_provider.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
-            {"status": "succeeded", "amount": 13000},
+            {"status": "succeeded"},
         )
         mock_get_provider.return_value = mock_provider
 

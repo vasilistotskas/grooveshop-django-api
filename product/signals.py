@@ -2,6 +2,7 @@ import logging
 
 import django.dispatch
 from django.conf import settings
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from simple_history.signals import post_create_historical_record
@@ -145,12 +146,16 @@ def reindex_product_translations(sender, instance, **kwargs):
         if not translation_pks:
             return
         logger.debug("Reindexing ProductTranslation Async")
-        for pk in translation_pks:
-            index_document_task.delay(
-                app_label="product",
-                model_name="producttranslation",
-                pk=pk,
-            )
+
+        def _dispatch_reindex(pks=translation_pks):
+            for pk in pks:
+                index_document_task.delay(
+                    app_label="product",
+                    model_name="producttranslation",
+                    pk=pk,
+                )
+
+        transaction.on_commit(_dispatch_reindex)
     else:
         if not translations.exists():
             return
@@ -209,14 +214,22 @@ def notify_product_price_lowered(
         send_product_alert_price_drop,
     )
 
-    send_price_drop_notifications.delay(
-        product_id=instance.id,
-        old_price=float(old_price),
-        new_price=float(new_price),
+    product_id = instance.id
+    old_price_f = float(old_price)
+    new_price_f = float(new_price)
+
+    transaction.on_commit(
+        lambda: send_price_drop_notifications.delay(
+            product_id=product_id,
+            old_price=old_price_f,
+            new_price=new_price_f,
+        )
     )
-    send_product_alert_price_drop.delay(
-        product_id=instance.id,
-        new_price=float(new_price),
+    transaction.on_commit(
+        lambda: send_product_alert_price_drop.delay(
+            product_id=product_id,
+            new_price=new_price_f,
+        )
     )
 
 
@@ -230,10 +243,18 @@ def notify_product_back_in_stock(sender, instance, **kwargs):
         send_product_alert_restock,
     )
 
+    product_id = instance.id
+
     # Explicit opt-in subscribers get an email (ProductAlert RESTOCK).
-    send_product_alert_restock.delay(product_id=instance.id)
+    transaction.on_commit(
+        lambda: send_product_alert_restock.delay(product_id=product_id)
+    )
     # Implicit interest (favouriters) gets a live in-app notification.
-    notify_back_in_stock_favourites_live.delay(product_id=instance.id)
+    transaction.on_commit(
+        lambda: notify_back_in_stock_favourites_live.delay(
+            product_id=product_id
+        )
+    )
 
 
 @receiver(
@@ -279,12 +300,16 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
         logger.debug(
             f"Reindexing ProductTranslation Async due to ProductAttribute change for product {instance.product_id}"
         )
-        for pk in translation_pks:
-            index_document_task.delay(
-                app_label="product",
-                model_name="producttranslation",
-                pk=pk,
-            )
+
+        def _dispatch_attr_reindex(pks=translation_pks):
+            for pk in pks:
+                index_document_task.delay(
+                    app_label="product",
+                    model_name="producttranslation",
+                    pk=pk,
+                )
+
+        transaction.on_commit(_dispatch_attr_reindex)
     else:
         if not translations.exists():
             return

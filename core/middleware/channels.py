@@ -1,7 +1,4 @@
-import binascii
 import logging
-from hmac import compare_digest
-from typing import TYPE_CHECKING
 from urllib.parse import parse_qs
 
 from channels.db import database_sync_to_async
@@ -9,14 +6,8 @@ from channels.middleware import BaseMiddleware
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
-from django.utils import timezone
-from knox.crypto import hash_token
-from knox.settings import CONSTANTS, knox_settings
 
 from notification.views.websocket import build_ticket_cache_key
-
-if TYPE_CHECKING:
-    from knox.models import AuthToken
 
 logger = logging.getLogger(__name__)
 
@@ -30,72 +21,60 @@ def authenticate_ticket(ticket: str):
     The ticket is deleted on first read so intercepted values can't be
     replayed — a legitimate client never sends the same ticket twice
     because tickets map 1:1 to connection attempts.
+
+    Uses an atomic Redis GETDEL so that concurrent connection attempts
+    using the same ticket value can never both succeed (compare-and-delete
+    has a TOCTOU window; GETDEL is a single round-trip).
+
+    Also verifies that at least one live Knox token exists for the user.
+    If Knox tokens were revoked (e.g. password/email change) between
+    ticket minting and WS connect, the connection is denied even though
+    the ticket itself is still valid.
     """
+    from knox.models import get_token_model  # noqa: PLC0415
+
     if not ticket:
         return AnonymousUser()
 
-    key = build_ticket_cache_key(ticket)
-    user_id = cache.get(key)
-    if user_id is None:
+    raw_key = build_ticket_cache_key(ticket)
+    # Resolve the Django-prefixed Redis key that the cache layer stored.
+    prefixed_key = cache.make_and_validate_key(raw_key)
+
+    # Atomic GETDEL — returns bytes or None.
+    raw_value: bytes | None = cache._cache.get_client(
+        prefixed_key, write=True
+    ).getdel(prefixed_key)
+
+    if raw_value is None:
         return AnonymousUser()
-    cache.delete(key)
+
+    # Django's RedisSerializer stores plain ints without pickling them.
+    try:
+        user_id = int(raw_value)
+    except (ValueError, TypeError):
+        logger.warning(
+            "WS ticket cache value is not a valid user PK: %r", raw_value
+        )
+        return AnonymousUser()
 
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
         return AnonymousUser()
 
-    return user if user.is_active else AnonymousUser()
-
-
-@database_sync_to_async
-def authenticate_token(token: str):
-    from knox.models import get_token_model  # noqa: PLC0415
-
-    try:
-        token = token.strip()
-    except AttributeError:
+    if not user.is_active:
         return AnonymousUser()
 
-    for auth_token in get_token_model().objects.filter(
-        token_key=token[: CONSTANTS.TOKEN_KEY_LENGTH]
-    ):
-        if _cleanup_token(auth_token):
-            continue
+    # Deny connections if all Knox tokens have been revoked — e.g. because
+    # the user changed their password between minting the ticket and
+    # opening the WebSocket.
+    if not get_token_model().objects.filter(user=user).exists():
+        logger.info(
+            "WS ticket rejected: no live Knox tokens for user %s", user.pk
+        )
+        return AnonymousUser()
 
-        try:
-            digest = hash_token(token)
-        except (TypeError, binascii.Error) as e:
-            logger.debug("Error hashing WebSocket token: %s", e)
-            continue
-
-        if compare_digest(digest, auth_token.digest):
-            if knox_settings.AUTO_REFRESH and auth_token.expiry:
-                _renew_token(auth_token)
-
-            return (
-                auth_token.user
-                if auth_token.user.is_active
-                else AnonymousUser()
-            )
-
-    return AnonymousUser()
-
-
-def _renew_token(auth_token: "AuthToken"):
-    current_expiry = auth_token.expiry
-    new_expiry = timezone.now() + knox_settings.TOKEN_TTL
-    auth_token.expiry = new_expiry
-    delta = (new_expiry - current_expiry).total_seconds()
-    if delta > knox_settings.MIN_REFRESH_INTERVAL:
-        auth_token.save(update_fields=("expiry",))
-
-
-def _cleanup_token(auth_token: "AuthToken"):
-    if auth_token.expiry is not None and auth_token.expiry < timezone.now():
-        auth_token.delete()
-        return True
-    return False
+    return user
 
 
 class TokenAuthMiddleware(BaseMiddleware):
@@ -103,16 +82,10 @@ class TokenAuthMiddleware(BaseMiddleware):
         query_string = scope.get("query_string", b"").decode()
         query_params = parse_qs(query_string)
 
-        # Prefer single-use ticket (short-lived, can't be replayed).
-        # `access_token` remains as a fallback for internal/test callers
-        # that can't fetch a ticket; remove once all clients migrate.
         ticket = query_params.get("ticket", [None])[0]
-        access_token = query_params.get("access_token", [None])[0]
 
         if ticket:
             scope["user"] = await authenticate_ticket(ticket)
-        elif access_token:
-            scope["user"] = await authenticate_token(access_token)
         else:
             scope["user"] = AnonymousUser()
 

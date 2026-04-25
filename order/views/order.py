@@ -39,6 +39,8 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    PaymentAmountMismatchError,
+    PaymentCurrencyMismatchError,
     PaymentNotFoundError,
 )
 from order.filters import OrderFilter
@@ -253,9 +255,15 @@ class OrderViewSet(BaseModelViewSet):
 
         Uses Order.objects.for_list() for list views and
         Order.objects.for_detail() for detail views to avoid N+1 queries.
+
+        Non-staff users on the list action only see their own orders to
+        prevent IDOR enumeration of all orders.
         """
         if self.action == "list":
-            return Order.objects.for_list()
+            qs = Order.objects.for_list()
+            if not self.request.user.is_staff:
+                qs = qs.filter(user=self.request.user)
+            return qs
         elif self.action == "my_orders":
             return Order.objects.for_list()
         return Order.objects.for_detail()
@@ -470,6 +478,40 @@ class OrderViewSet(BaseModelViewSet):
                     "detail": _("Payment not found"),
                     "error": {
                         "type": "payment_not_found",
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except PaymentAmountMismatchError as e:
+            logger.warning(
+                "Payment amount mismatch: provider=%d cents, calculated=%d cents",
+                e.provider_amount_cents,
+                e.calculated_amount_cents,
+            )
+            return Response(
+                {
+                    "detail": _("Payment amount does not match order total."),
+                    "error": {
+                        "type": "payment_amount_mismatch",
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except PaymentCurrencyMismatchError as e:
+            logger.warning(
+                "Payment currency mismatch: provider='%s', expected='%s'",
+                e.provider_currency,
+                e.expected_currency,
+            )
+            return Response(
+                {
+                    "detail": _(
+                        "Payment currency does not match order currency."
+                    ),
+                    "error": {
+                        "type": "payment_currency_mismatch",
                     },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
@@ -778,7 +820,17 @@ class OrderViewSet(BaseModelViewSet):
 
         return Response(response_serializer.validated_data)
 
-    @action(detail=True, methods=["POST"], url_path="retry-payment")
+    @action(
+        detail=True,
+        methods=["POST"],
+        url_path="retry-payment",
+        throttle_classes=[
+            AnonRateThrottle,
+            UserRateThrottle,
+            PaymentAttemptThrottle,
+            PaymentAttemptAnonThrottle,
+        ],
+    )
     def retry_payment(self, request, *args, **kwargs):
         """Create a fresh Stripe PaymentIntent for a failed/pending order.
 

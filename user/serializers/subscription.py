@@ -156,14 +156,7 @@ class UserSubscriptionSerializer(serializers.ModelSerializer[UserSubscription]):
 
 class UserSubscriptionDetailSerializer(UserSubscriptionSerializer):
     class Meta(UserSubscriptionSerializer.Meta):
-        fields = [
-            *UserSubscriptionSerializer.Meta.fields,
-            "confirmation_token",
-        ]
-        read_only_fields = [
-            *UserSubscriptionSerializer.Meta.read_only_fields,
-            "confirmation_token",
-        ]
+        pass
 
 
 class UserSubscriptionWriteSerializer(
@@ -177,7 +170,6 @@ class UserSubscriptionWriteSerializer(
         model = UserSubscription
         fields = [
             "topic",
-            "status",
             "metadata",
         ]
 

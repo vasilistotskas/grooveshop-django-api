@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.db.models import Count
+from django.db.models import Count, Exists, OuterRef
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
@@ -134,7 +134,11 @@ class BlogCommentViewSet(BaseModelViewSet):
         if not self.request.user.is_staff:
             queryset = queryset.filter(approved=True)
 
-        return queryset
+        return queryset.annotate(
+            has_replies=Exists(
+                BlogComment.objects.filter(parent=OuterRef("pk"), approved=True)
+            )
+        )
 
     def get_permissions(self):
         permission_classes = []
@@ -268,6 +272,11 @@ class BlogCommentViewSet(BaseModelViewSet):
             )
             .annotate(
                 likes_count_field=Count("likes", distinct=True),
+                has_replies=Exists(
+                    BlogComment.objects.filter(
+                        parent=OuterRef("pk"), approved=True
+                    )
+                ),
             )
             .filter(user=request.user)
             .order_by("-created_at")

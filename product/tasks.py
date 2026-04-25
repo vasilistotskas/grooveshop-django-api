@@ -199,7 +199,15 @@ def send_price_drop_notifications(
     }
 
 
-@shared_task
+@shared_task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    soft_time_limit=600,
+    time_limit=900,
+)
 def check_low_stock_products() -> dict:
     """Send a single consolidated low-stock alert to the admin.
 

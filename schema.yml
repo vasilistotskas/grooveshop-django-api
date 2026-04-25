@@ -7564,6 +7564,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartPaymentIntentResponse'
+          description: ''
   /api/v1/cart/item:
     get:
       operationId: listCartItem
@@ -11487,7 +11493,6 @@ paths:
         name: paymentStatus
         schema:
           type: string
-          title: Κατάσταση πληρωμής
           enum:
           - CANCELED
           - COMPLETED
@@ -11499,13 +11504,13 @@ paths:
         description: |-
           Filter by payment status
 
-          * `PENDING` - Εκκρεμεί
-          * `PROCESSING` - Σε επεξεργασία
-          * `COMPLETED` - Ολοκληρώθηκε
+          * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `COMPLETED` - Completed
           * `FAILED` - Failed
-          * `REFUNDED` - Επεστράφη
+          * `REFUNDED` - Refunded
           * `PARTIALLY_REFUNDED` - Partially Refunded
-          * `CANCELED` - Ακυρώθηκε
+          * `CANCELED` - Canceled
       - in: query
         name: paymentStatus_In
         schema:
@@ -11607,7 +11612,6 @@ paths:
         name: status
         schema:
           type: string
-          title: Κατάσταση
           enum:
           - CANCELED
           - COMPLETED
@@ -11620,14 +11624,14 @@ paths:
         description: |-
           Filter by order status
 
-          * `PENDING` - Εκκρεμεί
-          * `PROCESSING` - Σε επεξεργασία
-          * `SHIPPED` - Απεστάλη
-          * `DELIVERED` - Παραδόθηκε
-          * `COMPLETED` - Ολοκληρώθηκε
-          * `CANCELED` - Ακυρώθηκε
-          * `RETURNED` - Επιστράφηκε
-          * `REFUNDED` - Επεστράφη
+          * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `SHIPPED` - Shipped
+          * `DELIVERED` - Delivered
+          * `COMPLETED` - Completed
+          * `CANCELED` - Canceled
+          * `RETURNED` - Returned
+          * `REFUNDED` - Refunded
       - in: query
         name: status_In
         schema:
@@ -11820,8 +11824,8 @@ paths:
           description: ''
     post:
       operationId: createOrder
-      description: Create a new Παραγγελία. Requires authentication.
-      summary: Create a Παραγγελία
+      description: Create a new Ταξινόμηση. Requires authentication.
+      summary: Create a Ταξινόμηση
       parameters:
       - in: query
         name: languageCode
@@ -11890,10 +11894,10 @@ paths:
   /api/v1/order-items:
     get:
       operationId: listOrderItem
-      description: 'Retrieve a list of Προϊόντα Παραγγελίας with filtering and search
-        capabilities. Supports multiple pagination strategies: pageNumber (default),
-        cursor, and limitOffset.'
-      summary: List Προϊόντα Παραγγελίας
+      description: 'Retrieve a list of Order Items with filtering and search capabilities.
+        Supports multiple pagination strategies: pageNumber (default), cursor, and
+        limitOffset.'
+      summary: List Order Items
       parameters:
       - in: query
         name: bulkItems
@@ -12081,7 +12085,6 @@ paths:
         name: order_PaymentStatus
         schema:
           type: string
-          title: Κατάσταση πληρωμής
           enum:
           - CANCELED
           - COMPLETED
@@ -12093,13 +12096,13 @@ paths:
         description: |-
           Filter by order payment status
 
-          * `PENDING` - Εκκρεμεί
-          * `PROCESSING` - Σε επεξεργασία
-          * `COMPLETED` - Ολοκληρώθηκε
+          * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `COMPLETED` - Completed
           * `FAILED` - Failed
-          * `REFUNDED` - Επεστράφη
+          * `REFUNDED` - Refunded
           * `PARTIALLY_REFUNDED` - Partially Refunded
-          * `CANCELED` - Ακυρώθηκε
+          * `CANCELED` - Canceled
       - in: query
         name: order_Region
         schema:
@@ -12109,7 +12112,6 @@ paths:
         name: order_Status
         schema:
           type: string
-          title: Κατάσταση
           enum:
           - CANCELED
           - COMPLETED
@@ -12122,14 +12124,14 @@ paths:
         description: |-
           Filter by order status
 
-          * `PENDING` - Εκκρεμεί
-          * `PROCESSING` - Σε επεξεργασία
-          * `SHIPPED` - Απεστάλη
-          * `DELIVERED` - Παραδόθηκε
-          * `COMPLETED` - Ολοκληρώθηκε
-          * `CANCELED` - Ακυρώθηκε
-          * `RETURNED` - Επιστράφηκε
-          * `REFUNDED` - Επεστράφη
+          * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `SHIPPED` - Shipped
+          * `DELIVERED` - Delivered
+          * `COMPLETED` - Completed
+          * `CANCELED` - Canceled
+          * `RETURNED` - Returned
+          * `REFUNDED` - Refunded
       - in: query
         name: order_User
         schema:
@@ -12915,8 +12917,8 @@ paths:
   /api/v1/order/{id}:
     get:
       operationId: retrieveOrder
-      description: Get detailed information about a specific Παραγγελία.
-      summary: Retrieve a Παραγγελία
+      description: Get detailed information about a specific Ταξινόμηση.
+      summary: Retrieve a Ταξινόμηση
       parameters:
       - in: path
         name: id
@@ -12974,8 +12976,8 @@ paths:
           description: ''
     put:
       operationId: updateOrder
-      description: Update Παραγγελία information. Requires authentication.
-      summary: Update a Παραγγελία
+      description: Update Ταξινόμηση information. Requires authentication.
+      summary: Update a Ταξινόμηση
       parameters:
       - in: path
         name: id
@@ -13051,8 +13053,8 @@ paths:
           description: ''
     patch:
       operationId: partialUpdateOrder
-      description: Partially update Παραγγελία information. Requires authentication.
-      summary: Partially update a Παραγγελία
+      description: Partially update Ταξινόμηση information. Requires authentication.
+      summary: Partially update a Ταξινόμηση
       parameters:
       - in: path
         name: id
@@ -13127,8 +13129,8 @@ paths:
           description: ''
     delete:
       operationId: destroyOrder
-      description: Delete a Παραγγελία. Requires authentication.
-      summary: Delete a Παραγγελία
+      description: Delete a Ταξινόμηση. Requires authentication.
+      summary: Delete a Ταξινόμηση
       parameters:
       - in: path
         name: id
@@ -14156,7 +14158,6 @@ paths:
         name: paymentStatus
         schema:
           type: string
-          title: Κατάσταση πληρωμής
           enum:
           - CANCELED
           - COMPLETED
@@ -14168,13 +14169,13 @@ paths:
         description: |-
           Filter by payment status
 
-          * `PENDING` - Εκκρεμεί
-          * `PROCESSING` - Σε επεξεργασία
-          * `COMPLETED` - Ολοκληρώθηκε
+          * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `COMPLETED` - Completed
           * `FAILED` - Failed
-          * `REFUNDED` - Επεστράφη
+          * `REFUNDED` - Refunded
           * `PARTIALLY_REFUNDED` - Partially Refunded
-          * `CANCELED` - Ακυρώθηκε
+          * `CANCELED` - Canceled
       - in: query
         name: paymentStatus_In
         schema:
@@ -14276,7 +14277,6 @@ paths:
         name: status
         schema:
           type: string
-          title: Κατάσταση
           enum:
           - CANCELED
           - COMPLETED
@@ -14289,14 +14289,14 @@ paths:
         description: |-
           Filter by order status
 
-          * `PENDING` - Εκκρεμεί
-          * `PROCESSING` - Σε επεξεργασία
-          * `SHIPPED` - Απεστάλη
-          * `DELIVERED` - Παραδόθηκε
-          * `COMPLETED` - Ολοκληρώθηκε
-          * `CANCELED` - Ακυρώθηκε
-          * `RETURNED` - Επιστράφηκε
-          * `REFUNDED` - Επεστράφη
+          * `PENDING` - Pending
+          * `PROCESSING` - Processing
+          * `SHIPPED` - Shipped
+          * `DELIVERED` - Delivered
+          * `COMPLETED` - Completed
+          * `CANCELED` - Canceled
+          * `RETURNED` - Returned
+          * `REFUNDED` - Refunded
       - in: query
         name: status_In
         schema:
@@ -15700,8 +15700,8 @@ paths:
           description: ''
     post:
       operationId: createProduct
-      description: Create a new Προϊόν. Requires authentication.
-      summary: Create a Προϊόν
+      description: Create a new Product. Requires authentication.
+      summary: Create a Product
       parameters:
       - in: query
         name: languageCode
@@ -15770,8 +15770,8 @@ paths:
   /api/v1/product/{id}:
     get:
       operationId: retrieveProduct
-      description: Get detailed information about a specific Προϊόν.
-      summary: Retrieve a Προϊόν
+      description: Get detailed information about a specific Product.
+      summary: Retrieve a Product
       parameters:
       - in: path
         name: id
@@ -15830,8 +15830,8 @@ paths:
           description: ''
     put:
       operationId: updateProduct
-      description: Update Προϊόν information. Requires authentication.
-      summary: Update a Προϊόν
+      description: Update Product information. Requires authentication.
+      summary: Update a Product
       parameters:
       - in: path
         name: id
@@ -15907,8 +15907,8 @@ paths:
           description: ''
     patch:
       operationId: partialUpdateProduct
-      description: Partially update Προϊόν information. Requires authentication.
-      summary: Partially update a Προϊόν
+      description: Partially update Product information. Requires authentication.
+      summary: Partially update a Product
       parameters:
       - in: path
         name: id
@@ -15983,8 +15983,8 @@ paths:
           description: ''
     delete:
       operationId: destroyProduct
-      description: Delete a Προϊόν. Requires authentication.
-      summary: Delete a Προϊόν
+      description: Delete a Product. Requires authentication.
+      summary: Delete a Product
       parameters:
       - in: path
         name: id
@@ -19684,7 +19684,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -19817,7 +19816,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '401':
           content:
@@ -20048,7 +20046,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -20189,7 +20186,6 @@ paths:
       security:
       - knoxApiToken: []
       - cookieAuth: []
-      - {}
       responses:
         '400':
           content:
@@ -21042,7 +21038,6 @@ paths:
         name: status
         schema:
           type: string
-          title: Κατάσταση
           enum:
           - 'FALSE'
           - NEW
@@ -22455,7 +22450,7 @@ paths:
       summary: Search products with advanced filters
       parameters:
       - in: query
-        name: attributeValue
+        name: attributeValues
         schema:
           type: string
         description: Comma-separated attribute value IDs (attribute_values IN [ids])
@@ -26212,7 +26207,6 @@ paths:
         name: status
         schema:
           type: string
-          title: Κατάσταση
           enum:
           - ACTIVE
           - BOUNCED
@@ -26221,7 +26215,7 @@ paths:
         description: |-
           Filter by subscription status
 
-          * `ACTIVE` - Ενεργή
+          * `ACTIVE` - Active
           * `PENDING` - Pending Confirmation
           * `UNSUBSCRIBED` - Unsubscribed
           * `BOUNCED` - Bounced
@@ -26264,7 +26258,6 @@ paths:
         name: topicCategory
         schema:
           type: string
-          title: Κατηγορία
           enum:
           - ACCOUNT
           - MARKETING
@@ -26278,7 +26271,7 @@ paths:
 
           * `MARKETING` - Marketing Campaigns
           * `PRODUCT` - Product Updates
-          * `ACCOUNT` - Λογαριασμός Ανενεργός
+          * `ACCOUNT` - Account Updates
           * `SYSTEM` - System Notifications
           * `NEWSLETTER` - Newsletter
           * `PROMOTIONAL` - Promotional
@@ -26914,7 +26907,6 @@ paths:
         name: category
         schema:
           type: string
-          title: Κατηγορία
           enum:
           - ACCOUNT
           - MARKETING
@@ -26928,7 +26920,7 @@ paths:
 
           * `MARKETING` - Marketing Campaigns
           * `PRODUCT` - Product Updates
-          * `ACCOUNT` - Λογαριασμός Ανενεργός
+          * `ACCOUNT` - Account Updates
           * `SYSTEM` - System Notifications
           * `NEWSLETTER` - Newsletter
           * `PROMOTIONAL` - Promotional
@@ -27881,7 +27873,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -27946,7 +27937,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -28006,6 +27996,7 @@ components:
           readOnly: true
         user:
           type: integer
+          readOnly: true
         website:
           type: string
           nullable: true
@@ -29153,7 +29144,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -29209,7 +29199,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -29262,7 +29251,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
       required:
       - translations
     BulkSubscriptionRequest:
@@ -29358,6 +29346,10 @@ components:
             Uses annotated value if available (from optimized queryset),
             otherwise queries the database.
           readOnly: true
+        currency:
+          type: string
+          readOnly: true
+          description: ISO 4217 currency code for all monetary values in this cart
         createdAt:
           type: string
           format: date-time
@@ -29372,6 +29364,7 @@ components:
           readOnly: true
       required:
       - createdAt
+      - currency
       - id
       - items
       - lastActivity
@@ -29444,6 +29437,10 @@ components:
             Uses annotated value if available (from optimized queryset),
             otherwise queries the database.
           readOnly: true
+        currency:
+          type: string
+          readOnly: true
+          description: ISO 4217 currency code for all monetary values in this cart
         createdAt:
           type: string
           format: date-time
@@ -29464,6 +29461,7 @@ components:
           description: Product recommendations based on cart contents
       required:
       - createdAt
+      - currency
       - id
       - items
       - lastActivity
@@ -29492,7 +29490,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
-          title: Ποσότητα
         weightInfo:
           type: object
           properties:
@@ -29606,7 +29603,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
-          title: Ποσότητα
       required:
       - product
     CartItemDetail:
@@ -29626,7 +29622,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
-          title: Ποσότητα
         weightInfo:
           type: object
           properties:
@@ -29745,7 +29740,33 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
-          title: Ποσότητα
+    CartPaymentIntentResponse:
+      type: object
+      description: Response body returned by the create-payment-intent cart action.
+      properties:
+        clientSecret:
+          type: string
+          description: Stripe PaymentIntent client secret for frontend confirmation
+        paymentIntentId:
+          type: string
+          description: Stripe PaymentIntent ID to be stored on the order
+        amount:
+          type: number
+          format: double
+          maximum: 10000000000
+          minimum: -10000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Total charge amount (cart + shipping + payment fee)
+        currency:
+          type: string
+          description: ISO 4217 currency code (e.g. EUR)
+          maxLength: 3
+      required:
+      - amount
+      - clientSecret
+      - currency
+      - paymentIntentId
     CartWriteRequest:
       type: object
       properties:
@@ -30578,9 +30599,7 @@ components:
         kind:
           $ref: '#/components/schemas/NotificationKindEnum'
         category:
-          allOf:
-          - $ref: '#/components/schemas/NotificationCategory'
-          title: Κατηγορία
+          $ref: '#/components/schemas/NotificationCategory'
         priority:
           $ref: '#/components/schemas/PriorityEnum'
         notificationType:
@@ -30645,12 +30664,12 @@ components:
       - RECOMMENDATION
       type: string
       description: |-
-        * `ORDER` - Παραγγελία
+        * `ORDER` - Ταξινόμηση
         * `PAYMENT` - Payment
-        * `SHIPPING` - Μεταφορικά
+        * `SHIPPING` - Shipping
         * `CART` - Cart
-        * `PRODUCT` - Προϊόν
-        * `ACCOUNT` - Λογαριασμός Ανενεργός
+        * `PRODUCT` - Product
+        * `ACCOUNT` - Account
         * `SECURITY` - Security
         * `PROMOTION` - Promotion
         * `SYSTEM` - System
@@ -30736,8 +30755,10 @@ components:
           readOnly: true
         user:
           type: integer
+          readOnly: true
         notification:
           type: integer
+          readOnly: true
         seen:
           type: boolean
         seenAt:
@@ -30815,15 +30836,12 @@ components:
     NotificationUserWriteRequest:
       type: object
       properties:
-        user:
-          type: integer
         notification:
           type: integer
         seen:
           type: boolean
       required:
       - notification
-      - user
     Order:
       type: object
       properties:
@@ -30859,9 +30877,7 @@ components:
           type: integer
           nullable: true
         status:
-          allOf:
-          - $ref: '#/components/schemas/OrderStatus'
-          title: Κατάσταση
+          $ref: '#/components/schemas/OrderStatus'
         statusDisplay:
           type: string
           readOnly: true
@@ -30959,7 +30975,6 @@ components:
           nullable: true
           maxLength: 255
         paymentStatus:
-          title: Κατάσταση πληρωμής
           oneOf:
           - $ref: '#/components/schemas/PaymentStatusEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -31146,9 +31161,7 @@ components:
           type: integer
           nullable: true
         status:
-          allOf:
-          - $ref: '#/components/schemas/OrderStatus'
-          title: Κατάσταση
+          $ref: '#/components/schemas/OrderStatus'
         statusDisplay:
           type: string
           readOnly: true
@@ -31247,7 +31260,6 @@ components:
           nullable: true
           maxLength: 255
         paymentStatus:
-          title: Κατάσταση πληρωμής
           oneOf:
           - $ref: '#/components/schemas/PaymentStatusEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -31331,7 +31343,6 @@ components:
             endpoint to find out.
         trackingNumber:
           type: string
-          title: Αριθμός Παρακολούθησης
           maxLength: 255
         shippingCarrier:
           type: string
@@ -31421,7 +31432,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
-          title: Ποσότητα
         isRefunded:
           type: boolean
           readOnly: true
@@ -31468,7 +31478,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
-          title: Ποσότητα
         notes:
           type: string
       required:
@@ -31501,7 +31510,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
-          title: Ποσότητα
         isRefunded:
           type: boolean
           readOnly: true
@@ -31609,7 +31617,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
-          title: Ποσότητα
         notes:
           type: string
       required:
@@ -31627,14 +31634,14 @@ components:
       - REFUNDED
       type: string
       description: |-
-        * `PENDING` - Εκκρεμεί
-        * `PROCESSING` - Σε επεξεργασία
-        * `SHIPPED` - Απεστάλη
-        * `DELIVERED` - Παραδόθηκε
-        * `COMPLETED` - Ολοκληρώθηκε
-        * `CANCELED` - Ακυρώθηκε
-        * `RETURNED` - Επιστράφηκε
-        * `REFUNDED` - Επεστράφη
+        * `PENDING` - Pending
+        * `PROCESSING` - Processing
+        * `SHIPPED` - Shipped
+        * `DELIVERED` - Delivered
+        * `COMPLETED` - Completed
+        * `CANCELED` - Canceled
+        * `RETURNED` - Returned
+        * `REFUNDED` - Refunded
     OrderWriteRequest:
       type: object
       properties:
@@ -31671,10 +31678,6 @@ components:
         payWay:
           type: integer
           nullable: true
-        status:
-          allOf:
-          - $ref: '#/components/schemas/OrderStatus'
-          title: Κατάσταση
         firstName:
           type: string
           minLength: 1
@@ -31710,22 +31713,6 @@ components:
             $ref: '#/components/schemas/OrderItemCreateRequest'
         documentType:
           $ref: '#/components/schemas/OrderDocumentType'
-        paymentId:
-          type: string
-          minLength: 1
-        paymentStatus:
-          type: string
-          minLength: 1
-        paymentMethod:
-          type: string
-          minLength: 1
-        trackingNumber:
-          type: string
-          title: Αριθμός Παρακολούθησης
-          maxLength: 255
-        shippingCarrier:
-          type: string
-          maxLength: 255
       required:
       - city
       - email
@@ -33132,7 +33119,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
     PatchedCartItemUpdateRequest:
       type: object
       properties:
@@ -33140,7 +33126,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: 0
-          title: Ποσότητα
     PatchedCartWriteRequest:
       type: object
       properties:
@@ -33195,8 +33180,6 @@ components:
     PatchedNotificationUserWriteRequest:
       type: object
       properties:
-        user:
-          type: integer
         notification:
           type: integer
         seen:
@@ -33212,7 +33195,6 @@ components:
           type: integer
           maximum: 2147483647
           minimum: -2147483648
-          title: Ποσότητα
         notes:
           type: string
     PatchedOrderWriteRequest:
@@ -33251,10 +33233,6 @@ components:
         payWay:
           type: integer
           nullable: true
-        status:
-          allOf:
-          - $ref: '#/components/schemas/OrderStatus'
-          title: Κατάσταση
         firstName:
           type: string
           minLength: 1
@@ -33290,22 +33268,6 @@ components:
             $ref: '#/components/schemas/OrderItemCreateRequest'
         documentType:
           $ref: '#/components/schemas/OrderDocumentType'
-        paymentId:
-          type: string
-          minLength: 1
-        paymentStatus:
-          type: string
-          minLength: 1
-        paymentMethod:
-          type: string
-          minLength: 1
-        trackingNumber:
-          type: string
-          title: Αριθμός Παρακολούθησης
-          maxLength: 255
-        shippingCarrier:
-          type: string
-          maxLength: 255
     PatchedPayWayWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -33342,7 +33304,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
         cost:
           type: number
           format: double
@@ -33404,7 +33365,6 @@ components:
           default: MAIN
         active:
           type: boolean
-          title: Ενεργή
         translations:
           type: object
           properties:
@@ -33464,7 +33424,6 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         active:
           type: boolean
-          title: Ενεργή
         parent:
           type: integer
           nullable: true
@@ -33618,7 +33577,6 @@ components:
           maxLength: 255
         active:
           type: boolean
-          title: Ενεργή
     PatchedRegionWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -33687,20 +33645,19 @@ components:
         category:
           allOf:
           - $ref: '#/components/schemas/TopicCategory'
-          title: Κατηγορία
           description: |-
             Category of the subscription topic
 
             * `MARKETING` - Marketing Campaigns
             * `PRODUCT` - Product Updates
-            * `ACCOUNT` - Λογαριασμός Ανενεργός
+            * `ACCOUNT` - Account Updates
             * `SYSTEM` - System Notifications
             * `NEWSLETTER` - Newsletter
             * `PROMOTIONAL` - Promotional
             * `OTHER` - Other
         isActive:
           type: boolean
-          title: Ενεργή
+          title: Active
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
@@ -33733,7 +33690,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
     PatchedTaggedItemWriteRequest:
       type: object
       properties:
@@ -33809,10 +33765,6 @@ components:
       properties:
         topic:
           type: integer
-        status:
-          allOf:
-          - $ref: '#/components/schemas/SubscriptionStatus'
-          title: Κατάσταση
         metadata:
           description: Additional subscription preferences or data
     PatchedUserWriteRequest:
@@ -33961,7 +33913,6 @@ components:
           readOnly: true
         active:
           type: boolean
-          title: Ενεργή
         cost:
           type: number
           format: double
@@ -34064,7 +34015,6 @@ components:
           readOnly: true
         active:
           type: boolean
-          title: Ενεργή
         cost:
           type: number
           format: double
@@ -34167,7 +34117,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
         cost:
           type: number
           format: double
@@ -34216,13 +34165,13 @@ components:
       - CANCELED
       type: string
       description: |-
-        * `PENDING` - Εκκρεμεί
-        * `PROCESSING` - Σε επεξεργασία
-        * `COMPLETED` - Ολοκληρώθηκε
+        * `PENDING` - Pending
+        * `PROCESSING` - Processing
+        * `COMPLETED` - Completed
         * `FAILED` - Failed
-        * `REFUNDED` - Επεστράφη
+        * `REFUNDED` - Refunded
         * `PARTIALLY_REFUNDED` - Partially Refunded
-        * `CANCELED` - Ακυρώθηκε
+        * `CANCELED` - Canceled
     PaymentStatusResponse:
       type: object
       properties:
@@ -34377,7 +34326,6 @@ components:
             Set to 0 to disable alerts for this product.
         active:
           type: boolean
-          title: Ενεργή
         weight:
           type: object
           properties:
@@ -34673,7 +34621,6 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         active:
           type: boolean
-          title: Ενεργή
         parent:
           type: integer
           nullable: true
@@ -34741,7 +34688,6 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         active:
           type: boolean
-          title: Ενεργή
         parent:
           type: integer
           nullable: true
@@ -34813,7 +34759,6 @@ components:
           default: MAIN
         active:
           type: boolean
-          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -34907,7 +34852,6 @@ components:
           default: MAIN
         active:
           type: boolean
-          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -34982,7 +34926,6 @@ components:
           default: MAIN
         active:
           type: boolean
-          title: Ενεργή
         translations:
           type: object
           properties:
@@ -35046,7 +34989,6 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         active:
           type: boolean
-          title: Ενεργή
         parent:
           type: integer
           nullable: true
@@ -35122,7 +35064,6 @@ components:
             Set to 0 to disable alerts for this product.
         active:
           type: boolean
-          title: Ενεργή
         weight:
           type: object
           properties:
@@ -35297,7 +35238,6 @@ components:
             Set to 0 to disable alerts for this product.
         active:
           type: boolean
-          title: Ενεργή
         weight:
           type: object
           properties:
@@ -35878,9 +35818,7 @@ components:
           minimum: 0
           maximum: 32767
         status:
-          allOf:
-          - $ref: '#/components/schemas/ReviewStatus'
-          title: Κατάσταση
+          $ref: '#/components/schemas/ReviewStatus'
         isPublished:
           type: boolean
         createdAt:
@@ -35949,9 +35887,7 @@ components:
           minimum: 0
           maximum: 32767
         status:
-          allOf:
-          - $ref: '#/components/schemas/ReviewStatus'
-          title: Κατάσταση
+          $ref: '#/components/schemas/ReviewStatus'
         isPublished:
           type: boolean
         createdAt:
@@ -36109,7 +36045,6 @@ components:
           maxLength: 255
         active:
           type: boolean
-          title: Ενεργή
       required:
       - category
       - price
@@ -36515,7 +36450,7 @@ components:
       - BOUNCED
       type: string
       description: |-
-        * `ACTIVE` - Ενεργή
+        * `ACTIVE` - Active
         * `PENDING` - Pending Confirmation
         * `UNSUBSCRIBED` - Unsubscribed
         * `BOUNCED` - Bounced
@@ -36562,20 +36497,19 @@ components:
         category:
           allOf:
           - $ref: '#/components/schemas/TopicCategory'
-          title: Κατηγορία
           description: |-
             Category of the subscription topic
 
             * `MARKETING` - Marketing Campaigns
             * `PRODUCT` - Product Updates
-            * `ACCOUNT` - Λογαριασμός Ανενεργός
+            * `ACCOUNT` - Account Updates
             * `SYSTEM` - System Notifications
             * `NEWSLETTER` - Newsletter
             * `PROMOTIONAL` - Promotional
             * `OTHER` - Other
         isActive:
           type: boolean
-          title: Ενεργή
+          title: Active
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
@@ -36636,20 +36570,19 @@ components:
         category:
           allOf:
           - $ref: '#/components/schemas/TopicCategory'
-          title: Κατηγορία
           description: |-
             Category of the subscription topic
 
             * `MARKETING` - Marketing Campaigns
             * `PRODUCT` - Product Updates
-            * `ACCOUNT` - Λογαριασμός Ανενεργός
+            * `ACCOUNT` - Account Updates
             * `SYSTEM` - System Notifications
             * `NEWSLETTER` - Newsletter
             * `PROMOTIONAL` - Promotional
             * `OTHER` - Other
         isActive:
           type: boolean
-          title: Ενεργή
+          title: Active
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
@@ -36714,20 +36647,19 @@ components:
         category:
           allOf:
           - $ref: '#/components/schemas/TopicCategory'
-          title: Κατηγορία
           description: |-
             Category of the subscription topic
 
             * `MARKETING` - Marketing Campaigns
             * `PRODUCT` - Product Updates
-            * `ACCOUNT` - Λογαριασμός Ανενεργός
+            * `ACCOUNT` - Account Updates
             * `SYSTEM` - System Notifications
             * `NEWSLETTER` - Newsletter
             * `PROMOTIONAL` - Promotional
             * `OTHER` - Other
         isActive:
           type: boolean
-          title: Ενεργή
+          title: Active
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
@@ -36766,7 +36698,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -36822,7 +36753,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
         sortOrder:
           type: integer
           readOnly: true
@@ -36880,7 +36810,6 @@ components:
                   type: string
         active:
           type: boolean
-          title: Ενεργή
       required:
       - translations
     TaggedItem:
@@ -37062,7 +36991,7 @@ components:
       description: |-
         * `MARKETING` - Marketing Campaigns
         * `PRODUCT` - Product Updates
-        * `ACCOUNT` - Λογαριασμός Ανενεργός
+        * `ACCOUNT` - Account Updates
         * `SYSTEM` - System Notifications
         * `NEWSLETTER` - Newsletter
         * `PROMOTIONAL` - Promotional
@@ -37523,7 +37452,7 @@ components:
         isActive:
           type: boolean
           readOnly: true
-          title: Ενεργή
+          title: Active
         isStaff:
           type: boolean
           readOnly: true
@@ -37584,9 +37513,7 @@ components:
           - $ref: '#/components/schemas/SubscriptionTopic'
           readOnly: true
         status:
-          allOf:
-          - $ref: '#/components/schemas/SubscriptionStatus'
-          title: Κατάσταση
+          $ref: '#/components/schemas/SubscriptionStatus'
         subscribedAt:
           type: string
           format: date-time
@@ -37632,9 +37559,7 @@ components:
           - $ref: '#/components/schemas/SubscriptionTopic'
           readOnly: true
         status:
-          allOf:
-          - $ref: '#/components/schemas/SubscriptionStatus'
-          title: Κατάσταση
+          $ref: '#/components/schemas/SubscriptionStatus'
         subscribedAt:
           type: string
           format: date-time
@@ -37654,12 +37579,7 @@ components:
           type: string
           format: date-time
           readOnly: true
-        confirmationToken:
-          type: string
-          readOnly: true
-          description: Token for email confirmation if required
       required:
-      - confirmationToken
       - createdAt
       - id
       - subscribedAt
@@ -37673,10 +37593,6 @@ components:
       properties:
         topic:
           type: integer
-        status:
-          allOf:
-          - $ref: '#/components/schemas/SubscriptionStatus'
-          title: Κατάσταση
         metadata:
           description: Additional subscription preferences or data
       required:

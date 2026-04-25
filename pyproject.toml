@@ -65,6 +65,7 @@ dependencies = [
   "weasyprint>=68.1",
   "requests==2.32.5",
   "xmlschema==4.2.0",
+  "argon2-cffi>=25.1.0",
 ]
 
 [project.urls]
@@ -137,7 +138,7 @@ relative_files = true
 [tool.coverage.report]
 precision = 2
 skip_covered = true
-fail_under = 50
+fail_under = 70
 show_missing = true
 exclude_lines = [
     "pragma: no cover",
@@ -222,7 +223,17 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 timeout = 600
-addopts = "--tb=short --maxfail=0 -n auto --dist worksteal"
+# ``--dist loadfile`` keeps every test inside a file pinned to one xdist
+# worker. With ``worksteal``, tests from different files end up
+# interleaved on the same process — fine for pure unit tests but
+# corrosive here, because module-level singletons (e.g.
+# ``core.middleware.translation_reload._local_translation_version``,
+# extra-settings cache, factory random state) carry over between
+# unrelated tests, and EAGER signal cascades from one test's
+# OrderFactory call can pollute another test's mocks. ``loadfile``
+# costs ~30% more wall-time but is the difference between a stable
+# suite and 1-3 random flakes per run.
+addopts = "--tb=short --maxfail=0 -n auto --dist loadfile"
 
 # ─────────────────────────────────────────────────────────
 # Django-stubs configuration

@@ -115,7 +115,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
         mock_provider = MagicMock()
         mock_provider.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
-            {"amount": "100.00", "currency": "EUR"},
+            {},
         )
         mock_get_payment_provider.return_value = mock_provider
 
@@ -373,7 +373,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
         mock_provider = MagicMock()
         mock_provider.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
-            {"amount": "100.00", "currency": "EUR"},
+            {},
         )
         mock_get_payment_provider.return_value = mock_provider
 
@@ -415,7 +415,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
         mock_provider = MagicMock()
         mock_provider.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
-            {"amount": "100.00", "currency": "EUR"},
+            {},
         )
         mock_get_payment_provider.return_value = mock_provider
 

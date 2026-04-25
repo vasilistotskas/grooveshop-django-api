@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 from django.contrib import admin, messages
+from django.db import transaction
 from django.db.models import Count, Sum
 from django.http import FileResponse, Http404
 from django.shortcuts import redirect
@@ -285,6 +286,7 @@ class OrderItemInline(TabularInline):
 class OrderHistoryInline(TabularInline):
     model = OrderHistory
     extra = 0
+    max_num = 20
     fields = (
         "change_type",
         "description_display",
@@ -300,6 +302,9 @@ class OrderHistoryInline(TabularInline):
     ordering = ("-created_at",)
 
     tab = True
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).order_by("-created_at")[:20]
 
     @admin.display(description=_("Description"))
     def description_display(self, obj):
@@ -1083,16 +1088,19 @@ class OrderAdmin(ModelAdmin):
         icon="play_arrow",
     )
     def mark_as_processing(self, request, queryset):
-        for order in queryset:
-            try:
-                OrderService.update_order_status(order, OrderStatus.PROCESSING)
-                self.message_user(
-                    request,
-                    _("Order %(order_id)s marked as processing")
-                    % {"order_id": order.id},
-                )
-            except ValueError as e:
-                self.message_user(request, f"Error: {e!s}", level="error")
+        with transaction.atomic():
+            for order in queryset:
+                try:
+                    OrderService.update_order_status(
+                        order, OrderStatus.PROCESSING
+                    )
+                    self.message_user(
+                        request,
+                        _("Order %(order_id)s marked as processing")
+                        % {"order_id": order.id},
+                    )
+                except ValueError as e:
+                    self.message_user(request, f"Error: {e!s}", level="error")
 
     @action(
         description=str(_("Mark selected orders as shipped")),
@@ -1100,16 +1108,17 @@ class OrderAdmin(ModelAdmin):
         icon="local_shipping",
     )
     def mark_as_shipped(self, request, queryset):
-        for order in queryset:
-            try:
-                OrderService.update_order_status(order, OrderStatus.SHIPPED)
-                self.message_user(
-                    request,
-                    _("Order %(order_id)s marked as shipped")
-                    % {"order_id": order.id},
-                )
-            except ValueError as e:
-                self.message_user(request, f"Error: {e!s}", level="error")
+        with transaction.atomic():
+            for order in queryset:
+                try:
+                    OrderService.update_order_status(order, OrderStatus.SHIPPED)
+                    self.message_user(
+                        request,
+                        _("Order %(order_id)s marked as shipped")
+                        % {"order_id": order.id},
+                    )
+                except ValueError as e:
+                    self.message_user(request, f"Error: {e!s}", level="error")
 
     @action(
         description=str(_("Mark selected orders as delivered")),
@@ -1117,16 +1126,19 @@ class OrderAdmin(ModelAdmin):
         icon="check_circle",
     )
     def mark_as_delivered(self, request, queryset):
-        for order in queryset:
-            try:
-                OrderService.update_order_status(order, OrderStatus.DELIVERED)
-                self.message_user(
-                    request,
-                    _("Order %(order_id)s marked as delivered")
-                    % {"order_id": order.id},
-                )
-            except ValueError as e:
-                self.message_user(request, f"Error: {e!s}", level="error")
+        with transaction.atomic():
+            for order in queryset:
+                try:
+                    OrderService.update_order_status(
+                        order, OrderStatus.DELIVERED
+                    )
+                    self.message_user(
+                        request,
+                        _("Order %(order_id)s marked as delivered")
+                        % {"order_id": order.id},
+                    )
+                except ValueError as e:
+                    self.message_user(request, f"Error: {e!s}", level="error")
 
     @action(
         description=str(_("Mark selected orders as completed")),
@@ -1134,16 +1146,19 @@ class OrderAdmin(ModelAdmin):
         icon="task_alt",
     )
     def mark_as_completed(self, request, queryset):
-        for order in queryset:
-            try:
-                OrderService.update_order_status(order, OrderStatus.COMPLETED)
-                self.message_user(
-                    request,
-                    _("Order %(order_id)s marked as completed")
-                    % {"order_id": order.id},
-                )
-            except ValueError as e:
-                self.message_user(request, f"Error: {e!s}", level="error")
+        with transaction.atomic():
+            for order in queryset:
+                try:
+                    OrderService.update_order_status(
+                        order, OrderStatus.COMPLETED
+                    )
+                    self.message_user(
+                        request,
+                        _("Order %(order_id)s marked as completed")
+                        % {"order_id": order.id},
+                    )
+                except ValueError as e:
+                    self.message_user(request, f"Error: {e!s}", level="error")
 
     @action(
         description=str(_("Cancel selected orders and restore stock")),
@@ -1151,16 +1166,17 @@ class OrderAdmin(ModelAdmin):
         icon="cancel",
     )
     def mark_as_canceled(self, request, queryset):
-        for order in queryset:
-            try:
-                OrderService.cancel_order(order)
-                self.message_user(
-                    request,
-                    _("Order %(order_id)s marked as canceled")
-                    % {"order_id": order.id},
-                )
-            except ValueError as e:
-                self.message_user(request, f"Error: {e!s}", level="error")
+        with transaction.atomic():
+            for order in queryset:
+                try:
+                    OrderService.cancel_order(order)
+                    self.message_user(
+                        request,
+                        _("Order %(order_id)s marked as canceled")
+                        % {"order_id": order.id},
+                    )
+                except ValueError as e:
+                    self.message_user(request, f"Error: {e!s}", level="error")
 
     # --- Invoice detail actions ---------------------------------------
     # Unfold detail-action signature is ``(self, request, object_id)`` —

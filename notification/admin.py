@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.contrib import admin
 from django.db import models
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
@@ -196,7 +197,14 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("user__user")
+        qs = super().get_queryset(request).prefetch_related("user__user")
+        return qs.annotate(
+            nu_total=Count("notification_users"),
+            nu_seen=Count(
+                "notification_users",
+                filter=Q(notification_users__seen=True),
+            ),
+        )
 
     @admin.display(description=_("Notification"))
     def notification_info(self, obj):
@@ -408,8 +416,10 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Engagement"))
     def engagement_stats(self, obj):
-        total_users = obj.notification_users.count()
-        seen_users = obj.notification_users.filter(seen=True).count()
+        total_users = getattr(obj, "nu_total", obj.notification_users.count())
+        seen_users = getattr(
+            obj, "nu_seen", obj.notification_users.filter(seen=True).count()
+        )
         unseen_users = total_users - seen_users
 
         engagement_rate = (seen_users / max(total_users, 1)) * 100
@@ -520,8 +530,10 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Engagement Summary"))
     def engagement_summary(self, obj):
-        total_users = obj.notification_users.count()
-        seen_users = obj.notification_users.filter(seen=True).count()
+        total_users = getattr(obj, "nu_total", obj.notification_users.count())
+        seen_users = getattr(
+            obj, "nu_seen", obj.notification_users.filter(seen=True).count()
+        )
         unseen_users = total_users - seen_users
 
         if total_users > 0:

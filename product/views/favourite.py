@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
@@ -79,14 +79,7 @@ class ProductFavouriteViewSet(BaseModelViewSet):
     filterset_class = ProductFavouriteFilter
 
     def get_permissions(self):
-        if self.action in (
-            "create",
-            "update",
-            "partial_update",
-            "destroy",
-        ):
-            return [IsAuthenticated()]
-        return [AllowAny()]
+        return [IsAuthenticated()]
 
     ordering_fields = [
         "id",
@@ -103,9 +96,20 @@ class ProductFavouriteViewSet(BaseModelViewSet):
     serializers_config = serializers_config
 
     def get_queryset(self):
+        # Schema generation and unit tests may instantiate the viewset
+        # without a live request — fall back to the unscoped optimised
+        # queryset in that case (DRF won't actually invoke list/retrieve
+        # without a real request, so this only affects introspection).
+        request = getattr(self, "request", None)
+        is_staff = bool(request and request.user.is_staff)
+
+        if is_staff or request is None:
+            if self.action == "list":
+                return ProductFavourite.objects.for_list()
+            return ProductFavourite.objects.for_detail()
         if self.action == "list":
-            return ProductFavourite.objects.for_list()
-        return ProductFavourite.objects.for_detail()
+            return ProductFavourite.objects.for_list().filter(user=request.user)
+        return ProductFavourite.objects.for_detail().filter(user=request.user)
 
     def create(self, request, *args, **kwargs):
         req_serializer = self.get_request_serializer()

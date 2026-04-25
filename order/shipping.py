@@ -80,11 +80,29 @@ class ShippingCarrier(ABC):
 
 
 class FedExCarrier(ShippingCarrier):
+    """Stub carrier for FedEx.
+
+    NOTE: This is an intentional placeholder, not a real integration.
+    All methods return synthesised data with hardcoded prices, fake
+    tracking numbers, and constant ``IN_TRANSIT`` status.
+
+    Production currently routes through ELTA (Hellenic Post) at the
+    order level — these classes only exist so the data model
+    (``ShippingOption``, ``ShippingService.get_tracking_info``) is in
+    place when a real FedEx integration ships. Until then,
+    ``update_order_statuses_from_shipping`` cannot promote a SHIPPED
+    order to DELIVERED via this path; that transition stays manual.
+
+    To replace with the real SDK: add ``fedex-rest-api-sdk`` (or the
+    successor) to dependencies, wire it through ``self.api_key`` /
+    ``self.account_number``, and update the methods below — the public
+    surface (``get_shipping_options``, ``create_shipment``,
+    ``get_tracking_info``) is already stable.
+    """
+
     def __init__(self):
         self.api_key = settings.FEDEX_API_KEY
         self.account_number = settings.FEDEX_ACCOUNT_NUMBER
-
-        # @TODO - In a real implementation, we would import and use FedEx SDK
 
     def get_shipping_options(
         self,
@@ -97,7 +115,7 @@ class FedExCarrier(ShippingCarrier):
         **kwargs,
     ) -> list[ShippingOption]:
         logger.info(
-            "Getting FedEx shipping options",
+            "Getting FedEx shipping options (stub)",
             extra={
                 "weight": str(weight),
                 "from_country": from_country.alpha_2,
@@ -106,9 +124,7 @@ class FedExCarrier(ShippingCarrier):
             },
         )
 
-        # @TODO - Mock implementation - in real world, we would call FedEx API
-        # and parse the response
-
+        # Synthesised options — see class docstring for context.
         options = []
 
         # For domestic shipments, offer 3 options
@@ -219,11 +235,11 @@ class FedExCarrier(ShippingCarrier):
     def get_tracking_info(self, tracking_number: str) -> dict[str, Any]:
         try:
             logger.info(
-                "Getting FedEx tracking info",
+                "Getting FedEx tracking info (stub — always returns IN_TRANSIT)",
                 extra={"tracking_number": tracking_number},
             )
 
-            # @TODO - Mock response
+            # Synthesised payload — never promotes orders to DELIVERED.
             current_date = timezone.now().date()
 
             tracking_data = {
@@ -264,11 +280,17 @@ class FedExCarrier(ShippingCarrier):
 
 
 class UPSCarrier(ShippingCarrier):
+    """Stub carrier for UPS — see :class:`FedExCarrier` for context.
+
+    Same intentional-placeholder shape: returns hardcoded options +
+    synthesised tracking that always reports IN_TRANSIT. Replace with
+    the real ``ups-api`` SDK when a UPS account is procured; the public
+    method signatures don't need to change.
+    """
+
     def __init__(self):
         self.api_key = settings.UPS_API_KEY
         self.account_number = settings.UPS_ACCOUNT_NUMBER
-
-        # @TODO - In a real implementation, we would import and use UPS SDK
 
     def get_shipping_options(
         self,
@@ -317,14 +339,14 @@ class UPSCarrier(ShippingCarrier):
     ) -> tuple[bool, dict[str, Any]]:
         try:
             logger.info(
-                "Creating UPS shipment",
+                "Creating UPS shipment (stub)",
                 extra={
                     "order_id": order_id,
                     "shipping_option_id": shipping_option_id,
                 },
             )
 
-            # @TODO - Mock response
+            # Synthesised payload — see class docstring for context.
             shipment_data = {
                 "tracking_number": f"1Z{order_id}789",
                 "label_url": f"https://example.com/labels/ups_{order_id}.pdf",
@@ -348,11 +370,11 @@ class UPSCarrier(ShippingCarrier):
     def get_tracking_info(self, tracking_number: str) -> dict[str, Any]:
         try:
             logger.info(
-                "Getting UPS tracking info",
+                "Getting UPS tracking info (stub — always returns IN_TRANSIT)",
                 extra={"tracking_number": tracking_number},
             )
 
-            # @TODO - Mock response
+            # Synthesised payload — never promotes orders to DELIVERED.
             current_date = timezone.now().date()
 
             tracking_data = {

@@ -24,12 +24,18 @@ class TestPaymentConfirmationConvertsReservations:
 
     @pytest.fixture
     def mock_payment_validation(self):
-        """Mock payment provider validation to avoid external API calls."""
+        """Mock payment provider validation to avoid external API calls.
+
+        Omits ``amount``/``currency`` from the payload so OrderService's
+        amount-vs-total cross-check is skipped — these tests exercise the
+        reservation → stock-decrement conversion, not payment amount
+        validation (covered elsewhere).
+        """
         with patch("order.payment.get_payment_provider") as mock_provider:
             mock_instance = Mock()
             mock_instance.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,
-                {"status": "succeeded", "amount": 10000, "currency": "usd"},
+                {"status": "succeeded"},
             )
             mock_provider.return_value = mock_instance
             yield mock_provider

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count
 from django.utils import timezone
 from django.utils.html import conditional_escape
@@ -250,6 +250,13 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
         )
         return mark_safe(html)
 
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(posts_count_ann=Count("blog_posts", distinct=True))
+        )
+
     @admin.display(description=_("Bio"))
     def bio_preview(self, obj):
         bio = obj.safe_translation_getter("bio", any_language=True) or ""
@@ -259,7 +266,7 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Posts"))
     def posts_count(self, obj):
-        count = obj.blog_posts.count()
+        count = getattr(obj, "posts_count_ann", obj.blog_posts.count())
         safe_count = conditional_escape(str(count))
 
         html = (
@@ -338,6 +345,13 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(posts_count_ann=Count("blog_posts", distinct=True))
+        )
+
     @admin.display(description=_("Name"))
     def name_display(self, obj):
         name = (
@@ -371,7 +385,7 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Posts"))
     def posts_count_badge(self, obj):
-        count = obj.blog_posts.count()
+        count = getattr(obj, "posts_count_ann", obj.blog_posts.count())
         safe_count = conditional_escape(str(count))
 
         html = (
@@ -820,6 +834,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         variant=ActionVariant.PRIMARY,
         icon="star",
     )
+    @transaction.atomic
     def mark_as_featured(self, request, queryset):
         updated = queryset.update(featured=True)
         self.message_user(
@@ -833,6 +848,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         variant=ActionVariant.WARNING,
         icon="star_border",
     )
+    @transaction.atomic
     def unmark_as_featured(self, request, queryset):
         updated = queryset.update(featured=False)
         self.message_user(
@@ -846,6 +862,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         variant=ActionVariant.SUCCESS,
         icon="publish",
     )
+    @transaction.atomic
     def publish_posts(self, request, queryset):
         updated = queryset.update(
             is_published=True, published_at=timezone.now()
@@ -861,6 +878,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         variant=ActionVariant.WARNING,
         icon="unpublished",
     )
+    @transaction.atomic
     def unpublish_posts(self, request, queryset):
         updated = queryset.update(is_published=False)
         self.message_user(
@@ -1075,6 +1093,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
+    @transaction.atomic
     def approve_comments(self, request, queryset):
         updated = queryset.update(approved=True)
         self.message_user(
@@ -1088,6 +1107,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
+    @transaction.atomic
     def unapprove_comments(self, request, queryset):
         updated = queryset.update(approved=False)
         self.message_user(

@@ -145,7 +145,9 @@ class NotificationUserViewSet(BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        count = self.queryset.filter(user=request.user, seen=False).count()
+        count = (
+            self.get_queryset().filter(user=request.user, seen=False).count()
+        )
         if count == 0:
             return Response(
                 {
@@ -170,7 +172,9 @@ class NotificationUserViewSet(BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        self.queryset.filter(user=request.user, seen=False).update(seen=True)
+        self.get_queryset().filter(user=request.user, seen=False).update(
+            seen=True
+        )
 
         response_data = {"success": True}
 
@@ -189,7 +193,9 @@ class NotificationUserViewSet(BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        self.queryset.filter(user=request.user, seen=True).update(seen=False)
+        self.get_queryset().filter(user=request.user, seen=True).update(
+            seen=False
+        )
 
         response_data = {"success": True}
 
@@ -224,7 +230,7 @@ class NotificationUserViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        self.queryset.filter(
+        self.get_queryset().filter(
             id__in=notification_user_ids, user=request.user
         ).update(seen=True)
 
@@ -261,7 +267,7 @@ class NotificationUserViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        self.queryset.filter(
+        self.get_queryset().filter(
             id__in=notification_user_ids, user=request.user
         ).update(seen=False)
 

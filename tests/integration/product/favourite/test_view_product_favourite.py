@@ -23,6 +23,9 @@ class ProductFavouriteViewSetTestCase(APITestCase):
             product=self.product,
             user=self.user,
         )
+        # ProductFavouriteViewSet now requires IsAuthenticated on every
+        # action (was AllowAny on list/retrieve); authenticate by default.
+        self.client.force_authenticate(user=self.user)
 
     def get_product_favourite_detail_url(self, pk):
         return reverse("product-favourite-detail", args=[pk])

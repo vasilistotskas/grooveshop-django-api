@@ -57,6 +57,22 @@ def build_ticket_cache_key(ticket: str) -> str:
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_websocket_ticket(request):
+    from knox.models import get_token_model  # noqa: PLC0415
+
+    # Guard against the edge case where Knox tokens were revoked between
+    # the moment the HTTP request was authenticated (DRF Knox auth) and
+    # this line — e.g. a concurrent password-change request arrived first.
+    # In practice this window is tiny, but the check is cheap.
+    if not get_token_model().objects.filter(user=request.user).exists():
+        logger.warning(
+            "WS ticket denied: no live Knox tokens for user %s",
+            request.user.pk,
+        )
+        return Response(
+            {"detail": "No active session."},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
     ticket = secrets.token_urlsafe(32)
     cache.set(
         build_ticket_cache_key(ticket),

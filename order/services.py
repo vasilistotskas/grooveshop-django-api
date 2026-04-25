@@ -16,6 +16,8 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    PaymentAmountMismatchError,
+    PaymentCurrencyMismatchError,
     PaymentError,
     PaymentNotFoundError,
     ProductNotFoundError,
@@ -231,6 +233,70 @@ class OrderService:
                     )
                 )
 
+            # Verify the provider amount matches the server-calculated total.
+            # The Stripe PaymentIntent's amount (in cents) must equal the
+            # cart total + shipping + payment fee to prevent a tampered client
+            # submitting a PI created for a lower amount.
+            # payment_data["amount"] is in euros (stripe_pi.amount / 100).
+            # We calculate the expected total using the same logic as Step 5.
+            _cart_total = cart.total_price
+            _shipping_cost = cls.calculate_shipping_cost(
+                order_value=_cart_total,
+                country_id=shipping_address.get("country_id"),
+                region_id=shipping_address.get("region_id"),
+            )
+            _order_subtotal = Money(
+                _cart_total.amount + _shipping_cost.amount,
+                _cart_total.currency,
+            )
+            _payment_fee = cls.calculate_payment_method_fee(
+                pay_way=pay_way,
+                order_value=_order_subtotal,
+            )
+            _expected_total = (
+                _cart_total.amount + _shipping_cost.amount + _payment_fee.amount
+            )
+            calculated_total_cents = int(round(_expected_total * 100))
+            # The Stripe provider returns amount already divided by 100
+            # (see payment.py StripePaymentProvider.get_payment_status) and
+            # also returns a currency code. Some providers/tests return a
+            # stripped payload without amount/currency — only enforce the
+            # check when the provider actually supplied those fields.
+            expected_currency = settings.DEFAULT_CURRENCY.lower()
+
+            if "amount" in payment_data and payment_data["amount"] is not None:
+                provider_amount_cents = int(round(payment_data["amount"] * 100))
+                if provider_amount_cents != calculated_total_cents:
+                    logger.warning(
+                        "Payment amount mismatch for intent %s: "
+                        "provider=%d cents, calculated=%d cents",
+                        payment_intent_id,
+                        provider_amount_cents,
+                        calculated_total_cents,
+                    )
+                    raise PaymentAmountMismatchError(
+                        provider_amount_cents=provider_amount_cents,
+                        calculated_amount_cents=calculated_total_cents,
+                    )
+
+            if payment_data.get("currency"):
+                provider_currency = payment_data["currency"].lower()
+                if provider_currency not in {
+                    "eur",
+                    expected_currency,
+                }:
+                    logger.warning(
+                        "Payment currency mismatch for intent %s: "
+                        "provider='%s', expected='%s'",
+                        payment_intent_id,
+                        provider_currency,
+                        expected_currency,
+                    )
+                    raise PaymentCurrencyMismatchError(
+                        provider_currency=provider_currency,
+                        expected_currency=expected_currency,
+                    )
+
             # Step 4: Get stock reservations for cart session
             # Reservations are identified by cart.uuid (session_id)
             reservations = list(
@@ -239,8 +305,12 @@ class OrderService:
                 ).select_related("product")
             )
 
-            # Validate we have reservations for all cart items
-            cart_items = cart.get_items()
+            # Validate we have reservations for all cart items.
+            # Materialize the queryset eagerly: the order_created signal
+            # handler schedules ``cart.delete()`` via ``transaction.on_commit``;
+            # if anything causes that callback to fire before this loop
+            # executes, the lazy queryset would resolve to zero rows.
+            cart_items = list(cart.get_items())
 
             # Check if any reservations have expired
             expired_reservations = [r for r in reservations if r.is_expired]
@@ -640,8 +710,12 @@ class OrderService:
                 ).select_related("product")
             )
 
-            # Validate we have reservations for all cart items
-            cart_items = cart.get_items()
+            # Validate we have reservations for all cart items.
+            # Materialize the queryset eagerly: the order_created signal
+            # handler schedules ``cart.delete()`` via ``transaction.on_commit``;
+            # if anything causes that callback to fire before this loop
+            # executes, the lazy queryset would resolve to zero rows.
+            cart_items = list(cart.get_items())
 
             # Check if any reservations have expired
             expired_reservations = [r for r in reservations if r.is_expired]

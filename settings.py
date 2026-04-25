@@ -1003,6 +1003,17 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "int",
         "value": 2,
     },
+    # Storefront UI toggles
+    {
+        "name": "RECENTLY_VIEWED_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the 'Recently Viewed' rail on the storefront home page. "
+            "The history itself is stored client-side in localStorage; "
+            "this flag only controls whether the rail renders."
+        ),
+    },
     # Loyalty system settings
     {
         "name": "LOYALTY_ENABLED",

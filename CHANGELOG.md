@@ -3,6 +3,29 @@
 
 
 
+## v1.113.1 (2026-04-26)
+
+### Bug fixes
+
+* fix: update uv lock ([`2b39627`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b39627a1dfdb1bde4254b3f4ccc39cdc8005d50))
+
+* fix(logging): suppress asyncio CancelledError tracebacks from client disconnects
+
+When an ASGI client drops the connection mid-request, asgiref re-raises
+CancelledError out of the inner coroutine and asyncio's default
+exception handler logs it at ERROR level with a full Django middleware
+traceback (often pointing at allauth_ratelimit, search.middleware, etc).
+That's expected behaviour — the request just went away — but the
+tracebacks look like real 500s in log search and were the dominant
+"500-shaped" noise in the production grooveshop pod logs.
+
+Add a logging filter on the asyncio logger that drops records whose
+exc_info is CancelledError; any other asyncio errors (loop crashes,
+real bugs) still propagate. Wired into both the IS_KUBERNETES and
+IS_DOCKER LOGGING configs.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e7c5d6f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e7c5d6f59351dddc2c945fff78b521fffdfca731))
+
 ## v1.113.0 (2026-04-25)
 
 ### Features

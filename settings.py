@@ -2121,6 +2121,9 @@ if IS_KUBERNETES:
             "add_correlation_id": {
                 "()": "core.logging.CorrelationIdFilter",
             },
+            "drop_asyncio_cancelled": {
+                "()": "core.logging.DropAsyncioCancelledError",
+            },
         },
         "handlers": {
             "console": {
@@ -2143,6 +2146,13 @@ if IS_KUBERNETES:
             },
             "celery": {
                 "level": logging_level,
+                "propagate": True,
+            },
+            # Suppress asyncio's CancelledError tracebacks emitted when an
+            # ASGI client disconnects mid-request. See DropAsyncioCancelledError.
+            "asyncio": {
+                "level": logging_level,
+                "filters": ["drop_asyncio_cancelled"],
                 "propagate": True,
             },
         },
@@ -2174,6 +2184,9 @@ elif IS_DOCKER or IS_DEVELOPMENT:
             "add_correlation_id": {
                 "()": "core.logging.CorrelationIdFilter",
             },
+            "drop_asyncio_cancelled": {
+                "()": "core.logging.DropAsyncioCancelledError",
+            },
         },
         "handlers": {
             "console": {
@@ -2202,6 +2215,12 @@ elif IS_DOCKER or IS_DEVELOPMENT:
             },
             "celery": {
                 "level": logging_level,
+                "propagate": True,
+            },
+            # See DropAsyncioCancelledError — silences ASGI client-disconnect noise.
+            "asyncio": {
+                "level": logging_level,
+                "filters": ["drop_asyncio_cancelled"],
                 "propagate": True,
             },
         },

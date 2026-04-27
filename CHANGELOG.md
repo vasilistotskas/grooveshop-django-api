@@ -3,6 +3,49 @@
 
 
 
+## v1.114.3 (2026-04-27)
+
+### Bug fixes
+
+* fix(admin): force parler translation save in TranslatableAdmin.save_model
+
+Translated fields (name, description) were silently not persisting on
+real HTTP POSTs to django-parler-backed admin pages, while the same
+flow run programmatically via RequestFactory worked correctly. Master
+fields, slug, seo_title, and stock all saved fine — only the translated
+columns refused to land. The form was returning 302 success and master
+history rows were created, masking the bug. Symptom for the user: edit
+description in admin, click Αποθήκευση, F5 — changes are gone.
+
+Root cause is somewhere in the parler 2.3.0 + Django 6.0 + Unfold
+interaction during the live request pipeline that drops the translation
+cache between `_post_clean()` (which populates it) and `save_model()`
+(which calls `obj.save()` → `save_translations()` → finds nothing
+modified). Did not isolate the exact step yet — the same Python flow
+constructed by hand persists translations correctly, so it's something
+specific to how the running pipeline hands the form/instance through.
+
+Workaround installs a `save_model` override on parler's `TranslatableAdmin`
+in `CoreConfig.ready()` that, after the normal save, re-applies the
+form's cleaned_data to the active language's translation row via a
+direct ORM upsert. Bypasses parler's `_translations_cache` entirely so
+the bug is moot. Idempotent — guarded with `_grooveshop_save_fix_installed`.
+
+Affects every TranslatableAdmin in the codebase (Product, BlogPost,
+Category, Tag, etc.) since the patch is on the base class.
+
+The previous TinyMCE save-sync work (commit 055f9e28) was a red herring
+— the textarea sync was actually working correctly, but parler discarded
+the values downstream. ([`ac8563a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ac8563a19e0cd69dc646ac53cb402519af2d4d06))
+
+### Chores
+
+* chore: sync uv.lock to project version 1.114.2
+
+Lockfile drifted to a stale version pin after semantic-release; CI's
+`uv sync --locked` rejected the previous parler-fix commit. No actual
+dependency changes — just realigning the self-reference. ([`88ab892`](https://github.com/vasilistotskas/grooveshop-django-api/commit/88ab892304a3c6ec008c7b4ee948d4c44b8f6790))
+
 ## v1.114.2 (2026-04-27)
 
 ### Bug fixes

@@ -3,6 +3,46 @@
 
 
 
+## v1.114.1 (2026-04-27)
+
+### Bug fixes
+
+* fix(admin): rich-text edits not persisting (TinyMCE → textarea sync)
+
+Editing a Product description (or any HTMLField) in the Webside admin
+returned 302 success but the field was unchanged on reload. Root
+cause: django-tinymce normally registers a form-submit handler that
+copies the iframe's HTML back to the underlying <textarea> via
+``tinymce.triggerSave()`` before submission. django-unfold's admin
+shell can race that registration, leaving the textarea pinned to its
+page-load value while the iframe shows the user's edit. The form
+posts the stale textarea content; ``Product.save`` runs against
+unchanged data; ``django-simple-history`` writes a row whose fields
+match the previous row exactly.
+
+Reproduced on production with chrome-mcp + JS introspection on
+``/admin/product/product/2/change/``:
+- ``editorLen=3371`` vs ``textareaLen=2877``
+- ``contentSyncedToTextarea=false``
+- DB ``description`` length unchanged after save (sanitize_html
+  strips disallowed tags but the content delta we cared about was
+  never in the POST body)
+
+Fix wires the missing handoff three ways so at least one fires:
+- form-submit listener (capture phase) → ``tinymce.triggerSave()``
+- per-editor ``change/input/keyup/blur/ExecCommand/SetContent`` →
+  ``editor.save()`` (continuous textarea sync, not just at submit)
+- ``beforeunload`` → ``triggerSave`` (last-ditch for click handlers
+  that navigate without a real submit)
+
+Loaded on every admin page via the new ``UNFOLD["SCRIPTS"]`` entry.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ebd0a41`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ebd0a41f85c4294e5d82bd23b5ea5048fbc7ce7f))
+
+### Chores
+
+* chore: claude update ([`6eff21b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6eff21b123896a87f64716956c1cfc80d256a749))
+
 ## v1.114.0 (2026-04-27)
 
 ### Features

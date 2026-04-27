@@ -3,6 +3,52 @@
 
 
 
+## v1.114.2 (2026-04-27)
+
+### Bug fixes
+
+* fix: update uv lock ([`a807ffa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a807ffaa0905d5e0400506e2714ac3db62284316))
+
+* fix(admin): TinyMCE save-sync uses stable v7/v8 API (was no-op)
+
+The previous fix relied on ``tinymce.editors`` and
+``tinymce.editorManager`` to enumerate and bind handlers — both are
+undefined on the global ``tinymce`` object in TinyMCE 7+ (the
+underlying EditorManager surface was removed from the public API).
+The form-submit handler also called ``tinymce.triggerSave()`` which
+internally walks the same now-missing array and silently no-ops.
+
+Verified live in production: ``tinymceVersion: "7.8.0"``,
+``tinymceEditorsType: "undefined"``, ``editorManager: false``. Both
+my bind path and my submit-time sync ran but did nothing — the user's
+save still posted the page-load textarea value, leaving the DB
+unchanged.
+
+Rewritten using only documented stable API surface:
+- ``tinymce.get(id)`` for per-textarea editor lookup
+- ``editor.save()`` for editor → textarea content sync (writes
+  iframe HTML to the bound textarea, fires SaveContent event)
+- ``tinymce.on('AddEditor', cb)`` directly on the global (NOT on
+  the deprecated EditorManager) to catch editors that mount after
+  this script runs
+
+The submit listener now walks ``document.querySelectorAll("textarea")``,
+calls ``tinymce.get(textarea.id)`` for each, and invokes
+``editor.save()`` directly — bypassing ``tinymce.triggerSave()``
+entirely so the broken-array path can't no-op us.
+
+Continuous per-editor sync via ``input change keyup blur ExecCommand
+SetContent`` is preserved as a defence-in-depth layer so the textarea
+stays fresh between submit events too.
+
+Verified in the live production page after a manual JS injection of
+the new logic: marker added in editor → not in textarea →
+``editor.save()`` → marker now in textarea. Old API path: marker
+added → ``tinymce.triggerSave()`` runs without error → textarea
+unchanged.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`055f9e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/055f9e28b0def92b2ab2247e66858b92ea121367))
+
 ## v1.114.1 (2026-04-27)
 
 ### Bug fixes

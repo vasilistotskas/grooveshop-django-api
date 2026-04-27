@@ -1644,6 +1644,17 @@ UNFOLD = {
         lambda request: static("css/admin.css"),
         "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
     ],
+    # Loads on every admin page. ``tinymce_save_sync.js`` patches the
+    # missing django-tinymce ↔ unfold form-submit handoff so that
+    # rich-text edits in HTMLField (Product description, BlogPost body,
+    # etc.) are actually copied from the TinyMCE iframe to the underlying
+    # <textarea> before the form is POSTed. Without it the save returns
+    # 302 success and django-simple-history writes a row, but the field
+    # value is unchanged because the form body has the page-load
+    # textarea value, not the edited iframe content.
+    "SCRIPTS": [
+        lambda request: static("admin/js/tinymce_save_sync.js"),
+    ],
     "DASHBOARD_CALLBACK": "admin.dashboard.dashboard_callback",
     "SIDEBAR": {
         "show_search": True,

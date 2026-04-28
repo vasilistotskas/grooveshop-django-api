@@ -8,6 +8,7 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from core.utils.email import is_disposable_domain
 from country.models import Country
 from order.enum.document_type import OrderCreateDocumentTypeEnum
+from order.enum.shipping_method import OrderShippingMethod
 from order.enum.status import OrderStatus
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -18,6 +19,9 @@ from order.serializers.item import (
 from pay_way.models import PayWay
 from product.models.product import Product
 from region.models import Region
+from shipping_boxnow.serializers.shipment import (
+    BoxNowShipmentDetailSerializer,
+)
 
 CARRIER_TRACKING_URLS: dict[str, str] = {
     "elta": "https://www.elta.gr/en/tracking?code={number}",
@@ -95,6 +99,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "payment_id",
             "payment_status",
             "payment_method",
+            "shipping_method",
             "can_be_canceled",
             "is_paid",
         )
@@ -132,12 +137,29 @@ class OrderDetailSerializer(OrderSerializer):
             "request to the invoice endpoint to find out."
         )
     )
+    boxnow_shipment = serializers.SerializerMethodField(
+        help_text=(
+            "BoxNow shipment details when shipping_method is "
+            "'box_now_locker', else null."
+        )
+    )
     phone = PhoneNumberField(read_only=True)
 
     @extend_schema_field({"type": "boolean"})
     def get_has_invoice(self, obj: Order) -> bool:
         invoice = getattr(obj, "invoice", None)
         return bool(invoice and invoice.has_document())
+
+    @extend_schema_field(BoxNowShipmentDetailSerializer(allow_null=True))
+    def get_boxnow_shipment(self, obj: Order) -> dict | None:
+        if obj.shipping_method != OrderShippingMethod.BOX_NOW_LOCKER:
+            return None
+        shipment = getattr(obj, "boxnow_shipment", None)
+        if shipment is None:
+            return None
+        return BoxNowShipmentDetailSerializer(
+            shipment, context=self.context
+        ).data
 
     @extend_schema_field(
         {
@@ -283,6 +305,7 @@ class OrderDetailSerializer(OrderSerializer):
             "pricing_breakdown",
             "tracking_details",
             "has_invoice",
+            "boxnow_shipment",
             "phone",
             "document_type",
             "payment_id",
@@ -301,6 +324,7 @@ class OrderDetailSerializer(OrderSerializer):
             "pricing_breakdown",
             "tracking_details",
             "has_invoice",
+            "boxnow_shipment",
         )
 
 
@@ -419,6 +443,29 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         ),
     )
 
+    # Shipping method selection
+    shipping_method = serializers.ChoiceField(
+        choices=OrderShippingMethod.choices,
+        default=OrderShippingMethod.HOME_DELIVERY,
+        required=False,
+        help_text=_("Shipping method for this order"),
+    )
+
+    # BoxNow locker fields (required when shipping_method == BOX_NOW_LOCKER)
+    boxnow_locker_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        help_text=_("BoxNow APM locker ID from the widget"),
+    )
+    boxnow_compartment_size = serializers.IntegerField(
+        min_value=1,
+        max_value=3,
+        required=False,
+        default=1,
+        help_text=_("BoxNow compartment size: 1=Small, 2=Medium, 3=Large"),
+    )
+
     def validate_email(self, value: str) -> str:
         """Validate email is not from disposable domain."""
         if not value:
@@ -465,7 +512,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         return cleaned
 
     def validate(self, attrs):
-        """Cross-field rules for B2B invoicing.
+        """Cross-field rules for B2B invoicing and BoxNow shipping.
 
         1. ``B2B_INVOICING_ENABLED`` gates the feature site-wide — when
            off, ``document_type=INVOICE`` is rejected so the API can't
@@ -473,6 +520,9 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         2. ``document_type=INVOICE`` ⇒ ``billing_vat_id`` required.
            Otherwise the myDATA submission would silently downgrade to
            11.1 (tax-fraud-adjacent) or hard-fail at the worker.
+        3. ``shipping_method=BOX_NOW_LOCKER`` ⇒ ``boxnow_locker_id``
+           required and ``pay_way`` must be an online-payment method
+           (no COD at lockers).
         """
         from extra_settings.models import Setting
 
@@ -493,6 +543,33 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                     )
                 }
             )
+
+        # BoxNow cross-field validation
+        if attrs.get("shipping_method") == OrderShippingMethod.BOX_NOW_LOCKER:
+            if not attrs.get("boxnow_locker_id"):
+                raise serializers.ValidationError(
+                    {
+                        "boxnow_locker_id": _(
+                            "Locker ID required when shipping method is BoxNow"
+                        )
+                    }
+                )
+            pay_way_id = attrs.get("pay_way_id")
+            if pay_way_id:
+                try:
+                    pay_way = PayWay.objects.get(pk=pay_way_id)
+                    if not pay_way.is_online_payment:
+                        raise serializers.ValidationError(
+                            {
+                                "pay_way": _(
+                                    "BoxNow lockers do not support "
+                                    "cash-on-delivery"
+                                )
+                            }
+                        )
+                except PayWay.DoesNotExist:
+                    pass  # let the view handle the missing pay_way
+
         return attrs
 
 

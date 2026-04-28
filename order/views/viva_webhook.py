@@ -497,6 +497,23 @@ def _handle_payment_created(order, event_data, transaction_id):
     # duplicate webhook delivery or a retry will not resend.
     send_order_confirmation_email.delay(order.id)
 
+    # Enqueue BoxNow delivery-request creation if the order uses a locker.
+    from order.enum.shipping_method import OrderShippingMethod
+
+    if order.shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
+        try:
+            from shipping_boxnow.tasks import (
+                create_boxnow_shipment_for_order,
+            )
+
+            create_boxnow_shipment_for_order.delay(order.id)
+        except ImportError:
+            logger.warning(
+                "shipping_boxnow not yet available — "
+                "skipping BoxNow task dispatch for order %s",
+                order.id,
+            )
+
 
 def _handle_payment_failed(order, event_data, transaction_id):
     logger.info(

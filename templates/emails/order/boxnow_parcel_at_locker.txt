@@ -1,0 +1,15 @@
+{% load i18n %}{% blocktrans %}Your BOX NOW parcel has arrived!{% endblocktrans %}
+
+{% blocktrans with first_name=order.first_name %}Hello {{ first_name }},{% endblocktrans %}
+
+{% blocktrans with order_id=order.id %}Your parcel for order #{{ order_id }} has arrived at the BOX NOW locker and is ready for pickup.{% endblocktrans %}
+
+{% blocktrans %}Voucher number{% endblocktrans %}: {{ shipment.parcel_id }}
+{% blocktrans %}Locker address{% endblocktrans %}: {{ locker_address }}{% if locker %}
+{% blocktrans %}Locker name{% endblocktrans %}: {{ locker.name }}{% endif %}
+
+{% blocktrans %}Your parcel is available for pickup 24 hours a day, 7 days a week.{% endblocktrans %}
+
+{% if SITE_URL %}{% blocktrans %}View your order{% endblocktrans %}: {{ SITE_URL }}/account/orders/{{ order.id }}
+{% endif %}
+{% blocktrans with site_name=SITE_NAME %}This is an automated message from {{ site_name }}.{% endblocktrans %}

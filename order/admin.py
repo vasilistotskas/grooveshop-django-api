@@ -304,7 +304,13 @@ class OrderHistoryInline(TabularInline):
     tab = True
 
     def get_queryset(self, request):
-        return super().get_queryset(request).order_by("-created_at")[:20]
+        # Don't slice here — Django's inline formset later does
+        # ``qs.filter(<fk>=<parent>)`` which raises
+        # ``Cannot filter a query once a slice has been taken``.
+        # If perf becomes a concern for orders with very long histories,
+        # introduce a paginated-inline package or a SubqueryFK trick;
+        # native Django inlines don't support a "show last N" pattern.
+        return super().get_queryset(request).order_by("-created_at")
 
     @admin.display(description=_("Description"))
     def description_display(self, obj):
@@ -432,6 +438,12 @@ class OrderAdmin(ModelAdmin):
         ("pay_way", RelatedDropdownFilter),
         "payment_method",
         "document_type",
+        # Filter Orders by ``home_delivery`` vs ``box_now_locker`` —
+        # useful for support tickets & shipping batch operations.
+        "shipping_method",
+        # Filter on the BoxNow parcel state via the OneToOne reverse
+        # relation. Only fires for box_now_locker orders.
+        "boxnow_shipment__parcel_state",
     ]
     search_fields = [
         "id",
@@ -443,6 +455,11 @@ class OrderAdmin(ModelAdmin):
         "city",
         "tracking_number",
         "payment_id",
+        # BoxNow voucher / delivery-request lookup by parcel ID, so
+        # support can paste a 10-digit voucher and find the order.
+        "boxnow_shipment__parcel_id",
+        "boxnow_shipment__delivery_request_id",
+        "boxnow_shipment__locker_external_id",
     ]
     readonly_fields = (
         "uuid",
@@ -453,6 +470,12 @@ class OrderAdmin(ModelAdmin):
         "financial_summary",
         "customer_summary",
         "shipping_summary",
+        # ``shipping_method`` is set at order-creation time and is
+        # read-only after; ``boxnow_summary`` is a computed display that
+        # surfaces BoxNow parcel state inline in the Shipping fieldset
+        # so admins don't have to scroll to the inline below.
+        "shipping_method",
+        "boxnow_summary",
     )
 
     fieldsets = (
@@ -523,9 +546,11 @@ class OrderAdmin(ModelAdmin):
             _("Shipping & Tracking"),
             {
                 "fields": (
+                    "shipping_method",
                     "shipping_price",
                     "tracking_number",
                     "shipping_carrier",
+                    "boxnow_summary",
                 ),
                 "classes": ("wide",),
                 "description": _(
@@ -562,6 +587,20 @@ class OrderAdmin(ModelAdmin):
     save_on_top = True
     date_hierarchy = "created_at"
     list_select_related = ["user", "country", "region", "pay_way"]
+
+    def get_inlines(self, request, obj=None):
+        # Show the BoxNow shipment inline only when the order actually
+        # uses BoxNow — keeps the change form clean for home_delivery
+        # orders. Lazy import sidesteps the circular ``order ↔ shipping_boxnow``
+        # registration cycle at app-load time.
+        inlines = list(super().get_inlines(request, obj))
+        if obj and obj.shipping_method == "box_now_locker":
+            from shipping_boxnow.admin import (  # noqa: PLC0415
+                BoxNowShipmentOrderInline,
+            )
+
+            inlines.append(BoxNowShipmentOrderInline)
+        return inlines
 
     def get_queryset(self, request):
         return (
@@ -638,6 +677,77 @@ class OrderAdmin(ModelAdmin):
             "</div>"
         )
         return mark_safe(html)
+
+    @admin.display(description=_("BoxNow Summary"))
+    def boxnow_summary(self, obj):
+        """Compact summary of the BoxNow shipment shown inline in
+        the Shipping & Tracking fieldset. Renders nothing for non-BoxNow
+        orders. For BoxNow orders, surfaces parcel state, voucher, and
+        chosen locker so admins don't have to scroll to the inline.
+        """
+        if obj.shipping_method != "box_now_locker":
+            return mark_safe(
+                '<span class="text-sm text-base-500">'
+                + str(_("Not a BoxNow order"))
+                + "</span>"
+            )
+
+        shipment = getattr(obj, "boxnow_shipment", None)
+        if shipment is None:
+            return mark_safe(
+                '<span class="text-sm text-orange-600">'
+                + str(
+                    _(
+                        "shipping_method=box_now_locker but no "
+                        "BoxNowShipment row — order created before the "
+                        "BoxNow integration shipped, or a service-layer "
+                        "bug. Inspect order.history for clues."
+                    )
+                )
+                + "</span>"
+            )
+
+        # Map parcel_state → Tailwind colour for the badge.
+        state_color = {
+            "pending_creation": "bg-base-200 text-base-700",
+            "new": "bg-blue-100 text-blue-700",
+            "in_depot": "bg-cyan-100 text-cyan-700",
+            "final_destination": "bg-amber-100 text-amber-700",
+            "delivered": "bg-green-100 text-green-700",
+            "returned": "bg-red-100 text-red-700",
+            "expired": "bg-red-100 text-red-700",
+            "canceled": "bg-red-100 text-red-700",
+            "missing": "bg-red-100 text-red-700",
+            "lost": "bg-red-100 text-red-700",
+            "accepted_for_return": "bg-cyan-100 text-cyan-700",
+            "accepted_to_locker": "bg-blue-100 text-blue-700",
+        }.get(shipment.parcel_state, "bg-base-200 text-base-700")
+
+        state_label = conditional_escape(shipment.get_parcel_state_display())
+        voucher = (
+            f'<div class="font-mono text-sm">{conditional_escape(shipment.parcel_id)}</div>'
+            if shipment.parcel_id
+            else (
+                '<div class="text-sm text-orange-600">'
+                + str(_("Voucher pending — fires after payment"))
+                + "</div>"
+            )
+        )
+        locker_id = conditional_escape(shipment.locker_external_id or "—")
+        locker_name = ""
+        if shipment.locker is not None:
+            locker_name = (
+                f" &middot; {conditional_escape(shipment.locker.name)}"
+            )
+
+        return mark_safe(
+            '<div class="space-y-1 text-sm">'
+            f'<div><span class="rounded px-2 py-0.5 text-xs font-medium {state_color}">{state_label}</span></div>'
+            f"<div><strong>{_('Voucher')}:</strong> {voucher}</div>"
+            f"<div><strong>{_('Locker')}:</strong> "
+            f'<span class="font-mono">{locker_id}</span>{locker_name}</div>'
+            "</div>"
+        )
 
     @admin.display(description=_("Shipping"))
     def shipping_info(self, obj):

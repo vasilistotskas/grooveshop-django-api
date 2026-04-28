@@ -204,6 +204,28 @@ serializers_config: SerializersConfig = {
         ),
         tags=["Orders"],
     ),
+    "boxnow_cancel": ActionConfig(
+        operation_id="cancelBoxNowShipmentForOrder",
+        summary=_("Cancel the BoxNow shipment for an order"),
+        description=_(
+            "Admin-only. Requests parcel cancellation via the BoxNow API. "
+            "Only valid when the parcel state is NEW (BoxNow error P420 "
+            "otherwise). Accepts an optional ``reason`` field in the "
+            "request body."
+        ),
+        tags=["Orders"],
+    ),
+    "boxnow_label": ActionConfig(
+        operation_id="getBoxNowLabelForOrder",
+        summary=_("Download the BoxNow parcel label PDF for an order"),
+        description=_(
+            "Streams the BoxNow label PDF through Django auth. "
+            "Accessible by the order owner, staff, or a guest with the "
+            "order UUID. Returns 404 when no BoxNow shipment exists for "
+            "the order or the parcel ID has not yet been assigned."
+        ),
+        tags=["Orders"],
+    ),
 }
 
 
@@ -279,6 +301,7 @@ class OrderViewSet(BaseModelViewSet):
             "reorder",
             "invoice",
             "invoice_download",
+            "boxnow_label",
         }
         guest_allowed_actions = {
             "retrieve_by_uuid",
@@ -288,7 +311,12 @@ class OrderViewSet(BaseModelViewSet):
             "create_checkout_session",
             "retry_payment",
         }
-        admin_only_actions = {"add_tracking", "update_status", "refund_order"}
+        admin_only_actions = {
+            "add_tracking",
+            "update_status",
+            "refund_order",
+            "boxnow_cancel",
+        }
         public_actions = {"create"}
 
         if self.action in owner_or_admin_actions:
@@ -734,20 +762,43 @@ class OrderViewSet(BaseModelViewSet):
 
         Note: djangorestframework_camel_case middleware automatically converts
         camelCase request data to snake_case, so we only need to check snake_case keys.
+
+        IMPORTANT: this dict is the only path by which the request body
+        reaches ``OrderService.create_order_from_cart`` and
+        ``create_order_from_cart_offline``. Every field the service reads
+        must be forwarded here — silently dropping a key means the field
+        is lost on the order without any error to the caller.
         """
-        phone = request.data.get("phone")
         return {
+            # Customer + address (always present)
             "first_name": request.data.get("first_name"),
             "last_name": request.data.get("last_name"),
             "email": request.data.get("email"),
+            "phone": request.data.get("phone"),
             "street": request.data.get("street"),
             "street_number": request.data.get("street_number"),
             "city": request.data.get("city"),
             "zipcode": request.data.get("zipcode"),
+            "place": request.data.get("place", ""),
+            "floor": request.data.get("floor", ""),
+            "location_type": request.data.get("location_type", ""),
             "country_id": request.data.get("country_id"),
             "region_id": request.data.get("region_id"),
-            "phone": phone,
             "customer_notes": request.data.get("customer_notes", ""),
+            # B2B billing identity (Tier B — Τιμολόγιο Πώλησης). Empty for retail.
+            "document_type": request.data.get("document_type"),
+            "billing_vat_id": request.data.get("billing_vat_id", ""),
+            "billing_country": request.data.get("billing_country", ""),
+            # Shipping method + BoxNow (per StepShipping in Nuxt). Default to
+            # home_delivery so legacy POSTs without the field stay backwards-
+            # compatible. ``boxnow_locker_id`` is empty for home_delivery.
+            "shipping_method": request.data.get(
+                "shipping_method", "home_delivery"
+            ),
+            "boxnow_locker_id": request.data.get("boxnow_locker_id", ""),
+            "boxnow_compartment_size": request.data.get(
+                "boxnow_compartment_size", 1
+            ),
         }
 
     # Payment endpoints are expensive and abuse-prone (Stripe PaymentIntent
@@ -1456,3 +1507,72 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="boxnow_cancel",
+        permission_classes=[IsAdminUser],
+    )
+    def boxnow_cancel(self, request, pk=None):
+        """Cancel the BoxNow shipment for an order (admin-only)."""
+        from shipping_boxnow.exceptions import BoxNowAPIError
+        from shipping_boxnow.services import BoxNowService
+
+        order = self.get_object()
+
+        shipment = getattr(order, "boxnow_shipment", None)
+        if shipment is None:
+            raise NotFound(_("This order does not have a BoxNow shipment."))
+
+        reason: str = request.data.get("reason", "")
+
+        try:
+            BoxNowService.cancel_shipment(shipment, reason=reason)
+        except BoxNowAPIError as exc:
+            logger.warning(
+                "BoxNow cancel (order-action) failed | order=%s"
+                " | parcel_id=%s | code=%s | msg=%s",
+                order.id,
+                shipment.parcel_id,
+                exc.code,
+                exc,
+            )
+            return Response(
+                {"detail": str(exc), "code": exc.code},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = OrderService.get_order_by_id(order.id)
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(
+            order, context=self.get_serializer_context()
+        )
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="boxnow_label",
+    )
+    def boxnow_label(self, request, pk=None):
+        """Download the BoxNow parcel label PDF for an order."""
+        from io import BytesIO
+
+        from shipping_boxnow.services import BoxNowService
+
+        order = self.get_object()
+
+        shipment = getattr(order, "boxnow_shipment", None)
+        if shipment is None or not shipment.parcel_id:
+            raise NotFound(
+                _("No BoxNow shipment or parcel ID found for this order.")
+            )
+
+        label_bytes: bytes = BoxNowService.fetch_label_bytes(shipment)
+        return FileResponse(
+            BytesIO(label_bytes),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"boxnow-{shipment.parcel_id}.pdf",
+        )

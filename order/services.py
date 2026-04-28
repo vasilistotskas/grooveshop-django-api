@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.shipping_method import OrderShippingMethod
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     InsufficientStockError,
@@ -55,7 +56,39 @@ class OrderService:
             if user and user.is_authenticated:
                 order_data["user"] = user
 
+            # Pop BoxNow-specific fields before Order.objects.create —
+            # they are not Order columns.
+            boxnow_locker_id = order_data.pop("boxnow_locker_id", "") or ""
+            boxnow_compartment_size = (
+                order_data.pop("boxnow_compartment_size", 1) or 1
+            )
+
             order = Order.objects.create(**order_data)
+
+            # Create BoxNow shipment row when locker delivery is selected
+            # (no API call yet — Celery task fires after payment succeeds).
+            if order.shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
+                try:
+                    from shipping_boxnow.models import (
+                        BoxNowLocker,
+                        BoxNowShipment,
+                    )
+
+                    locker = BoxNowLocker.objects.filter(
+                        external_id=boxnow_locker_id
+                    ).first()
+                    BoxNowShipment.objects.create(
+                        order=order,
+                        locker_external_id=boxnow_locker_id,
+                        locker=locker,
+                        compartment_size=boxnow_compartment_size,
+                    )
+                except ImportError:
+                    logger.warning(
+                        "shipping_boxnow app not available — "
+                        "skipping BoxNowShipment creation for order %s",
+                        order.id,
+                    )
 
             target_currency = (
                 order.shipping_price.currency
@@ -401,7 +434,19 @@ class OrderService:
                     shipping_address.get("document_type")
                     or OrderDocumentTypeEnum.RECEIPT
                 ),
+                "shipping_method": shipping_address.get(
+                    "shipping_method",
+                    OrderShippingMethod.HOME_DELIVERY,
+                ),
             }
+
+            # Extract BoxNow-specific fields (not Order model columns)
+            boxnow_locker_id = (
+                shipping_address.get("boxnow_locker_id", "") or ""
+            )
+            boxnow_compartment_size = (
+                shipping_address.get("boxnow_compartment_size", 1) or 1
+            )
 
             # Calculate shipping cost
             cart_total = cart.total_price
@@ -426,6 +471,33 @@ class OrderService:
 
             # Create the order
             order = Order.objects.create(**order_data)
+
+            # Create BoxNow shipment row when locker delivery is selected
+            if (
+                order_data.get("shipping_method")
+                == OrderShippingMethod.BOX_NOW_LOCKER
+            ):
+                try:
+                    from shipping_boxnow.models import (
+                        BoxNowLocker,
+                        BoxNowShipment,
+                    )
+
+                    locker = BoxNowLocker.objects.filter(
+                        external_id=boxnow_locker_id
+                    ).first()
+                    BoxNowShipment.objects.create(
+                        order=order,
+                        locker_external_id=boxnow_locker_id,
+                        locker=locker,
+                        compartment_size=boxnow_compartment_size,
+                    )
+                except ImportError:
+                    logger.warning(
+                        "shipping_boxnow app not available — "
+                        "skipping BoxNowShipment creation for order %s",
+                        order.id,
+                    )
 
             # Initialize metadata with cart snapshot
             order.metadata = {
@@ -805,7 +877,19 @@ class OrderService:
                     shipping_address.get("document_type")
                     or OrderDocumentTypeEnum.RECEIPT
                 ),
+                "shipping_method": shipping_address.get(
+                    "shipping_method",
+                    OrderShippingMethod.HOME_DELIVERY,
+                ),
             }
+
+            # Extract BoxNow-specific fields (not Order model columns)
+            boxnow_locker_id = (
+                shipping_address.get("boxnow_locker_id", "") or ""
+            )
+            boxnow_compartment_size = (
+                shipping_address.get("boxnow_compartment_size", 1) or 1
+            )
 
             # Calculate shipping cost
             cart_total = cart.total_price
@@ -837,6 +921,33 @@ class OrderService:
             if not pay_way.is_online_payment:
                 order.payment_id = f"offline_{order.uuid}"
                 order.save(update_fields=["payment_id"])
+
+            # Create BoxNow shipment row when locker delivery is selected
+            if (
+                order_data.get("shipping_method")
+                == OrderShippingMethod.BOX_NOW_LOCKER
+            ):
+                try:
+                    from shipping_boxnow.models import (
+                        BoxNowLocker,
+                        BoxNowShipment,
+                    )
+
+                    locker = BoxNowLocker.objects.filter(
+                        external_id=boxnow_locker_id
+                    ).first()
+                    BoxNowShipment.objects.create(
+                        order=order,
+                        locker_external_id=boxnow_locker_id,
+                        locker=locker,
+                        compartment_size=boxnow_compartment_size,
+                    )
+                except ImportError:
+                    logger.warning(
+                        "shipping_boxnow app not available — "
+                        "skipping BoxNowShipment creation for order %s",
+                        order.id,
+                    )
 
             # Initialize metadata with cart snapshot
             order.metadata = {
@@ -1171,6 +1282,22 @@ class OrderService:
         for field in required_fields:
             if not address.get(field):
                 errors[field] = [_("This field is required")]
+
+        # BoxNow shipping requires a locker selection. Without it, the
+        # BoxNow API call would fail with P402 (invalid destination)
+        # asynchronously inside the Celery task — way too late for a
+        # useful error message. Fail fast at the create-order boundary.
+        if address.get(
+            "shipping_method"
+        ) == OrderShippingMethod.BOX_NOW_LOCKER and not address.get(
+            "boxnow_locker_id"
+        ):
+            errors["boxnow_locker_id"] = [
+                _(
+                    "Select a BOX NOW locker before placing an order with "
+                    "locker delivery."
+                )
+            ]
 
         # Validate email format if provided
         email = address.get("email")
@@ -1710,6 +1837,21 @@ class OrderService:
 
         if order.status == OrderStatus.PENDING:
             cls.update_order_status(order, OrderStatus.PROCESSING)
+
+        # Enqueue BoxNow shipment creation after payment confirmation
+        if order.shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
+            try:
+                from shipping_boxnow.tasks import (
+                    create_boxnow_shipment_for_order,
+                )
+
+                create_boxnow_shipment_for_order.delay(order.id)
+            except ImportError:
+                logger.warning(
+                    "shipping_boxnow app not available — "
+                    "skipping BoxNow task dispatch for order %s",
+                    order.id,
+                )
 
         publish_payment_status(order)
         logger.info("Order %s marked as paid successfully", order.id)

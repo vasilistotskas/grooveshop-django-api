@@ -75,6 +75,17 @@ class PayWayViewSet(BaseModelViewSet):
         return super().get_permissions()
 
     def get_queryset(self):
-        if self.action == "list":
-            return PayWay.objects.for_list()
-        return PayWay.objects.for_detail()
+        qs = (
+            PayWay.objects.for_list()
+            if self.action == "list"
+            else PayWay.objects.for_detail()
+        )
+        # Hide disabled PayWays from the customer-facing list/retrieve.
+        # Staff still see everything so admins can audit/re-enable rows
+        # via the DRF API as well as Django admin.
+        user = getattr(self.request, "user", None)
+        if self.action in {"list", "retrieve"} and not (
+            user and user.is_authenticated and user.is_staff
+        ):
+            qs = qs.active()
+        return qs

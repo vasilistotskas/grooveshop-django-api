@@ -80,6 +80,13 @@ class PayWayFilter(
             "Filter payment methods that have/don't have configuration"
         ),
     )
+    shipping_method = filters.CharFilter(
+        method="filter_shipping_method",
+        help_text=_(
+            "Filter pay ways compatible with the given shipping method. "
+            "When 'box_now_locker', only online-payment pay ways are returned."
+        ),
+    )
 
     class Meta:
         model = PayWay
@@ -112,3 +119,8 @@ class PayWayFilter(
         elif value is False:
             return queryset.filter(configuration__isnull=True)
         return queryset
+
+    def filter_shipping_method(self, queryset, name, value):
+        from pay_way.services import PayWayService
+
+        return PayWayService.filter_by_shipping_method(queryset, value)

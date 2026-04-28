@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
@@ -13,6 +14,30 @@ logger = logging.getLogger(__name__)
 
 
 class PayWayService:
+    @staticmethod
+    def filter_by_shipping_method(
+        queryset: QuerySet,
+        shipping_method: str | None,
+    ) -> QuerySet:
+        """Filter PayWays compatible with the chosen shipping method.
+
+        BoxNow lockers do not support cash-on-delivery: filter out
+        any PayWay with ``is_online_payment=False`` when the method is
+        BOX_NOW_LOCKER. Other shipping methods don't constrain PayWays.
+
+        Args:
+            queryset: Base PayWay queryset.
+            shipping_method: One of ``OrderShippingMethod`` values, or None.
+
+        Returns:
+            Filtered queryset.
+        """
+        from order.enum.shipping_method import OrderShippingMethod
+
+        if shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
+            return queryset.filter(is_online_payment=True)
+        return queryset
+
     @staticmethod
     def get_provider_for_pay_way(pay_way: PayWay):
         if not pay_way.provider_code:

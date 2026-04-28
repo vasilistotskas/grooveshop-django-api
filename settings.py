@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 from os import getenv, makedirs, path
 from pathlib import Path
 
@@ -118,6 +119,7 @@ LOCAL_APPS = [
     "country",
     "region",
     "pay_way",
+    "shipping_boxnow",
     "cart",
     "notification",
     "contact",
@@ -717,6 +719,13 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["daily_6am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
+        },
+        "sync-boxnow-lockers": {
+            "task": "shipping_boxnow.tasks.sync_boxnow_lockers",
+            "schedule": SCHEDULE_PRESETS["daily_2am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery"},
         },
     }
 
@@ -1987,6 +1996,12 @@ SPECTACULAR_SETTINGS = {
         # generated frontend types on every regeneration.
         "OrderDocumentType": "order.enum.document_type.OrderDocumentTypeEnum",
         "OrderCreateDocumentType": "order.enum.document_type.OrderCreateDocumentTypeEnum",
+        # ``BoxNowShipment.parcel_state`` and ``BoxNowParcelEvent.event_type``
+        # both use ``BoxNowParcelState.choices``. Without this override,
+        # drf-spectacular emits ``ParcelStateEnum`` and ``EventTypeEnum``
+        # for the same choice set — a single canonical name is cleaner
+        # for the generated frontend types.
+        "BoxNowParcelState": "shipping_boxnow.enum.parcel_state.BoxNowParcelState",
     },
 }
 
@@ -2307,3 +2322,26 @@ FEDEX_API_KEY = getenv("FEDEX_API_KEY", "")
 FEDEX_ACCOUNT_NUMBER = getenv("FEDEX_ACCOUNT_NUMBER", "")
 UPS_API_KEY = getenv("UPS_API_KEY", "")
 UPS_ACCOUNT_NUMBER = getenv("UPS_ACCOUNT_NUMBER", "")
+
+# ---------- BoxNow Shipping ----------
+BOXNOW_CLIENT_ID = getenv("BOXNOW_CLIENT_ID", "")
+BOXNOW_CLIENT_SECRET = getenv("BOXNOW_CLIENT_SECRET", "")
+BOXNOW_PARTNER_ID = getenv("BOXNOW_PARTNER_ID", "")
+BOXNOW_WAREHOUSE_ID = getenv("BOXNOW_WAREHOUSE_ID", "2")
+BOXNOW_WEBHOOK_SECRET = getenv("BOXNOW_WEBHOOK_SECRET", "")
+BOXNOW_API_BASE_URL = getenv(
+    "BOXNOW_API_BASE_URL", "https://api-stage.boxnow.gr"
+)
+BOXNOW_LOCATION_API_BASE_URL = getenv(
+    "BOXNOW_LOCATION_API_BASE_URL",
+    "https://locationapi-stage.boxnow.gr",
+)
+BOXNOW_LIVE_MODE = getenv("BOXNOW_LIVE_MODE", "False").lower() == "true"
+BOXNOW_DEFAULT_COMPARTMENT_SIZE = int(
+    getenv("BOXNOW_DEFAULT_COMPARTMENT_SIZE", "1")
+)
+BOXNOW_SHIPPING_PRICE = Decimal(getenv("BOXNOW_SHIPPING_PRICE", "2.50"))
+BOXNOW_FREE_SHIPPING_THRESHOLD = Decimal(
+    getenv("BOXNOW_FREE_SHIPPING_THRESHOLD", "30.00")
+)
+BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))

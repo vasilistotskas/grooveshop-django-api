@@ -21,6 +21,7 @@ from core.models import (
     MetaDataModel,
 )
 from order.enum.document_type import OrderDocumentTypeEnum
+from order.enum.shipping_method import OrderShippingMethod
 from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager
 
@@ -213,6 +214,13 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     )
     shipping_carrier = models.CharField(
         _("Shipping Carrier"), max_length=255, blank=True, default=""
+    )
+    shipping_method = models.CharField(
+        _("Shipping Method"),
+        max_length=32,
+        choices=OrderShippingMethod.choices,
+        default=OrderShippingMethod.HOME_DELIVERY,
+        db_index=True,
     )
     stock_reservation_ids = models.JSONField(
         _("Stock Reservation IDs"),

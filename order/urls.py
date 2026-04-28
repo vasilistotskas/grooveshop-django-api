@@ -79,6 +79,16 @@ urlpatterns = [
         name="order-update-status",
     ),
     path(
+        "order/<int:pk>/boxnow_cancel",
+        OrderViewSet.as_view({"post": "boxnow_cancel"}),
+        name="order-boxnow-cancel",
+    ),
+    path(
+        "order/<int:pk>/boxnow_label",
+        OrderViewSet.as_view({"get": "boxnow_label"}),
+        name="order-boxnow-label",
+    ),
+    path(
         "order/my_orders",
         OrderViewSet.as_view({"get": "my_orders"}),
         name="order-my-orders",

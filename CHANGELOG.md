@@ -3,6 +3,117 @@
 
 
 
+## v1.116.0 (2026-04-28)
+
+### Bug fixes
+
+* fix: update uv.lock ([`d7e4de4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d7e4de43864c0527f1667db3a0ed03896a1c9f2f))
+
+* fix(boxnow): send real parcel weight to BoxNow + clamp to API max
+
+Two related issues exposed by inspecting the stage voucher PDF for
+order #641 — it printed "0.00 kg" even though the product carries a
+real `MeasurementField` weight (e.g. 94.62 g, 105 g on prod #43).
+
+**Root cause**: `BoxNowShipment.weight_grams` is `PositiveIntegerField`
+with `default=0`, and none of the three order-creation paths
+(`create_order`, `create_order_from_cart`,
+`create_order_from_cart_offline`) populated it from cart items, so
+every shipment dispatched `weight=0` to BoxNow's delivery-request
+payload. Visible to the customer on the printed voucher and (per
+BoxNow's tariff structure) wrong for billing.
+
+**Fix**: New module-level helper in `order/services.py`,
+`_compute_total_weight_grams(items)`, sums `(product, quantity)`
+pairs — reads `product.weight.g` (Mass.STANDARD_UNIT is `'g'`, so
+this returns grams regardless of the stored unit) — and rounds to
+the nearest non-negative int. Wired at all three BoxNowShipment
+create-sites with the appropriate iterable (`items_data` for
+`create_order`, `cart.items.select_related('product')` for the two
+cart paths).
+
+**Defense in depth**: New `_clamp_parcel_weight_grams()` in
+`shipping_boxnow/services.py` clamps to BoxNow's per-PDF P421 cap of
+1e6 grams (1000 kg) right before the payload goes out. None /
+negative / zero-or-less values become 0 (BoxNow API §3.4 explicitly
+allows "if parcel weight unknown pass 0"). Anything over the cap is
+clamped + logged as a warning so the operator can chase down the
+upstream unit confusion (e.g. someone storing a kg value as grams).
+
+Coverage:
+* `tests/unit/order/test_compute_weight_grams.py` — 9 cases for the
+  pair-summing helper (single-item, multi-item, zero qty, missing
+  product, missing weight, rounding, negative).
+* `tests/unit/shipping_boxnow/test_clamp_parcel_weight_grams.py` —
+  8 cases for the clamp (passthrough, zero, None, negative, exact
+  max, above max, log breadcrumb on overflow).
+
+Verified locally: order #641's product (94.62 g) now correctly
+computes to 95 g. Re-running BoxNow shipment creation on a fresh
+stage order will print "0.10 kg" on the voucher instead of 0.00 kg.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`54cbae0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/54cbae02381adc2312578be78e4d2c2a19abe87e))
+
+### Continuous integration
+
+* ci: use --dist loadfile + bump test timeout to 15min
+
+Two coupled fixes for the failing GitHub Actions test job that timed
+out at 10min having reached ~99% of 4340 tests:
+
+1. **Switch back to ``--dist loadfile``** — the previous
+   ``--dist worksteal`` overrode the ``loadfile`` set in
+   ``pyproject.toml::addopts``, contradicting the stability
+   requirement documented in ``project_test_suite_stability.md`` item
+   1: with ``worksteal``, tests from different files interleave on
+   the same xdist worker and module-level singletons (the
+   ``translation_reload`` middleware version, ``extra_settings``
+   cache, factory random state) leak between unrelated tests. That
+   is the source of 1-3 random flakes per CI run we kept chasing.
+
+2. **Bump step timeout from 10 to 15 min** — coverage instrumentation
+   adds 2-3× overhead on top of the ~2.5-min no-cov runtime. On the
+   2-vCPU GitHub free runner that's right at the 10-min edge; today's
+   run got to 99% before timing out. 15 min gives enough headroom
+   without inflating the surrounding job timeout (still 20 min, so
+   5 min reserved for the install/migrate prelude).
+
+Added a comment block explaining why the explicit ``-n auto --dist
+loadfile`` is duplicated here even though ``addopts`` already has it
+— so a future careless edit doesn't silently flip the project off
+the supported worker-distribution mode.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`bbe73a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bbe73a17f9a0c738825b61b98ca56a91bfab1d04))
+
+### Features
+
+* feat(boxnow): admin toggle to hide BoxNow option until partner activated
+
+Adds a `BOXNOW_ENABLED` `extra_settings.Setting` row, defaults to
+**False** so a fresh production deploy hides the BoxNow shipping
+option in checkout until BoxNow has explicitly approved the partner
+account for live traffic. The auth call to `api-production.boxnow.gr`
+returns 403 against credentials BoxNow issues for stage testing —
+hiding the row until they flip the live switch on their side prevents
+real customers from picking a method that can't dispatch.
+
+Wired at three layers:
+
+* `core/api/views.py::PUBLIC_SETTING_KEYS` — exposes the row through
+  `/api/settings/get` so the storefront can read it without auth.
+* `order/serializers/order.py::OrderCreateFromCartSerializer.validate`
+  — rejects `shipping_method=box_now_locker` orders when the toggle
+  is off; covers the API path.
+* `order/views/order.py::_validate_shipping_method_rules` — same
+  rejection at the dual-flow `create()` boundary; the view bypasses
+  the serializer's `validate()` and needs the rule re-applied.
+
+An admin can flip the row to True in Django admin once BoxNow
+confirms — no redeploy. New integration test covers the rejected-
+when-disabled path; existing tests now flip the row on in setUp.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1553a77`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1553a77c929861ec8838eaa88158bc4cc573b9f6))
+
 ## v1.115.1 (2026-04-28)
 
 ### Bug fixes

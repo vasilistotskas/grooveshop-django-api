@@ -53,8 +53,14 @@ class TestProductAlertEmailUnsubscribeHeaders:
 
         # RFC 8058: both URI forms separated by comma; both <>-bracketed.
         unsubscribe_header = msg.extra_headers["List-Unsubscribe"]
-        assert "<mailto:info@example.com?subject=unsubscribe>" in unsubscribe_header
-        assert "<https://api.example.com/api/v1/user/unsubscribe/" in unsubscribe_header
+        assert (
+            "<mailto:info@example.com?subject=unsubscribe>"
+            in unsubscribe_header
+        )
+        assert (
+            "<https://api.example.com/api/v1/user/unsubscribe/"
+            in unsubscribe_header
+        )
 
         # One-click POST flag — required by Gmail/Yahoo bulk-sender rules.
         assert (
@@ -64,8 +70,7 @@ class TestProductAlertEmailUnsubscribeHeaders:
 
         # List-ID lets mailbox providers bucket per-list reputation.
         assert (
-            msg.extra_headers["List-ID"]
-            == "product-restock-alerts.GrooveShop"
+            msg.extra_headers["List-ID"] == "product-restock-alerts.GrooveShop"
         )
 
     @override_settings(DEFAULT_FROM_EMAIL="from@example.com")

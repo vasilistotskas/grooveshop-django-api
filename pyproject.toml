@@ -328,3 +328,13 @@ no-matching-overload = "ignore"
 too-many-positional-arguments = "ignore"
 unsupported-operator = "ignore"
 invalid-return-type = "ignore"
+
+# django-unfold's @action decorator is annotated as `-> Action`
+# but actually returns the inner decorator callable, so ty flags
+# every `@action(...)` usage as call-non-callable. Suppress for
+# all per-app admin modules until upstream stubs are fixed.
+[[tool.ty.overrides]]
+include = ["**/admin.py"]
+
+[tool.ty.overrides.rules]
+call-non-callable = "ignore"

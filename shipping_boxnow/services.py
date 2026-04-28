@@ -50,6 +50,33 @@ _TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
 # Label cache TTL in seconds (1 hour).
 _LABEL_CACHE_TTL = 3600
 
+# BoxNow API §5 P421: parcel weight must be 0 ≤ weight ≤ 1e6 grams.
+_BOXNOW_MAX_WEIGHT_GRAMS = 1_000_000
+
+
+def _clamp_parcel_weight_grams(weight_grams: int | None) -> int:
+    """Clamp a parcel weight (grams) to BoxNow's accepted range.
+
+    Defends the delivery-request payload against P421 ("Invalid parcel
+    weight … between 0 and 1e6"). A value out of bounds is logged once
+    and clamped; we deliberately don't raise so a single corrupt row
+    can't block the entire BoxNow Celery task fan-out for an order.
+    Pass 0 when None — BoxNow's PDF explicitly allows that ("if parcel
+    weight unknown pass 0").
+    """
+    if weight_grams is None or weight_grams <= 0:
+        return 0
+    if weight_grams > _BOXNOW_MAX_WEIGHT_GRAMS:
+        logger.warning(
+            "Clamping BoxNow parcel weight %s g to BoxNow's max %s g "
+            "(P421 prevention). Likely a unit mix-up upstream — check "
+            "the product's MeasurementField unit.",
+            weight_grams,
+            _BOXNOW_MAX_WEIGHT_GRAMS,
+        )
+        return _BOXNOW_MAX_WEIGHT_GRAMS
+    return int(weight_grams)
+
 
 class BoxNowService:
     """
@@ -170,7 +197,13 @@ class BoxNowService:
                     "name": "voucher",
                     "value": invoice_value,
                     "compartmentSize": shipment.compartment_size,
-                    "weight": shipment.weight_grams or 0,
+                    # BoxNow API §3.4 expects parcel weight in **grams**
+                    # as a non-negative integer. P421 caps it at 1e6
+                    # (1 000 kg) — we clamp here so a corrupt model value
+                    # surfaces as a tracked log line instead of a 4xx
+                    # from BoxNow that retries and eventually dead-letters.
+                    # Pass 0 when unknown (per the PDF example comment).
+                    "weight": _clamp_parcel_weight_grams(shipment.weight_grams),
                 }
             ],
         }

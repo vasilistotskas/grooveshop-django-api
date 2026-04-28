@@ -34,6 +34,7 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from order.enum.shipping_method import OrderShippingMethod
 from order.exceptions import (
     InsufficientStockError,
     InvalidOrderDataError,
@@ -428,6 +429,13 @@ class OrderViewSet(BaseModelViewSet):
         """
 
         try:
+            # Step 0: Enforce shipping-method cross-field rules.
+            # The two `_create_*` flows below read fields directly from
+            # `request.data` and skip the serializer's `validate()` —
+            # so we apply the BoxNow rules inline here. (B2B invoice
+            # rules live in OrderWriteSerializer's update path.)
+            self._validate_shipping_method_rules(request)
+
             # Step 1: Get payment method to determine flow
             # Note: djangorestframework_camel_case converts payWay -> pay_way
             pay_way_id = request.data.get("pay_way_id")
@@ -575,6 +583,42 @@ class OrderViewSet(BaseModelViewSet):
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    def _validate_shipping_method_rules(self, request) -> None:
+        """Enforce BoxNow-specific cross-field rules from the request body.
+
+        These rules also live in `OrderCreateFromCartSerializer.validate()`
+        but the dual-flow `create()` does not run that serializer, so we
+        re-apply them here. Source of truth: the serializer — keep both
+        in sync.
+        """
+        shipping_method = request.data.get("shipping_method")
+        if shipping_method != OrderShippingMethod.BOX_NOW_LOCKER:
+            return
+
+        if not request.data.get("boxnow_locker_id"):
+            raise ValidationError(
+                {
+                    "boxnow_locker_id": [
+                        _("Locker ID required when shipping method is BoxNow")
+                    ]
+                }
+            )
+
+        pay_way_id = request.data.get("pay_way_id")
+        if pay_way_id:
+            try:
+                pay_way = PayWay.objects.get(pk=pay_way_id)
+            except PayWay.DoesNotExist:
+                return
+            if not pay_way.is_online_payment:
+                raise ValidationError(
+                    {
+                        "pay_way": [
+                            _("BoxNow lockers do not support cash-on-delivery")
+                        ]
+                    }
+                )
 
     def _create_with_payment_intent(self, request, pay_way: PayWay) -> Response:
         """

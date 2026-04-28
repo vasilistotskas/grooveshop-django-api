@@ -68,7 +68,19 @@ def _make_client(**kwargs) -> BoxNowClient:
 
 
 class TestAuthenticate:
-    """Tests for BoxNowClient._get_access_token."""
+    """Tests for BoxNowClient._get_access_token.
+
+    Each test owns its cache state. The conftest ``clear_caches`` fixture
+    clears AFTER yield, so a stale entry written by a previous test in the
+    same xdist worker would still be visible at the START of the next
+    test. Each test here calls ``cache.delete(_token_cache_key())`` at the
+    top to make the starting cache state explicit and worker-order
+    independent.
+    """
+
+    @staticmethod
+    def _token_cache_key(client) -> str:
+        return f"boxnow:access_token:{client.partner_id}"
 
     @pytest.mark.django_db
     def test_authenticate_success(self):
@@ -76,6 +88,7 @@ class TestAuthenticate:
         from django.core.cache import cache
 
         client = _make_client()
+        cache.delete(self._token_cache_key(client))
         auth_resp = _make_response(
             200,
             {
@@ -89,10 +102,8 @@ class TestAuthenticate:
         token = client._get_access_token()
 
         assert token == "abc123"
-        # Token must be in cache with a key scoped to partner_id.
-        cached = cache.get(f"boxnow:access_token:{client.partner_id}")
+        cached = cache.get(self._token_cache_key(client))
         assert cached == "abc123"
-        # Verify POST was called once.
         client._session.post.assert_called_once()
         call_kwargs = client._session.post.call_args
         assert "/api/v1/auth-sessions" in call_kwargs[0][0]
@@ -103,9 +114,7 @@ class TestAuthenticate:
         from django.core.cache import cache
 
         client = _make_client()
-        cache.set(
-            f"boxnow:access_token:{client.partner_id}", "cached-token", 60
-        )
+        cache.set(self._token_cache_key(client), "cached-token", 60)
 
         token = client._get_access_token()
 
@@ -118,7 +127,7 @@ class TestAuthenticate:
         from django.core.cache import cache
 
         client = _make_client()
-        cache.set(f"boxnow:access_token:{client.partner_id}", "old-token", 3600)
+        cache.set(self._token_cache_key(client), "old-token", 3600)
         auth_resp = _make_response(
             200,
             {

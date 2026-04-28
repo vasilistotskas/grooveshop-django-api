@@ -21,6 +21,7 @@ import logging
 
 from celery import shared_task
 from django.conf import settings
+from django.db.utils import DatabaseError, OperationalError
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_noop
 from django.utils.translation import override as translation_override
@@ -37,13 +38,26 @@ from order.models.order import Order
 logger = logging.getLogger(__name__)
 
 
+# Only retry on transient database/operational errors. `IntegrityError`
+# (a subclass of DatabaseError) is excluded — a unique-constraint or FK
+# violation will not resolve on retry, and a partially-completed task
+# rerun would create a second Notification row instead of fixing the
+# conflict (the helper isn't idempotent). `Exception` would catch
+# IntegrityError too, masking real bugs as flaky retries.
+RETRYABLE_DB_ERRORS = (OperationalError,)
+
+
 TASK_DEFAULTS = {
     "bind": True,
     "max_retries": 3,
-    "autoretry_for": (Exception,),
+    "autoretry_for": RETRYABLE_DB_ERRORS,
     "retry_backoff": True,
     "retry_jitter": True,
 }
+
+
+# Re-export DatabaseError for tests that want to assert on the exclusion.
+__all__ = ("RETRYABLE_DB_ERRORS", "TASK_DEFAULTS", "DatabaseError")
 
 
 # Status → (category, kind, notification_type, i18n (title_msgid, message_msgid))

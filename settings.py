@@ -2364,3 +2364,7 @@ BOXNOW_DEFAULT_COMPARTMENT_SIZE = int(
 # and Nuxt (`/api/settings/get`) read from there so an admin can retune the
 # rate without a redeploy.
 BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
+# Operations phone BoxNow calls about pickup issues at the origin warehouse.
+# Per BoxNow API §3.4 must be a real number in full international format
+# (P405 rejects malformed phones). Stage placeholder by default.
+BOXNOW_NOTIFY_PHONE = getenv("BOXNOW_NOTIFY_PHONE", "+302100000000")

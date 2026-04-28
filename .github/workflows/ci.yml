@@ -138,8 +138,21 @@ jobs:
         run: uv run python manage.py migrate
 
       - name: Run Tests
-        run: uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml -n auto --dist worksteal
-        timeout-minutes: 10
+        # ``--dist loadfile`` is mandatory for stability per
+        # ``project_test_suite_stability.md`` — interleaving tests
+        # from different files on the same xdist worker (the
+        # ``worksteal`` default) leaks module-level singletons (the
+        # ``translation_reload`` middleware version, ``extra_settings``
+        # cache, factory random state) and produces 1-3 random flakes
+        # per CI run. ``-n auto`` and ``--dist loadfile`` are also set
+        # in ``pyproject.toml::addopts`` — keeping them explicit here
+        # so a careless edit can't silently flip the project off the
+        # supported configuration.
+        # The 15-min timeout absorbs coverage overhead (~2-3× the no-cov
+        # runtime) on the 2-vCPU GitHub runner; the previous 10-min cap
+        # ran out at ~99% of the suite.
+        run: uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml -n auto --dist loadfile
+        timeout-minutes: 15
         env:
           HYPOTHESIS_PROFILE: ci
 

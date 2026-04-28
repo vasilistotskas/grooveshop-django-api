@@ -406,11 +406,14 @@ class BoxNowService:
             return None
 
         # --- Map webhook event to our enum -------------------------------
+        # `event_type` is a CharField so it accepts either an enum
+        # member's `.value` (the canonical case) or the raw webhook
+        # string when BoxNow ships a state we haven't mapped yet —
+        # narrow to `str` either way and store that.
         raw_event: str = data["event"]
+        mapped_state: str
         try:
-            mapped_state: BoxNowParcelState = (
-                BoxNowParcelState.from_webhook_event(raw_event)
-            )
+            mapped_state = BoxNowParcelState.from_webhook_event(raw_event)
         except ValueError:
             logger.warning(
                 "apply_webhook_event: unknown BoxNow event %r for "
@@ -418,9 +421,7 @@ class BoxNowService:
                 raw_event,
                 parcel_id,
             )
-            # Fall back to storing the raw string; coerce to a str so
-            # the event_type field receives something serialisable.
-            mapped_state = raw_event  # type: ignore[assignment]
+            mapped_state = raw_event
 
         # --- Parse event timestamp ---------------------------------------
         event_time = parse_datetime(data["time"])

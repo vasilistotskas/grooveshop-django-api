@@ -277,6 +277,7 @@ class OrderService:
                 order_value=_cart_total,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
+                shipping_method=shipping_address.get("shipping_method"),
             )
             _order_subtotal = Money(
                 _cart_total.amount + _shipping_cost.amount,
@@ -454,6 +455,7 @@ class OrderService:
                 order_value=cart_total,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
+                shipping_method=shipping_address.get("shipping_method"),
             )
             order_data["shipping_price"] = shipping_cost
 
@@ -897,6 +899,7 @@ class OrderService:
                 order_value=cart_total,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
+                shipping_method=shipping_address.get("shipping_method"),
             )
             order_data["shipping_price"] = shipping_cost
 
@@ -1883,8 +1886,22 @@ class OrderService:
         order_value: Money,
         country_id: int | None = None,
         region_id: int | None = None,
+        shipping_method: str | None = None,
     ) -> Money:
         from extra_settings.models import Setting
+
+        if shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
+            base_shipping_cost = Setting.get(
+                "BOXNOW_SHIPPING_PRICE", default=2.50
+            )
+            free_shipping_threshold = Setting.get(
+                "BOXNOW_FREE_SHIPPING_THRESHOLD", default=30.00
+            )
+            # BoxNow rate is a flat partnership fee; country/region
+            # adjustments don't apply to locker shipments.
+            if order_value.amount >= float(free_shipping_threshold):
+                return Money(0, order_value.currency)
+            return Money(float(base_shipping_cost), order_value.currency)
 
         base_shipping_cost = Setting.get(
             "CHECKOUT_SHIPPING_PRICE", default=3.00

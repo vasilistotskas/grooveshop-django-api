@@ -1,5 +1,4 @@
 import datetime
-from decimal import Decimal
 from os import getenv, makedirs, path
 from pathlib import Path
 
@@ -966,6 +965,25 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "FREE_SHIPPING_THRESHOLD",
         "type": "decimal",
         "value": 50.00,
+    },
+    {
+        "name": "BOXNOW_SHIPPING_PRICE",
+        "type": "decimal",
+        "value": 2.50,
+        "description": (
+            "Flat shipping cost in EUR when the customer ships to a "
+            "BoxNow locker. BoxNow's contractual rate; admin-tunable."
+        ),
+    },
+    {
+        "name": "BOXNOW_FREE_SHIPPING_THRESHOLD",
+        "type": "decimal",
+        "value": 30.00,
+        "description": (
+            "Cart subtotal in EUR above which BoxNow shipping becomes "
+            "free. Admin-tunable; mirrors FREE_SHIPPING_THRESHOLD for "
+            "the home-delivery flow."
+        ),
     },
     {
         "name": "CART_ABANDONED_HOURS",
@@ -2340,8 +2358,9 @@ BOXNOW_LIVE_MODE = getenv("BOXNOW_LIVE_MODE", "False").lower() == "true"
 BOXNOW_DEFAULT_COMPARTMENT_SIZE = int(
     getenv("BOXNOW_DEFAULT_COMPARTMENT_SIZE", "1")
 )
-BOXNOW_SHIPPING_PRICE = Decimal(getenv("BOXNOW_SHIPPING_PRICE", "2.50"))
-BOXNOW_FREE_SHIPPING_THRESHOLD = Decimal(
-    getenv("BOXNOW_FREE_SHIPPING_THRESHOLD", "30.00")
-)
+# Shipping price + free-shipping threshold are NOT mirrored as Django
+# settings: they live in `extra_settings.Setting` rows (BOXNOW_SHIPPING_PRICE
+# / BOXNOW_FREE_SHIPPING_THRESHOLD). Both Django (calculate_shipping_cost)
+# and Nuxt (`/api/settings/get`) read from there so an admin can retune the
+# rate without a redeploy.
 BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))

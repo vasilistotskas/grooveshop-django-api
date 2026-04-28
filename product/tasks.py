@@ -324,8 +324,28 @@ def check_low_stock_products() -> dict:
 
 
 def _send_product_alert_email(
-    *, recipient: str, subject: str, context: dict, template_basename: str
+    *,
+    recipient: str,
+    subject: str,
+    context: dict,
+    template_basename: str,
+    user=None,
+    list_id: str = "product-alerts",
 ) -> bool:
+    """Send a product-alert email with RFC 8058 unsubscribe headers.
+
+    When ``user`` is provided the email carries a ``List-Unsubscribe``
+    header pointing to the blanket-unsubscribe URL so Gmail/Outlook
+    surface a one-click control. Anonymous alerts (``ProductAlert``
+    rows with only ``email``, no ``user``) skip the header — there's
+    no token we can mint for them — and the email is delivered without
+    one-click semantics. Both paths are otherwise identical.
+    """
+    from user.utils.subscription import (
+        build_list_unsubscribe_headers,
+        generate_blanket_unsubscribe_link,
+    )
+
     try:
         text_content = render_to_string(
             f"emails/product/{template_basename}.txt", context
@@ -344,12 +364,20 @@ def _send_product_alert_email(
             f"<p><a href='{context.get('product_url', '')}'>View product</a></p>"
         )
 
+    headers: dict[str, str] | None = None
+    if user is not None and getattr(user, "pk", None) is not None:
+        unsubscribe_url = generate_blanket_unsubscribe_link(user)
+        headers = build_list_unsubscribe_headers(
+            unsubscribe_url, list_id=list_id
+        )
+
     try:
         msg = EmailMultiAlternatives(
             subject,
             text_content,
             settings.DEFAULT_FROM_EMAIL,
             [recipient],
+            headers=headers,
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()
@@ -416,6 +444,8 @@ def send_product_alert_restock(product_id: int) -> dict:
             subject=str(subject),
             context=context,
             template_basename="restock_alert",
+            user=alert.user if alert.user_id else None,
+            list_id="product-restock-alerts",
         ):
             sent += 1
 
@@ -488,6 +518,8 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
             subject=str(subject),
             context=context,
             template_basename="price_drop_alert",
+            user=alert.user if alert.user_id else None,
+            list_id="product-price-drop-alerts",
         ):
             sent += 1
         triggered_ids.append(alert.id)

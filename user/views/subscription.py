@@ -501,8 +501,21 @@ def _validate_unsubscribe_token(uidb64: str, token: str):
         uid = urlsafe_base64_decode(uidb64).decode()
         user = User.objects.get(pk=uid)
     except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        # Log so broken/forged links surface in observability without
+        # leaking detail to the caller (POST replies are silent 200 per
+        # RFC 8058; GET replies still 400 with a generic error message).
+        logger.warning(
+            "unsubscribe: could not resolve user from uidb64 %r — "
+            "link is malformed or the user was deleted",
+            uidb64,
+        )
         return None, _("Invalid unsubscribe link")
     if not default_token_generator.check_token(user, token):
+        logger.warning(
+            "unsubscribe: token check failed for user_id=%s — link "
+            "expired (default_token_generator timeout) or tampered",
+            user.pk,
+        )
         return None, _("Invalid or expired unsubscribe link")
     return user, None
 

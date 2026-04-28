@@ -11,9 +11,6 @@ from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import EmailMultiAlternatives, send_mail
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
 from django.db import connections, transaction
 from django.db.models import F
 from django.template.loader import render_to_string
@@ -489,11 +486,12 @@ def send_inactive_user_notifications() -> dict[str, Any]:
         total_users += 1
 
         try:
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
-            unsubscribe_url = (
-                f"{settings.API_BASE_URL}/api/v1/user/unsubscribe/{uid}/{token}"
+            from user.utils.subscription import (
+                build_list_unsubscribe_headers,
+                generate_blanket_unsubscribe_link,
             )
+
+            unsubscribe_url = generate_blanket_unsubscribe_link(user)
 
             context = {
                 "user": {
@@ -524,14 +522,9 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
                 reply_to=[settings.INFO_EMAIL],
-                headers={
-                    "List-Unsubscribe": (
-                        f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
-                        f"<{unsubscribe_url}>"
-                    ),
-                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                    "List-ID": f"reengagement.{settings.SITE_NAME}",
-                },
+                headers=build_list_unsubscribe_headers(
+                    unsubscribe_url, list_id="reengagement"
+                ),
             )
             email_msg.attach_alternative(html_body, "text/html")
             email_msg.send(fail_silently=False)

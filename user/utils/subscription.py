@@ -24,6 +24,8 @@ from user.models.subscription import SubscriptionTopic, UserSubscription
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from django.contrib.auth.models import AbstractBaseUser
+
     from user.models.account import UserAccount as User
 else:
     User = get_user_model()
@@ -124,6 +126,54 @@ def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
     return unsubscribe_url
 
 
+def generate_blanket_unsubscribe_link(
+    user: "AbstractBaseUser",
+) -> str:
+    """Build the blanket (no-topic) unsubscribe URL for ``user``.
+
+    Mirrors ``generate_unsubscribe_link`` but emits the URL form that
+    ``UnsubscribeAllView`` accepts — drops every active subscription
+    when the recipient hits one-click unsubscribe in Gmail/Outlook.
+
+    Use this in marketing/notification emails that aren't bound to a
+    single topic (re-engagement, product alerts) so the email still
+    carries an RFC 8058-compliant ``List-Unsubscribe`` header.
+
+    Accepts ``AbstractBaseUser`` so callers with a generic FK
+    (e.g. ``ProductAlert.user``) can pass it directly — only ``pk`` and
+    ``default_token_generator`` compatibility are required.
+    """
+    token = default_token_generator.make_token(user)
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+    base_url = settings.API_BASE_URL.rstrip("/")
+    return f"{base_url}/api/v1/user/unsubscribe/{uid}/{token}"
+
+
+def build_list_unsubscribe_headers(
+    unsubscribe_url: str, *, list_id: str
+) -> dict[str, str]:
+    """Build the ``List-Unsubscribe`` + ``List-ID`` header dict.
+
+    Centralised so every marketing/notification email emits the same
+    Gmail/Yahoo-friendly shape (per RFC 8058 + 2024 sender rules):
+
+    * ``List-Unsubscribe`` — both ``mailto:`` and HTTPS so MUAs that
+      don't support one-click POST still have a working link.
+    * ``List-Unsubscribe-Post`` — flags one-click as supported.
+    * ``List-ID`` — opaque list identifier; helps mailbox providers
+      bucket per-list deliverability stats.
+    """
+    return {
+        "List-Unsubscribe": (
+            f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
+            f"<{unsubscribe_url}>"
+        ),
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        "List-ID": f"{list_id}.{settings.SITE_NAME}",
+    }
+
+
 def send_newsletter(
     topic: SubscriptionTopic,
     subject: str,
@@ -194,14 +244,9 @@ def send_newsletter(
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
                 reply_to=[settings.INFO_EMAIL],
-                headers={
-                    "List-Unsubscribe": (
-                        f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
-                        f"<{unsubscribe_url}>"
-                    ),
-                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                    "List-ID": f"{topic.slug}.{settings.SITE_NAME}",
-                },
+                headers=build_list_unsubscribe_headers(
+                    unsubscribe_url, list_id=topic.slug
+                ),
             )
             email.attach_alternative(html_message, "text/html")
             email.send()

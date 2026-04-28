@@ -596,6 +596,22 @@ class OrderViewSet(BaseModelViewSet):
         if shipping_method != OrderShippingMethod.BOX_NOW_LOCKER:
             return
 
+        # Master switch — defends against a stale frontend that still
+        # surfaces the option after an admin has hidden it. See
+        # ``OrderCreateFromCartSerializer.validate`` for the same check
+        # at the serializer layer; both live behind the
+        # `extra_settings.Setting` row ``BOXNOW_ENABLED``.
+        from extra_settings.models import Setting
+
+        if not Setting.get("BOXNOW_ENABLED", default=False):
+            raise ValidationError(
+                {
+                    "shipping_method": [
+                        _("BoxNow locker shipping is currently unavailable.")
+                    ]
+                }
+            )
+
         if not request.data.get("boxnow_locker_id"):
             raise ValidationError(
                 {

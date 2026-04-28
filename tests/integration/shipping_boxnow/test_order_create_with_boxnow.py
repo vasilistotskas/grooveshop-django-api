@@ -40,6 +40,15 @@ class TestOrderCreateWithBoxNow(APITestCase):
 
     def setUp(self):
         super().setUp()
+        # The BOXNOW_ENABLED Setting defaults to False (production
+        # safety: hide the option until BoxNow activates the partner
+        # account). Tests that exercise the box_now_locker path need
+        # to flip it on; the row is auto-seeded by the conftest's
+        # `_reseed_extra_settings` fixture.
+        from extra_settings.models import Setting
+
+        Setting.objects.filter(name="BOXNOW_ENABLED").update(value_bool=True)
+
         self.user = UserAccountFactory(num_addresses=0)
         self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(country=self.country)
@@ -200,3 +209,40 @@ class TestOrderCreateWithBoxNow(APITestCase):
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         body_str = str(response.json()).lower()
         assert "locker" in body_str or "boxnow" in body_str
+
+    @patch("order.payment.get_payment_provider")
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_create_order_rejected_when_boxnow_disabled_globally(
+        self,
+        mock_validate_address,
+        mock_validate_cart,
+        mock_get_payment_provider,
+    ):
+        """When the admin flips BOXNOW_ENABLED to False the API must
+        reject ``box_now_locker`` orders even if the request is
+        otherwise valid — defends against a stale frontend cache that
+        still surfaces the option after admin hides it."""
+        from extra_settings.models import Setting
+
+        Setting.objects.filter(name="BOXNOW_ENABLED").update(value_bool=False)
+
+        mock_validate_cart.return_value = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+        }
+        mock_validate_address.return_value = None
+        self._mock_payment_success(mock_get_payment_provider)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            self.create_url,
+            self._build_payload(pay_way_id=self.online_pay_way.id),
+            format="json",
+            HTTP_X_CART_ID=str(self.cart.id),
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        body_str = str(response.json()).lower()
+        assert "shipping" in body_str or "unavailable" in body_str

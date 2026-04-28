@@ -986,6 +986,20 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "BOXNOW_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Master switch for the BoxNow locker shipping option in "
+            "checkout. Defaults to False so a fresh production deploy "
+            "doesn't expose the option to customers until BoxNow has "
+            "explicitly approved the partner account for live traffic "
+            "(stage credentials return 403 against api-production.boxnow.gr "
+            "until they activate). Flip to True in Django admin once "
+            "BoxNow confirms."
+        ),
+    },
+    {
         "name": "CART_ABANDONED_HOURS",
         "type": "int",
         "value": 24,

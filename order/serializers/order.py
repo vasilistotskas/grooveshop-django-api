@@ -546,6 +546,19 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
 
         # BoxNow cross-field validation
         if attrs.get("shipping_method") == OrderShippingMethod.BOX_NOW_LOCKER:
+            # Master switch — admin can hide BoxNow without redeploy.
+            # Production starts disabled (BOXNOW_ENABLED defaults to
+            # False); we only allow ``box_now_locker`` orders once an
+            # admin has flipped the Setting row to True. Defends against
+            # a stale frontend cache surfacing the option.
+            if not Setting.get("BOXNOW_ENABLED", default=False):
+                raise serializers.ValidationError(
+                    {
+                        "shipping_method": _(
+                            "BoxNow locker shipping is currently unavailable."
+                        )
+                    }
+                )
             if not attrs.get("boxnow_locker_id"):
                 raise serializers.ValidationError(
                     {

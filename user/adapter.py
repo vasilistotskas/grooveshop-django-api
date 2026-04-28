@@ -119,7 +119,7 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
             user.save(update_fields=["language_code"])
         return user
 
-    def get_connect_redirect_url(self, request, social_account: SocialAccount):
+    def get_connect_redirect_url(self, request, socialaccount: SocialAccount):
         url = request.POST.get("next") or request.GET.get("next")
         allowed_hosts = {
             settings.APP_MAIN_HOST_NAME,

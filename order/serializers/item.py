@@ -80,9 +80,9 @@ class OrderItemWriteSerializer(serializers.ModelSerializer[OrderItem]):
             )
         return value
 
-    def validate(self, data: dict) -> dict:
-        product = data.get("product")
-        quantity = data.get("quantity")
+    def validate(self, attrs: dict) -> dict:
+        product = attrs.get("product")
+        quantity = attrs.get("quantity")
 
         if product and hasattr(product, "stock") and product.stock < quantity:
             raise serializers.ValidationError(
@@ -95,7 +95,7 @@ class OrderItemWriteSerializer(serializers.ModelSerializer[OrderItem]):
                 }
             )
 
-        return data
+        return attrs
 
 
 class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):
@@ -114,9 +114,9 @@ class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):
             )
         return value
 
-    def validate(self, data: dict) -> dict:
-        product = data.get("product")
-        quantity = data.get("quantity")
+    def validate(self, attrs: dict) -> dict:
+        product = attrs.get("product")
+        quantity = attrs.get("quantity")
 
         if product and hasattr(product, "stock") and product.stock < quantity:
             raise serializers.ValidationError(
@@ -129,7 +129,7 @@ class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):
                 }
             )
 
-        return data
+        return attrs
 
 
 class OrderItemRefundSerializer(serializers.Serializer):
@@ -145,9 +145,9 @@ class OrderItemRefundSerializer(serializers.Serializer):
         help_text=_("Optional reason for the refund"),
     )
 
-    def validate(self, data):
+    def validate(self, attrs):
         item = self.context.get("item")
-        quantity = data.get("quantity")
+        quantity = attrs.get("quantity")
 
         if not item:
             raise serializers.ValidationError(
@@ -163,7 +163,7 @@ class OrderItemRefundSerializer(serializers.Serializer):
                 )
             )
 
-        return data
+        return attrs
 
 
 class OrderItemRefundResponseSerializer(serializers.Serializer):

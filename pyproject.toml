@@ -262,11 +262,8 @@ python-version = "3.14"
 # Django ORM metaclass: reverse relations, FK _id accessors,
 # get_*_display(), AbstractBaseUser attrs, Celery .delay(),
 # Parler/MPTT methods — ty lacks django-stubs mypy plugin support
+# (https://github.com/astral-sh/ty/blob/main/docs/reference/typing-faq.md)
 unresolved-attribute = "ignore"
-possibly-missing-attribute = "ignore"
-# DRF standard pattern: serializer validate() overrides with
-# different signatures are idiomatic and expected
-invalid-method-override = "ignore"
 
 [tool.ty.src]
 exclude = [
@@ -324,7 +321,6 @@ invalid-assignment = "ignore"
 not-subscriptable = "ignore"
 not-iterable = "ignore"
 call-non-callable = "ignore"
-no-matching-overload = "ignore"
 too-many-positional-arguments = "ignore"
 unsupported-operator = "ignore"
 invalid-return-type = "ignore"

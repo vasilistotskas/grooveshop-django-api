@@ -129,13 +129,13 @@ class CartItemWriteSerializer(serializers.ModelSerializer[CartItem]):
             raise serializers.ValidationError(_("Quantity cannot exceed 999."))
         return value
 
-    def validate(self, data: dict) -> dict:
+    def validate(self, attrs: dict) -> dict:
         if self.instance:
             product = self.instance.product
-            quantity = data.get("quantity", self.instance.quantity)
+            quantity = attrs.get("quantity", self.instance.quantity)
         else:
-            product = data.get("product")
-            quantity = data.get("quantity", 1)
+            product = attrs.get("product")
+            quantity = attrs.get("quantity", 1)
 
         if product:
             if not product.active:
@@ -160,7 +160,7 @@ class CartItemWriteSerializer(serializers.ModelSerializer[CartItem]):
                     )
                 )
 
-        return data
+        return attrs
 
     def create(self, validated_data: dict) -> CartItem:
         cart = self.context.get("cart") or validated_data.get("cart")
@@ -200,9 +200,9 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
             raise serializers.ValidationError(_("Quantity cannot exceed 999."))
         return value
 
-    def validate(self, data: dict) -> dict:
-        product = data.get("product")
-        quantity = data.get("quantity", 1)
+    def validate(self, attrs: dict) -> dict:
+        product = attrs.get("product")
+        quantity = attrs.get("quantity", 1)
 
         if product:
             if not product.active:
@@ -226,7 +226,7 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
                         quantity=quantity,
                     )
                 )
-        return data
+        return attrs
 
     def create(self, validated_data: dict) -> CartItem:
         cart = self.context.get("cart") or validated_data.get("cart")
@@ -265,11 +265,11 @@ class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):
             raise serializers.ValidationError(_("Quantity cannot exceed 999."))
         return value
 
-    def validate(self, data: dict) -> dict:
+    def validate(self, attrs: dict) -> dict:
         instance = self.instance
         if instance:
             product = instance.product
-            quantity = data.get("quantity", instance.quantity)
+            quantity = attrs.get("quantity", instance.quantity)
 
             if product and product.stock < quantity:
                 raise serializers.ValidationError(
@@ -283,7 +283,7 @@ class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):
                         quantity=quantity,
                     )
                 )
-        return data
+        return attrs
 
     def update(self, instance: CartItem, validated_data: dict) -> CartItem:
         quantity = validated_data.get("quantity", instance.quantity)

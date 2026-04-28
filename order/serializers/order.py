@@ -613,8 +613,8 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             )
         return value
 
-    def validate(self, data):
-        items_data = data.get("items", [])
+    def validate(self, attrs):
+        items_data = attrs.get("items", [])
 
         # Batch-fetch all products in a single query to avoid N+1.
         product_ids = []
@@ -665,7 +665,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                     )
                 )
 
-        return data
+        return attrs
 
     def create(self, validated_data):
         from django.conf import settings

@@ -61,9 +61,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             logger.exception(f"Unexpected error in connect: {e}")
             await self.close(code=4500)
 
-    async def disconnect(self, close_code):
+    async def disconnect(self, code):
         logger.debug(
-            f"NotificationConsumer disconnect called with code: {close_code}"
+            f"NotificationConsumer disconnect called with code: {code}"
         )
         if not self.user:
             logger.debug("No user in disconnect")

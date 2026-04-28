@@ -12,7 +12,9 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
     )
     attribute_name = serializers.SerializerMethodField()
     attribute_value_id = serializers.IntegerField(source="attribute_value.id")
-    value = serializers.SerializerMethodField()
+    value = serializers.SerializerMethodField(
+        method_name="get_translated_value"
+    )
 
     class Meta:
         model = ProductAttribute
@@ -38,7 +40,7 @@ class ProductAttributeSerializer(serializers.ModelSerializer):
             "name", any_language=True
         )
 
-    def get_value(self, obj) -> str:
+    def get_translated_value(self, obj) -> str:
         """Return translated attribute value."""
         return obj.attribute_value.safe_translation_getter(
             "value", any_language=True

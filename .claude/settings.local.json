@@ -54,7 +54,15 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "WebFetch(domain:developer.viva.com)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(uv pip *)",
+      "Bash(sed -i 's/^invalid-method-override = \"ignore\"/# invalid-method-override = \"ignore\"/' pyproject.toml)",
+      "Bash(uv run *)",
+      "Read(//c//**)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)"
     ],
     "deny": [],
     "ask": []

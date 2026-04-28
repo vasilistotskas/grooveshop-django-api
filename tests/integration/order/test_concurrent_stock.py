@@ -95,6 +95,13 @@ class TestConcurrentStockOperationsPreventOverselling:
                             "quantity": quantity,
                         }
                     )
+            finally:
+                # Release the per-thread connection so TransactionTestCase's
+                # teardown flush isn't blocked by an idle but open
+                # transaction that prevents TRUNCATE — the leak surfaces
+                # as residual rows in unrelated tests on the same xdist
+                # worker (notably the OrderItemFilterTest count assertions).
+                connection.close()
 
         # Create 5 threads, each trying to reserve 3 units
         threads = []
@@ -226,6 +233,9 @@ class TestConcurrentStockOperationsPreventOverselling:
                             "quantity": quantity,
                         }
                     )
+            finally:
+                # See reserve_stock_thread above for the rationale.
+                connection.close()
 
         # Create 5 threads, each trying to decrement 3 units
         threads = []
@@ -378,6 +388,9 @@ class TestConcurrentStockOperationsPreventOverselling:
                             "quantity": quantity,
                         }
                     )
+            finally:
+                # See reserve_stock_thread above for the rationale.
+                connection.close()
 
         # Create 5 threads, each trying to order 3 units
         threads = []

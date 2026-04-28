@@ -3,6 +3,28 @@
 
 
 
+## v1.115.1 (2026-04-28)
+
+### Bug fixes
+
+* fix: update uv.lock ([`3ca10a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3ca10a9945ea6d57e06ee4f0706c1ee42186bcf3))
+
+### Refactoring
+
+* refactor: align overrides with upstream signatures, drop redundant ty ignores
+
+Rename method-override params to match the base classes ty stubs declare:
+DRF Serializer.validate(self, attrs), Field.to_representation(self, value),
+Channels AsyncWebsocketConsumer.disconnect(self, code), allauth
+get_connect_redirect_url(..., socialaccount). Resolve Field.get_value
+collision in ProductAttributeSerializer via SerializerMethodField method_name.
+
+Drop project-wide invalid-method-override and possibly-missing-attribute
+ignores (now 0 errors), and the redundant no-matching-overload from the
+library-stubs override block.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2ac734a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ac734a06239c554cd07b144d789e6899e412451))
+
 ## v1.115.0 (2026-04-28)
 
 ### Bug fixes

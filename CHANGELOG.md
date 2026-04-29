@@ -3,6 +3,76 @@
 
 
 
+## v1.117.0 (2026-04-29)
+
+### Bug fixes
+
+* fix(boxnow): send parcel weight in kilograms, not grams
+
+Empirical evidence from a stage voucher: sending integer ``189`` for
+``items[].weight`` printed **"189.00 kg"** on the voucher PDF, NOT
+0.19 kg. So BoxNow's API field is in **kilograms (decimal)** and the
+voucher template stamps the value verbatim with a ``kg`` label.
+
+Yesterday's fix sent ``shipment.weight_grams`` directly to BoxNow,
+which would have made the voucher print 0.105 kg as "105.00 kg" —
+wrong by 1000×, plus way over P421's 10⁶ cap so BoxNow would 4xx
+real shipments.
+
+**Fix**: rename ``_clamp_parcel_weight_grams`` → ``_format_parcel_weight_kg``
+and divide by 1000 (round to 3 decimals = gram precision) before
+serialising into the payload. ``weight_grams`` stays the internal
+storage unit (integer for precision) so the model + admin don't
+change.
+
+Verified locally: 1 × 94.62 g now sends ``"weight": 0.095`` and the
+voucher prints "0.10 kg" (BoxNow rounds to 2 decimals on print).
+Renamed the test file to match
+(``test_format_parcel_weight_kg.py``) and updated all cases.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2272103`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2272103b2a00289fb99e6b52cc014c9fb1fb0abb))
+
+### Continuous integration
+
+* ci: pin astral-sh actions to commit SHAs
+
+astral-sh stopped publishing minor/major tags (e.g. ``@v4``, ``@v8``,
+``@v8.0``) as a supply-chain hardening — same response as the
+tj-actions incident. Tag-based references now resolve to nothing,
+breaking the Quality job.
+
+Pinned references with the resolved tag in a trailing comment so
+Dependabot/Renovate can still surface upgrades:
+
+* ``astral-sh/setup-uv`` → ``08807647…`` (v8.1.0)
+* ``astral-sh/ruff-action`` → ``0ce1b0bf…`` (v4.0.0)
+
+Refs: https://github.com/astral-sh/ruff-action/issues/362
+Refs: https://github.com/astral-sh/setup-uv/issues/830
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`50392bd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50392bd1be6fafc79c21facf7ba2f18aa6344409))
+
+* ci: bump ruff ([`8a44510`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8a4451025725ced898fb0a0ba413706c7e6a7f0a))
+
+### Features
+
+* feat(boxnow): admin "Download voucher" action on Order + Shipment
+
+Adds a one-click voucher PDF download in the Django admin so operators
+no longer need a Django shell to fetch BoxNow labels. Hits the same
+``BoxNowService.fetch_label_bytes`` path that the customer-facing
+``/orders/{id}/boxnow:label.pdf`` proxy uses, so the response is
+cache-warmed across both surfaces.
+
+* ``BoxNowShipmentAdmin.actions_detail`` gains ``download_voucher_action``
+* ``OrderAdmin.actions_detail`` gains ``download_boxnow_voucher`` for the
+  common case where the operator is already on the order page
+* Both actions guard on ``parcel_id`` absence (still pending creation)
+  and on non-BoxNow orders, flashing an explanatory message instead of
+  500ing.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`387e1ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/387e1ae076371d7ca5bad71b5d5643750f102bd3))
+
 ## v1.116.0 (2026-04-28)
 
 ### Bug fixes

@@ -375,7 +375,7 @@ class BoxNowShipmentAdmin(ModelAdmin):
     )
     inlines = [BoxNowParcelEventInline]
     actions = ["cancel_parcels", "resync_label"]
-    actions_detail = ["cancel_parcel_action"]
+    actions_detail = ["download_voucher_action", "cancel_parcel_action"]
     list_select_related = ["order", "locker"]
     save_on_top = True
     date_hierarchy = "created_at"
@@ -497,6 +497,83 @@ class BoxNowShipmentAdmin(ModelAdmin):
             )
 
     # ── Detail actions ──────────────────────────────────────────────
+
+    @action(
+        description=str(_("Download BoxNow voucher (PDF)")),
+        variant=ActionVariant.PRIMARY,
+        icon="download",
+    )
+    def download_voucher_action(self, request, object_id):
+        """Stream the BoxNow voucher PDF for a single shipment.
+
+        Calls ``BoxNowService.fetch_label_bytes`` (which hits BoxNow's
+        ``/api/v1/parcels/{id}/label.pdf`` and caches for an hour) and
+        returns the bytes inline so the operator can preview-then-print
+        from any modern browser. The ``attachment`` Content-Disposition
+        keeps the filename predictable (``boxnow-voucher-<parcel>.pdf``)
+        for filing.
+
+        Falls back to a redirect with a flash message when the shipment
+        has no parcel_id yet (e.g. ``parcel_state=pending_creation``)
+        rather than 404'ing — admins are usually triaging stuck rows.
+        """
+        from django.http import HttpResponse  # noqa: PLC0415
+        from django.shortcuts import redirect  # noqa: PLC0415
+
+        from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
+
+        try:
+            shipment = BoxNowShipment.objects.get(pk=object_id)
+        except BoxNowShipment.DoesNotExist:
+            messages.error(request, _("Shipment not found."))
+            return redirect(
+                reverse(
+                    "admin:shipping_boxnow_boxnowshipment_change",
+                    args=[object_id],
+                )
+            )
+
+        if not shipment.parcel_id:
+            messages.warning(
+                request,
+                _(
+                    "No voucher available — shipment is in state "
+                    "'%(state)s'. The BoxNow delivery-request task has "
+                    "not yet assigned a parcel ID for this order."
+                )
+                % {"state": shipment.get_parcel_state_display()},
+            )
+            return redirect(
+                reverse(
+                    "admin:shipping_boxnow_boxnowshipment_change",
+                    args=[object_id],
+                )
+            )
+
+        try:
+            pdf_bytes = BoxNowService.fetch_label_bytes(shipment)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "Admin download_voucher_action failed for shipment %s",
+                shipment.pk,
+            )
+            messages.error(
+                request,
+                _("Failed to fetch voucher for parcel %(parcel_id)s: %(err)s")
+                % {"parcel_id": shipment.parcel_id, "err": str(exc)},
+            )
+            return redirect(
+                reverse(
+                    "admin:shipping_boxnow_boxnowshipment_change",
+                    args=[object_id],
+                )
+            )
+
+        filename = f"boxnow-voucher-{shipment.parcel_id}.pdf"
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Content-Length"] = str(len(pdf_bytes))
+        return response
 
     @action(
         description=str(_("Cancel parcel via BoxNow API")),

@@ -582,6 +582,7 @@ class OrderAdmin(ModelAdmin):
         "regenerate_invoice",
         "send_invoice_to_mydata_now",
         "cancel_mydata_invoice_now",
+        "download_boxnow_voucher",
     ]
     inlines = [OrderItemInline, InvoiceInline, OrderHistoryInline]
     save_on_top = True
@@ -1526,6 +1527,81 @@ class OrderAdmin(ModelAdmin):
             % {"mark": invoice.mydata_mark, "order_id": order.id},
         )
         return self._redirect_to_order_change(object_id)
+
+    @action(
+        description=str(_("Download BoxNow voucher (PDF)")),
+        variant=ActionVariant.PRIMARY,
+        icon="download",
+    )
+    def download_boxnow_voucher(self, request, object_id):
+        """Stream the BoxNow voucher PDF for the order's parcel.
+
+        Mirrors the same action on ``BoxNowShipmentAdmin`` — admins
+        triaging orders rarely click through to the shipment detail
+        page, so duplicating the button here saves a hop. Falls back
+        to a flash message + redirect when the order isn't BoxNow or
+        the shipment doesn't have a parcel ID yet.
+        """
+        from django.http import HttpResponse  # noqa: PLC0415
+
+        try:
+            order = Order.objects.get(pk=object_id)
+        except Order.DoesNotExist:
+            messages.error(request, _("Order not found."))
+            return self._redirect_to_order_change(object_id)
+
+        if order.shipping_method != "box_now_locker":
+            messages.warning(
+                request,
+                _(
+                    "Order #%(order_id)s is not a BoxNow order — no "
+                    "voucher to download."
+                )
+                % {"order_id": order.id},
+            )
+            return self._redirect_to_order_change(object_id)
+
+        try:
+            from shipping_boxnow.models import BoxNowShipment  # noqa: PLC0415
+            from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
+        except ImportError:
+            messages.error(
+                request,
+                _("BoxNow shipping app not available."),
+            )
+            return self._redirect_to_order_change(object_id)
+
+        shipment = BoxNowShipment.objects.filter(order=order).first()
+        if shipment is None or not shipment.parcel_id:
+            messages.warning(
+                request,
+                _(
+                    "No voucher available for order #%(order_id)s — the "
+                    "BoxNow delivery-request task has not yet assigned a "
+                    "parcel ID. Trigger ``create_boxnow_shipment_for_order`` "
+                    "or wait for the post-payment Celery dispatch."
+                )
+                % {"order_id": order.id},
+            )
+            return self._redirect_to_order_change(object_id)
+
+        try:
+            pdf_bytes = BoxNowService.fetch_label_bytes(shipment)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "Admin download_boxnow_voucher failed for order %s", order.id
+            )
+            messages.error(
+                request,
+                _("Failed to fetch voucher: %(err)s") % {"err": str(exc)},
+            )
+            return self._redirect_to_order_change(object_id)
+
+        filename = f"boxnow-voucher-{shipment.parcel_id}.pdf"
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Content-Length"] = str(len(pdf_bytes))
+        return response
 
 
 @admin.register(OrderItem)

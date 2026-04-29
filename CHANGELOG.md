@@ -3,6 +3,28 @@
 
 
 
+## v1.118.0 (2026-04-29)
+
+### Features
+
+* feat(shipping): integrate ACS Courier with multi-provider abstraction
+
+- New `shipping/` core app: ShippingProvider DB-backed registry,
+  ShippingCarrierInterface ABC, generic options/dispatch services.
+- New `shipping_acs/` app: AcsClient, AcsService (voucher creation,
+  daily pickup-list issuance, polling tracker, label PDF, COD payout
+  reconciliation, address validation), Celery tasks, admin, serializers,
+  views.
+- Order flow: dynamic provider routing, COD orders dispatch shipment
+  task from `create_order_from_cart_offline`, PREPAID/COD charge type
+  derived from `pay_way.is_online_payment` with comma-decimal Cod_Ammount
+  formatting (Greek locale).
+- Migrations are additive (PreSync-hook safe).
+- BoxNow registered as a carrier on the same registry.
+- 95 ACS tests + 1287 order tests green.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`61dd098`](https://github.com/vasilistotskas/grooveshop-django-api/commit/61dd09854acf5bec06aa3ebc4288493eb16cd464))
+
 ## v1.117.0 (2026-04-29)
 
 ### Bug fixes

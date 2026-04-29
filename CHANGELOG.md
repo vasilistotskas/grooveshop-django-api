@@ -3,6 +3,109 @@
 
 
 
+## v1.118.1 (2026-04-29)
+
+### Bug fixes
+
+* fix: update uv.lock ([`c103178`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1031782c38387cf4bde5dafbdf0d59add11979f))
+
+* fix(order): provider-aware admin shipment inline + voucher download
+
+The Order admin previously assumed BoxNow for both the shipment
+inline and the "Download voucher" action — ACS orders showed
+"Not a BoxNow order" in the Shipment Summary and a useless
+"Download BoxNow voucher" button. Both now route through the
+shipping registry:
+
+* `OrderAdmin.get_inlines` appends the right carrier-specific
+  inline (`AcsShipmentOrderInline` for ACS, the existing
+  `BoxNowShipmentOrderInline` for BoxNow), keyed off
+  `obj.shipping_provider.code` with a fallback to the legacy
+  `shipping_method` enum.
+* `download_shipping_voucher` (renamed from `download_boxnow_voucher`)
+  fetches the label via `ShippingService.adapter_for_order(order)`
+  + `adapter.fetch_label_bytes()` so any future carrier with a
+  registered adapter is supported automatically.
+* `boxnow_summary` keeps its name for backwards-compat with the
+  fieldset references but renders an ACS summary block (state badge
+  + voucher + kind + COD + Smartpoint) when the order is an ACS
+  shipment, mirroring the BoxNow card visually.
+
+Verified end-to-end against order 682 (ACS COD): the "ACS Shipment"
+inline tab renders, the new top button reads "Download shipping
+voucher (PDF)", and the Shipment Summary shows New / 7401573185 /
+Home delivery / COD 47,01 €. All 1392 order + shipping tests still
+green.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`b92a6c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b92a6c548163744e83e1a934533314d58fe7ea69))
+
+* fix(acs): comma-decimal Weight + orphan-resilient voucher minting
+
+Two related production-grade fixes against ACS_Create_Voucher,
+verified end-to-end against the stage env (voucher 7401573200,
+order 683).
+
+* Weight Greek-locale: ACS parses numeric strings with the Greek
+  convention — dot is the thousands separator, comma is the decimal —
+  so the previous "0.5" Weight payload was being rendered on the
+  printed voucher as 5,00 KG and would have billed a 0.5 kg parcel
+  at the 5 kg tariff (10x). _kg_from_grams now returns "0,5" and
+  the test fixtures move with it. Same locale rule already applies
+  to Cod_Ammount; both helpers now hand back comma-decimal strings.
+
+* Three-phase voucher mint (claim → API → persist): the previous
+  @transaction.atomic + select_for_update wrapper held the row lock
+  across the slow ACS HTTP call, so an idle_in_transaction_session_
+  timeout (or any DB error after the API succeeded) would roll back
+  the voucher_no save while ACS retained the freshly-minted voucher.
+  Next Celery retry then minted a duplicate. Order 682 verifiably
+  leaked an orphan voucher (7401573174) this way on 2026-04-29 —
+  ACS would have collected COD from the customer twice.
+
+New design:
+  1. Claim — short atomic, lock + idempotency check + cod sync,
+     stamp metadata['mint_started_at'] (90s TTL), commit & release.
+  2. API call — no DB lock, no open transaction.
+  3. Persist — fresh atomic + race check; if another worker won
+     the slot, attempt ACS_Delete_Voucher on our duplicate and
+     fall back to recording it in metadata['orphan_vouchers'] for
+     manual reconciliation.
+
+Concurrent retries hitting an active claim raise AcsRetryableError
+so Celery's autoretry-with-backoff handles them instead of racing.
+_release_mint_claim drops the flag on API failure so the next retry
+doesn't have to wait out the TTL.
+
+All 79 ACS tests + 1287 order tests still green.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ffe1718`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ffe1718e411d223a5c8b9ca522fcb5db863e3bf0))
+
+* fix(acs): decode pickup-list PDF from nested ACSObjectOutput dict
+
+ACS_Print_Pickup_List wraps the base64 PDF differently from
+ACS_Print_Voucher: it nests it inside a dict containing PDFData and
+Mass_Voucher_No instead of returning the base64 string directly under
+ACSValueOutput[0]['ACSObjectOutput']. The decoder now handles all three
+observed shapes (voucher string, pickup-list nested dict, POD top-level
+keyed array) so each print endpoint Just Works.
+
+Verified: pickup list 7401573196 prints to a valid 111 KB %PDF-1.4 file.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`907b1e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/907b1e7d05c412715938786f996cd00b52149fed))
+
+* fix(acs): decode PDF blob from real ACSValueOutput shape
+
+ACS_Print_Voucher / ACS_Print_Pickup_List / ACS_POD_FROM_REFERENCE_NO
+return the base64 PDF inside `ACSValueOutput[0]['ACSObjectOutput']` as a
+single string, not under the documented `ACSObjectOutput[*][voucher_no]`
+shape. Accept both layouts so a future server-side fix doesn't break us
+and the original test fixtures keep passing.
+
+Verified end-to-end against the stage env: voucher 7401573185 prints
+to a valid 179 KB %PDF-1.4 file.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`08399a2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/08399a28271822ad97cea2e4236affa3d38faf70))
+
 ## v1.118.0 (2026-04-29)
 
 ### Features

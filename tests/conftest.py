@@ -296,6 +296,68 @@ def _reseed_extra_settings(request):
             pass
 
 
+@pytest.fixture(autouse=True)
+def _reseed_shipping_providers(request):
+    """Restore the ``ShippingProvider`` seed rows for every DB test.
+
+    The ``shipping/migrations/0002_seed_providers.py`` data migration
+    only runs once at DB creation. Same issue as the
+    ``_reseed_extra_settings`` fixture above: any test marked
+    ``@pytest.mark.django_db(transaction=True)`` flushes every table on
+    teardown, wiping the ``acs`` / ``boxnow`` rows.
+
+    Subsequent tests that ``ShippingProvider.objects.get(code="acs")``
+    (e.g. via the carrier registry, the order serializer, or the
+    ``available_options`` view) then explode with ``DoesNotExist`` —
+    one or two unlucky tests at random per ``-n auto`` run.
+
+    Idempotent: ``update_or_create`` is a no-op when the seed rows
+    are still in place, restorative when they are not.
+    """
+    if request.node.get_closest_marker("django_db"):
+        try:
+            from shipping.models import ShippingProvider
+
+            ShippingProvider.objects.update_or_create(
+                code="boxnow",
+                defaults={
+                    "name": "BOX NOW",
+                    "is_active": False,
+                    "supports_home_delivery": False,
+                    "supports_pickup_point": True,
+                    "live_mode": False,
+                    "priority": 20,
+                    "metadata": {
+                        "supported_countries": ["GR"],
+                        "locker_picker_kind": "boxnow_widget",
+                        "tagline_key": "shipping.method.boxnow.tagline",
+                        "tagline_color": "info",
+                        "logo": "/img/shipping/boxnow.png",
+                    },
+                },
+            )
+            ShippingProvider.objects.update_or_create(
+                code="acs",
+                defaults={
+                    "name": "ACS Courier",
+                    "is_active": False,
+                    "supports_home_delivery": True,
+                    "supports_pickup_point": True,
+                    "live_mode": False,
+                    "priority": 10,
+                    "metadata": {
+                        "supported_countries": ["GR"],
+                        "locker_picker_kind": "acs_db_picker",
+                        "logo": "/img/shipping/acs.png",
+                    },
+                },
+            )
+        except Exception:
+            # The fixture is best-effort — a transient DB connection
+            # error must not mask the real failure of the test itself.
+            pass
+
+
 @pytest.fixture
 def count_queries():
     class QueryCounter:

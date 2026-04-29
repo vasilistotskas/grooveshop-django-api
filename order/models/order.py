@@ -24,6 +24,7 @@ from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.shipping_method import OrderShippingMethod
 from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager
+from shipping.enum import ShippingKind
 
 
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
@@ -221,6 +222,32 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         choices=OrderShippingMethod.choices,
         default=OrderShippingMethod.HOME_DELIVERY,
         db_index=True,
+        help_text=_(
+            "Legacy enum kept for backwards compatibility. New code reads "
+            "the (shipping_provider, shipping_kind) pair instead — both "
+            "fields are dual-written by OrderService until Phase 3 of the "
+            "shipping abstraction migration."
+        ),
+    )
+    shipping_provider = models.ForeignKey(
+        "shipping.ShippingProvider",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="orders",
+        verbose_name=_("Shipping Provider"),
+        help_text=_(
+            "Carrier handling this order. Null for legacy rows where "
+            "fulfilment is handled outside any registered provider."
+        ),
+    )
+    shipping_kind = models.CharField(
+        _("Shipping Kind"),
+        max_length=32,
+        choices=ShippingKind.choices,
+        default=ShippingKind.HOME_DELIVERY,
+        db_index=True,
+        help_text=_("Generic fulfilment kind, independent of provider."),
     )
     stock_reservation_ids = models.JSONField(
         _("Stock Reservation IDs"),

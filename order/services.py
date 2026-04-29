@@ -87,44 +87,27 @@ class OrderService:
             if user and user.is_authenticated:
                 order_data["user"] = user
 
-            # Pop BoxNow-specific fields before Order.objects.create —
-            # they are not Order columns.
-            boxnow_locker_id = order_data.pop("boxnow_locker_id", "") or ""
-            boxnow_compartment_size = (
-                order_data.pop("boxnow_compartment_size", 1) or 1
-            )
+            # Pop provider-specific fields before Order.objects.create —
+            # they are not Order columns. The full dict is then handed
+            # to the registered carrier adapter so each provider reads
+            # its own keys.
+            shipment_payload = cls._extract_shipment_payload(order_data)
+            cls._resolve_shipping_provider(order_data)
 
             order = Order.objects.create(**order_data)
 
-            # Create BoxNow shipment row when locker delivery is selected
-            # (no API call yet — Celery task fires after payment succeeds).
-            if order.shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
-                try:
-                    from shipping_boxnow.models import (
-                        BoxNowLocker,
-                        BoxNowShipment,
-                    )
+            items_pairs = [
+                (item.get("product"), item.get("quantity", 0))
+                for item in items_data
+            ]
 
-                    locker = BoxNowLocker.objects.filter(
-                        external_id=boxnow_locker_id
-                    ).first()
-                    weight_grams = _compute_total_weight_grams(
-                        (item.get("product"), item.get("quantity", 0))
-                        for item in items_data
-                    )
-                    BoxNowShipment.objects.create(
-                        order=order,
-                        locker_external_id=boxnow_locker_id,
-                        locker=locker,
-                        compartment_size=boxnow_compartment_size,
-                        weight_grams=weight_grams,
-                    )
-                except ImportError:
-                    logger.warning(
-                        "shipping_boxnow app not available — "
-                        "skipping BoxNowShipment creation for order %s",
-                        order.id,
-                    )
+            # One generic dispatch — provider's create_shipment_row
+            # handles its own filtering on shipping_method / kind.
+            from shipping.services import ShippingService
+
+            ShippingService.create_shipment_row_for_order(
+                order, payload=shipment_payload, items=items_pairs
+            )
 
             target_currency = (
                 order.shipping_price.currency
@@ -477,14 +460,6 @@ class OrderService:
                 ),
             }
 
-            # Extract BoxNow-specific fields (not Order model columns)
-            boxnow_locker_id = (
-                shipping_address.get("boxnow_locker_id", "") or ""
-            )
-            boxnow_compartment_size = (
-                shipping_address.get("boxnow_compartment_size", 1) or 1
-            )
-
             # Calculate shipping cost
             cart_total = cart.total_price
             shipping_cost = cls.calculate_shipping_cost(
@@ -492,6 +467,10 @@ class OrderService:
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
                 shipping_method=shipping_address.get("shipping_method"),
+                shipping_provider_code=shipping_address.get(
+                    "shipping_provider_code"
+                ),
+                shipping_kind=shipping_address.get("shipping_kind"),
             )
             order_data["shipping_price"] = shipping_cost
 
@@ -507,40 +486,31 @@ class OrderService:
             )
             order_data["payment_method_fee"] = payment_fee
 
-            # Create the order
+            # Resolve provider FK + kind, then create the order.
+            order_data.setdefault(
+                "shipping_provider_code",
+                shipping_address.get("shipping_provider_code"),
+            )
+            order_data.setdefault(
+                "shipping_kind", shipping_address.get("shipping_kind")
+            )
+            cls._resolve_shipping_provider(order_data)
             order = Order.objects.create(**order_data)
 
-            # Create BoxNow shipment row when locker delivery is selected
-            if (
-                order_data.get("shipping_method")
-                == OrderShippingMethod.BOX_NOW_LOCKER
-            ):
-                try:
-                    from shipping_boxnow.models import (
-                        BoxNowLocker,
-                        BoxNowShipment,
-                    )
+            cart_items_pairs = [
+                (ci.product, ci.quantity)
+                for ci in cart.items.select_related("product").all()
+            ]
 
-                    locker = BoxNowLocker.objects.filter(
-                        external_id=boxnow_locker_id
-                    ).first()
-                    weight_grams = _compute_total_weight_grams(
-                        (ci.product, ci.quantity)
-                        for ci in cart.items.select_related("product").all()
-                    )
-                    BoxNowShipment.objects.create(
-                        order=order,
-                        locker_external_id=boxnow_locker_id,
-                        locker=locker,
-                        compartment_size=boxnow_compartment_size,
-                        weight_grams=weight_grams,
-                    )
-                except ImportError:
-                    logger.warning(
-                        "shipping_boxnow app not available — "
-                        "skipping BoxNowShipment creation for order %s",
-                        order.id,
-                    )
+            # Provider-agnostic shipment row creation. The carrier
+            # adapter reads its own keys out of ``shipping_address``
+            # (boxnow_locker_id, acs_station_external_id, etc.) and
+            # filters on ``shipping_kind`` itself.
+            from shipping.services import ShippingService
+
+            ShippingService.create_shipment_row_for_order(
+                order, payload=shipping_address, items=cart_items_pairs
+            )
 
             # Initialize metadata with cart snapshot
             order.metadata = {
@@ -926,14 +896,6 @@ class OrderService:
                 ),
             }
 
-            # Extract BoxNow-specific fields (not Order model columns)
-            boxnow_locker_id = (
-                shipping_address.get("boxnow_locker_id", "") or ""
-            )
-            boxnow_compartment_size = (
-                shipping_address.get("boxnow_compartment_size", 1) or 1
-            )
-
             # Calculate shipping cost
             cart_total = cart.total_price
             shipping_cost = cls.calculate_shipping_cost(
@@ -941,6 +903,10 @@ class OrderService:
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
                 shipping_method=shipping_address.get("shipping_method"),
+                shipping_provider_code=shipping_address.get(
+                    "shipping_provider_code"
+                ),
+                shipping_kind=shipping_address.get("shipping_kind"),
             )
             order_data["shipping_price"] = shipping_cost
 
@@ -956,7 +922,15 @@ class OrderService:
             )
             order_data["payment_method_fee"] = payment_fee
 
-            # Create the order
+            order_data.setdefault(
+                "shipping_provider_code",
+                shipping_address.get("shipping_provider_code"),
+            )
+            order_data.setdefault(
+                "shipping_kind", shipping_address.get("shipping_kind")
+            )
+            cls._resolve_shipping_provider(order_data)
+
             order = Order.objects.create(**order_data)
 
             # Set payment_id for offline payments only.
@@ -966,37 +940,17 @@ class OrderService:
                 order.payment_id = f"offline_{order.uuid}"
                 order.save(update_fields=["payment_id"])
 
-            # Create BoxNow shipment row when locker delivery is selected
-            if (
-                order_data.get("shipping_method")
-                == OrderShippingMethod.BOX_NOW_LOCKER
-            ):
-                try:
-                    from shipping_boxnow.models import (
-                        BoxNowLocker,
-                        BoxNowShipment,
-                    )
+            cart_items_pairs = [
+                (ci.product, ci.quantity)
+                for ci in cart.items.select_related("product").all()
+            ]
 
-                    locker = BoxNowLocker.objects.filter(
-                        external_id=boxnow_locker_id
-                    ).first()
-                    weight_grams = _compute_total_weight_grams(
-                        (ci.product, ci.quantity)
-                        for ci in cart.items.select_related("product").all()
-                    )
-                    BoxNowShipment.objects.create(
-                        order=order,
-                        locker_external_id=boxnow_locker_id,
-                        locker=locker,
-                        compartment_size=boxnow_compartment_size,
-                        weight_grams=weight_grams,
-                    )
-                except ImportError:
-                    logger.warning(
-                        "shipping_boxnow app not available — "
-                        "skipping BoxNowShipment creation for order %s",
-                        order.id,
-                    )
+            # Provider-agnostic shipment row creation via the registry.
+            from shipping.services import ShippingService
+
+            ShippingService.create_shipment_row_for_order(
+                order, payload=shipping_address, items=cart_items_pairs
+            )
 
             # Initialize metadata with cart snapshot
             order.metadata = {
@@ -1172,7 +1126,15 @@ class OrderService:
             cart.items.all().delete()
             logger.info("Cleared cart %s after order creation", cart.uuid)
 
-            # Step 8: Return order in PENDING status
+            # Step 8: Dispatch shipment creation for true offline payments
+            # (COD, Bank Transfer). Online providers that route through
+            # this method (Viva Wallet) defer dispatch to the payment
+            # webhook so the courier voucher only mints after the
+            # shopper actually pays.
+            if not pay_way.is_online_payment:
+                cls._dispatch_shipment_creation_task(order)
+
+            # Step 9: Return order in PENDING status
             logger.info(
                 "Order %s created successfully from cart %s (order-first, %s)",
                 order.id,
@@ -1347,6 +1309,30 @@ class OrderService:
                     "locker delivery."
                 )
             ]
+
+        # New abstraction: when the request carries an explicit
+        # (shipping_provider_code, shipping_kind) pair, defer field-
+        # level validation to the provider adapter so each carrier
+        # owns its own rules without bloating this method.
+        provider_code = address.get("shipping_provider_code")
+        kind_value = address.get("shipping_kind")
+        if provider_code and kind_value:
+            from shipping.exceptions import ShippingProviderNotFoundError
+            from shipping.services import ShippingService
+
+            try:
+                provider_errors = ShippingService.validate_order_payload(
+                    provider_code=provider_code,
+                    kind=kind_value,
+                    payload=address,
+                )
+            except ShippingProviderNotFoundError:
+                errors["shipping_provider_code"] = [
+                    _("Unknown shipping provider.")
+                ]
+            else:
+                for field, messages in provider_errors.items():
+                    errors.setdefault(field, []).extend(messages)
 
         # Validate email format if provided
         email = address.get("email")
@@ -1868,6 +1854,113 @@ class OrderService:
         return order
 
     @classmethod
+    def _resolve_shipping_provider(cls, order_data: dict[str, Any]) -> None:
+        """Resolve ``shipping_provider_code`` → ``shipping_provider`` FK.
+
+        Mutates ``order_data`` in place: removes ``shipping_provider_code``
+        and replaces it with the resolved ``shipping_provider`` (a
+        ``ShippingProvider`` instance) plus a default ``shipping_kind``
+        when the caller did not supply one.
+
+        Falls back to provider/kind inferred from the legacy
+        ``shipping_method`` when the new keys are absent so old callers
+        continue to work transparently.
+        """
+        from shipping.models import ShippingProvider
+
+        code = order_data.pop("shipping_provider_code", None) or None
+        kind = order_data.get("shipping_kind")
+        method = order_data.get("shipping_method")
+
+        # Infer (provider, kind) from the legacy enum when the caller
+        # did not supply explicit values. Mapping is one-way and
+        # additive — old API clients sending only ``shipping_method``
+        # keep working unchanged.
+        if not code:
+            if method == OrderShippingMethod.BOX_NOW_LOCKER:
+                code = "boxnow"
+            elif method == OrderShippingMethod.ACS_SMARTPOINT:
+                code = "acs"
+        if not kind:
+            if method == OrderShippingMethod.BOX_NOW_LOCKER:
+                kind = "pickup_point"
+            elif method == OrderShippingMethod.ACS_SMARTPOINT:
+                kind = "pickup_point"
+            else:
+                kind = "home_delivery"
+
+        # Dynamic-routing fallback: a plain ``home_delivery`` request
+        # auto-routes to whichever active provider advertises
+        # ``supports_home_delivery=True``.  Lower ``priority`` wins
+        # the tie.  Adding a new courier (ELTA, Speedex …) is then a
+        # one-row Django admin change — no order-flow code touched.
+        if not code and kind == "home_delivery":
+            picked = (
+                ShippingProvider.objects.filter(
+                    is_active=True, supports_home_delivery=True
+                )
+                .order_by("priority", "code")
+                .first()
+            )
+            if picked is not None:
+                code = picked.code
+
+        if code:
+            provider = ShippingProvider.objects.filter(code=code).first()
+            if provider is None:
+                logger.warning(
+                    "Unknown shipping_provider_code=%r — leaving Order "
+                    "unlinked.",
+                    code,
+                )
+            else:
+                order_data["shipping_provider"] = provider
+
+        order_data["shipping_kind"] = kind
+
+    # Carrier-payload keys popped before Order.objects.create() — they
+    # are not Order columns but each provider adapter reads its own
+    # subset out of the original dict via create_shipment_row().
+    _SHIPMENT_PAYLOAD_KEYS: tuple[str, ...] = (
+        "boxnow_locker_id",
+        "boxnow_compartment_size",
+        "acs_station_external_id",
+        "acs_station_branch",
+        "acs_charge_type",
+    )
+
+    @classmethod
+    def _extract_shipment_payload(
+        cls, order_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Pop carrier-specific keys off ``order_data`` and return them.
+
+        Mutates ``order_data`` in place — the popped keys would otherwise
+        cause ``Order.objects.create(**order_data)`` to crash with an
+        unexpected-kwarg ``TypeError``.  The returned dict is handed to
+        the carrier registry so each adapter reads what it needs.
+        """
+        return {
+            key: order_data.pop(key)
+            for key in cls._SHIPMENT_PAYLOAD_KEYS
+            if key in order_data
+        }
+
+    @classmethod
+    def _dispatch_shipment_creation_task(cls, order: Order) -> None:
+        """Enqueue the provider's create-shipment Celery task.
+
+        Routes via :class:`shipping.services.ShippingService`, which
+        falls back to the legacy ``shipping_method`` enum when the new
+        ``shipping_provider`` FK is null.  Each provider's task is
+        idempotent on its shipment row, so duplicate dispatches under
+        payment-provider retries are harmless.
+        """
+        from shipping.services import ShippingService
+
+        ShippingService.dispatch_create_shipment_task(order)
+
+    @classmethod
     @transaction.atomic
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
         from order.payment_events import publish_payment_status
@@ -1887,20 +1980,11 @@ class OrderService:
         if order.status == OrderStatus.PENDING:
             cls.update_order_status(order, OrderStatus.PROCESSING)
 
-        # Enqueue BoxNow shipment creation after payment confirmation
-        if order.shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
-            try:
-                from shipping_boxnow.tasks import (
-                    create_boxnow_shipment_for_order,
-                )
-
-                create_boxnow_shipment_for_order.delay(order.id)
-            except ImportError:
-                logger.warning(
-                    "shipping_boxnow app not available — "
-                    "skipping BoxNow task dispatch for order %s",
-                    order.id,
-                )
+        # Enqueue provider-specific shipment creation after payment.
+        # Routed by the new (shipping_provider, shipping_kind) pair when
+        # set; falls back to the legacy shipping_method enum so older
+        # rows still trigger BoxNow correctly.
+        cls._dispatch_shipment_creation_task(order)
 
         publish_payment_status(order)
         logger.info("Order %s marked as paid successfully", order.id)
@@ -1933,8 +2017,30 @@ class OrderService:
         country_id: int | None = None,
         region_id: int | None = None,
         shipping_method: str | None = None,
+        shipping_provider_code: str | None = None,
+        shipping_kind: str | None = None,
     ) -> Money:
         from extra_settings.models import Setting
+
+        # New abstraction takes precedence: when (provider, kind) is
+        # supplied, dispatch through the registry so each provider
+        # owns its own pricing rules. Falls back to the legacy
+        # shipping_method branch when the registry has no opinion or
+        # the provider isn't installed.
+        if shipping_provider_code and shipping_kind:
+            from shipping.services import ShippingService
+
+            quote = ShippingService.calculate_shipping_cost(
+                provider_code=shipping_provider_code,
+                kind=shipping_kind,
+                order_value_amount=float(order_value.amount),
+                currency=str(order_value.currency),
+                country_id=str(country_id) if country_id else None,
+                region_id=str(region_id) if region_id else None,
+            )
+            if quote is not None:
+                amount, currency = quote
+                return Money(amount, currency)
 
         if shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
             base_shipping_cost = Setting.get(

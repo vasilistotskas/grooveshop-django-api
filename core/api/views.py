@@ -500,6 +500,12 @@ PUBLIC_SETTING_KEYS = frozenset(
         "BOXNOW_SHIPPING_PRICE",
         "BOXNOW_FREE_SHIPPING_THRESHOLD",
         "BOXNOW_ENABLED",
+        # ACS pricing + on/off toggles read by the Nuxt checkout —
+        # see useCheckoutForm.ts. The rest (e.g. ACS_DYNAMIC_PRICING_ENABLED)
+        # are server-side only and stay admin-gated.
+        "ACS_SHIPPING_PRICE",
+        "ACS_FREE_SHIPPING_THRESHOLD",
+        "ACS_SMARTPOINT_ENABLED",
         "LOYALTY_ENABLED",
         "LOYALTY_REDEMPTION_RATIO_EUR",
         "LOYALTY_POINTS_FACTOR",

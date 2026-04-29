@@ -19,6 +19,7 @@ from order.serializers.item import (
 from pay_way.models import PayWay
 from product.models.product import Product
 from region.models import Region
+from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
 from shipping_boxnow.serializers.shipment import (
     BoxNowShipmentDetailSerializer,
 )
@@ -143,6 +144,29 @@ class OrderDetailSerializer(OrderSerializer):
             "'box_now_locker', else null."
         )
     )
+    acs_shipment = serializers.SerializerMethodField(
+        help_text=(
+            "ACS shipment details when the order's shipping provider "
+            "is ACS, else null."
+        )
+    )
+    shipment = serializers.SerializerMethodField(
+        help_text=(
+            "Provider-agnostic shipment payload — frontends can read "
+            "this single field instead of branching on boxnow_shipment "
+            "/ acs_shipment.  Returns the active provider's detail "
+            "serializer dict (shape depends on the provider) or null "
+            "when no shipment exists."
+        )
+    )
+    shipment_provider_code = serializers.SerializerMethodField(
+        help_text=(
+            "Identifier of the carrier handling this order — 'acs', "
+            "'boxnow', or null when no provider is attached.  Lets "
+            "frontends switch on a stable code instead of inspecting "
+            "the shipment shape."
+        )
+    )
     phone = PhoneNumberField(read_only=True)
 
     @extend_schema_field({"type": "boolean"})
@@ -160,6 +184,46 @@ class OrderDetailSerializer(OrderSerializer):
         return BoxNowShipmentDetailSerializer(
             shipment, context=self.context
         ).data
+
+    @extend_schema_field(AcsShipmentDetailSerializer(allow_null=True))
+    def get_acs_shipment(self, obj: Order) -> dict | None:
+        provider = getattr(obj, "shipping_provider", None)
+        if provider is None or provider.code != "acs":
+            return None
+        shipment = getattr(obj, "acs_shipment", None)
+        if shipment is None:
+            return None
+        return AcsShipmentDetailSerializer(shipment, context=self.context).data
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "nullable": True,
+            "additionalProperties": True,
+            "description": (
+                "Provider-shipment detail payload. Shape varies by "
+                "carrier — frontends should read shipmentProviderCode "
+                "to decide which fields to render."
+            ),
+        }
+    )
+    def get_shipment(self, obj: Order) -> dict | None:
+        """Generic provider-agnostic shipment payload.
+
+        Dispatches via ``ShippingService.serialize_shipment(order)``
+        which looks up the order's carrier adapter and returns its
+        detail-serializer dict.  Frontends migrating off the
+        provider-specific fields (``boxnow_shipment`` /
+        ``acs_shipment``) should consume this one.
+        """
+        from shipping.services import ShippingService
+
+        return ShippingService.serialize_shipment(obj, context=self.context)
+
+    @extend_schema_field({"type": "string", "nullable": True})
+    def get_shipment_provider_code(self, obj: Order) -> str | None:
+        provider = getattr(obj, "shipping_provider", None)
+        return provider.code if provider is not None else None
 
     @extend_schema_field(
         {
@@ -306,6 +370,9 @@ class OrderDetailSerializer(OrderSerializer):
             "tracking_details",
             "has_invoice",
             "boxnow_shipment",
+            "acs_shipment",
+            "shipment",
+            "shipment_provider_code",
             "phone",
             "document_type",
             "payment_id",
@@ -325,6 +392,9 @@ class OrderDetailSerializer(OrderSerializer):
             "tracking_details",
             "has_invoice",
             "boxnow_shipment",
+            "acs_shipment",
+            "shipment",
+            "shipment_provider_code",
         )
 
 
@@ -464,6 +534,44 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         required=False,
         default=1,
         help_text=_("BoxNow compartment size: 1=Small, 2=Medium, 3=Large"),
+    )
+
+    # New shipping abstraction (Phase 0). Frontends that have migrated
+    # send these instead of (or alongside) the legacy `shipping_method`.
+    # Validated against the in-memory carrier registry.
+    shipping_provider_code = serializers.SlugField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_("Carrier code from /api/v1/shipping/options (e.g. 'acs')."),
+    )
+    shipping_kind = serializers.ChoiceField(
+        choices=[
+            ("home_delivery", _("Home delivery")),
+            ("pickup_point", _("Pickup point / locker")),
+        ],
+        required=False,
+        help_text=_("Generic fulfilment kind, independent of provider."),
+    )
+    # ACS-specific fields, only honoured when shipping_provider_code='acs'.
+    acs_station_external_id = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "ACS Smartpoint / shop external ID (Phase 2 pickup-point flow)."
+        ),
+    )
+    acs_station_branch = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_("ACS_Station_Branch_Destination value."),
+    )
+    acs_charge_type = serializers.ChoiceField(
+        choices=[(1, _("Prepaid")), (2, _("Cash on delivery"))],
+        required=False,
+        default=1,
     )
 
     def validate_email(self, value: str) -> str:

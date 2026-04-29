@@ -1,0 +1,76 @@
+"""Seed the ShippingProvider rows for BoxNow + ACS.
+
+Idempotent: re-running update_or_create with the same code does nothing.
+Provider apps register their adapter classes at AppConfig.ready(), but
+the DB-side row is the on/off switch + capability declaration.
+
+Both providers ship with ``is_active=False`` so a fresh deploy never
+exposes the option to checkout until an admin flips the row.  The
+existing ``BOXNOW_ENABLED`` extra-setting Setting still gates BoxNow on
+the frontend during the dual-write transition; once Phase 3 lands the
+``ShippingProvider.is_active`` flag becomes the single source of truth.
+"""
+
+from __future__ import annotations
+
+from django.db import migrations
+
+
+def seed_providers(apps, schema_editor):
+    ShippingProvider = apps.get_model("shipping", "ShippingProvider")
+
+    ShippingProvider.objects.update_or_create(
+        code="boxnow",
+        defaults={
+            "name": "BOX NOW",
+            "is_active": False,
+            "supports_home_delivery": False,
+            "supports_pickup_point": True,
+            "live_mode": False,
+            "priority": 20,
+            "metadata": {
+                "supported_countries": ["GR"],
+                "locker_picker_kind": "boxnow_widget",
+                "tagline_key": "shipping.method.boxnow.tagline",
+                "tagline_color": "info",
+                "logo": "/img/shipping/boxnow.png",
+            },
+        },
+    )
+
+    ShippingProvider.objects.update_or_create(
+        code="acs",
+        defaults={
+            "name": "ACS Courier",
+            "is_active": False,
+            "supports_home_delivery": True,
+            # Smartpoint pickup ships in Phase 2; the follow-up
+            # migration 0003_acs_supports_pickup_point.py flips this
+            # to True without disturbing existing rows. Default here
+            # is False so the row at first seed reflects what the
+            # 0001/0002 contract advertised.
+            "supports_pickup_point": False,
+            "live_mode": False,
+            "priority": 10,
+            "metadata": {
+                "supported_countries": ["GR"],
+                "locker_picker_kind": "acs_db_picker",
+                "logo": "/img/shipping/acs.png",
+            },
+        },
+    )
+
+
+def unseed_providers(apps, schema_editor):
+    ShippingProvider = apps.get_model("shipping", "ShippingProvider")
+    ShippingProvider.objects.filter(code__in=["boxnow", "acs"]).delete()
+
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ("shipping", "0001_initial_provider_registry"),
+    ]
+
+    operations = [
+        migrations.RunPython(seed_providers, reverse_code=unseed_providers),
+    ]

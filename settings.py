@@ -118,7 +118,9 @@ LOCAL_APPS = [
     "country",
     "region",
     "pay_way",
+    "shipping",
     "shipping_boxnow",
+    "shipping_acs",
     "cart",
     "notification",
     "contact",
@@ -726,6 +728,45 @@ def get_celery_beat_schedule():
             else SCHEDULE_PRESETS["every_hour"],
             "options": {"queue": "celery"},
         },
+        # ACS — daily station sync at 03:00 Athens (Phase 2 only fires
+        # when the AcsStation cache is in use; harmless to schedule now
+        # since the task no-ops when ACS provider is inactive).
+        "sync-acs-stations": {
+            "task": "shipping_acs.tasks.sync_acs_stations",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery"},
+        },
+        # Issue the daily ACS pickup list Mon-Fri at 16:30 Athens.
+        # Beats the close of the courier's daily collection window and
+        # keeps the path matched to admin's manual override.
+        "issue-acs-pickup-list": {
+            "task": "shipping_acs.tasks.issue_daily_acs_pickup_list",
+            "schedule": crontab(hour="16", minute="30", day_of_week="mon-fri"),
+            "options": {"queue": "celery"},
+        },
+        # Poll ACS_Trackingsummary every 15 min for non-terminal
+        # shipments. Sub-tasks fan out internally with a 0.2s
+        # countdown stagger so we stay well within ACS's 10 req/sec
+        # cap.
+        "poll-acs-tracking": {
+            "task": "shipping_acs.tasks.poll_acs_tracking_batch",
+            "schedule": crontab(minute="*/15"),
+            "options": {"queue": "celery"},
+        },
+        # Reconcile yesterday's COD payouts daily at 02:30 Athens —
+        # safely after midnight so ACS's books for the prior day are
+        # finalised.  The service method is idempotent on
+        # (voucher_no, cod_payment_date) so an early run or a re-run
+        # is harmless.
+        "reconcile-acs-cod-payouts": {
+            "task": "shipping_acs.tasks.reconcile_acs_cod_payouts",
+            "schedule": crontab(hour="2", minute="30")
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery"},
+        },
     }
 
     if path.exists("/.dockerenv") and not getenv("KUBERNETES_SERVICE_HOST"):
@@ -997,6 +1038,48 @@ EXTRA_SETTINGS_DEFAULTS = [
             "(stage credentials return 403 against api-production.boxnow.gr "
             "until they activate). Flip to True in Django admin once "
             "BoxNow confirms."
+        ),
+    },
+    {
+        "name": "ACS_SHIPPING_PRICE",
+        "type": "decimal",
+        "value": 3.50,
+        "description": (
+            "Flat ACS home-delivery / Smartpoint shipping cost in EUR. "
+            "Phase 4 may switch to live ACS_Price_Calculation; for now "
+            "this admin-tunable Setting is the source of truth."
+        ),
+    },
+    {
+        "name": "ACS_FREE_SHIPPING_THRESHOLD",
+        "type": "decimal",
+        "value": 40.00,
+        "description": (
+            "Cart subtotal in EUR above which ACS shipping becomes "
+            "free. Mirrors the BoxNow + checkout-default thresholds."
+        ),
+    },
+    {
+        "name": "ACS_SMARTPOINT_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Customer-facing toggle for the ACS Smartpoint locker "
+            "pickup option. Defaults False so a fresh deploy hides "
+            "the option until ops have synced AcsStation rows and "
+            "verified the picker; flip in Django admin to expose."
+        ),
+    },
+    {
+        "name": "ACS_DYNAMIC_PRICING_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "When True the ACS carrier asks the courier API for a "
+            "live shipping quote (ACS_Price_Calculation) at checkout. "
+            "Falls back to ACS_SHIPPING_PRICE on any API failure so "
+            "a transient outage cannot block checkout. Defaults False "
+            "until ops have run end-to-end pricing tests on stage."
         ),
     },
     {
@@ -1786,6 +1869,79 @@ UNFOLD = {
                         "icon": "percent",
                         "link": reverse_lazy("admin:vat_vat_changelist"),
                     },
+                    {
+                        "title": _("Invoices"),
+                        "icon": "receipt",
+                        "link": reverse_lazy("admin:order_invoice_changelist"),
+                    },
+                    {
+                        "title": _("Stock Logs"),
+                        "icon": "inventory",
+                        "link": reverse_lazy("admin:order_stocklog_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Shipping"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Shipping Providers"),
+                        "icon": "local_shipping",
+                        "link": reverse_lazy(
+                            "admin:shipping_shippingprovider_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("BoxNow Shipments"),
+                        "icon": "package_2",
+                        "link": reverse_lazy(
+                            "admin:shipping_boxnow_boxnowshipment_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("BoxNow Lockers"),
+                        "icon": "lock",
+                        "link": reverse_lazy(
+                            "admin:shipping_boxnow_boxnowlocker_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("BoxNow Events"),
+                        "icon": "event_note",
+                        "link": reverse_lazy(
+                            "admin:shipping_boxnow_boxnowparcelevent_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("ACS Shipments"),
+                        "icon": "local_post_office",
+                        "link": reverse_lazy(
+                            "admin:shipping_acs_acsshipment_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("ACS Stations"),
+                        "icon": "store",
+                        "link": reverse_lazy(
+                            "admin:shipping_acs_acsstation_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("ACS Pickup Lists"),
+                        "icon": "assignment",
+                        "link": reverse_lazy(
+                            "admin:shipping_acs_acspickuplist_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("ACS COD Payouts"),
+                        "icon": "account_balance",
+                        "link": reverse_lazy(
+                            "admin:shipping_acs_acscodpayout_changelist"
+                        ),
+                    },
                 ],
             },
             {
@@ -1798,6 +1954,13 @@ UNFOLD = {
                         "icon": "people",
                         "link": reverse_lazy(
                             "admin:user_useraccount_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("User Addresses"),
+                        "icon": "home",
+                        "link": reverse_lazy(
+                            "admin:user_useraddress_changelist"
                         ),
                     },
                     {
@@ -1934,6 +2097,54 @@ UNFOLD = {
                     },
                 ],
             },
+            {
+                "title": _("Background Jobs"),
+                "separator": True,
+                "collapsible": True,
+                "permission": "admin.permissions.is_superuser",
+                "items": [
+                    {
+                        "title": _("Periodic Tasks"),
+                        "icon": "task_alt",
+                        "link": reverse_lazy(
+                            "admin:django_celery_beat_periodictask_changelist"
+                        ),
+                        "permission": "admin.permissions.is_superuser",
+                    },
+                    {
+                        "title": _("Crontab Schedules"),
+                        "icon": "more_time",
+                        "link": reverse_lazy(
+                            "admin:django_celery_beat_crontabschedule_changelist"
+                        ),
+                        "permission": "admin.permissions.is_superuser",
+                    },
+                    {
+                        "title": _("Interval Schedules"),
+                        "icon": "update",
+                        "link": reverse_lazy(
+                            "admin:django_celery_beat_intervalschedule_changelist"
+                        ),
+                        "permission": "admin.permissions.is_superuser",
+                    },
+                    {
+                        "title": _("Clocked Schedules"),
+                        "icon": "alarm",
+                        "link": reverse_lazy(
+                            "admin:django_celery_beat_clockedschedule_changelist"
+                        ),
+                        "permission": "admin.permissions.is_superuser",
+                    },
+                    {
+                        "title": _("Solar Schedules"),
+                        "icon": "wb_sunny",
+                        "link": reverse_lazy(
+                            "admin:django_celery_beat_solarschedule_changelist"
+                        ),
+                        "permission": "admin.permissions.is_superuser",
+                    },
+                ],
+            },
         ],
     },
     "SITE_DROPDOWN": [
@@ -2034,6 +2245,14 @@ SPECTACULAR_SETTINGS = {
         # for the same choice set — a single canonical name is cleaner
         # for the generated frontend types.
         "BoxNowParcelState": "shipping_boxnow.enum.parcel_state.BoxNowParcelState",
+        # ``Order.shipping_kind`` and ``AcsShipment.delivery_kind`` both
+        # reuse ``ShippingKind.choices``; same fix as BoxNow above to
+        # keep the generated TS type single-named.
+        "ShippingKind": "shipping.enum.shipping_kind.ShippingKind",
+        # ``AcsShipment.charge_type`` and the inline choices on
+        # ``OrderCreateFromCartSerializer.acs_charge_type`` share the
+        # same choice set; consolidate naming.
+        "AcsChargeType": "shipping_acs.enum.charge_type.AcsChargeType",
     },
 }
 
@@ -2382,3 +2601,32 @@ BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
 # Per BoxNow API §3.4 must be a real number in full international format
 # (P405 rejects malformed phones). Stage placeholder by default.
 BOXNOW_NOTIFY_PHONE = getenv("BOXNOW_NOTIFY_PHONE", "+302100000000")
+
+# ---------- ACS Shipping ----------
+# Single static API key in the AcsApiKey header + per-call body
+# credentials (Company_*, User_*) plus the partner Billing_Code.  See
+# docs/acs-web-services.pdf.  Note: ACS_BILLING_CODE may contain Greek
+# characters (e.g. "2ΑΚ89587"); the env file must be UTF-8.
+ACS_API_KEY = getenv("ACS_API_KEY", "")
+ACS_COMPANY_ID = getenv("ACS_COMPANY_ID", "")
+ACS_COMPANY_PASSWORD = getenv("ACS_COMPANY_PASSWORD", "")
+ACS_USER_ID = getenv("ACS_USER_ID", "")
+ACS_USER_PASSWORD = getenv("ACS_USER_PASSWORD", "")
+ACS_BILLING_CODE = getenv("ACS_BILLING_CODE", "")
+ACS_API_BASE_URL = getenv(
+    "ACS_API_BASE_URL",
+    "https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest",
+)
+ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
+ACS_LIVE_MODE = getenv("ACS_LIVE_MODE", "False").lower() == "true"
+ACS_PICKUP_LIST_TIMEZONE = getenv("ACS_PICKUP_LIST_TIMEZONE", "Europe/Athens")
+ACS_SUPPORTED_COUNTRIES = [
+    code.strip().upper()
+    for code in getenv("ACS_SUPPORTED_COUNTRIES", "GR").split(",")
+    if code.strip()
+]
+# Pricing lives in extra_settings.Setting rows
+# (ACS_SHIPPING_PRICE / ACS_FREE_SHIPPING_THRESHOLD) so admins can
+# retune without a redeploy. The master on/off switch is the
+# ShippingProvider.is_active flag, NOT a setting — see Phase 0
+# (shipping/migrations/0002_seed_providers.py).

@@ -227,6 +227,52 @@ serializers_config: SerializersConfig = {
         ),
         tags=["Orders"],
     ),
+    "acs_cancel": ActionConfig(
+        operation_id="cancelAcsShipmentForOrder",
+        summary=_("Cancel the ACS shipment for an order"),
+        description=_(
+            "Admin-only. Calls ACS_Delete_Voucher. Only valid before "
+            "the voucher is finalised in a pickup list."
+        ),
+        tags=["Orders"],
+    ),
+    "acs_label": ActionConfig(
+        operation_id="getAcsLabelForOrder",
+        summary=_("Download the ACS voucher label PDF for an order"),
+        description=_(
+            "Streams the ACS label PDF through Django auth. "
+            "Accessible by the order owner, staff, or a guest with the "
+            "order UUID. Returns 404 when no ACS shipment exists for "
+            "the order or the voucher has not been minted yet."
+        ),
+        tags=["Orders"],
+    ),
+    "shipment_label": ActionConfig(
+        response=OrderDetailSerializer,
+        operation_id="getShipmentLabelForOrder",
+        summary=_("Download the carrier label PDF for an order"),
+        description=_(
+            "Provider-agnostic label download. Looks up the order's "
+            "shipping provider and dispatches to the matching carrier "
+            "adapter via the shipping registry — frontends can call "
+            "the same endpoint regardless of which courier is "
+            "fulfilling the order."
+        ),
+        tags=["Orders"],
+    ),
+    "shipment_cancel": ActionConfig(
+        response=OrderDetailSerializer,
+        operation_id="cancelShipmentForOrder",
+        summary=_("Cancel the carrier shipment for an order"),
+        description=_(
+            "Admin-only. Provider-agnostic cancellation: looks up the "
+            "order's shipping provider and dispatches to the carrier "
+            "adapter. The provider's own rules apply (BoxNow only "
+            "cancels parcels in NEW state; ACS only cancels vouchers "
+            "not yet finalised in a pickup list)."
+        ),
+        tags=["Orders"],
+    ),
 }
 
 
@@ -303,6 +349,8 @@ class OrderViewSet(BaseModelViewSet):
             "invoice",
             "invoice_download",
             "boxnow_label",
+            "acs_label",
+            "shipment_label",
         }
         guest_allowed_actions = {
             "retrieve_by_uuid",
@@ -317,6 +365,8 @@ class OrderViewSet(BaseModelViewSet):
             "update_status",
             "refund_order",
             "boxnow_cancel",
+            "acs_cancel",
+            "shipment_cancel",
         }
         public_actions = {"create"}
 
@@ -1636,3 +1686,155 @@ class OrderViewSet(BaseModelViewSet):
             as_attachment=True,
             filename=f"boxnow-{shipment.parcel_id}.pdf",
         )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="acs_cancel",
+        permission_classes=[IsAdminUser],
+    )
+    def acs_cancel(self, request, pk=None):
+        """Cancel the ACS shipment for an order (admin-only)."""
+        from shipping_acs.exceptions import AcsAPIError
+        from shipping_acs.services import AcsService
+
+        order = self.get_object()
+
+        shipment = getattr(order, "acs_shipment", None)
+        if shipment is None:
+            raise NotFound(_("This order does not have an ACS shipment."))
+
+        reason: str = request.data.get("reason", "")
+        try:
+            AcsService.cancel_voucher(shipment, reason=reason)
+        except AcsAPIError as exc:
+            logger.warning(
+                "ACS cancel (order-action) failed | order=%s | "
+                "voucher_no=%s | msg=%s",
+                order.id,
+                shipment.voucher_no,
+                exc,
+            )
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = OrderService.get_order_by_id(order.id)
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(
+            order, context=self.get_serializer_context()
+        )
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="acs_label",
+    )
+    def acs_label(self, request, pk=None):
+        """Download the ACS voucher label PDF for an order."""
+        from io import BytesIO
+
+        from shipping_acs.services import AcsService
+
+        order = self.get_object()
+
+        shipment = getattr(order, "acs_shipment", None)
+        if shipment is None or not shipment.voucher_no:
+            raise NotFound(
+                _("No ACS shipment or voucher found for this order.")
+            )
+
+        label_bytes: bytes = AcsService.fetch_label_bytes(shipment)
+        return FileResponse(
+            BytesIO(label_bytes),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"acs-{shipment.voucher_no}.pdf",
+        )
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="shipment_label",
+    )
+    def shipment_label(self, request, pk=None):
+        """Download the carrier label PDF — provider-agnostic.
+
+        Looks up the order's ``shipping_provider`` and dispatches to
+        the matching carrier adapter via the shipping registry.  Lets
+        the frontend hit a single endpoint regardless of which courier
+        is fulfilling the order.
+        """
+        from io import BytesIO
+
+        from shipping.services import ShippingService
+
+        order = self.get_object()
+
+        adapter = ShippingService.adapter_for_order(order)
+        if adapter is None:
+            raise NotFound(_("No carrier shipment found for this order."))
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            raise NotFound(_("No carrier shipment found for this order."))
+
+        label_bytes: bytes = adapter.fetch_label_bytes(shipment)
+        provider_code = order.shipping_provider.code
+        return FileResponse(
+            BytesIO(label_bytes),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"{provider_code}-{order.id}.pdf",
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="shipment_cancel",
+        permission_classes=[IsAdminUser],
+    )
+    def shipment_cancel(self, request, pk=None):
+        """Cancel the carrier shipment — provider-agnostic.
+
+        Admin-only.  Dispatches to the order's carrier adapter; the
+        provider's own state-machine rules apply (BoxNow rejects
+        already-shipped parcels with P420; ACS rejects vouchers
+        already in a pickup list).
+        """
+        from shipping.services import ShippingService
+        from shipping_acs.exceptions import AcsAPIError
+        from shipping_boxnow.exceptions import BoxNowAPIError
+
+        order = self.get_object()
+
+        adapter = ShippingService.adapter_for_order(order)
+        if adapter is None:
+            raise NotFound(_("No carrier shipment found for this order."))
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            raise NotFound(_("No carrier shipment found for this order."))
+
+        reason: str = request.data.get("reason", "")
+        try:
+            adapter.cancel_shipment(shipment, reason=reason)
+        except (BoxNowAPIError, AcsAPIError) as exc:
+            logger.warning(
+                "Shipment cancel (generic) failed | order=%s | "
+                "provider=%s | msg=%s",
+                order.id,
+                order.shipping_provider.code,
+                exc,
+            )
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = OrderService.get_order_by_id(order.id)
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(
+            order, context=self.get_serializer_context()
+        )
+        return Response(serializer.data)

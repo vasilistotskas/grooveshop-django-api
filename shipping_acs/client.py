@@ -479,26 +479,50 @@ class AcsClient:
 
 
 def _decode_pdf(envelope: dict[str, Any], *, key: str, alias: str) -> bytes:
-    """Decode the base64 PDF blob ACS returns inside ACSObjectOutput.
+    """Decode the base64 PDF blob from an ACS print response.
 
-    ACS print endpoints (``ACS_Print_Voucher``,
-    ``ACS_Print_Pickup_List``, ``ACS_POD_FROM_REFERENCE_NO``) all share
-    the shape ``{"ACSObjectOutput": [{<key>: "<base64>"}, ...]}``.
+    ACS observed wire shape (``ACS_Print_Voucher``,
+    ``ACS_Print_Pickup_List``, ``ACS_POD_FROM_REFERENCE_NO``):
+
+        ``{"ACSValueOutput": [{"ACSObjectOutput": "<base64>"}, ...]}``
+
+    The PDF docs show a top-level ``ACSObjectOutput`` array keyed by
+    voucher number, but the live API actually emits the blob inside
+    ``ACSValueOutput[0]['ACSObjectOutput']`` as a single base64
+    string. We accept both shapes so a future server-side fix doesn't
+    break us, and so the original PDF-based test fixtures keep
+    passing.
     """
-    objects = envelope.get("ACSObjectOutput") or []
-    for entry in objects:
-        b64 = entry.get(key) or entry.get(str(key))
-        if b64:
-            try:
-                return base64.b64decode(b64)
-            except (TypeError, ValueError) as exc:
-                raise AcsAPIError(
-                    alias=alias,
-                    error_message=(
-                        f"ACS returned an undecodable PDF for key {key!r}: "
-                        f"{exc}"
-                    ),
-                ) from exc
+    candidates: list[str] = []
+
+    value_output = envelope.get("ACSValueOutput") or []
+    for entry in value_output:
+        if not isinstance(entry, dict):
+            continue
+        blob = entry.get("ACSObjectOutput")
+        if isinstance(blob, str) and blob:
+            candidates.append(blob)
+
+    object_output = envelope.get("ACSObjectOutput") or []
+    if isinstance(object_output, list):
+        for entry in object_output:
+            if not isinstance(entry, dict):
+                continue
+            blob = entry.get(key) or entry.get(str(key))
+            if isinstance(blob, str) and blob:
+                candidates.append(blob)
+
+    for b64 in candidates:
+        try:
+            return base64.b64decode(b64)
+        except (TypeError, ValueError) as exc:
+            raise AcsAPIError(
+                alias=alias,
+                error_message=(
+                    f"ACS returned an undecodable PDF for key {key!r}: {exc}"
+                ),
+            ) from exc
+
     raise AcsAPIError(
         alias=alias,
         error_message=f"ACS response contained no PDF blob for key {key!r}.",

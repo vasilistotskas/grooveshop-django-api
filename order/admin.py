@@ -582,7 +582,7 @@ class OrderAdmin(ModelAdmin):
         "regenerate_invoice",
         "send_invoice_to_mydata_now",
         "cancel_mydata_invoice_now",
-        "download_boxnow_voucher",
+        "download_shipping_voucher",
     ]
     inlines = [OrderItemInline, InvoiceInline, OrderHistoryInline]
     save_on_top = True
@@ -590,17 +590,33 @@ class OrderAdmin(ModelAdmin):
     list_select_related = ["user", "country", "region", "pay_way"]
 
     def get_inlines(self, request, obj=None):
-        # Show the BoxNow shipment inline only when the order actually
-        # uses BoxNow — keeps the change form clean for home_delivery
-        # orders. Lazy import sidesteps the circular ``order ↔ shipping_boxnow``
+        # Show the carrier-specific shipment inline only when the order
+        # actually uses that provider — keeps the change form clean for
+        # the other case (e.g. ACS orders don't get a BoxNow inline).
+        # Lazy imports sidestep the circular ``order ↔ shipping_*``
         # registration cycle at app-load time.
         inlines = list(super().get_inlines(request, obj))
-        if obj and obj.shipping_method == "box_now_locker":
+        if obj is None:
+            return inlines
+
+        provider_code = (
+            obj.shipping_provider.code if obj.shipping_provider_id else None
+        )
+        # Routing prefers the new (shipping_provider, shipping_kind) FK
+        # pair, with a fallback to the legacy enum so pre-Phase-0 rows
+        # still surface their inline correctly.
+        if provider_code == "boxnow" or obj.shipping_method == "box_now_locker":
             from shipping_boxnow.admin import (  # noqa: PLC0415
                 BoxNowShipmentOrderInline,
             )
 
             inlines.append(BoxNowShipmentOrderInline)
+        elif provider_code == "acs" or obj.shipping_method == "acs_smartpoint":
+            from shipping_acs.admin import (  # noqa: PLC0415
+                AcsShipmentOrderInline,
+            )
+
+            inlines.append(AcsShipmentOrderInline)
         return inlines
 
     def get_queryset(self, request):
@@ -679,17 +695,32 @@ class OrderAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    @admin.display(description=_("BoxNow Summary"))
+    @admin.display(description=_("Shipment Summary"))
     def boxnow_summary(self, obj):
-        """Compact summary of the BoxNow shipment shown inline in
-        the Shipping & Tracking fieldset. Renders nothing for non-BoxNow
-        orders. For BoxNow orders, surfaces parcel state, voucher, and
-        chosen locker so admins don't have to scroll to the inline.
+        """Compact summary of the carrier shipment, shown inline in
+        the Shipping & Tracking fieldset.
+
+        Field name kept as ``boxnow_summary`` for backwards-compat
+        with existing fieldsets/readonly references — display label
+        is generic. For ACS orders we render the ACS state + voucher;
+        for BoxNow we keep the original badge + locker rendering.
         """
-        if obj.shipping_method != "box_now_locker":
+        provider_code = (
+            obj.shipping_provider.code if obj.shipping_provider_id else None
+        )
+        is_acs = (
+            provider_code == "acs" or obj.shipping_method == "acs_smartpoint"
+        )
+        is_boxnow = (
+            provider_code == "boxnow" or obj.shipping_method == "box_now_locker"
+        )
+
+        if is_acs:
+            return self._acs_summary_html(obj)
+        if not is_boxnow:
             return mark_safe(
                 '<span class="text-sm text-base-500">'
-                + str(_("Not a BoxNow order"))
+                + str(_("No carrier-specific shipment for this order."))
                 + "</span>"
             )
 
@@ -748,6 +779,79 @@ class OrderAdmin(ModelAdmin):
             f"<div><strong>{_('Locker')}:</strong> "
             f'<span class="font-mono">{locker_id}</span>{locker_name}</div>'
             "</div>"
+        )
+
+    def _acs_summary_html(self, obj):
+        """ACS shipment summary helper used by ``boxnow_summary``.
+
+        Kept as a private helper rather than its own admin display so
+        the existing fieldset doesn't need a second column added — the
+        single ``boxnow_summary`` field renders whichever carrier is
+        attached. Mirrors the BoxNow rendering for visual consistency.
+        """
+        shipment = getattr(obj, "acs_shipment", None)
+        if shipment is None:
+            return mark_safe(
+                '<span class="text-sm text-orange-600">'
+                + str(
+                    _(
+                        "ACS order without an AcsShipment row — likely a "
+                        "race during order creation or an upgrade-time "
+                        "data gap. Inspect order.history for clues."
+                    )
+                )
+                + "</span>"
+            )
+
+        state_color = {
+            "pending_creation": "bg-base-200 text-base-700",
+            "new": "bg-blue-100 text-blue-700",
+            "in_transit": "bg-cyan-100 text-cyan-700",
+            "at_destination": "bg-amber-100 text-amber-700",
+            "out_for_delivery": "bg-amber-100 text-amber-700",
+            "delivered": "bg-green-100 text-green-700",
+            "attempted": "bg-orange-100 text-orange-700",
+            "returned": "bg-red-100 text-red-700",
+            "canceled": "bg-red-100 text-red-700",
+            "lost": "bg-red-100 text-red-700",
+        }.get(shipment.shipment_state, "bg-base-200 text-base-700")
+
+        state_label = conditional_escape(shipment.get_shipment_state_display())
+        voucher_html = (
+            f'<div class="font-mono text-sm">{conditional_escape(shipment.voucher_no)}</div>'
+            if shipment.voucher_no
+            else (
+                '<div class="text-sm text-orange-600">'
+                + str(_("Voucher pending — fires after order creation"))
+                + "</div>"
+            )
+        )
+
+        kind_label = conditional_escape(shipment.get_delivery_kind_display())
+        rows = [
+            f'<div><span class="rounded px-2 py-0.5 text-xs font-medium {state_color}">{state_label}</span></div>',
+            f"<div><strong>{_('Voucher')}:</strong> {voucher_html}</div>",
+            f"<div><strong>{_('Kind')}:</strong> {kind_label}</div>",
+        ]
+
+        if shipment.charge_type == 2 and shipment.cod_amount:  # COD
+            cod_amount = conditional_escape(str(shipment.cod_amount))
+            rows.append(
+                f"<div><strong>{_('COD')}:</strong> "
+                f'<span class="font-mono">{cod_amount}</span></div>'
+            )
+
+        if shipment.station_destination_external_id:
+            station = conditional_escape(
+                shipment.station_destination_external_id
+            )
+            rows.append(
+                f"<div><strong>{_('Smartpoint')}:</strong> "
+                f'<span class="font-mono">{station}</span></div>'
+            )
+
+        return mark_safe(
+            '<div class="space-y-1 text-sm">' + "".join(rows) + "</div>"
         )
 
     @admin.display(description=_("Shipping"))
@@ -1529,20 +1633,25 @@ class OrderAdmin(ModelAdmin):
         return self._redirect_to_order_change(object_id)
 
     @action(
-        description=str(_("Download BoxNow voucher (PDF)")),
+        description=str(_("Download shipping voucher (PDF)")),
         variant=ActionVariant.PRIMARY,
         icon="download",
     )
-    def download_boxnow_voucher(self, request, object_id):
-        """Stream the BoxNow voucher PDF for the order's parcel.
+    def download_shipping_voucher(self, request, object_id):
+        """Stream the carrier voucher PDF for the order's shipment.
 
-        Mirrors the same action on ``BoxNowShipmentAdmin`` — admins
-        triaging orders rarely click through to the shipment detail
-        page, so duplicating the button here saves a hop. Falls back
-        to a flash message + redirect when the order isn't BoxNow or
-        the shipment doesn't have a parcel ID yet.
+        Provider-agnostic: routes through ``ShippingService`` so it
+        works for BoxNow, ACS, and any future carrier that registers
+        an adapter. Mirrors the same action on each carrier-specific
+        ShipmentAdmin — admins triaging orders rarely click through
+        to the shipment detail page, so duplicating the button here
+        saves a hop. Falls back to a flash message + redirect when
+        the order has no carrier attached or the carrier hasn't yet
+        minted a voucher.
         """
         from django.http import HttpResponse  # noqa: PLC0415
+
+        from shipping.services import ShippingService  # noqa: PLC0415
 
         try:
             order = Order.objects.get(pk=object_id)
@@ -1550,46 +1659,36 @@ class OrderAdmin(ModelAdmin):
             messages.error(request, _("Order not found."))
             return self._redirect_to_order_change(object_id)
 
-        if order.shipping_method != "box_now_locker":
+        adapter = ShippingService.adapter_for_order(order)
+        if adapter is None:
             messages.warning(
                 request,
                 _(
-                    "Order #%(order_id)s is not a BoxNow order — no "
-                    "voucher to download."
+                    "Order #%(order_id)s has no shipping carrier "
+                    "attached — nothing to download."
+                )
+                % {"order_id": order.id},
+            )
+            return self._redirect_to_order_change(object_id)
+
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            messages.warning(
+                request,
+                _(
+                    "No shipment row for order #%(order_id)s — the "
+                    "create-shipment task has not run yet."
                 )
                 % {"order_id": order.id},
             )
             return self._redirect_to_order_change(object_id)
 
         try:
-            from shipping_boxnow.models import BoxNowShipment  # noqa: PLC0415
-            from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
-        except ImportError:
-            messages.error(
-                request,
-                _("BoxNow shipping app not available."),
-            )
-            return self._redirect_to_order_change(object_id)
-
-        shipment = BoxNowShipment.objects.filter(order=order).first()
-        if shipment is None or not shipment.parcel_id:
-            messages.warning(
-                request,
-                _(
-                    "No voucher available for order #%(order_id)s — the "
-                    "BoxNow delivery-request task has not yet assigned a "
-                    "parcel ID. Trigger ``create_boxnow_shipment_for_order`` "
-                    "or wait for the post-payment Celery dispatch."
-                )
-                % {"order_id": order.id},
-            )
-            return self._redirect_to_order_change(object_id)
-
-        try:
-            pdf_bytes = BoxNowService.fetch_label_bytes(shipment)
+            pdf_bytes = adapter.fetch_label_bytes(shipment)
         except Exception as exc:  # noqa: BLE001
             logger.exception(
-                "Admin download_boxnow_voucher failed for order %s", order.id
+                "Admin download_shipping_voucher failed for order %s",
+                order.id,
             )
             messages.error(
                 request,
@@ -1597,7 +1696,12 @@ class OrderAdmin(ModelAdmin):
             )
             return self._redirect_to_order_change(object_id)
 
-        filename = f"boxnow-voucher-{shipment.parcel_id}.pdf"
+        identifier = (
+            getattr(shipment, "voucher_no", None)
+            or getattr(shipment, "parcel_id", None)
+            or order.id
+        )
+        filename = f"{adapter.code}-voucher-{identifier}.pdf"
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         response["Content-Length"] = str(len(pdf_bytes))

@@ -24,18 +24,20 @@ pytestmark = pytest.mark.django_db
 
 
 class TestKgFromGrams:
+    """Output uses Greek-locale comma-decimal — see services._kg_from_grams."""
+
     def test_zero_or_none_clamps_to_minimum(self):
-        assert _kg_from_grams(None) == "0.5"
-        assert _kg_from_grams(0) == "0.5"
+        assert _kg_from_grams(None) == "0,5"
+        assert _kg_from_grams(0) == "0,5"
 
     def test_below_minimum_clamps_up(self):
-        assert _kg_from_grams(100) == "0.5"  # 0.1 kg → 0.5 floor
+        assert _kg_from_grams(100) == "0,5"  # 0.1 kg → 0.5 floor
 
     def test_typical_grams_to_kg(self):
-        assert _kg_from_grams(2500) == "2.5"
+        assert _kg_from_grams(2500) == "2,5"
 
     def test_excessive_weight_clamps_down(self):
-        assert _kg_from_grams(10**9) == "999.0"
+        assert _kg_from_grams(10**9) == "999,0"
 
 
 # ---------------------------------------------------------------------------

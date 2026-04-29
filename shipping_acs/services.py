@@ -71,33 +71,39 @@ _MAX_VOUCHER_KG = Decimal("999")
 def _kg_from_grams(weight_grams: int | None) -> str:
     """Convert internal grams → ACS's kilogram-decimal payload value.
 
-    Returns a string formatted with up to 3 decimals because ACS's
-    API has been observed rejecting trailing-zero floats.  Values
-    below the 0.5 kg minimum are clamped up to 0.5 (per PDF: "min
-    ή 0.5"); values above the safety ceiling are clamped down with a
-    warning so a single bad row can't dead-letter the create-voucher
-    Celery task fan-out.
+    Returns a Greek-locale comma-decimal string (e.g. ``"0,5"``).
+    ACS parses numeric strings with the Greek convention — dot is the
+    thousands separator and comma is the decimal — so ``"0.5"`` is
+    read as ``5`` KG and a single small parcel ends up billed at the
+    5 KG tariff. Sending the comma form keeps the kg value intact.
+
+    Values below the 0.5 kg minimum are clamped up to 0.5 (per PDF:
+    "min ή 0.5"); values above the safety ceiling are clamped down
+    with a warning so a single bad row can't dead-letter the
+    create-voucher Celery task fan-out.
     """
     grams = int(weight_grams or 0)
     if grams <= 0:
-        return f"{_MIN_VOUCHER_KG.normalize():f}"
-
-    kg = (Decimal(grams) / Decimal(1000)).quantize(Decimal("0.001"))
-    if kg < _MIN_VOUCHER_KG:
         kg = _MIN_VOUCHER_KG
-    if kg > _MAX_VOUCHER_KG:
-        logger.warning(
-            "Clamping ACS voucher weight from %s kg to %s kg — "
-            "likely a unit mix-up upstream.",
-            kg,
-            _MAX_VOUCHER_KG,
-        )
-        kg = _MAX_VOUCHER_KG
-    # Trim trailing zeros for cleaner wire output (12.000 → 12.0).
+    else:
+        kg = (Decimal(grams) / Decimal(1000)).quantize(Decimal("0.001"))
+        if kg < _MIN_VOUCHER_KG:
+            kg = _MIN_VOUCHER_KG
+        if kg > _MAX_VOUCHER_KG:
+            logger.warning(
+                "Clamping ACS voucher weight from %s kg to %s kg — "
+                "likely a unit mix-up upstream.",
+                kg,
+                _MAX_VOUCHER_KG,
+            )
+            kg = _MAX_VOUCHER_KG
+
+    # Trim trailing zeros (12.000 → 12.0) then swap dot → comma for
+    # Greek locale parsing on the ACS side.
     text = f"{kg.normalize():f}"
     if "." not in text:
         text = f"{text}.0"
-    return text
+    return text.replace(".", ",")
 
 
 def _event_fingerprint(
@@ -120,71 +126,112 @@ class AcsService:
     # Voucher creation
     # ------------------------------------------------------------------
 
+    # How long another Celery worker waits before re-attempting after
+    # picking up a shipment that another instance has already started
+    # minting. Larger than the ACS HTTP timeout (15s) plus urllib3
+    # retry budget so a healthy mint always wins; smaller than Celery's
+    # task timeout so a crashed worker doesn't permanently strand a
+    # shipment.
+    _MINT_CLAIM_TTL_SECONDS = 90
+
     @classmethod
-    @transaction.atomic
     def create_voucher_for_order(cls, order: Order) -> AcsShipment:
         """Issue a voucher for ``order`` via ``ACS_Create_Voucher``.
 
-        Why atomic + select_for_update:
-            ``handle_payment_succeeded`` may fire multiple times under
-            payment-provider retries; locking the shipment row prevents
-            two task invocations from both seeing a blank ``voucher_no``
-            and minting duplicate vouchers.
+        Three-phase design that survives a connection-level failure
+        between the API success and the local save:
 
-        Idempotency:
-            If ``voucher_no`` is already set the method returns the
-            existing shipment unchanged.
-
-        Side-effects:
-            * Updates ``Order.tracking_number`` + ``Order.shipping_carrier``.
-            * Persists the multi-part children (when ``item_quantity > 1``)
-              into ``shipment.metadata['multipart_vouchers']``.
-            * Caches the raw create response under
-              ``shipment.metadata['create_response']``.
+        1. **Claim** — short atomic block: lock the shipment row,
+           short-circuit on existing ``voucher_no``, sync ``cod_amount``,
+           and stamp ``metadata['mint_started_at']``. The claim
+           prevents two concurrent Celery workers from both POSTing
+           ``ACS_Create_Voucher`` and minting duplicate vouchers.
+        2. **API call** — no DB lock, no open transaction. Network
+           latency or `idle_in_transaction_session_timeout` can no
+           longer roll back the local save.
+        3. **Persist** — fresh atomic + ``select_for_update`` race
+           check. If another worker has already saved a voucher (the
+           claim TTL expired during a slow API), our voucher becomes
+           the duplicate; we attempt ``ACS_Delete_Voucher`` and return
+           the row the other worker saved.
         """
-        try:
-            shipment: AcsShipment = (
-                AcsShipment.objects.select_for_update()
-                .select_related("order")
-                .get(order=order)
-            )
-        except AcsShipment.DoesNotExist as exc:
-            raise ValueError(
-                f"Order {order.id} has no AcsShipment row. Create one at "
-                "order-creation time."
-            ) from exc
-
-        if shipment.voucher_no:
-            logger.info(
-                "create_voucher_for_order: order=%s already has "
-                "voucher_no=%s — returning existing shipment",
-                order.id,
-                shipment.voucher_no,
-            )
-            return shipment
-
-        # Sync the COD amount from the order's final paid_amount. The
-        # shipment row is persisted at order-creation time, before
-        # loyalty redemption collapses the final total, so cod_amount
-        # would otherwise stay at 0 and ACS would reject Charge_Type=2
-        # without a Cod_Ammount.
         from shipping_acs.enum.charge_type import AcsChargeType
 
-        if (
-            shipment.charge_type == AcsChargeType.COD
-            and (not shipment.cod_amount or shipment.cod_amount.amount == 0)
-            and order.paid_amount
-            and order.paid_amount.amount > 0
-        ):
-            shipment.cod_amount = order.paid_amount
-            shipment.save(update_fields=["cod_amount", "cod_amount_currency"])
-
         client = AcsClient()
+        # ----- Phase 1: claim the row + sync COD amount -----
+        with transaction.atomic():
+            try:
+                shipment: AcsShipment = (
+                    AcsShipment.objects.select_for_update()
+                    .select_related("order")
+                    .get(order=order)
+                )
+            except AcsShipment.DoesNotExist as exc:
+                raise ValueError(
+                    f"Order {order.id} has no AcsShipment row. Create one "
+                    "at order-creation time."
+                ) from exc
+
+            if shipment.voucher_no:
+                logger.info(
+                    "create_voucher_for_order: order=%s already has "
+                    "voucher_no=%s — returning existing shipment",
+                    order.id,
+                    shipment.voucher_no,
+                )
+                return shipment
+
+            metadata = shipment.metadata or {}
+            started_raw = metadata.get("mint_started_at")
+            if started_raw:
+                started = parse_datetime(str(started_raw))
+                if started is not None:
+                    if started.tzinfo is None:
+                        started = timezone.make_aware(started)
+                    age = (timezone.now() - started).total_seconds()
+                    if age < cls._MINT_CLAIM_TTL_SECONDS:
+                        # Another worker is in the middle of minting.
+                        # Bail out as a retryable so Celery backs off
+                        # rather than racing in.
+                        from shipping_acs.exceptions import AcsRetryableError
+
+                        raise AcsRetryableError(
+                            alias="ACS_Create_Voucher",
+                            error_message=(
+                                f"Voucher mint already in progress for "
+                                f"order={order.id} (started {age:.1f}s ago)."
+                            ),
+                        )
+
+            update_fields = ["metadata"]
+            metadata["mint_started_at"] = timezone.now().isoformat()
+            shipment.metadata = metadata
+
+            cod_synced = (
+                shipment.charge_type == AcsChargeType.COD
+                and (not shipment.cod_amount or shipment.cod_amount.amount == 0)
+                and order.paid_amount
+                and order.paid_amount.amount > 0
+            )
+            if cod_synced:
+                shipment.cod_amount = order.paid_amount
+                update_fields.extend(["cod_amount", "cod_amount_currency"])
+
+            shipment.save(update_fields=update_fields)
+
+        # ----- Phase 2: API call (no DB lock held) -----
         params = cls._build_create_voucher_params(order, shipment, client)
-        result = client.create_voucher(params)
+        try:
+            result = client.create_voucher(params)
+        except Exception:
+            # API call failed — release the claim so a future retry
+            # can proceed without waiting out the TTL.
+            cls._release_mint_claim(shipment)
+            raise
 
         voucher_no = (result.get("Voucher_No") or "").strip()
         if not voucher_no:
+            cls._release_mint_claim(shipment)
             error_message = (
                 result.get("Error_Message")
                 or "ACS_Create_Voucher succeeded but returned no Voucher_No."
@@ -195,34 +242,93 @@ class AcsService:
                 raw=result,
             )
 
-        # Multi-part children (per PDF: ``Get_Multipart_Vouchers``).
         children: list[str] = []
         if shipment.item_quantity > 1:
             try:
                 children = client.get_multipart_vouchers(voucher_no)
             except AcsAPIError as exc:
-                # Multipart fetch failures are non-fatal — the master
-                # voucher is the one ACS uses for fulfilment.  Log and
-                # carry on so the task doesn't dead-letter.
                 logger.warning(
                     "ACS_Get_Multipart_Vouchers failed for voucher %s: %s",
                     voucher_no,
                     exc,
                 )
 
-        shipment.voucher_no = voucher_no
-        shipment.shipment_state = AcsShipmentState.NEW
-        shipment.metadata = {
-            **(shipment.metadata or {}),
-            "create_response": result,
-            "multipart_vouchers": children,
-        }
-        shipment.save(
-            update_fields=["voucher_no", "shipment_state", "metadata"]
-        )
+        # ----- Phase 3: persist (fresh atomic, race-checked) -----
+        with transaction.atomic():
+            shipment = (
+                AcsShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
+            )
+            if shipment.voucher_no and shipment.voucher_no != voucher_no:
+                # Another worker won the race. Our voucher is the dupe.
+                logger.warning(
+                    "Concurrent voucher mint for order=%s: DB saved %s, "
+                    "we minted %s — attempting cancel.",
+                    order.id,
+                    shipment.voucher_no,
+                    voucher_no,
+                )
+                try:
+                    client.delete_voucher(voucher_no)
+                except AcsAPIError as exc:
+                    logger.error(
+                        "Failed to cancel duplicate voucher %s for order=%s: %s "
+                        "— flag in shipment.metadata['orphan_vouchers'] for "
+                        "manual reconciliation.",
+                        voucher_no,
+                        order.id,
+                        exc,
+                    )
+                    metadata = shipment.metadata or {}
+                    orphans = list(metadata.get("orphan_vouchers") or [])
+                    orphans.append(voucher_no)
+                    metadata["orphan_vouchers"] = orphans
+                    shipment.metadata = metadata
+                    shipment.save(update_fields=["metadata"])
+                return shipment
+
+            metadata = shipment.metadata or {}
+            metadata.pop("mint_started_at", None)
+            metadata["create_response"] = result
+            metadata["multipart_vouchers"] = children
+
+            shipment.voucher_no = voucher_no
+            shipment.shipment_state = AcsShipmentState.NEW
+            shipment.metadata = metadata
+            shipment.save(
+                update_fields=["voucher_no", "shipment_state", "metadata"]
+            )
 
         order.add_tracking_info(voucher_no, "acs")
         return shipment
+
+    @classmethod
+    def _release_mint_claim(cls, shipment: AcsShipment) -> None:
+        """Drop the ``mint_started_at`` flag so a retry can proceed.
+
+        Best effort — a failure here just means the next retry has to
+        wait for the TTL to expire.
+        """
+        try:
+            with transaction.atomic():
+                fresh = (
+                    AcsShipment.objects.select_for_update()
+                    .only("metadata")
+                    .get(pk=shipment.pk)
+                )
+                metadata = fresh.metadata or {}
+                if metadata.pop("mint_started_at", None) is not None:
+                    fresh.metadata = metadata
+                    fresh.save(update_fields=["metadata"])
+        except Exception:
+            logger.warning(
+                "Failed to release mint claim for shipment=%s — next retry "
+                "will wait out the %ss TTL.",
+                shipment.pk,
+                cls._MINT_CLAIM_TTL_SECONDS,
+                exc_info=True,
+            )
 
     @classmethod
     def _build_create_voucher_params(

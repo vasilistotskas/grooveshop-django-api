@@ -50,32 +50,44 @@ _TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
 # Label cache TTL in seconds (1 hour).
 _LABEL_CACHE_TTL = 3600
 
-# BoxNow API §5 P421: parcel weight must be 0 ≤ weight ≤ 1e6 grams.
-_BOXNOW_MAX_WEIGHT_GRAMS = 1_000_000
+# BoxNow's voucher template prints ``items[].weight`` directly with a
+# ``kg`` label and 2-decimal formatting — empirically verified by
+# inspecting a stage voucher: sending ``189`` printed ``189.00 kg`` (NOT
+# 0.189 kg). So the field is **kilograms**, not grams. The P421 cap
+# (0..10^6) therefore caps kilograms — generous, but BoxNow's max
+# physical compartment is ~30 kg so any sane parcel passes through
+# the bound easily.
+_BOXNOW_MAX_WEIGHT_KG = 1_000_000.0
 
 
-def _clamp_parcel_weight_grams(weight_grams: int | None) -> int:
-    """Clamp a parcel weight (grams) to BoxNow's accepted range.
+def _format_parcel_weight_kg(weight_grams: int | None) -> float:
+    """Convert internal grams → BoxNow's kilogram-decimal payload value.
 
-    Defends the delivery-request payload against P421 ("Invalid parcel
-    weight … between 0 and 1e6"). A value out of bounds is logged once
-    and clamped; we deliberately don't raise so a single corrupt row
-    can't block the entire BoxNow Celery task fan-out for an order.
-    Pass 0 when None — BoxNow's PDF explicitly allows that ("if parcel
-    weight unknown pass 0").
+    Internally we store weight as integer grams (``weight_grams``) for
+    precision. BoxNow's delivery-request API expects ``items[].weight``
+    in **kilograms** (their voucher template stamps the value verbatim
+    as ``N.NN kg``), so we divide by 1000 and round to 3 decimals
+    (gram-level precision while staying inside BoxNow's expected
+    decimal scale).
+
+    A None / zero / negative input becomes ``0.0`` per BoxNow PDF
+    §3.4 ("if parcel weight unknown pass 0"). Values above the P421
+    cap are clamped + logged so a single corrupt row can't dead-letter
+    the whole BoxNow Celery task fan-out.
     """
     if weight_grams is None or weight_grams <= 0:
-        return 0
-    if weight_grams > _BOXNOW_MAX_WEIGHT_GRAMS:
+        return 0.0
+    weight_kg = round(weight_grams / 1000.0, 3)
+    if weight_kg > _BOXNOW_MAX_WEIGHT_KG:
         logger.warning(
-            "Clamping BoxNow parcel weight %s g to BoxNow's max %s g "
+            "Clamping BoxNow parcel weight %s kg to BoxNow's max %s kg "
             "(P421 prevention). Likely a unit mix-up upstream — check "
             "the product's MeasurementField unit.",
-            weight_grams,
-            _BOXNOW_MAX_WEIGHT_GRAMS,
+            weight_kg,
+            _BOXNOW_MAX_WEIGHT_KG,
         )
-        return _BOXNOW_MAX_WEIGHT_GRAMS
-    return int(weight_grams)
+        return _BOXNOW_MAX_WEIGHT_KG
+    return weight_kg
 
 
 class BoxNowService:
@@ -197,13 +209,13 @@ class BoxNowService:
                     "name": "voucher",
                     "value": invoice_value,
                     "compartmentSize": shipment.compartment_size,
-                    # BoxNow API §3.4 expects parcel weight in **grams**
-                    # as a non-negative integer. P421 caps it at 1e6
-                    # (1 000 kg) — we clamp here so a corrupt model value
-                    # surfaces as a tracked log line instead of a 4xx
-                    # from BoxNow that retries and eventually dead-letters.
-                    # Pass 0 when unknown (per the PDF example comment).
-                    "weight": _clamp_parcel_weight_grams(shipment.weight_grams),
+                    # BoxNow API §3.4 expects parcel weight in
+                    # **kilograms** (decimal). Empirically: their voucher
+                    # template prints the raw value with a ``kg`` label
+                    # and 2-decimal formatting, so 189 g → ``189.00 kg``
+                    # (NOT 0.19 kg). We store grams internally for
+                    # precision and convert to kilograms here.
+                    "weight": _format_parcel_weight_kg(shipment.weight_grams),
                 }
             ],
         }

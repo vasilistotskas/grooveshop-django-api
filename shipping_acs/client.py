@@ -481,17 +481,22 @@ class AcsClient:
 def _decode_pdf(envelope: dict[str, Any], *, key: str, alias: str) -> bytes:
     """Decode the base64 PDF blob from an ACS print response.
 
-    ACS observed wire shape (``ACS_Print_Voucher``,
-    ``ACS_Print_Pickup_List``, ``ACS_POD_FROM_REFERENCE_NO``):
+    ACS varies the wire shape per alias. Three layouts have been
+    observed against the live stage env:
 
-        ``{"ACSValueOutput": [{"ACSObjectOutput": "<base64>"}, ...]}``
+    * ``ACS_Print_Voucher`` — single base64 string at
+      ``ACSValueOutput[0]['ACSObjectOutput']``.
+    * ``ACS_Print_Pickup_List`` — nested dict at
+      ``ACSValueOutput[0]['ACSObjectOutput']`` with ``PDFData``
+      holding the base64 string (and ``Mass_Voucher_No`` echoed
+      back for cross-checking).
+    * ``ACS_POD_FROM_REFERENCE_NO`` — top-level
+      ``ACSObjectOutput`` array keyed by voucher number (the
+      shape originally documented in the PDF spec).
 
-    The PDF docs show a top-level ``ACSObjectOutput`` array keyed by
-    voucher number, but the live API actually emits the blob inside
-    ``ACSValueOutput[0]['ACSObjectOutput']`` as a single base64
-    string. We accept both shapes so a future server-side fix doesn't
-    break us, and so the original PDF-based test fixtures keep
-    passing.
+    All three are accepted so a future server-side normalisation
+    doesn't regress us and the original PDF-based test fixtures
+    keep working.
     """
     candidates: list[str] = []
 
@@ -502,6 +507,10 @@ def _decode_pdf(envelope: dict[str, Any], *, key: str, alias: str) -> bytes:
         blob = entry.get("ACSObjectOutput")
         if isinstance(blob, str) and blob:
             candidates.append(blob)
+        elif isinstance(blob, dict):
+            nested = blob.get("PDFData") or blob.get(key) or blob.get(str(key))
+            if isinstance(nested, str) and nested:
+                candidates.append(nested)
 
     object_output = envelope.get("ACSObjectOutput") or []
     if isinstance(object_output, list):

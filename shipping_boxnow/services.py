@@ -111,65 +111,98 @@ class BoxNowService:
     # create_shipment_for_order
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # 3-phase mint design constants — mirrors AcsService
+    # ------------------------------------------------------------------
+
+    # How long another Celery worker waits before re-attempting a mint
+    # that another instance has already started. Larger than the BoxNow
+    # HTTP timeout + retry budget so a healthy mint always wins; shorter
+    # than the Celery soft-timeout so a crashed worker never permanently
+    # strands a shipment.
+    _MINT_CLAIM_TTL_SECONDS = 90
+
     @classmethod
-    @transaction.atomic
     def create_shipment_for_order(cls, order: Order) -> BoxNowShipment:
         """
         Call BoxNow's delivery-request API and persist the IDs on the
         shipment row.
 
-        Why atomic + select_for_update
-        --------------------------------
-        ``handle_payment_succeeded`` can fire multiple times (Stripe /
-        Viva webhooks both retry on network timeouts).  Locking the row
-        prevents two Celery task invocations from both seeing a blank
-        ``delivery_request_id`` and issuing duplicate delivery requests
-        to BoxNow.
+        Three-phase design — mirrors :meth:`AcsService.create_voucher_for_order`
+        — that survives a connection-level failure between the API
+        success and the local save:
 
-        Idempotency
-        -----------
-        If ``shipment.delivery_request_id`` is already set the method
-        returns the existing shipment unchanged.  BoxNow errors P410
-        (duplicate order number) would otherwise bubble up and trigger
-        unnecessary retries.
+        1. **Claim** — short atomic block: lock the shipment row,
+           short-circuit on existing ``delivery_request_id``, and stamp
+           ``metadata['mint_started_at']``. The claim prevents two
+           concurrent Celery workers from both POSTing to BoxNow and
+           minting duplicate parcels.
+        2. **API call** — no DB lock, no open transaction. Network
+           latency or ``idle_in_transaction_session_timeout`` can no
+           longer roll back the local save after BoxNow already minted
+           the parcel — the orphan-parcel risk goes away.
+        3. **Persist** — fresh atomic + ``select_for_update`` race
+           check. If another worker has already saved a delivery_request_id
+           (the claim TTL expired during a slow API), our request becomes
+           the duplicate and is recorded for manual reconciliation
+           (BoxNow has no programmatic "delete delivery request" before
+           it's finalised; ``cancel_shipment`` is the cleanup path).
 
-        Args:
-            order: The paid Order instance.  Must have an associated
-                   ``BoxNowShipment`` row (created at order-creation
-                   time by ``OrderService.create_order``).
-
-        Returns:
-            The ``BoxNowShipment`` instance (created or pre-existing).
-
-        Raises:
-            ValueError: The order has no ``BoxNowShipment`` row.
-            BoxNowAPIError: The BoxNow API returned a non-retryable error.
-            BoxNowRetryableError: Transient API failure — Celery will retry.
+        Idempotency on ``delivery_request_id``: if the shipment already
+        has one, return it unchanged. BoxNow's P410 (duplicate order
+        number) would otherwise surface as a non-retryable error.
         """
-        # Lock the shipment row for the duration of this transaction.
-        try:
-            shipment: BoxNowShipment = (
-                BoxNowShipment.objects.select_for_update()
-                .select_related("order")
-                .get(order=order)
-            )
-        except BoxNowShipment.DoesNotExist:
-            raise ValueError(
-                f"Order {order.id} has no BoxNow shipment row. "
-                "Create a BoxNowShipment at order-creation time."
-            )
+        # ---- Phase 1: claim ----------------------------------------------
+        with transaction.atomic():
+            try:
+                shipment: BoxNowShipment = (
+                    BoxNowShipment.objects.select_for_update()
+                    .select_related("order")
+                    .get(order=order)
+                )
+            except BoxNowShipment.DoesNotExist as exc:
+                raise ValueError(
+                    f"Order {order.id} has no BoxNow shipment row. "
+                    "Create a BoxNowShipment at order-creation time."
+                ) from exc
 
-        # --- Idempotency guard -------------------------------------------
-        if shipment.delivery_request_id:
-            logger.info(
-                "create_shipment_for_order: order=%s already has "
-                "delivery_request_id=%s — returning existing shipment",
-                order.id,
-                shipment.delivery_request_id,
-            )
-            return shipment
+            if shipment.delivery_request_id:
+                logger.info(
+                    "create_shipment_for_order: order=%s already has "
+                    "delivery_request_id=%s — returning existing shipment",
+                    order.id,
+                    shipment.delivery_request_id,
+                )
+                return shipment
 
-        # --- Build the BoxNow delivery-request payload -------------------
+            metadata = shipment.metadata or {}
+            started_raw = metadata.get("mint_started_at")
+            if started_raw:
+                started = parse_datetime(str(started_raw))
+                if started is not None:
+                    if started.tzinfo is None:
+                        started = timezone.make_aware(started)
+                    age = (timezone.now() - started).total_seconds()
+                    if age < cls._MINT_CLAIM_TTL_SECONDS:
+                        # Another worker is mid-flight. Surface as
+                        # retryable so Celery backs off and re-checks.
+                        from shipping_boxnow.exceptions import (
+                            BoxNowRetryableError,
+                        )
+
+                        raise BoxNowRetryableError(
+                            f"BoxNow mint already in flight for order "
+                            f"{order.id} (started {age:.1f}s ago) — "
+                            "deferring to that worker."
+                        )
+
+            shipment.metadata = {
+                **metadata,
+                "mint_started_at": timezone.now().isoformat(),
+            }
+            shipment.save(update_fields=["metadata", "updated_at"])
+
+        # ---- Phase 2: API call (no transaction, no lock) -----------------
         notify_phone = getattr(settings, "BOXNOW_NOTIFY_PHONE", "+302100000000")
         site_name = getattr(settings, "SITE_NAME", "GrooveShop")
         warehouse_id = str(getattr(settings, "BOXNOW_WAREHOUSE_ID", "2"))
@@ -220,7 +253,6 @@ class BoxNowService:
             ],
         }
 
-        # --- Call BoxNow API ---------------------------------------------
         logger.info(
             "create_shipment_for_order: creating delivery request "
             "for order=%s locker=%s",
@@ -230,8 +262,6 @@ class BoxNowService:
         try:
             response = BoxNowClient().create_delivery_request(payload)
         except BoxNowAPIError as exc:
-            # Non-retryable business error (e.g. P410 duplicate order number,
-            # P402 invalid locker ID). Persist diagnostics so ops can inspect.
             logger.error(
                 "BoxNow API error creating delivery request for order %s: %s",
                 order.id,
@@ -242,50 +272,91 @@ class BoxNowService:
                     "boxnow_message": exc.message,
                 },
             )
-            shipment.metadata = {
-                **shipment.metadata,
-                "last_error": {
+            cls._release_mint_claim(
+                shipment.pk,
+                last_error={
                     "type": "BoxNowAPIError",
                     "code": exc.code,
                     "message": exc.message,
                     "status_code": exc.status_code,
                     "response_text": exc.response_text[:500],
                 },
-            }
-            shipment.save(update_fields=["metadata", "updated_at"])
+            )
+            raise
+        except Exception:
+            # Connection error / retryable — drop the claim so the
+            # next Celery retry can re-acquire after the TTL expires.
+            cls._release_mint_claim(shipment.pk)
             raise
 
         delivery_request_id: str = response["id"]
         parcel_id: str = response["parcels"][0]["id"]
 
-        # --- Persist BoxNow IDs on the shipment --------------------------
-        shipment.delivery_request_id = delivery_request_id
-        shipment.parcel_id = parcel_id
-        shipment.parcel_state = BoxNowParcelState.NEW
-        shipment.last_event_at = timezone.now()
-        shipment.metadata = {
-            **shipment.metadata,
-            "create_response": response,
-            "last_error": None,
-        }
-        shipment.save(
-            update_fields=[
-                "delivery_request_id",
-                "parcel_id",
-                "parcel_state",
-                "last_event_at",
-                "metadata",
-                "updated_at",
-            ]
-        )
+        # ---- Phase 3: persist atomically ---------------------------------
+        with transaction.atomic():
+            shipment = (
+                BoxNowShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
+            )
 
-        # --- Update Order tracking fields ---------------------------------
-        # ``add_tracking_info`` issues its own save() with update_fields;
-        # that save is covered by our enclosing atomic block.
-        order.add_tracking_info(
-            tracking_number=parcel_id,
-            shipping_carrier="boxnow",
-        )
+            if (
+                shipment.delivery_request_id
+                and shipment.delivery_request_id != delivery_request_id
+            ):
+                # Another worker raced past the TTL and persisted a
+                # different delivery request. Stash ours in metadata
+                # for manual reconciliation; return the saved row.
+                logger.error(
+                    "create_shipment_for_order: race detected for order=%s "
+                    "— another worker persisted delivery_request_id=%s "
+                    "while we minted %s. Recording orphan for ops review.",
+                    order.id,
+                    shipment.delivery_request_id,
+                    delivery_request_id,
+                )
+                orphans = shipment.metadata.get("orphan_delivery_requests", [])
+                orphans.append(
+                    {
+                        "delivery_request_id": delivery_request_id,
+                        "parcel_id": parcel_id,
+                        "minted_at": timezone.now().isoformat(),
+                    }
+                )
+                shipment.metadata = {
+                    **shipment.metadata,
+                    "orphan_delivery_requests": orphans,
+                    "mint_started_at": None,
+                }
+                shipment.save(update_fields=["metadata", "updated_at"])
+                return shipment
+
+            shipment.delivery_request_id = delivery_request_id
+            shipment.parcel_id = parcel_id
+            shipment.parcel_state = BoxNowParcelState.NEW
+            shipment.last_event_at = timezone.now()
+            shipment.metadata = {
+                **shipment.metadata,
+                "create_response": response,
+                "last_error": None,
+                "mint_started_at": None,
+            }
+            shipment.save(
+                update_fields=[
+                    "delivery_request_id",
+                    "parcel_id",
+                    "parcel_state",
+                    "last_event_at",
+                    "metadata",
+                    "updated_at",
+                ]
+            )
+
+            # ``add_tracking_info`` issues its own save inside this txn.
+            order.add_tracking_info(
+                tracking_number=parcel_id,
+                shipping_carrier="boxnow",
+            )
 
         logger.info(
             "create_shipment_for_order: order=%s → "
@@ -296,12 +367,36 @@ class BoxNowService:
         )
         return shipment
 
+    @classmethod
+    def _release_mint_claim(
+        cls, shipment_pk: int, *, last_error: dict | None = None
+    ) -> None:
+        """Drop the mint claim after a Phase-2 failure.
+
+        Best-effort — uses an inner ``select_for_update`` so a healthy
+        worker that grabbed the lock between Phase 1 and Phase 3 isn't
+        clobbered. ``last_error`` is stashed for ops diagnostics when
+        the failure is a non-retryable BoxNow API error.
+        """
+        with transaction.atomic():
+            shipment = (
+                BoxNowShipment.objects.select_for_update()
+                .filter(pk=shipment_pk)
+                .first()
+            )
+            if shipment is None:
+                return
+            update: dict[str, Any] = {"mint_started_at": None}
+            if last_error is not None:
+                update["last_error"] = last_error
+            shipment.metadata = {**shipment.metadata, **update}
+            shipment.save(update_fields=["metadata", "updated_at"])
+
     # ------------------------------------------------------------------
     # cancel_shipment
     # ------------------------------------------------------------------
 
     @classmethod
-    @transaction.atomic
     def cancel_shipment(
         cls, shipment: BoxNowShipment, *, reason: str = ""
     ) -> None:
@@ -309,9 +404,22 @@ class BoxNowService:
         Cancel a BoxNow parcel delivery.
 
         BoxNow only permits cancellation while the parcel is in the
-        ``NEW`` state (error P420 otherwise).  We mirror that guard
+        ``NEW`` state (error P420 otherwise). We mirror that guard
         locally so we never make an API call that BoxNow would reject,
         and so the caller gets a clear error message.
+
+        Three-phase design — same shape as ``create_shipment_for_order``
+        — so the BoxNow API call doesn't happen with a row lock held.
+        Without it, a slow BoxNow response under
+        ``idle_in_transaction_session_timeout=10000ms`` would abort
+        the txn AFTER BoxNow had already cancelled the parcel,
+        leaving the DB showing parcel_state=NEW while BoxNow had
+        marked it CANCELED — subsequent retries would hit P420
+        ("not in cancellable state") and surface that as a real error.
+
+        Phase 1 — short atomic: lock + state guard + parcel_id read.
+        Phase 2 — API call without lock or transaction.
+        Phase 3 — short atomic: lock again, persist cancellation.
 
         Args:
             shipment: The ``BoxNowShipment`` to cancel.
@@ -322,57 +430,74 @@ class BoxNowService:
             BoxNowAPIError: Shipment is not in the ``NEW`` state (P420).
             BoxNowAPIError: BoxNow API rejected the request.
         """
-        # Re-acquire the row with a lock so no concurrent process
-        # (e.g. a webhook handler) changes the state underneath us.
-        locked: BoxNowShipment = BoxNowShipment.objects.select_for_update().get(
-            pk=shipment.pk
-        )
+        # ---- Phase 1: state guard + parcel_id snapshot ------------------
+        with transaction.atomic():
+            locked: BoxNowShipment = (
+                BoxNowShipment.objects.select_for_update().get(pk=shipment.pk)
+            )
+            if locked.parcel_state != BoxNowParcelState.NEW:
+                raise BoxNowAPIError(
+                    409,
+                    code="P420",
+                    message=(
+                        "Parcel not cancellable in current state "
+                        f"({locked.parcel_state!r}). "
+                        "BoxNow only permits cancellation from the NEW state."
+                    ),
+                )
+            parcel_id = locked.parcel_id
 
-        if locked.parcel_state != BoxNowParcelState.NEW:
-            raise BoxNowAPIError(
-                409,
-                code="P420",
-                message=(
-                    "Parcel not cancellable in current state "
-                    f"({locked.parcel_state!r}). "
-                    "BoxNow only permits cancellation from the NEW state."
-                ),
+        # ---- Phase 2: API call (no transaction, no lock) ----------------
+        logger.info(
+            "cancel_shipment: cancelling parcel_id=%s reason=%r",
+            parcel_id,
+            reason,
+        )
+        BoxNowClient().cancel_parcel(parcel_id)
+
+        # ---- Phase 3: persist cancellation atomically -------------------
+        with transaction.atomic():
+            locked = BoxNowShipment.objects.select_for_update().get(
+                pk=shipment.pk
+            )
+
+            # Idempotency: if a webhook beat us to it (BoxNow's own
+            # cancellation event), the row is already CANCELED — fine.
+            if locked.parcel_state == BoxNowParcelState.CANCELED:
+                logger.info(
+                    "cancel_shipment: parcel_id=%s was already marked "
+                    "CANCELED locally — skipping persist phase.",
+                    parcel_id,
+                )
+                return
+
+            locked.cancel_requested_at = timezone.now()
+            locked.parcel_state = BoxNowParcelState.CANCELED
+
+            cancellations: list[dict] = locked.metadata.get("cancellations", [])
+            cancellations.append(
+                {
+                    "reason": reason,
+                    "cancelled_at": locked.cancel_requested_at.isoformat(),
+                }
+            )
+            locked.metadata = {
+                **locked.metadata,
+                "cancellations": cancellations,
+            }
+
+            locked.save(
+                update_fields=[
+                    "cancel_requested_at",
+                    "parcel_state",
+                    "metadata",
+                    "updated_at",
+                ]
             )
 
         logger.info(
-            "cancel_shipment: cancelling parcel_id=%s reason=%r",
-            locked.parcel_id,
-            reason,
-        )
-
-        BoxNowClient().cancel_parcel(locked.parcel_id)
-
-        # Record the cancellation timestamp and state.
-        locked.cancel_requested_at = timezone.now()
-        locked.parcel_state = BoxNowParcelState.CANCELED
-
-        # Append the reason to the cancellations audit list.
-        cancellations: list[dict] = locked.metadata.get("cancellations", [])
-        cancellations.append(
-            {
-                "reason": reason,
-                "cancelled_at": locked.cancel_requested_at.isoformat(),
-            }
-        )
-        locked.metadata = {**locked.metadata, "cancellations": cancellations}
-
-        locked.save(
-            update_fields=[
-                "cancel_requested_at",
-                "parcel_state",
-                "metadata",
-                "updated_at",
-            ]
-        )
-
-        logger.info(
             "cancel_shipment: parcel_id=%s cancelled successfully",
-            locked.parcel_id,
+            parcel_id,
         )
 
     # ------------------------------------------------------------------

@@ -260,7 +260,9 @@ def handle_order_status_changed(
         order_delivered.send(sender=sender, order=order)
 
     elif new_status == OrderStatus.CANCELED.value:
-        order_canceled.send(sender=sender, order=order)
+        order_canceled.send(
+            sender=sender, order=order, previous_status=old_status
+        )
 
     elif new_status == OrderStatus.COMPLETED.value:
         order_completed.send(sender=sender, order=order)

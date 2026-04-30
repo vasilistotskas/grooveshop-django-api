@@ -387,6 +387,7 @@ class BoxNowService:
                 tracking_number=parcel_id,
                 shipping_carrier="boxnow",
             )
+            cls._advance_pending_order_to_processing(order)
 
         logger.info(
             "create_shipment_for_order: order=%s → "
@@ -1050,6 +1051,36 @@ class BoxNowService:
                 order.id,
                 current_status,
                 new_status,
+                exc,
+            )
+
+    @classmethod
+    def _advance_pending_order_to_processing(cls, order: Order) -> None:
+        """Bump a PENDING order to PROCESSING after voucher mint.
+
+        See AcsService._advance_pending_order_to_processing for the
+        rationale — same UX guarantee for COD shoppers on the BoxNow
+        path.
+        """
+        from order.exceptions import InvalidStatusTransitionError
+        from order.models.order import Order as _Order
+        from order.services import OrderService
+
+        current_status = (
+            _Order.objects.filter(pk=order.pk)
+            .values_list("status", flat=True)
+            .first()
+        )
+        if current_status != "PENDING":
+            return
+        order.status = current_status
+        try:
+            OrderService.update_order_status(order, "PROCESSING")
+        except InvalidStatusTransitionError as exc:
+            logger.warning(
+                "BoxNow voucher mint: could not advance order=%s PENDING -> "
+                "PROCESSING: %s",
+                order.id,
                 exc,
             )
 

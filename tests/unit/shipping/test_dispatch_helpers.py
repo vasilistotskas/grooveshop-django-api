@@ -11,6 +11,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+from django.db import transaction
 
 from order.factories.order import OrderFactory
 from shipping.factories import ShippingProviderFactory
@@ -93,3 +94,48 @@ def test_dispatch_task_no_op_for_orders_without_provider():
 
     # Should not raise; nothing to assert beyond "no exception".
     ShippingService.dispatch_create_shipment_task(order)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dispatch_task_does_not_fire_when_outer_txn_rolls_back():
+    """Regression for commit 59527a87: dispatch must be wrapped in
+    ``transaction.on_commit`` so the courier task never enqueues for
+    an order whose creating transaction never committed.
+
+    Without that wrap the worker observed "Order N not found" and
+    abandoned the voucher mint permanently (verified on prod order
+    47, 2026-04-30). This test rolls the outer transaction back and
+    asserts the carrier's per-provider dispatcher was never reached.
+    """
+    order = OrderFactory()
+    _attach_provider(order, "boxnow")
+
+    with patch(
+        "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
+    ) as mock_dispatch:
+        with transaction.atomic():
+            ShippingService.dispatch_create_shipment_task(order)
+            transaction.set_rollback(True)
+
+    assert mock_dispatch.call_count == 0, (
+        "BoxNowCarrier.dispatch_create_shipment_task fired despite the "
+        "outer transaction rolling back — on_commit guard is missing."
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_dispatch_task_fires_when_outer_txn_commits():
+    """Positive case: when the outer atomic block commits cleanly,
+    the on_commit callback runs and the carrier's dispatcher is
+    invoked exactly once."""
+    order = OrderFactory()
+    _attach_provider(order, "boxnow")
+
+    with patch(
+        "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
+    ) as mock_dispatch:
+        with transaction.atomic():
+            ShippingService.dispatch_create_shipment_task(order)
+        # Atomic block exited cleanly → on_commit fires here.
+
+    assert mock_dispatch.call_count == 1

@@ -1940,6 +1940,18 @@ class OrderService:
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
         from order.payment_events import publish_payment_status
 
+        # Acquire the row lock with a plain query — ``for_detail()``
+        # adds GROUP BY for items_count / totals annotations and
+        # Postgres rejects ``FOR UPDATE`` against an aggregate query.
+        # We re-load with ``for_detail`` once we hold the lock so the
+        # rest of the pipeline (publish_payment_status, downstream
+        # serializers) sees the rich object.
+        try:
+            Order.objects.select_for_update().filter(
+                payment_id=payment_intent_id
+            ).first()
+        except Order.DoesNotExist:
+            pass
         try:
             order = Order.objects.for_detail().get(payment_id=payment_intent_id)
         except Order.DoesNotExist:
@@ -1956,9 +1968,9 @@ class OrderService:
             cls.update_order_status(order, OrderStatus.PROCESSING)
 
         # Enqueue provider-specific shipment creation after payment.
-        # Routed by the new (shipping_provider, shipping_kind) pair when
-        # set; falls back to the legacy shipping_method enum so older
-        # rows still trigger BoxNow correctly.
+        # ShippingService.dispatch_create_shipment_task wraps the
+        # delay() in transaction.on_commit so the worker only sees the
+        # committed row.
         cls._dispatch_shipment_creation_task(order)
 
         publish_payment_status(order)
@@ -1970,6 +1982,12 @@ class OrderService:
     def handle_payment_failed(cls, payment_intent_id: str) -> Order | None:
         from order.payment_events import publish_payment_status
 
+        try:
+            Order.objects.select_for_update().filter(
+                payment_id=payment_intent_id
+            ).first()
+        except Order.DoesNotExist:
+            pass
         try:
             order = Order.objects.for_detail().get(payment_id=payment_intent_id)
         except Order.DoesNotExist:

@@ -359,6 +359,7 @@ class AcsService:
             )
 
         order.add_tracking_info(voucher_no, "acs")
+        cls._advance_pending_order_to_processing(order)
         return shipment
 
     @classmethod
@@ -1028,6 +1029,47 @@ class AcsService:
                 order.id,
                 current_status,
                 new_status,
+                exc,
+            )
+
+    @classmethod
+    def _advance_pending_order_to_processing(cls, order: Order) -> None:
+        """Bump a PENDING order to PROCESSING after voucher mint.
+
+        For COD / offline-paid orders the order sits at PENDING through
+        the entire create_order_from_cart_offline flow because nothing
+        else advances payment_status either; without this nudge the
+        shopper sees "Εκκρεμεί" forever even after the voucher is live
+        at ACS and the courier has been engaged. Online-paid orders
+        already reach PROCESSING via OrderService.handle_payment_
+        succeeded — the guard below makes that path a no-op rather
+        than tripping the state-machine validator.
+
+        Status is read with a fresh single-column query rather than
+        ``order.refresh_from_db(fields=["status"])``; the latter leaves
+        other fields deferred, and ``Order.__init__`` lazy-loads them
+        when it snapshots ``_original_tracking_number`` etc., which
+        recurses through the manager.
+        """
+        from order.exceptions import InvalidStatusTransitionError
+        from order.models.order import Order as _Order
+        from order.services import OrderService
+
+        current_status = (
+            _Order.objects.filter(pk=order.pk)
+            .values_list("status", flat=True)
+            .first()
+        )
+        if current_status != "PENDING":
+            return
+        order.status = current_status
+        try:
+            OrderService.update_order_status(order, "PROCESSING")
+        except InvalidStatusTransitionError as exc:
+            logger.warning(
+                "ACS voucher mint: could not advance order=%s PENDING -> "
+                "PROCESSING: %s",
+                order.id,
                 exc,
             )
 

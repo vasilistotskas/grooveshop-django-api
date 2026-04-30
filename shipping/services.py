@@ -106,11 +106,27 @@ class ShippingService:
         missing provider here means the order is genuinely
         provider-less (e.g. flat-rate home delivery without a courier
         adapter) — silently return.
+
+        Defers the per-carrier dispatch with ``transaction.on_commit``
+        so the Celery worker never receives the order_id before the
+        creating transaction has committed. Without this guard the
+        worker observed a "Order N not found" race (verified on prod
+        order 47, 2026-04-30): the task fired inside the open
+        ``create_order_from_cart_offline`` transaction, the worker
+        looked up the order on a different DB connection, and gave up
+        permanently because Order.DoesNotExist isn't a retryable
+        exception. ``on_commit`` is a no-op outside a transaction, so
+        the admin "issue voucher now" action and other already-
+        committed call sites still dispatch immediately.
         """
+        from django.db import transaction
+
         adapter = cls.adapter_for_order(order)
         if adapter is None:
             return
-        adapter.dispatch_create_shipment_task(order)
+        transaction.on_commit(
+            lambda: adapter.dispatch_create_shipment_task(order)
+        )
 
     @classmethod
     def cancel_shipment(cls, order: Order, *, reason: str = "") -> bool:

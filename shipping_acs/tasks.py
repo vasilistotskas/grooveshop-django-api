@@ -46,7 +46,22 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         order = Order.objects.get(id=order_id)
-    except Order.DoesNotExist:
+    except Order.DoesNotExist as exc:
+        # Defensive retry: the dispatcher already wraps with
+        # ``transaction.on_commit``, but a stale-replica read or a
+        # connection pool serving an in-flight transaction can still
+        # surface DoesNotExist briefly. Without this, prod order 47
+        # was permanently marooned in voucher=pending. Cap retries at
+        # 3 (~30s total with backoff) so a genuinely-missing order
+        # doesn't loop forever.
+        if self.request.retries < 3:
+            logger.warning(
+                "Order %s not yet visible — retrying ACS voucher creation "
+                "(attempt %s/3)",
+                order_id,
+                self.request.retries + 1,
+            )
+            raise self.retry(exc=exc, countdown=5 * (self.request.retries + 1))
         logger.error("Order %s not found for ACS voucher creation", order_id)
         return {"status": "order_not_found", "order_id": order_id}
 

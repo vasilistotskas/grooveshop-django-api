@@ -45,9 +45,40 @@ class TestCreateBoxNowShipmentTask:
         assert result["parcel_id"] == "9219709201"
 
     def test_task_handles_missing_order(self):
-        """Task returns order_not_found status without raising for unknown id."""
-        result = create_boxnow_shipment_for_order(999999999)
+        """A genuinely-missing order eventually returns order_not_found.
 
+        The task retries up to 3 times on Order.DoesNotExist (defends
+        against the dispatch/commit race observed on prod order 47).
+        Stub ``self.retry`` so the test doesn't actually wait through
+        five rounds of exponential backoff; the stubbed retry counter
+        drives the loop to the cap and the order_not_found return
+        path executes.
+        """
+        from celery.exceptions import Retry
+        from unittest.mock import patch
+
+        retry_count = [0]
+
+        def fake_retry(*_args, **_kwargs):
+            retry_count[0] += 1
+            raise Retry()
+
+        with patch.object(
+            create_boxnow_shipment_for_order, "retry", side_effect=fake_retry
+        ):
+            for attempt in range(4):
+                try:
+                    create_boxnow_shipment_for_order.push_request(
+                        retries=attempt
+                    )
+                    result = create_boxnow_shipment_for_order(999999999)
+                    break
+                except Retry:
+                    continue
+                finally:
+                    create_boxnow_shipment_for_order.pop_request()
+
+        assert retry_count[0] == 3
         assert result["status"] == "order_not_found"
         assert result["order_id"] == 999999999
 

@@ -41,7 +41,20 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         order = Order.objects.get(id=order_id)
-    except Order.DoesNotExist:
+    except Order.DoesNotExist as exc:
+        # Defensive retry against the same race the ACS task hit on
+        # prod order 47: ``ShippingService.dispatch_create_shipment_task``
+        # now wraps in ``transaction.on_commit``, but a stale-replica
+        # read can still surface DoesNotExist briefly. Cap at 3
+        # attempts so a genuinely-missing order doesn't loop forever.
+        if self.request.retries < 3:
+            logger.warning(
+                "Order %s not yet visible — retrying BoxNow shipment "
+                "creation (attempt %s/3)",
+                order_id,
+                self.request.retries + 1,
+            )
+            raise self.retry(exc=exc, countdown=5 * (self.request.retries + 1))
         logger.error(
             "Order %s not found for BoxNow shipment creation", order_id
         )

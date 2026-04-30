@@ -3,6 +3,121 @@
 
 
 
+## v1.119.0 (2026-04-30)
+
+### Features
+
+* feat(order): wire shipping-notification email + List-Unsubscribe on transactional emails
+
+PR #4 — two high-impact polish fixes from the audit:
+
+Q1 — send_shipping_notification_email is finally wired.
+The task was defined in order/tasks.py:603 but no caller ever
+dispatched it; customers only saw the in-app live notification, no
+email landed in their inbox when the carrier voucher minted. New
+``email_shipment_dispatched`` receiver hooks ``order_shipment_
+dispatched`` and dispatches via ``transaction.on_commit`` so the
+worker sees the committed tracking_number. Both the online flow
+(handle_payment_succeeded → courier dispatch → tracking save) and
+the COD flow (offline create → courier dispatch → tracking save)
+land here automatically.
+
+Idempotency: the task now mirrors send_order_confirmation_email's
+``confirmation_email_sent`` pattern with a new
+``shipping_notification_email_sent`` metadata flag and a
+``_reserve_shipping_notification_email`` helper. Concurrent fires
+(admin re-edits tracking + a carrier event arriving in the same
+window) won't email twice. Retries inside the same task instance
+still re-send because they share the worker that originally
+reserved the slot.
+
+Q3 — List-Unsubscribe headers on transactional emails.
+Gmail/Yahoo's 2024 bulk-sender rules expect a usable
+``List-Unsubscribe`` header even on transactional traffic. Added
+``build_transactional_list_headers(list_id)`` next to the existing
+marketing helper; emits ``mailto:`` only (no one-click HTTPS) since
+there's no legitimate unsubscribe path for receipts. Applied to all
+five customer-facing transactional email tasks:
+
+- send_order_confirmation_email (list_id=order_confirmation)
+- send_payment_failed_email (list_id=payment_failed)
+- send_order_status_update_email (list_id=order_status)
+- send_shipping_notification_email (list_id=shipping_notification)
+- send_invoice_email (list_id=order_invoice)
+
+Staff-only notifications (send_dispute_notification_email) skip the
+header — they're internal traffic, not customer-facing.
+
+New regression tests in test_signals.py:
+- ``test_tracking_info_set_dispatches_shipping_email`` proves the
+  signal wiring fires the task on a null → set transition.
+- ``test_tracking_info_unchanged_does_not_redispatch`` proves a
+  no-op save (admin re-edit with same value) doesn't re-fire.
+
+Existing test_send_shipping_notification_email_success updated to
+clear the new idempotency flag before the explicit task call —
+the auto-fire from the test's setUp already stamped it.
+
+Verified — 494 Django tests pass across the order + shipping
+suites. ruff format + ruff check + ty check — clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`353ab49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/353ab4965a955ab971a5ded84212cb18f1ccb972))
+
+* feat(order): payment_status_display, cancellation surface, is_online_payment, language_code capture
+
+PR #3 Tier-2 user-facing polish — four small, related fixes to the
+Order detail surface so the storefront stops rendering raw enum
+values, COD shoppers stop seeing scary "outstanding amount" warnings,
+and email tasks render in the shopper's actual locale.
+
+P1 — PaymentStatus translations + paymentStatusDisplay.
+``OrderSerializer.payment_status_display`` mirrors the existing
+``status_display`` SerializerMethodField. Greek ``msgstr`` filled in
+for the previously-empty "Failed" → "Απέτυχε" and "Partially
+Refunded" → "Μερική επιστροφή" entries (the only two PaymentStatus
+values that hadn't been translated).
+
+P2 — COD success-page alert suppression.
+``OrderDetailSerializer.is_online_payment`` derives from
+``order.pay_way.is_online_payment``. The storefront's order detail
+page now suppresses the "Υπάρχει εκκρεμές ποσό" warning unless the
+remaining balance applies to an online pay way — COD shoppers
+intentionally pay €0 at checkout, so the previous unconditional
+warning was misleading.
+
+P3 — Cancellation reason on order detail.
+``OrderDetailSerializer.cancellation`` exposes the operator-supplied
+``reason``, ``canceled_at``, ``previous_status``, and
+``shipment_cancel`` outcome from ``order.metadata['cancellation']``.
+Internal flags (webhook idempotency markers, mint tickets) are
+intentionally NOT surfaced. The storefront cancel banner now renders
+the reason as the description when one exists.
+
+P4 — Capture Order.language_code at create.
+``OrderService._seed_language_code`` reads
+``django.utils.translation.get_language()`` — set from the
+LocaleMiddleware via the i18n cookie + Accept-Language header — and
+seeds it onto the new Order before the INSERT. Wired into all three
+``create_order*`` paths. Closes the per-order email-language gap
+where every order shipped with the default ``settings.LANGUAGE_CODE``
+regardless of what locale the request was in.
+
+Schema regenerated; the storefront sees the new fields with full type
+safety. ``UBadge :label="paymentStatusDisplay || paymentStatus"``
+falls back to the raw enum so older snapshots still render
+something readable.
+
+Verified — 468 Django tests pass across the order + shipping suites
+(test_payment_confirmation, test_payment_failure,
+test_webhook_handlers, test_state_machine, test_signals,
+test_cancel_and_invoice_views, test_refund_webhook_and_cancel_cascade,
+test_order_service_payment_first, test_payment_first_order_creation,
+test_api_order, plus all unit + integration shipping_acs / boxnow).
+ruff format + ruff check + ty check — clean. Storefront pnpm lint +
+vue-tsc — clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`976d860`](https://github.com/vasilistotskas/grooveshop-django-api/commit/976d8602c6023a036169a6cc960d3cc56d12e213))
+
 ## v1.118.8 (2026-04-30)
 
 ### Bug fixes

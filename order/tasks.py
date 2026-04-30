@@ -21,6 +21,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.services import OrderService
 from order.shipping import ShippingService
+from user.utils.subscription import build_transactional_list_headers
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,9 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(
+                list_id="order_confirmation"
+            ),
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -413,6 +417,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(list_id="payment_failed"),
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()
@@ -552,6 +557,7 @@ def send_order_status_update_email(
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(list_id="order_status"),
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -599,9 +605,57 @@ def send_order_status_update_email(
         return False
 
 
+SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG = "shipping_notification_email_sent"
+
+
+def _reserve_shipping_notification_email(order_id: int) -> bool:
+    """Atomically claim the shipping-notification-email slot for an order.
+
+    Mirrors ``_reserve_confirmation_email`` so concurrent fires of the
+    ``order_shipment_dispatched`` signal (e.g. an admin manually
+    re-saving tracking + a carrier event arriving in the same window)
+    can't email the customer twice. Raises ``Order.DoesNotExist`` if
+    the order is missing so the caller's logging path stays
+    consistent with the rest of the file.
+    """
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.metadata and order.metadata.get(
+            SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG
+        ):
+            return False
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG] = True
+        order.save(update_fields=["metadata"])
+    return True
+
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def send_shipping_notification_email(self, order_id: int) -> bool:
     try:
+        # Only reserve on the first attempt. Retries are expected to
+        # re-send because the flag is held by this worker; releasing
+        # on every retry would defeat idempotency, and re-checking
+        # would block a legitimate retry after a transient failure.
+        if self.request.retries == 0:
+            try:
+                if not _reserve_shipping_notification_email(order_id):
+                    logger.info(
+                        "Shipping notification email already sent (or reserved) "
+                        "for order #%s, skipping",
+                        order_id,
+                    )
+                    return True
+            except Order.DoesNotExist:
+                logger.error(
+                    "Could not reserve shipping notification email — Order #%s "
+                    "not found",
+                    order_id,
+                    extra={"order_id": order_id},
+                )
+                return False
+
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
             .prefetch_related("items__product__translations")
@@ -642,6 +696,9 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(
+                list_id="shipping_notification"
+            ),
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -835,6 +892,7 @@ def send_invoice_email(self, order_id: int) -> bool:
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(list_id="order_invoice"),
         )
         msg.attach_alternative(html_content, "text/html")
 

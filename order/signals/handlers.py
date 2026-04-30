@@ -39,6 +39,7 @@ from order.tasks import (
     send_order_confirmation_email,
     send_order_status_update_email,
     send_payment_failed_email,
+    send_shipping_notification_email,
 )
 
 logger = logging.getLogger(__name__)
@@ -300,6 +301,35 @@ def notify_shipment_dispatched(
     if not order.user_id:
         return
     notify_order_shipment_dispatched_live.delay(order.id)
+
+
+@receiver(
+    order_shipment_dispatched,
+    dispatch_uid="order.email_shipment_dispatched",
+)
+def email_shipment_dispatched(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """Send the customer their carrier-tracking email.
+
+    Fires alongside the live in-app notification: when the order
+    transitions from "no tracking" to "has tracking + carrier" — i.e.
+    a courier voucher minted and the parcel ID is on the order. Both
+    online (Stripe / Viva → handle_payment_succeeded → courier
+    dispatch) and COD (offline create → courier dispatch) paths land
+    here because both end in ``order.add_tracking_info(...)`` →
+    post-save → ``order_shipment_dispatched`` signal.
+
+    The shipping-notification task itself is idempotent on the
+    ``shipping_notification_email_sent`` metadata flag, so a duplicate
+    fire (e.g. tracking re-set by an admin correction) won't email
+    twice. Deferred to ``transaction.on_commit`` for the same reason
+    the live notification is — the worker must see the persisted
+    tracking_number.
+    """
+    transaction.on_commit(
+        lambda oid=order.id: send_shipping_notification_email.delay(oid)
+    )
 
 
 @receiver(

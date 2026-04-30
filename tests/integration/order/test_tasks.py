@@ -207,6 +207,18 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         order_with_tracking.shipping_carrier = "UPS"
         order_with_tracking.save()
 
+        # The save() above fires order_shipment_dispatched, which under
+        # EAGER Celery already invoked the task once and stamped the
+        # idempotency flag (see _reserve_shipping_notification_email).
+        # Clear the flag so the explicit task call in this test
+        # exercises the actual send path instead of short-circuiting.
+        order_with_tracking.refresh_from_db()
+        if order_with_tracking.metadata:
+            order_with_tracking.metadata.pop(
+                "shipping_notification_email_sent", None
+            )
+            order_with_tracking.save(update_fields=["metadata"])
+
         mock_email_instance = Mock()
         mock_email.return_value = mock_email_instance
 

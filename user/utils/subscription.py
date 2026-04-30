@@ -174,6 +174,28 @@ def build_list_unsubscribe_headers(
     }
 
 
+def build_transactional_list_headers(*, list_id: str) -> dict[str, str]:
+    """Build the ``List-Unsubscribe`` + ``List-ID`` header dict for
+    transactional emails (order receipts, payment failures, shipping
+    notifications, invoices).
+
+    The shopper can't really opt out of receipts for what they bought,
+    but Gmail/Yahoo's 2024 bulk-sender rules expect a usable
+    ``List-Unsubscribe`` even on transactional traffic — so we emit
+    just the ``mailto:`` form. ``List-Unsubscribe-Post=One-Click`` is
+    intentionally omitted: there's no programmatic unsubscribe path
+    for transactional, and clients that see One-Click without a
+    matching HTTPS endpoint penalise the sender. ``List-ID`` keeps
+    per-stream deliverability stats clean at the mailbox provider.
+    """
+    return {
+        "List-Unsubscribe": (
+            f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>"
+        ),
+        "List-ID": f"{list_id}.{settings.SITE_NAME}",
+    }
+
+
 def send_newsletter(
     topic: SubscriptionTopic,
     subject: str,

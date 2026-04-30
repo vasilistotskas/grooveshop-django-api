@@ -3,6 +3,212 @@
 
 
 
+## v1.118.3 (2026-04-30)
+
+### Bug fixes
+
+* fix: update uv.lock ([`b073563`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0735632bae19bc5ae2391420b0cca55a33cec29))
+
+* fix(shipping): Viva webhook + observability + edge-case guards
+
+Final-pass review surfaced four issues the earlier commits missed:
+
+1. **Viva webhook never dispatched ACS shipment task** (CRIT)
+   ``viva_webhook.py:_handle_payment_succeeded`` had a legacy
+   ``if order.shipping_method == BOX_NOW_LOCKER`` block that I missed
+   in the no-legacy purge — meaning ACS orders paid via Viva would
+   complete payment and then sit in PROCESSING forever with no
+   voucher minted. Replace with the same provider-agnostic
+   ``ShippingService.dispatch_create_shipment_task(order)`` that
+   ``handle_payment_succeeded`` (Stripe path) already uses.
+
+2. **Stale-claim warning on Phase-1 re-entry** (HIGH — observability)
+   When a worker crashes between Phase 2 (API success) and Phase 3
+   (DB persist) the next mint after the 90s TTL re-attempts and may
+   produce an orphan voucher / parcel on the carrier side that we
+   never recorded locally. The 3-phase design's race-check only
+   fires for *concurrent* races, not crashed-worker re-entries —
+   silent orphan. Log a WARNING with structured ``extra`` so ops
+   can reconcile against the carrier dashboard
+   (ACS: search by ``Reference_Key1=order.id``;
+   BoxNow: search by ``orderNumber=order.id``). Applied to both
+   ``AcsService.create_voucher_for_order`` and
+   ``BoxNowService.create_shipment_for_order``.
+
+3. **BoxNow cancel_shipment null parcel_id guard** (MED)
+   When cancellation runs before the create-shipment task fires (or
+   crashes pre-persist), ``shipment.parcel_id`` is empty. Calling
+   ``BoxNowClient().cancel_parcel("")`` would surface as a confusing
+   P403/P404. Short-circuit: mark CANCELED locally with a
+   metadata-tagged "no parcel_id — local-only cancel" entry.
+
+4. **Distributed-lock test coverage** (HIGH — test gap)
+   ``poll_acs_tracking_batch``'s ``cache.add`` mutex was never
+   exercised by the test suite — DummyCache (used in unit tests
+   per project memory) returns True from every ``add()`` call, so
+   the lock-blocked branch was dead in tests. Add
+   ``tests/unit/shipping_acs/test_poll_tracking_batch.py`` with
+   patches that return False from ``cache.add`` to cover the
+   skipped-because-locked path AND the lock-released-after-success
+   path.
+
+Plus a couple of structured ``extra={...}`` dicts on existing log
+calls so evlog can query by ``order_id``/``shipment_pk``/``carrier``
+in production debugging.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1ab4efc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ab4efcb696fe6eca51bffb3f440ccda308d674a))
+
+* fix(boxnow): apply 3-phase mint pattern to create + cancel shipment
+
+Both ``create_shipment_for_order`` and ``cancel_shipment`` previously
+held a ``select_for_update`` row lock across the BoxNow HTTP call.
+Under ``idle_in_transaction_session_timeout=10000ms``, a slow BoxNow
+response would abort the transaction AFTER BoxNow had already minted
+the parcel (or marked it cancelled), leaving the local DB out of sync
+with the carrier — exactly the orphan-parcel risk that ACS already
+fixed for ``ACS_Create_Voucher``.
+
+Apply the same three-phase pattern as AcsService:
+
+1. **Claim** — short atomic block: lock the row, short-circuit on
+   existing ID, stamp ``metadata['mint_started_at']`` with a 90s TTL.
+   Concurrent workers see the claim and back off via a retryable
+   exception so Celery's autoretry_for=(BoxNowRetryableError,) handles
+   the wait without holding any DB resources.
+2. **API call** — no DB lock, no transaction open. The
+   ``idle_in_transaction_session_timeout`` clock isn't running because
+   no transaction is open. A failure at this stage releases the claim
+   in a separate small atomic block and re-raises so Celery retries.
+3. **Persist** — fresh atomic + select_for_update. If another worker
+   raced past our TTL, the second mint records as an orphan in
+   metadata for ops review instead of overwriting the saved row.
+
+Cancel-shipment follows the same shape: lock + state guard, release,
+API call, lock + persist. Adds idempotency for the case where a BoxNow
+webhook flips the parcel to CANCELED before our persist phase.
+
+All 86 BoxNow unit + integration tests pass.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a3e7c5a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3e7c5a9f45952abad317e8069935da22b636bda))
+
+* fix(shipping): correctness + concurrency hardening across ACS and BoxNow
+
+Resolve 14 findings from a deep multi-axis review of the shipping
+subsystems:
+
+ACS (Greek courier)
+- ACS_Price_Calculation: send Weight as comma-decimal "0,5" instead of
+  dot-decimal "0.5". The Greek-locale parser on the ACS side reads
+  "0.5" as 5 kg, inflating the live shipping quote shown to the
+  customer at checkout. Mirrors the same fix already applied on the
+  voucher-mint path.
+- urllib3.Retry: drop POST status-retry. Voucher-mint is not idempotent
+  on the ACS side (orphan vouchers were observed in stage when
+  retrying after 502); Celery's autoretry_for=(AcsRetryableError,) and
+  the 3-phase claim/mint/persist design own the retry surface for
+  write aliases. We still retry connection failures (no risk of
+  duplicate mutation).
+- _decode_pdf: try every base64 candidate before raising. The previous
+  early-raise discarded a valid PDF blob behind a corrupt one.
+- poll_acs_tracking_batch: distributed lock via cache.add. With HPA
+  running multiple worker pods, two consumers could each dispatch the
+  full 200-task fan-out, doubling the API rate and breaching the ACS
+  10 req/sec cap. Single-flight cluster-wide now.
+- sync_stations: track successful_kinds per kind. The shared seen_ids
+  set caused stations of an empty-response kind to be deactivated when
+  a sibling kind succeeded — exactly the cache-wipe outcome the
+  per-kind continue was meant to prevent.
+- issue_daily_pickup_list: 3-phase pattern. The HTTP call no longer
+  happens while select_for_update locks are held — under
+  idle_in_transaction_session_timeout=10000ms a slow ACS response
+  would otherwise abort the txn after the manifest was already issued.
+- poll_shipment_tracking: 3-phase pattern. Two ACS HTTP calls per
+  shipment used to hold the row lock for the full network round-trip.
+- from_tracking_summary: terminal-state guard. Once a shipment reaches
+  DELIVERED/RETURNED/CANCELED/LOST we never exit it, preventing a
+  noisy poll from flipping CANCELED -> RETURNED.
+- _event_fingerprint: include checkpoint_notes so two distinct events
+  at the same time/action/location land as separate AcsTrackingEvent
+  rows instead of merging.
+- Beat schedule: add expires=300 to all ACS + BoxNow entries to discard
+  stale enqueues across DST fall-back and beat-pod restarts.
+
+BoxNow
+- apply_webhook_event: move select_for_update inside transaction.atomic.
+  Outside the block, under autocommit, the lock is released the instant
+  the SELECT completes — silent no-op leaving the state-update path
+  racy under concurrent webhooks for the same parcel.
+- BoxNowCarrier.validate_order_payload: reject COD pay-ways. BoxNow
+  doesn't support COD (their P411 error); we now fail fast at the
+  create-order boundary instead of dead-lettering the Celery task.
+
+Order
+- validate_shipping_address: accept pay_way kwarg and inject
+  _pay_way_is_online into the carrier payload so per-carrier
+  validators (BoxNow's COD ban) can see it without leaking pay_way
+  knowledge into ShippingService's signature.
+
+All 80 ACS + 1112 BoxNow/Order unit and integration tests pass under
+-n auto. Lint + format + ty clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c162201`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c1622019e525436e1464ccb5945286f794a4f8fe))
+
+### Refactoring
+
+* refactor(shipping): remove legacy OrderShippingMethod-driven dispatch
+
+Per "no legacy/backwards-compat" guideline: shipping dispatch is now
+driven solely by the registry-backed ``(shipping_provider_code,
+shipping_kind)`` pair. Drop the ``OrderShippingMethod`` enum's role as
+a routing mechanism and the per-carrier branches that fanned out from
+it across ``order/`` and ``shipping/``:
+
+OrderService
+- ``calculate_shipping_cost`` no longer special-cases
+  ``OrderShippingMethod.BOX_NOW_LOCKER``. BoxNow's flat rate +
+  free-shipping threshold are owned by ``BoxNowCarrier.calculate_shipping_cost``
+  and reach this method through ``ShippingService.calculate_shipping_cost``.
+  Drop the ``shipping_method`` parameter from the public signature.
+- ``_resolve_shipping_provider`` no longer infers (provider, kind) from
+  ``shipping_method``. Callers must pass ``shipping_provider_code`` +
+  ``shipping_kind`` explicitly. Dynamic home-delivery auto-routing
+  (when both are empty) still picks the lowest-priority active provider
+  with ``supports_home_delivery=True``.
+- ``_SHIPMENT_PAYLOAD_KEYS`` deleted. Each adapter now declares its
+  own ``payload_keys`` ClassVar (``ShippingCarrierInterface.payload_keys``);
+  ``shipping.interfaces.all_payload_keys()`` returns the union for
+  ``_extract_shipment_payload`` to pop. Adding ELTA / Speedex now
+  truly is one new adapter file.
+
+ShippingService
+- ``dispatch_create_shipment_task`` drops the legacy ``OrderShippingMethod``
+  fallback. Orders without ``shipping_provider`` set silently no-op.
+
+OrderCreateFromCartSerializer + OrderViewSet
+- BoxNow master-switch (``BOXNOW_ENABLED``) and locker-id presence
+  checks now key off ``shipping_provider_code="boxnow"`` +
+  ``shipping_kind="pickup_point"`` rather than ``shipping_method``.
+- ``_build_shipping_address`` forwards ``shipping_provider_code``,
+  ``shipping_kind``, and the carrier-specific keys (``acs_*``)
+  through to the service layer so registry-driven dispatch works
+  end-to-end through the create-order endpoint.
+
+The ``Order.shipping_method`` column and ``OrderShippingMethod`` enum
+remain in place as denormalised display data (admin / order detail
+read paths). They no longer drive any code path. A follow-up release
+will drop them once we confirm no external consumers (analytics,
+reports) still depend on the column.
+
+Tests touched (legacy-fallback expectations rewired to the new API):
+- tests/unit/shipping/test_dispatch_helpers.py
+- tests/unit/shipping_acs/test_resolve_shipping_provider.py
+- tests/integration/shipping_boxnow/test_order_create_with_boxnow.py
+- tests/unit/order/test_payment_amount.py
+
+All 1469 shipping + order tests pass; lint + format clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a4fe0b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a4fe0b55391060d8d99465d473ddd42962f89ec4))
+
 ## v1.118.2 (2026-04-30)
 
 ### Bug fixes

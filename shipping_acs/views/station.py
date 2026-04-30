@@ -17,18 +17,11 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 
 from core.utils.views import cache_methods
-from shipping_acs.enum.shop_kind import AcsShopKind
+from shipping_acs import config as acs_config
 from shipping_acs.models import AcsStation
 from shipping_acs.serializers import (
     AcsStationDetailSerializer,
     AcsStationSerializer,
-)
-
-# Smartpoint locker kinds — used as the default for the pickup-point
-# checkout flow (kinds 7 + 8 in the GR catalogue per ACS PDF "ΣΤΑΘΜΟΙ ACS").
-_LOCKER_KINDS: tuple[int, ...] = (
-    AcsShopKind.SMARTPOINT_INBOUND,
-    AcsShopKind.SMARTPOINT_OUTBOUND,
 )
 
 
@@ -62,9 +55,10 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         """Filter by ?shopKind / ?postalCode / ?countryCode if supplied.
 
-        Defaults to locker kinds (7+8) so the checkout picker doesn't
-        get flooded with general shop rows that aren't valid pickup
-        destinations.
+        Defaults to the locker kinds configured on the ``acs``
+        ``ShippingProvider.metadata`` (currently 7+8 for GR, 7 for CY)
+        — so the checkout picker doesn't get flooded with general
+        shop rows that aren't valid pickup destinations.
 
         Note: ``CamelCaseMiddleWare`` (settings.MIDDLEWARE) rewrites
         camelCase query keys to snake_case before the view sees them,
@@ -72,6 +66,8 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
         Nuxt proxy both work.
         """
         qs = super().get_queryset()
+
+        country = self._read_param("countryCode", "country_code")
 
         kind_param = self._read_param("shopKind", "shop_kind")
         if kind_param:
@@ -82,13 +78,19 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
         elif self.action == "list":
             # Default the list endpoint to lockers only — admin /
             # diagnostics callers can override with shopKind=1, 4, etc.
-            qs = qs.filter(shop_kind__in=_LOCKER_KINDS)
+            # Country-aware: kind 8 doesn't exist in CY, so passing
+            # countryCode=CY narrows the default to (7,) instead of
+            # (7,8). Without a country, union across all countries.
+            if country:
+                kinds = acs_config.shop_kinds_for_country(country)
+            else:
+                kinds = acs_config.all_locker_kinds()
+            qs = qs.filter(shop_kind__in=kinds)
 
         postal = self._read_param("postalCode", "postal_code")
         if postal:
             qs = qs.filter(postal_code__startswith=postal[:5])
 
-        country = self._read_param("countryCode", "country_code")
         if country:
             qs = qs.filter(country_code=country.upper())
 
@@ -111,12 +113,14 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
         operation_id="findNearestAcsStations",
         summary="Find nearest ACS Smartpoint lockers to a postcode",
         description=(
-            "Returns up to 20 active locker rows whose ``postal_code`` "
-            "matches the supplied postcode prefix, ordered by exact "
-            "match first then alphabetic.  Falls back to a city-name "
-            "ILIKE match when no postcode hits are found.  Designed "
-            "for the checkout locker picker — no GPS or geo math, the "
-            "Nuxt UI does the visual ordering."
+            "Returns active locker rows whose ``postal_code`` matches "
+            "the supplied postcode prefix, ordered by exact match "
+            "first then alphabetic. Falls back to a city-name ILIKE "
+            "match when no postcode hits are found. The row cap is "
+            "configurable via ``ShippingProvider.metadata.nearest_limit`` "
+            "on the ``acs`` row (default 20). Designed for the "
+            "checkout locker picker — no GPS or geo math, the Nuxt "
+            "UI does the visual ordering."
         ),
         parameters=[
             OpenApiParameter(
@@ -133,9 +137,22 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
             ),
             OpenApiParameter(
                 name="shopKind",
-                description="Optional override (default: lockers 7+8).",
+                description=(
+                    "Optional override. Default is the union of locker "
+                    "kinds across configured countries (see "
+                    "ShippingProvider.metadata.shop_kinds_by_country)."
+                ),
                 required=False,
                 type=int,
+            ),
+            OpenApiParameter(
+                name="countryCode",
+                description=(
+                    "Optional ISO-2 country code; narrows the default "
+                    "kind filter to that country's locker catalogue."
+                ),
+                required=False,
+                type=str,
             ),
         ],
         responses={200: AcsStationSerializer(many=True)},
@@ -151,15 +168,25 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
         postal = (self._read_param("postalCode", "postal_code") or "").strip()
         city = (self._read_param("city") or "").strip()
         kind_param = self._read_param("shopKind", "shop_kind")
+        country = (
+            self._read_param("countryCode", "country_code") or ""
+        ).strip()
 
         qs = AcsStation.objects.filter(is_active=True)
         if kind_param:
             try:
                 qs = qs.filter(shop_kind=int(kind_param))
             except ValueError:
-                qs = qs.filter(shop_kind__in=_LOCKER_KINDS)
+                qs = qs.filter(shop_kind__in=acs_config.all_locker_kinds())
+        elif country:
+            qs = qs.filter(
+                shop_kind__in=acs_config.shop_kinds_for_country(country)
+            )
         else:
-            qs = qs.filter(shop_kind__in=_LOCKER_KINDS)
+            qs = qs.filter(shop_kind__in=acs_config.all_locker_kinds())
+
+        if country:
+            qs = qs.filter(country_code=country.upper())
 
         if not postal:
             return Response(
@@ -169,11 +196,12 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
 
         # Postcode prefix match first — ACS Smartpoints share the
         # 5-digit catchment with deliveries to that area.
+        limit = acs_config.nearest_limit()
         prefix = postal[:5]
         rows = list(
             qs.filter(postal_code__startswith=prefix).order_by(
                 "postal_code", "external_id"
-            )[:20]
+            )[:limit]
         )
 
         # Fallback to city-name ILIKE when no postcode hits — covers
@@ -182,7 +210,7 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
             rows = list(
                 qs.filter(
                     Q(city__icontains=city) | Q(name__icontains=city)
-                ).order_by("postal_code", "external_id")[:20]
+                ).order_by("postal_code", "external_id")[:limit]
             )
 
         serializer = AcsStationSerializer(

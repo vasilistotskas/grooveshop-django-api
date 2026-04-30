@@ -59,15 +59,6 @@ _TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
 _LABEL_CACHE_TTL = 3600  # 1 hour, mirrors BoxNow
 
 
-# Minimum chargeable weight per ACS_Create_Voucher Weight rules
-# (PDF: ``min ή 0.5``).  Below this the API rejects the voucher.
-_MIN_VOUCHER_KG = Decimal("0.5")
-# Defensive upper bound; ACS does not document a hard maximum but the
-# parcels we ship rarely exceed 30 kg and clamping prevents a bad
-# product weight from poisoning the create-voucher call.
-_MAX_VOUCHER_KG = Decimal("999")
-
-
 def _kg_from_grams(weight_grams: int | None) -> str:
     """Convert internal grams → ACS's kilogram-decimal payload value.
 
@@ -77,26 +68,33 @@ def _kg_from_grams(weight_grams: int | None) -> str:
     read as ``5`` KG and a single small parcel ends up billed at the
     5 KG tariff. Sending the comma form keeps the kg value intact.
 
-    Values below the 0.5 kg minimum are clamped up to 0.5 (per PDF:
-    "min ή 0.5"); values above the safety ceiling are clamped down
-    with a warning so a single bad row can't dead-letter the
-    create-voucher Celery task fan-out.
+    Values below the chargeable minimum (per PDF: ``min ή 0.5``) are
+    clamped up; values above the safety ceiling are clamped down with
+    a warning so a single bad row can't dead-letter the
+    create-voucher Celery task fan-out. Both bounds come from the
+    ACS provider's metadata (``min_weight_kg`` / ``max_weight_kg``)
+    so operators can adjust without a redeploy.
     """
+    from shipping_acs import config as acs_config
+
+    min_kg = acs_config.min_voucher_weight_kg()
+    max_kg = acs_config.max_voucher_weight_kg()
+
     grams = int(weight_grams or 0)
     if grams <= 0:
-        kg = _MIN_VOUCHER_KG
+        kg = min_kg
     else:
         kg = (Decimal(grams) / Decimal(1000)).quantize(Decimal("0.001"))
-        if kg < _MIN_VOUCHER_KG:
-            kg = _MIN_VOUCHER_KG
-        if kg > _MAX_VOUCHER_KG:
+        if kg < min_kg:
+            kg = min_kg
+        if kg > max_kg:
             logger.warning(
                 "Clamping ACS voucher weight from %s kg to %s kg — "
                 "likely a unit mix-up upstream.",
                 kg,
-                _MAX_VOUCHER_KG,
+                max_kg,
             )
-            kg = _MAX_VOUCHER_KG
+            kg = max_kg
 
     # Trim trailing zeros (12.000 → 12.0) then swap dot → comma for
     # Greek locale parsing on the ACS side.
@@ -338,11 +336,16 @@ class AcsService:
         client: AcsClient,
     ) -> dict[str, Any]:
         """Translate Order + AcsShipment fields to the ACS payload."""
+        from shipping_acs import config as acs_config
+
         sender = getattr(settings, "SITE_NAME", "GrooveShop")
+        fallback_country = acs_config.default_country()
         country_code = (
             order.country_id
             if isinstance(order.country_id, str)
-            else (order.country.alpha_2 if order.country_id else "GR")
+            else (
+                order.country.alpha_2 if order.country_id else fallback_country
+            )
         )
 
         params: dict[str, Any] = {
@@ -358,14 +361,14 @@ class AcsService:
             "Recipient_Region": order.city,
             "Recipient_Phone": str(order.phone) if order.phone else "",
             "Recipient_Cell_Phone": str(order.phone) if order.phone else "",
-            "Recipient_Country": country_code or "GR",
+            "Recipient_Country": country_code or fallback_country,
             "Recipient_Email": order.email or "",
             "Charge_Type": shipment.charge_type,
             "Item_Quantity": shipment.item_quantity,
             "Weight": _kg_from_grams(shipment.weight_grams),
             "Reference_Key1": str(order.id),
             "Reference_Key2": str(order.uuid),
-            "Language": "GR",
+            "Language": acs_config.default_voucher_language(),
         }
 
         if shipment.delivery_kind == ShippingKind.PICKUP_POINT:
@@ -635,8 +638,8 @@ class AcsService:
     def sync_stations(
         cls,
         *,
-        country: str = "GR",
-        kinds: tuple[int, ...] = (1, 7, 8),
+        country: str | None = None,
+        kinds: tuple[int, ...] | None = None,
     ) -> dict[str, int]:
         """Refresh ``AcsStation`` from the ``Acs_Stations`` endpoint.
 
@@ -644,7 +647,24 @@ class AcsService:
         including the safety guard: when the API returns zero rows for
         a kind we *do not* deactivate existing rows for that kind —
         a transient API failure must not blank the entire local cache.
+
+        ``country`` defaults to the ACS provider's first configured
+        country (``ShippingProvider.metadata.shop_kinds_by_country``);
+        ``kinds`` defaults to that country's locker kinds plus the
+        physical SHOP kind (1) so we keep our generic-shop fallback
+        rows up to date.  Pass either explicitly to sync a specific
+        country or kind set.
         """
+        from shipping_acs import config as acs_config
+
+        country = (country or acs_config.default_country()).upper()
+        if kinds is None:
+            country_kinds = acs_config.shop_kinds_for_country(country)
+            # Always include kind 1 (physical SHOP) so the fallback
+            # tier stays fresh — admins can hide it from the picker
+            # via ``shop_kinds_by_country`` without losing the data.
+            kinds = tuple(sorted({1, *country_kinds}))
+
         client = AcsClient()
         seen_ids: set[str] = set()
         upserted = 0

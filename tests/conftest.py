@@ -333,6 +333,7 @@ def _reseed_shipping_providers(request):
                         "tagline_key": "shipping.method.boxnow.tagline",
                         "tagline_color": "info",
                         "logo": "/img/shipping/boxnow.png",
+                        "uses_generic_picker": False,
                     },
                 },
             )
@@ -345,10 +346,45 @@ def _reseed_shipping_providers(request):
                     "supports_pickup_point": True,
                     "live_mode": False,
                     "priority": 10,
+                    # Mirror the seed in ``shipping/migrations/
+                    # 0004_seed_provider_metadata.py``. Keep these in
+                    # sync — the metadata-driven config tests rely on
+                    # the keys being present on every test row, and
+                    # production reads the same keys.
                     "metadata": {
                         "supported_countries": ["GR"],
                         "locker_picker_kind": "acs_db_picker",
                         "logo": "/img/shipping/acs.png",
+                        "shop_kinds_by_country": {
+                            "GR": [7, 8],
+                            "CY": [7],
+                        },
+                        "nearest_limit": 20,
+                        "min_weight_kg": "0.5",
+                        "max_weight_kg": "999",
+                        "default_voucher_language": "GR",
+                        "default_map_center": [37.9838, 23.7275],
+                        "default_map_zoom": 11,
+                        "tile_provider": {
+                            "light": {
+                                "url": (
+                                    "https://{s}.basemaps.cartocdn.com/"
+                                    "light_all/{z}/{x}/{y}{r}.png"
+                                ),
+                                "attribution": "© OSM © CARTO",
+                                "max_zoom": 19,
+                                "subdomains": "abcd",
+                            },
+                            "dark": {
+                                "url": (
+                                    "https://{s}.basemaps.cartocdn.com/"
+                                    "dark_all/{z}/{x}/{y}{r}.png"
+                                ),
+                                "attribution": "© OSM © CARTO",
+                                "max_zoom": 19,
+                                "subdomains": "abcd",
+                            },
+                        },
                     },
                 },
             )

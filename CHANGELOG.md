@@ -3,6 +3,57 @@
 
 
 
+## v1.118.4 (2026-04-30)
+
+### Bug fixes
+
+* fix: update uv.lock ([`8c04519`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8c0451919e8c26824404e61c4e35440af7906b6c))
+
+### Refactoring
+
+* refactor(shipping): pay-way + order-detail dispatch via carrier registry
+
+Final no-legacy cleanup — every remaining read of ``Order.shipping_method``
+that drove logic now keys off the registry-backed
+``shipping_provider`` FK instead. The column stays as denormalised
+display data only; once external consumers (analytics, reports)
+have migrated, the next release can drop it cleanly.
+
+PayWay filtering
+- ``PayWayService.filter_by_shipping_method`` (legacy enum-driven)
+  → ``PayWayService.filter_by_carrier(provider_code, shipping_kind)``.
+  Dispatches through ``ShippingCarrierInterface.filter_pay_ways(kind)``
+  so each adapter owns its own compatibility rules. The default
+  implementation is pass-through; ``BoxNowCarrier`` overrides it to
+  reject COD on locker pickup (BoxNow's P411).
+- ``PayWayFilter`` exposes ``?shippingProviderCode=...&shippingKind=...``
+  query params. The legacy ``?shippingMethod=...`` filter is gone.
+- New ``ShippingCarrierInterface.filter_pay_ways`` ABC method —
+  default no-op, BoxNow overrides.
+
+OrderDetailSerializer
+- ``get_boxnow_shipment`` previously gated on
+  ``shipping_method != BOX_NOW_LOCKER``; now matches
+  ``get_acs_shipment``'s pattern and reads
+  ``shipping_provider.code != "boxnow"``. Both methods are now
+  consistent, registry-driven, and immune to ``shipping_method``
+  drift on legacy rows.
+
+Schema regenerated via ``manage.py spectacular`` so the new query
+params surface in the OpenAPI spec for Nuxt's openapi-ts.
+
+All 1566 shipping + order + pay_way tests pass; lint + ty clean.
+
+Production reconciliation snapshot (pre-deploy):
+- ACS shipments with stale ``mint_started_at``: 0
+- BoxNow shipments with stale ``mint_started_at``: 0
+- Recorded orphan vouchers (ACS): 0
+- Recorded orphan delivery requests (BoxNow): 0
+
+The 3-phase mint design is holding clean on prod data.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3bd8f1c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3bd8f1ca45b288617908d572f03728abfca029a4))
+
 ## v1.118.3 (2026-04-30)
 
 ### Bug fixes

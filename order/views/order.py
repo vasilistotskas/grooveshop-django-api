@@ -905,13 +905,7 @@ class OrderViewSet(BaseModelViewSet):
             "billing_country": request.data.get("billing_country", ""),
             # Registry-driven shipping dispatch: explicit
             # ``(shipping_provider_code, shipping_kind)`` flows through
-            # ``_resolve_shipping_provider`` → carrier adapter. The
-            # legacy ``shipping_method`` field is forwarded only as a
-            # denormalised display column write — it no longer drives
-            # provider routing.
-            "shipping_method": request.data.get(
-                "shipping_method", "home_delivery"
-            ),
+            # ``_resolve_shipping_provider`` → carrier adapter.
             "shipping_provider_code": request.data.get(
                 "shipping_provider_code"
             ),

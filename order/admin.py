@@ -438,11 +438,14 @@ class OrderAdmin(ModelAdmin):
         ("pay_way", RelatedDropdownFilter),
         "payment_method",
         "document_type",
-        # Filter Orders by ``home_delivery`` vs ``box_now_locker`` —
-        # useful for support tickets & shipping batch operations.
-        "shipping_method",
+        # Filter Orders by carrier — replaces the legacy
+        # ``shipping_method`` enum filter; FK lookup is denser
+        # (provider name) but supports the same support-ticket
+        # workflow.
+        ("shipping_provider", RelatedDropdownFilter),
+        "shipping_kind",
         # Filter on the BoxNow parcel state via the OneToOne reverse
-        # relation. Only fires for box_now_locker orders.
+        # relation. Only fires for BoxNow pickup-point orders.
         "boxnow_shipment__parcel_state",
     ]
     search_fields = [
@@ -470,11 +473,9 @@ class OrderAdmin(ModelAdmin):
         "financial_summary",
         "customer_summary",
         "shipping_summary",
-        # ``shipping_method`` is set at order-creation time and is
-        # read-only after; ``boxnow_summary`` is a computed display that
-        # surfaces BoxNow parcel state inline in the Shipping fieldset
-        # so admins don't have to scroll to the inline below.
-        "shipping_method",
+        # ``boxnow_summary`` is a computed display that surfaces the
+        # BoxNow parcel state inline in the Shipping fieldset so admins
+        # don't have to scroll to the inline below.
         "boxnow_summary",
     )
 
@@ -546,7 +547,8 @@ class OrderAdmin(ModelAdmin):
             _("Shipping & Tracking"),
             {
                 "fields": (
-                    "shipping_method",
+                    "shipping_provider",
+                    "shipping_kind",
                     "shipping_price",
                     "tracking_number",
                     "shipping_carrier",
@@ -602,16 +604,18 @@ class OrderAdmin(ModelAdmin):
         provider_code = (
             obj.shipping_provider.code if obj.shipping_provider_id else None
         )
-        # Routing prefers the new (shipping_provider, shipping_kind) FK
-        # pair, with a fallback to the legacy enum so pre-Phase-0 rows
-        # still surface their inline correctly.
-        if provider_code == "boxnow" or obj.shipping_method == "box_now_locker":
+        # Registry-driven inline routing — the legacy
+        # ``shipping_method`` enum no longer informs which inline to
+        # mount. Pre-Phase-0 rows (no ``shipping_provider`` set) get
+        # neither carrier inline; their data still lives on the order
+        # itself and can be reviewed from the change form fields.
+        if provider_code == "boxnow":
             from shipping_boxnow.admin import (  # noqa: PLC0415
                 BoxNowShipmentOrderInline,
             )
 
             inlines.append(BoxNowShipmentOrderInline)
-        elif provider_code == "acs" or obj.shipping_method == "acs_smartpoint":
+        elif provider_code == "acs":
             from shipping_acs.admin import (  # noqa: PLC0415
                 AcsShipmentOrderInline,
             )
@@ -708,12 +712,8 @@ class OrderAdmin(ModelAdmin):
         provider_code = (
             obj.shipping_provider.code if obj.shipping_provider_id else None
         )
-        is_acs = (
-            provider_code == "acs" or obj.shipping_method == "acs_smartpoint"
-        )
-        is_boxnow = (
-            provider_code == "boxnow" or obj.shipping_method == "box_now_locker"
-        )
+        is_acs = provider_code == "acs"
+        is_boxnow = provider_code == "boxnow"
 
         if is_acs:
             return self._acs_summary_html(obj)
@@ -730,10 +730,10 @@ class OrderAdmin(ModelAdmin):
                 '<span class="text-sm text-orange-600">'
                 + str(
                     _(
-                        "shipping_method=box_now_locker but no "
-                        "BoxNowShipment row — order created before the "
-                        "BoxNow integration shipped, or a service-layer "
-                        "bug. Inspect order.history for clues."
+                        "shipping_provider=boxnow but no BoxNowShipment "
+                        "row — order created before the BoxNow integration "
+                        "shipped, or a service-layer bug. Inspect "
+                        "order.history for clues."
                     )
                 )
                 + "</span>"

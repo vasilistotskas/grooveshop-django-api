@@ -8,7 +8,6 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from core.utils.email import is_disposable_domain
 from country.models import Country
 from order.enum.document_type import OrderCreateDocumentTypeEnum
-from order.enum.shipping_method import OrderShippingMethod
 from order.enum.status import OrderStatus
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -100,7 +99,6 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "payment_id",
             "payment_status",
             "payment_method",
-            "shipping_method",
             "can_be_canceled",
             "is_paid",
         )
@@ -518,15 +516,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         ),
     )
 
-    # Shipping method selection
-    shipping_method = serializers.ChoiceField(
-        choices=OrderShippingMethod.choices,
-        default=OrderShippingMethod.HOME_DELIVERY,
-        required=False,
-        help_text=_("Shipping method for this order"),
-    )
-
-    # BoxNow locker fields (required when shipping_method == BOX_NOW_LOCKER)
+    # BoxNow locker fields (required when carrier=boxnow + kind=pickup_point)
     boxnow_locker_id = serializers.CharField(
         max_length=64,
         required=False,
@@ -541,9 +531,11 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         help_text=_("BoxNow compartment size: 1=Small, 2=Medium, 3=Large"),
     )
 
-    # New shipping abstraction (Phase 0). Frontends that have migrated
-    # send these instead of (or alongside) the legacy `shipping_method`.
-    # Validated against the in-memory carrier registry.
+    # Shipping abstraction: ``(shipping_provider_code, shipping_kind)``
+    # is the single source of truth for carrier dispatch. Validated
+    # against the in-memory carrier registry; the dynamic home-delivery
+    # auto-router fills ``shipping_provider`` server-side when callers
+    # send only ``shipping_kind="home_delivery"``.
     shipping_provider_code = serializers.SlugField(
         max_length=32,
         required=False,
@@ -633,9 +625,9 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         2. ``document_type=INVOICE`` ⇒ ``billing_vat_id`` required.
            Otherwise the myDATA submission would silently downgrade to
            11.1 (tax-fraud-adjacent) or hard-fail at the worker.
-        3. ``shipping_method=BOX_NOW_LOCKER`` ⇒ ``boxnow_locker_id``
-           required and ``pay_way`` must be an online-payment method
-           (no COD at lockers).
+        3. ``(shipping_provider_code='boxnow', shipping_kind='pickup_point')``
+           ⇒ ``boxnow_locker_id`` required and ``pay_way`` must be an
+           online-payment method (BoxNow rejects COD at lockers).
         """
         from extra_settings.models import Setting
 

@@ -105,15 +105,25 @@ def _kg_from_grams(weight_grams: int | None) -> str:
 
 
 def _event_fingerprint(
-    *, shipment_id: int, event_time: str, action: str, location: str
+    *,
+    shipment_id: int,
+    event_time: str,
+    action: str,
+    location: str,
+    notes: str = "",
 ) -> str:
     """Stable idempotency key for ``AcsTrackingEvent``.
 
-    SHA-1 of the four fields most likely to uniquely identify an
-    ACS_TrackingDetails row.  Replaces BoxNow's webhook_message_id
+    SHA-1 of the five fields that uniquely identify an
+    ACS_TrackingDetails row.  Replaces BoxNow's ``webhook_message_id``
     since ACS doesn't issue per-event IDs.
+
+    ``notes`` is included so two distinct events at the same
+    ``event_time``/``action``/``location`` (e.g. delivery-attempt
+    failures with different reason codes) land as separate rows
+    instead of merging into one and losing the first event's notes.
     """
-    blob = f"{shipment_id}|{event_time}|{action}|{location}"
+    blob = f"{shipment_id}|{event_time}|{action}|{location}|{notes}"
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
 
 
@@ -459,7 +469,6 @@ class AcsService:
     # ------------------------------------------------------------------
 
     @classmethod
-    @transaction.atomic
     def issue_daily_pickup_list(
         cls,
         *,
@@ -469,19 +478,33 @@ class AcsService:
     ) -> AcsPickupList | None:
         """Finalise the day's vouchers via ``ACS_Issue_Pickup_List``.
 
+        Three-phase design — same shape as ``create_voucher_for_order``
+        — so the ACS API call is never made while a Postgres row lock
+        is held. With ``idle_in_transaction_session_timeout=10000`` a
+        slow ACS response would otherwise abort the transaction
+        AFTER ACS has already issued the manifest, leaving the courier
+        with a list and us with nothing.
+
+        Phase 1 — read candidates (no lock; the linkage we write back
+                  uses the candidate IDs, not these row references).
+        Phase 2 — call ACS_Issue_Pickup_List with no transaction open.
+        Phase 3 — short atomic block: re-confirm candidates with
+                  ``select_for_update``, create the pickup list row,
+                  bulk-update shipments. The lock duration here is
+                  bounded by an INSERT and an UPDATE — sub-second.
+
         Returns the created :class:`AcsPickupList` or ``None`` when no
         candidate shipments are eligible (idempotent on re-run).
         """
         the_date = pickup_date or timezone.localdate()
 
+        # --- Phase 1: collect candidates, no lock ---
         candidates = list(
-            AcsShipment.objects.select_for_update()
-            .filter(
+            AcsShipment.objects.filter(
                 voucher_no__isnull=False,
                 pickup_list__isnull=True,
                 shipment_state=AcsShipmentState.NEW,
-            )
-            .values_list("id", flat=True)
+            ).values_list("id", flat=True)
         )
         if not candidates:
             logger.info(
@@ -490,6 +513,7 @@ class AcsService:
             )
             return None
 
+        # --- Phase 2: ACS API call, outside any transaction ---
         client = AcsClient()
         result = client.issue_pickup_list(pickup_date=the_date.isoformat())
 
@@ -514,19 +538,26 @@ class AcsService:
             )
             return None
 
+        # --- Phase 3: persist atomically; re-confirm under lock ---
         billing = billing_code or getattr(settings, "ACS_BILLING_CODE", "")
-        pickup_list = AcsPickupList.objects.create(
-            pickup_list_no=pickup_list_no,
-            issued_at=timezone.now(),
-            issued_by_id=issued_by_id,
-            billing_code=billing,
-            voucher_count=len(candidates),
-            metadata={"issue_response": result},
-        )
-
-        AcsShipment.objects.filter(id__in=candidates).update(
-            pickup_list=pickup_list
-        )
+        with transaction.atomic():
+            confirmed = list(
+                AcsShipment.objects.select_for_update()
+                .filter(id__in=candidates, pickup_list__isnull=True)
+                .values_list("id", flat=True)
+            )
+            pickup_list = AcsPickupList.objects.create(
+                pickup_list_no=pickup_list_no,
+                issued_at=timezone.now(),
+                issued_by_id=issued_by_id,
+                billing_code=billing,
+                voucher_count=len(confirmed),
+                metadata={"issue_response": result},
+            )
+            if confirmed:
+                AcsShipment.objects.filter(id__in=confirmed).update(
+                    pickup_list=pickup_list
+                )
 
         return pickup_list
 
@@ -535,7 +566,6 @@ class AcsService:
     # ------------------------------------------------------------------
 
     @classmethod
-    @transaction.atomic
     def poll_shipment_tracking(cls, shipment: AcsShipment) -> AcsShipment:
         """Refresh tracking state + events for ``shipment``.
 
@@ -543,90 +573,118 @@ class AcsService:
         ``ACS_TrackingDetails`` for the history; idempotent via
         ``event_fingerprint``.  Always updates ``last_polled_at``;
         only updates ``shipment_state`` on forward transitions.
+
+        The two ACS HTTP calls happen with **no DB transaction open
+        and no row lock held** — under
+        ``idle_in_transaction_session_timeout=10000ms`` a slow ACS
+        response would otherwise abort the txn and lose the
+        ``last_polled_at`` update, causing the shipment to be
+        re-selected on the next batch and waste API budget.
         """
-        shipment = (
-            AcsShipment.objects.select_for_update()
-            .select_related("order")
-            .get(pk=shipment.pk)
-        )
-        if not shipment.voucher_no:
-            shipment.last_polled_at = timezone.now()
-            shipment.save(update_fields=["last_polled_at"])
+        # --- Phase 1: short read, no lock ---
+        try:
+            shipment = AcsShipment.objects.select_related("order").get(
+                pk=shipment.pk
+            )
+        except AcsShipment.DoesNotExist:
             return shipment
 
+        if not shipment.voucher_no:
+            with transaction.atomic():
+                AcsShipment.objects.filter(pk=shipment.pk).update(
+                    last_polled_at=timezone.now()
+                )
+            shipment.refresh_from_db()
+            return shipment
+
+        # --- Phase 2: ACS API calls, outside any transaction ---
         client = AcsClient()
         summary = client.tracking_summary(shipment.voucher_no)
         details = client.tracking_details(shipment.voucher_no)
 
-        old_state = AcsShipmentState(shipment.shipment_state)
-        new_state = AcsShipmentState.from_tracking_summary(
-            summary, current=old_state
-        )
-
-        # Event upsert via fingerprint
-        latest_event_at: datetime | None = shipment.last_event_at
-        for row in details:
-            event_time_raw = row.get("checkpoint_date_time")
-            event_time = parse_datetime(event_time_raw or "")
-            if event_time is None:
-                continue
-            if event_time.tzinfo is None:
-                event_time = timezone.make_aware(event_time)
-
-            action = (row.get("checkpoint_action") or "").strip()
-            location = (row.get("checkpoint_location") or "").strip()
-            fingerprint = _event_fingerprint(
-                shipment_id=shipment.id,
-                event_time=event_time.isoformat(),
-                action=action,
-                location=location,
+        # --- Phase 3: persist atomically ---
+        with transaction.atomic():
+            shipment = (
+                AcsShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
             )
-            AcsTrackingEvent.objects.update_or_create(
-                event_fingerprint=fingerprint,
-                defaults={
-                    "shipment": shipment,
-                    "event_time": event_time,
-                    "checkpoint_action": action[:255],
-                    "checkpoint_location": location[:255],
-                    "notes": (row.get("checkpoint_notes") or "")[:5000],
-                    "raw_payload": row,
-                },
+
+            old_state = AcsShipmentState(shipment.shipment_state)
+            new_state = AcsShipmentState.from_tracking_summary(
+                summary, current=old_state
             )
-            if latest_event_at is None or event_time > latest_event_at:
-                latest_event_at = event_time
 
-        delivery_date = parse_datetime(summary.get("delivery_date") or "")
-        if delivery_date and delivery_date.tzinfo is None:
-            delivery_date = timezone.make_aware(delivery_date)
+            # Event upsert via fingerprint
+            latest_event_at: datetime | None = shipment.last_event_at
+            for row in details:
+                event_time_raw = row.get("checkpoint_date_time")
+                event_time = parse_datetime(event_time_raw or "")
+                if event_time is None:
+                    continue
+                if event_time.tzinfo is None:
+                    event_time = timezone.make_aware(event_time)
 
-        update_fields = ["last_polled_at"]
-        shipment.last_polled_at = timezone.now()
-        if latest_event_at and latest_event_at != shipment.last_event_at:
-            shipment.last_event_at = latest_event_at
-            update_fields.append("last_event_at")
-        if delivery_date and shipment.delivery_date != delivery_date:
-            shipment.delivery_date = delivery_date
-            update_fields.append("delivery_date")
-        if str(summary.get("delivery_flag", "")) != shipment.delivery_flag:
-            shipment.delivery_flag = str(summary.get("delivery_flag", ""))[:4]
-            update_fields.append("delivery_flag")
-        if str(summary.get("returned_flag", "")) != shipment.returned_flag:
-            shipment.returned_flag = str(summary.get("returned_flag", ""))[:4]
-            update_fields.append("returned_flag")
-        raw_status = str(summary.get("shipment_status", ""))[:8]
-        if raw_status != shipment.raw_shipment_status:
-            shipment.raw_shipment_status = raw_status
-            update_fields.append("raw_shipment_status")
+                action = (row.get("checkpoint_action") or "").strip()
+                location = (row.get("checkpoint_location") or "").strip()
+                notes = (row.get("checkpoint_notes") or "").strip()
+                fingerprint = _event_fingerprint(
+                    shipment_id=shipment.id,
+                    event_time=event_time.isoformat(),
+                    action=action,
+                    location=location,
+                    notes=notes,
+                )
+                AcsTrackingEvent.objects.update_or_create(
+                    event_fingerprint=fingerprint,
+                    defaults={
+                        "shipment": shipment,
+                        "event_time": event_time,
+                        "checkpoint_action": action[:255],
+                        "checkpoint_location": location[:255],
+                        "notes": (row.get("checkpoint_notes") or "")[:5000],
+                        "raw_payload": row,
+                    },
+                )
+                if latest_event_at is None or event_time > latest_event_at:
+                    latest_event_at = event_time
 
-        if new_state != old_state:
-            shipment.shipment_state = new_state
-            update_fields.append("shipment_state")
+            delivery_date = parse_datetime(summary.get("delivery_date") or "")
+            if delivery_date and delivery_date.tzinfo is None:
+                delivery_date = timezone.make_aware(delivery_date)
 
-        shipment.save(update_fields=update_fields)
+            update_fields = ["last_polled_at"]
+            shipment.last_polled_at = timezone.now()
+            if latest_event_at and latest_event_at != shipment.last_event_at:
+                shipment.last_event_at = latest_event_at
+                update_fields.append("last_event_at")
+            if delivery_date and shipment.delivery_date != delivery_date:
+                shipment.delivery_date = delivery_date
+                update_fields.append("delivery_date")
+            if str(summary.get("delivery_flag", "")) != shipment.delivery_flag:
+                shipment.delivery_flag = str(summary.get("delivery_flag", ""))[
+                    :4
+                ]
+                update_fields.append("delivery_flag")
+            if str(summary.get("returned_flag", "")) != shipment.returned_flag:
+                shipment.returned_flag = str(summary.get("returned_flag", ""))[
+                    :4
+                ]
+                update_fields.append("returned_flag")
+            raw_status = str(summary.get("shipment_status", ""))[:8]
+            if raw_status != shipment.raw_shipment_status:
+                shipment.raw_shipment_status = raw_status
+                update_fields.append("raw_shipment_status")
 
-        if new_state != old_state:
-            cls._apply_order_status_transition(shipment.order, new_state)
-            cls._maybe_notify_arrival(shipment, new_state, old_state)
+            if new_state != old_state:
+                shipment.shipment_state = new_state
+                update_fields.append("shipment_state")
+
+            shipment.save(update_fields=update_fields)
+
+            if new_state != old_state:
+                cls._apply_order_status_transition(shipment.order, new_state)
+                cls._maybe_notify_arrival(shipment, new_state, old_state)
 
         return shipment
 
@@ -667,6 +725,13 @@ class AcsService:
 
         client = AcsClient()
         seen_ids: set[str] = set()
+        # Track which kinds returned data so deactivation only fires
+        # against those kinds. Otherwise a kind whose API call returned
+        # zero rows (transient failure) would have all its stations
+        # deactivated because they're absent from ``seen_ids`` —
+        # exactly the cache-wiping outcome the per-kind ``continue``
+        # was meant to prevent.
+        successful_kinds: set[int] = set()
         upserted = 0
 
         for kind in kinds:
@@ -679,6 +744,7 @@ class AcsService:
                 )
                 continue
 
+            successful_kinds.add(kind)
             for row in rows:
                 external_id = (
                     row.get("ACS_SHOP_STATION_ID_EN")
@@ -712,13 +778,16 @@ class AcsService:
                 seen_ids.add(external_id)
                 upserted += 1
 
-        # Deactivate stations not seen in this run (only when at least
-        # one of the polled kinds returned data — handled by the
-        # `continue` above).
+        # Per-kind deactivation: only deactivate stations of kinds
+        # that returned data. A kind that errored out keeps all its
+        # rows active so a later successful sync can re-confirm them.
         deactivated = 0
-        if seen_ids:
+        if seen_ids and successful_kinds:
             deactivated = (
-                AcsStation.objects.filter(country_code=country)
+                AcsStation.objects.filter(
+                    country_code=country,
+                    shop_kind__in=successful_kinds,
+                )
                 .exclude(external_id__in=seen_ids)
                 .update(is_active=False)
             )

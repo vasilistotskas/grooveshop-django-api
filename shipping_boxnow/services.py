@@ -430,14 +430,9 @@ class BoxNowService:
             )
             return None
 
-        # --- Locate shipment ---------------------------------------------
+        # --- Pre-check shipment exists (no lock — autocommit) ----------
         parcel_id: str = data["parcelId"]
-        shipment: BoxNowShipment | None = (
-            BoxNowShipment.objects.select_for_update()
-            .filter(parcel_id=parcel_id)
-            .first()
-        )
-        if shipment is None:
+        if not BoxNowShipment.objects.filter(parcel_id=parcel_id).exists():
             # BoxNow may fire hooks before we have finished persisting
             # the shipment row (race between create_shipment_for_order
             # task and the first incoming hook).  Log and return — the
@@ -471,8 +466,31 @@ class BoxNowService:
         # --- Parse event timestamp ---------------------------------------
         event_time = parse_datetime(data["time"])
 
-        # --- Atomic block: create event + update shipment + order --------
+        # --- Atomic block: lock shipment + create event + update order ---
+        # ``select_for_update`` MUST live inside ``transaction.atomic``
+        # — outside, under autocommit, the lock is released the instant
+        # the SELECT statement completes (silent no-op). The previous
+        # code took the lock outside the block and then read the stale
+        # ``shipment`` reference inside, leaving the state-update path
+        # racy under two concurrent webhooks for the same parcel.
         with transaction.atomic():
+            try:
+                shipment: BoxNowShipment = (
+                    BoxNowShipment.objects.select_for_update()
+                    .select_related("order")
+                    .get(parcel_id=parcel_id)
+                )
+            except BoxNowShipment.DoesNotExist:
+                # Disappeared between the pre-check and the lock — same
+                # outcome: skip and let BoxNow retry the webhook.
+                logger.warning(
+                    "apply_webhook_event: BoxNowShipment for parcel_id=%s "
+                    "vanished between pre-check and lock (message_id=%s)",
+                    parcel_id,
+                    message_id,
+                )
+                return None
+
             # Re-check idempotency inside the transaction in case a
             # concurrent request inserted the row after our outer check.
             event, created = BoxNowParcelEvent.objects.get_or_create(

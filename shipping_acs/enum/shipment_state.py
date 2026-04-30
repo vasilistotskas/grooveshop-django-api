@@ -44,7 +44,17 @@ class AcsShipmentState(models.TextChoices):
         Falls back to ``current`` when the payload is missing/garbled
         rather than letting a single bad poll downgrade an already-
         terminal shipment.
+
+        **Terminal-state guard**: once a shipment reaches a terminal
+        state (DELIVERED / RETURNED / CANCELED / LOST) we never exit
+        it — even if a later poll surfaces conflicting flags. ACS has
+        been observed echoing stale tracking rows for cancelled
+        vouchers; without this guard a CANCELED shipment could be
+        flipped to RETURNED on a noisy response.
         """
+        if current in _TERMINAL_STATES:
+            return current
+
         delivery = _normalise_flag(payload.get("delivery_flag"))
         returned = _normalise_flag(payload.get("returned_flag"))
         status_raw = payload.get("shipment_status")
@@ -70,6 +80,16 @@ class AcsShipmentState(models.TextChoices):
         if status in mapping:
             return mapping[status]
         return current
+
+
+_TERMINAL_STATES: frozenset[AcsShipmentState] = frozenset(
+    {
+        AcsShipmentState.DELIVERED,
+        AcsShipmentState.RETURNED,
+        AcsShipmentState.CANCELED,
+        AcsShipmentState.LOST,
+    }
+)
 
 
 def _normalise_flag(value: Any) -> int | None:

@@ -726,17 +726,20 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["daily_2am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "options": {"queue": "celery"},
+            "options": {"queue": "celery", "expires": 300},
         },
         # ACS — daily station sync at 03:00 Athens (Phase 2 only fires
         # when the AcsStation cache is in use; harmless to schedule now
         # since the task no-ops when ACS provider is inactive).
+        # ``expires=300`` discards stale enqueues so a beat-pod restart
+        # mid-DST-fallback hour (Europe/Athens transitions twice yearly)
+        # can't re-fire the task against a stale ``last_run_at``.
         "sync-acs-stations": {
             "task": "shipping_acs.tasks.sync_acs_stations",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "options": {"queue": "celery"},
+            "options": {"queue": "celery", "expires": 300},
         },
         # Issue the daily ACS pickup list Mon-Fri at 16:30 Athens.
         # Beats the close of the courier's daily collection window and
@@ -744,16 +747,17 @@ def get_celery_beat_schedule():
         "issue-acs-pickup-list": {
             "task": "shipping_acs.tasks.issue_daily_acs_pickup_list",
             "schedule": crontab(hour="16", minute="30", day_of_week="mon-fri"),
-            "options": {"queue": "celery"},
+            "options": {"queue": "celery", "expires": 300},
         },
         # Poll ACS_Trackingsummary every 15 min for non-terminal
         # shipments. Sub-tasks fan out internally with a 0.2s
         # countdown stagger so we stay well within ACS's 10 req/sec
-        # cap.
+        # cap. Distributed mutex inside the task body prevents two
+        # workers from each running the full fan-out concurrently.
         "poll-acs-tracking": {
             "task": "shipping_acs.tasks.poll_acs_tracking_batch",
             "schedule": crontab(minute="*/15"),
-            "options": {"queue": "celery"},
+            "options": {"queue": "celery", "expires": 300},
         },
         # Reconcile yesterday's COD payouts daily at 02:30 Athens —
         # safely after midnight so ACS's books for the prior day are
@@ -765,7 +769,7 @@ def get_celery_beat_schedule():
             "schedule": crontab(hour="2", minute="30")
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "options": {"queue": "celery"},
+            "options": {"queue": "celery", "expires": 300},
         },
     }
 

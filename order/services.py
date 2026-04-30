@@ -253,7 +253,7 @@ class OrderService:
                 )
 
             # Step 2: Validate shipping address
-            cls.validate_shipping_address(shipping_address)
+            cls.validate_shipping_address(shipping_address, pay_way=pay_way)
 
             # Step 3: Validate payment intent exists
             from order.payment import get_payment_provider
@@ -785,7 +785,7 @@ class OrderService:
                 )
 
             # Step 2: Validate shipping address
-            cls.validate_shipping_address(shipping_address)
+            cls.validate_shipping_address(shipping_address, pay_way=pay_way)
 
             # Step 3: Get stock reservations for cart session
             # Reservations are identified by cart.uuid (session_id)
@@ -1238,7 +1238,12 @@ class OrderService:
         }
 
     @classmethod
-    def validate_shipping_address(cls, address: dict[str, Any]) -> None:
+    def validate_shipping_address(
+        cls,
+        address: dict[str, Any],
+        *,
+        pay_way: Any | None = None,
+    ) -> None:
         """
         Validate shipping address completeness.
 
@@ -1314,6 +1319,19 @@ class OrderService:
         # (shipping_provider_code, shipping_kind) pair, defer field-
         # level validation to the provider adapter so each carrier
         # owns its own rules without bloating this method.
+        #
+        # Carrier validators that care about pay-way compatibility
+        # (e.g. BoxNow doesn't support COD) need the ``is_online_payment``
+        # bit available on the payload. We inject it under a private
+        # key so the validator stays a pure function of its inputs
+        # without us having to thread ``pay_way`` through the whole
+        # ``ShippingService`` API.
+        validation_payload = dict(address)
+        if pay_way is not None:
+            validation_payload["_pay_way_is_online"] = bool(
+                pay_way.is_online_payment
+            )
+
         provider_code = address.get("shipping_provider_code")
         kind_value = address.get("shipping_kind")
         if provider_code and kind_value:
@@ -1324,7 +1342,7 @@ class OrderService:
                 provider_errors = ShippingService.validate_order_payload(
                     provider_code=provider_code,
                     kind=kind_value,
-                    payload=address,
+                    payload=validation_payload,
                 )
             except ShippingProviderNotFoundError:
                 errors["shipping_provider_code"] = [

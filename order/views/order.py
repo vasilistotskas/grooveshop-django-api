@@ -719,7 +719,9 @@ class OrderViewSet(BaseModelViewSet):
         # Step 4: Build and validate shipping address
         shipping_address = self._build_shipping_address(request)
         try:
-            OrderService.validate_shipping_address(shipping_address)
+            OrderService.validate_shipping_address(
+                shipping_address, pay_way=pay_way
+            )
         except DjangoValidationError as e:
             raise ValidationError(
                 e.message_dict
@@ -780,7 +782,9 @@ class OrderViewSet(BaseModelViewSet):
         # Step 3: Build and validate shipping address
         shipping_address = self._build_shipping_address(request)
         try:
-            OrderService.validate_shipping_address(shipping_address)
+            OrderService.validate_shipping_address(
+                shipping_address, pay_way=pay_way
+            )
         except DjangoValidationError as e:
             raise ValidationError(
                 e.message_dict

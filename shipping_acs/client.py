@@ -31,16 +31,22 @@ from shipping_acs.exceptions import (
 
 logger = logging.getLogger("shipping_acs.client")
 
-# Mirrors the BoxNow client's retry policy: 3 retries on connection
-# errors and 5xx responses with exponential back-off (0.5s, 1s, 2s).
-# POSTs are retried because every ACS call is technically a POST and
-# the API is idempotent on the operations we use (re-POST of an
-# already-issued voucher returns the same Voucher_No back).
+# Retry only on connection errors (no request was ever delivered, so
+# no risk of duplicate mutation on the ACS side). 5xx and read-timeout
+# responses are NOT retried at the HTTP layer because every ACS call
+# is a POST and write aliases like ``ACS_Create_Voucher`` are not
+# idempotent — re-POSTing a voucher request after a 502 has been
+# observed in stage to mint an orphan voucher (project memory:
+# ``project_acs_voucher_orphan_prevention.md``).  Celery's
+# ``autoretry_for=(AcsRetryableError,)`` plus the 3-phase claim/mint
+# /persist design in ``shipping_acs/services.py`` is the durable
+# retry path for everything that can have a server-side effect.
 _RETRY_CONFIG = Retry(
     total=3,
+    connect=3,
+    read=0,
+    status=0,
     backoff_factor=0.5,
-    status_forcelist=[500, 502, 503, 504],
-    allowed_methods=["POST"],
     raise_on_status=False,
 )
 
@@ -521,16 +527,26 @@ def _decode_pdf(envelope: dict[str, Any], *, key: str, alias: str) -> bytes:
             if isinstance(blob, str) and blob:
                 candidates.append(blob)
 
+    last_exc: Exception | None = None
     for b64 in candidates:
         try:
             return base64.b64decode(b64)
         except (TypeError, ValueError) as exc:
-            raise AcsAPIError(
-                alias=alias,
-                error_message=(
-                    f"ACS returned an undecodable PDF for key {key!r}: {exc}"
-                ),
-            ) from exc
+            # Try the next candidate — ACS occasionally surfaces an
+            # empty / malformed blob in the first slot while the real
+            # PDF lives in a later one. Raising on the first failure
+            # would discard a valid blob behind it.
+            last_exc = exc
+            continue
+
+    if last_exc is not None:
+        raise AcsAPIError(
+            alias=alias,
+            error_message=(
+                f"ACS returned only undecodable PDF blobs for key {key!r}: "
+                f"{last_exc}"
+            ),
+        ) from last_exc
 
     raise AcsAPIError(
         alias=alias,

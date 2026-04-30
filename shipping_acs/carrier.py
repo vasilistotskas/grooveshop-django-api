@@ -277,7 +277,13 @@ class AcsCarrier(ShippingCarrierInterface):
             response = client.price_calculation(
                 {
                     "Billing_Category": 2,
-                    "Weight": "0.5",
+                    # Greek locale: ACS reads numeric strings with
+                    # comma-decimal (dot is thousands separator). Send
+                    # ``"0,5"`` — ``"0.5"`` is parsed as 5 kg and quotes
+                    # the 5 kg tariff, inflating the live price shown
+                    # to the customer at checkout. Mirrors
+                    # ``_kg_from_grams`` in shipping_acs/services.py.
+                    "Weight": "0,5",
                     "Charge_Type": 2,
                     "Pickup_Date": timezone.localdate().isoformat(),
                 }

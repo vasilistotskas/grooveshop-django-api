@@ -81,15 +81,39 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
         if kind != ShippingKind.PICKUP_POINT:
             return {}
+
+        errors: dict[str, list[str]] = {}
+
         if not payload.get("boxnow_locker_id"):
-            error: str = str(
-                _(
-                    "Select a BOX NOW locker before placing an order "
-                    "with locker delivery."
+            errors["boxnow_locker_id"] = [
+                str(
+                    _(
+                        "Select a BOX NOW locker before placing an order "
+                        "with locker delivery."
+                    )
                 )
-            )
-            return {"boxnow_locker_id": [error]}
-        return {}
+            ]
+
+        # BoxNow does not support cash-on-delivery for standard
+        # partners — the API rejects with P411 ("not eligible to use
+        # COD") asynchronously inside the Celery task. Fail fast at
+        # the create-order boundary while we still have a customer
+        # in the checkout to surface a useful message to. The
+        # ``_pay_way_is_online`` key is injected by ``OrderService``
+        # at the call site so this validator stays a pure function
+        # of its inputs.
+        pay_way_is_online = payload.get("_pay_way_is_online")
+        if pay_way_is_online is False:
+            errors["pay_way"] = [
+                str(
+                    _(
+                        "BOX NOW locker delivery does not support cash on "
+                        "delivery — choose an online payment method."
+                    )
+                )
+            ]
+
+        return errors
 
     # ------------------------------------------------------------------
     # Order-creation hooks (Phase 3 abstraction)

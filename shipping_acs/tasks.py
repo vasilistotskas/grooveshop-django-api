@@ -131,6 +131,14 @@ def issue_daily_acs_pickup_list(self) -> dict[str, Any]:
     }
 
 
+# Distributed mutex key + TTL for the polling-batch dispatcher.
+# TTL is shorter than the 15-minute beat tick so a crashed worker
+# can't permanently block the next run — autoexpiry releases the
+# lock after 13 minutes if our ``finally`` block didn't fire.
+_POLL_BATCH_LOCK_KEY = "acs:poll_batch:lock"
+_POLL_BATCH_LOCK_TTL = 13 * 60  # 13 minutes
+
+
 @shared_task(
     bind=True,
     autoretry_for=(AcsRetryableError,),
@@ -146,33 +154,55 @@ def poll_acs_tracking_batch(self, *, max_per_run: int = 200) -> dict[str, int]:
     roughly 5 req/sec — well within the cap with margin for the
     ``tracking_summary`` + ``tracking_details`` two-call pair per
     shipment.
+
+    Concurrency-safe via a Redis-backed ``cache.add`` mutex: with
+    ``celery-beat`` enqueuing into a shared RabbitMQ queue and the
+    HPA running multiple worker pods, two consumers could otherwise
+    each dequeue this beat task and each dispatch the full 200-task
+    fan-out — doubling the API rate to 20 req/sec and breaching the
+    ACS 10 req/sec cap. The mutex makes the batch single-flight
+    cluster-wide.
     """
+    from django.core.cache import cache
+
     from shipping_acs.enum.shipment_state import AcsShipmentState
     from shipping_acs.models import AcsShipment
 
-    cutoff = timezone.now() - timedelta(minutes=15)
-    candidates = list(
-        AcsShipment.objects.filter(voucher_no__isnull=False)
-        .exclude(
-            shipment_state__in=[
-                AcsShipmentState.PENDING_CREATION,
-                AcsShipmentState.DELIVERED,
-                AcsShipmentState.RETURNED,
-                AcsShipmentState.CANCELED,
-                AcsShipmentState.LOST,
-            ]
+    # ``cache.add`` is atomic on Redis (SET NX with TTL) — only one
+    # worker per cluster wins the lock per beat tick.
+    if not cache.add(_POLL_BATCH_LOCK_KEY, 1, _POLL_BATCH_LOCK_TTL):
+        logger.info(
+            "poll_acs_tracking_batch: another worker holds the lock — "
+            "skipping this tick to stay under the ACS 10 req/sec cap."
         )
-        .filter(models_or_null(cutoff))
-        .order_by("last_polled_at")
-        .values_list("id", flat=True)[:max_per_run]
-    )
+        return {"dispatched": 0, "skipped": True}
 
-    for index, shipment_id in enumerate(candidates):
-        poll_acs_tracking_one.apply_async(
-            args=[shipment_id],
-            countdown=index * 0.2,
+    try:
+        cutoff = timezone.now() - timedelta(minutes=15)
+        candidates = list(
+            AcsShipment.objects.filter(voucher_no__isnull=False)
+            .exclude(
+                shipment_state__in=[
+                    AcsShipmentState.PENDING_CREATION,
+                    AcsShipmentState.DELIVERED,
+                    AcsShipmentState.RETURNED,
+                    AcsShipmentState.CANCELED,
+                    AcsShipmentState.LOST,
+                ]
+            )
+            .filter(models_or_null(cutoff))
+            .order_by("last_polled_at")
+            .values_list("id", flat=True)[:max_per_run]
         )
-    return {"dispatched": len(candidates)}
+
+        for index, shipment_id in enumerate(candidates):
+            poll_acs_tracking_one.apply_async(
+                args=[shipment_id],
+                countdown=index * 0.2,
+            )
+        return {"dispatched": len(candidates)}
+    finally:
+        cache.delete(_POLL_BATCH_LOCK_KEY)
 
 
 def models_or_null(cutoff):

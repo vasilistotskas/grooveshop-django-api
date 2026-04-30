@@ -1441,6 +1441,54 @@ class OrderService:
             raise
 
     @classmethod
+    def maybe_advance_to_completed(cls, order: Order) -> Order:
+        """Auto-advance ``order`` from DELIVERED to COMPLETED when paid.
+
+        The canonical state-machine table allows DELIVERED → COMPLETED,
+        but nothing in the wild was actually invoking it: online orders
+        ended at DELIVERED, COD orders ended at DELIVERED + payment_
+        status=PENDING (until the reconcile pass flips them). Without
+        this helper, "completed" was an admin-only manual flip.
+
+        Triggers from two call-sites:
+        * Carrier event handlers (ACS poll, BoxNow webhook) right after
+          they advance to DELIVERED for an already-paid online order.
+        * COD reconcile, after flipping payment_status to COMPLETED.
+
+        Idempotent and silent when the order is not eligible — a
+        non-paid order or one already past DELIVERED no-ops.
+
+        Status fields are read with ``values_list`` rather than
+        ``refresh_from_db(fields=...)``: the latter leaves other
+        columns deferred, and ``Order.__init__`` lazy-loads them when
+        it snapshots ``_original_tracking_number`` etc., which
+        recurses through the manager.
+        """
+        row = (
+            Order.objects.filter(pk=order.pk)
+            .values("status", "payment_status")
+            .first()
+        )
+        if not row:
+            return order
+        if row["status"] != OrderStatus.DELIVERED:
+            return order
+        if row["payment_status"] != PaymentStatus.COMPLETED:
+            return order
+        order.status = row["status"]
+        order.payment_status = row["payment_status"]
+        try:
+            return cls.update_order_status(order, OrderStatus.COMPLETED)
+        except InvalidStatusTransitionError as exc:
+            logger.warning(
+                "Order %s DELIVERED -> COMPLETED auto-advance rejected by "
+                "state machine: %s",
+                order.id,
+                exc,
+            )
+            return order
+
+    @classmethod
     def get_user_orders(cls, user_id: int) -> QuerySet:
         """Get all orders for a user with optimized queryset."""
         return (
@@ -1640,6 +1688,14 @@ class OrderService:
                 order.id,
                 old_status,
             )
+
+            # Cascade to the courier voucher when one is attached. ACS
+            # rejects cancellation once the voucher is in a daily
+            # pickup list (the parcel is already with the courier);
+            # we log + record on the order and continue, so admins
+            # can still cancel the order at our end while the courier
+            # handles the in-transit return out of band.
+            cls._cancel_attached_shipment(order, reason)
 
             refund_info = None
             if (
@@ -1920,6 +1976,49 @@ class OrderService:
             for key in all_payload_keys()
             if key in order_data
         }
+
+    @classmethod
+    def _cancel_attached_shipment(cls, order: Order, reason: str) -> None:
+        """Best-effort: cancel the courier voucher when the order is canceled.
+
+        Routed through ``ShippingService.cancel_shipment`` so each
+        carrier enforces its own cancellability rules. Common
+        rejections (ACS voucher already in a pickup list, BoxNow
+        parcel already accepted at a locker) are recorded on
+        ``order.metadata['cancellation']['shipment_cancel']`` so the
+        admin can see why the cascade didn't reach the courier and
+        coordinate the in-transit return out of band.
+
+        Never raises — order cancellation must be allowed to complete
+        even when the courier-side cancel fails.
+        """
+        from shipping.services import ShippingService
+
+        info: dict[str, Any] = {}
+        try:
+            dispatched = ShippingService.cancel_shipment(order, reason=reason)
+            info = {
+                "attempted": True,
+                "dispatched": dispatched,
+            }
+        except Exception as exc:  # pragma: no cover - logged below
+            info = {
+                "attempted": True,
+                "dispatched": False,
+                "error": str(exc),
+            }
+            logger.warning(
+                "Order %s canceled, but courier voucher cancel failed: %s",
+                order.id,
+                exc,
+                exc_info=True,
+            )
+
+        if not order.metadata:
+            order.metadata = {}
+        cancellation = order.metadata.setdefault("cancellation", {})
+        cancellation["shipment_cancel"] = info
+        order.save(update_fields=["metadata"])
 
     @classmethod
     def _dispatch_shipment_creation_task(cls, order: Order) -> None:

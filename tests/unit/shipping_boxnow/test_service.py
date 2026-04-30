@@ -254,11 +254,35 @@ class TestApplyWebhookEvent:
         order.refresh_from_db()
         assert order.status == OrderStatus.SHIPPED
 
-    def test_delivered_transitions_order_to_delivered(self):
-        """delivered event advances order status to DELIVERED."""
+    def test_delivered_transitions_order_to_completed_when_paid(self):
+        """delivered event advances an already-paid order through DELIVERED
+        and on to COMPLETED (PR #2 G — auto-advance via
+        OrderService.maybe_advance_to_completed)."""
         order = OrderFactory(
             status=OrderStatus.SHIPPED,
             payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = BoxNowShipmentFactory(
+            order=order,
+            with_parcel=True,
+            parcel_state=BoxNowParcelState.FINAL_DESTINATION,
+        )
+
+        envelope = _build_envelope(
+            parcel_id=shipment.parcel_id,
+            event="delivered",
+        )
+        BoxNowService.apply_webhook_event(envelope)
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.COMPLETED
+
+    def test_delivered_pauses_at_delivered_when_payment_pending(self):
+        """A COD-style order with payment_status=PENDING stops at
+        DELIVERED — the COMPLETED auto-advance is gated on payment."""
+        order = OrderFactory(
+            status=OrderStatus.SHIPPED,
+            payment_status=PaymentStatus.PENDING,
         )
         shipment = BoxNowShipmentFactory(
             order=order,

@@ -226,3 +226,58 @@ def test_property_18_backwards_transitions_are_prevented(
     # Verify status unchanged
     order.refresh_from_db()
     assert order.status == current_status
+
+
+# ---------------------------------------------------------------------------
+# PR #2 G — DELIVERED -> COMPLETED auto-advance
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_maybe_advance_to_completed_paid_delivered_order_advances():
+    """A DELIVERED order with payment_status=COMPLETED auto-advances."""
+    from order.enum.status import PaymentStatus
+
+    order = OrderFactory(
+        status=OrderStatus.DELIVERED,
+        payment_status=PaymentStatus.COMPLETED,
+    )
+    OrderService.maybe_advance_to_completed(order)
+    order.refresh_from_db()
+    assert order.status == OrderStatus.COMPLETED
+
+
+@pytest.mark.django_db
+def test_maybe_advance_to_completed_unpaid_delivered_order_stays():
+    """A DELIVERED order with payment_status=PENDING (COD pre-reconcile)
+    stays at DELIVERED — must wait for the payout flip."""
+    from order.enum.status import PaymentStatus
+
+    order = OrderFactory(
+        status=OrderStatus.DELIVERED,
+        payment_status=PaymentStatus.PENDING,
+    )
+    OrderService.maybe_advance_to_completed(order)
+    order.refresh_from_db()
+    assert order.status == OrderStatus.DELIVERED
+
+
+@pytest.mark.django_db
+def test_maybe_advance_to_completed_non_delivered_order_no_op():
+    """Non-DELIVERED orders are a no-op regardless of payment status."""
+    from order.enum.status import PaymentStatus
+
+    for current in (
+        OrderStatus.PENDING,
+        OrderStatus.PROCESSING,
+        OrderStatus.SHIPPED,
+        OrderStatus.COMPLETED,
+        OrderStatus.CANCELED,
+    ):
+        order = OrderFactory(
+            status=current,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        OrderService.maybe_advance_to_completed(order)
+        order.refresh_from_db()
+        assert order.status == current

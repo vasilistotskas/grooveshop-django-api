@@ -981,7 +981,45 @@ class AcsService:
             )
             upserted += 1
 
+            # COD payment confirmation. ACS only returns a payout row
+            # once the courier has remitted the cash to us, so reaching
+            # this branch means the customer DID pay on delivery —
+            # safe to mark the order as paid. Idempotent: only flips
+            # PENDING; re-runs of a payout that's already been
+            # reconciled are no-ops.
+            if shipment is not None:
+                cls._mark_cod_order_paid_if_pending(shipment)
+
         return {"upserted": upserted, "linked": linked, "rows": len(rows)}
+
+    @classmethod
+    def _mark_cod_order_paid_if_pending(cls, shipment: AcsShipment) -> None:
+        """Flip the linked order from PENDING payment to COMPLETED.
+
+        Mirrors what ``Order.mark_as_paid`` does for online payments,
+        but adapted for the COD path where the customer pays the
+        courier in cash on delivery and ACS later remits the amount.
+        Fires ``order_paid`` and queues the confirmation email exactly
+        once via the standard signal chain. After the flip, attempts
+        the DELIVERED → COMPLETED auto-advance so accounting matches
+        the lifecycle.
+        """
+        from order.enum.status import PaymentStatus
+        from order.services import OrderService
+
+        order = getattr(shipment, "order", None)
+        if order is None:
+            return
+        if order.payment_status != PaymentStatus.PENDING:
+            return
+        order.mark_as_paid(payment_method="acs_cod")
+        logger.info(
+            "ACS COD reconcile: order=%s payment_status PENDING -> "
+            "COMPLETED (voucher=%s)",
+            order.id,
+            shipment.voucher_no,
+        )
+        OrderService.maybe_advance_to_completed(order)
 
     # ------------------------------------------------------------------
     # Private helpers — order status
@@ -1031,6 +1069,15 @@ class AcsService:
                 new_status,
                 exc,
             )
+            return
+
+        # When the carrier marks DELIVERED for an already-paid online
+        # order, COMPLETED is reachable in the same pass. COD orders
+        # stay at DELIVERED here and only advance once the daily
+        # reconcile flips payment_status (handled by
+        # AcsService._mark_cod_order_paid_if_pending).
+        if new_status == "DELIVERED":
+            OrderService.maybe_advance_to_completed(order)
 
     @classmethod
     def _advance_pending_order_to_processing(cls, order: Order) -> None:

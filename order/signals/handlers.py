@@ -759,6 +759,119 @@ def handle_stripe_payment_requires_action(sender, **kwargs):
         )
 
 
+@djstripe_receiver("charge.refunded")
+def handle_stripe_charge_refunded(sender, **kwargs):
+    """Handle Stripe ``charge.refunded`` webhook (full + partial).
+
+    Stripe fires this after a refund issued from the dashboard, the
+    Stripe API, or our own ``OrderService.refund_order`` path. Without
+    a handler, refunds initiated outside our admin would never hit the
+    DB and the order would silently look paid.
+
+    Mapping:
+    * ``amount_refunded == amount`` → ``PaymentStatus.REFUNDED``
+    * ``amount_refunded < amount``  → ``PaymentStatus.PARTIALLY_REFUNDED``
+
+    ``Order.status`` is intentionally NOT changed — the canonical
+    transition table only reaches ``REFUNDED`` from ``RETURNED``, and
+    deciding whether a refund means the goods were also returned is a
+    business call. Admin can drive that from the order page.
+
+    Idempotency: ``webhook_processed_{event_id}`` flag mirrors the
+    succeeded / failed handlers; redeliveries are no-ops.
+    """
+    logger.debug("Processing charge.refunded webhook")
+
+    try:
+        event: Event = kwargs["event"]
+        charge = event.data["object"]
+        event_id = event.id
+        payment_intent_id = charge.get("payment_intent") or ""
+        amount = int(charge.get("amount") or 0)
+        amount_refunded = int(charge.get("amount_refunded") or 0)
+
+        if not payment_intent_id:
+            logger.warning(
+                "charge.refunded event %s has no payment_intent — skipping",
+                event_id,
+            )
+            return
+
+        logger.info(
+            "Stripe charge refunded: payment_intent=%s amount_refunded=%s/%s",
+            payment_intent_id,
+            amount_refunded,
+            amount,
+        )
+
+        is_full_refund = amount_refunded >= amount > 0
+        new_payment_status = (
+            PaymentStatus.REFUNDED
+            if is_full_refund
+            else PaymentStatus.PARTIALLY_REFUNDED
+        )
+
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .filter(payment_id=payment_intent_id)
+                .first()
+            )
+            if order is None:
+                logger.warning(
+                    "No order found for refunded payment_intent %s "
+                    "(charge event=%s)",
+                    payment_intent_id,
+                    event_id,
+                )
+                return
+
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                return
+
+            previous_payment_status = order.payment_status
+            order.payment_status = new_payment_status
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata[f"webhook_processed_{event_id}"] = True
+            refunds = list(order.metadata.get("refunds") or [])
+            refunds.append(
+                {
+                    "stripe_event_id": event_id,
+                    "amount_refunded": amount_refunded,
+                    "amount": amount,
+                    "currency": (charge.get("currency") or "").lower(),
+                    "is_full_refund": is_full_refund,
+                    "payment_intent": payment_intent_id,
+                }
+            )
+            order.metadata["refunds"] = refunds
+            order.save(update_fields=["payment_status", "metadata"])
+
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={"payment_status": str(previous_payment_status)},
+            new_value={
+                "payment_status": str(new_payment_status),
+                "amount_refunded": amount_refunded,
+                "is_full_refund": is_full_refund,
+            },
+        )
+
+        if is_full_refund:
+            order_refunded.send(sender=Order, order=order)
+
+    except Exception as e:
+        logger.error("Error handling charge.refunded: %s", e, exc_info=True)
+
+
 @djstripe_receiver("charge.dispute.created")
 def handle_stripe_dispute_created(sender, **kwargs):
     """Handle Stripe dispute creation webhook.

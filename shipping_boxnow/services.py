@@ -1053,6 +1053,14 @@ class BoxNowService:
                 new_status,
                 exc,
             )
+            return
+
+        # Mirror AcsService: auto-complete already-paid orders when the
+        # carrier hands them DELIVERED. COD orders rely on the COD
+        # reconcile pass to flip payment_status before this advance
+        # is allowed.
+        if new_status == "DELIVERED":
+            OrderService.maybe_advance_to_completed(order)
 
     @classmethod
     def _advance_pending_order_to_processing(cls, order: Order) -> None:

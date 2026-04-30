@@ -23219,11 +23219,12 @@ paths:
   /api/v1/shipping/acs/stations/nearest:
     get:
       operationId: findNearestAcsStations
-      description: Returns up to 20 active locker rows whose ``postal_code`` matches
-        the supplied postcode prefix, ordered by exact match first then alphabetic.  Falls
-        back to a city-name ILIKE match when no postcode hits are found.  Designed
-        for the checkout locker picker — no GPS or geo math, the Nuxt UI does the
-        visual ordering.
+      description: Returns active locker rows whose ``postal_code`` matches the supplied
+        postcode prefix, ordered by exact match first then alphabetic. Falls back
+        to a city-name ILIKE match when no postcode hits are found. The row cap is
+        configurable via ``ShippingProvider.metadata.nearest_limit`` on the ``acs``
+        row (default 20). Designed for the checkout locker picker — no GPS or geo
+        math, the Nuxt UI does the visual ordering.
       summary: Find nearest ACS Smartpoint lockers to a postcode
       parameters:
       - in: query
@@ -23231,6 +23232,12 @@ paths:
         schema:
           type: string
         description: Optional city-name fallback.
+      - in: query
+        name: countryCode
+        schema:
+          type: string
+        description: Optional ISO-2 country code; narrows the default kind filter
+          to that country's locker catalogue.
       - name: ordering
         required: false
         in: query
@@ -23274,7 +23281,8 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: 'Optional override (default: lockers 7+8).'
+        description: Optional override. Default is the union of locker kinds across
+          configured countries (see ShippingProvider.metadata.shop_kinds_by_country).
       tags:
       - ACS stations
       security:

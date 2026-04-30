@@ -497,22 +497,15 @@ def _handle_payment_created(order, event_data, transaction_id):
     # duplicate webhook delivery or a retry will not resend.
     send_order_confirmation_email.delay(order.id)
 
-    # Enqueue BoxNow delivery-request creation if the order uses a locker.
-    from order.enum.shipping_method import OrderShippingMethod
+    # Enqueue the carrier's delivery-request creation. Provider-agnostic
+    # dispatch through the registry — Stripe's ``handle_payment_succeeded``
+    # uses the same hook. Without this call, ACS (and any future
+    # carrier) orders paid via Viva would never get their shipment task
+    # fired on payment success, leaving the order stuck in PROCESSING
+    # with no voucher / no parcel.
+    from shipping.services import ShippingService
 
-    if order.shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
-        try:
-            from shipping_boxnow.tasks import (
-                create_boxnow_shipment_for_order,
-            )
-
-            create_boxnow_shipment_for_order.delay(order.id)
-        except ImportError:
-            logger.warning(
-                "shipping_boxnow not yet available — "
-                "skipping BoxNow task dispatch for order %s",
-                order.id,
-            )
+    ShippingService.dispatch_create_shipment_task(order)
 
 
 def _handle_payment_failed(order, event_data, transaction_id):

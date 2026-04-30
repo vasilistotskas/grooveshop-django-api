@@ -210,6 +210,30 @@ class AcsService:
                                 f"order={order.id} (started {age:.1f}s ago)."
                             ),
                         )
+                    # TTL expired but no voucher_no was persisted — a
+                    # prior worker likely crashed AFTER ACS minted the
+                    # voucher but BEFORE Phase 3 saved. The next mint
+                    # may produce an orphan voucher on ACS's side. Log
+                    # loudly so ops can reconcile against the ACS
+                    # dashboard (search by Reference_Key1=order.id).
+                    logger.warning(
+                        "create_voucher_for_order: stale mint_started_at "
+                        "for order=%s (age=%.1fs > TTL=%ds) without a "
+                        "voucher_no — re-minting. Check ACS dashboard "
+                        "for a prior orphan voucher under "
+                        "Reference_Key1=%s.",
+                        order.id,
+                        age,
+                        cls._MINT_CLAIM_TTL_SECONDS,
+                        order.id,
+                        extra={
+                            "order_id": order.id,
+                            "shipment_pk": shipment.pk,
+                            "carrier": "acs",
+                            "phase": "phase1_stale_claim",
+                            "claim_age_seconds": age,
+                        },
+                    )
 
             update_fields = ["metadata"]
             metadata["mint_started_at"] = timezone.now().isoformat()
@@ -227,14 +251,40 @@ class AcsService:
 
             shipment.save(update_fields=update_fields)
 
+        logger.info(
+            "create_voucher_for_order: claim acquired for order=%s "
+            "shipment=%s — invoking ACS_Create_Voucher",
+            order.id,
+            shipment.pk,
+            extra={
+                "order_id": order.id,
+                "shipment_pk": shipment.pk,
+                "carrier": "acs",
+                "phase": "phase1_claim",
+            },
+        )
+
         # ----- Phase 2: API call (no DB lock held) -----
         params = cls._build_create_voucher_params(order, shipment, client)
         try:
             result = client.create_voucher(params)
-        except Exception:
+        except Exception as exc:
             # API call failed — release the claim so a future retry
             # can proceed without waiting out the TTL.
             cls._release_mint_claim(shipment)
+            logger.warning(
+                "create_voucher_for_order: API call failed for order=%s "
+                "shipment=%s — released mint claim. Error: %s",
+                order.id,
+                shipment.pk,
+                exc,
+                extra={
+                    "order_id": order.id,
+                    "shipment_pk": shipment.pk,
+                    "carrier": "acs",
+                    "phase": "phase2_api",
+                },
+            )
             raise
 
         voucher_no = (result.get("Voucher_No") or "").strip()

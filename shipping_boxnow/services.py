@@ -186,15 +186,45 @@ class BoxNowService:
                     if age < cls._MINT_CLAIM_TTL_SECONDS:
                         # Another worker is mid-flight. Surface as
                         # retryable so Celery backs off and re-checks.
+                        # ``status_code=409`` matches the semantic
+                        # ("conflict — work already in progress");
+                        # nothing inspects it for routing.
                         from shipping_boxnow.exceptions import (
                             BoxNowRetryableError,
                         )
 
                         raise BoxNowRetryableError(
-                            f"BoxNow mint already in flight for order "
-                            f"{order.id} (started {age:.1f}s ago) — "
-                            "deferring to that worker."
+                            409,
+                            message=(
+                                f"BoxNow mint already in flight for order "
+                                f"{order.id} (started {age:.1f}s ago) — "
+                                "deferring to that worker."
+                            ),
                         )
+                    # TTL expired but no delivery_request_id was saved.
+                    # A prior worker likely crashed AFTER BoxNow created
+                    # the parcel but BEFORE Phase 3 saved. The next
+                    # mint may produce an orphan parcel on BoxNow's
+                    # side. Log loudly so ops can reconcile against
+                    # BoxNow's dashboard by orderNumber=order.id.
+                    logger.warning(
+                        "create_shipment_for_order: stale mint_started_at "
+                        "for order=%s (age=%.1fs > TTL=%ds) without a "
+                        "delivery_request_id — re-minting. Check BoxNow "
+                        "dashboard for a prior orphan parcel under "
+                        "orderNumber=%s.",
+                        order.id,
+                        age,
+                        cls._MINT_CLAIM_TTL_SECONDS,
+                        order.id,
+                        extra={
+                            "order_id": order.id,
+                            "shipment_pk": shipment.pk,
+                            "carrier": "boxnow",
+                            "phase": "phase1_stale_claim",
+                            "claim_age_seconds": age,
+                        },
+                    )
 
             shipment.metadata = {
                 **metadata,
@@ -446,6 +476,50 @@ class BoxNowService:
                     ),
                 )
             parcel_id = locked.parcel_id
+
+            # Edge case: a shipment row exists (state=NEW) but the
+            # mint task never ran or crashed before persisting the
+            # parcel_id. Calling BoxNow with empty parcel_id would
+            # surface as P403/P404 (confusing). Mark CANCELED locally
+            # and short-circuit — there is nothing on BoxNow's side
+            # to cancel.
+            if not parcel_id:
+                logger.info(
+                    "cancel_shipment: shipment=%s has no parcel_id "
+                    "(create task pending or crashed pre-persist) — "
+                    "marking CANCELED locally without an API call.",
+                    shipment.pk,
+                    extra={
+                        "shipment_pk": shipment.pk,
+                        "order_id": locked.order_id,
+                        "carrier": "boxnow",
+                    },
+                )
+                locked.cancel_requested_at = timezone.now()
+                locked.parcel_state = BoxNowParcelState.CANCELED
+                cancellations: list[dict] = locked.metadata.get(
+                    "cancellations", []
+                )
+                cancellations.append(
+                    {
+                        "reason": reason,
+                        "cancelled_at": locked.cancel_requested_at.isoformat(),
+                        "note": "no parcel_id — local-only cancel",
+                    }
+                )
+                locked.metadata = {
+                    **locked.metadata,
+                    "cancellations": cancellations,
+                }
+                locked.save(
+                    update_fields=[
+                        "cancel_requested_at",
+                        "parcel_state",
+                        "metadata",
+                        "updated_at",
+                    ]
+                )
+                return
 
         # ---- Phase 2: API call (no transaction, no lock) ----------------
         logger.info(

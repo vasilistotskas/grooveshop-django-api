@@ -3,6 +3,65 @@
 
 
 
+## v1.118.2 (2026-04-30)
+
+### Bug fixes
+
+* fix: update uv.lock ([`f03d9fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f03d9fb38ad9523cc1f62e4bf5c17dabf57cebc8))
+
+### Chores
+
+* chore(schema): regenerate after metadata-driven ACS endpoints
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`910edff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/910edff60bfd7731e89a65487ac6508fff89de5a))
+
+### Refactoring
+
+* refactor(shipping): move ACS structural config into ShippingProvider.metadata
+
+Phase 0 of the ACS Smartpoint map work. Pulls every magic value out of
+the ACS source code and into the existing ``ShippingProvider.metadata``
+JSONField — admins now tune these from the Django admin without a
+redeploy, and adding a new country onboards via one row update.
+
+* New ``shipping_acs/config.py`` module exposes typed accessors for
+  ``shop_kinds_for_country``, ``all_locker_kinds``, ``nearest_limit``,
+  ``min_voucher_weight_kg`` / ``max_voucher_weight_kg``,
+  ``default_country``, ``default_voucher_language``, ``map_config``.
+  Each accessor falls back to a constant when metadata is empty so
+  the code path always works (CI fresh DBs, partial seed migrations).
+
+* ``shipping/migrations/0004_seed_provider_metadata.py`` seeds the new
+  keys onto the existing ``acs`` and ``boxnow`` rows. Idempotent
+  (``setdefault`` merge) so re-runs never clobber operator overrides.
+
+* ``shipping_acs/views/station.py`` no longer hardcodes
+  ``_LOCKER_KINDS = (7, 8)`` or ``[:20]``. The ``list`` and ``nearest``
+  endpoints read kinds + limit from metadata; passing
+  ``?countryCode=CY`` correctly narrows to the Cypriot catalogue.
+
+* ``shipping_acs/services.py`` weight bounds (``_MIN_VOUCHER_KG``,
+  ``_MAX_VOUCHER_KG``) replaced with metadata reads. ``sync_stations``
+  defaults ``country`` and ``kinds`` from metadata when unset, with
+  kind 1 always included so the SHOP fallback tier stays fresh.
+  ``_build_create_voucher_params`` reads the country fallback and
+  voucher language from metadata too.
+
+* New ``tests/unit/shipping_acs/test_metadata_driven_config.py`` (12
+  cases) is the regression guard: changing metadata changes effective
+  behaviour without code edits. ``conftest.py`` reseed fixture updated
+  to mirror the migration's metadata shape.
+
+* Frontend impact zero — ``ShippingService.available_options`` already
+  passes ``provider.metadata`` through the response untouched, so the
+  new ``tile_provider`` / ``default_map_center`` / ``default_map_zoom``
+  keys flow to the Nuxt picker for free in Phase 2.
+
+Tests: 117 ACS + shipping pass, 1287 order tests pass, no new migrations
+detected. ``uv run ruff check`` and ``uv run ty check`` clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`582d9ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/582d9aeeb684706abaf12aa20e795224058100a8))
+
 ## v1.118.1 (2026-04-29)
 
 ### Bug fixes

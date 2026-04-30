@@ -3,6 +3,28 @@
 
 
 
+## v1.118.6 (2026-04-30)
+
+### Bug fixes
+
+* fix: update uv.lock ([`8023cd3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8023cd3fc1144c5e6f1ef615b281d2ed31667a99))
+
+* fix(acs): widen nearest-locker postcode match to 3-digit Greek area
+
+The nearest-locker view was doing ``postal_code__startswith=postal[:5]``
+— effectively an exact 5-digit match — so a customer in postcode
+10671 saw an empty picker even with Smartpoints in 10675 / 10677
+(both in the same Athens centre area). The city-name fallback only
+fires when the request includes ``?city=`` and the picker doesn't
+always send it.
+
+Widen the postcode pass: try ``postal[:5]`` first (exact area), then
+fall back to ``postal[:3]`` (Greek 3-digit area code that groups
+geographically adjacent postcodes). Keep the city-name ILIKE fallback
+for rural / island codes that have no locker in the same area code.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e158981`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e158981aa820dd21e7fcf3377f9959b399d81171))
+
 ## v1.118.5 (2026-04-30)
 
 ### Bug fixes

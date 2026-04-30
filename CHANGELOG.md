@@ -3,6 +3,119 @@
 
 
 
+## v1.118.8 (2026-04-30)
+
+### Bug fixes
+
+* fix(order): cancel cascades to courier voucher, charge.refunded webhook, COD reconcile flips payment_status, DELIVERED auto-completes paid orders
+
+Four follow-on correctness fixes landed in PR #2 after the audit:
+
+H — Cancel cascades to courier voucher.
+``OrderService.cancel_order`` now calls
+``ShippingService.cancel_shipment`` after the order flips to
+CANCELED. Each carrier owns its own cancellability rules (ACS
+rejects when the voucher is already in a pickup list, BoxNow has
+its own gate); cascade failures are swallowed and recorded under
+``order.metadata['cancellation']['shipment_cancel']`` so admins
+can see the parcel is still in transit and coordinate the return
+out of band. Order cancellation always completes regardless.
+
+I — Stripe ``charge.refunded`` webhook handler.
+New ``handle_stripe_charge_refunded`` listener flips
+``payment_status`` to REFUNDED for full refunds and
+PARTIALLY_REFUNDED otherwise (revives the previously-orphaned
+PaymentStatus.PARTIALLY_REFUNDED enum value). Idempotent via the
+existing ``webhook_processed_{event_id}`` metadata flag.
+``Order.status`` is intentionally NOT auto-mutated — REFUNDED is
+only reachable from RETURNED in the canonical state machine, and
+deciding whether refund means goods returned is a business call.
+
+F — COD payout reconcile flips ``Order.payment_status``.
+``AcsService.reconcile_cod_payouts`` now calls
+``_mark_cod_order_paid_if_pending`` after upserting each
+``AcsCodPayout``: a payout row only exists once ACS has remitted
+the cash to us, so reaching that branch means the customer DID
+pay on delivery. Idempotent (only flips PENDING → COMPLETED).
+
+G — DELIVERED → COMPLETED auto-advance.
+New ``OrderService.maybe_advance_to_completed`` helper closes the
+canonical state-machine table by actually firing the previously-
+unused DELIVERED → COMPLETED transition when payment_status is
+COMPLETED. Wired from both carriers' ``_apply_order_status_
+transition`` (online orders auto-complete the moment the carrier
+reports DELIVERED) and from ``_mark_cod_order_paid_if_pending``
+(COD orders complete on the next reconcile pass after delivery).
+
+Status fields are read with ``values_list`` rather than
+``refresh_from_db(fields=...)`` to avoid the deferred-field
+recursion through ``Order.__init__`` documented in
+``_advance_pending_order_to_processing``.
+
+Tests added:
+
+- tests/integration/order/test_state_machine.py — 3 tests for
+  ``maybe_advance_to_completed`` (paid-delivered advances,
+  unpaid-delivered stays, non-delivered no-op)
+- tests/integration/order/test_refund_webhook_and_cancel_cascade.py
+  — 5 tests for the charge.refunded handler (full refund, partial
+  refund, redelivery idempotency, unknown PI, missing PI) and 4
+  for the cancel cascade (call made, metadata records dispatched,
+  carrier error swallowed, no-op without carrier)
+- tests/unit/shipping_boxnow/test_service.py — replaced the
+  pre-existing ``test_delivered_transitions_order_to_delivered``
+  with a paid-vs-COD pair so the auto-advance + the COD pause are
+  both pinned
+
+Verified with the targeted suites:
+
+- tests/integration/order/test_state_machine.py +
+  test_refund_webhook_and_cancel_cascade.py — 102 pass
+- tests/integration/order/test_payment_confirmation.py +
+  test_payment_failure.py + test_webhook_handlers.py +
+  test_signals.py + test_cancel_and_invoice_views.py +
+  tests/unit/shipping{,_acs,_boxnow} +
+  tests/integration/shipping_acs + shipping_boxnow — 315 pass
+- ruff format + ruff check + ty check — clean
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6521f8f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6521f8f2a4f772585bc7397e2596e2b3b800875f))
+
+* fix(order): advance COD orders to PROCESSING on voucher mint, lock payment-handler rows, regression test for on_commit dispatch
+
+Four related correctness fixes:
+
+1. COD/offline-paid orders sat at PENDING ("Εκκρεμεί" in the admin)
+   forever because nothing flipped status when the courier voucher
+   was minted. Online-paid orders advance via handle_payment_succeeded;
+   COD has no equivalent. Add ``_advance_pending_order_to_processing``
+   helpers in AcsService and BoxNowService that run after the voucher
+   persist and bump PENDING → PROCESSING. Online orders are already
+   PROCESSING by then, so the guard makes the call a no-op.
+
+2. ``handle_order_status_changed`` now passes ``previous_status`` to
+   ``order_canceled.send(...)`` so the cancel log line stops reading
+   "previous status: None".
+
+3. ``handle_payment_succeeded`` and ``handle_payment_failed`` now
+   ``select_for_update`` the order row (separate plain query, since
+   ``for_detail()`` adds GROUP BY which Postgres rejects with FOR
+   UPDATE) before mutating, so concurrent admin writes can't race
+   the mark_as_paid / status advance / dispatch sequence.
+
+4. New regression tests prove ``ShippingService.dispatch_create_
+   shipment_task`` does NOT enqueue the carrier task when the
+   wrapping atomic block rolls back, and DOES enqueue it exactly
+   once on commit. Without these, the bug fixed in 59527a87
+   (prod order 47 voucher_no=pending) could re-emerge silently.
+
+Verified with the targeted suites:
+
+- tests/unit/shipping/test_dispatch_helpers.py — 7 tests, all pass
+- tests/integration/order/test_payment_confirmation.py + test_payment_failure.py + test_webhook_handlers.py — 88 tests, all pass
+- tests/unit/shipping_acs/test_service.py + tests/integration/shipping_boxnow/test_create_shipment_task.py + tests/integration/order/test_state_machine.py + test_signals.py + test_cancel_and_invoice_views.py — 315 pass, 1 unrelated flake on a BoxNow client auth test that passes in isolation.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0520805`](https://github.com/vasilistotskas/grooveshop-django-api/commit/05208050ad79d2b9718276efaaa3511974ea572f))
+
 ## v1.118.7 (2026-04-30)
 
 ### Bug fixes

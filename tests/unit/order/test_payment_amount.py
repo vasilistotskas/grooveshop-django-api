@@ -247,7 +247,6 @@ class ShippingCostCalculationTestCase(TestCase):
         self, mock_setting
     ):
         """BoxNow shipping reads BOXNOW_* settings, not the home_delivery ones."""
-        from order.enum.shipping_method import OrderShippingMethod
         from order.services import OrderService
 
         mock_setting.side_effect = lambda key, **kw: {
@@ -261,14 +260,14 @@ class ShippingCostCalculationTestCase(TestCase):
         cart_total = Money(Decimal("25.00"), "EUR")
         shipping = OrderService.calculate_shipping_cost(
             cart_total,
-            shipping_method=OrderShippingMethod.BOX_NOW_LOCKER,
+            shipping_provider_code="boxnow",
+            shipping_kind="pickup_point",
         )
         self.assertEqual(shipping.amount, Decimal("2.50"))
 
     @mock.patch("extra_settings.models.Setting.get")
     def test_boxnow_shipping_free_above_threshold(self, mock_setting):
         """BoxNow shipping is waived once cart total reaches the threshold."""
-        from order.enum.shipping_method import OrderShippingMethod
         from order.services import OrderService
 
         mock_setting.side_effect = lambda key, **kw: {
@@ -279,7 +278,8 @@ class ShippingCostCalculationTestCase(TestCase):
         cart_total = Money(Decimal("35.00"), "EUR")
         shipping = OrderService.calculate_shipping_cost(
             cart_total,
-            shipping_method=OrderShippingMethod.BOX_NOW_LOCKER,
+            shipping_provider_code="boxnow",
+            shipping_kind="pickup_point",
         )
         self.assertEqual(shipping.amount, Decimal("0"))
 
@@ -288,7 +288,6 @@ class ShippingCostCalculationTestCase(TestCase):
         self, mock_setting
     ):
         """BoxNow's flat partnership rate ignores country/region multipliers."""
-        from order.enum.shipping_method import OrderShippingMethod
         from order.services import OrderService
 
         mock_setting.side_effect = lambda key, **kw: {
@@ -301,7 +300,8 @@ class ShippingCostCalculationTestCase(TestCase):
             cart_total,
             country_id="GR",
             region_id="GR-A1",
-            shipping_method=OrderShippingMethod.BOX_NOW_LOCKER,
+            shipping_provider_code="boxnow",
+            shipping_kind="pickup_point",
         )
         # BoxNow rate is flat: country/region adjustments don't apply.
         self.assertEqual(shipping.amount, Decimal("2.50"))

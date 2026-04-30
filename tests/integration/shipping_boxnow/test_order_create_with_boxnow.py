@@ -23,7 +23,6 @@ from rest_framework.test import APITestCase
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from country.factories import CountryFactory
-from order.enum.shipping_method import OrderShippingMethod
 from order.enum.status import PaymentStatus
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
@@ -94,7 +93,11 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "region_id": self.region.alpha,
             "phone": "+302100000000",
             "shipping_price": "2.50",
-            "shipping_method": OrderShippingMethod.BOX_NOW_LOCKER.value,
+            # Registry-driven dispatch: explicit (provider, kind) is the
+            # only supported routing — the legacy ``shipping_method``
+            # enum no longer drives provider lookup.
+            "shipping_provider_code": "boxnow",
+            "shipping_kind": "pickup_point",
             "boxnow_compartment_size": 1,
         }
         if include_locker_id:
@@ -141,7 +144,9 @@ class TestOrderCreateWithBoxNow(APITestCase):
         from order.models.order import Order
 
         order = Order.objects.latest("id")
-        assert order.shipping_method == OrderShippingMethod.BOX_NOW_LOCKER.value
+        assert order.shipping_provider is not None
+        assert order.shipping_provider.code == "boxnow"
+        assert order.shipping_kind == "pickup_point"
 
         shipment = BoxNowShipment.objects.get(order=order)
         assert shipment.parcel_state == BoxNowParcelState.PENDING_CREATION.value

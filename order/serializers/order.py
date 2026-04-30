@@ -652,17 +652,24 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                 }
             )
 
-        # BoxNow cross-field validation
-        if attrs.get("shipping_method") == OrderShippingMethod.BOX_NOW_LOCKER:
+        # BoxNow cross-field validation. Trigger condition is the
+        # registry-driven ``(shipping_provider_code, shipping_kind)``
+        # pair — the legacy ``shipping_method`` enum no longer drives
+        # carrier selection.
+        is_boxnow_pickup = (
+            attrs.get("shipping_provider_code") == "boxnow"
+            and attrs.get("shipping_kind") == "pickup_point"
+        )
+        if is_boxnow_pickup:
             # Master switch — admin can hide BoxNow without redeploy.
             # Production starts disabled (BOXNOW_ENABLED defaults to
-            # False); we only allow ``box_now_locker`` orders once an
-            # admin has flipped the Setting row to True. Defends against
-            # a stale frontend cache surfacing the option.
+            # False); we only allow BoxNow locker orders once an admin
+            # has flipped the Setting row to True. Defends against a
+            # stale frontend cache surfacing the option.
             if not Setting.get("BOXNOW_ENABLED", default=False):
                 raise serializers.ValidationError(
                     {
-                        "shipping_method": _(
+                        "shipping_provider_code": _(
                             "BoxNow locker shipping is currently unavailable."
                         )
                     }

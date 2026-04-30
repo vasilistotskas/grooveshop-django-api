@@ -39,6 +39,15 @@ class ShippingCarrierInterface(ABC):
 
     code: ClassVar[str]
 
+    # Carrier-specific keys that arrive in the create-order request
+    # body but are NOT columns on ``Order``. The order-flow code pops
+    # these off the request dict before calling ``Order.objects.create``
+    # and hands them to ``create_shipment_row`` so each provider reads
+    # its own subset. Override per provider — empty tuple means the
+    # carrier doesn't add any per-order payload (e.g. flat home-delivery
+    # carriers without locker selection).
+    payload_keys: ClassVar[tuple[str, ...]] = ()
+
     @abstractmethod
     def create_shipment(
         self,
@@ -192,3 +201,17 @@ def is_registered(code: str) -> bool:
 def registered_codes() -> list[str]:
     """Return the list of registered provider codes (for diagnostics)."""
     return sorted(_REGISTRY.keys())
+
+
+def all_payload_keys() -> tuple[str, ...]:
+    """Return the union of every registered carrier's ``payload_keys``.
+
+    Used by the order-creation paths to pop carrier-specific keys off
+    the request body before calling ``Order.objects.create`` so adding
+    a new carrier doesn't require editing ``order/services.py`` to
+    extend a hardcoded ``_SHIPMENT_PAYLOAD_KEYS`` tuple.
+    """
+    keys: set[str] = set()
+    for adapter in _REGISTRY.values():
+        keys.update(adapter.payload_keys)
+    return tuple(sorted(keys))

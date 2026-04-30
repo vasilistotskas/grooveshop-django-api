@@ -60,11 +60,11 @@ def test_create_shipment_row_no_op_when_provider_unset():
     ShippingService.create_shipment_row_for_order(order)
 
 
-def test_dispatch_task_falls_back_to_legacy_enum_for_boxnow():
-    """A row that pre-dates Phase 0 has shipping_provider=NULL but
-    shipping_method='box_now_locker'. The dispatcher must still find
-    BoxNow via the legacy enum mapping."""
-    order = OrderFactory(shipping_method="box_now_locker")
+def test_dispatch_task_dispatches_to_boxnow_via_provider_fk():
+    """Orders with shipping_provider=boxnow attached dispatch through
+    the BoxNow carrier's Celery task hook."""
+    order = OrderFactory()
+    _attach_provider(order, "boxnow")
 
     with patch(
         "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
@@ -74,8 +74,9 @@ def test_dispatch_task_falls_back_to_legacy_enum_for_boxnow():
     assert mock_dispatch.called
 
 
-def test_dispatch_task_falls_back_to_legacy_enum_for_acs():
-    order = OrderFactory(shipping_method="acs_smartpoint")
+def test_dispatch_task_dispatches_to_acs_via_provider_fk():
+    order = OrderFactory()
+    _attach_provider(order, "acs")
 
     with patch(
         "shipping_acs.carrier.AcsCarrier.dispatch_create_shipment_task"
@@ -85,10 +86,10 @@ def test_dispatch_task_falls_back_to_legacy_enum_for_acs():
     assert mock_dispatch.called
 
 
-def test_dispatch_task_no_op_for_home_delivery():
-    """home_delivery has no provider attached and no legacy mapping
-    — the dispatcher must silently no-op."""
-    order = OrderFactory(shipping_method="home_delivery")
+def test_dispatch_task_no_op_for_orders_without_provider():
+    """Orders without a shipping_provider attached (e.g. legacy data,
+    home delivery without a courier) must silently no-op."""
+    order = OrderFactory()  # no shipping_provider
 
     # Should not raise; nothing to assert beyond "no exception".
     ShippingService.dispatch_create_shipment_task(order)

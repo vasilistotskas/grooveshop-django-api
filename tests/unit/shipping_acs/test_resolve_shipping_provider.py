@@ -1,8 +1,7 @@
-"""Verify OrderService._resolve_shipping_provider maps the legacy enum
-to the new (shipping_provider, shipping_kind) pair correctly for ACS.
-
-This is the back-compat bridge that lets v1 API clients sending only
-``shipping_method`` continue to work after Phase 0/1.
+"""Verify OrderService._resolve_shipping_provider routes the explicit
+``(shipping_provider_code, shipping_kind)`` pair through to the FK +
+kind columns correctly, and that the dynamic home-delivery auto-router
+picks the right active provider.
 """
 
 from __future__ import annotations
@@ -14,9 +13,10 @@ from order.services import OrderService
 pytestmark = pytest.mark.django_db
 
 
-def test_acs_smartpoint_method_maps_to_acs_provider_pickup_point():
+def test_explicit_provider_code_attaches_provider_fk():
     order_data = {
-        "shipping_method": "acs_smartpoint",
+        "shipping_provider_code": "acs",
+        "shipping_kind": "pickup_point",
     }
     OrderService._resolve_shipping_provider(order_data)
 
@@ -24,11 +24,15 @@ def test_acs_smartpoint_method_maps_to_acs_provider_pickup_point():
     assert provider is not None
     assert provider.code == "acs"
     assert order_data["shipping_kind"] == "pickup_point"
+    # The shipping_provider_code key must be removed before
+    # Order.objects.create() is called.
+    assert "shipping_provider_code" not in order_data
 
 
-def test_box_now_locker_method_maps_to_boxnow_provider_pickup_point():
+def test_explicit_boxnow_pickup_point_attaches_boxnow():
     order_data = {
-        "shipping_method": "box_now_locker",
+        "shipping_provider_code": "boxnow",
+        "shipping_kind": "pickup_point",
     }
     OrderService._resolve_shipping_provider(order_data)
 
@@ -38,13 +42,12 @@ def test_box_now_locker_method_maps_to_boxnow_provider_pickup_point():
     assert order_data["shipping_kind"] == "pickup_point"
 
 
-def test_home_delivery_method_unattached_when_no_provider_active():
+def test_home_delivery_without_explicit_provider_stays_unlinked_when_no_provider_active():
     """When no provider has ``is_active=True`` AND
     ``supports_home_delivery=True``, ``home_delivery`` orders stay
-    unlinked — exactly the pre-Phase-0 behaviour for legacy rows."""
-    order_data = {
-        "shipping_method": "home_delivery",
-    }
+    unlinked — they fall through to the platform's flat-rate
+    home-delivery path without a courier adapter."""
+    order_data = {"shipping_kind": "home_delivery"}
     OrderService._resolve_shipping_provider(order_data)
 
     # All seeded providers default to is_active=False so no auto-routing.
@@ -52,18 +55,16 @@ def test_home_delivery_method_unattached_when_no_provider_active():
     assert order_data["shipping_kind"] == "home_delivery"
 
 
-def test_home_delivery_auto_routes_to_active_home_delivery_provider():
+def test_home_delivery_auto_routes_to_active_provider():
     """Once ops flips a home-delivery provider's ``is_active`` flag on,
-    plain ``shipping_method=home_delivery`` orders auto-attach to it
-    via the dynamic-routing fallback in ``_resolve_shipping_provider``.
-    Lets ops add a new courier without touching order-flow code."""
+    plain ``home_delivery`` orders without an explicit provider code
+    auto-attach to it via the dynamic-routing fallback. Lets ops add
+    a new courier (ELTA / Speedex) without touching order-flow code."""
     from shipping.models import ShippingProvider
 
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
 
-    order_data = {
-        "shipping_method": "home_delivery",
-    }
+    order_data = {"shipping_kind": "home_delivery"}
     OrderService._resolve_shipping_provider(order_data)
 
     provider = order_data.get("shipping_provider")
@@ -72,19 +73,15 @@ def test_home_delivery_auto_routes_to_active_home_delivery_provider():
     assert order_data["shipping_kind"] == "home_delivery"
 
 
-def test_explicit_provider_code_wins_over_legacy_enum():
-    """When the new pair is sent, the legacy enum is ignored."""
-    order_data = {
-        "shipping_method": "home_delivery",
-        "shipping_provider_code": "acs",
-        "shipping_kind": "home_delivery",
-    }
+def test_default_kind_is_home_delivery_when_omitted():
+    """Callers that send ``shipping_provider_code`` without a kind
+    default to ``home_delivery`` — keeps backwards-compat with v1
+    clients that only knew about a single home-delivery flow."""
+    from shipping.models import ShippingProvider
+
+    ShippingProvider.objects.filter(code="acs").update(is_active=True)
+
+    order_data: dict = {}
     OrderService._resolve_shipping_provider(order_data)
 
-    provider = order_data.get("shipping_provider")
-    assert provider is not None
-    assert provider.code == "acs"
     assert order_data["shipping_kind"] == "home_delivery"
-    # The shipping_provider_code key must be removed before
-    # Order.objects.create() is called.
-    assert "shipping_provider_code" not in order_data

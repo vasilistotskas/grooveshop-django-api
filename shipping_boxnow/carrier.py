@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 class BoxNowCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "boxnow"
 
+    # Carrier-specific request-body keys popped before Order.create().
+    payload_keys: ClassVar[tuple[str, ...]] = (
+        "boxnow_locker_id",
+        "boxnow_compartment_size",
+    )
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------

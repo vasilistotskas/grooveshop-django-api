@@ -34,7 +34,6 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
-from order.enum.shipping_method import OrderShippingMethod
 from order.exceptions import (
     InsufficientStockError,
     InvalidOrderDataError,
@@ -642,8 +641,9 @@ class OrderViewSet(BaseModelViewSet):
         re-apply them here. Source of truth: the serializer — keep both
         in sync.
         """
-        shipping_method = request.data.get("shipping_method")
-        if shipping_method != OrderShippingMethod.BOX_NOW_LOCKER:
+        provider_code = request.data.get("shipping_provider_code")
+        shipping_kind = request.data.get("shipping_kind")
+        if provider_code != "boxnow" or shipping_kind != "pickup_point":
             return
 
         # Master switch — defends against a stale frontend that still
@@ -656,7 +656,7 @@ class OrderViewSet(BaseModelViewSet):
         if not Setting.get("BOXNOW_ENABLED", default=False):
             raise ValidationError(
                 {
-                    "shipping_method": [
+                    "shipping_provider_code": [
                         _("BoxNow locker shipping is currently unavailable.")
                     ]
                 }
@@ -903,16 +903,33 @@ class OrderViewSet(BaseModelViewSet):
             "document_type": request.data.get("document_type"),
             "billing_vat_id": request.data.get("billing_vat_id", ""),
             "billing_country": request.data.get("billing_country", ""),
-            # Shipping method + BoxNow (per StepShipping in Nuxt). Default to
-            # home_delivery so legacy POSTs without the field stay backwards-
-            # compatible. ``boxnow_locker_id`` is empty for home_delivery.
+            # Registry-driven shipping dispatch: explicit
+            # ``(shipping_provider_code, shipping_kind)`` flows through
+            # ``_resolve_shipping_provider`` → carrier adapter. The
+            # legacy ``shipping_method`` field is forwarded only as a
+            # denormalised display column write — it no longer drives
+            # provider routing.
             "shipping_method": request.data.get(
                 "shipping_method", "home_delivery"
             ),
+            "shipping_provider_code": request.data.get(
+                "shipping_provider_code"
+            ),
+            "shipping_kind": request.data.get("shipping_kind"),
+            # Carrier-specific payload keys — kept here so each
+            # adapter's ``payload_keys`` ClassVar can pop what it
+            # needs in ``_extract_shipment_payload``. Adding a new
+            # carrier means listing its keys on the adapter, not
+            # editing this dict.
             "boxnow_locker_id": request.data.get("boxnow_locker_id", ""),
             "boxnow_compartment_size": request.data.get(
                 "boxnow_compartment_size", 1
             ),
+            "acs_station_external_id": request.data.get(
+                "acs_station_external_id", ""
+            ),
+            "acs_station_branch": request.data.get("acs_station_branch", ""),
+            "acs_charge_type": request.data.get("acs_charge_type"),
         }
 
     # Payment endpoints are expensive and abuse-prone (Stripe PaymentIntent

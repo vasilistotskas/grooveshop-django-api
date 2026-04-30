@@ -20,6 +20,15 @@ logger = logging.getLogger(__name__)
 class AcsCarrier(ShippingCarrierInterface):
     code: ClassVar[str] = "acs"
 
+    # Carrier-specific request-body keys popped before Order.create().
+    # Add a new key here when ACS introduces a new per-order field
+    # (Phase 4 added ``acs_charge_type`` for offline-payway override).
+    payload_keys: ClassVar[tuple[str, ...]] = (
+        "acs_station_external_id",
+        "acs_station_branch",
+        "acs_charge_type",
+    )
+
     def create_shipment(
         self,
         order: Order,

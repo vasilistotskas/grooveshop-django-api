@@ -296,7 +296,10 @@ class OrderService:
                 order_value=_cart_total,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
-                shipping_method=shipping_address.get("shipping_method"),
+                shipping_provider_code=shipping_address.get(
+                    "shipping_provider_code"
+                ),
+                shipping_kind=shipping_address.get("shipping_kind"),
             )
             _order_subtotal = Money(
                 _cart_total.amount + _shipping_cost.amount,
@@ -466,7 +469,6 @@ class OrderService:
                 order_value=cart_total,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
-                shipping_method=shipping_address.get("shipping_method"),
                 shipping_provider_code=shipping_address.get(
                     "shipping_provider_code"
                 ),
@@ -902,7 +904,6 @@ class OrderService:
                 order_value=cart_total,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
-                shipping_method=shipping_address.get("shipping_method"),
                 shipping_provider_code=shipping_address.get(
                     "shipping_provider_code"
                 ),
@@ -1877,35 +1878,20 @@ class OrderService:
 
         Mutates ``order_data`` in place: removes ``shipping_provider_code``
         and replaces it with the resolved ``shipping_provider`` (a
-        ``ShippingProvider`` instance) plus a default ``shipping_kind``
-        when the caller did not supply one.
+        ``ShippingProvider`` instance). Defaults ``shipping_kind`` to
+        ``home_delivery`` when not supplied.
 
-        Falls back to provider/kind inferred from the legacy
-        ``shipping_method`` when the new keys are absent so old callers
-        continue to work transparently.
+        Dispatch is registry-driven from the explicit
+        ``(shipping_provider_code, shipping_kind)`` pair only.
+        ``home_delivery`` orders without an explicit code auto-route
+        to whichever active provider advertises
+        ``supports_home_delivery=True`` — adding a new courier (ELTA,
+        Speedex …) is then a one-row admin change.
         """
         from shipping.models import ShippingProvider
 
         code = order_data.pop("shipping_provider_code", None) or None
-        kind = order_data.get("shipping_kind")
-        method = order_data.get("shipping_method")
-
-        # Infer (provider, kind) from the legacy enum when the caller
-        # did not supply explicit values. Mapping is one-way and
-        # additive — old API clients sending only ``shipping_method``
-        # keep working unchanged.
-        if not code:
-            if method == OrderShippingMethod.BOX_NOW_LOCKER:
-                code = "boxnow"
-            elif method == OrderShippingMethod.ACS_SMARTPOINT:
-                code = "acs"
-        if not kind:
-            if method == OrderShippingMethod.BOX_NOW_LOCKER:
-                kind = "pickup_point"
-            elif method == OrderShippingMethod.ACS_SMARTPOINT:
-                kind = "pickup_point"
-            else:
-                kind = "home_delivery"
+        kind = order_data.get("shipping_kind") or "home_delivery"
 
         # Dynamic-routing fallback: a plain ``home_delivery`` request
         # auto-routes to whichever active provider advertises
@@ -1936,17 +1922,6 @@ class OrderService:
 
         order_data["shipping_kind"] = kind
 
-    # Carrier-payload keys popped before Order.objects.create() — they
-    # are not Order columns but each provider adapter reads its own
-    # subset out of the original dict via create_shipment_row().
-    _SHIPMENT_PAYLOAD_KEYS: tuple[str, ...] = (
-        "boxnow_locker_id",
-        "boxnow_compartment_size",
-        "acs_station_external_id",
-        "acs_station_branch",
-        "acs_charge_type",
-    )
-
     @classmethod
     def _extract_shipment_payload(
         cls, order_data: dict[str, Any]
@@ -1957,10 +1932,17 @@ class OrderService:
         cause ``Order.objects.create(**order_data)`` to crash with an
         unexpected-kwarg ``TypeError``.  The returned dict is handed to
         the carrier registry so each adapter reads what it needs.
+
+        The key list is the union of every registered carrier's
+        ``payload_keys`` ClassVar, so adding a new carrier (ELTA,
+        Speedex …) means writing one new adapter file with its
+        ``payload_keys`` declared — no edit to ``order/services.py``.
         """
+        from shipping.interfaces import all_payload_keys
+
         return {
             key: order_data.pop(key)
-            for key in cls._SHIPMENT_PAYLOAD_KEYS
+            for key in all_payload_keys()
             if key in order_data
         }
 
@@ -2034,17 +2016,17 @@ class OrderService:
         order_value: Money,
         country_id: int | None = None,
         region_id: int | None = None,
-        shipping_method: str | None = None,
         shipping_provider_code: str | None = None,
         shipping_kind: str | None = None,
     ) -> Money:
         from extra_settings.models import Setting
 
-        # New abstraction takes precedence: when (provider, kind) is
-        # supplied, dispatch through the registry so each provider
-        # owns its own pricing rules. Falls back to the legacy
-        # shipping_method branch when the registry has no opinion or
-        # the provider isn't installed.
+        # When the request carries a (provider, kind) pair, dispatch
+        # through the registry so each provider owns its own pricing
+        # rules. The provider's adapter has full control over flat
+        # rate, dynamic quotes, free-shipping thresholds, and per-
+        # country/region overrides — keeping per-carrier logic out of
+        # this generic dispatcher.
         if shipping_provider_code and shipping_kind:
             from shipping.services import ShippingService
 
@@ -2060,19 +2042,9 @@ class OrderService:
                 amount, currency = quote
                 return Money(amount, currency)
 
-        if shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
-            base_shipping_cost = Setting.get(
-                "BOXNOW_SHIPPING_PRICE", default=2.50
-            )
-            free_shipping_threshold = Setting.get(
-                "BOXNOW_FREE_SHIPPING_THRESHOLD", default=30.00
-            )
-            # BoxNow rate is a flat partnership fee; country/region
-            # adjustments don't apply to locker shipments.
-            if order_value.amount >= float(free_shipping_threshold):
-                return Money(0, order_value.currency)
-            return Money(float(base_shipping_cost), order_value.currency)
-
+        # Generic fallback for orders without a courier adapter — the
+        # platform's flat-rate home-delivery price, country/region
+        # overrides applied below.
         base_shipping_cost = Setting.get(
             "CHECKOUT_SHIPPING_PRICE", default=3.00
         )

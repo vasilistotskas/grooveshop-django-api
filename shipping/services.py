@@ -100,22 +100,14 @@ class ShippingService:
     def dispatch_create_shipment_task(cls, order: Order) -> None:
         """Fire the provider's create-shipment Celery task.
 
-        Routing strategy: order's ``shipping_provider`` FK first; falls
-        back to the legacy ``shipping_method`` enum so pre-Phase-0
-        rows still reach the right Celery task on payment success.
+        The order MUST have ``shipping_provider`` set — orders created
+        through any of the ``OrderService.create_order*`` paths always
+        go through ``_resolve_shipping_provider`` which sets it. A
+        missing provider here means the order is genuinely
+        provider-less (e.g. flat-rate home delivery without a courier
+        adapter) — silently return.
         """
-        from order.enum.shipping_method import OrderShippingMethod
-
         adapter = cls.adapter_for_order(order)
-        if adapter is None:
-            method = order.shipping_method
-            if method == OrderShippingMethod.BOX_NOW_LOCKER:
-                adapter = (
-                    get_provider("boxnow") if is_registered("boxnow") else None
-                )
-            elif method == OrderShippingMethod.ACS_SMARTPOINT:
-                adapter = get_provider("acs") if is_registered("acs") else None
-
         if adapter is None:
             return
         adapter.dispatch_create_shipment_task(order)

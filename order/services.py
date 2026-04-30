@@ -10,7 +10,6 @@ from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.shipping_method import OrderShippingMethod
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     InsufficientStockError,
@@ -457,10 +456,6 @@ class OrderService:
                     shipping_address.get("document_type")
                     or OrderDocumentTypeEnum.RECEIPT
                 ),
-                "shipping_method": shipping_address.get(
-                    "shipping_method",
-                    OrderShippingMethod.HOME_DELIVERY,
-                ),
             }
 
             # Calculate shipping cost
@@ -892,10 +887,6 @@ class OrderService:
                     shipping_address.get("document_type")
                     or OrderDocumentTypeEnum.RECEIPT
                 ),
-                "shipping_method": shipping_address.get(
-                    "shipping_method",
-                    OrderShippingMethod.HOME_DELIVERY,
-                ),
             }
 
             # Calculate shipping cost
@@ -1300,26 +1291,10 @@ class OrderService:
             if not address.get(field):
                 errors[field] = [_("This field is required")]
 
-        # BoxNow shipping requires a locker selection. Without it, the
-        # BoxNow API call would fail with P402 (invalid destination)
-        # asynchronously inside the Celery task — way too late for a
-        # useful error message. Fail fast at the create-order boundary.
-        if address.get(
-            "shipping_method"
-        ) == OrderShippingMethod.BOX_NOW_LOCKER and not address.get(
-            "boxnow_locker_id"
-        ):
-            errors["boxnow_locker_id"] = [
-                _(
-                    "Select a BOX NOW locker before placing an order with "
-                    "locker delivery."
-                )
-            ]
-
-        # New abstraction: when the request carries an explicit
-        # (shipping_provider_code, shipping_kind) pair, defer field-
-        # level validation to the provider adapter so each carrier
-        # owns its own rules without bloating this method.
+        # Carrier-specific validation runs through the registry below
+        # (see ``ShippingService.validate_order_payload``) — each
+        # provider adapter owns its own field-level rules so this
+        # method stays carrier-agnostic.
         #
         # Carrier validators that care about pay-way compatibility
         # (e.g. BoxNow doesn't support COD) need the ``is_online_payment``

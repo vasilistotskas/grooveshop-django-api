@@ -33300,15 +33300,6 @@ components:
         paymentMethod:
           type: string
           maxLength: 50
-        shippingMethod:
-          allOf:
-          - $ref: '#/components/schemas/ShippingMethodEnum'
-          description: |-
-            Legacy enum kept for backwards compatibility. New code reads the (shipping_provider, shipping_kind) pair instead — both fields are dual-written by OrderService until Phase 3 of the shipping abstraction migration.
-
-            * `home_delivery` - Home delivery
-            * `box_now_locker` - BOX NOW Locker
-            * `acs_smartpoint` - ACS Smartpoint
         canBeCanceled:
           type: boolean
           readOnly: true
@@ -33444,16 +33435,6 @@ components:
           minimum: 0
           nullable: true
           description: Number of loyalty points to redeem for discount on this order
-        shippingMethod:
-          allOf:
-          - $ref: '#/components/schemas/ShippingMethodEnum'
-          default: home_delivery
-          description: |-
-            Shipping method for this order
-
-            * `home_delivery` - Home delivery
-            * `box_now_locker` - BOX NOW Locker
-            * `acs_smartpoint` - ACS Smartpoint
         boxnowLockerId:
           type: string
           description: BoxNow APM locker ID from the widget
@@ -33639,15 +33620,6 @@ components:
         paymentMethod:
           type: string
           maxLength: 50
-        shippingMethod:
-          allOf:
-          - $ref: '#/components/schemas/ShippingMethodEnum'
-          description: |-
-            Legacy enum kept for backwards compatibility. New code reads the (shipping_provider, shipping_kind) pair instead — both fields are dual-written by OrderService until Phase 3 of the shipping abstraction migration.
-
-            * `home_delivery` - Home delivery
-            * `box_now_locker` - BOX NOW Locker
-            * `acs_smartpoint` - ACS Smartpoint
         canBeCanceled:
           type: boolean
           readOnly: true
@@ -33728,7 +33700,7 @@ components:
           - $ref: '#/components/schemas/BoxNowShipmentDetail'
           nullable: true
           readOnly: true
-          description: BoxNow shipment details when shipping_method is 'box_now_locker',
+          description: BoxNow shipment details when shipping_provider.code is 'boxnow',
             else null.
         acsShipment:
           allOf:
@@ -38988,16 +38960,6 @@ components:
       description: |-
         * `home_delivery` - Home delivery
         * `pickup_point` - Pickup point / locker
-    ShippingMethodEnum:
-      enum:
-      - home_delivery
-      - box_now_locker
-      - acs_smartpoint
-      type: string
-      description: |-
-        * `home_delivery` - Home delivery
-        * `box_now_locker` - BOX NOW Locker
-        * `acs_smartpoint` - ACS Smartpoint
     ShippingOption:
       type: object
       description: |-

@@ -138,8 +138,8 @@ class OrderDetailSerializer(OrderSerializer):
     )
     boxnow_shipment = serializers.SerializerMethodField(
         help_text=(
-            "BoxNow shipment details when shipping_method is "
-            "'box_now_locker', else null."
+            "BoxNow shipment details when shipping_provider.code is "
+            "'boxnow', else null."
         )
     )
     acs_shipment = serializers.SerializerMethodField(

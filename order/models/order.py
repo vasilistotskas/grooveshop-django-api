@@ -21,7 +21,6 @@ from core.models import (
     MetaDataModel,
 )
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.shipping_method import OrderShippingMethod
 from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager
 from shipping.enum import ShippingKind
@@ -215,19 +214,6 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     )
     shipping_carrier = models.CharField(
         _("Shipping Carrier"), max_length=255, blank=True, default=""
-    )
-    shipping_method = models.CharField(
-        _("Shipping Method"),
-        max_length=32,
-        choices=OrderShippingMethod.choices,
-        default=OrderShippingMethod.HOME_DELIVERY,
-        db_index=True,
-        help_text=_(
-            "Legacy enum kept for backwards compatibility. New code reads "
-            "the (shipping_provider, shipping_kind) pair instead — both "
-            "fields are dual-written by OrderService until Phase 3 of the "
-            "shipping abstraction migration."
-        ),
     )
     shipping_provider = models.ForeignKey(
         "shipping.ShippingProvider",

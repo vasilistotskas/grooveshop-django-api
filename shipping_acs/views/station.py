@@ -194,15 +194,28 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
                 status=400,
             )
 
-        # Postcode prefix match first — ACS Smartpoints share the
-        # 5-digit catchment with deliveries to that area.
+        # Postcode match — try widening the prefix from full-5 down to
+        # 3 digits (Greek area code) so a customer in 10671 still gets
+        # the nearby Smartpoints in 10675/10677. The picker only needs
+        # ``nearest_limit`` rows; sort by ``postal_code`` so closer
+        # codes naturally lead.
         limit = acs_config.nearest_limit()
-        prefix = postal[:5]
-        rows = list(
-            qs.filter(postal_code__startswith=prefix).order_by(
-                "postal_code", "external_id"
-            )[:limit]
-        )
+        rows: list[AcsStation] = []
+        # ``postal[:5]`` for the 5-digit exact-area pass (covers
+        # postcodes that genuinely have a locker), then ``postal[:3]``
+        # as the area-code fallback (Greek postcodes share a 3-digit
+        # prefix per geographic region).
+        for prefix_len in (5, 3):
+            prefix = postal[:prefix_len]
+            if not prefix:
+                continue
+            rows = list(
+                qs.filter(postal_code__startswith=prefix).order_by(
+                    "postal_code", "external_id"
+                )[:limit]
+            )
+            if rows:
+                break
 
         # Fallback to city-name ILIKE when no postcode hits — covers
         # rural / island postcodes that don't map cleanly to a locker.

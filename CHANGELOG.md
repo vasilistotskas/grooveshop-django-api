@@ -3,6 +3,36 @@
 
 
 
+## v1.118.7 (2026-04-30)
+
+### Bug fixes
+
+* fix(shipping): defer create-shipment task until after order commit
+
+Prod order 47 was stuck at voucher=pending: the ACS create_acs_voucher
+task fired inside the open create_order_from_cart_offline transaction,
+the worker looked up the order on a separate DB connection that hadn't
+yet seen the INSERT, raised Order.DoesNotExist, and gave up
+permanently because that path returned a non-retryable status dict.
+
+ShippingService.dispatch_create_shipment_task now wraps the per-carrier
+dispatch in transaction.on_commit, so the worker only sees the order
+after the creating transaction has actually committed. on_commit is a
+no-op outside a transaction, so the admin "issue voucher now" action
+and other already-committed call sites still dispatch immediately.
+
+Belt-and-suspenders: both ACS and BoxNow create-shipment tasks now
+retry up to 3 times (~30s with backoff) on Order.DoesNotExist before
+returning order_not_found, defending against any future call site that
+forgets the on_commit wrap or a stale-replica read under load.
+
+Verified end-to-end on stage: re-fired the task for order 47, voucher
+9767398830 minted in 670ms, then cancelled cleanly via
+AcsService.cancel_voucher (state new -> canceled, voucher_no retained
+for audit), order flipped to CANCELED.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`59527a8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/59527a873b8973066e2fd961c8914525ce7df9f3))
+
 ## v1.118.6 (2026-04-30)
 
 ### Bug fixes

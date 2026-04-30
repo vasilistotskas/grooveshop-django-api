@@ -3,6 +3,81 @@
 
 
 
+## v1.118.5 (2026-04-30)
+
+### Bug fixes
+
+* fix: update uv.lock ([`94d4598`](https://github.com/vasilistotskas/grooveshop-django-api/commit/94d45988dd0761b6a3b65661306f55efd7b06901))
+
+### Refactoring
+
+* refactor(order): drop Order.shipping_method column + OrderShippingMethod enum
+
+Final no-legacy step. The previous commit (056f2c65) removed every
+read of ``Order.shipping_method`` from the codebase; this commit
+deletes the underlying column and enum.
+
+Schema migration: ``order/migrations/0038_drop_shipping_method.py``
+- ``RemoveField(model_name='order', name='shipping_method')``.
+- Per the Argo CD PreSync deploy contract, schema-changing migrations
+  must be backwards-compatible with the previously-deployed image.
+  The previous release (056f2c65) shipped a runtime that no longer
+  reads the column, so dropping it now is safe — old pods aren't
+  hitting it during the rolling deploy.
+
+Code cleanup:
+- Delete ``order/enum/shipping_method.py``.
+- Remove ``OrderShippingMethod`` re-export from ``order/enum/__init__.py``.
+- Remove the column from ``Order`` model + drop the import.
+- Drop the residual ``shipping_method`` defaults in
+  ``OrderService.create_order_*`` paths and the dead BoxNow-locker
+  guard in ``validate_shipping_address`` (the registry validator now
+  owns that error path).
+- Update the ``boxnow_shipment`` serializer help-text to describe
+  the registry condition, not the dropped enum.
+
+Schema regenerated.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d521e06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d521e066a9dc45238d4bcfa3b30363eb17978cf4))
+
+* refactor(order): remove all shipping_method reads ahead of column drop
+
+Stop reading the legacy ``Order.shipping_method`` column anywhere
+that drives logic, output, or display. Prepares the model for the
+column-drop migration in the next commit.
+
+OrderDetailSerializer
+- Drop ``shipping_method`` from Meta.fields. The field is no longer
+  serialised on order detail responses; consumers read
+  ``shippingProvider`` (FK) + ``shippingKind`` instead, both of which
+  are already exposed by the registry-driven serializer.
+
+OrderCreateFromCartSerializer
+- Drop the ``shipping_method`` ChoiceField input. Callers pass
+  ``shipping_provider_code`` + ``shipping_kind`` (registry-driven)
+  exclusively. The validate() doc-string is updated accordingly.
+
+OrderViewSet
+- ``_build_shipping_address`` no longer forwards ``shipping_method``
+  to the service layer. Carrier dispatch goes through
+  ``(shipping_provider_code, shipping_kind)``.
+
+OrderAdmin
+- ``list_filter`` swaps the legacy enum filter for
+  ``("shipping_provider", RelatedDropdownFilter)`` + ``shipping_kind``,
+  preserving the support-ticket workflow with denser FK lookups.
+- ``readonly_fields`` and the ``Shipping & Tracking`` fieldset render
+  ``shipping_provider`` + ``shipping_kind`` instead.
+- ``get_inlines`` and ``boxnow_summary`` drop the legacy
+  ``shipping_method == "..."`` fallback OR — pre-Phase-0 rows with
+  no ``shipping_provider`` set get neither carrier inline (data is
+  still on the Order itself).
+
+After this commit, no Python code reads ``Order.shipping_method``.
+The next commit drops the column.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`056f2c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/056f2c65822971692b1bd08606b85b41a1dd6eb0))
+
 ## v1.118.4 (2026-04-30)
 
 ### Bug fixes

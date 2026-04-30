@@ -80,11 +80,20 @@ class PayWayFilter(
             "Filter payment methods that have/don't have configuration"
         ),
     )
-    shipping_method = filters.CharFilter(
-        method="filter_shipping_method",
+    shipping_provider_code = filters.CharFilter(
+        method="filter_carrier_compat",
         help_text=_(
-            "Filter pay ways compatible with the given shipping method. "
-            "When 'box_now_locker', only online-payment pay ways are returned."
+            "Filter pay ways compatible with the given shipping carrier. "
+            "Each carrier owns its own compatibility rules — BoxNow "
+            "(``boxnow``) rejects COD on locker pickup; other carriers "
+            "pass through unchanged. Pair with ``shippingKind``."
+        ),
+    )
+    shipping_kind = filters.CharFilter(
+        method="filter_carrier_compat",
+        help_text=_(
+            "Pair with ``shippingProviderCode`` to filter pay ways by "
+            "the carrier's compatibility rules for that kind."
         ),
     )
 
@@ -120,7 +129,22 @@ class PayWayFilter(
             return queryset.filter(configuration__isnull=True)
         return queryset
 
-    def filter_shipping_method(self, queryset, name, value):
+    def filter_carrier_compat(self, queryset, name, value):
+        """Both ``shippingProviderCode`` and ``shippingKind`` route to
+        this method; we only filter when BOTH are provided so the API
+        stays predictable. ``self.data`` lets us read the sibling
+        param without binding the methods together at the field level.
+        """
         from pay_way.services import PayWayService
 
-        return PayWayService.filter_by_shipping_method(queryset, value)
+        # ``self.data`` is already camel-decoded by CamelCaseFilterMixin
+        # so we read snake_case keys.
+        provider_code = self.data.get("shipping_provider_code")
+        shipping_kind = self.data.get("shipping_kind")
+        if not provider_code or not shipping_kind:
+            return queryset
+        return PayWayService.filter_by_carrier(
+            queryset,
+            provider_code=provider_code,
+            shipping_kind=shipping_kind,
+        )

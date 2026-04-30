@@ -77,6 +77,16 @@ class BoxNowCarrier(ShippingCarrierInterface):
     # Validation (called by order/services._validate_address_data)
     # ------------------------------------------------------------------
 
+    def filter_pay_ways(self, queryset, *, kind: ShippingKind):
+        """BoxNow rejects COD on locker pickup — pre-filter at the
+        ``/api/v1/pay-way`` listing so the frontend never offers an
+        invalid combination, and the order-create boundary doesn't
+        need a redundant guard for the same case.
+        """
+        if kind == ShippingKind.PICKUP_POINT:
+            return queryset.filter(is_online_payment=True)
+        return queryset
+
     def validate_order_payload(
         self,
         *,

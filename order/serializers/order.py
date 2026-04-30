@@ -176,7 +176,12 @@ class OrderDetailSerializer(OrderSerializer):
 
     @extend_schema_field(BoxNowShipmentDetailSerializer(allow_null=True))
     def get_boxnow_shipment(self, obj: Order) -> dict | None:
-        if obj.shipping_method != OrderShippingMethod.BOX_NOW_LOCKER:
+        # Mirror ``get_acs_shipment`` — gate on the registry-backed
+        # ``shipping_provider`` FK rather than the denormalised
+        # ``shipping_method`` enum so the field stays consistent
+        # across carriers and the legacy column can be dropped.
+        provider = getattr(obj, "shipping_provider", None)
+        if provider is None or provider.code != "boxnow":
             return None
         shipment = getattr(obj, "boxnow_shipment", None)
         if shipment is None:

@@ -15,28 +15,45 @@ logger = logging.getLogger(__name__)
 
 class PayWayService:
     @staticmethod
-    def filter_by_shipping_method(
+    def filter_by_carrier(
         queryset: QuerySet,
-        shipping_method: str | None,
+        *,
+        provider_code: str | None,
+        shipping_kind: str | None,
     ) -> QuerySet:
-        """Filter PayWays compatible with the chosen shipping method.
+        """Filter PayWays compatible with the chosen carrier + kind.
 
-        BoxNow lockers do not support cash-on-delivery: filter out
-        any PayWay with ``is_online_payment=False`` when the method is
-        BOX_NOW_LOCKER. Other shipping methods don't constrain PayWays.
+        Each carrier owns its own pay-way compatibility rules — BoxNow
+        rejects COD at locker pickup (P411 from their API), ACS allows
+        COD on every kind. The dispatch goes through the registry so
+        adding ELTA / Speedex doesn't require editing this method.
 
         Args:
             queryset: Base PayWay queryset.
-            shipping_method: One of ``OrderShippingMethod`` values, or None.
+            provider_code: ``ShippingProvider.code`` value, or None.
+            shipping_kind: ``ShippingKind`` value, or None.
 
         Returns:
             Filtered queryset.
         """
-        from order.enum.shipping_method import OrderShippingMethod
+        if not provider_code or not shipping_kind:
+            return queryset
 
-        if shipping_method == OrderShippingMethod.BOX_NOW_LOCKER:
-            return queryset.filter(is_online_payment=True)
-        return queryset
+        from shipping.enum import ShippingKind
+        from shipping.interfaces import get_provider, is_registered
+
+        if not is_registered(provider_code):
+            return queryset
+
+        try:
+            kind_enum = ShippingKind(shipping_kind)
+        except ValueError:
+            return queryset
+
+        adapter = get_provider(provider_code)
+        # Default carriers don't constrain pay-ways; BoxNow's adapter
+        # overrides this hook to block COD on PICKUP_POINT.
+        return adapter.filter_pay_ways(queryset, kind=kind_enum)
 
     @staticmethod
     def get_provider_for_pay_way(pay_way: PayWay):

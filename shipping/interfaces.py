@@ -161,6 +161,21 @@ class ShippingCarrierInterface(ABC):
         """
         return None
 
+    def filter_pay_ways(self, queryset, *, kind: ShippingKind):
+        """Return a PayWay queryset filtered by this carrier's rules.
+
+        Default: pass-through — the carrier accepts any pay-way the
+        platform offers. Override when the carrier rejects a payment
+        type for a given kind. Examples:
+
+        * BoxNow's API returns P411 for COD on locker pickup, so
+          ``BoxNowCarrier`` filters out non-online pay-ways when
+          ``kind == PICKUP_POINT``.
+        * A future Speedex carrier might restrict prepaid-only on
+          one kind by overriding the same hook.
+        """
+        return queryset
+
 
 # Module-level adapter registry. Populated by @register_provider at
 # AppConfig.ready() time. Lookup via get_provider("acs") etc.

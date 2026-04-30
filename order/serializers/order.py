@@ -56,11 +56,25 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     )
     phone = PhoneNumberField()
     status_display = serializers.SerializerMethodField("get_status_display")
+    payment_status_display = serializers.SerializerMethodField(
+        "get_payment_status_display",
+        help_text=(
+            "Localised label for ``payment_status`` (mirrors "
+            "``status_display``). Frontend renders this rather than the "
+            "raw enum value so Greek/English/German locales all work "
+            "without per-locale string maps in the UI."
+        ),
+    )
     can_be_canceled = serializers.BooleanField(read_only=True)
     is_paid = serializers.BooleanField(read_only=True)
 
+    @extend_schema_field({"type": "string"})
     def get_status_display(self, order: Order) -> str:
         return order.get_status_display()
+
+    @extend_schema_field({"type": "string"})
+    def get_payment_status_display(self, order: Order) -> str:
+        return order.get_payment_status_display()
 
     class Meta:
         model = Order
@@ -98,6 +112,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "full_address",
             "payment_id",
             "payment_status",
+            "payment_status_display",
             "payment_method",
             "can_be_canceled",
             "is_paid",
@@ -165,6 +180,25 @@ class OrderDetailSerializer(OrderSerializer):
             "the shipment shape."
         )
     )
+    cancellation = serializers.SerializerMethodField(
+        help_text=(
+            "Cancellation context for CANCELED orders — exposes the "
+            "operator-supplied reason, timestamp, and shipment-cancel "
+            "outcome from ``order.metadata['cancellation']``. Returns "
+            "null when the order was not canceled. Internal flags from "
+            "the metadata bag (webhook idempotency markers, mint "
+            "tickets) are intentionally not surfaced."
+        )
+    )
+    is_online_payment = serializers.SerializerMethodField(
+        help_text=(
+            "True when the order's PayWay charges the shopper online "
+            "(Stripe, Viva); false for cash-on-delivery / bank "
+            "transfer. Surfaced so the storefront can suppress "
+            'misleading "outstanding amount" warnings for COD orders '
+            "where the shopper intentionally paid €0 at checkout."
+        )
+    )
     phone = PhoneNumberField(read_only=True)
 
     @extend_schema_field({"type": "boolean"})
@@ -227,6 +261,50 @@ class OrderDetailSerializer(OrderSerializer):
     def get_shipment_provider_code(self, obj: Order) -> str | None:
         provider = getattr(obj, "shipping_provider", None)
         return provider.code if provider is not None else None
+
+    @extend_schema_field({"type": "boolean"})
+    def get_is_online_payment(self, obj: Order) -> bool:
+        pay_way = getattr(obj, "pay_way", None)
+        return bool(pay_way and pay_way.is_online_payment)
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "nullable": True,
+            "properties": {
+                "reason": {"type": "string"},
+                "canceled_at": {"type": "string", "format": "date-time"},
+                "previous_status": {"type": "string"},
+                "shipment_cancel": {
+                    "type": "object",
+                    "nullable": True,
+                    "properties": {
+                        "attempted": {"type": "boolean"},
+                        "dispatched": {"type": "boolean"},
+                        "error": {"type": "string", "nullable": True},
+                    },
+                },
+            },
+        }
+    )
+    def get_cancellation(self, obj: Order) -> dict | None:
+        meta = obj.metadata or {}
+        cancellation = meta.get("cancellation")
+        if not isinstance(cancellation, dict):
+            return None
+        out: dict[str, object] = {}
+        for key in ("reason", "canceled_at", "previous_status"):
+            value = cancellation.get(key)
+            if value is not None:
+                out[key] = value
+        shipment_cancel = cancellation.get("shipment_cancel")
+        if isinstance(shipment_cancel, dict):
+            out["shipment_cancel"] = {
+                "attempted": bool(shipment_cancel.get("attempted")),
+                "dispatched": bool(shipment_cancel.get("dispatched")),
+                "error": shipment_cancel.get("error"),
+            }
+        return out or None
 
     @extend_schema_field(
         {
@@ -376,6 +454,8 @@ class OrderDetailSerializer(OrderSerializer):
             "acs_shipment",
             "shipment",
             "shipment_provider_code",
+            "cancellation",
+            "is_online_payment",
             "phone",
             "document_type",
             "payment_id",

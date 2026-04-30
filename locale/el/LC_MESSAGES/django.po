@@ -3896,7 +3896,7 @@ msgstr ""
 #: .\core\templates\emails\order\payment_failed.txt:7 .\order\admin.py:87
 #: .\order\enum\status.py:37 .\user\models\data_export.py:23
 msgid "Failed"
-msgstr ""
+msgstr "Απέτυχε"
 
 #: .\core\templates\emails\order\payment_failed.html:24
 msgid "Try again"
@@ -5467,7 +5467,7 @@ msgstr ""
 
 #: .\order\admin.py:89 .\order\enum\status.py:39
 msgid "Partially Refunded"
-msgstr ""
+msgstr "Μερική επιστροφή"
 
 #: .\order\admin.py:91
 msgid "Needs Attention (Failed/Pending)"

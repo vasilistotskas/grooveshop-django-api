@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import get_language, gettext_lazy as _
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -92,6 +92,7 @@ class OrderService:
             # its own keys.
             shipment_payload = cls._extract_shipment_payload(order_data)
             cls._resolve_shipping_provider(order_data)
+            cls._seed_language_code(order_data)
 
             order = Order.objects.create(**order_data)
 
@@ -492,6 +493,7 @@ class OrderService:
                 "shipping_kind", shipping_address.get("shipping_kind")
             )
             cls._resolve_shipping_provider(order_data)
+            cls._seed_language_code(order_data)
             order = Order.objects.create(**order_data)
 
             cart_items_pairs = [
@@ -922,6 +924,7 @@ class OrderService:
                 "shipping_kind", shipping_address.get("shipping_kind")
             )
             cls._resolve_shipping_provider(order_data)
+            cls._seed_language_code(order_data)
 
             order = Order.objects.create(**order_data)
 
@@ -1976,6 +1979,32 @@ class OrderService:
             for key in all_payload_keys()
             if key in order_data
         }
+
+    @staticmethod
+    def _seed_language_code(order_data: dict[str, Any]) -> None:
+        """Capture the active locale into ``Order.language_code`` at create.
+
+        ``Order.language_code`` exists for the email tasks
+        (``send_order_confirmation_email``, ``send_order_status_update_
+        email``, etc.) — they activate ``translation.override(get_order_
+        language(order))`` before rendering. Without seeding here the
+        column defaults to ``settings.LANGUAGE_CODE`` ("el") regardless
+        of what locale the request was in, so a German shopper would
+        get Greek emails for the rest of their order's lifecycle.
+
+        Pulled from ``django.utils.translation.get_language`` (set
+        by ``LocaleMiddleware`` from the i18n cookie + Accept-Language
+        header) so views don't need to thread a ``request`` argument
+        through. Validated against ``settings.LANGUAGES`` so a stray
+        unknown code never lands in the DB.
+        """
+        if order_data.get("language_code"):
+            return
+        candidate = (get_language() or "").split("-")[0].strip().lower()
+        valid = {code for code, _name in settings.LANGUAGES}
+        order_data["language_code"] = (
+            candidate if candidate in valid else settings.LANGUAGE_CODE
+        )
 
     @classmethod
     def _cancel_attached_shipment(cls, order: Order, reason: str) -> None:

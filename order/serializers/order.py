@@ -65,6 +65,16 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "without per-locale string maps in the UI."
         ),
     )
+    is_online_payment = serializers.SerializerMethodField(
+        help_text=(
+            "True when the order's PayWay charges the shopper online "
+            "(Stripe, Viva); false for cash-on-delivery / bank "
+            "transfer. Surfaced on both list + detail so both views "
+            "can suppress misleading 'outstanding amount' warnings "
+            "for COD orders where the shopper intentionally paid €0 "
+            "at checkout."
+        ),
+    )
     can_be_canceled = serializers.BooleanField(read_only=True)
     is_paid = serializers.BooleanField(read_only=True)
 
@@ -75,6 +85,11 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     @extend_schema_field({"type": "string"})
     def get_payment_status_display(self, order: Order) -> str:
         return order.get_payment_status_display()
+
+    @extend_schema_field({"type": "boolean"})
+    def get_is_online_payment(self, order: Order) -> bool:
+        pay_way = getattr(order, "pay_way", None)
+        return bool(pay_way and pay_way.is_online_payment)
 
     class Meta:
         model = Order
@@ -114,6 +129,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "payment_status",
             "payment_status_display",
             "payment_method",
+            "is_online_payment",
             "can_be_canceled",
             "is_paid",
         )
@@ -130,6 +146,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "status_updated_at",
             "can_be_canceled",
             "is_paid",
+            "is_online_payment",
         )
 
 
@@ -188,15 +205,6 @@ class OrderDetailSerializer(OrderSerializer):
             "null when the order was not canceled. Internal flags from "
             "the metadata bag (webhook idempotency markers, mint "
             "tickets) are intentionally not surfaced."
-        )
-    )
-    is_online_payment = serializers.SerializerMethodField(
-        help_text=(
-            "True when the order's PayWay charges the shopper online "
-            "(Stripe, Viva); false for cash-on-delivery / bank "
-            "transfer. Surfaced so the storefront can suppress "
-            'misleading "outstanding amount" warnings for COD orders '
-            "where the shopper intentionally paid €0 at checkout."
         )
     )
     phone = PhoneNumberField(read_only=True)
@@ -261,11 +269,6 @@ class OrderDetailSerializer(OrderSerializer):
     def get_shipment_provider_code(self, obj: Order) -> str | None:
         provider = getattr(obj, "shipping_provider", None)
         return provider.code if provider is not None else None
-
-    @extend_schema_field({"type": "boolean"})
-    def get_is_online_payment(self, obj: Order) -> bool:
-        pay_way = getattr(obj, "pay_way", None)
-        return bool(pay_way and pay_way.is_online_payment)
 
     @extend_schema_field(
         {
@@ -455,7 +458,6 @@ class OrderDetailSerializer(OrderSerializer):
             "shipment",
             "shipment_provider_code",
             "cancellation",
-            "is_online_payment",
             "phone",
             "document_type",
             "payment_id",

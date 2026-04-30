@@ -1,0 +1,22 @@
+Stripe dispute opened — Order #{{ order.id }}
+
+A Stripe dispute has been opened against this order. The order
+status has NOT been changed automatically — please review the dispute
+in the Stripe dashboard and decide whether to accept or contest it.
+
+DISPUTE
+  Dispute ID:        {{ dispute_id }}
+  Reason:            {{ reason|default:"unknown" }}
+  Order:             #{{ order.id }}
+  Customer:          {{ order.first_name }} {{ order.last_name }} <{{ order.email }}>
+{% if order.payment_id %}  Stripe PI:         {{ order.payment_id }}
+{% endif %}  Order placed:      {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}
+  Order total:       {{ order.total_price }}
+
+NEXT STEPS
+  - Open the Stripe dashboard, find dispute {{ dispute_id }}.
+  - Decide whether to submit evidence (contest) or accept the dispute.
+  - Respond before Stripe's deadline — defaults to 7 calendar days for chargebacks.
+  - Update order metadata or status manually if you accept the dispute.
+
+This email is operational; staff only.

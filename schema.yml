@@ -33330,6 +33330,13 @@ components:
         paymentMethod:
           type: string
           maxLength: 50
+        isOnlinePayment:
+          type: boolean
+          readOnly: true
+          description: True when the order's PayWay charges the shopper online (Stripe,
+            Viva); false for cash-on-delivery / bank transfer. Surfaced on both list
+            + detail so both views can suppress misleading 'outstanding amount' warnings
+            for COD orders where the shopper intentionally paid €0 at checkout.
         canBeCanceled:
           type: boolean
           readOnly: true
@@ -33345,6 +33352,7 @@ components:
       - firstName
       - fullAddress
       - id
+      - isOnlinePayment
       - isPaid
       - items
       - lastName
@@ -33660,6 +33668,13 @@ components:
         paymentMethod:
           type: string
           maxLength: 50
+        isOnlinePayment:
+          type: boolean
+          readOnly: true
+          description: True when the order's PayWay charges the shopper online (Stripe,
+            Viva); false for cash-on-delivery / bank transfer. Surfaced on both list
+            + detail so both views can suppress misleading 'outstanding amount' warnings
+            for COD orders where the shopper intentionally paid €0 at checkout.
         canBeCanceled:
           type: boolean
           readOnly: true
@@ -33793,13 +33808,6 @@ components:
             Returns null when the order was not canceled. Internal flags from the
             metadata bag (webhook idempotency markers, mint tickets) are intentionally
             not surfaced.
-        isOnlinePayment:
-          type: boolean
-          readOnly: true
-          description: True when the order's PayWay charges the shopper online (Stripe,
-            Viva); false for cash-on-delivery / bank transfer. Surfaced so the storefront
-            can suppress misleading "outstanding amount" warnings for COD orders where
-            the shopper intentionally paid €0 at checkout.
         trackingNumber:
           type: string
           title: Αριθμός Παρακολούθησης

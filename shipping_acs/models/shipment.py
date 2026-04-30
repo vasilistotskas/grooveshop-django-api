@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
+from simple_history.models import HistoricalRecords
 
 from core.models import TimeStampMixinModel, UUIDModel
 from shipping.enum import ShippingKind
@@ -204,6 +205,15 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
             "Multipart child voucher numbers, last create-voucher "
             "response, last error envelope, cached POD URL."
         ),
+    )
+
+    # Audit trail for voucher mint, state transitions, cancellation,
+    # COD reconciliation. Mirrors product.Product.history. Listed
+    # ``excluded_fields`` to keep history rows lean — the metadata
+    # bag and the polling timestamps churn frequently and aren't
+    # part of the audit story.
+    history = HistoricalRecords(
+        excluded_fields=["metadata", "last_polled_at", "updated_at"],
     )
 
     class Meta(TypedModelMeta):

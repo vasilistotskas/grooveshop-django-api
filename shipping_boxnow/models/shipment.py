@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 from djmoney.money import Money
+from simple_history.models import HistoricalRecords
 
 from core.models import TimeStampMixinModel, UUIDModel
 from shipping_boxnow.enum.compartment_size import BoxNowCompartmentSize
@@ -152,6 +153,13 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
         help_text=_(
             "Full delivery-request response and diagnostics from BoxNow"
         ),
+    )
+
+    # Audit trail mirrors AcsShipment.history. ``metadata``/
+    # ``last_event_at``/``updated_at`` excluded so the history rows
+    # focus on state-machine transitions, not high-frequency churn.
+    history = HistoricalRecords(
+        excluded_fields=["metadata", "last_event_at", "updated_at"],
     )
 
     class Meta(TypedModelMeta):

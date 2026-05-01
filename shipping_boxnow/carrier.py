@@ -78,13 +78,24 @@ class BoxNowCarrier(ShippingCarrierInterface):
     # ------------------------------------------------------------------
 
     def filter_pay_ways(self, queryset, *, kind: ShippingKind):
-        """BoxNow rejects COD on locker pickup — pre-filter at the
-        ``/api/v1/pay-way`` listing so the frontend never offers an
-        invalid combination, and the order-create boundary doesn't
-        need a redundant guard for the same case.
+        """BoxNow supports prepaid AND COD on lockers.
+
+        The legacy "BoxNow rejects COD on locker pickup" rule was
+        true before BoxNow shipped their PAY ON THE GO product
+        (2025-Q3), which collects cash / card at the locker on
+        delivery. Once BoxNow activates PAY ON THE GO on the
+        partner account, an offline pay-way (Αντικαταβολή) maps to
+        ``paymentMode='cod'`` + ``amountToBeCollected=<total>`` in
+        the create-shipment payload (handled in
+        ``create_shipment_row`` below) and BoxNow honours it.
+
+        We therefore expose ALL active pay-ways for both
+        ``HOME_DELIVERY`` and ``PICKUP_POINT``. Partners that don't
+        have PAY ON THE GO active should remove the offline pay-way
+        from their PayWay catalogue (or mark it inactive) so it
+        doesn't appear in the picker; that's a deployment-config
+        decision, not a courier-rule one.
         """
-        if kind == ShippingKind.PICKUP_POINT:
-            return queryset.filter(is_online_payment=True)
         return queryset
 
     def validate_order_payload(
@@ -187,12 +198,33 @@ class BoxNowCarrier(ShippingCarrierInterface):
             else None
         )
 
+        # Derive paymentMode + amountToBeCollected from the order's
+        # pay-way. Offline pay-ways (Αντικαταβολή / bank transfer) → COD
+        # via BoxNow PAY ON THE GO: voucher prints "COD" and BoxNow
+        # collects the full order total at the locker on delivery.
+        # Online pay-ways (Viva, Stripe) → PREPAID: shopper paid online
+        # already, BoxNow collects nothing.
+        from djmoney.money import Money
+        from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
+
+        pay_way = getattr(order, "pay_way", None)
+        is_offline = bool(pay_way and not pay_way.is_online_payment)
+        currency = getattr(order.total_price, "currency", "EUR")
+        payment_mode = (
+            BoxNowPaymentMode.COD if is_offline else BoxNowPaymentMode.PREPAID
+        )
+        amount_to_be_collected = (
+            order.total_price if is_offline else Money(0, currency)
+        )
+
         BoxNowShipment.objects.create(
             order=order,
             locker_external_id=locker_id,
             locker=locker,
             compartment_size=compartment_size,
             weight_grams=weight_grams,
+            payment_mode=payment_mode,
+            amount_to_be_collected=amount_to_be_collected,
         )
 
     def dispatch_create_shipment_task(self, order: Order) -> None:

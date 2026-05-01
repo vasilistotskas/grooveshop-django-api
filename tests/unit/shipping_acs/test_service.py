@@ -229,6 +229,131 @@ class TestPollShipmentTracking:
         assert AcsTrackingEvent.objects.filter(shipment=shipment).count() == 1
 
 
+@pytest.fixture
+def acs_client_mock_delivered(monkeypatch):
+    """Variant of ``acs_client_mock`` that drives summaries to DELIVERED.
+
+    Used by the carrier-event → order-status integration tests
+    (PR #6 S2). Mirrors the production payload shape: ``delivery_flag=1``
+    + ``shipment_status=5`` (delivered) with a non-empty
+    ``delivery_date`` so the post-delivery branches in
+    ``poll_shipment_tracking`` exercise.
+    """
+    from shipping_acs import services
+
+    class _DeliveredClient:
+        billing_code = "TEST_BILLING"
+
+        def tracking_summary(self, voucher_no):
+            return {
+                "delivery_flag": 1,
+                "returned_flag": 0,
+                "shipment_status": 5,
+                "delivery_date": "2026-04-30T15:30:00",
+            }
+
+        def tracking_details(self, voucher_no):
+            return [
+                {
+                    "checkpoint_date_time": "2026-04-30T15:30:00",
+                    "checkpoint_action": "ΠΑΡΑΔΟΘΗΚΕ",
+                    "checkpoint_location": "ΑΘΗΝΑ",
+                    "checkpoint_notes": "",
+                }
+            ]
+
+    monkeypatch.setattr(services, "AcsClient", _DeliveredClient)
+    return _DeliveredClient
+
+
+class TestPollShipmentDeliveryTransitions:
+    """ACS DELIVERED tracking event → Order status auto-advance.
+
+    PR #6 S2: BoxNow already had this coverage in
+    tests/unit/shipping_boxnow/test_service.py
+    (test_delivered_transitions_order_to_completed_when_paid +
+    test_delivered_pauses_at_delivered_when_payment_pending). ACS
+    didn't, so a regression in the auto-advance wiring would not
+    have surfaced for the ACS path.
+    """
+
+    def test_paid_order_auto_completes_on_delivered(
+        self, acs_client_mock_delivered
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.SHIPPED,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9999998888",
+            shipment_state=AcsShipmentState.OUT_FOR_DELIVERY,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        order.refresh_from_db()
+        shipment.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.DELIVERED
+        # PR #2 G — DELIVERED + payment_status=COMPLETED auto-completes.
+        assert order.status == OrderStatus.COMPLETED
+
+    def test_unpaid_cod_order_pauses_at_delivered(
+        self, acs_client_mock_delivered
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.SHIPPED,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9999998889",
+            shipment_state=AcsShipmentState.OUT_FOR_DELIVERY,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        order.refresh_from_db()
+        shipment.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.DELIVERED
+        # COD — Order pauses at DELIVERED until reconcile_cod_payouts
+        # flips payment_status to COMPLETED, then advances.
+        assert order.status == OrderStatus.DELIVERED
+        assert order.payment_status == PaymentStatus.PENDING
+
+    def test_terminal_order_status_never_regresses(
+        self, acs_client_mock_delivered
+    ):
+        """An admin-set terminal order status (DELIVERED / COMPLETED /
+        CANCELED) is never overwritten by polling — the state-machine
+        forward-only guard in OrderService.update_order_status filters
+        backwards moves and ``_apply_order_status_transition`` early-
+        returns when ``current_status in _TERMINAL_ORDER_STATUSES``."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.COMPLETED,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9999998890",
+            shipment_state=AcsShipmentState.DELIVERED,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        order.refresh_from_db()
+        # DELIVERED → COMPLETED is forward, so the previously-COMPLETED
+        # order stays COMPLETED. Crucially, we never see backward moves
+        # to DELIVERED or any earlier state.
+        assert order.status == OrderStatus.COMPLETED
+
+
 # ---------------------------------------------------------------------------
 # issue_daily_pickup_list
 # ---------------------------------------------------------------------------

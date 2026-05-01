@@ -119,8 +119,9 @@ class BoxNowService:
     # that another instance has already started. Larger than the BoxNow
     # HTTP timeout + retry budget so a healthy mint always wins; shorter
     # than the Celery soft-timeout so a crashed worker never permanently
-    # strands a shipment.
-    _MINT_CLAIM_TTL_SECONDS = 90
+    # strands a shipment. Mirrors AcsService — see the rationale there
+    # for the 300s sizing (stage order 682, 2026-04-29).
+    _MINT_CLAIM_TTL_SECONDS = 300
 
     @classmethod
     def create_shipment_for_order(cls, order: Order) -> BoxNowShipment:

@@ -140,7 +140,13 @@ class AcsService:
     # retry budget so a healthy mint always wins; smaller than Celery's
     # task timeout so a crashed worker doesn't permanently strand a
     # shipment.
-    _MINT_CLAIM_TTL_SECONDS = 90
+    #
+    # Bumped 90 → 300 after stage order 682 (2026-04-29) leaked an
+    # orphan voucher: the ACS round-trip exceeded 90s under load, a
+    # second worker observed the expired claim and re-minted. 5 min
+    # still recovers a crashed worker within one Celery task-timeout
+    # window while giving healthy slow mints enough budget.
+    _MINT_CLAIM_TTL_SECONDS = 300
 
     @classmethod
     def create_voucher_for_order(cls, order: Order) -> AcsShipment:

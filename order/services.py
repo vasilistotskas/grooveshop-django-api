@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -192,6 +192,7 @@ class OrderService:
         pay_way,
         user=None,
         loyalty_points_to_redeem: int | None = None,
+        meta_context: dict[str, Any] | None = None,
     ) -> Order:
         """
         Create order from cart after payment confirmation (payment-first flow).
@@ -521,6 +522,13 @@ class OrderService:
                     "currency": str(cart.total_price.currency),
                 },
             }
+            # Meta Pixel context forwarded by the storefront proxy.
+            # Persisted alongside cart_snapshot so the CAPI dispatcher
+            # can build a UserData payload with the same fbp/fbc the
+            # browser pixel saw.
+            sanitised_meta = cls._sanitise_meta_context(meta_context)
+            if sanitised_meta:
+                order.metadata["meta"] = sanitised_meta
 
             # Track reservation IDs for this order
             reservation_ids = []
@@ -722,6 +730,7 @@ class OrderService:
         pay_way,
         user=None,
         loyalty_points_to_redeem: int | None = None,
+        meta_context: dict[str, Any] | None = None,
     ) -> Order:
         """
         Create order from cart using the order-first flow.
@@ -958,6 +967,9 @@ class OrderService:
                 },
                 "payment_type": "offline",
             }
+            sanitised_meta = cls._sanitise_meta_context(meta_context)
+            if sanitised_meta:
+                order.metadata["meta"] = sanitised_meta
 
             # Track reservation IDs for this order
             reservation_ids = []
@@ -2064,6 +2076,67 @@ class OrderService:
             candidate if candidate in valid else settings.LANGUAGE_CODE
         )
 
+    # Allow-list for keys we accept on ``order.metadata['meta']``. The
+    # storefront proxy can only forward what's here; everything else
+    # is dropped silently. Keeps the column from drifting into a free-
+    # for-all and protects against a malicious client trying to stuff
+    # PII into Meta event logs.
+    _META_CONTEXT_KEYS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "fbp",
+            "fbc",
+            "client_user_agent",
+            "client_ip_address",
+            "event_ids",
+            "consent",
+        }
+    )
+    _META_EVENT_ID_KEYS: ClassVar[frozenset[str]] = frozenset(
+        {"purchase", "initiate_checkout", "add_payment_info"}
+    )
+
+    @classmethod
+    def _sanitise_meta_context(
+        cls, raw: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Filter the storefront-supplied meta dict down to known keys.
+
+        Returns an empty dict when input is missing or malformed. The
+        empty result is special-cased upstream to skip the ``meta``
+        field on ``order.metadata`` entirely so it doesn't show up in
+        admin as a phantom empty bag.
+        """
+        if not raw or not isinstance(raw, dict):
+            return {}
+        out: dict[str, Any] = {}
+        for key in cls._META_CONTEXT_KEYS:
+            if key not in raw:
+                continue
+            value = raw[key]
+            if key == "event_ids" and isinstance(value, dict):
+                event_ids = {
+                    sub_key: str(sub_val)
+                    for sub_key, sub_val in value.items()
+                    if sub_key in cls._META_EVENT_ID_KEYS
+                    and isinstance(sub_val, (str, int))
+                    and str(sub_val)
+                }
+                if event_ids:
+                    out["event_ids"] = event_ids
+                continue
+            if key == "consent" and isinstance(value, dict):
+                # Only keep boolean fields we understand. ``ads`` is
+                # the master gate — without it set to True the CAPI
+                # dispatcher refuses to send.
+                consent = {"ads": bool(value.get("ads"))}
+                out["consent"] = consent
+                continue
+            if isinstance(value, str) and value.strip():
+                # Cap raw strings at a sane length so a malicious
+                # client can't bloat order rows.
+                out[key] = value.strip()[:512]
+        return out
+
     @classmethod
     def _cancel_attached_shipment(cls, order: Order, reason: str) -> None:
         """Best-effort: cancel the courier voucher when the order is canceled.
@@ -2112,10 +2185,11 @@ class OrderService:
         """Enqueue the provider's create-shipment Celery task.
 
         Routes via :class:`shipping.services.ShippingService`, which
-        falls back to the legacy ``shipping_method`` enum when the new
-        ``shipping_provider`` FK is null.  Each provider's task is
-        idempotent on its shipment row, so duplicate dispatches under
-        payment-provider retries are harmless.
+        looks up the carrier adapter from ``order.shipping_provider``
+        (FK → ``ShippingProvider`` row → registered adapter). Orders
+        without a provider attached silently no-op. Each provider's
+        task is idempotent on its shipment row, so duplicate
+        dispatches under payment-provider retries are harmless.
         """
         from shipping.services import ShippingService
 

@@ -3,6 +3,120 @@
 
 
 
+## v1.121.1 (2026-05-01)
+
+### Bug fixes
+
+* fix(order): apply PR #7 PROCESSING suppression to Viva webhook + sync docs
+
+While verifying ``docs/order-system.md`` against the actual code I
+hit a real gap: Viva's ``_handle_payment_created`` does the inline
+``order.status = OrderStatus.PROCESSING`` + ``order.save(...)``
+without pre-stamping the customer-notification suppression flags
+that PR #7 added on the Stripe path.
+
+Result: Viva customers received both ``order_status_update``
+(PROCESSING) AND ``send_order_confirmation_email`` (order_received)
+within ms — the same duplicate the Stripe path was fixed to avoid.
+
+The fix mirrors handle_payment_succeeded: call
+``OrderService._suppress_customer_status_notifications(order,
+"PROCESSING")`` immediately before flipping the status. Internal
+state still flows (signal fires, OrderHistory logged) but the
+user-visible PROCESSING email + WS toast are skipped.
+
+Doc updates:
+- Refreshed line-number references that drifted with intermediate
+  edits (update_order_status, create_order_*, handle_stripe_*,
+  AcsService.create_voucher_for_order, viva _handle_payment_created).
+- Section 4.3 now describes the actual differences between Viva
+  and Stripe: row-lock at entry-point, inline status mutation,
+  the just-added PROCESSING suppression, and the absence of a
+  ``notify_payment_confirmed_live`` toast (Stripe-specific).
+- Top-of-file freshness stamp updated.
+
+Verified — 209 tests pass across order webhook + payment + signal
++ state-machine + refund-cancel-cascade suites. ruff format +
+ruff check + ty check — clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2d2507d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2d2507de5cca3b00cc133f06a7fcbf544a667fc3))
+
+* fix: update uv.lock ([`d298290`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d29829068f03ed84eb8b34ee34b7c269afe34817))
+
+### Documentation
+
+* docs(claude): point at docs/order-system.md from the Domain Patterns section
+
+The new comprehensive reference is the canonical source for the
+order / payment / shipping / notification surface. Anyone (or any
+agent) landing in this repo to change those domains should read it
+first instead of reconstructing the constraints from scattered
+comments + memory notes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`71fa468`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71fa4687f57e95938dad53db320849bd338092bb))
+
+* docs: add comprehensive order/payment/shipping/notification reference
+
+PRs #1-#8 added a lot of load-bearing constraints to this surface
+(transaction.on_commit dispatch, voucher-mint TTL, customer-
+notification suppression, COD reconciliation, etc.) and the
+knowledge was scattered across CLAUDE.md, ~12 memory notes,
+inline comments, and commit messages. Future maintenance work
+shouldn't have to reconstruct it.
+
+``docs/order-system.md`` consolidates:
+
+- State machines (OrderStatus + PaymentStatus transitions).
+- Three order creation paths and how they differ.
+- Payment paths: Stripe online, Viva online, COD/offline, refunds.
+- ACS / BoxNow shipping integration shapes + the carrier-adapter
+  abstraction for plugging in new couriers.
+- Email + WS notification graph: triggers, idempotency flags,
+  locale handling, the chained-transition suppression mechanism.
+- Cancellation + refund flows with all entry points.
+- Critical invariants table — links to memory notes documenting
+  why each one is load-bearing.
+- Common-task playbook: adding an email / status / serializer
+  field, recovering from manual prod state edits.
+- Audit history table mapping PRs #1-#8 to their themes.
+
+Force-added against the existing ``/docs/`` gitignore rule (which
+exists to keep vendor PDFs out of the repo); ``docs/migrations.md``
+is the prior precedent for project docs living here.
+
+Cross-references use file paths + line numbers; commit messages
+are still the source for the *why* of any given change. The doc
+is the *what* and *how things hang together*.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4f9ef63`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4f9ef6369302bef9fc0bb2956274ba90b26fc7c7))
+
+### Testing
+
+* test: pin English locale in 2 tests sensitive to compiled translations
+
+These tests assert on user-facing English strings ("We miss you!",
+"Active", "Unsubscribed") rendered through Django's translation
+system. They were passing on machines without a freshly compiled
+``locale/el/django.mo`` because the missing translations fell
+through to English; once PR #3 added Greek translations and
+``compilemessages`` ran, the rendered output flipped to Greek and
+the assertions broke.
+
+Fix:
+* ``test_send_inactive_user_notifications_success`` — pin
+  ``language_code="en"`` on the factory-created users so the
+  task's ``translation.override(get_user_language(user))`` block
+  renders the English subject the assertion expects.
+* ``test_status_display`` — wrap the admin label rendering in
+  ``translation.override("en")`` since the test's intent is the
+  English label specifically.
+
+Verified — 4475 tests pass with 7 skipped and 0 failures across
+the full Django suite. ruff format + ruff check + ty check —
+clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`02aecb8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02aecb87fa11f5aa3dfae37819c34b19c82902e9))
+
 ## v1.121.0 (2026-05-01)
 
 ### Bug fixes

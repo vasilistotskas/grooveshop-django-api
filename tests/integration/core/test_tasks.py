@@ -498,26 +498,36 @@ class TestSendInactiveUserNotificationsTask:
     def test_send_inactive_user_notifications_success(
         self, mock_logger, mock_render, mock_email_cls, db
     ):
+        # Pin English locale on the inactive recipients — the task
+        # renders the subject under ``translation.override(get_user_
+        # language(user))``, and ``UserAccountFactory.language_code``
+        # defaults to ``settings.LANGUAGE_CODE`` ("el") so an unpinned
+        # account would render the Greek translation and break the
+        # English subject assertion below.
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=30),
             is_active=True,
             email="active@example.com",
+            language_code="en",
         )
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=70),
             is_active=True,
             email="inactive@example.com",
             first_name="John",
+            language_code="en",
         )
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=100),
             is_active=True,
             email="old@example.com",
+            language_code="en",
         )
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=70),
             is_active=True,
             email="",
+            language_code="en",
         )
 
         mock_render.return_value = "<html>Test email</html>"

@@ -648,6 +648,13 @@ class TestUserSubscriptionAdmin:
         assert "Weekly Newsletter" in result or "Newsletter" in result
 
     def test_status_display(self):
+        # ``status_display`` renders user-facing labels via
+        # ``get_status_display()`` which respects the active locale.
+        # Force English so the assertion stays portable across
+        # machines with the Greek ``.mo`` compiled (LANGUAGE_CODE
+        # default) vs un-compiled.
+        from django.utils import translation
+
         admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
         user = UserAccountFactory()
         topic1 = SubscriptionTopicFactory()
@@ -658,7 +665,8 @@ class TestUserSubscriptionAdmin:
             topic=topic1,
             status=UserSubscription.SubscriptionStatus.ACTIVE,
         )
-        result = admin.status_display(active_sub)
+        with translation.override("en"):
+            result = admin.status_display(active_sub)
         assert "Active" in result
 
         unsubscribed_sub = UserSubscriptionFactory(
@@ -666,7 +674,8 @@ class TestUserSubscriptionAdmin:
             topic=topic2,
             status=UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
         )
-        result = admin.status_display(unsubscribed_sub)
+        with translation.override("en"):
+            result = admin.status_display(unsubscribed_sub)
         assert "Unsubscribed" in result
 
     def test_subscription_dates(self):

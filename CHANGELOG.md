@@ -3,6 +3,121 @@
 
 
 
+## v1.121.0 (2026-05-01)
+
+### Bug fixes
+
+* fix(order): suppress duplicate customer emails + WS toasts on chained transitions
+
+PR #7 — closes three duplicate-notification scenarios surfaced by
+tracing the email/WS dispatch graph end-to-end.
+
+The bug pattern:
+``handle_order_status_changed`` dispatches both ``send_order_status_
+update_email`` and ``notify_order_status_changed_live`` on every
+transition. Three call paths chain transitions back-to-back, so the
+customer received two visually-identical messages within ~ms:
+
+1. Carrier event → DELIVERED → ``maybe_advance_to_completed`` →
+   COMPLETED. Customer got "Your order has arrived" then ~ms later
+   "Thank you for your purchase!". Both emails + both toasts.
+2. Stripe ``payment_intent.succeeded`` → ``handle_payment_succeeded``
+   transitions PENDING → PROCESSING (status email "Your order is
+   being processed") and the same handler immediately dispatches
+   ``send_order_confirmation_email`` (order_received template, also
+   "we've got your order, processing it shortly"). Two emails saying
+   the same thing.
+3. Admin manual ``add_tracking_info`` from PENDING chains PENDING →
+   PROCESSING → SHIPPED. Two ``order_status_changed`` signals fire
+   ms apart → two emails, two toasts.
+
+The fix:
+
+``OrderService._suppress_customer_status_notifications(order, status)``
+pre-stamps two metadata flags on the order:
+
+* ``status_update_email_sent_<status>`` — already used by
+  ``_reserve_status_update_email`` to dedupe; pre-stamping it makes
+  the email task short-circuit on the chained-into transition.
+* ``suppress_status_ws_<status>`` — read by
+  ``handle_order_status_changed`` to skip the WS dispatch.
+
+Internal state still flows: signals fire, ``OrderHistory`` logs the
+transition, the post-save handler runs. Only the user-visible
+dispatches are skipped.
+
+Applied to three call sites:
+
+* ``maybe_advance_to_completed`` accepts ``silent_for_customer=True``;
+  both ACS and BoxNow ``_apply_order_status_transition`` pass it
+  when chaining DELIVERED → COMPLETED. The COD reconcile path keeps
+  it ``False`` because hours/days separate DELIVERED from COMPLETED
+  in that flow, so the "loyalty points credited" message is
+  meaningful, not duplicate.
+* ``handle_payment_succeeded`` suppresses PROCESSING — the Stripe
+  webhook handler dispatches the confirmation email immediately
+  after, which already conveys the same content.
+* ``add_tracking_info`` PENDING → PROCESSING → SHIPPED suppresses
+  the intermediate PROCESSING transition.
+
+Pre-existing email idempotency tests still cover the dedupe-on-retry
+case. New
+``test_paid_delivered_suppresses_completed_email_and_toast`` proves
+the carrier-driven DELIVERED → COMPLETED chain leaves the COMPLETED
+email + WS suppression flags set on the order metadata.
+
+Verified — 1484 tests pass across the full order + shipping suites
+(1 unrelated parallel-cache flake on test_address_validation that
+passes in isolation; matches the known suite flake floor in
+``project_test_suite_stability.md``). ruff format + ruff check + ty
+check — clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c827118`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8271188492e1c9ec4e41bfbe5c34c4afd744540))
+
+### Features
+
+* feat(order): refund confirmation email — closes the silent-refund gap
+
+PR #8 — closes the last missing customer email in the order
+lifecycle.
+
+Customers who got a refund (admin-initiated via
+``OrderService.refund_order`` or Stripe-dashboard refund arriving
+as a ``charge.refunded`` webhook) received a live in-app toast but
+no email — only WS-connected authenticated customers had any
+indication their card was refunded. Guests got nothing.
+
+This adds:
+
+- ``order.tasks.send_refund_confirmation_email`` — renders the
+  existing ``emails/order/order_refunded.{html,txt}`` (which
+  inherits from ``order_status_generic`` with the REFUNDED branch).
+  Locale picked via ``get_order_language(order)``. Reuses the
+  transactional ``List-Unsubscribe`` headers added in PR #4.
+- ``REFUND_CONFIRMATION_EMAIL_SENT_FLAG`` + reservation helpers
+  mirroring the confirmation / payment-failed / shipping-
+  notification patterns. Single boolean rather than per-event
+  because both refund paths converge on ``order_refunded.send``
+  for the same order; the customer wants exactly one email per
+  refund regardless of which path won the race.
+- ``handle_order_refunded`` queues the email via
+  ``transaction.on_commit`` alongside the existing live-
+  notification dispatch. Guest orders get the email (uses
+  ``order.email`` directly) — unlike the live notification which
+  is account-bound and silently drops guests.
+
+New regression test
+``test_full_refund_dispatches_confirmation_email_once`` proves the
+Stripe-redelivery scenario emails the customer exactly once.
+
+Verified — 1483 tests pass; 3 unrelated parallel-cache flakes on
+``test_model_order_history`` that pass in isolation, matching the
+suite's known flake floor in
+``project_test_suite_stability.md``. ruff format + ruff check + ty
+check — clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`974fe1e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/974fe1eaa60f00275ffcd9021eae197e0cd5e49e))
+
 ## v1.120.0 (2026-05-01)
 
 ### Bug fixes

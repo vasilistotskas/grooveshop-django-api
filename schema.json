@@ -19638,6 +19638,7 @@
                         "name": "paymentStatus",
                         "schema": {
                             "type": "string",
+                            "title": "Κατάσταση πληρωμής",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -19648,7 +19649,7 @@
                                 "REFUNDED"
                             ]
                         },
-                        "description": "Filter by payment status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `REFUNDED` - Refunded\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Canceled"
+                        "description": "Filter by payment status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `COMPLETED` - Ολοκληρώθηκε\n* `FAILED` - Απέτυχε\n* `REFUNDED` - Επεστράφη\n* `PARTIALLY_REFUNDED` - Μερική επιστροφή\n* `CANCELED` - Ακυρώθηκε"
                     },
                     {
                         "in": "query",
@@ -19829,6 +19830,7 @@
                         "name": "status",
                         "schema": {
                             "type": "string",
+                            "title": "Κατάσταση",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -19840,7 +19842,7 @@
                                 "SHIPPED"
                             ]
                         },
-                        "description": "Filter by order status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `SHIPPED` - Shipped\n* `DELIVERED` - Delivered\n* `COMPLETED` - Completed\n* `CANCELED` - Canceled\n* `RETURNED` - Returned\n* `REFUNDED` - Refunded"
+                        "description": "Filter by order status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `SHIPPED` - Απεστάλη\n* `DELIVERED` - Παραδόθηκε\n* `COMPLETED` - Ολοκληρώθηκε\n* `CANCELED` - Ακυρώθηκε\n* `RETURNED` - Επιστράφηκε\n* `REFUNDED` - Επεστράφη"
                     },
                     {
                         "in": "query",
@@ -20162,8 +20164,8 @@
             },
             "post": {
                 "operationId": "createOrder",
-                "description": "Create a new Ταξινόμηση. Requires authentication.",
-                "summary": "Create a Ταξινόμηση",
+                "description": "Create a new Παραγγελία. Requires authentication.",
+                "summary": "Create a Παραγγελία",
                 "parameters": [
                     {
                         "in": "query",
@@ -20278,8 +20280,8 @@
         "/api/v1/order-items": {
             "get": {
                 "operationId": "listOrderItem",
-                "description": "Retrieve a list of Order Items with filtering and search capabilities. Supports multiple pagination strategies: pageNumber (default), cursor, and limitOffset.",
-                "summary": "List Order Items",
+                "description": "Retrieve a list of Προϊόντα Παραγγελίας with filtering and search capabilities. Supports multiple pagination strategies: pageNumber (default), cursor, and limitOffset.",
+                "summary": "List Προϊόντα Παραγγελίας",
                 "parameters": [
                     {
                         "in": "query",
@@ -20596,6 +20598,7 @@
                         "name": "order_PaymentStatus",
                         "schema": {
                             "type": "string",
+                            "title": "Κατάσταση πληρωμής",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -20606,7 +20609,7 @@
                                 "REFUNDED"
                             ]
                         },
-                        "description": "Filter by order payment status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `REFUNDED` - Refunded\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Canceled"
+                        "description": "Filter by order payment status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `COMPLETED` - Ολοκληρώθηκε\n* `FAILED` - Απέτυχε\n* `REFUNDED` - Επεστράφη\n* `PARTIALLY_REFUNDED` - Μερική επιστροφή\n* `CANCELED` - Ακυρώθηκε"
                     },
                     {
                         "in": "query",
@@ -20621,6 +20624,7 @@
                         "name": "order_Status",
                         "schema": {
                             "type": "string",
+                            "title": "Κατάσταση",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -20632,7 +20636,7 @@
                                 "SHIPPED"
                             ]
                         },
-                        "description": "Filter by order status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `SHIPPED` - Shipped\n* `DELIVERED` - Delivered\n* `COMPLETED` - Completed\n* `CANCELED` - Canceled\n* `RETURNED` - Returned\n* `REFUNDED` - Refunded"
+                        "description": "Filter by order status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `SHIPPED` - Απεστάλη\n* `DELIVERED` - Παραδόθηκε\n* `COMPLETED` - Ολοκληρώθηκε\n* `CANCELED` - Ακυρώθηκε\n* `RETURNED` - Επιστράφηκε\n* `REFUNDED` - Επεστράφη"
                     },
                     {
                         "in": "query",
@@ -22034,8 +22038,8 @@
         "/api/v1/order/{id}": {
             "get": {
                 "operationId": "retrieveOrder",
-                "description": "Get detailed information about a specific Ταξινόμηση.",
-                "summary": "Retrieve a Ταξινόμηση",
+                "description": "Get detailed information about a specific Παραγγελία.",
+                "summary": "Retrieve a Παραγγελία",
                 "parameters": [
                     {
                         "in": "path",
@@ -22134,8 +22138,8 @@
             },
             "put": {
                 "operationId": "updateOrder",
-                "description": "Update Ταξινόμηση information. Requires authentication.",
-                "summary": "Update a Ταξινόμηση",
+                "description": "Update Παραγγελία information. Requires authentication.",
+                "summary": "Update a Παραγγελία",
                 "parameters": [
                     {
                         "in": "path",
@@ -22264,8 +22268,8 @@
             },
             "patch": {
                 "operationId": "partialUpdateOrder",
-                "description": "Partially update Ταξινόμηση information. Requires authentication.",
-                "summary": "Partially update a Ταξινόμηση",
+                "description": "Partially update Παραγγελία information. Requires authentication.",
+                "summary": "Partially update a Παραγγελία",
                 "parameters": [
                     {
                         "in": "path",
@@ -22393,8 +22397,8 @@
             },
             "delete": {
                 "operationId": "destroyOrder",
-                "description": "Delete a Ταξινόμηση. Requires authentication.",
-                "summary": "Delete a Ταξινόμηση",
+                "description": "Delete a Παραγγελία. Requires authentication.",
+                "summary": "Delete a Παραγγελία",
                 "parameters": [
                     {
                         "in": "path",
@@ -22449,6 +22453,182 @@
                         "description": ""
                     },
                     "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/order/{id}/acs_cancel": {
+            "post": {
+                "operationId": "cancelAcsShipmentForOrder",
+                "description": "Admin-only. Calls ACS_Delete_Voucher. Only valid before the voucher is finalised in a pickup list.",
+                "summary": "Cancel the ACS shipment for an order",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/order/{id}/acs_label": {
+            "get": {
+                "operationId": "getAcsLabelForOrder",
+                "description": "Streams the ACS label PDF through Django auth. Accessible by the order owner, staff, or a guest with the order UUID. Returns 404 when no ACS shipment exists for the order or the voucher has not been minted yet.",
+                "summary": "Download the ACS voucher label PDF for an order",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "500": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -23562,6 +23742,202 @@
                 }
             }
         },
+        "/api/v1/order/{id}/shipment_cancel": {
+            "post": {
+                "operationId": "cancelShipmentForOrder",
+                "description": "Admin-only. Provider-agnostic cancellation: looks up the order's shipping provider and dispatches to the carrier adapter. The provider's own rules apply (BoxNow only cancels parcels in NEW state; ACS only cancels vouchers not yet finalised in a pickup list).",
+                "summary": "Cancel the carrier shipment for an order",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/order/{id}/shipment_label": {
+            "get": {
+                "operationId": "getShipmentLabelForOrder",
+                "description": "Provider-agnostic label download. Looks up the order's shipping provider and dispatches to the matching carrier adapter via the shipping registry — frontends can call the same endpoint regardless of which courier is fulfilling the order.",
+                "summary": "Download the carrier label PDF for an order",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OrderDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/order/{id}/update_status": {
             "post": {
                 "operationId": "updateOrderStatus",
@@ -24332,6 +24708,7 @@
                         "name": "paymentStatus",
                         "schema": {
                             "type": "string",
+                            "title": "Κατάσταση πληρωμής",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -24342,7 +24719,7 @@
                                 "REFUNDED"
                             ]
                         },
-                        "description": "Filter by payment status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `REFUNDED` - Refunded\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Canceled"
+                        "description": "Filter by payment status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `COMPLETED` - Ολοκληρώθηκε\n* `FAILED` - Απέτυχε\n* `REFUNDED` - Επεστράφη\n* `PARTIALLY_REFUNDED` - Μερική επιστροφή\n* `CANCELED` - Ακυρώθηκε"
                     },
                     {
                         "in": "query",
@@ -24523,6 +24900,7 @@
                         "name": "status",
                         "schema": {
                             "type": "string",
+                            "title": "Κατάσταση",
                             "enum": [
                                 "CANCELED",
                                 "COMPLETED",
@@ -24534,7 +24912,7 @@
                                 "SHIPPED"
                             ]
                         },
-                        "description": "Filter by order status\n\n* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `SHIPPED` - Shipped\n* `DELIVERED` - Delivered\n* `COMPLETED` - Completed\n* `CANCELED` - Canceled\n* `RETURNED` - Returned\n* `REFUNDED` - Refunded"
+                        "description": "Filter by order status\n\n* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `SHIPPED` - Απεστάλη\n* `DELIVERED` - Παραδόθηκε\n* `COMPLETED` - Ολοκληρώθηκε\n* `CANCELED` - Ακυρώθηκε\n* `RETURNED` - Επιστράφηκε\n* `REFUNDED` - Επεστράφη"
                     },
                     {
                         "in": "query",
@@ -25331,11 +25709,19 @@
                     },
                     {
                         "in": "query",
-                        "name": "shippingMethod",
+                        "name": "shippingKind",
                         "schema": {
                             "type": "string"
                         },
-                        "description": "Filter pay ways compatible with the given shipping method. When 'box_now_locker', only online-payment pay ways are returned."
+                        "description": "Pair with ``shippingProviderCode`` to filter pay ways by the carrier's compatibility rules for that kind."
+                    },
+                    {
+                        "in": "query",
+                        "name": "shippingProviderCode",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Filter pay ways compatible with the given shipping carrier. Each carrier owns its own compatibility rules — BoxNow (``boxnow``) rejects COD on locker pickup; other carriers pass through unchanged. Pair with ``shippingKind``."
                     },
                     {
                         "in": "query",
@@ -27003,8 +27389,8 @@
             },
             "post": {
                 "operationId": "createProduct",
-                "description": "Create a new Product. Requires authentication.",
-                "summary": "Create a Product",
+                "description": "Create a new Προϊόν. Requires authentication.",
+                "summary": "Create a Προϊόν",
                 "parameters": [
                     {
                         "in": "query",
@@ -27119,8 +27505,8 @@
         "/api/v1/product/{id}": {
             "get": {
                 "operationId": "retrieveProduct",
-                "description": "Get detailed information about a specific Product.",
-                "summary": "Retrieve a Product",
+                "description": "Get detailed information about a specific Προϊόν.",
+                "summary": "Retrieve a Προϊόν",
                 "parameters": [
                     {
                         "in": "path",
@@ -27220,8 +27606,8 @@
             },
             "put": {
                 "operationId": "updateProduct",
-                "description": "Update Product information. Requires authentication.",
-                "summary": "Update a Product",
+                "description": "Update Προϊόν information. Requires authentication.",
+                "summary": "Update a Προϊόν",
                 "parameters": [
                     {
                         "in": "path",
@@ -27350,8 +27736,8 @@
             },
             "patch": {
                 "operationId": "partialUpdateProduct",
-                "description": "Partially update Product information. Requires authentication.",
-                "summary": "Partially update a Product",
+                "description": "Partially update Προϊόν information. Requires authentication.",
+                "summary": "Partially update a Προϊόν",
                 "parameters": [
                     {
                         "in": "path",
@@ -27479,8 +27865,8 @@
             },
             "delete": {
                 "operationId": "destroyProduct",
-                "description": "Delete a Product. Requires authentication.",
-                "summary": "Delete a Product",
+                "description": "Delete a Προϊόν. Requires authentication.",
+                "summary": "Delete a Προϊόν",
                 "parameters": [
                     {
                         "in": "path",
@@ -35935,6 +36321,7 @@
                         "name": "status",
                         "schema": {
                             "type": "string",
+                            "title": "Κατάσταση",
                             "enum": [
                                 "FALSE",
                                 "NEW",
@@ -38619,6 +39006,522 @@
                 }
             }
         },
+        "/api/v1/shipping/acs/address-validation": {
+            "post": {
+                "operationId": "validateAcsAddress",
+                "description": "Calls ACS_Address_Validation with the supplied street + zip + city string. Returns the first resolved match. Empty 200 body when ACS could not geocode — frontends should treat that as 'address not recognised, fall back to free-text submission'.",
+                "summary": "Validate / geocode a Greek address against ACS's catalogue",
+                "tags": [
+                    "ACS shipments"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AcsAddressValidationRequestRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AcsAddressValidationRequestRequest"
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AcsAddressValidationRequestRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AcsAddressValidationResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "No response body"
+                    },
+                    "502": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/acs/pickup-lists/{pickup_list_no}/manifest.pdf": {
+            "get": {
+                "operationId": "getAcsPickupListManifest",
+                "description": "Download the manifest PDF for a specific pickup list.",
+                "summary": "Download ACS pickup-list manifest PDF",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "pickupListNo",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "ACS pickup lists"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/acs/pickup-lists/issue": {
+            "post": {
+                "operationId": "issueAcsPickupList",
+                "description": "Admin override for the daily Celery beat task. Calls AcsService.issue_daily_pickup_list. Returns the new pickup list, or 204 when no candidate vouchers exist.",
+                "summary": "Issue today's ACS pickup list",
+                "tags": [
+                    "ACS pickup lists"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AcsPickupList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "403": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/acs/shipments/{voucher_no}/cancel": {
+            "post": {
+                "operationId": "cancelAcsShipment",
+                "description": "Admin-only.  Calls ACS_Delete_Voucher.  Only valid before the voucher is issued in a pickup list.",
+                "summary": "Cancel an ACS voucher",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "voucherNo",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "ACS shipments"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "description": "No response body"
+                    },
+                    "403": {
+                        "description": "No response body"
+                    },
+                    "404": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/acs/shipments/{voucher_no}/label.pdf": {
+            "get": {
+                "operationId": "getAcsLabel",
+                "description": "Fetches the ACS PDF label for the given voucher number and streams it as an attachment.  Accessible by the order owner, staff, or a guest with the order UUID.",
+                "summary": "Download ACS voucher label PDF",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "voucherNo",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "ACS shipments"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No response body"
+                    },
+                    "404": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/acs/shipments/{voucher_no}/tracking": {
+            "get": {
+                "operationId": "getAcsTracking",
+                "description": "Return the shipment + last 50 events for ``voucher_no``.",
+                "summary": "Read ACS shipment tracking snapshot",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "voucherNo",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "ACS shipments"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AcsShipmentDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/acs/stations": {
+            "get": {
+                "operationId": "api_v1_shipping_acs_stations_list",
+                "description": "List / retrieve ACS stations and Smartpoint lockers.",
+                "parameters": [
+                    {
+                        "name": "ordering",
+                        "required": false,
+                        "in": "query",
+                        "description": "Which field to use when ordering the results.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "required": false,
+                        "in": "query",
+                        "description": "A search term.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "tags": [
+                    "api"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedAcsStationList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/acs/stations/{external_id}": {
+            "get": {
+                "operationId": "api_v1_shipping_acs_stations_retrieve",
+                "description": "List / retrieve ACS stations and Smartpoint lockers.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "externalId",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "api"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AcsStationDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/acs/stations/nearest": {
+            "get": {
+                "operationId": "findNearestAcsStations",
+                "description": "Returns active locker rows whose ``postal_code`` matches the supplied postcode prefix, ordered by exact match first then alphabetic. Falls back to a city-name ILIKE match when no postcode hits are found. The row cap is configurable via ``ShippingProvider.metadata.nearest_limit`` on the ``acs`` row (default 20). Designed for the checkout locker picker — no GPS or geo math, the Nuxt UI does the visual ordering.",
+                "summary": "Find nearest ACS Smartpoint lockers to a postcode",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "city",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Optional city-name fallback."
+                    },
+                    {
+                        "in": "query",
+                        "name": "countryCode",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Optional ISO-2 country code; narrows the default kind filter to that country's locker catalogue."
+                    },
+                    {
+                        "name": "ordering",
+                        "required": false,
+                        "in": "query",
+                        "description": "Which field to use when ordering the results.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "postalCode",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Greek postcode (5-digit), required.",
+                        "required": true
+                    },
+                    {
+                        "name": "search",
+                        "required": false,
+                        "in": "query",
+                        "description": "A search term.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "shopKind",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+$"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        },
+                        "description": "Optional override. Default is the union of locker kinds across configured countries (see ShippingProvider.metadata.shop_kinds_by_country)."
+                    }
+                ],
+                "tags": [
+                    "ACS stations"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedAcsStationList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/v1/shipping/boxnow/lockers": {
             "get": {
                 "operationId": "listBoxNowLocker",
@@ -39084,6 +39987,117 @@
                     },
                     "404": {
                         "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/options": {
+            "get": {
+                "operationId": "listShippingOptions",
+                "description": "Returns one row per (active provider × supported kind) combination. The frontend renders one radio card per row.",
+                "summary": "List checkout shipping options",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "countryCode",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "ISO 3166-1 alpha-2 country code (e.g. 'GR')."
+                    },
+                    {
+                        "in": "query",
+                        "name": "currency",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "ISO 4217 currency code (default 'EUR')."
+                    },
+                    {
+                        "in": "query",
+                        "name": "orderValueAmount",
+                        "schema": {
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$"
+                                },
+                                {
+                                    "type": "number"
+                                }
+                            ]
+                        },
+                        "description": "Cart subtotal — included so providers can return free-shipping pricing when the threshold is hit."
+                    }
+                ],
+                "tags": [
+                    "Shipping"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    },
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ShippingOption"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/v1/shipping/providers": {
+            "get": {
+                "operationId": "api_v1_shipping_providers_list",
+                "description": "Admin-only list of registered providers for diagnostics.",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "required": false,
+                        "in": "query",
+                        "description": "A search term.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "tags": [
+                    "api"
+                ],
+                "security": [
+                    {
+                        "knoxApiToken": []
+                    },
+                    {
+                        "cookieAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ShippingProvider"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -45017,6 +46031,7 @@
                         "name": "status",
                         "schema": {
                             "type": "string",
+                            "title": "Κατάσταση",
                             "enum": [
                                 "ACTIVE",
                                 "BOUNCED",
@@ -45024,7 +46039,7 @@
                                 "UNSUBSCRIBED"
                             ]
                         },
-                        "description": "Filter by subscription status\n\n* `ACTIVE` - Active\n* `PENDING` - Pending Confirmation\n* `UNSUBSCRIBED` - Unsubscribed\n* `BOUNCED` - Bounced"
+                        "description": "Filter by subscription status\n\n* `ACTIVE` - Ενεργή\n* `PENDING` - Pending Confirmation\n* `UNSUBSCRIBED` - Unsubscribed\n* `BOUNCED` - Bounced"
                     },
                     {
                         "in": "query",
@@ -45089,6 +46104,7 @@
                         "name": "topicCategory",
                         "schema": {
                             "type": "string",
+                            "title": "Κατηγορία",
                             "enum": [
                                 "ACCOUNT",
                                 "MARKETING",
@@ -45099,7 +46115,7 @@
                                 "SYSTEM"
                             ]
                         },
-                        "description": "Filter by topic category\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "description": "Filter by topic category\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     {
                         "in": "query",
@@ -46138,6 +47154,7 @@
                         "name": "category",
                         "schema": {
                             "type": "string",
+                            "title": "Κατηγορία",
                             "enum": [
                                 "ACCOUNT",
                                 "MARKETING",
@@ -46148,7 +47165,7 @@
                                 "SYSTEM"
                             ]
                         },
-                        "description": "Filter by topic category\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "description": "Filter by topic category\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     {
                         "in": "query",
@@ -47680,6 +48697,659 @@
     },
     "components": {
         "schemas": {
+            "AcsAddressValidationRequestRequest": {
+                "type": "object",
+                "description": "Free-text address payload — ACS does its own parsing.",
+                "properties": {
+                    "address": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Street + number + optional zip + city, e.g. 'Pireos 25 17778'.",
+                        "maxLength": 500
+                    },
+                    "addressId": {
+                        "type": "string",
+                        "description": "Optional re-validation key from a previous response.",
+                        "maxLength": 64
+                    },
+                    "language": {
+                        "type": "string",
+                        "default": "GR",
+                        "maxLength": 2
+                    }
+                },
+                "required": [
+                    "address"
+                ]
+            },
+            "AcsAddressValidationResponse": {
+                "type": "object",
+                "description": "A single resolved address — the first ACSObjectOutput row.",
+                "properties": {
+                    "geoId": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "resolvedStreet": {
+                        "type": "string"
+                    },
+                    "resolvedStreetNum": {
+                        "type": "string"
+                    },
+                    "resolvedZip": {
+                        "type": "string"
+                    },
+                    "resolvedArea": {
+                        "type": "string"
+                    },
+                    "resolvedLong": {
+                        "type": "number",
+                        "format": "double",
+                        "nullable": true
+                    },
+                    "resolvedLat": {
+                        "type": "number",
+                        "format": "double",
+                        "nullable": true
+                    },
+                    "resolvedStationId": {
+                        "type": "string"
+                    },
+                    "resolvedBranchId": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "resolvedProvidence": {
+                        "type": "string"
+                    },
+                    "addressId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "addressId",
+                    "resolvedArea",
+                    "resolvedProvidence",
+                    "resolvedStationId",
+                    "resolvedStreet",
+                    "resolvedStreetNum",
+                    "resolvedZip"
+                ]
+            },
+            "AcsChargeType": {
+                "enum": [
+                    1,
+                    2
+                ],
+                "type": "integer",
+                "description": "* `1` - Prepaid\n* `2` - Cash on delivery"
+            },
+            "AcsPickupList": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "pickupListNo": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Pickup list number",
+                        "description": "PickupList_No returned by ACS_Issue_Pickup_List."
+                    },
+                    "issuedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "issuedBy": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Admin who triggered the manual issue. Null when the daily Celery beat task issued the list."
+                    },
+                    "issuedByUsername": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true
+                    },
+                    "billingCode": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Billing_Code captured at issuance time so historical manifests stay reprintable even if the env var changes."
+                    },
+                    "voucherCount": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "billingCode",
+                    "createdAt",
+                    "id",
+                    "issuedAt",
+                    "issuedBy",
+                    "issuedByUsername",
+                    "pickupListNo",
+                    "updatedAt",
+                    "voucherCount"
+                ]
+            },
+            "AcsShipmentDetail": {
+                "type": "object",
+                "description": "Detail serializer used on the order-detail endpoint.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "uuid": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "voucherNo": {
+                        "type": "string",
+                        "readOnly": true,
+                        "nullable": true,
+                        "title": "Voucher number",
+                        "description": "10-digit ACS voucher (Voucher_No from ACS_Create_Voucher)."
+                    },
+                    "shipmentState": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ShipmentStateEnum"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "shipmentStateDisplay": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Human-readable label for the shipment_state choice"
+                    },
+                    "deliveryKind": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ShippingKind"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "weightGrams": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "title": "Weight (grams)",
+                        "description": "Internal grams; converted to kilograms (>= 0.5) at API call time per ACS Weight requirements."
+                    },
+                    "itemQuantity": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "chargeType": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AcsChargeType"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "deliveryProducts": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Comma-separated Acs_Delivery_Products codes (COD, REC, SAT, RDO …)."
+                    },
+                    "lastEventAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "lastPolledAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true,
+                        "description": "Used by poll_acs_tracking_batch to spread load and skip shipments polled within the last 15 minutes."
+                    },
+                    "deliveryDate": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "stationDestinationExternalId": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Destination station external ID",
+                        "description": "Denormalised ACS_SHOP_STATION_ID — preserved even if the AcsStation row is deleted."
+                    },
+                    "stationBranchDestination": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Destination branch",
+                        "description": "Acs_Station_Branch_Destination value."
+                    },
+                    "station": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AcsStation"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true,
+                        "description": "Destination ACS station details (Smartpoint pickups)."
+                    },
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AcsTrackingEvent"
+                        },
+                        "readOnly": true,
+                        "description": "Last 50 tracking events ordered by event_time desc."
+                    },
+                    "labelUrl": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Relative URL to download the voucher PDF via the Django proxy.",
+                        "readOnly": true
+                    },
+                    "deliveryFlag": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Raw delivery_flag value from ACS_Trackingsummary."
+                    },
+                    "returnedFlag": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "rawShipmentStatus": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "cancelRequestedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "metadata": {
+                        "readOnly": true,
+                        "description": "Multipart child voucher numbers, last create-voucher response, last error envelope, cached POD URL."
+                    }
+                },
+                "required": [
+                    "cancelRequestedAt",
+                    "chargeType",
+                    "createdAt",
+                    "deliveryDate",
+                    "deliveryFlag",
+                    "deliveryKind",
+                    "deliveryProducts",
+                    "events",
+                    "id",
+                    "itemQuantity",
+                    "labelUrl",
+                    "lastEventAt",
+                    "lastPolledAt",
+                    "metadata",
+                    "rawShipmentStatus",
+                    "returnedFlag",
+                    "shipmentState",
+                    "shipmentStateDisplay",
+                    "station",
+                    "stationBranchDestination",
+                    "stationDestinationExternalId",
+                    "updatedAt",
+                    "uuid",
+                    "voucherNo",
+                    "weightGrams"
+                ]
+            },
+            "AcsStation": {
+                "type": "object",
+                "description": "List serializer for ACS stations / Smartpoints.\n\nIncludes ``working_hours`` so the checkout picker can render\nopening hours inline without requiring a per-row detail fetch.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "uuid": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "externalId": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "ACS_SHOP_STATION_ID — used as Acs_Station_Destination."
+                    },
+                    "branchCode": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "ACS_SHOP_BRANCH_ID — paired with external_id when creating vouchers (Acs_Station_Branch_Destination)."
+                    },
+                    "shopKind": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ShopKindEnum"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "ACS_SHOP_KIND — 1 shop, 7/8 Smartpoint locker.\n\n* `1` - Shop\n* `2` - Partner shop (2)\n* `3` - Partner shop (3)\n* `4` - Xpress Point\n* `5` - Kiosk\n* `7` - Smartpoint (inbound)\n* `8` - Smartpoint (outbound)"
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "addressLine1": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "city": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "postalCode": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "countryCode": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "ISO 3166-1 alpha-2 country code."
+                    },
+                    "lat": {
+                        "type": "number",
+                        "format": "double",
+                        "maximum": 1000,
+                        "minimum": -1000,
+                        "exclusiveMaximum": true,
+                        "exclusiveMinimum": true,
+                        "readOnly": true,
+                        "nullable": true,
+                        "title": "Latitude"
+                    },
+                    "lng": {
+                        "type": "number",
+                        "format": "double",
+                        "maximum": 1000,
+                        "minimum": -1000,
+                        "exclusiveMaximum": true,
+                        "exclusiveMinimum": true,
+                        "readOnly": true,
+                        "nullable": true,
+                        "title": "Longitude"
+                    },
+                    "maxWeightKg": {
+                        "type": "number",
+                        "format": "double",
+                        "maximum": 1000,
+                        "minimum": -1000,
+                        "exclusiveMaximum": true,
+                        "exclusiveMinimum": true,
+                        "readOnly": true,
+                        "title": "Max weight (kg)",
+                        "description": "Smartpoint lockers cap at 6 kg per ACS docs; non-locker stations have no fixed cap (still stored as 6 by default)."
+                    },
+                    "workingHours": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "isActive": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "lastSyncedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "addressLine1",
+                    "branchCode",
+                    "city",
+                    "countryCode",
+                    "createdAt",
+                    "externalId",
+                    "id",
+                    "isActive",
+                    "lastSyncedAt",
+                    "lat",
+                    "lng",
+                    "maxWeightKg",
+                    "name",
+                    "postalCode",
+                    "shopKind",
+                    "updatedAt",
+                    "uuid",
+                    "workingHours"
+                ]
+            },
+            "AcsStationDetail": {
+                "type": "object",
+                "description": "List serializer for ACS stations / Smartpoints.\n\nIncludes ``working_hours`` so the checkout picker can render\nopening hours inline without requiring a per-row detail fetch.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "uuid": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "externalId": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "ACS_SHOP_STATION_ID — used as Acs_Station_Destination."
+                    },
+                    "branchCode": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "ACS_SHOP_BRANCH_ID — paired with external_id when creating vouchers (Acs_Station_Branch_Destination)."
+                    },
+                    "shopKind": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ShopKindEnum"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "ACS_SHOP_KIND — 1 shop, 7/8 Smartpoint locker.\n\n* `1` - Shop\n* `2` - Partner shop (2)\n* `3` - Partner shop (3)\n* `4` - Xpress Point\n* `5` - Kiosk\n* `7` - Smartpoint (inbound)\n* `8` - Smartpoint (outbound)"
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "addressLine1": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "city": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "postalCode": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "countryCode": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "ISO 3166-1 alpha-2 country code."
+                    },
+                    "lat": {
+                        "type": "number",
+                        "format": "double",
+                        "maximum": 1000,
+                        "minimum": -1000,
+                        "exclusiveMaximum": true,
+                        "exclusiveMinimum": true,
+                        "readOnly": true,
+                        "nullable": true,
+                        "title": "Latitude"
+                    },
+                    "lng": {
+                        "type": "number",
+                        "format": "double",
+                        "maximum": 1000,
+                        "minimum": -1000,
+                        "exclusiveMaximum": true,
+                        "exclusiveMinimum": true,
+                        "readOnly": true,
+                        "nullable": true,
+                        "title": "Longitude"
+                    },
+                    "maxWeightKg": {
+                        "type": "number",
+                        "format": "double",
+                        "maximum": 1000,
+                        "minimum": -1000,
+                        "exclusiveMaximum": true,
+                        "exclusiveMinimum": true,
+                        "readOnly": true,
+                        "title": "Max weight (kg)",
+                        "description": "Smartpoint lockers cap at 6 kg per ACS docs; non-locker stations have no fixed cap (still stored as 6 by default)."
+                    },
+                    "workingHours": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "isActive": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "lastSyncedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "addressLine2": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "region": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "phone": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Τηλέφωνο"
+                    }
+                },
+                "required": [
+                    "addressLine1",
+                    "addressLine2",
+                    "branchCode",
+                    "city",
+                    "countryCode",
+                    "createdAt",
+                    "externalId",
+                    "id",
+                    "isActive",
+                    "lastSyncedAt",
+                    "lat",
+                    "lng",
+                    "maxWeightKg",
+                    "name",
+                    "phone",
+                    "postalCode",
+                    "region",
+                    "shopKind",
+                    "updatedAt",
+                    "uuid",
+                    "workingHours"
+                ]
+            },
+            "AcsTrackingEvent": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "eventTime": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "Checkpoint_Date_Time from ACS_TrackingDetails."
+                    },
+                    "checkpointAction": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Checkpoint_Action_Description — human-readable Greek text describing the event."
+                    },
+                    "checkpointLocation": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Checkpoint_Location_Description."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "ACS Comments field."
+                    },
+                    "receivedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "Wall-clock time when the polling task observed this event."
+                    }
+                },
+                "required": [
+                    "checkpointAction",
+                    "checkpointLocation",
+                    "eventTime",
+                    "id",
+                    "notes",
+                    "receivedAt"
+                ]
+            },
             "ActionEnum": {
                 "enum": [
                     "subscribe",
@@ -47750,7 +49420,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -47838,7 +49509,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -49501,7 +51173,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -49577,7 +51250,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -49649,7 +51323,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     }
                 },
                 "required": [
@@ -50094,7 +51769,7 @@
                             }
                         ],
                         "readOnly": true,
-                        "description": "BoxNow event mapped from the webhook 'event' field\n\n* `pending_creation` - Pending creation\n* `new` - New\n* `in_depot` - In depot\n* `final_destination` - At locker\n* `delivered` - Delivered\n* `returned` - Returned\n* `expired` - Expired\n* `canceled` - Canceled\n* `accepted_for_return` - Accepted for return\n* `accepted_to_locker` - Accepted to locker\n* `missing` - Missing\n* `lost` - Lost"
+                        "description": "BoxNow event mapped from the webhook 'event' field\n\n* `pending_creation` - Pending creation\n* `new` - New\n* `in_depot` - In depot\n* `final_destination` - At locker\n* `delivered` - Παραδόθηκε\n* `returned` - Επιστράφηκε\n* `expired` - Expired\n* `canceled` - Ακυρώθηκε\n* `accepted_for_return` - Accepted for return\n* `accepted_to_locker` - Accepted to locker\n* `missing` - Missing\n* `lost` - Lost"
                     },
                     "eventTypeDisplay": {
                         "type": "string",
@@ -50168,7 +51843,7 @@
                     "lost"
                 ],
                 "type": "string",
-                "description": "* `pending_creation` - Pending creation\n* `new` - New\n* `in_depot` - In depot\n* `final_destination` - At locker\n* `delivered` - Delivered\n* `returned` - Returned\n* `expired` - Expired\n* `canceled` - Canceled\n* `accepted_for_return` - Accepted for return\n* `accepted_to_locker` - Accepted to locker\n* `missing` - Missing\n* `lost` - Lost"
+                "description": "* `pending_creation` - Pending creation\n* `new` - New\n* `in_depot` - In depot\n* `final_destination` - At locker\n* `delivered` - Παραδόθηκε\n* `returned` - Επιστράφηκε\n* `expired` - Expired\n* `canceled` - Ακυρώθηκε\n* `accepted_for_return` - Accepted for return\n* `accepted_to_locker` - Accepted to locker\n* `missing` - Missing\n* `lost` - Lost"
             },
             "BoxNowShipmentDetail": {
                 "type": "object",
@@ -50736,7 +52411,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0
+                        "minimum": 0,
+                        "title": "Ποσότητα"
                     },
                     "weightInfo": {
                         "type": "object",
@@ -50872,7 +52548,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0
+                        "minimum": 0,
+                        "title": "Ποσότητα"
                     }
                 },
                 "required": [
@@ -50901,7 +52578,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0
+                        "minimum": 0,
+                        "title": "Ποσότητα"
                     },
                     "weightInfo": {
                         "type": "object",
@@ -51043,7 +52721,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0
+                        "minimum": 0,
+                        "title": "Ποσότητα"
                     }
                 }
             },
@@ -52150,7 +53829,12 @@
                         "$ref": "#/components/schemas/NotificationKindEnum"
                     },
                     "category": {
-                        "$ref": "#/components/schemas/NotificationCategory"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/NotificationCategory"
+                            }
+                        ],
+                        "title": "Κατηγορία"
                     },
                     "priority": {
                         "$ref": "#/components/schemas/PriorityEnum"
@@ -52214,7 +53898,7 @@
                     "RECOMMENDATION"
                 ],
                 "type": "string",
-                "description": "* `ORDER` - Ταξινόμηση\n* `PAYMENT` - Payment\n* `SHIPPING` - Shipping\n* `CART` - Cart\n* `PRODUCT` - Product\n* `ACCOUNT` - Account\n* `SECURITY` - Security\n* `PROMOTION` - Promotion\n* `SYSTEM` - System\n* `REVIEW` - Review\n* `WISHLIST` - Wishlist\n* `SUPPORT` - Support\n* `NEWSLETTER` - Newsletter\n* `RECOMMENDATION` - Recommendation"
+                "description": "* `ORDER` - Παραγγελία\n* `PAYMENT` - Πληρωμή\n* `SHIPPING` - Μεταφορικά\n* `CART` - Cart\n* `PRODUCT` - Προϊόν\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SECURITY` - Security\n* `PROMOTION` - Promotion\n* `SYSTEM` - System\n* `REVIEW` - Review\n* `WISHLIST` - Wishlist\n* `SUPPORT` - Support\n* `NEWSLETTER` - Newsletter\n* `RECOMMENDATION` - Recommendation"
             },
             "NotificationCountResponse": {
                 "type": "object",
@@ -52469,7 +54153,12 @@
                         "nullable": true
                     },
                     "status": {
-                        "$ref": "#/components/schemas/OrderStatus"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/OrderStatus"
+                            }
+                        ],
+                        "title": "Κατάσταση"
                     },
                     "statusDisplay": {
                         "type": "string",
@@ -52591,6 +54280,7 @@
                         "maxLength": 255
                     },
                     "paymentStatus": {
+                        "title": "Κατάσταση πληρωμής",
                         "oneOf": [
                             {
                                 "$ref": "#/components/schemas/PaymentStatusEnum"
@@ -52600,12 +54290,19 @@
                             }
                         ]
                     },
+                    "paymentStatusDisplay": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Localised label for ``payment_status`` (mirrors ``status_display``). Frontend renders this rather than the raw enum value so Greek/English/German locales all work without per-locale string maps in the UI."
+                    },
                     "paymentMethod": {
                         "type": "string",
                         "maxLength": 50
                     },
-                    "shippingMethod": {
-                        "$ref": "#/components/schemas/ShippingMethodEnum"
+                    "isOnlinePayment": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "True when the order's PayWay charges the shopper online (Stripe, Viva); false for cash-on-delivery / bank transfer. Surfaced on both list + detail so both views can suppress misleading 'outstanding amount' warnings for COD orders where the shopper intentionally paid €0 at checkout."
                     },
                     "canBeCanceled": {
                         "type": "boolean",
@@ -52625,12 +54322,14 @@
                     "firstName",
                     "fullAddress",
                     "id",
+                    "isOnlinePayment",
                     "isPaid",
                     "items",
                     "lastName",
                     "paidAmount",
                     "payWay",
                     "paymentMethodFee",
+                    "paymentStatusDisplay",
                     "phone",
                     "region",
                     "shippingPrice",
@@ -52752,15 +54451,6 @@
                         "nullable": true,
                         "description": "Number of loyalty points to redeem for discount on this order"
                     },
-                    "shippingMethod": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/ShippingMethodEnum"
-                            }
-                        ],
-                        "default": "home_delivery",
-                        "description": "Shipping method for this order\n\n* `home_delivery` - Home delivery\n* `box_now_locker` - BOX NOW Locker"
-                    },
                     "boxnowLockerId": {
                         "type": "string",
                         "description": "BoxNow APM locker ID from the widget",
@@ -52772,6 +54462,45 @@
                         "minimum": 1,
                         "default": 1,
                         "description": "BoxNow compartment size: 1=Small, 2=Medium, 3=Large"
+                    },
+                    "shippingProviderCode": {
+                        "type": "string",
+                        "description": "Carrier code from /api/v1/shipping/options (e.g. 'acs').",
+                        "maxLength": 32,
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "shippingKind": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ShippingKind"
+                            }
+                        ],
+                        "description": "Generic fulfilment kind, independent of provider.\n\n* `home_delivery` - Home delivery\n* `pickup_point` - Pickup point / locker"
+                    },
+                    "acsStationExternalId": {
+                        "type": "string",
+                        "description": "ACS Smartpoint / shop external ID (Phase 2 pickup-point flow).",
+                        "maxLength": 32
+                    },
+                    "acsStationBranch": {
+                        "type": "string",
+                        "description": "ACS_Station_Branch_Destination value.",
+                        "maxLength": 32
+                    },
+                    "acsChargeType": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AcsChargeType"
+                            }
+                        ],
+                        "default": 1
+                    },
+                    "meta": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "writeOnly": true,
+                        "nullable": true,
+                        "description": "Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``, ``client_ip_address``, ``event_ids`` (dict of {purchase, initiate_checkout, add_payment_info}), ``consent`` (dict with ``ads`` boolean). Empty dict / null when the customer declined marketing cookies; the CAPI dispatcher then skips the send."
                     }
                 },
                 "required": [
@@ -52840,7 +54569,12 @@
                         "nullable": true
                     },
                     "status": {
-                        "$ref": "#/components/schemas/OrderStatus"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/OrderStatus"
+                            }
+                        ],
+                        "title": "Κατάσταση"
                     },
                     "statusDisplay": {
                         "type": "string",
@@ -52963,6 +54697,7 @@
                         "maxLength": 255
                     },
                     "paymentStatus": {
+                        "title": "Κατάσταση πληρωμής",
                         "oneOf": [
                             {
                                 "$ref": "#/components/schemas/PaymentStatusEnum"
@@ -52972,12 +54707,19 @@
                             }
                         ]
                     },
+                    "paymentStatusDisplay": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Localised label for ``payment_status`` (mirrors ``status_display``). Frontend renders this rather than the raw enum value so Greek/English/German locales all work without per-locale string maps in the UI."
+                    },
                     "paymentMethod": {
                         "type": "string",
                         "maxLength": 50
                     },
-                    "shippingMethod": {
-                        "$ref": "#/components/schemas/ShippingMethodEnum"
+                    "isOnlinePayment": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "True when the order's PayWay charges the shopper online (Stripe, Viva); false for cash-on-delivery / bank transfer. Surfaced on both list + detail so both views can suppress misleading 'outstanding amount' warnings for COD orders where the shopper intentionally paid €0 at checkout."
                     },
                     "canBeCanceled": {
                         "type": "boolean",
@@ -53089,10 +54831,68 @@
                         ],
                         "nullable": true,
                         "readOnly": true,
-                        "description": "BoxNow shipment details when shipping_method is 'box_now_locker', else null."
+                        "description": "BoxNow shipment details when shipping_provider.code is 'boxnow', else null."
+                    },
+                    "acsShipment": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AcsShipmentDetail"
+                            }
+                        ],
+                        "nullable": true,
+                        "readOnly": true,
+                        "description": "ACS shipment details when the order's shipping provider is ACS, else null."
+                    },
+                    "shipment": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": true,
+                        "description": "Provider-agnostic shipment payload — frontends can read this single field instead of branching on boxnow_shipment / acs_shipment.  Returns the active provider's detail serializer dict (shape depends on the provider) or null when no shipment exists.",
+                        "readOnly": true
+                    },
+                    "shipmentProviderCode": {
+                        "type": "string",
+                        "nullable": true,
+                        "readOnly": true,
+                        "description": "Identifier of the carrier handling this order — 'acs', 'boxnow', or null when no provider is attached.  Lets frontends switch on a stable code instead of inspecting the shipment shape."
+                    },
+                    "cancellation": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "reason": {
+                                "type": "string"
+                            },
+                            "canceledAt": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "previousStatus": {
+                                "type": "string"
+                            },
+                            "shipmentCancel": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                    "attempted": {
+                                        "type": "boolean"
+                                    },
+                                    "dispatched": {
+                                        "type": "boolean"
+                                    },
+                                    "error": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                }
+                            }
+                        },
+                        "readOnly": true,
+                        "description": "Cancellation context for CANCELED orders — exposes the operator-supplied reason, timestamp, and shipment-cancel outcome from ``order.metadata['cancellation']``. Returns null when the order was not canceled. Internal flags from the metadata bag (webhook idempotency markers, mint tickets) are intentionally not surfaced."
                     },
                     "trackingNumber": {
                         "type": "string",
+                        "title": "Αριθμός Παρακολούθησης",
                         "maxLength": 255
                     },
                     "shippingCarrier": {
@@ -53110,11 +54910,21 @@
                     "isCanceled": {
                         "type": "boolean",
                         "readOnly": true
+                    },
+                    "metaEventIds": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Meta Pixel ``eventID`` values the browser must reuse when firing the matching pixel call on the success page so Meta dedups the browser event against the server-side Conversions API event. Only the keys minted at order creation are surfaced (purchase, initiate_checkout, add_payment_info). Empty dict when the customer declined marketing cookies — in that case the browser should not fire the matching pixel either.",
+                        "readOnly": true
                     }
                 },
                 "required": [
+                    "acsShipment",
                     "boxnowShipment",
                     "canBeCanceled",
+                    "cancellation",
                     "city",
                     "country",
                     "createdAt",
@@ -53126,16 +54936,21 @@
                     "id",
                     "isCanceled",
                     "isCompleted",
+                    "isOnlinePayment",
                     "isPaid",
                     "items",
                     "lastName",
+                    "metaEventIds",
                     "orderTimeline",
                     "paidAmount",
                     "payWay",
                     "paymentMethodFee",
+                    "paymentStatusDisplay",
                     "phone",
                     "pricingBreakdown",
                     "region",
+                    "shipment",
+                    "shipmentProviderCode",
                     "shippingPrice",
                     "statusDisplay",
                     "statusUpdatedAt",
@@ -53191,7 +55006,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648
+                        "minimum": -2147483648,
+                        "title": "Ποσότητα"
                     },
                     "isRefunded": {
                         "type": "boolean",
@@ -53248,7 +55064,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648
+                        "minimum": -2147483648,
+                        "title": "Ποσότητα"
                     },
                     "notes": {
                         "type": "string"
@@ -53293,7 +55110,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648
+                        "minimum": -2147483648,
+                        "title": "Ποσότητα"
                     },
                     "isRefunded": {
                         "type": "boolean",
@@ -53427,7 +55245,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648
+                        "minimum": -2147483648,
+                        "title": "Ποσότητα"
                     },
                     "notes": {
                         "type": "string"
@@ -53450,7 +55269,7 @@
                     "REFUNDED"
                 ],
                 "type": "string",
-                "description": "* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `SHIPPED` - Shipped\n* `DELIVERED` - Delivered\n* `COMPLETED` - Completed\n* `CANCELED` - Canceled\n* `RETURNED` - Returned\n* `REFUNDED` - Refunded"
+                "description": "* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `SHIPPED` - Απεστάλη\n* `DELIVERED` - Παραδόθηκε\n* `COMPLETED` - Ολοκληρώθηκε\n* `CANCELED` - Ακυρώθηκε\n* `RETURNED` - Επιστράφηκε\n* `REFUNDED` - Επεστράφη"
             },
             "OrderWriteRequest": {
                 "type": "object",
@@ -53564,6 +55383,58 @@
                     "streetNumber",
                     "zipcode"
                 ]
+            },
+            "PaginatedAcsStationList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "links": {
+                        "type": "object",
+                        "properties": {
+                            "next": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uri",
+                                "example": "http://api.example.org/accounts/?page=4"
+                            },
+                            "previous": {
+                                "type": "string",
+                                "nullable": true,
+                                "format": "uri",
+                                "example": "http://api.example.org/accounts/?page=2"
+                            }
+                        }
+                    },
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "totalPages": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "pageSize": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "pageTotalResults": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "page": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AcsStation"
+                        }
+                    }
+                }
             },
             "PaginatedAttributeList": {
                 "type": "object",
@@ -55549,7 +57420,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     }
                 }
             },
@@ -55559,7 +57431,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": 0
+                        "minimum": 0,
+                        "title": "Ποσότητα"
                     }
                 }
             },
@@ -55657,7 +57530,8 @@
                     "quantity": {
                         "type": "integer",
                         "maximum": 2147483647,
-                        "minimum": -2147483648
+                        "minimum": -2147483648,
+                        "title": "Ποσότητα"
                     },
                     "notes": {
                         "type": "string"
@@ -55818,7 +57692,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "cost": {
                         "type": "number",
@@ -55899,7 +57774,8 @@
                         "default": "MAIN"
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "translations": {
                         "type": "object",
@@ -55990,7 +57866,8 @@
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "parent": {
                         "type": "integer",
@@ -56077,6 +57954,7 @@
                                 "$ref": "#/components/schemas/RateEnum"
                             }
                         ],
+                        "title": "Συντ.",
                         "minimum": 0,
                         "maximum": 32767
                     },
@@ -56215,7 +58093,8 @@
                         "maxLength": 255
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     }
                 }
             },
@@ -56320,11 +58199,12 @@
                                 "$ref": "#/components/schemas/TopicCategory"
                             }
                         ],
-                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "title": "Κατηγορία",
+                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     "isActive": {
                         "type": "boolean",
-                        "title": "Active",
+                        "title": "Ενεργή",
                         "description": "Whether this topic is currently available for subscription"
                     },
                     "isDefault": {
@@ -56372,7 +58252,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     }
                 }
             },
@@ -56674,7 +58555,8 @@
                         "readOnly": true
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "cost": {
                         "type": "number",
@@ -56808,7 +58690,8 @@
                         "readOnly": true
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "cost": {
                         "type": "number",
@@ -56942,7 +58825,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "cost": {
                         "type": "number",
@@ -57008,7 +58892,7 @@
                     "CANCELED"
                 ],
                 "type": "string",
-                "description": "* `PENDING` - Pending\n* `PROCESSING` - Processing\n* `COMPLETED` - Completed\n* `FAILED` - Failed\n* `REFUNDED` - Refunded\n* `PARTIALLY_REFUNDED` - Partially Refunded\n* `CANCELED` - Canceled"
+                "description": "* `PENDING` - Εκκρεμεί\n* `PROCESSING` - Σε επεξεργασία\n* `COMPLETED` - Ολοκληρώθηκε\n* `FAILED` - Απέτυχε\n* `REFUNDED` - Επεστράφη\n* `PARTIALLY_REFUNDED` - Μερική επιστροφή\n* `CANCELED` - Ακυρώθηκε"
             },
             "PaymentStatusResponse": {
                 "type": "object",
@@ -57102,7 +58986,8 @@
                     },
                     "description": {
                         "type": "string",
-                        "readOnly": true
+                        "readOnly": true,
+                        "title": "Περιγραφή"
                     },
                     "createdAt": {
                         "type": "string",
@@ -57210,7 +59095,8 @@
                         "description": "Stock level at or below which admins get a low-stock alert. Set to 0 to disable alerts for this product."
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "weight": {
                         "type": "object",
@@ -57584,7 +59470,8 @@
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "parent": {
                         "type": "integer",
@@ -57677,7 +59564,8 @@
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "parent": {
                         "type": "integer",
@@ -57772,7 +59660,8 @@
                         "default": "MAIN"
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -57903,7 +59792,8 @@
                         "default": "MAIN"
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -58007,7 +59897,8 @@
                         "default": "MAIN"
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "translations": {
                         "type": "object",
@@ -58103,7 +59994,8 @@
                         "pattern": "^[-a-zA-Z0-9_]+$"
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "parent": {
                         "type": "integer",
@@ -58207,7 +60099,8 @@
                         "description": "Stock level at or below which admins get a low-stock alert. Set to 0 to disable alerts for this product."
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "weight": {
                         "type": "object",
@@ -58435,7 +60328,8 @@
                         "description": "Stock level at or below which admins get a low-stock alert. Set to 0 to disable alerts for this product."
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "weight": {
                         "type": "object",
@@ -59229,11 +61123,17 @@
                                 "$ref": "#/components/schemas/RateEnum"
                             }
                         ],
+                        "title": "Συντ.",
                         "minimum": 0,
                         "maximum": 32767
                     },
                     "status": {
-                        "$ref": "#/components/schemas/ReviewStatus"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ReviewStatus"
+                            }
+                        ],
+                        "title": "Κατάσταση"
                     },
                     "isPublished": {
                         "type": "boolean"
@@ -59331,11 +61231,17 @@
                                 "$ref": "#/components/schemas/RateEnum"
                             }
                         ],
+                        "title": "Συντ.",
                         "minimum": 0,
                         "maximum": 32767
                     },
                     "status": {
-                        "$ref": "#/components/schemas/ReviewStatus"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/ReviewStatus"
+                            }
+                        ],
+                        "title": "Κατάσταση"
                     },
                     "isPublished": {
                         "type": "boolean"
@@ -59416,6 +61322,7 @@
                                 "$ref": "#/components/schemas/RateEnum"
                             }
                         ],
+                        "title": "Συντ.",
                         "minimum": 0,
                         "maximum": 32767
                     },
@@ -59559,7 +61466,8 @@
                         "maxLength": 255
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     }
                 },
                 "required": [
@@ -60090,13 +61998,162 @@
                     "value"
                 ]
             },
-            "ShippingMethodEnum": {
+            "ShipmentStateEnum": {
                 "enum": [
-                    "home_delivery",
-                    "box_now_locker"
+                    "pending_creation",
+                    "new",
+                    "in_transit",
+                    "at_destination",
+                    "out_for_delivery",
+                    "delivered",
+                    "attempted",
+                    "returned",
+                    "canceled",
+                    "lost"
                 ],
                 "type": "string",
-                "description": "* `home_delivery` - Home delivery\n* `box_now_locker` - BOX NOW Locker"
+                "description": "* `pending_creation` - Pending creation\n* `new` - New\n* `in_transit` - In transit\n* `at_destination` - At destination station\n* `out_for_delivery` - Out for delivery\n* `delivered` - Παραδόθηκε\n* `attempted` - Delivery attempted\n* `returned` - Επιστράφηκε\n* `canceled` - Ακυρώθηκε\n* `lost` - Lost"
+            },
+            "ShippingKind": {
+                "enum": [
+                    "home_delivery",
+                    "pickup_point"
+                ],
+                "type": "string",
+                "description": "* `home_delivery` - Home delivery\n* `pickup_point` - Pickup point / locker"
+            },
+            "ShippingOption": {
+                "type": "object",
+                "description": "One row in the checkout shipping-method radio.\n\nReturned by :class:`shipping.views.ShippingOptionsView`.  The\nfrontend renders one card per row; the ``kind`` value tells it\nwhether to show a locker picker, and ``provider_code`` tells it\nwhich picker variant (BoxNow widget vs ACS server-side list).",
+                "properties": {
+                    "providerCode": {
+                        "type": "string"
+                    },
+                    "providerName": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "$ref": "#/components/schemas/ShippingKind"
+                    },
+                    "price": {
+                        "type": "number",
+                        "format": "double",
+                        "maximum": 1000000000,
+                        "minimum": -1000000000,
+                        "exclusiveMaximum": true,
+                        "exclusiveMinimum": true,
+                        "nullable": true,
+                        "description": "Null when the provider defers to the global flat rate."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "maxLength": 3
+                    },
+                    "liveMode": {
+                        "type": "boolean"
+                    },
+                    "priority": {
+                        "type": "integer"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    }
+                },
+                "required": [
+                    "currency",
+                    "kind",
+                    "liveMode",
+                    "metadata",
+                    "price",
+                    "priority",
+                    "providerCode",
+                    "providerName"
+                ]
+            },
+            "ShippingProvider": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "code": {
+                        "type": "string",
+                        "readOnly": true,
+                        "title": "Κωδικός",
+                        "description": "Stable identifier matching the registered carrier adapter (e.g. 'acs', 'boxnow').",
+                        "pattern": "^[-a-zA-Z0-9_]+$"
+                    },
+                    "name": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Display name shown to customers (e.g. 'ACS Courier')."
+                    },
+                    "isActive": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Master switch — when False the provider is hidden from checkout regardless of capability flags."
+                    },
+                    "supportsHomeDelivery": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "supportsPickupPoint": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "liveMode": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "False = sandbox / test credentials. Used by the admin UI to warn operators that vouchers won't actually ship."
+                    },
+                    "priority": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "Sort order in checkout — lower numbers appear first."
+                    },
+                    "metadata": {
+                        "readOnly": true,
+                        "description": "Provider-specific configuration (supported countries, feature flags, branding hints)."
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "code",
+                    "createdAt",
+                    "id",
+                    "isActive",
+                    "liveMode",
+                    "metadata",
+                    "name",
+                    "priority",
+                    "supportsHomeDelivery",
+                    "supportsPickupPoint",
+                    "updatedAt"
+                ]
+            },
+            "ShopKindEnum": {
+                "enum": [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    7,
+                    8
+                ],
+                "type": "integer",
+                "description": "* `1` - Shop\n* `2` - Partner shop (2)\n* `3` - Partner shop (3)\n* `4` - Xpress Point\n* `5` - Kiosk\n* `7` - Smartpoint (inbound)\n* `8` - Smartpoint (outbound)"
             },
             "SubscriptionStatus": {
                 "enum": [
@@ -60106,7 +62163,7 @@
                     "BOUNCED"
                 ],
                 "type": "string",
-                "description": "* `ACTIVE` - Active\n* `PENDING` - Pending Confirmation\n* `UNSUBSCRIBED` - Unsubscribed\n* `BOUNCED` - Bounced"
+                "description": "* `ACTIVE` - Ενεργή\n* `PENDING` - Pending Confirmation\n* `UNSUBSCRIBED` - Unsubscribed\n* `BOUNCED` - Bounced"
             },
             "SubscriptionTopic": {
                 "type": "object",
@@ -60171,11 +62228,12 @@
                                 "$ref": "#/components/schemas/TopicCategory"
                             }
                         ],
-                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "title": "Κατηγορία",
+                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     "isActive": {
                         "type": "boolean",
-                        "title": "Active",
+                        "title": "Ενεργή",
                         "description": "Whether this topic is currently available for subscription"
                     },
                     "isDefault": {
@@ -60263,11 +62321,12 @@
                                 "$ref": "#/components/schemas/TopicCategory"
                             }
                         ],
-                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "title": "Κατηγορία",
+                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     "isActive": {
                         "type": "boolean",
-                        "title": "Active",
+                        "title": "Ενεργή",
                         "description": "Whether this topic is currently available for subscription"
                     },
                     "isDefault": {
@@ -60359,11 +62418,12 @@
                                 "$ref": "#/components/schemas/TopicCategory"
                             }
                         ],
-                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                        "title": "Κατηγορία",
+                        "description": "Category of the subscription topic\n\n* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
                     },
                     "isActive": {
                         "type": "boolean",
-                        "title": "Active",
+                        "title": "Ενεργή",
                         "description": "Whether this topic is currently available for subscription"
                     },
                     "isDefault": {
@@ -60419,7 +62479,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -60495,7 +62556,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     },
                     "sortOrder": {
                         "type": "integer",
@@ -60573,7 +62635,8 @@
                         }
                     },
                     "active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "title": "Ενεργή"
                     }
                 },
                 "required": [
@@ -60812,7 +62875,7 @@
                     "OTHER"
                 ],
                 "type": "string",
-                "description": "* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Account Updates\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
+                "description": "* `MARKETING` - Marketing Campaigns\n* `PRODUCT` - Product Updates\n* `ACCOUNT` - Λογαριασμός Ανενεργός\n* `SYSTEM` - System Notifications\n* `NEWSLETTER` - Newsletter\n* `PROMOTIONAL` - Promotional\n* `OTHER` - Other"
             },
             "TransactionTypeEnum": {
                 "enum": [
@@ -61421,7 +63484,7 @@
                     "isActive": {
                         "type": "boolean",
                         "readOnly": true,
-                        "title": "Active"
+                        "title": "Ενεργή"
                     },
                     "isStaff": {
                         "type": "boolean",
@@ -61498,7 +63561,12 @@
                         "readOnly": true
                     },
                     "status": {
-                        "$ref": "#/components/schemas/SubscriptionStatus"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SubscriptionStatus"
+                            }
+                        ],
+                        "title": "Κατάσταση"
                     },
                     "subscribedAt": {
                         "type": "string",
@@ -61560,7 +63628,12 @@
                         "readOnly": true
                     },
                     "status": {
-                        "$ref": "#/components/schemas/SubscriptionStatus"
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SubscriptionStatus"
+                            }
+                        ],
+                        "title": "Κατάσταση"
                     },
                     "subscribedAt": {
                         "type": "string",

@@ -33509,6 +33509,16 @@ components:
           allOf:
           - $ref: '#/components/schemas/AcsChargeType'
           default: 1
+        meta:
+          type: object
+          additionalProperties: {}
+          writeOnly: true
+          nullable: true
+          description: 'Meta Pixel context: keys ``fbp``, ``fbc``, ``client_user_agent``,
+            ``client_ip_address``, ``event_ids`` (dict of {purchase, initiate_checkout,
+            add_payment_info}), ``consent`` (dict with ``ads`` boolean). Empty dict
+            / null when the customer declined marketing cookies; the CAPI dispatcher
+            then skips the send.'
       required:
       - city
       - countryId
@@ -33824,6 +33834,17 @@ components:
         isCanceled:
           type: boolean
           readOnly: true
+        metaEventIds:
+          type: object
+          additionalProperties:
+            type: string
+          description: Meta Pixel ``eventID`` values the browser must reuse when firing
+            the matching pixel call on the success page so Meta dedups the browser
+            event against the server-side Conversions API event. Only the keys minted
+            at order creation are surfaced (purchase, initiate_checkout, add_payment_info).
+            Empty dict when the customer declined marketing cookies — in that case
+            the browser should not fire the matching pixel either.
+          readOnly: true
       required:
       - acsShipment
       - boxnowShipment
@@ -33844,6 +33865,7 @@ components:
       - isPaid
       - items
       - lastName
+      - metaEventIds
       - orderTimeline
       - paidAmount
       - payWay

@@ -207,7 +207,42 @@ class OrderDetailSerializer(OrderSerializer):
             "tickets) are intentionally not surfaced."
         )
     )
+    meta_event_ids = serializers.SerializerMethodField(
+        help_text=(
+            "Meta Pixel ``eventID`` values the browser must reuse when "
+            "firing the matching pixel call on the success page so "
+            "Meta dedups the browser event against the server-side "
+            "Conversions API event. Only the keys minted at order "
+            "creation are surfaced (purchase, initiate_checkout, "
+            "add_payment_info). Empty dict when the customer declined "
+            "marketing cookies — in that case the browser should not "
+            "fire the matching pixel either."
+        )
+    )
     phone = PhoneNumberField(read_only=True)
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "description": (
+                "Per-event-name UUIDs for Meta Pixel deduplication."
+            ),
+        }
+    )
+    def get_meta_event_ids(self, obj: Order) -> dict[str, str]:
+        meta = obj.metadata or {}
+        meta_ctx = meta.get("meta") or {}
+        if not isinstance(meta_ctx, dict):
+            return {}
+        event_ids = meta_ctx.get("event_ids") or {}
+        if not isinstance(event_ids, dict):
+            return {}
+        return {
+            key: str(value)
+            for key, value in event_ids.items()
+            if isinstance(value, (str, int)) and str(value)
+        }
 
     @extend_schema_field({"type": "boolean"})
     def get_has_invoice(self, obj: Order) -> bool:
@@ -469,6 +504,7 @@ class OrderDetailSerializer(OrderSerializer):
             "is_completed",
             "is_canceled",
             "full_address",
+            "meta_event_ids",
         )
         read_only_fields = (
             *OrderSerializer.Meta.read_only_fields,
@@ -651,6 +687,29 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         choices=[(1, _("Prepaid")), (2, _("Cash on delivery"))],
         required=False,
         default=1,
+    )
+
+    # ---------- Meta Conversions API context ----------
+    # Forwarded by the Nuxt ``server/api/orders/index.post.ts`` proxy
+    # at order creation. Persisted on ``order.metadata['meta']`` so
+    # the server-side Purchase/InitiateCheckout/Refund dispatchers
+    # can build a ``UserData`` payload with the same fbp/fbc cookies
+    # the browser pixel saw — the *only* way to reach a high
+    # Event Match Quality score on Meta's side. Strictly write-only;
+    # never serialised on Order detail responses.
+    meta = serializers.DictField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text=_(
+            "Meta Pixel context: keys ``fbp``, ``fbc``, "
+            "``client_user_agent``, ``client_ip_address``, "
+            "``event_ids`` (dict of {purchase, initiate_checkout, "
+            "add_payment_info}), ``consent`` (dict with ``ads`` "
+            "boolean). Empty dict / null when the customer declined "
+            "marketing cookies; the CAPI dispatcher then skips the "
+            "send."
+        ),
     )
 
     def validate_email(self, value: str) -> str:

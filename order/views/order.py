@@ -717,6 +717,12 @@ class OrderViewSet(BaseModelViewSet):
         # Step 5: Get loyalty points to redeem (if any)
         loyalty_points_to_redeem = request.data.get("loyalty_points_to_redeem")
 
+        # Step 5.5: Pull Meta Pixel context (fbp/fbc/UA/IP/event_ids) the
+        # storefront proxy forwarded for Conversions API matching. The
+        # service-level helper ``_sanitise_meta_context`` filters this
+        # against an allow-list, so it's safe to forward as-is here.
+        meta_context = request.data.get("meta")
+
         # Step 6: Create order from cart with payment_intent_id
         order = OrderService.create_order_from_cart(
             cart=cart,
@@ -725,6 +731,7 @@ class OrderViewSet(BaseModelViewSet):
             pay_way=pay_way,
             user=user,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
+            meta_context=meta_context,
         )
 
         # Return order details
@@ -780,6 +787,11 @@ class OrderViewSet(BaseModelViewSet):
         # Step 4: Get loyalty points to redeem (if any)
         loyalty_points_to_redeem = request.data.get("loyalty_points_to_redeem")
 
+        # Step 4.5: Pull Meta Pixel context for the offline path too —
+        # COD orders trigger the canonical Purchase event from
+        # ``order_paid`` so the dispatcher needs the same fbp/fbc.
+        meta_context = request.data.get("meta")
+
         # Step 5: Create order from cart without payment_intent_id
         order = OrderService.create_order_from_cart_offline(
             cart=cart,
@@ -787,6 +799,7 @@ class OrderViewSet(BaseModelViewSet):
             pay_way=pay_way,
             user=user,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
+            meta_context=meta_context,
         )
 
         # Return order details

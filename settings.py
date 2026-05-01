@@ -127,6 +127,7 @@ LOCAL_APPS = [
     "tag",
     "meili",
     "loyalty",
+    "meta_capi",
 ]
 
 THIRD_PARTY_APPS = [
@@ -1130,6 +1131,22 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "CHECKOUT_ABANDONMENT_HOURS",
         "type": "int",
         "value": 2,
+    },
+    # Meta Conversions API
+    {
+        "name": "META_CAPI_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Master kill switch for the server-side Meta Conversions "
+            "API dispatcher. Defaults False so a fresh deploy doesn't "
+            "leak unintended events when ``META_PIXEL_ID`` / "
+            "``META_CAPI_ACCESS_TOKEN`` are still placeholders. Flip "
+            "to True in Django admin once Meta credentials are in "
+            "place and the Test Events feed in Events Manager looks "
+            "right. The browser pixel is independent — it gates on "
+            "the ``ad_storage`` cookie consent on the storefront."
+        ),
     },
     # Storefront UI toggles
     {
@@ -2634,3 +2651,27 @@ ACS_SUPPORTED_COUNTRIES = [
 # retune without a redeploy. The master on/off switch is the
 # ShippingProvider.is_active flag, NOT a setting — see Phase 0
 # (shipping/migrations/0002_seed_providers.py).
+
+# ---------- Meta Conversions API ----------
+# Pixel ID is public (rendered in the browser pixel tag) but kept in
+# settings here so the Django side can stamp it on every server-side
+# event. The access token is a server-only secret; never echo it back
+# to the frontend or include it in error responses. ``META_CAPI_ENABLED``
+# in extra_settings.Setting is the master kill switch — flipping it
+# False stops the Celery dispatcher from posting to Meta without any
+# code changes (lets ops shut traffic off during an incident).
+META_PIXEL_ID = getenv("META_PIXEL_ID", "")
+META_CAPI_ACCESS_TOKEN = getenv("META_CAPI_ACCESS_TOKEN", "")
+META_CAPI_API_VERSION = getenv("META_CAPI_API_VERSION", "v22.0")
+# Optional Meta-issued code that flags every event as a test event.
+# Set during integration testing so events surface under "Test Events"
+# in Events Manager instead of polluting prod attribution. Empty in
+# production.
+META_CAPI_TEST_EVENT_CODE = getenv("META_CAPI_TEST_EVENT_CODE", "")
+# Identifier sent on every CAPI request via ``partner_agent`` so Meta
+# can attribute support requests to this integration.
+META_CAPI_PARTNER_AGENT = getenv(
+    "META_CAPI_PARTNER_AGENT", "grooveshop-django-capi-1.0"
+)
+# Per-request timeout for the facebook_business SDK's HTTP client.
+META_CAPI_HTTP_TIMEOUT = int(getenv("META_CAPI_HTTP_TIMEOUT", "10"))

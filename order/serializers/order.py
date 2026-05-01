@@ -219,6 +219,17 @@ class OrderDetailSerializer(OrderSerializer):
             "fire the matching pixel either."
         )
     )
+    currency = serializers.SerializerMethodField(
+        help_text=(
+            "ISO 4217 currency code for every monetary field on the "
+            "order (paidAmount, shippingPrice, totalPriceItems, …). "
+            "Surfaced as a top-level field because djmoney serialises "
+            "money fields as bare numbers — without this, the "
+            "frontend has no way to know whether ``59.98`` is EUR or "
+            "USD, which breaks ad-pixel attribution and cart "
+            "totals in multi-currency reports."
+        )
+    )
     phone = PhoneNumberField(read_only=True)
 
     @extend_schema_field(
@@ -243,6 +254,28 @@ class OrderDetailSerializer(OrderSerializer):
             for key, value in event_ids.items()
             if isinstance(value, (str, int)) and str(value)
         }
+
+    @extend_schema_field({"type": "string", "example": "EUR"})
+    def get_currency(self, obj: Order) -> str:
+        # ``paid_amount`` is the canonical reference: it's the field
+        # the customer actually paid in. Falls back to total_price_items
+        # for orders where paid_amount may be a zero Money (COD before
+        # reconciliation), and finally to the project default. Walking
+        # multiple sources keeps us safe against the rare case where
+        # the order was created with one currency and reconciled in
+        # another (shouldn't happen, but cheap to guard against).
+        from django.conf import settings
+
+        for source_name in (
+            "paid_amount",
+            "total_price_items",
+            "shipping_price",
+        ):
+            money = getattr(obj, source_name, None)
+            currency = getattr(money, "currency", None) if money else None
+            if currency is not None:
+                return str(currency).upper()
+        return settings.DEFAULT_CURRENCY
 
     @extend_schema_field({"type": "boolean"})
     def get_has_invoice(self, obj: Order) -> bool:
@@ -505,6 +538,7 @@ class OrderDetailSerializer(OrderSerializer):
             "is_canceled",
             "full_address",
             "meta_event_ids",
+            "currency",
         )
         read_only_fields = (
             *OrderSerializer.Meta.read_only_fields,

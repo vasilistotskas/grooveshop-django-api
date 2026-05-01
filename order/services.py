@@ -1444,7 +1444,45 @@ class OrderService:
             raise
 
     @classmethod
-    def maybe_advance_to_completed(cls, order: Order) -> Order:
+    def _suppress_customer_status_notifications(
+        cls, order: Order, new_status: str
+    ) -> None:
+        """Pre-stamp metadata so the next ``new_status`` transition
+        skips the customer email + WS toast.
+
+        Used by chained transitions (DELIVERED → COMPLETED auto-advance,
+        admin tracking promotion that hops PENDING → PROCESSING → SHIPPED,
+        online payment succeeded firing PENDING → PROCESSING right
+        before the order_received confirmation email lands) where the
+        chained-into status would arrive at the customer's inbox /
+        notification bell within ~ms of the previous one and feel like
+        spam.
+
+        Internal state still flows: ``order_status_changed`` signal
+        fires, OrderHistory logs the transition, the post-save handler
+        runs. Only the user-visible ``send_order_status_update_email``
+        + ``notify_order_status_changed_live`` dispatches are skipped.
+
+        ``_status_update_reservation_key`` is the same key the email
+        task uses to dedupe — pre-stamping it makes the task short-
+        circuit. The matching ``suppress_status_ws_<status>`` flag
+        is read by ``handle_order_status_changed`` for the live-
+        notification dispatch.
+        """
+        from order.tasks import _status_update_reservation_key
+
+        email_flag = _status_update_reservation_key(order.id, new_status)
+        ws_flag = f"suppress_status_ws_{new_status}"
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[email_flag] = True
+        order.metadata[ws_flag] = True
+        order.save(update_fields=["metadata"])
+
+    @classmethod
+    def maybe_advance_to_completed(
+        cls, order: Order, *, silent_for_customer: bool = False
+    ) -> Order:
         """Auto-advance ``order`` from DELIVERED to COMPLETED when paid.
 
         The canonical state-machine table allows DELIVERED → COMPLETED,
@@ -1456,7 +1494,13 @@ class OrderService:
         Triggers from two call-sites:
         * Carrier event handlers (ACS poll, BoxNow webhook) right after
           they advance to DELIVERED for an already-paid online order.
+          Pass ``silent_for_customer=True`` here — the customer just
+          got the DELIVERED email + toast and a COMPLETED message ~ms
+          later would feel like a duplicate.
         * COD reconcile, after flipping payment_status to COMPLETED.
+          Leave ``silent_for_customer=False`` (default) — DELIVERED
+          fired hours/days earlier, so a fresh "thanks for your loyalty
+          points" message is welcome, not redundant.
 
         Idempotent and silent when the order is not eligible — a
         non-paid order or one already past DELIVERED no-ops.
@@ -1480,6 +1524,10 @@ class OrderService:
             return order
         order.status = row["status"]
         order.payment_status = row["payment_status"]
+        if silent_for_customer:
+            cls._suppress_customer_status_notifications(
+                order, OrderStatus.COMPLETED.value
+            )
         try:
             return cls.update_order_status(order, OrderStatus.COMPLETED)
         except InvalidStatusTransitionError as exc:
@@ -1891,6 +1939,16 @@ class OrderService:
         elif order.status == OrderStatus.PROCESSING:
             cls.update_order_status(order, OrderStatus.SHIPPED)
         elif order.status == OrderStatus.PENDING:
+            # Two-hop chain → suppress the intermediate PROCESSING
+            # email + WS toast. The customer cares that the order has
+            # SHIPPED; getting "your order is being prepared" then
+            # "your order is shipped" within the same second is the
+            # admin path's only remaining duplicate. The PROCESSING
+            # transition still fires the signal + OrderHistory row,
+            # only the user-visible dispatches are skipped.
+            cls._suppress_customer_status_notifications(
+                order, OrderStatus.PROCESSING.value
+            )
             cls.update_order_status(order, OrderStatus.PROCESSING)
             cls.update_order_status(order, OrderStatus.SHIPPED)
         else:
@@ -2093,6 +2151,19 @@ class OrderService:
         )
 
         if order.status == OrderStatus.PENDING:
+            # The Stripe webhook handler dispatches
+            # ``send_order_confirmation_email`` immediately after this
+            # method returns — that email already conveys "we received
+            # your order, processing it now". Suppress this transition's
+            # status-update email + WS toast so the customer doesn't get
+            # back-to-back messages saying essentially the same thing.
+            # The COD path doesn't go through this method, so the
+            # PENDING → PROCESSING advance for COD voucher mints
+            # (AcsService._advance_pending_order_to_processing) keeps
+            # firing its email as before.
+            cls._suppress_customer_status_notifications(
+                order, OrderStatus.PROCESSING.value
+            )
             cls.update_order_status(order, OrderStatus.PROCESSING)
 
         # Enqueue provider-specific shipment creation after payment.

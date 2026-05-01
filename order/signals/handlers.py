@@ -236,6 +236,17 @@ def handle_order_status_changed(
         order=order, previous_status=old_status, new_status=new_status
     )
 
+    # Customer-notifications suppression flag (set by
+    # OrderService._suppress_customer_status_notifications for chained
+    # transitions where the customer just got the previous status's
+    # email/toast and a second one ms later would feel like spam).
+    # The email task already short-circuits via its own metadata flag;
+    # checking the WS-flag here keeps the toast in lockstep with that.
+    suppress_customer = bool(
+        order.metadata
+        and order.metadata.get(f"suppress_status_ws_{new_status}")
+    )
+
     transaction.on_commit(
         lambda oid=order.id, s=new_status: send_order_status_update_email.delay(
             oid, s
@@ -247,7 +258,7 @@ def handle_order_status_changed(
     # bell (PROCESSING, SHIPPED, DELIVERED, COMPLETED, CANCELED), so
     # dispatching unconditionally is safe and centralises the policy in
     # one place (``order/notifications.py::_ORDER_STATUS_COPY``).
-    if order.user_id:
+    if order.user_id and not suppress_customer:
         transaction.on_commit(
             lambda oid=order.id, s=new_status: (
                 notify_order_status_changed_live.delay(oid, s)

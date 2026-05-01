@@ -1082,8 +1082,17 @@ class AcsService:
         # stay at DELIVERED here and only advance once the daily
         # reconcile flips payment_status (handled by
         # AcsService._mark_cod_order_paid_if_pending).
+        #
+        # ``silent_for_customer=True`` because the customer just got
+        # the DELIVERED email + toast in this same transition; a
+        # COMPLETED notification ~ms later would read as a duplicate.
+        # COMPLETED still fires the signal + history row + state
+        # advance — only the user-visible email/WS dispatches are
+        # skipped.
         if new_status == "DELIVERED":
-            OrderService.maybe_advance_to_completed(order)
+            OrderService.maybe_advance_to_completed(
+                order, silent_for_customer=True
+            )
 
     @classmethod
     def _advance_pending_order_to_processing(cls, order: Order) -> None:

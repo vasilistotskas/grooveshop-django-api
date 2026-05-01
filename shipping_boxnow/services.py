@@ -1057,11 +1057,16 @@ class BoxNowService:
             return
 
         # Mirror AcsService: auto-complete already-paid orders when the
-        # carrier hands them DELIVERED. COD orders rely on the COD
-        # reconcile pass to flip payment_status before this advance
-        # is allowed.
+        # carrier hands them DELIVERED. ``silent_for_customer=True``
+        # because the customer just got the DELIVERED notifications in
+        # this same transition. COD orders rely on the COD reconcile
+        # pass to flip payment_status before this advance is allowed —
+        # that path keeps ``silent_for_customer=False`` so the
+        # "loyalty points credited" message isn't suppressed.
         if new_status == "DELIVERED":
-            OrderService.maybe_advance_to_completed(order)
+            OrderService.maybe_advance_to_completed(
+                order, silent_for_customer=True
+            )
 
     @classmethod
     def _advance_pending_order_to_processing(cls, order: Order) -> None:

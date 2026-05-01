@@ -300,6 +300,55 @@ class TestPollShipmentDeliveryTransitions:
         # PR #2 G — DELIVERED + payment_status=COMPLETED auto-completes.
         assert order.status == OrderStatus.COMPLETED
 
+    def test_paid_delivered_suppresses_completed_email_and_toast(
+        self, acs_client_mock_delivered
+    ):
+        """PR #7: when DELIVERED auto-advances to COMPLETED via the
+        carrier path, the customer must not get back-to-back DELIVERED
+        + COMPLETED emails or toasts. The DELIVERED transition fires
+        normally; COMPLETED is suppressed."""
+        from order.enum.status import OrderStatus, PaymentStatus
+        from order.tasks import _status_update_reservation_key
+
+        order = OrderFactory(
+            status=OrderStatus.SHIPPED,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        AcsShipmentFactory(
+            order=order,
+            voucher_no="9999998891",
+            shipment_state=AcsShipmentState.OUT_FOR_DELIVERY,
+        )
+
+        AcsService.poll_shipment_tracking(order.acs_shipment)
+
+        order.refresh_from_db()
+        # Sanity: state machine landed at COMPLETED.
+        assert order.status == OrderStatus.COMPLETED
+        meta = order.metadata or {}
+        # Email reservation flag is pre-stamped → email task short-
+        # circuits the COMPLETED send.
+        completed_email_flag = _status_update_reservation_key(
+            order.id, OrderStatus.COMPLETED.value
+        )
+        assert meta.get(completed_email_flag) is True
+        # WS suppression flag is set → handle_order_status_changed
+        # skips the COMPLETED toast dispatch.
+        assert (
+            meta.get(f"suppress_status_ws_{OrderStatus.COMPLETED.value}")
+            is True
+        )
+        # DELIVERED's customer notifications were NOT suppressed; only
+        # COMPLETED was. The DELIVERED email reservation flag is
+        # whatever the email task itself set when it ran (truthy if
+        # eager-fired, missing if the task was mocked) — we don't
+        # assert on it here. Just confirm the WS suppression flag for
+        # DELIVERED is absent.
+        assert (
+            meta.get(f"suppress_status_ws_{OrderStatus.DELIVERED.value}")
+            is None
+        )
+
     def test_unpaid_cod_order_pauses_at_delivered(
         self, acs_client_mock_delivered
     ):

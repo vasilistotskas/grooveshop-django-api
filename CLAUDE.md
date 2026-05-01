@@ -124,6 +124,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 ### Domain Patterns
 
+- **Order / payment / shipping / notification system**: see [`docs/order-system.md`](docs/order-system.md) for the full reference — state machines, creation paths, carrier integrations, email + WS dedup, critical invariants, common-task playbook. Read this first before changing anything in `order/`, `shipping_acs/`, `shipping_boxnow/`, or `pay_way/`.
 - **Translations**: django-parler `TranslatableModel` on Product, BlogPost, Category, LoyaltyTier, etc. Languages: el (default), en, de. Factories create translations for all languages.
 - **Audit history**: django-simple-history on models
 - **Tree structures**: django-mptt `TreeForeignKey` for ProductCategory, BlogCategory

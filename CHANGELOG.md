@@ -3,6 +3,94 @@
 
 
 
+## v1.120.0 (2026-05-01)
+
+### Bug fixes
+
+* fix(shipping): bump voucher-mint claim TTL to 300s; add ACS DELIVERED→COMPLETED tests
+
+PR #6 — two concurrency / coverage follow-ups from the audit:
+
+S1 — Bump _MINT_CLAIM_TTL_SECONDS from 90 → 300 in both
+``AcsService`` and ``BoxNowService``.
+
+Stage order 682 (2026-04-29) leaked an orphan voucher when the
+ACS round-trip exceeded 90s under load: a second worker observed
+the expired claim and re-minted, both calls succeeded, and we
+ended up with a dangling voucher number that wasn't tied to any
+shipment row. The 90s window was tight relative to a slow API
+response + urllib3 retry budget; 5 minutes still recovers a
+crashed worker within a single Celery task-timeout window while
+giving healthy slow mints headroom. Memory note
+``project_acs_voucher_orphan_prevention.md`` already documents
+the 3-phase claim → API → persist flow that this constant
+guards.
+
+S2 — ACS carrier-event → order-status integration tests.
+
+BoxNow had paid-vs-COD coverage of the DELIVERED auto-completion
+path (PR #2 G); ACS didn't, so a regression in the ACS poll +
+``maybe_advance_to_completed`` wiring would not have surfaced.
+New ``TestPollShipmentDeliveryTransitions`` class adds:
+
+- ``test_paid_order_auto_completes_on_delivered`` — paid SHIPPED
+  order receiving a DELIVERED tracking row auto-advances to
+  COMPLETED via ``OrderService.maybe_advance_to_completed``.
+- ``test_unpaid_cod_order_pauses_at_delivered`` — COD order
+  pauses at DELIVERED until the daily reconcile flips
+  ``payment_status``.
+- ``test_terminal_order_status_never_regresses`` — already-
+  COMPLETED order can't be downgraded by a polling event,
+  proving the ``_TERMINAL_ORDER_STATUSES`` early-return guard.
+
+Adds a new ``acs_client_mock_delivered`` pytest fixture that
+returns ``delivery_flag=1, shipment_status=5`` so the existing
+``poll_shipment_tracking`` tests don't need to be touched.
+
+Verified — 294 tests pass across the targeted shipping +
+state-machine + signal suites. ruff format + ruff check + ty
+check — clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`65b4653`](https://github.com/vasilistotskas/grooveshop-django-api/commit/65b4653908868a152ceffd333fe91125bc106044))
+
+### Features
+
+* feat(order/shipping): HistoricalRecords on shipments, is_online_payment on list, dispute templates
+
+PR #5 — three deferred audit items, all small + additive:
+
+R1 — django-simple-history HistoricalRecords on AcsShipment +
+BoxNowShipment. Mirrors the existing Product.history pattern.
+Excluded fields (``metadata``, ``last_polled_at`` /
+``last_event_at``, ``updated_at``) keep history rows lean —
+those columns churn on every poll/save and aren't part of the
+audit story (voucher mint, state transitions, cancellation,
+COD reconciliation are). Migrations are pure additive
+(``HistoricalAcsShipment`` + ``HistoricalBoxNowShipment``
+tables); PreSync-hook safe.
+
+R2 — ``is_online_payment`` promoted from OrderDetailSerializer
+to the base OrderSerializer. Both list and detail views can now
+suppress the misleading "outstanding amount" warning for COD
+orders (the warning isn't currently rendered on the list card,
+but the field is consistently available so future polish can
+opt in without another schema bump).
+
+R3 — ``core/templates/emails/order/dispute_notification.html``
++ ``.txt``. ``send_dispute_notification_email`` previously fell
+through to inline-string fallback. Templates now match the rest
+of the order email family (``email_base.html`` extension, same
+card-with-coloured-border visual). Internal staff email — no
+i18n is added on this template since INFO_EMAIL is operator-
+internal and recipients work in English.
+
+Verified — 1481 Django tests pass across order + shipping suites.
+Schema regenerated; OrderSerializer / OrderDetail both expose
+``isOnlinePayment``. ruff format + ruff check + ty check —
+clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a77d960`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a77d960757b2bab882128d3f3cd81e9c26315332))
+
 ## v1.119.0 (2026-04-30)
 
 ### Features

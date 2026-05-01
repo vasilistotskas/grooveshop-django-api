@@ -231,7 +231,28 @@ class BoxNowService:
                 **metadata,
                 "mint_started_at": timezone.now().isoformat(),
             }
-            shipment.save(update_fields=["metadata", "updated_at"])
+            update_fields = ["metadata", "updated_at"]
+
+            # COD amount is filled in here (not at row creation) because
+            # ``order.total_price`` requires order items to be persisted
+            # — which happens after the create_shipment_row hook fires.
+            # Idempotent: re-runs see the existing non-zero amount and
+            # skip the recompute.
+            from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
+
+            if (
+                shipment.payment_mode == BoxNowPaymentMode.COD
+                and shipment.amount_to_be_collected.amount == 0
+            ):
+                shipment.amount_to_be_collected = order.total_price
+                update_fields.extend(
+                    [
+                        "amount_to_be_collected",
+                        "amount_to_be_collected_currency",
+                    ]
+                )
+
+            shipment.save(update_fields=update_fields)
 
         # ---- Phase 2: API call (no transaction, no lock) -----------------
         notify_phone = getattr(settings, "BOXNOW_NOTIFY_PHONE", "+302100000000")

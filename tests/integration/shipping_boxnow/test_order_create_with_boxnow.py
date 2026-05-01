@@ -156,12 +156,17 @@ class TestOrderCreateWithBoxNow(APITestCase):
     @patch("order.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")
     @patch("order.services.OrderService.validate_shipping_address")
-    def test_create_order_with_boxnow_method_rejects_cod_payway(
+    def test_create_order_with_boxnow_method_accepts_cod_payway(
         self,
         mock_validate_address,
         mock_validate_cart,
         mock_get_payment_provider,
     ):
+        # BoxNow PAY ON THE GO supports cash-on-delivery on lockers:
+        # the shipment row must be created with payment_mode=COD so the
+        # voucher prints "COD". ``amount_to_be_collected`` is set by
+        # ``BoxNowService.create_shipment_for_order`` once items are
+        # persisted (order.total_price is 0 at row-creation time).
         mock_validate_cart.return_value = {
             "valid": True,
             "errors": [],
@@ -178,11 +183,16 @@ class TestOrderCreateWithBoxNow(APITestCase):
             HTTP_X_CART_ID=str(self.cart.id),
         )
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        body_str = str(response.json()).lower()
-        assert (
-            "pay_way" in body_str or "cash" in body_str or "online" in body_str
+        assert response.status_code == status.HTTP_201_CREATED, (
+            f"Unexpected response: {response.json()}"
         )
+
+        from order.models.order import Order
+        from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
+
+        order = Order.objects.latest("id")
+        shipment = BoxNowShipment.objects.get(order=order)
+        assert shipment.payment_mode == BoxNowPaymentMode.COD.value
 
     @patch("order.payment.get_payment_provider")
     @patch("order.services.OrderService.validate_cart_for_checkout")

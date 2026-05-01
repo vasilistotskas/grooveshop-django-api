@@ -1310,18 +1310,7 @@ class OrderService:
         # (see ``ShippingService.validate_order_payload``) — each
         # provider adapter owns its own field-level rules so this
         # method stays carrier-agnostic.
-        #
-        # Carrier validators that care about pay-way compatibility
-        # (e.g. BoxNow doesn't support COD) need the ``is_online_payment``
-        # bit available on the payload. We inject it under a private
-        # key so the validator stays a pure function of its inputs
-        # without us having to thread ``pay_way`` through the whole
-        # ``ShippingService`` API.
         validation_payload = dict(address)
-        if pay_way is not None:
-            validation_payload["_pay_way_is_online"] = bool(
-                pay_way.is_online_payment
-            )
 
         provider_code = address.get("shipping_provider_code")
         kind_value = address.get("shipping_kind")

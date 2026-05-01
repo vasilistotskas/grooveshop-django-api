@@ -159,17 +159,16 @@ class AcsCarrier(ShippingCarrierInterface):
         branch_code = payload.get("acs_station_branch", "") or ""
         delivery_kind = order.shipping_kind or kind.value
 
-        # COD detection runs off pay_way.is_online_payment so any
-        # offline provider (Αντικαταβολή, Bank Transfer with manual
-        # confirmation) is treated as cash-on-delivery for ACS. The
-        # explicit ``acs_charge_type`` payload key still wins so an
-        # admin override can force PREPAID against an offline pay_way
-        # (e.g. for B2B settlements pre-paid on invoice).
+        # COD detection uses ``PayWay.is_cash_on_delivery`` (offline
+        # AND not requires_confirmation) so bank-transfer-style pay-ways
+        # — which are settled off-platform — ship as PREPAID instead of
+        # being double-billed at the door. The explicit ``acs_charge_type``
+        # payload key still wins so an admin override can force either
+        # direction (e.g. flip a COD order to PREPAID for B2B invoice
+        # settlement).
         pay_way = getattr(order, "pay_way", None)
-        is_offline = bool(pay_way and not pay_way.is_online_payment)
-        default_charge = (
-            AcsChargeType.COD if is_offline else AcsChargeType.PREPAID
-        )
+        is_cod = bool(pay_way and pay_way.is_cash_on_delivery)
+        default_charge = AcsChargeType.COD if is_cod else AcsChargeType.PREPAID
         charge_type = int(payload.get("acs_charge_type") or default_charge)
         cod_payment_way = (
             AcsCodPaymentWay.CASH if charge_type == AcsChargeType.COD else None

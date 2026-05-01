@@ -136,6 +136,17 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         return self.has_configuration
 
     @property
+    def is_cash_on_delivery(self) -> bool:
+        # Why: BoxNow's PAY ON THE GO product (and ACS Acs_Delivery_Products="COD")
+        # need to distinguish "courier collects cash/card at the door" from
+        # other offline pay-ways (e.g. bank transfer, where the customer pays
+        # us directly off-platform and the courier collects nothing).
+        # ``is_online_payment=False`` alone is too broad — bank transfer is
+        # also offline. The canonical COD case is offline AND not requiring
+        # off-platform confirmation: the money changes hands on delivery.
+        return not self.is_online_payment and not self.requires_confirmation
+
+    @property
     def effective_cost(self) -> float:
         return float(self.cost.amount) if self.cost else 0.0
 

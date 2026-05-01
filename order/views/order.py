@@ -671,21 +671,6 @@ class OrderViewSet(BaseModelViewSet):
                 }
             )
 
-        pay_way_id = request.data.get("pay_way_id")
-        if pay_way_id:
-            try:
-                pay_way = PayWay.objects.get(pk=pay_way_id)
-            except PayWay.DoesNotExist:
-                return
-            if not pay_way.is_online_payment:
-                raise ValidationError(
-                    {
-                        "pay_way": [
-                            _("BoxNow lockers do not support cash-on-delivery")
-                        ]
-                    }
-                )
-
     def _create_with_payment_intent(self, request, pay_way: PayWay) -> Response:
         """
         Create order with payment-first flow (online payments).

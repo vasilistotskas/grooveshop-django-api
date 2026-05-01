@@ -761,21 +761,6 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                         )
                     }
                 )
-            pay_way_id = attrs.get("pay_way_id")
-            if pay_way_id:
-                try:
-                    pay_way = PayWay.objects.get(pk=pay_way_id)
-                    if not pay_way.is_online_payment:
-                        raise serializers.ValidationError(
-                            {
-                                "pay_way": _(
-                                    "BoxNow lockers do not support "
-                                    "cash-on-delivery"
-                                )
-                            }
-                        )
-                except PayWay.DoesNotExist:
-                    pass  # let the view handle the missing pay_way
 
         return attrs
 

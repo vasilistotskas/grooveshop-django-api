@@ -121,25 +121,6 @@ class BoxNowCarrier(ShippingCarrierInterface):
                 )
             ]
 
-        # BoxNow does not support cash-on-delivery for standard
-        # partners — the API rejects with P411 ("not eligible to use
-        # COD") asynchronously inside the Celery task. Fail fast at
-        # the create-order boundary while we still have a customer
-        # in the checkout to surface a useful message to. The
-        # ``_pay_way_is_online`` key is injected by ``OrderService``
-        # at the call site so this validator stays a pure function
-        # of its inputs.
-        pay_way_is_online = payload.get("_pay_way_is_online")
-        if pay_way_is_online is False:
-            errors["pay_way"] = [
-                str(
-                    _(
-                        "BOX NOW locker delivery does not support cash on "
-                        "delivery — choose an online payment method."
-                    )
-                )
-            ]
-
         return errors
 
     # ------------------------------------------------------------------
@@ -198,23 +179,25 @@ class BoxNowCarrier(ShippingCarrierInterface):
             else None
         )
 
-        # Derive paymentMode + amountToBeCollected from the order's
-        # pay-way. Offline pay-ways (Αντικαταβολή / bank transfer) → COD
-        # via BoxNow PAY ON THE GO: voucher prints "COD" and BoxNow
-        # collects the full order total at the locker on delivery.
-        # Online pay-ways (Viva, Stripe) → PREPAID: shopper paid online
-        # already, BoxNow collects nothing.
-        from djmoney.money import Money
+        # Derive paymentMode from the order's pay-way.
+        # ``PayWay.is_cash_on_delivery`` is the canonical discriminator
+        # (see ``pay_way/models.py``): only true cash-on-delivery maps to
+        # BoxNow PAY ON THE GO COD. Bank-transfer-style offline pay-ways
+        # (``requires_confirmation=True``) are settled off-platform and
+        # must ship as PREPAID — otherwise BoxNow would double-collect at
+        # the locker.
+        #
+        # ``amountToBeCollected`` is set lazily in
+        # ``BoxNowService.create_shipment_for_order`` (Phase 1) once the
+        # order's items + shipping_price + fees are fully persisted —
+        # ``order.total_price`` is 0 here because items are saved AFTER
+        # this row.
         from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
 
         pay_way = getattr(order, "pay_way", None)
-        is_offline = bool(pay_way and not pay_way.is_online_payment)
-        currency = getattr(order.total_price, "currency", "EUR")
+        is_cod = bool(pay_way and pay_way.is_cash_on_delivery)
         payment_mode = (
-            BoxNowPaymentMode.COD if is_offline else BoxNowPaymentMode.PREPAID
-        )
-        amount_to_be_collected = (
-            order.total_price if is_offline else Money(0, currency)
+            BoxNowPaymentMode.COD if is_cod else BoxNowPaymentMode.PREPAID
         )
 
         BoxNowShipment.objects.create(
@@ -224,7 +207,6 @@ class BoxNowCarrier(ShippingCarrierInterface):
             compartment_size=compartment_size,
             weight_grams=weight_grams,
             payment_mode=payment_mode,
-            amount_to_be_collected=amount_to_be_collected,
         )
 
     def dispatch_create_shipment_task(self, order: Order) -> None:

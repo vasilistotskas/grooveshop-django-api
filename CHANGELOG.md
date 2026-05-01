@@ -3,6 +3,27 @@
 
 
 
+## v1.123.0 (2026-05-01)
+
+### Features
+
+* feat(order): expose currency field on OrderDetailSerializer
+
+djmoney serialises ``MoneyField`` as bare numbers (e.g. ``59.98``),
+so the storefront and the new GA4 ecommerce events have no way to
+know whether the value is EUR or USD. The new top-level ``currency``
+field reads from ``paid_amount`` first (canonical reference), falls
+back to ``total_price_items``, and finally to ``settings.DEFAULT_CURRENCY``.
+
+Required by GA4 ``purchase`` / ``begin_checkout`` events on the
+storefront — both events take ``currency`` as a separate parameter
+alongside ``value``.
+
+``schema.json`` / ``schema.yml`` regenerated. ``uv.lock`` synced
+back to the published ``1.122.0`` version.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4468525`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4468525051abb83efe5fe5f745d42d6427b50277))
+
 ## v1.122.0 (2026-05-01)
 
 ### Bug fixes

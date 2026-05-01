@@ -472,6 +472,17 @@ def _handle_payment_created(order, event_data, transaction_id):
     ]
 
     if order.status == OrderStatus.PENDING:
+        # Mirror the Stripe handler's PR #7 suppression: the Viva
+        # webhook dispatches ``send_order_confirmation_email`` directly
+        # below — that already conveys "your order is being processed".
+        # Without this pre-stamp the post-save signal would fire a
+        # second PROCESSING email + toast within ms of the
+        # confirmation email.
+        from order.services import OrderService
+
+        OrderService._suppress_customer_status_notifications(
+            order, OrderStatus.PROCESSING.value
+        )
         order.status = OrderStatus.PROCESSING
         order.status_updated_at = timezone.now()
         update_fields += ["status", "status_updated_at"]

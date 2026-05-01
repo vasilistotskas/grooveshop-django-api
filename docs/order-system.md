@@ -5,7 +5,7 @@ Keep this file synchronised when invariants change. Cross-references
 are file paths + line numbers; the system has enough load-bearing
 "don't undo this" pieces that drift here is expensive.
 
-Last refresh: 2026-05-01 (post PR #8). See git log for changes since.
+Last refresh: 2026-05-01 (post PR #8 + Viva PROCESSING-suppression fix). See git log for changes since.
 
 ## 1. Overview
 
@@ -24,7 +24,7 @@ new couriers plug in without touching the order code.
 
 ## 2. State machines
 
-### 2.1 OrderStatus transitions (`order/services.py:1383-1404`)
+### 2.1 OrderStatus transitions (`order/services.py:1386-1404`)
 
 ```
 PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
@@ -67,18 +67,18 @@ Three entry points in `order/services.py`:
 - Sets `language_code` via `_seed_language_code`.
 - Status defaults to caller-supplied `order_data["status"]`.
 
-### 3.2 `create_order_from_cart` (`L186`) — payment-first / online
+### 3.2 `create_order_from_cart` (`L187`) — payment-first / online
 - **Caller**: Stripe Checkout flow.
 - Sets `status=PENDING`, `payment_status=<provider-returned>`.
 - **Does NOT** dispatch courier task here. Online payments defer
   the dispatch to the payment-success webhook (PR #1 commit
   `59527a87` — see `project_shipping_dispatch_on_commit.md`).
 
-### 3.3 `create_order_from_cart_offline` (`L716`) — order-first / COD / Viva
+### 3.3 `create_order_from_cart_offline` (`L718`) — order-first / COD / Viva
 - **Caller**: Nuxt checkout for offline pay-ways + Viva redirect flow.
 - Sets `status=PENDING`, `payment_status=PENDING`.
 - For **COD/offline**: dispatches courier task via
-  `_dispatch_shipment_creation_task` immediately at `L1127`. The
+  `_dispatch_shipment_creation_task` immediately at `L1130`. The
   dispatch is wrapped in `transaction.on_commit` inside
   `ShippingService.dispatch_create_shipment_task` so the worker
   only sees the order after the create transaction commits.
@@ -89,7 +89,7 @@ Three entry points in `order/services.py`:
 
 ### 4.1 Stripe online (`payment_intent.succeeded`)
 
-Webhook handler: `order/signals/handlers.py::handle_stripe_payment_succeeded` (`L608`).
+Webhook handler: `order/signals/handlers.py::handle_stripe_payment_succeeded` (`L633`).
 
 ```
 charge.succeeded → handle_stripe_payment_succeeded
@@ -114,7 +114,7 @@ load-bearing: without it the customer receives both an
 
 ### 4.2 Stripe refund (`charge.refunded`)
 
-Webhook handler: `handle_stripe_charge_refunded` (`L797`).
+Webhook handler: `handle_stripe_charge_refunded` (`L817`).
 
 - Full refund: `payment_status=REFUNDED`, fires `order_refunded.send`.
 - Partial refund: `payment_status=PARTIALLY_REFUNDED`, no signal fire.
@@ -122,13 +122,32 @@ Webhook handler: `handle_stripe_charge_refunded` (`L797`).
 
 ### 4.3 Viva Wallet online
 
-Webhook handler: `order/views/viva_webhook.py::_handle_payment_created` (`L321`).
+Webhook handler: `order/views/viva_webhook.py::_handle_payment_created` (`L372`).
 
-- Same shape as Stripe: select_for_update, mark_as_paid via inline
-  payment_status update, status → PROCESSING, dispatch courier
-  task.
-- Idempotency via `viva_webhook_{transaction_id}_{event_type_id}`
-  metadata flag.
+Differences from the Stripe path that are easy to miss:
+
+- **Row lock** is acquired at the entry-point (`L323`), not inside
+  a service method. The whole webhook body runs inside one
+  ``select_for_update`` block.
+- **Idempotency** uses ``viva_webhook_{transaction_id}_{event_type_id}``
+  metadata flag (Viva's analogue of Stripe's
+  ``webhook_processed_{event_id}``).
+- **Inline status mutation**: ``order.status = OrderStatus.PROCESSING``
+  + ``order.save(update_fields=[...])``, NOT
+  ``OrderService.update_order_status(...)``. The post-save signal
+  still fires, but the canonical state-machine validator is
+  skipped — Viva trusts that ``status==PENDING`` before the
+  payment landed.
+- **PR #7 PROCESSING suppression** is wired (mirrors Stripe): the
+  handler calls ``OrderService._suppress_customer_status_notifications(
+  order, "PROCESSING")`` immediately before the inline status flip
+  so the customer doesn't get back-to-back order_received +
+  order_processing emails when Viva confirms payment. Without
+  this, the post-save handler would dispatch both.
+- **No ``notify_payment_confirmed_live`` toast** — that's a Stripe-
+  specific dispatch. Viva customers see the order_received email
+  + the WS toasts that fire on later state changes (SHIPPED,
+  DELIVERED).
 
 ### 4.4 COD / PAY_ON_DELIVERY (offline)
 
@@ -153,7 +172,7 @@ Each carrier implements `ShippingCarrierInterface` in
 
 - **REST API**, polling-based (no webhooks).
 - Voucher mint: 3-phase `claim → API → persist` design in
-  `AcsService.create_voucher_for_order` (`L146`). Survives
+  `AcsService.create_voucher_for_order` (`L152`). Survives
   `idle_in_transaction_session_timeout` — see
   `project_acs_voucher_orphan_prevention.md`. **TTL 300s** (PR #6).
 - Polling: `poll_shipment_tracking` runs in two phases (read,

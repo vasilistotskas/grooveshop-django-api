@@ -3,6 +3,128 @@
 
 
 
+## v1.122.0 (2026-05-01)
+
+### Bug fixes
+
+* fix(shipping): use cash_on_delivery discriminator for BoxNow + ACS COD routing
+
+BoxNow's PAY ON THE GO and ACS's `Acs_Delivery_Products="COD"` flag must
+fire only for actual cash-on-delivery pay-ways — not for any pay-way
+where `is_online_payment=False`. With the previous logic, a future bank-
+transfer pay-way (offline AND `requires_confirmation=True`, customer
+pays via bank → we collect off-platform) would mis-route to the courier
+as COD and BoxNow/ACS would double-collect the order total at the door.
+
+Adds `PayWay.is_cash_on_delivery` (offline AND not requires_confirmation)
+as the canonical discriminator and switches both carriers to it.
+
+Drops three now-stale rejection sites that gated BoxNow against offline
+pay-ways back when "BoxNow rejects COD" was true (pre PAY ON THE GO):
+the `validate_order_payload` block in `shipping_boxnow/carrier.py`,
+the matching block in `OrderCreateFromCartSerializer.validate`, and the
+duplicate guard in `OrderViewSet._validate_shipping_method_rules`. Also
+drops the now-unused `_pay_way_is_online` payload injection from
+`OrderService.validate_shipping_address`. The `cod_pay_way` integration
+test is flipped from "rejects" to "accepts and stamps payment_mode=COD".
+
+Defers `BoxNowShipment.amount_to_be_collected` to
+`BoxNowService.create_shipment_for_order` Phase 1 so it reads
+`order.total_price` after items are persisted (the `create_shipment_row`
+hook fires before items are saved, so the collected amount would
+otherwise stay 0).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`57bc45e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/57bc45e234eda825596f9f439a9ac5a5aedcd726))
+
+### Chores
+
+* chore(order): refresh stale docstring on _dispatch_shipment_creation_task
+
+The previous docstring claimed ``ShippingService.dispatch_create_
+shipment_task`` "falls back to the legacy ``shipping_method`` enum
+when the new ``shipping_provider`` FK is null". That fallback path
+no longer exists — the ``shipping_method`` column was dropped after
+the (provider, kind) migration, and ``ShippingService`` now
+exclusively reads from ``order.shipping_provider``. Orders without
+a provider attached silently no-op (legacy pre-Phase-0 rows that
+never got backfilled).
+
+Comment-only change.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4132e1c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4132e1c76acc3946df06a3b97ca2521f7e148016))
+
+### Features
+
+* feat(meta-capi): server-side Meta Conversions API integration
+
+Adds `meta_capi/` Django app that mirrors the browser pixel via Meta's
+Conversions API for server-side event delivery — needed to maintain
+Event Match Quality after iOS 14.5 + the third-party-cookie deprecation
+path that breaks fbp/fbc reach for browser-only pixel calls.
+
+* `meta_capi/client.py` — Meta Graph API client (events POST + test-event-code support)
+* `meta_capi/events.py` — Purchase / InitiateCheckout / AddPaymentInfo / Refund event builders with PII hashing
+* `meta_capi/services.py` — orchestration; reads `order.metadata['meta']` for fbp/fbc/UA/IP
+* `meta_capi/tasks.py` — Celery dispatchers (autoretry on Meta rate limit)
+* `meta_capi/signals.py` — fires Purchase from `order_paid`, Refund from `charge.refunded`
+* `meta_capi/models.py` — `MetaCapiEvent` audit table with idempotency on event_id
+
+Order pipeline plumbing:
+* `OrderCreateFromCartSerializer.meta` (write-only DictField) — captures
+  fbp/fbc/UA/IP/event_ids/consent from the storefront proxy at
+  order-create time. Persisted on `order.metadata['meta']`.
+* `OrderDetailSerializer.meta_event_ids` (read-only) — surfaces the same
+  event UUIDs back to the success page so the browser pixel can dedupe
+  against the server-side event.
+* `OrderViewSet._create_with_payment_intent` and
+  `_create_without_payment_intent` thread `meta_context` through to
+  `OrderService.create_order_from_cart{,_offline}`.
+* `settings.py` — `META_CAPI_*` env block + Celery beat schedule.
+
+`schema.json` / `schema.yml` regenerated. Storefront pixel composables
++ proxy forward land in the matching Nuxt commit.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`24294c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/24294c231a814328244d70ad3dab8581ac390f48))
+
+* feat(boxnow): support COD on lockers via PAY ON THE GO
+
+BoxNow shipped their PAY ON THE GO product (COD-on-locker — collects
+cash or card at the locker on delivery), and our partner account is
+now activated for it. The legacy ``BoxNowCarrier.filter_pay_ways``
+gate that excluded all offline pay-ways from the BoxNow checkout
+predates that activation and was actively wrong.
+
+Two changes:
+
+1. ``filter_pay_ways(kind=PICKUP_POINT)`` no longer excludes COD
+   pay-ways. All active pay-ways are returned for both home delivery
+   and locker pickup. Partners without PAY ON THE GO active should
+   manage their PayWay catalogue (mark offline pay-ways inactive)
+   instead of relying on a courier-rule filter.
+
+2. ``create_shipment_row`` now derives the BoxNow voucher's
+   ``payment_mode`` and ``amount_to_be_collected`` from the order's
+   pay-way at create-time:
+   - offline pay-way (Αντικαταβολή / bank transfer)
+     → ``payment_mode='cod'``, ``amount_to_be_collected=order.total_price``
+     → BoxNow voucher prints "COD" and the collector takes the full
+       amount at the locker.
+   - online pay-way (Stripe / Viva)
+     → ``payment_mode='prepaid'``, ``amount_to_be_collected=Money(0)``
+     → BoxNow collects nothing.
+
+The existing voucher-mint payload at ``services.py:253`` already
+forwards ``payment_mode`` + ``amount_to_be_collected`` to BoxNow's
+``paymentMode`` + ``amountToBeCollected`` API fields, so this commit
+just makes the create-row write the correct values.
+
+BoxNow's email confirms the test flow: place an order with the
+offline pay-way + a locker, the resulting voucher should show
+"COD". This change makes that combo reachable from the checkout for
+the first time.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`891d566`](https://github.com/vasilistotskas/grooveshop-django-api/commit/891d5663319af5102b8f04475dff76dc78aaa153))
+
 ## v1.121.1 (2026-05-01)
 
 ### Bug fixes

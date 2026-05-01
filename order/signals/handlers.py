@@ -39,6 +39,7 @@ from order.tasks import (
     send_order_confirmation_email,
     send_order_status_update_email,
     send_payment_failed_email,
+    send_refund_confirmation_email,
     send_shipping_notification_email,
 )
 
@@ -574,6 +575,18 @@ def handle_order_refunded(
             transaction.on_commit(
                 lambda oid=order.id: notify_order_refunded_live.delay(oid)
             )
+
+        # Email confirmation. Idempotent via the
+        # ``refund_confirmation_email_sent`` reservation flag, so the
+        # in-app refund path (OrderService.refund_order) and the
+        # Stripe ``charge.refunded`` webhook both firing
+        # ``order_refunded.send`` for the same order can't double-
+        # email the customer. Guest orders DO get the email — unlike
+        # the live notification which is account-bound, the email
+        # uses ``order.email`` as the recipient.
+        transaction.on_commit(
+            lambda oid=order.id: send_refund_confirmation_email.delay(oid)
+        )
 
         logger.info("Order %s refunded", order.id)
 

@@ -126,6 +126,33 @@ class TestChargeRefundedWebhook:
         }
         handle_stripe_charge_refunded(sender=None, event=event)
 
+    def test_full_refund_dispatches_confirmation_email_once(self):
+        """PR #8 U1: a charge.refunded event for a full refund queues
+        the customer's refund-confirmation email exactly once. The
+        idempotency flag prevents a redelivery from emailing twice."""
+        order = OrderFactory(
+            payment_id="pi_email_once_1",
+            status=OrderStatus.DELIVERED,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        event = _build_charge_event(
+            event_id="evt_email_once_1",
+            payment_intent_id="pi_email_once_1",
+            amount=5000,
+            amount_refunded=5000,
+        )
+        with patch(
+            "order.signals.handlers.send_refund_confirmation_email.delay"
+        ) as mock_email:
+            handle_stripe_charge_refunded(sender=None, event=event)
+            # Stripe redelivers the same event ~10s later.
+            handle_stripe_charge_refunded(sender=None, event=event)
+
+        # First call queued the email; second call short-circuited at
+        # the webhook-event dedup before reaching the signal.
+        assert mock_email.call_count == 1
+        mock_email.assert_called_with(order.id)
+
 
 # ---------------------------------------------------------------------------
 # H — order cancel cascades to courier voucher

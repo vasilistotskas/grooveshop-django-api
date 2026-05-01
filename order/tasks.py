@@ -453,6 +453,158 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         return False
 
 
+REFUND_CONFIRMATION_EMAIL_SENT_FLAG = "refund_confirmation_email_sent"
+
+
+def _reserve_refund_confirmation_email(order_id: int) -> bool:
+    """Atomically claim the refund-confirmation-email slot for an order.
+
+    Both ``OrderService.refund_order`` (the in-app admin-initiated
+    path) and ``handle_stripe_charge_refunded`` (the webhook path)
+    fire ``order_refunded.send`` for the same order. Without this
+    reservation, the customer would get two refund emails — one when
+    we hit the Stripe API, another when Stripe redelivers the event
+    back to us.
+
+    Returns True if this caller won the race. Raises
+    ``Order.DoesNotExist`` so the caller can surface a missing order
+    consistently with the rest of the file.
+    """
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.metadata and order.metadata.get(
+            REFUND_CONFIRMATION_EMAIL_SENT_FLAG
+        ):
+            return False
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[REFUND_CONFIRMATION_EMAIL_SENT_FLAG] = True
+        order.save(update_fields=["metadata"])
+    return True
+
+
+def _release_refund_confirmation_email(order_id: int) -> None:
+    """Clear the refund-confirmation-email reservation on permanent failure."""
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None or not order.metadata:
+            return
+        if (
+            order.metadata.pop(REFUND_CONFIRMATION_EMAIL_SENT_FLAG, None)
+            is not None
+        ):
+            order.save(update_fields=["metadata"])
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+def send_refund_confirmation_email(self, order_id: int) -> bool:
+    """Send the customer the refund-confirmation email.
+
+    Triggered from ``handle_order_refunded`` so both refund paths
+    converge here — admin-initiated refunds via
+    ``OrderService.refund_order`` and Stripe-dashboard refunds
+    arriving as ``charge.refunded`` webhooks.
+
+    Renders ``emails/order/order_refunded.html`` (which inherits from
+    ``order_status_generic.html``'s REFUNDED branch). Reuses the
+    transactional ``List-Unsubscribe`` headers added in PR #4.
+    """
+    reserved_this_call = False
+    try:
+        if self.request.retries == 0:
+            try:
+                if not _reserve_refund_confirmation_email(order_id):
+                    logger.info(
+                        "Refund confirmation email already sent (or reserved) "
+                        "for order #%s, skipping",
+                        order_id,
+                    )
+                    return True
+                reserved_this_call = True
+            except Order.DoesNotExist:
+                logger.error(
+                    "Could not reserve refund confirmation email — Order #%s "
+                    "not found",
+                    order_id,
+                    extra={"order_id": order_id},
+                )
+                return False
+
+        order = Order.objects.select_related(
+            "user", "country", "region", "pay_way"
+        ).get(id=order_id)
+
+        context = {
+            "order": order,
+            "status": "REFUNDED",
+            "status_display": order.get_payment_status_display()
+            if order.payment_status
+            else "Refunded",
+            "items": order.items.all(),
+            "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+        }
+
+        with translation.override(get_order_language(order)):
+            subject = _("Refund Processed - Order #{order_id}").format(
+                order_id=order.id
+            )
+            text_content = render_to_string(
+                "emails/order/order_refunded.txt", context
+            )
+            html_content = render_to_string(
+                "emails/order/order_refunded.html", context
+            )
+
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            settings.DEFAULT_FROM_EMAIL,
+            [order.email],
+            reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(
+                list_id="refund_confirmation"
+            ),
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+        OrderHistory.log_note(
+            order=order,
+            note=f"Refund confirmation email sent to {order.email}",
+        )
+
+        logger.info(
+            "Refund confirmation email sent for order #%s",
+            order.id,
+            extra={"order_id": order.id, "email": order.email},
+        )
+        return True
+
+    except Order.DoesNotExist:
+        logger.error(
+            "Could not send refund confirmation email — Order #%s not found",
+            order_id,
+            extra={"order_id": order_id},
+        )
+        return False
+
+    except Exception as e:
+        logger.error(
+            "Error sending refund confirmation email for order #%s: %s",
+            order_id,
+            e,
+            extra={"order_id": order_id, "error": str(e)},
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e) from e
+        if reserved_this_call:
+            _release_refund_confirmation_email(order_id)
+        return False
+
+
 @shared_task(
     bind=True,
     max_retries=3,

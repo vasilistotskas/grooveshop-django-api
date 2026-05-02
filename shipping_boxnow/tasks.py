@@ -165,6 +165,7 @@ def boxnow_send_arrival_notification(
         NotificationCategoryEnum,
         NotificationKindEnum,
         NotificationPriorityEnum,
+        NotificationTypeEnum,
     )
     from notification.services import create_user_notification
     from shipping_boxnow.models import BoxNowParcelEvent
@@ -252,7 +253,7 @@ def boxnow_send_arrival_notification(
             kind=NotificationKindEnum.SUCCESS,
             category=NotificationCategoryEnum.SHIPPING,
             priority=NotificationPriorityEnum.HIGH,
-            notification_type="BOXNOW_PARCEL_AT_LOCKER",
+            notification_type=NotificationTypeEnum.BOXNOW_PARCEL_AT_LOCKER,
             link=f"/account/orders/{order.id}",
         )
 

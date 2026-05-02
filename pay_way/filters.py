@@ -85,8 +85,9 @@ class PayWayFilter(
         help_text=_(
             "Filter pay ways compatible with the given shipping carrier. "
             "Each carrier owns its own compatibility rules — BoxNow "
-            "(``boxnow``) rejects COD on locker pickup; other carriers "
-            "pass through unchanged. Pair with ``shippingKind``."
+            "(``boxnow``) supports COD on lockers via PAY ON THE GO "
+            "and so passes through; ACS passes through unchanged. "
+            "Pair with ``shippingKind``."
         ),
     )
     shipping_kind = filters.CharFilter(

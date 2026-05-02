@@ -316,6 +316,7 @@ def cleanup_old_guest_carts():
         count, _ = Cart.objects.filter(
             user__isnull=True,
             last_activity__lt=cutoff_date,
+            items__isnull=True,  # only empty guest carts
         ).delete()
 
         message = (

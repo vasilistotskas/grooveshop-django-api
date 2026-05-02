@@ -14,6 +14,19 @@ User = get_user_model()
 
 
 class TestSessionTokenStrategy:
+    @pytest.fixture(autouse=True)
+    def _disable_knox_token_limit(self, monkeypatch):
+        """Bypass the TOKEN_LIMIT_PER_USER pruning path so unit tests stay
+        DB-free.  The limit branch in ``create_access_token`` issues
+        ``AuthToken.objects.filter(...).count()`` which would otherwise
+        require a DB-backed test (the project sets the limit to 10 in
+        ``settings.REST_KNOX``).  The pruning logic itself has no specific
+        coverage here — these tests focus on the create-and-return path.
+        """
+        from core.api.tokens import knox_settings
+
+        monkeypatch.setattr(knox_settings, "TOKEN_LIMIT_PER_USER", None)
+
     def setup_method(self):
         self.strategy = SessionTokenStrategy()
         self.factory = RequestFactory()

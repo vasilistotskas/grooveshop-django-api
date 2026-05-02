@@ -31,9 +31,32 @@ def post_create_historical_record_callback(
     if prev_record is None:
         return
 
-    # Track price changes
-    old_price = prev_record.price.amount
-    new_price = instance.price.amount
+    # Track price changes using customer-facing price (price minus
+    # discount) so a discount-only cut still fires product_price_lowered.
+    # Historical records carry ``price`` and ``discount_percent`` but not
+    # the vat FK, so we use the live product's vat rate for both sides —
+    # the same rate is applied to old and new, so only the base-price /
+    # discount delta drives the direction signal.
+    def _customer_price(price_amount, discount_pct, vat_rate):
+        """price + vat - discount, all as Decimal amounts."""
+        vat = price_amount * vat_rate / 100
+        discount = price_amount * discount_pct / 100
+        return price_amount + vat - discount
+
+    from decimal import Decimal  # noqa: PLC0415
+
+    vat_rate = instance.vat_percent if instance.vat_id else Decimal("0")
+
+    old_price = _customer_price(
+        prev_record.price.amount,
+        prev_record.discount_percent,
+        vat_rate,
+    )
+    new_price = _customer_price(
+        instance.price.amount,
+        instance.discount_percent,
+        vat_rate,
+    )
 
     if old_price > new_price:
         product_price_lowered.send(

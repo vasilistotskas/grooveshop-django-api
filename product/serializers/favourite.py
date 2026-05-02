@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
@@ -77,12 +78,21 @@ class ProductFavouriteWriteSerializer(
                 _("Product is already in favorites")
             )
 
+        if not self.instance:
+            max_favourites = getattr(settings, "MAX_FAVOURITES_PER_USER", 500)
+            if (
+                ProductFavourite.objects.filter(user=user).count()
+                >= max_favourites
+            ):
+                raise serializers.ValidationError(_("Favourites limit reached"))
+
         return attrs
 
 
 class ProductFavouriteByProductsRequestSerializer(serializers.Serializer):
     product_ids = serializers.ListField(
         child=serializers.IntegerField(),
+        max_length=100,
         help_text=_("List of product IDs to check for favorites"),
     )
 

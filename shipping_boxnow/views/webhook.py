@@ -163,16 +163,31 @@ class BoxNowWebhookView(APIView):
         # ------------------------------------------------------------------ #
         # 7. Dispatch to service layer.                                        #
         # ------------------------------------------------------------------ #
+        # Narrow the exception handling so transient infra errors (DB
+        # outage, Redis hiccup) propagate as 500 — BoxNow will retry.
+        # Application-logic errors (e.g. an unknown shipment that
+        # legitimately can't be replayed) keep the existing 200 + log
+        # behaviour so we don't trigger a retry storm for a permanent
+        # failure.
+        from django.db import DatabaseError, OperationalError
+
         from shipping_boxnow.services import BoxNowService
 
         try:
             BoxNowService.apply_webhook_event(envelope)
+        except (DatabaseError, OperationalError):
+            logger.exception(
+                "BoxNow webhook event handling hit a transient DB error "
+                "for message %s — returning 500 so BoxNow retries.",
+                envelope.get("id", "<unknown>"),
+            )
+            return Response(status=500)
         except Exception:
             logger.exception(
                 "BoxNow webhook event handling failed for message %s",
                 envelope.get("id", "<unknown>"),
             )
-            # Still return 200 to prevent BoxNow retry storm — the event
-            # is logged and an operator can replay it from logs.
+            # Application-level error — return 200 so BoxNow doesn't loop;
+            # the message is logged so an operator can replay it.
 
         return Response(status=200)

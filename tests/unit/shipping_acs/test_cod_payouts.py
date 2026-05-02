@@ -33,7 +33,11 @@ _BASE_ROW = {
 
 
 def test_reconcile_inserts_new_row_and_links_shipment():
-    order = OrderFactory()
+    from order.enum.status import OrderStatus, PaymentStatus
+
+    order = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
     shipment = AcsShipmentFactory(order=order, voucher_no="7227891234")
 
     with patch("shipping_acs.services.AcsClient") as mock_class:

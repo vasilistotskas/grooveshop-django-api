@@ -185,7 +185,6 @@ MIDDLEWARE = [
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "simple_history.middleware.HistoryRequestMiddleware",
     "core.middleware.asgi_compat.ASGICompatMiddleware",  # ASGI compatibility for Rosetta
-    "core.middleware.stripe_webhook.StripeWebhookDebugMiddleware",  # Stripe webhook debugging
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -332,6 +331,11 @@ ADMINS = [
     ("Info", getenv("INFO_EMAIL", "")),
 ]
 
+if DEBUG:
+    MIDDLEWARE += [
+        "core.middleware.stripe_webhook.StripeWebhookDebugMiddleware",
+    ]
+
 if ENABLE_DEBUG_TOOLBAR:
     INSTALLED_APPS += ["debug_toolbar"]
     MIDDLEWARE.append("debug_toolbar.middleware.DebugToolbarMiddleware")
@@ -439,6 +443,9 @@ ALLAUTH_USER_CODE_FORMAT = {"numeric": True, "dashed": False, "length": 6}
 ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = "email_confirm"
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http" if DEBUG else "https"
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
+ACCOUNT_REAUTHENTICATION_TIMEOUT = int(
+    getenv("ACCOUNT_REAUTHENTICATION_TIMEOUT", "300")
+)
 ACCOUNT_EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
 
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
@@ -898,6 +905,9 @@ SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
 DEFAULT_CURRENCY = getenv("DEFAULT_CURRENCY", "EUR")
 CURRENCIES = ("EUR", "USD")
 CURRENCY_CHOICES = [("EUR", "EUR €"), ("USD", "USD $")]
+
+# Product favourites — per-user cap
+MAX_FAVOURITES_PER_USER = int(getenv("MAX_FAVOURITES_PER_USER", "500"))
 
 CONN_HEALTH_CHECKS = True
 ATOMIC_REQUESTS = False

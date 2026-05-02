@@ -13,13 +13,17 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 
 
 class ShipmentDispatchedSignalTestCase(TestCase):
     def _fresh_order(self) -> Order:
-        order = OrderFactory()
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
         # Strip any tracking that might have been populated by the
         # factory so we start from a clean null baseline.
         order.tracking_number = ""

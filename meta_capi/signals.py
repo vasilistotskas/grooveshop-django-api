@@ -18,6 +18,7 @@ import logging
 from typing import Any
 
 from allauth.account.signals import user_signed_up
+from django.db import transaction
 from django.dispatch import receiver
 
 from meta_capi.tasks import (
@@ -80,23 +81,31 @@ def _on_user_signed_up(
         # ingress that reaches Django at this stage of the signup
         # flow, and ``USE_X_FORWARDED_HOST`` already pins the trust
         # boundary at the proxy.
+        # Trust X-Real-IP only — set by the Nuxt proxy via
+        # ``CF-Connecting-IP``. The leftmost ``X-Forwarded-For`` entry
+        # is client-supplied and trivially spoofable to poison Meta's
+        # match quality or attribute the registration to a victim's IP.
+        # If no proxy header is present we fall back to ``REMOTE_ADDR``
+        # so dev/CI still get something usable.
         ip_addr = (meta.get("HTTP_X_REAL_IP") or "").strip()
         if not ip_addr:
-            forwarded_for = (meta.get("HTTP_X_FORWARDED_FOR") or "").strip()
-            if forwarded_for:
-                ip_addr = forwarded_for.split(",")[0].strip()
-            else:
-                ip_addr = meta.get("REMOTE_ADDR", "") or ""
+            ip_addr = meta.get("REMOTE_ADDR", "") or ""
         ua = meta.get("HTTP_USER_AGENT", "") or ""
         # ``HTTP_REFERER`` is the storefront page that submitted the
         # signup form — Meta uses it for content matching.
         event_source_url = meta.get("HTTP_REFERER", "") or ""
 
-    dispatch_complete_registration_event.delay(
-        user.id,
-        fbp=fbp or None,
-        fbc=fbc or None,
-        client_ip_address=ip_addr or None,
-        client_user_agent=ua or None,
-        event_source_url=event_source_url or None,
+    # Wrapped in on_commit so the worker sees the committed user row.
+    # The allauth signup flow runs inside an atomic block; dispatching
+    # before commit means the worker can hit User.DoesNotExist on a
+    # fast Celery node.
+    transaction.on_commit(
+        lambda: dispatch_complete_registration_event.delay(
+            user.id,
+            fbp=fbp or None,
+            fbc=fbc or None,
+            client_ip_address=ip_addr or None,
+            client_user_agent=ua or None,
+            event_source_url=event_source_url or None,
+        )
     )

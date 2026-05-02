@@ -15106,8 +15106,9 @@ paths:
         schema:
           type: string
         description: Filter pay ways compatible with the given shipping carrier. Each
-          carrier owns its own compatibility rules — BoxNow (``boxnow``) rejects COD
-          on locker pickup; other carriers pass through unchanged. Pair with ``shippingKind``.
+          carrier owns its own compatibility rules — BoxNow (``boxnow``) supports
+          COD on lockers via PAY ON THE GO and so passes through; ACS passes through
+          unchanged. Pair with ``shippingKind``.
       - in: query
         name: sortOrder
         schema:
@@ -23252,42 +23253,12 @@ paths:
           type: string
         description: Optional ISO-2 country code; narrows the default kind filter
           to that country's locker catalogue.
-      - name: ordering
-        required: false
-        in: query
-        description: Which field to use when ordering the results.
-        schema:
-          type: string
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
       - in: query
         name: postalCode
         schema:
           type: string
         description: Greek postcode (5-digit), required.
         required: true
-      - name: search
-        required: false
-        in: query
-        description: A search term.
-        schema:
-          type: string
       - in: query
         name: shopKind
         schema:
@@ -23308,8 +23279,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedAcsStationList'
-          description: ''
+                type: array
+                items:
+                  $ref: '#/components/schemas/AcsStation'
+          description: Bare array of matching ACS station objects — not paginated.
   /api/v1/shipping/boxnow/lockers:
     get:
       operationId: listBoxNowLocker
@@ -28874,6 +28847,23 @@ paths:
           description: No response body
         '503':
           description: No response body
+  /viva-wallet/resolve-order:
+    get:
+      operationId: viva_wallet_resolve_order_retrieve
+      description: |-
+        Resolve a Viva Wallet order code to an order UUID.
+
+        Used by the frontend to redirect from Viva's payment page to the
+        order success page. Requires authentication so anonymous callers
+        cannot enumerate order UUIDs by brute-forcing order codes.
+      tags:
+      - viva-wallet
+      security:
+      - knoxApiToken: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: No response body
 components:
   schemas:
     AcsAddressValidationRequestRequest:
@@ -29194,36 +29184,16 @@ components:
           readOnly: true
           description: ISO 3166-1 alpha-2 country code.
         lat:
-          type: number
-          format: double
-          maximum: 1000
-          minimum: -1000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
+          type: string
           nullable: true
-          title: Latitude
+          readOnly: true
         lng:
-          type: number
-          format: double
-          maximum: 1000
-          minimum: -1000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
+          type: string
           nullable: true
-          title: Longitude
-        maxWeightKg:
-          type: number
-          format: double
-          maximum: 1000
-          minimum: -1000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
           readOnly: true
-          title: Max weight (kg)
-          description: Smartpoint lockers cap at 6 kg per ACS docs; non-locker stations
-            have no fixed cap (still stored as 6 by default).
+        maxWeightKg:
+          type: string
+          readOnly: true
         workingHours:
           type: string
           readOnly: true
@@ -29317,36 +29287,16 @@ components:
           readOnly: true
           description: ISO 3166-1 alpha-2 country code.
         lat:
-          type: number
-          format: double
-          maximum: 1000
-          minimum: -1000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
+          type: string
           nullable: true
-          title: Latitude
+          readOnly: true
         lng:
-          type: number
-          format: double
-          maximum: 1000
-          minimum: -1000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
-          readOnly: true
+          type: string
           nullable: true
-          title: Longitude
-        maxWeightKg:
-          type: number
-          format: double
-          maximum: 1000
-          minimum: -1000
-          exclusiveMaximum: true
-          exclusiveMinimum: true
           readOnly: true
-          title: Max weight (kg)
-          description: Smartpoint lockers cap at 6 kg per ACS docs; non-locker stations
-            have no fixed cap (still stored as 6 by default).
+        maxWeightKg:
+          type: string
+          readOnly: true
         workingHours:
           type: string
           readOnly: true
@@ -32960,6 +32910,9 @@ components:
             * `restock_favourite` - Back in stock (favourited product)
             * `loyalty_tier_up` - Loyalty tier promotion
             * `comment_liked` - Blog comment liked
+            * `BOXNOW_PARCEL_AT_LOCKER` - BoxNow parcel arrived at locker
+            * `BOXNOW_PARCEL_DELIVERED` - BoxNow parcel delivered
+            * `ACS_OUT_FOR_DELIVERY` - ACS parcel out for delivery
           oneOf:
           - $ref: '#/components/schemas/NotificationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -33071,6 +33024,9 @@ components:
       - restock_favourite
       - loyalty_tier_up
       - comment_liked
+      - BOXNOW_PARCEL_AT_LOCKER
+      - BOXNOW_PARCEL_DELIVERED
+      - ACS_OUT_FOR_DELIVERY
       type: string
       description: |-
         * `order_created` - Order created
@@ -33087,6 +33043,9 @@ components:
         * `restock_favourite` - Back in stock (favourited product)
         * `loyalty_tier_up` - Loyalty tier promotion
         * `comment_liked` - Blog comment liked
+        * `BOXNOW_PARCEL_AT_LOCKER` - BoxNow parcel arrived at locker
+        * `BOXNOW_PARCEL_DELIVERED` - BoxNow parcel delivered
+        * `ACS_OUT_FOR_DELIVERY` - ACS parcel out for delivery
     NotificationUser:
       type: object
       properties:

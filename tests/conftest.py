@@ -271,6 +271,19 @@ def _django_clear_cache(request):
 
 
 @pytest.fixture(autouse=True)
+def _reset_payment_events_redis_client():
+    """Drop the cached Redis client between tests so per-test
+    ``patch('redis.Redis')`` mocks aren't bypassed by a stale instance
+    saved by an earlier test in the same process.
+    """
+    import order.payment_events as payment_events_module
+
+    payment_events_module._redis_client = None
+    yield
+    payment_events_module._redis_client = None
+
+
+@pytest.fixture(autouse=True)
 def _reseed_extra_settings(request):
     """Ensure ``EXTRA_SETTINGS_DEFAULTS`` rows exist before every DB test.
 

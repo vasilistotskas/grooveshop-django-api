@@ -45,7 +45,7 @@ urlpatterns = [
     ),
     path(
         "viva-wallet/resolve-order",
-        resolve_viva_order_code,
+        resolve_viva_order_code.as_view(),
         name="viva-wallet-resolve-order",
     ),
     path(

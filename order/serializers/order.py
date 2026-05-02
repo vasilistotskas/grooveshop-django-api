@@ -1000,17 +1000,30 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                 except (ValueError, TypeError):
                     pass
 
-        # Validate and lock stock BEFORE creating order
+        # Validate and lock stock BEFORE creating order. Locking all
+        # products in one ``SELECT … FOR UPDATE WHERE pk IN (…)`` is
+        # one round-trip regardless of cart size — the previous
+        # per-item loop fired N locks + N updates inside the same
+        # transaction, scaling round-trips linearly with cart depth.
         from product.models import Product
+
+        product_ids = [item["product"].pk for item in items_data]
+        locked_products = {
+            p.pk: p
+            for p in Product.objects.select_for_update().filter(
+                pk__in=product_ids
+            )
+        }
 
         for item_data in items_data:
             product = item_data.get("product")
             quantity = item_data.get("quantity", 1)
-
-            # Lock product row for update to prevent race conditions
-            locked_product = Product.objects.select_for_update().get(
-                pk=product.pk
-            )
+            locked_product = locked_products.get(product.pk)
+            if locked_product is None:
+                # Product disappeared between cart load and order create.
+                raise serializers.ValidationError(
+                    {"items": [f"Product {product.pk} no longer available."]}
+                )
 
             if locked_product.stock < quantity:
                 raise serializers.ValidationError(

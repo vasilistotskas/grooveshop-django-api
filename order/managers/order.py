@@ -103,6 +103,7 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
                 "acs_shipment",
                 "acs_shipment__events",
                 "acs_shipment__station_destination",
+                "invoice",
             )
         )
 

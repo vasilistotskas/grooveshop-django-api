@@ -5,9 +5,46 @@ import django.db.models.deletion
 import django.utils.timezone
 import djmoney.models.fields
 import djmoney.money
-import order.models.invoice
 import uuid
+from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from django.db import migrations, models
+from django.utils import timezone as tz
+
+
+# ---------------------------------------------------------------------------
+# Inline copies — migrations must be self-contained so that renaming or
+# moving callables in order.models.invoice never breaks fresh DB setups.
+# ---------------------------------------------------------------------------
+
+
+def _private_invoice_storage():
+    """Minimal inline copy of order.models.invoice._private_invoice_storage."""
+    if getattr(settings, "USE_AWS", False):
+        from core.storages import PrivateMediaStorage  # noqa: PLC0415
+
+        return PrivateMediaStorage()
+    location = getattr(
+        settings,
+        "PRIVATE_MEDIA_ROOT",
+        (settings.MEDIA_ROOT + "_private")
+        if getattr(settings, "MEDIA_ROOT", None)
+        else "private_media",
+    )
+    return FileSystemStorage(location=location)
+
+
+def _invoice_upload_to(instance, filename):
+    """Minimal inline copy of order.models.invoice._invoice_upload_to."""
+    year = (
+        instance.issue_date.year
+        if getattr(instance, "issue_date", None)
+        else tz.now().year
+    )
+    base = getattr(instance, "invoice_number", None) or (
+        f"pending-{instance.pk or 'new'}"
+    )
+    return f"invoices/{year}/{base}.pdf"
 
 
 class Migration(migrations.Migration):
@@ -38,7 +75,7 @@ class Migration(migrations.Migration):
                 ('uuid', models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
                 ('invoice_number', models.CharField(help_text='Sequential identifier in the form ``INV-{YEAR}-{NNNNNN}``. Gaps are not allowed by Greek tax law.', max_length=32, unique=True, verbose_name='Invoice Number')),
                 ('issue_date', models.DateField(default=django.utils.timezone.localdate, help_text='Fiscal date of issue. Immutable once the invoice is rendered — used for sequential numbering and reporting.', verbose_name='Issue Date')),
-                ('document_file', models.FileField(blank=True, help_text='The rendered PDF. Stored in private storage — access only via signed URL from the download endpoint.', null=True, storage=order.models.invoice._private_invoice_storage, upload_to=order.models.invoice._invoice_upload_to, verbose_name='Document File')),
+                ('document_file', models.FileField(blank=True, help_text='The rendered PDF. Stored in private storage — access only via signed URL from the download endpoint.', null=True, storage=_private_invoice_storage, upload_to=_invoice_upload_to, verbose_name='Document File')),
                 ('subtotal_currency', djmoney.models.fields.CurrencyField(choices=[('EUR', 'EUR €'), ('USD', 'USD $')], default='EUR', editable=False, max_length=3)),
                 ('subtotal', djmoney.models.fields.MoneyField(decimal_places=2, default=djmoney.money.Money(0, 'EUR'), max_digits=11, verbose_name='Subtotal (excl. VAT)')),
                 ('total_vat_currency', djmoney.models.fields.CurrencyField(choices=[('EUR', 'EUR €'), ('USD', 'USD $')], default='EUR', editable=False, max_length=3)),

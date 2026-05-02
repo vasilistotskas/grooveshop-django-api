@@ -465,7 +465,6 @@ class AcsService:
     # ------------------------------------------------------------------
 
     @classmethod
-    @transaction.atomic
     def cancel_voucher(
         cls,
         shipment: AcsShipment,
@@ -474,52 +473,119 @@ class AcsService:
     ) -> None:
         """Cancel a voucher when allowed by ACS rules.
 
+        Three-phase design — mirrors create_voucher_for_order — so the
+        ACS API call is never made while a Postgres transaction is open.
+        With ``idle_in_transaction_session_timeout`` a slow ACS response
+        would otherwise roll back the transaction AFTER ACS already
+        cancelled the voucher, leaving local state inconsistent.
+
         Per PDF: ``ACS_Delete_Voucher`` only succeeds for vouchers not
         yet finalised in a pickup list — once issued, the voucher is
-        immutable.  Caller (admin endpoint) must pass a fresh row.
+        immutable. Caller (admin endpoint) must pass a fresh row.
         """
-        shipment = (
-            AcsShipment.objects.select_for_update()
-            .select_related("order")
-            .get(pk=shipment.pk)
-        )
-
-        if shipment.shipment_state == AcsShipmentState.CANCELED:
-            return  # idempotent
-
-        if shipment.pickup_list_id is not None:
-            raise AcsAPIError(
-                alias="ACS_Delete_Voucher",
-                error_message=(
-                    "Cannot cancel a voucher that is already in a "
-                    "pickup list — contact ACS support to issue a "
-                    "manual return instead."
-                ),
+        # ----- Phase 1: claim the row + guard against double-cancel -----
+        with transaction.atomic():
+            shipment = (
+                AcsShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
             )
 
-        if not shipment.voucher_no:
+            if shipment.shipment_state == AcsShipmentState.CANCELED:
+                return  # idempotent
+
+            if shipment.pickup_list_id is not None:
+                raise AcsAPIError(
+                    alias="ACS_Delete_Voucher",
+                    error_message=(
+                        "Cannot cancel a voucher that is already in a "
+                        "pickup list — contact ACS support to issue a "
+                        "manual return instead."
+                    ),
+                )
+
+            if not shipment.voucher_no:
+                # Nothing to cancel on ACS side — mark locally and exit.
+                shipment.shipment_state = AcsShipmentState.CANCELED
+                shipment.cancel_requested_at = timezone.now()
+                shipment.save(
+                    update_fields=["shipment_state", "cancel_requested_at"]
+                )
+                return
+
+            # Stamp cancel_started_at so a concurrent caller can detect an
+            # in-progress cancel (same TTL as mint_started_at).
+            metadata = shipment.metadata or {}
+            started_raw = metadata.get("cancel_started_at")
+            if started_raw:
+                from django.utils.dateparse import parse_datetime
+
+                started = parse_datetime(str(started_raw))
+                if started is not None:
+                    if started.tzinfo is None:
+                        started = timezone.make_aware(started)
+                    age = (timezone.now() - started).total_seconds()
+                    if age < cls._MINT_CLAIM_TTL_SECONDS:
+                        from shipping_acs.exceptions import AcsRetryableError
+
+                        raise AcsRetryableError(
+                            alias="ACS_Delete_Voucher",
+                            error_message=(
+                                f"Voucher cancel already in progress for "
+                                f"shipment={shipment.pk} (started {age:.1f}s ago)."
+                            ),
+                        )
+
+            metadata["cancel_started_at"] = timezone.now().isoformat()
+            shipment.metadata = metadata
+            shipment.save(update_fields=["metadata"])
+
+        voucher_no = shipment.voucher_no
+
+        # ----- Phase 2: API call (no DB lock, no open transaction) -----
+        try:
+            AcsClient().delete_voucher(voucher_no)
+        except Exception:
+            # Release the claim so a retry can proceed without waiting out TTL.
+            try:
+                with transaction.atomic():
+                    fresh = (
+                        AcsShipment.objects.select_for_update()
+                        .only("metadata")
+                        .get(pk=shipment.pk)
+                    )
+                    m = fresh.metadata or {}
+                    m.pop("cancel_started_at", None)
+                    fresh.metadata = m
+                    fresh.save(update_fields=["metadata"])
+            except Exception:
+                logger.exception(
+                    "cancel_voucher: failed to release cancel claim for "
+                    "shipment=%s",
+                    shipment.pk,
+                )
+            raise
+
+        # ----- Phase 3: persist (fresh atomic, brief lock) -----
+        with transaction.atomic():
+            shipment = (
+                AcsShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
+            )
+            metadata = shipment.metadata or {}
+            metadata.pop("cancel_started_at", None)
+            metadata["cancel_reason"] = reason
             shipment.shipment_state = AcsShipmentState.CANCELED
             shipment.cancel_requested_at = timezone.now()
+            shipment.metadata = metadata
             shipment.save(
-                update_fields=["shipment_state", "cancel_requested_at"]
+                update_fields=[
+                    "shipment_state",
+                    "cancel_requested_at",
+                    "metadata",
+                ]
             )
-            return
-
-        AcsClient().delete_voucher(shipment.voucher_no)
-
-        shipment.shipment_state = AcsShipmentState.CANCELED
-        shipment.cancel_requested_at = timezone.now()
-        shipment.metadata = {
-            **(shipment.metadata or {}),
-            "cancel_reason": reason,
-        }
-        shipment.save(
-            update_fields=[
-                "shipment_state",
-                "cancel_requested_at",
-                "metadata",
-            ]
-        )
 
     # ------------------------------------------------------------------
     # Daily pickup list (manifest)

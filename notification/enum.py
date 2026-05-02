@@ -91,3 +91,19 @@ class NotificationTypeEnum(models.TextChoices):
     # Engagement / gamification.
     LOYALTY_TIER_UP = "loyalty_tier_up", _("Loyalty tier promotion")
     COMMENT_LIKED = "comment_liked", _("Blog comment liked")
+
+    # BoxNow shipping events.
+    BOXNOW_PARCEL_AT_LOCKER = (
+        "BOXNOW_PARCEL_AT_LOCKER",
+        _("BoxNow parcel arrived at locker"),
+    )
+    BOXNOW_PARCEL_DELIVERED = (
+        "BOXNOW_PARCEL_DELIVERED",
+        _("BoxNow parcel delivered"),
+    )
+
+    # ACS shipping events.
+    ACS_OUT_FOR_DELIVERY = (
+        "ACS_OUT_FOR_DELIVERY",
+        _("ACS parcel out for delivery"),
+    )

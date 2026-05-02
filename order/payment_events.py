@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.db import transaction
@@ -30,6 +30,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 PAYMENT_STATUS_CHANNEL_PREFIX = "payment:status:"
+
+# Module-level Redis client. Constructing one per webhook fires (Stripe
+# `payment_intent.succeeded`, `charge.refunded`, COD voucher mint) opens
+# a fresh TCP socket each time and bypasses the pool discipline we get
+# from a single ConnectionPool. The client is lazy: we only build it on
+# the first publish so importing this module never touches Redis.
+_redis_client: Any = None
 
 
 def payment_status_channel(order_id: int) -> str:
@@ -47,15 +54,18 @@ def _serialize(order: Order) -> str:
     return json.dumps(payload)
 
 
-def _publish(order_id: int, message: str) -> None:
-    # Import lazily — the redis package is an install-time dep but we
-    # don't want module-level import side effects (and it keeps test
-    # isolation cleaner).
-    try:
+def _get_client() -> Any:
+    global _redis_client
+    if _redis_client is None:
         from redis import Redis  # noqa: PLC0415
 
-        client = Redis.from_url(settings.REDIS_URL)
-        client.publish(payment_status_channel(order_id), message)
+        _redis_client = Redis.from_url(settings.REDIS_URL, max_connections=4)
+    return _redis_client
+
+
+def _publish(order_id: int, message: str) -> None:
+    try:
+        _get_client().publish(payment_status_channel(order_id), message)
     except Exception as exc:  # pragma: no cover — defensive only
         # RedisError is the expected case; broader except guards against
         # the rare `django.core.exceptions.ImproperlyConfigured` at

@@ -97,7 +97,11 @@ def acs_client_mock(monkeypatch):
 
 class TestCreateVoucherForOrder:
     def test_idempotent_when_voucher_already_set(self, acs_client_mock):
-        order = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         existing = AcsShipmentFactory(order=order, voucher_no="7777")
 
         result = AcsService.create_voucher_for_order(order)
@@ -106,7 +110,11 @@ class TestCreateVoucherForOrder:
         assert acs_client_mock.last_create_payload is None
 
     def test_persists_voucher_no_and_advances_state(self, acs_client_mock):
-        order = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         AcsShipmentFactory(order=order, item_quantity=1)
 
         result = AcsService.create_voucher_for_order(order)
@@ -116,7 +124,11 @@ class TestCreateVoucherForOrder:
     def test_persists_multipart_children_when_quantity_gt_one(
         self, acs_client_mock
     ):
-        order = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         AcsShipmentFactory(order=order, item_quantity=3)
 
         result = AcsService.create_voucher_for_order(order)
@@ -127,7 +139,11 @@ class TestCreateVoucherForOrder:
         assert acs_client_mock.last_multipart_call == "7227891234"
 
     def test_writes_tracking_info_on_order(self, acs_client_mock):
-        order = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         AcsShipmentFactory(order=order)
 
         AcsService.create_voucher_for_order(order)
@@ -136,6 +152,7 @@ class TestCreateVoucherForOrder:
         assert order.shipping_carrier == "acs"
 
     def test_raises_when_no_voucher_returned(self, monkeypatch):
+        from order.enum.status import OrderStatus, PaymentStatus
         from shipping_acs import services
 
         class _BadClient:
@@ -145,7 +162,9 @@ class TestCreateVoucherForOrder:
                 return {"Voucher_No": "", "Error_Message": "Invalid address."}
 
         monkeypatch.setattr(services, "AcsClient", _BadClient)
-        order = OrderFactory()
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         AcsShipmentFactory(order=order)
 
         with pytest.raises(AcsAPIError) as exc_info:
@@ -160,7 +179,11 @@ class TestCreateVoucherForOrder:
 
 class TestCancelVoucher:
     def test_blocks_when_pickup_list_already_issued(self, acs_client_mock):
-        order = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         pickup = AcsPickupListFactory()
         shipment = AcsShipmentFactory(
             order=order,
@@ -173,7 +196,11 @@ class TestCancelVoucher:
             AcsService.cancel_voucher(shipment, reason="customer changed mind")
 
     def test_calls_delete_when_eligible(self, acs_client_mock):
-        order = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         shipment = AcsShipmentFactory(
             order=order,
             voucher_no="7227891234",
@@ -186,7 +213,11 @@ class TestCancelVoucher:
         assert acs_client_mock.last_delete_call == "7227891234"
 
     def test_idempotent_for_already_canceled(self, acs_client_mock):
-        order = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         shipment = AcsShipmentFactory(
             order=order,
             voucher_no="7227891234",
@@ -203,7 +234,11 @@ class TestCancelVoucher:
 
 class TestPollShipmentTracking:
     def test_inserts_event_with_fingerprint(self, acs_client_mock):
-        order = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         shipment = AcsShipmentFactory(
             order=order,
             voucher_no="7227891234",
@@ -216,7 +251,11 @@ class TestPollShipmentTracking:
         assert AcsTrackingEvent.objects.filter(shipment=shipment).count() == 1
 
     def test_idempotent_on_repoll(self, acs_client_mock):
-        order = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         shipment = AcsShipmentFactory(
             order=order,
             voucher_no="7227891234",
@@ -414,8 +453,14 @@ class TestIssueDailyPickupList:
         assert result is None
 
     def test_creates_pickup_list_and_links_shipments(self, acs_client_mock):
-        order_a = OrderFactory()
-        order_b = OrderFactory()
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order_a = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        order_b = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
         AcsShipmentFactory(
             order=order_a,
             voucher_no="7227891111",

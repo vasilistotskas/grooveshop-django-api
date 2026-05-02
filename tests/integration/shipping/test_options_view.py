@@ -74,3 +74,58 @@ def test_options_skips_provider_with_unregistered_adapter():
     assert all(
         opt["providerCode"] != "ghost_carrier" for opt in response.json()
     )
+
+
+def test_options_forwards_weight_grams_to_adapter():
+    """Endpoint passes ``weight_grams`` through ``available_options``
+    into the carrier adapter. Without this thread the ACS live quote
+    would always price at the 0.5 kg floor, no matter how heavy the
+    cart was."""
+    from unittest.mock import patch
+
+    ShippingProvider.objects.filter(code="acs").update(is_active=True)
+
+    client = APIClient()
+    captured: dict[str, object] = {}
+
+    def _spy(self, *, order_value_amount, currency, kind, **kwargs):
+        captured["weight_grams"] = kwargs.get("weight_grams")
+        return (3.5, currency)
+
+    with patch(
+        "shipping_acs.carrier.AcsCarrier.calculate_shipping_cost",
+        new=_spy,
+    ):
+        response = client.get(
+            reverse("shipping-options"),
+            {
+                "country_code": "GR",
+                "order_value_amount": "10.00",
+                "weight_grams": "2400",
+            },
+        )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert captured["weight_grams"] == 2400
+
+
+def test_options_rejects_negative_weight():
+    """``IntegerField(min_value=0)`` rejects weight below zero — the
+    request must 400 instead of silently coercing."""
+    client = APIClient()
+    response = client.get(
+        reverse("shipping-options"),
+        {"weight_grams": "-1"},
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_options_rejects_absurd_weight():
+    """100 kg+ orders aren't a real cart — bound the param so a
+    typo or hostile client can't blow out cache key cardinality."""
+    client = APIClient()
+    response = client.get(
+        reverse("shipping-options"),
+        {"weight_grams": "1000000"},
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST

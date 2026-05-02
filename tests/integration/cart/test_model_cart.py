@@ -80,6 +80,34 @@ class CartModelTestCase(TestCase):
     def test_total_items_unique(self):
         self.assertEqual(self.cart.total_items_unique, 2)
 
+    def test_total_weight_grams_sums_per_item_weight_times_quantity(self):
+        """Cart property must mirror the carrier's
+        ``compute_total_weight_grams`` so the live ACS quote at
+        checkout matches what the voucher mint will charge — same
+        helper, single source of truth.
+        """
+        from measurement.measures import Mass
+
+        self.cart_item_1.product.weight = Mass(g=250)
+        self.cart_item_1.product.save(update_fields=["weight"])
+        self.cart_item_2.product.weight = Mass(kg=1.2)
+        self.cart_item_2.product.save(update_fields=["weight"])
+
+        # 250g × 2 (item_1) + 1200g × 3 (item_2) = 4100g
+        self.assertEqual(self.cart.total_weight_grams, 4100)
+
+    def test_total_weight_grams_zero_when_weights_are_zero(self):
+        """Products with zero weight contribute 0; the property never
+        raises so a missing/zero weight can't block checkout."""
+        from measurement.measures import Mass
+
+        self.cart_item_1.product.weight = Mass(g=0)
+        self.cart_item_1.product.save(update_fields=["weight"])
+        self.cart_item_2.product.weight = Mass(g=0)
+        self.cart_item_2.product.save(update_fields=["weight"])
+
+        self.assertEqual(self.cart.total_weight_grams, 0)
+
     def test_refresh_last_activity(self):
         last_activity_before_refresh = self.cart.last_activity
         self.cart.refresh_last_activity()

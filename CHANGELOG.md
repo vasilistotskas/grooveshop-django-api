@@ -3,6 +3,85 @@
 
 
 
+## v1.124.0 (2026-05-02)
+
+### Chores
+
+* chore(deps): sync uv.lock to pyproject.toml 1.123.3
+
+The semantic-release commit bumped pyproject.toml without regenerating
+uv.lock; resync so ``uv sync --locked`` (CI) keeps passing.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2d9d6a0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2d9d6a0745db45115e3b0ba0de22406241fb0eb7))
+
+### Features
+
+* feat(shipping): weight-aware ACS live pricing + cart total_weight_grams
+
+The ACS live quote (``ACS_DYNAMIC_PRICING_ENABLED``) used a hardcoded
+0.5 kg floor at quote time. Cart-line items weren't on the request, so
+heavy carts were quoted at the minimum bracket and then upcharged at
+voucher mint — the customer saw 3.50€ in the sidebar and 5.20€ on the
+voucher.
+
+Thread ``weight_grams`` end-to-end:
+
+* ``ShippingCarrierInterface.calculate_shipping_cost`` accepts
+  ``weight_grams: int | None``. ACS uses it; BoxNow ignores (flat
+  contract tariff).
+* ``ACS._fetch_live_quote`` buckets the weight to the published ACS
+  tariff brackets (500g / 1kg / 2kg / 1kg-steps to 6kg / 1kg-steps
+  thereafter) so cache keys collapse near-identical carts and the
+  upstream API isn't hammered. Sends the bucketed value via
+  ``_kg_from_grams`` (Greek-locale comma-decimal) — same helper the
+  voucher mint uses, so quote and charge line up exactly.
+* ``ShippingService.available_options`` and ``calculate_shipping_cost``
+  forward the weight kwarg.
+* ``ShippingOptionsView`` accepts a ``weight_grams`` query param.
+* ``Order.create_order_from_cart`` and ``create_order_from_cart_offline``
+  compute the cart weight (via ``shipping.utils.compute_total_weight_
+  grams``) and pass it through; same for the Stripe PaymentIntent
+  amount-verification path.
+
+Cart serializer now exposes ``total_weight_grams`` so the frontend
+can forward the canonical value in the ``/shipping/options`` query
+without recomputing per-item arithmetic on the client.
+
+Verified: 1432 order + shipping_acs tests pass. Ruff/ty clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0bc63d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0bc63d94ba8d5666a24f953db02894276d8ec4bb))
+
+### Testing
+
+* test(shipping): coverage for weight-aware ACS pricing + cart total weight
+
+Locks in the invariants the round-7 weight-aware pricing pass relies
+on so a future refactor can't silently regress:
+
+* ``AcsCarrier._bucket_weight_grams`` — full parametric matrix across
+  the published ACS tariff brackets (500g / 1 kg / 2 kg / 1 kg-steps
+  to 6 kg / 1 kg above). Catches off-by-one bugs that would either
+  thrash the upstream cache (one entry per gram) or under/overcharge
+  a bracket boundary.
+* ``_fetch_live_quote`` weight forwarding — the bucketed weight goes
+  into ``ACS_Price_Calculation`` via the SAME ``_kg_from_grams``
+  helper the voucher mint uses, so quote and charge match exactly.
+  The assertion compares against ``_kg_from_grams(bucket)`` rather
+  than a hardcoded literal so a future locale-format tweak fails one
+  place, not two.
+* Cache-key bucketing — 200/487/499/500 collapse to one upstream
+  call (single 500g bucket) while 487 + 1500 hit two distinct buckets.
+* ``GET /api/v1/shipping/options`` — new ``weight_grams`` query param
+  threaded through ``available_options`` into the adapter; rejects
+  negative or absurd (>100kg) values at the serializer.
+* ``Cart.total_weight_grams`` — sums per-item ``product.weight.g ×
+  quantity``; zero-weight products contribute 0 without raising so a
+  missing weight can't block checkout.
+
+53 tests pass on this slice. Ruff/ty clean.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ce02775`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ce02775f9642e99de06e2d09ca7d9e44d8b2b2ab))
+
 ## v1.123.3 (2026-05-02)
 
 ### Bug fixes

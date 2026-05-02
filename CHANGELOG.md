@@ -3,6 +3,31 @@
 
 
 
+## v1.123.1 (2026-05-02)
+
+### Bug fixes
+
+* fix: update uv.lock ([`d1b8d47`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1b8d4789cb61ab22035556edb7dd7942198e5ed))
+
+* fix(notification): uppercase legacy kind/category/priority values
+
+A pre-existing notification row (id=21 on prod, blog-comment-liked
+event from 2025-05-14) carried lowercase enum values (``kind="info"``,
+``category="system"``, ``priority="normal"``) from before the
+schema flipped its TextChoices to uppercase. The model migration
+that bumped the choices didn't backfill existing data, so the
+storefront's Zod parser rejected ``GET /api/v1/user/account/<id>/
+notifications`` with a 422 the moment that row appeared in the feed.
+
+This RunPython migration upper-cases any remaining lowercase rows
+across all three columns. Idempotent — already-uppercased rows
+match neither the regex filter nor are touched. The matching prod
+row was patched manually before this commit; the migration ships
+so dev databases, restored backups, and any future envs land on
+the same canonical state.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6b58bc8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6b58bc89ced77870b60b25d3bd933161c3832505))
+
 ## v1.123.0 (2026-05-01)
 
 ### Features

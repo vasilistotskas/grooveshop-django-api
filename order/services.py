@@ -306,7 +306,12 @@ class OrderService:
             # submitting a PI created for a lower amount.
             # payment_data["amount"] is in euros (stripe_pi.amount / 100).
             # We calculate the expected total using the same logic as Step 5.
+            from shipping.utils import compute_total_weight_grams
+
             _cart_total = cart.total_price
+            _cart_weight_grams = compute_total_weight_grams(
+                (item.product, item.quantity) for item in cart.items.all()
+            )
             _shipping_cost = cls.calculate_shipping_cost(
                 order_value=_cart_total,
                 country_id=shipping_address.get("country_id"),
@@ -315,6 +320,7 @@ class OrderService:
                     "shipping_provider_code"
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
+                weight_grams=_cart_weight_grams,
             )
             _order_subtotal = Money(
                 _cart_total.amount + _shipping_cost.amount,
@@ -478,8 +484,15 @@ class OrderService:
                 ),
             }
 
-            # Calculate shipping cost
+            # Calculate shipping cost — pass cart weight so ACS live
+            # quotes match the weight-banded tariff bracket the voucher
+            # mint will charge (no surprise upcharge after order create).
+            from shipping.utils import compute_total_weight_grams
+
             cart_total = cart.total_price
+            cart_weight_grams = compute_total_weight_grams(
+                (ci.product, ci.quantity) for ci in cart_items
+            )
             shipping_cost = cls.calculate_shipping_cost(
                 order_value=cart_total,
                 country_id=shipping_address.get("country_id"),
@@ -488,6 +501,7 @@ class OrderService:
                     "shipping_provider_code"
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
+                weight_grams=cart_weight_grams,
             )
             order_data["shipping_price"] = shipping_cost
 
@@ -930,8 +944,15 @@ class OrderService:
                 ),
             }
 
-            # Calculate shipping cost
+            # Calculate shipping cost — pass cart weight so ACS live
+            # quotes match the weight-banded tariff bracket the voucher
+            # mint will charge.
+            from shipping.utils import compute_total_weight_grams
+
             cart_total = cart.total_price
+            cart_weight_grams = compute_total_weight_grams(
+                (ci.product, ci.quantity) for ci in cart_items
+            )
             shipping_cost = cls.calculate_shipping_cost(
                 order_value=cart_total,
                 country_id=shipping_address.get("country_id"),
@@ -940,6 +961,7 @@ class OrderService:
                     "shipping_provider_code"
                 ),
                 shipping_kind=shipping_address.get("shipping_kind"),
+                weight_grams=cart_weight_grams,
             )
             order_data["shipping_price"] = shipping_cost
 
@@ -2340,6 +2362,7 @@ class OrderService:
         region_id: int | None = None,
         shipping_provider_code: str | None = None,
         shipping_kind: str | None = None,
+        weight_grams: int | None = None,
     ) -> Money:
         from extra_settings.models import Setting
 
@@ -2359,6 +2382,7 @@ class OrderService:
                 currency=str(order_value.currency),
                 country_id=str(country_id) if country_id else None,
                 region_id=str(region_id) if region_id else None,
+                weight_grams=weight_grams,
             )
             if quote is not None:
                 amount, currency = quote

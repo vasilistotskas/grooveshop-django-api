@@ -26,6 +26,15 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     total_vat_value = MoneyField(
         max_digits=11, decimal_places=2, read_only=True
     )
+    total_weight_grams = serializers.IntegerField(
+        read_only=True,
+        help_text=_(
+            "Total cart weight in grams. Forwarded to "
+            "/api/v1/shipping/options at checkout so ACS live pricing "
+            "quotes against the actual weight bracket the voucher "
+            "mint will charge."
+        ),
+    )
     currency = serializers.SerializerMethodField(
         help_text=_(
             "ISO 4217 currency code for all monetary values in this cart"
@@ -48,6 +57,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "total_vat_value",
             "total_items",
             "total_items_unique",
+            "total_weight_grams",
             "currency",
             "created_at",
             "updated_at",
@@ -61,6 +71,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "total_vat_value",
             "total_items",
             "total_items_unique",
+            "total_weight_grams",
             "created_at",
             "updated_at",
             "last_activity",

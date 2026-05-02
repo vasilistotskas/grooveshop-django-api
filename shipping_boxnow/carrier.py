@@ -237,7 +237,10 @@ class BoxNowCarrier(ShippingCarrierInterface):
         kind: ShippingKind,
         country_id: str | None = None,
         region_id: str | None = None,
+        weight_grams: int | None = None,
     ) -> tuple[float, str] | None:
+        # ``weight_grams`` is intentionally unused — BoxNow's tariff is
+        # contract-flat per partner, not weight-banded.
         from extra_settings.models import Setting
 
         if kind != ShippingKind.PICKUP_POINT:

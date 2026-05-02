@@ -58,6 +58,17 @@ class ShippingOptionsView(APIView):
                 required=False,
                 type=str,
             ),
+            OpenApiParameter(
+                name="weight_grams",
+                description=(
+                    "Total cart weight in grams. Threaded into the ACS "
+                    "live quote so the displayed price matches the "
+                    "weight-banded tariff bracket the voucher mint will "
+                    "charge. Optional; defaults to ACS's 500g minimum."
+                ),
+                required=False,
+                type=int,
+            ),
         ],
         responses=ShippingOptionSerializer(many=True),
         tags=["Shipping"],
@@ -68,11 +79,13 @@ class ShippingOptionsView(APIView):
         country_code = query.validated_data.get("country_code") or None
         amount = float(query.validated_data.get("order_value_amount") or 0)
         currency = query.validated_data.get("currency") or "EUR"
+        weight_grams = query.validated_data.get("weight_grams")
 
         options = ShippingService.available_options(
             country_code=country_code,
             order_value_amount=amount,
             currency=currency,
+            weight_grams=weight_grams,
         )
         serializer = ShippingOptionSerializer(options, many=True)
         return Response(serializer.data)

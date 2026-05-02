@@ -27,6 +27,19 @@ class ShippingOptionsQuerySerializer(serializers.Serializer):
         max_length=3,
         default="EUR",
     )
+    weight_grams = serializers.IntegerField(
+        required=False,
+        min_value=0,
+        max_value=100_000,
+        allow_null=True,
+        help_text=_(
+            "Total cart weight in grams. ACS uses it to bucket the live "
+            "quote against the actual tariff bracket so the shopper sees "
+            "the same price the voucher mint will charge. BoxNow ignores "
+            "it. Defaults to the ACS minimum chargeable weight (500g) "
+            "when omitted."
+        ),
+    )
 
 
 class ShippingOptionSerializer(serializers.Serializer):

@@ -225,6 +225,7 @@ class AcsCarrier(ShippingCarrierInterface):
         kind: ShippingKind,
         country_id: str | None = None,
         region_id: str | None = None,
+        weight_grams: int | None = None,
     ) -> tuple[float, str] | None:
         from extra_settings.models import Setting
 
@@ -243,6 +244,7 @@ class AcsCarrier(ShippingCarrierInterface):
                 country_id=country_id,
                 region_id=region_id,
                 currency=currency,
+                weight_grams=weight_grams,
             )
             if quote is not None:
                 return quote
@@ -250,32 +252,62 @@ class AcsCarrier(ShippingCarrierInterface):
         base = float(Setting.get("ACS_SHIPPING_PRICE", default=3.50))
         return (base, currency)
 
-    @staticmethod
+    # ACS minimum chargeable weight per published tariff. Anything
+    # below 500g is billed at 500g.
+    _MIN_CHARGEABLE_GRAMS: ClassVar[int] = 500
+
+    @classmethod
+    def _bucket_weight_grams(cls, weight_grams: int | None) -> int:
+        """Bucket cart weight to the ACS billing brackets so the cache
+        key collapses ``487g`` and ``499g`` to the same quote without
+        bombarding the ACS API. The brackets mirror the published
+        tariff steps: 0.5, 1, 2, 3, 4, 5, 6 kg, then 1 kg increments.
+        """
+        if weight_grams is None or weight_grams <= 0:
+            return cls._MIN_CHARGEABLE_GRAMS
+        if weight_grams <= 500:
+            return 500
+        if weight_grams <= 1000:
+            return 1000
+        if weight_grams <= 2000:
+            return 2000
+        # 1 kg buckets up to 6 kg.
+        if weight_grams <= 6000:
+            return ((weight_grams + 999) // 1000) * 1000
+        # > 6 kg: round up to next kg.
+        return ((weight_grams + 999) // 1000) * 1000
+
+    @classmethod
     def _fetch_live_quote(
+        cls,
         *,
         country_id: str | None,
         region_id: str | None,
         currency: str,
+        weight_grams: int | None = None,
     ) -> tuple[float, str] | None:
         """Call ACS_Price_Calculation with caching + graceful failure.
 
-        Uses the ACS minimum chargeable weight (0.5 kg) because
-        cart-line items aren't on the request at quote time. Heavier
-        orders pay through to the create-voucher API where the actual
-        weight is sent — but the customer has already been shown the
-        smaller flat-style quote, which is bounded by ACS's published
-        tariff for that lane.
+        Uses ``weight_grams`` bucketed to the ACS billing brackets so
+        the customer-shown quote matches what the voucher API will
+        actually charge. Falls back to the 500g floor when the cart
+        weight isn't known (e.g. quote-only call without items).
 
-        Cache key: country/region tuple. 5-minute TTL so an admin
-        tariff change propagates without a cache flush.
+        Cache key: (country, region, weight bucket). 5-minute TTL so
+        an admin tariff change propagates without a cache flush.
         """
         from django.core.cache import cache
         from django.utils import timezone
 
         from shipping_acs.client import AcsClient
         from shipping_acs.exceptions import AcsAPIError, AcsConfigError
+        from shipping_acs.services import _kg_from_grams
 
-        cache_key = f"acs:price_quote:{country_id or '-'}:{region_id or '-'}"
+        bucketed_grams = cls._bucket_weight_grams(weight_grams)
+        cache_key = (
+            f"acs:price_quote:{country_id or '-'}:{region_id or '-'}"
+            f":{bucketed_grams}"
+        )
         cached = cache.get(cache_key)
         if cached is not None:
             return (float(cached), currency)
@@ -285,13 +317,12 @@ class AcsCarrier(ShippingCarrierInterface):
             response = client.price_calculation(
                 {
                     "Billing_Category": 2,
-                    # Greek locale: ACS reads numeric strings with
-                    # comma-decimal (dot is thousands separator). Send
-                    # ``"0,5"`` — ``"0.5"`` is parsed as 5 kg and quotes
-                    # the 5 kg tariff, inflating the live price shown
-                    # to the customer at checkout. Mirrors
-                    # ``_kg_from_grams`` in shipping_acs/services.py.
-                    "Weight": "0,5",
+                    # ACS reads numeric strings with the Greek locale
+                    # (comma-decimal). ``_kg_from_grams`` returns the
+                    # already-formatted ``"0,5"`` / ``"2,5"`` string —
+                    # use the same helper that the voucher mint uses
+                    # so the quote and the charge match exactly.
+                    "Weight": _kg_from_grams(bucketed_grams),
                     "Charge_Type": 2,
                     "Pickup_Date": timezone.localdate().isoformat(),
                 }

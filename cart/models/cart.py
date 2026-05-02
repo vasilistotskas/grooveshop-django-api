@@ -123,3 +123,23 @@ class Cart(TimeStampMixinModel, UUIDModel):
         if hasattr(self, "_items_count"):
             return cast(int, self._items_count) or 0
         return self.items.count()
+
+    @property
+    def total_weight_grams(self) -> int:
+        """Total cart weight in grams across all line items.
+
+        Used by the checkout shipping-quote call so ACS live pricing
+        can quote against the actual weight bracket. Wraps the
+        canonical ``shipping.utils.compute_total_weight_grams`` so a
+        carrier registry change propagates here automatically.
+        """
+        from shipping.utils import compute_total_weight_grams
+
+        items = (
+            self.items.all()
+            if "items" in getattr(self, "_prefetched_objects_cache", {})
+            else self.get_items()
+        )
+        return compute_total_weight_grams(
+            (item.product, item.quantity) for item in items
+        )

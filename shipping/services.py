@@ -201,6 +201,7 @@ class ShippingService:
         country_code: str | None = None,
         order_value_amount: float = 0.0,
         currency: str = "EUR",
+        weight_grams: int | None = None,
     ) -> list[dict[str, Any]]:
         """Return the matrix of (provider, kind) options for checkout.
 
@@ -253,6 +254,7 @@ class ShippingService:
                     order_value_amount=order_value_amount,
                     currency=currency,
                     kind=kind,
+                    weight_grams=weight_grams,
                 )
                 options.append(
                     {
@@ -284,6 +286,7 @@ class ShippingService:
         currency: str,
         country_id: str | None = None,
         region_id: str | None = None,
+        weight_grams: int | None = None,
     ) -> tuple[float, str] | None:
         """Return the shipping price for a provider+kind combination.
 
@@ -300,4 +303,5 @@ class ShippingService:
             kind=kind_enum,
             country_id=country_id,
             region_id=region_id,
+            weight_grams=weight_grams,
         )

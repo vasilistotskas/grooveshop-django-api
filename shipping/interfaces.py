@@ -108,8 +108,15 @@ class ShippingCarrierInterface(ABC):
         kind: ShippingKind,
         country_id: str | None = None,
         region_id: str | None = None,
+        weight_grams: int | None = None,
     ) -> tuple[float, str] | None:
         """Return ``(amount, currency)`` for the provider's shipping cost.
+
+        ``weight_grams`` is the total cart weight at quote time. Carriers
+        whose tariff is weight-banded (ACS) use it; flat-rate carriers
+        (BoxNow) ignore it. ``None`` means caller has no weight info —
+        carriers fall back to a sensible floor (ACS uses its 0.5 kg
+        minimum chargeable weight).
 
         Default: provider has no opinion → caller falls back to the
         global ``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD``

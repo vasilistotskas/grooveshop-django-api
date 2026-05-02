@@ -161,33 +161,24 @@ class BoxNowWebhookView(APIView):
         logger.info("BoxNow webhook: signature verified | id=%s", message_id)
 
         # ------------------------------------------------------------------ #
-        # 7. Dispatch to service layer.                                        #
+        # 7. Dispatch to Celery and acknowledge.                               #
         # ------------------------------------------------------------------ #
-        # Narrow the exception handling so transient infra errors (DB
-        # outage, Redis hiccup) propagate as 500 — BoxNow will retry.
-        # Application-logic errors (e.g. an unknown shipment that
-        # legitimately can't be replayed) keep the existing 200 + log
-        # behaviour so we don't trigger a retry storm for a permanent
-        # failure.
-        from django.db import DatabaseError, OperationalError
-
-        from shipping_boxnow.services import BoxNowService
-
+        # Signature verification is sync (it has to be — we can't queue
+        # an unauthenticated payload), but the apply flow runs in a
+        # worker so Daphne is never blocked by BoxNow retry storms.
+        # Celery handles transient infra errors via ``autoretry_for``.
         try:
-            BoxNowService.apply_webhook_event(envelope)
-        except (DatabaseError, OperationalError):
-            logger.exception(
-                "BoxNow webhook event handling hit a transient DB error "
-                "for message %s — returning 500 so BoxNow retries.",
-                envelope.get("id", "<unknown>"),
-            )
-            return Response(status=500)
+            from shipping_boxnow.tasks import process_boxnow_webhook_event
+
+            process_boxnow_webhook_event.delay(envelope)
         except Exception:
             logger.exception(
-                "BoxNow webhook event handling failed for message %s",
+                "BoxNow webhook dispatch failed for message %s",
                 envelope.get("id", "<unknown>"),
             )
-            # Application-level error — return 200 so BoxNow doesn't loop;
-            # the message is logged so an operator can replay it.
+            # If we can't even enqueue the task (broker outage) return
+            # 500 so BoxNow retries the delivery rather than dropping
+            # the event into the void.
+            return Response(status=500)
 
         return Response(status=200)

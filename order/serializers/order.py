@@ -282,6 +282,25 @@ class OrderDetailSerializer(OrderSerializer):
         invoice = getattr(obj, "invoice", None)
         return bool(invoice and invoice.has_document())
 
+    def _serialized_shipment(self, obj: Order) -> dict | None:
+        """Compute the carrier shipment payload once per response.
+
+        ``get_boxnow_shipment``, ``get_acs_shipment`` and the generic
+        ``get_shipment`` all need the same dict. Without memoisation
+        the carrier serializer ran twice per OrderDetail response (one
+        carrier-specific call + the generic dispatcher).
+        """
+        cache: dict = self.context.setdefault("_shipment_cache", {})
+        sentinel = object()
+        cached = cache.get(obj.pk, sentinel)
+        if cached is not sentinel:
+            return cached
+        from shipping.services import ShippingService
+
+        result = ShippingService.serialize_shipment(obj, context=self.context)
+        cache[obj.pk] = result
+        return result
+
     @extend_schema_field(BoxNowShipmentDetailSerializer(allow_null=True))
     def get_boxnow_shipment(self, obj: Order) -> dict | None:
         # Mirror ``get_acs_shipment`` — gate on the registry-backed
@@ -291,22 +310,14 @@ class OrderDetailSerializer(OrderSerializer):
         provider = getattr(obj, "shipping_provider", None)
         if provider is None or provider.code != "boxnow":
             return None
-        shipment = getattr(obj, "boxnow_shipment", None)
-        if shipment is None:
-            return None
-        return BoxNowShipmentDetailSerializer(
-            shipment, context=self.context
-        ).data
+        return self._serialized_shipment(obj)
 
     @extend_schema_field(AcsShipmentDetailSerializer(allow_null=True))
     def get_acs_shipment(self, obj: Order) -> dict | None:
         provider = getattr(obj, "shipping_provider", None)
         if provider is None or provider.code != "acs":
             return None
-        shipment = getattr(obj, "acs_shipment", None)
-        if shipment is None:
-            return None
-        return AcsShipmentDetailSerializer(shipment, context=self.context).data
+        return self._serialized_shipment(obj)
 
     @extend_schema_field(
         {
@@ -329,9 +340,7 @@ class OrderDetailSerializer(OrderSerializer):
         provider-specific fields (``boxnow_shipment`` /
         ``acs_shipment``) should consume this one.
         """
-        from shipping.services import ShippingService
-
-        return ShippingService.serialize_shipment(obj, context=self.context)
+        return self._serialized_shipment(obj)
 
     @extend_schema_field({"type": "string", "nullable": True})
     def get_shipment_provider_code(self, obj: Order) -> str | None:

@@ -133,6 +133,51 @@ def sync_boxnow_lockers(self) -> dict[str, int]:
 
 @shared_task(
     bind=True,
+    autoretry_for=(BoxNowRetryableError,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    max_retries=5,
+)
+def process_boxnow_webhook_event(
+    self, envelope: dict[str, Any]
+) -> dict[str, Any]:
+    """Apply a verified BoxNow webhook envelope asynchronously.
+
+    The HTTP view verifies the HMAC signature synchronously, then
+    dispatches the actual state-machine work here so the request
+    returns 200 to BoxNow within milliseconds even if the apply path
+    needs to chase Celery sub-tasks (arrival emails, order-status
+    transitions, etc.). This eliminates Daphne worker saturation
+    during BoxNow retry storms.
+    """
+    from shipping_boxnow.services import BoxNowService
+
+    try:
+        event = BoxNowService.apply_webhook_event(envelope)
+    except BoxNowRetryableError:
+        # Surface to the autoretry decorator above.
+        raise
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.exception(
+            "BoxNow webhook apply failed for message %s: %s",
+            envelope.get("id", "<unknown>"),
+            exc,
+        )
+        return {
+            "status": "error",
+            "message_id": envelope.get("id", ""),
+            "error": str(exc),
+        }
+
+    return {
+        "status": "ok",
+        "message_id": envelope.get("id", ""),
+        "parcel_event_id": getattr(event, "id", None) if event else None,
+    }
+
+
+@shared_task(
+    bind=True,
     autoretry_for=(Exception,),
     retry_backoff=True,
     retry_backoff_max=600,

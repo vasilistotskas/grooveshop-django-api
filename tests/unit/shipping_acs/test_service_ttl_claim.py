@@ -122,7 +122,11 @@ class TestCreateVoucherSetsMintStartedAtBeforeApiCall:
 
         monkeypatch.setattr(services, "AcsClient", _TrackingClient)
 
-        with patch("user.signals.get_channel_layer", return_value=None):
+        # ``get_channel_layer`` is imported lazily inside
+        # ``user.signals._broadcast_force_logout`` (and any other helper
+        # that pushes WS events), so the patch must target its source
+        # module rather than ``user.signals``.
+        with patch("channels.layers.get_channel_layer", return_value=None):
             AcsService.create_voucher_for_order(order)
 
         assert "mint_started_at_already_set" in call_order, (

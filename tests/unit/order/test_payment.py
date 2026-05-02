@@ -73,23 +73,21 @@ class PaymentModuleTestCase(TestCase):
             self.assertEqual(payment_data["status"], PaymentStatus.COMPLETED)
 
     @mock.patch("order.payment.logger")
-    def test_paypal_process_payment(self, mock_logger):
+    def test_paypal_process_payment_raises_not_implemented(self, mock_logger):
+        """PayPal provider is intentionally a hard-stop: the previous mock
+        ``COMPLETED`` return was an audit finding (any active PayPal pay-way
+        would have auto-confirmed orders without a real payment).  Until a
+        real PayPal integration ships, ``process_payment`` raises
+        ``NotImplementedError`` so the failure surfaces immediately.
+        """
         provider = PayPalPaymentProvider()
         amount = Money(
             amount=Decimal("100.00"), currency=settings.DEFAULT_CURRENCY
         )
         order_id = "test_order_id"
 
-        success, payment_data = provider.process_payment(amount, order_id)
-
-        self.assertTrue(success)
-        self.assertEqual(payment_data["payment_id"], f"PP_{order_id}_mock")
-        self.assertEqual(payment_data["status"], PaymentStatus.COMPLETED)
-        self.assertEqual(payment_data["amount"], str(amount.amount))
-        self.assertEqual(payment_data["currency"], str(amount.currency))
-        self.assertEqual(payment_data["provider"], "paypal")
-
-        mock_logger.info.assert_called_once()
+        with self.assertRaises(NotImplementedError):
+            provider.process_payment(amount, order_id)
 
     @mock.patch("order.payment.stripe.Refund.create")
     @mock.patch("order.payment.logger")

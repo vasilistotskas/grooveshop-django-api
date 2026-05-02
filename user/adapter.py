@@ -4,19 +4,18 @@ import logging
 from typing import TYPE_CHECKING
 
 from allauth.account.adapter import DefaultAccountAdapter
-from allauth.core.exceptions import ImmediateHttpResponse
 from allauth.core.internal.httpkit import clean_client_ip
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-from django.http import HttpRequest, HttpResponseRedirect
+from django.http import HttpRequest
 from django.utils import translation
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from core.utils.i18n import resolve_request_language
 
 if TYPE_CHECKING:  # pragma: no cover
-    from allauth.socialaccount.models import SocialAccount, SocialLogin
+    from allauth.socialaccount.models import SocialAccount
 
 logger = logging.getLogger(__name__)
 
@@ -59,81 +58,24 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
     #   SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
     #   SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 
-    def pre_social_login(
-        self, request: HttpRequest, sociallogin: "SocialLogin"
-    ) -> None:
-        """
-        Block auto-authentication when the matched local account has MFA
-        enrolled.
-
-        After allauth resolves the social identity to a local user, it
-        would normally complete the login transparently.  If that user has
-        TOTP / WebAuthn active we must NOT bypass the second factor, so we
-        redirect to the MFA verification page instead of allowing the
-        social provider to act as a sufficient credential on its own.
-
-        The redirect only fires when ``sociallogin.is_existing`` is True
-        (i.e. allauth has already found the matching local account); new
-        sign-ups skip this path and proceed normally.
-        """
-        from allauth.mfa.models import Authenticator  # noqa: PLC0415
-
-        user = sociallogin.user
-        if not sociallogin.is_existing or user is None:
-            # New signup — no existing account to protect.
-            return
-
-        has_mfa = (
-            Authenticator.objects.filter(
-                user_id=user.pk,
-            )
-            .exclude(
-                type=Authenticator.Type.RECOVERY_CODES,
-            )
-            .exists()
-        )
-
-        if not has_mfa:
-            return
-
-        logger.info(
-            "Social login blocked: MFA enrolled on matched account",
-            extra={
-                "user_id": user.pk,
-                "provider": sociallogin.account.provider,
-            },
-        )
-        # TODO(maintainers): This redirect is incorrect for headless allauth.
-        #
-        # Problem: ``ImmediateHttpResponse(HttpResponseRedirect(...))`` issues
-        # a browser redirect to ``/account/security/2fa``.  In headless mode
-        # allauth has no pending-login state at that URL — the Nuxt page
-        # receives the redirect but has no allauth session it can resume, so
-        # the user sees the security page without any actionable prompt.
-        #
-        # Correct headless pattern: remove this entire ``pre_social_login``
-        # override and rely on allauth's ``AuthenticateStage``
-        # (``allauth.mfa.stages``).  The stage pipeline is triggered
-        # automatically after social login completes and its
-        # ``_should_handle`` already calls
-        # ``is_mfa_enabled(user, [TOTP, WEBAUTHN])``, emitting a 401
-        # ``{"flows": [{"id": "mfa_authenticate", "is_pending": true}]}``
-        # JSON envelope that the Nuxt ``useAuth`` composable handles.
-        #
-        # The ``has_mfa`` guard and this block are therefore entirely
-        # redundant once the stage pipeline is trusted.  The correct fix
-        # is to delete this method, but it requires verifying that:
-        #   1. The Nuxt social-login callback path (``/account/login/callback``)
-        #      inspects the 401 pending-flows response.
-        #   2. The TOTP challenge screen is reachable from that callback before
-        #      the session expires.
-        # Until that Nuxt-side verification is done, keep the redirect as a
-        # hard block (MFA user cannot complete social login at all, which is
-        # better than silently bypassing the second factor).
-        #
-        # Audit ref: cleanup-2026-05-02 / Fix 2.
-        mfa_url = f"{settings.NUXT_BASE_URL}/account/security/2fa"
-        raise ImmediateHttpResponse(HttpResponseRedirect(mfa_url))
+    # ``pre_social_login`` is intentionally NOT overridden.
+    #
+    # Earlier versions issued an ``ImmediateHttpResponse(HttpResponseRedirect)``
+    # to a frontend URL when the matched local account had TOTP/WebAuthn
+    # enrolled.  That short-circuited allauth's stage pipeline, which means
+    # the headless contract was never produced and the Nuxt callback page
+    # had no actionable state to resume.
+    #
+    # The headless ``AuthenticateStage`` (``allauth.mfa.stages``) already
+    # intercepts *every* completed login — password and social — and emits a
+    # 401 ``{"flows": [{"id": "mfa_authenticate", "is_pending": true}]}``
+    # envelope that the Nuxt ``useAuth`` composable + ``handleAllAuthError``
+    # know how to route to the TOTP challenge screen.  Verified against the
+    # storefront's ``app/utils/error.ts`` flow handler and
+    # ``shared/constants/index.ts`` ``MFA_AUTHENTICATE`` mapping.
+    #
+    # Removing the override therefore restores the canonical headless
+    # behaviour without weakening MFA enforcement.
 
     def save_user(self, request, sociallogin, form=None):
         user = super().save_user(request, sociallogin, form=form)

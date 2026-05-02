@@ -41,6 +41,35 @@ logger = logging.getLogger(__name__)
 __all__ = ["OrderService", "_compute_total_weight_grams"]
 
 
+def _log_price_drift_if_needed(cart_item, current_price) -> None:
+    """Emit a warning when the live product price differs from the price the
+    customer saw at add-to-cart time.
+
+    This is observability only — we still charge the live price. Operators can
+    monitor warnings to detect runaway price changes between add-to-cart and
+    checkout, then decide whether to enforce price-match (block checkout when
+    drift exceeds a threshold) or warn-and-confirm (UX hop) as a follow-up.
+    """
+    frozen = getattr(cart_item, "price_at_add", None)
+    if frozen is None or current_price is None:
+        return
+    try:
+        if (
+            frozen.amount == current_price.amount
+            and frozen.currency == current_price.currency
+        ):
+            return
+    except (AttributeError, TypeError):
+        return
+    logger.warning(
+        "Cart price drift at checkout: cart_item=%s product=%s price_at_add=%s charged=%s",
+        getattr(cart_item, "id", "?"),
+        getattr(getattr(cart_item, "product", None), "id", "?"),
+        frozen,
+        current_price,
+    )
+
+
 class OrderService:
     @classmethod
     def get_order_by_id(cls, order_id: int) -> Order:
@@ -551,6 +580,8 @@ class OrderService:
                 else:
                     item_price = product_price
 
+                _log_price_drift_if_needed(cart_item, item_price)
+
                 # Create OrderItem
                 OrderItem.objects.create(
                     order=order,
@@ -1001,6 +1032,8 @@ class OrderService:
                     item_price = Money(product_price.amount, target_currency)
                 else:
                     item_price = product_price
+
+                _log_price_drift_if_needed(cart_item, item_price)
 
                 # Create OrderItem
                 OrderItem.objects.create(

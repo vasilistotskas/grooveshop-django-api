@@ -283,18 +283,10 @@ def handle_order_status_changed(
     elif (
         new_status == OrderStatus.PROCESSING.value
         and order.is_paid
-        and not (order.metadata or {}).get("paid_signal_sent")
+        and not hasattr(order, "_paid_signal_sent")
     ):
-        # Persist the dedup flag in metadata so a re-fetched Order
-        # instance (e.g. a Celery task that re-loads the row before
-        # re-entering update_order_status) still sees it. The previous
-        # in-memory object.__setattr__ guard was invisible across
-        # instance boundaries.
         order_paid.send(sender=sender, order=order)
-        if not order.metadata:
-            order.metadata = {}
-        order.metadata["paid_signal_sent"] = True
-        order.save(update_fields=["metadata"])
+        object.__setattr__(order, "_paid_signal_sent", True)
         logger.debug("Sent order_paid signal for order %s", order.id)
 
     logger.info(

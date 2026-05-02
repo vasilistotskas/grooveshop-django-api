@@ -61,7 +61,11 @@ def _emit_password_changed(user, request=None) -> None:
         request.user = user
 
     # Patch the channel layer so _broadcast_force_logout is a no-op.
-    with patch("user.signals.get_channel_layer", return_value=None):
+    # ``get_channel_layer`` is imported lazily inside the helper, so the
+    # patch must target ``channels.layers.get_channel_layer`` (its source
+    # module) rather than ``user.signals.get_channel_layer`` — the latter
+    # is not a module attribute because the import is function-local.
+    with patch("channels.layers.get_channel_layer", return_value=None):
         password_changed.send(
             sender=User,
             request=request,
@@ -150,9 +154,9 @@ class TestRevokeKnoxTokensOnPasswordChange:
         )()
 
         with (
-            patch("user.signals.get_channel_layer", return_value=fake_layer),
+            patch("channels.layers.get_channel_layer", return_value=fake_layer),
             patch(
-                "user.signals.async_to_sync",
+                "asgiref.sync.async_to_sync",
                 side_effect=lambda fn: fn,
             ),
         ):
@@ -174,16 +178,23 @@ class TestRevocationSignalHandlerRegistration:
     def test_signal_handler_is_connected(self):
         """The receiver is registered with the expected dispatch_uid so it
         fires exactly once per signal emission (no duplicate registrations)."""
-        receivers = password_changed.receivers
-        dispatch_uids = [uid for _, uid in receivers]
-        # dispatch_uid is stored as a tuple (id, dispatch_uid_string) in Django's
-        # Signal.receivers list; the lookup key is a tuple (receiver_id, dispatch_uid)
-        # so we check the flat string representation.
-        uid_strings = [str(uid) for uid in dispatch_uids]
+        # Django's ``Signal.receivers`` items are 4-tuples in 5.x:
+        #   ((dispatch_uid_or_receiver_id, sender_id), weakref, ..., ...)
+        # The dispatch_uid (when supplied as a string at @receiver registration
+        # time) sits at ``lookup_key[0]``; receiver_id (when no dispatch_uid)
+        # is also at ``lookup_key[0]`` but as an int.  Filter to strings only
+        # — those are the explicitly-named handlers.
+        dispatch_uids = []
+        for entry in password_changed.receivers:
+            lookup_key = entry[0] if isinstance(entry, tuple) else entry
+            if isinstance(lookup_key, tuple) and len(lookup_key) >= 1:
+                first = lookup_key[0]
+                if isinstance(first, str):
+                    dispatch_uids.append(first)
         assert any(
-            "user.revoke_knox_tokens_on_password_change" in s
-            for s in uid_strings
+            "user.revoke_knox_tokens_on_password_change" == s
+            for s in dispatch_uids
         ), (
             "Expected dispatch_uid 'user.revoke_knox_tokens_on_password_change' "
-            f"to be registered on password_changed. Found: {uid_strings}"
+            f"to be registered on password_changed. Found dispatch_uids: {dispatch_uids}"
         )

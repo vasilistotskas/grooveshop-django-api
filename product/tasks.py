@@ -7,6 +7,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.db import models
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.html import escape
 from django.utils.translation import gettext_lazy as _
 
 from core import celery_app
@@ -356,12 +357,14 @@ def _send_product_alert_email(
     except Exception:  # noqa: BLE001 — template may not exist yet
         # Minimal plain-text fallback keeps the feature working even if
         # the dedicated template has not been authored yet.
-        text_content = (
-            f"{subject}\n\nCheck it out: {context.get('product_url', '')}\n"
-        )
+        # Strip CR/LF from subject so it cannot be used for header
+        # injection if the caller ever passes it directly into headers.
+        safe_subject = subject.replace("\r", "").replace("\n", "")
+        product_url = context.get("product_url", "")
+        text_content = f"{safe_subject}\n\nCheck it out: {product_url}\n"
         html_content = (
-            f"<p>{subject}</p>"
-            f"<p><a href='{context.get('product_url', '')}'>View product</a></p>"
+            f"<p>{escape(safe_subject)}</p>"
+            f"<p><a href='{escape(product_url)}'>View product</a></p>"
         )
 
     headers: dict[str, str] | None = None
@@ -435,6 +438,9 @@ def send_product_alert_restock(product_id: int) -> dict:
             "product_name": product_name,
             "product_url": product_url,
             "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
         subject = _("[{site}] {name} is back in stock").format(
             site=settings.SITE_NAME, name=product_name
@@ -493,6 +499,7 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
         is_active=True,
         notified_at__isnull=True,
         target_price__gte=new_price_dec,
+        target_price_currency=getattr(settings, "DEFAULT_CURRENCY", "EUR"),
     ).select_related("user")
 
     sent = 0
@@ -509,6 +516,9 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
             "new_price": new_price,
             "target_price": str(alert.target_price.amount),
             "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
         subject = _("[{site}] Price drop: {name} is now at your target").format(
             site=settings.SITE_NAME, name=product_name

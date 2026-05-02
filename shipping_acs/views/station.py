@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db.models import Q
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+)
 from rest_framework import filters, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
@@ -155,7 +159,24 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
                 type=str,
             ),
         ],
-        responses={200: AcsStationSerializer(many=True)},
+        responses={
+            200: OpenApiResponse(
+                # Use a single-item serializer reference: drf-spectacular
+                # wraps many=True in the pagination envelope when the
+                # viewset carries a pagination_class.  Passing the raw
+                # component ref inside a manually-constructed array schema
+                # bypasses that wrapping so the spec reflects the bare
+                # array the view actually returns.
+                response={
+                    "type": "array",
+                    "items": {"$ref": "#/components/schemas/AcsStation"},
+                },
+                description=(
+                    "Bare array of matching ACS station objects — "
+                    "not paginated."
+                ),
+            )
+        },
         tags=["ACS stations"],
     )
     @action(

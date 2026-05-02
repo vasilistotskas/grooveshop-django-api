@@ -23,10 +23,13 @@ class PayWayService:
     ) -> QuerySet:
         """Filter PayWays compatible with the chosen carrier + kind.
 
-        Each carrier owns its own pay-way compatibility rules — BoxNow
-        rejects COD at locker pickup (P411 from their API), ACS allows
-        COD on every kind. The dispatch goes through the registry so
-        adding ELTA / Speedex doesn't require editing this method.
+        Each carrier owns its own pay-way compatibility rules. Today
+        all registered carriers (BoxNow via PAY ON THE GO, ACS) accept
+        every active pay-way and pass through unchanged. The dispatch
+        still goes through the registry so a future carrier with hard
+        constraints (e.g. an integration that genuinely cannot collect
+        COD) can override ``filter_pay_ways`` without editing this
+        method or any caller.
 
         Args:
             queryset: Base PayWay queryset.

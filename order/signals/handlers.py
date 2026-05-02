@@ -283,10 +283,18 @@ def handle_order_status_changed(
     elif (
         new_status == OrderStatus.PROCESSING.value
         and order.is_paid
-        and not hasattr(order, "_paid_signal_sent")
+        and not (order.metadata or {}).get("paid_signal_sent")
     ):
+        # Persist the dedup flag in metadata so a re-fetched Order
+        # instance (e.g. a Celery task that re-loads the row before
+        # re-entering update_order_status) still sees it. The previous
+        # in-memory object.__setattr__ guard was invisible across
+        # instance boundaries.
         order_paid.send(sender=sender, order=order)
-        object.__setattr__(order, "_paid_signal_sent", True)
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata["paid_signal_sent"] = True
+        order.save(update_fields=["metadata"])
         logger.debug("Sent order_paid signal for order %s", order.id)
 
     logger.info(
@@ -405,13 +413,15 @@ def handle_order_item_post_save(
         hasattr(instance, "_original_quantity")
         and instance._original_quantity != instance.quantity
     ):
-        from django.db.models import F, Value
-        from django.db.models.functions import Greatest
+        from order.stock import StockManager  # noqa: PLC0415
 
         product = instance.product
         stock_difference = instance._original_quantity - instance.quantity
-        type(product).objects.filter(pk=product.pk).update(
-            stock=Greatest(F("stock") + stock_difference, Value(0))
+        StockManager.adjust_stock(
+            product=product,
+            delta=stock_difference,
+            reason="admin order item edit",
+            performed_by=None,
         )
 
         OrderItemHistory.log_quantity_change(
@@ -685,6 +695,10 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
             # metadata reservation, so parallel webhook deliveries or a
             # subsequent checkout.session.completed event cannot cause
             # a duplicate send.
+            # Direct .delay(): handle_payment_succeeded() has already
+            # returned and committed its own @transaction.atomic block;
+            # there is no outer transaction here so on_commit would be
+            # a no-op wrapper.  Both task dispatches use the same pattern.
             send_order_confirmation_email.delay(order.id)
 
             # Live notification for the same event. The event-level
@@ -693,11 +707,7 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
             # redeliveries; the task itself is a single INSERT, so this
             # is safe at-most-once per event.
             if order.user_id:
-                transaction.on_commit(
-                    lambda oid=order.id: notify_payment_confirmed_live.delay(
-                        oid
-                    )
-                )
+                notify_payment_confirmed_live.delay(order.id)
 
     except Exception as e:
         logger.error(
@@ -762,7 +772,11 @@ def handle_stripe_payment_failed(sender, **kwargs):
             )
             # Notify the customer so they can retry instead of silently
             # sitting on a broken order.
-            send_payment_failed_email.delay(order.id)
+            # Wrapped in on_commit: handle_payment_failed runs inside
+            # @transaction.atomic; the worker must see the committed row.
+            transaction.on_commit(
+                lambda oid=order.id: send_payment_failed_email.delay(oid)
+            )
 
             # Parallel live notification — same idempotency story as
             # the succeeded branch above (guarded by the event-level

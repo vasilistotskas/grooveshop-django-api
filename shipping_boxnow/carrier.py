@@ -149,7 +149,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
         BoxNow voucher PDF prints the real weight (BoxNow tariffs by
         weight bracket).
         """
-        from order.services import _compute_total_weight_grams
+        from shipping.utils import compute_total_weight_grams
 
         try:
             from shipping_boxnow.models import BoxNowLocker, BoxNowShipment
@@ -171,7 +171,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
 
         weight_grams = 0
         if items is not None:
-            weight_grams = _compute_total_weight_grams(items)
+            weight_grams = compute_total_weight_grams(items)
 
         locker = (
             BoxNowLocker.objects.filter(external_id=locker_id).first()

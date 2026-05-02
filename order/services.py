@@ -29,38 +29,16 @@ from order.models.stock_reservation import StockReservation
 from order.signals import order_refunded
 from order.stock import StockManager
 
+# Re-export under the legacy private name so existing tests keep
+# passing without churn. The canonical home is ``shipping.utils``;
+# new call sites should import from there.
+from shipping.utils import (
+    compute_total_weight_grams as _compute_total_weight_grams,
+)
+
 logger = logging.getLogger(__name__)
 
-
-def _compute_total_weight_grams(items) -> int:
-    """Sum the parcel weight (in grams) from an iterable of (product, qty) pairs.
-
-    BoxNow expects ``items[].weight`` in grams as a non-negative
-    integer (per BoxNow API §3.4). Each Product carries a
-    ``MeasurementField`` whose underlying ``measurement.measures.Mass``
-    type uses ``STANDARD_UNIT = 'g'`` — reading ``weight.g`` returns
-    the value in grams regardless of the unit it was originally stored
-    in (kg, lb, oz all convert through the standard).
-
-    Used at BoxNowShipment creation time across the three order-creation
-    code paths (``create_order``, ``create_order_from_cart``,
-    ``create_order_from_cart_offline``) so the voucher PDF prints the
-    real parcel weight instead of "0.00 kg" — BoxNow tariffs by weight
-    bracket, so getting this right matters for billing accuracy too.
-
-    Falls back to 0 only when the product has no weight set; never
-    raises so missing data can't block order creation.
-    """
-    total_grams = 0.0
-    for product, quantity in items:
-        if not product or not quantity:
-            continue
-        weight = getattr(product, "weight", None)
-        if not weight:
-            continue
-        grams_per_unit = float(getattr(weight, "g", 0) or 0)
-        total_grams += grams_per_unit * float(quantity)
-    return max(0, int(round(total_grams)))
+__all__ = ["OrderService", "_compute_total_weight_grams"]
 
 
 class OrderService:
@@ -244,6 +222,13 @@ class OrderService:
             ... )
         """
         try:
+            from cart.models import Cart  # noqa: PLC0415
+
+            # Lock the Cart row immediately so concurrent checkouts on the
+            # same cart are serialised.  Must happen before any reads so
+            # validate_cart_for_checkout sees the locked snapshot.
+            cart = Cart.objects.select_for_update().get(pk=cart.pk)
+
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
             if not validation_result.get("valid", False):
@@ -367,7 +352,11 @@ class OrderService:
             # handler schedules ``cart.delete()`` via ``transaction.on_commit``;
             # if anything causes that callback to fire before this loop
             # executes, the lazy queryset would resolve to zero rows.
-            cart_items = list(cart.get_items())
+            # Also lock the CartItem rows within the same transaction to
+            # prevent concurrent mutations while we process them.
+            cart_items = list(
+                cart.items.select_for_update().select_related("product")
+            )
 
             # Check if any reservations have expired
             expired_reservations = [r for r in reservations if r.is_expired]
@@ -497,10 +486,9 @@ class OrderService:
             cls._seed_language_code(order_data)
             order = Order.objects.create(**order_data)
 
-            cart_items_pairs = [
-                (ci.product, ci.quantity)
-                for ci in cart.items.select_related("product").all()
-            ]
+            # Reuse the already-locked/materialised cart_items list rather
+            # than issuing a second SELECT on the same rows.
+            cart_items_pairs = [(ci.product, ci.quantity) for ci in cart_items]
 
             # Provider-agnostic shipment row creation. The carrier
             # adapter reads its own keys out of ``shipping_address``
@@ -783,6 +771,13 @@ class OrderService:
             ... )
         """
         try:
+            from cart.models import Cart  # noqa: PLC0415
+
+            # Lock the Cart row immediately so concurrent checkouts on the
+            # same cart are serialised.  Must happen before any reads so
+            # validate_cart_for_checkout sees the locked snapshot.
+            cart = Cart.objects.select_for_update().get(pk=cart.pk)
+
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
             if not validation_result.get("valid", False):
@@ -808,7 +803,11 @@ class OrderService:
             # handler schedules ``cart.delete()`` via ``transaction.on_commit``;
             # if anything causes that callback to fire before this loop
             # executes, the lazy queryset would resolve to zero rows.
-            cart_items = list(cart.get_items())
+            # Also lock the CartItem rows within the same transaction to
+            # prevent concurrent mutations while we process them.
+            cart_items = list(
+                cart.items.select_for_update().select_related("product")
+            )
 
             # Check if any reservations have expired
             expired_reservations = [r for r in reservations if r.is_expired]
@@ -944,10 +943,9 @@ class OrderService:
                 order.payment_id = f"offline_{order.uuid}"
                 order.save(update_fields=["payment_id"])
 
-            cart_items_pairs = [
-                (ci.product, ci.quantity)
-                for ci in cart.items.select_related("product").all()
-            ]
+            # Reuse the already-locked/materialised cart_items list rather
+            # than issuing a second SELECT on the same rows.
+            cart_items_pairs = [(ci.product, ci.quantity) for ci in cart_items]
 
             # Provider-agnostic shipment row creation via the registry.
             from shipping.services import ShippingService
@@ -1819,7 +1817,10 @@ class OrderService:
         if not order.is_paid:
             raise PaymentError(_("This order has not been paid yet."))
 
-        if order.payment_status == PaymentStatus.REFUNDED:
+        if order.payment_status in (
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+        ):
             raise PaymentError(_("This order has already been refunded."))
 
         if not order.pay_way:
@@ -2189,21 +2190,49 @@ class OrderService:
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
         from order.payment_events import publish_payment_status
 
-        # Acquire the row lock with a plain query — ``for_detail()``
-        # adds GROUP BY for items_count / totals annotations and
-        # Postgres rejects ``FOR UPDATE`` against an aggregate query.
-        # We re-load with ``for_detail`` once we hold the lock so the
-        # rest of the pipeline (publish_payment_status, downstream
-        # serializers) sees the rich object.
-        try:
-            Order.objects.select_for_update().filter(
-                payment_id=payment_intent_id
-            ).first()
-        except Order.DoesNotExist:
-            pass
-        try:
-            order = Order.objects.for_detail().get(payment_id=payment_intent_id)
-        except Order.DoesNotExist:
+        # Acquire a row lock and hydrate related objects in one query.
+        # ``for_detail()`` adds COUNT/SUM annotations which Postgres
+        # rejects under FOR UPDATE (aggregate in locked query). We
+        # replicate the select_related/prefetch_related chains from
+        # for_detail() manually, skipping with_counts() / with_total_amounts().
+        from django.db.models import Prefetch
+
+        from order.models.history import OrderHistory
+
+        # ``of=("self",)`` restricts the row lock to the Order table.
+        # Without it Postgres rejects the query with ``FOR UPDATE cannot
+        # be applied to the nullable side of an outer join`` because
+        # several of the FKs on Order are nullable (user, pay_way,
+        # country, region, shipping_provider) and ``select_related``
+        # joins them with LEFT OUTER JOIN.
+        order = (
+            Order.objects.select_for_update(of=("self",))
+            .select_related(
+                "user",
+                "pay_way",
+                "country",
+                "region",
+                "shipping_provider",
+            )
+            .prefetch_related(
+                "items__product__translations",
+                "items__product__images__translations",
+                Prefetch(
+                    "history",
+                    queryset=OrderHistory.objects.select_related(
+                        "user"
+                    ).order_by("created_at"),
+                ),
+                "boxnow_shipment",
+                "acs_shipment",
+                "acs_shipment__events",
+                "acs_shipment__station_destination",
+                "invoice",
+            )
+            .filter(payment_id=payment_intent_id)
+            .first()
+        )
+        if order is None:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
             )
@@ -2244,15 +2273,20 @@ class OrderService:
     def handle_payment_failed(cls, payment_intent_id: str) -> Order | None:
         from order.payment_events import publish_payment_status
 
-        try:
-            Order.objects.select_for_update().filter(
-                payment_id=payment_intent_id
-            ).first()
-        except Order.DoesNotExist:
-            pass
-        try:
-            order = Order.objects.for_detail().get(payment_id=payment_intent_id)
-        except Order.DoesNotExist:
+        # ``of=("self",)`` — see ``handle_payment_succeeded`` for why.
+        order = (
+            Order.objects.select_for_update(of=("self",))
+            .select_related(
+                "user",
+                "pay_way",
+                "country",
+                "region",
+                "shipping_provider",
+            )
+            .filter(payment_id=payment_intent_id)
+            .first()
+        )
+        if order is None:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
             )

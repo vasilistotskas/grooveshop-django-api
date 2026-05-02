@@ -830,6 +830,7 @@ class BoxNowService:
                 NotificationCategoryEnum,
                 NotificationKindEnum,
                 NotificationPriorityEnum,
+                NotificationTypeEnum,
             )
             from notification.services import (  # noqa: PLC0415
                 create_user_notification,
@@ -849,7 +850,7 @@ class BoxNowService:
                 kind=NotificationKindEnum.SUCCESS,
                 category=NotificationCategoryEnum.SHIPPING,
                 priority=NotificationPriorityEnum.NORMAL,
-                notification_type="BOXNOW_PARCEL_DELIVERED",
+                notification_type=NotificationTypeEnum.BOXNOW_PARCEL_DELIVERED,
                 link=f"/account/orders/{order.id}",
             )
         except Exception:

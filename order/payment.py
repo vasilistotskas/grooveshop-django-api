@@ -128,10 +128,10 @@ class StripePaymentProvider(PaymentProvider):
             shipping_price = kwargs.pop("shipping_price", None)
             if shipping_price and shipping_price.amount > 0:
                 line_item_amount = int(
-                    (amount.amount - shipping_price.amount) * 100
+                    round((amount.amount - shipping_price.amount) * 100)
                 )
             else:
-                line_item_amount = int(amount.amount * 100)
+                line_item_amount = int(round(amount.amount * 100))
 
             success_url = kwargs.get("success_url")
             cancel_url = kwargs.get("cancel_url")
@@ -176,7 +176,9 @@ class StripePaymentProvider(PaymentProvider):
                         "shipping_rate_data": {
                             "type": "fixed_amount",
                             "fixed_amount": {
-                                "amount": int(shipping_price.amount * 100),
+                                "amount": int(
+                                    round(shipping_price.amount * 100)
+                                ),
                                 "currency": currency_code,
                             },
                             "display_name": "Standard shipping",
@@ -262,7 +264,7 @@ class StripePaymentProvider(PaymentProvider):
                 },
             )
 
-            stripe_amount = int(amount.amount * 100)
+            stripe_amount = int(round(amount.amount * 100))
             currency_code = str(amount.currency).lower()
 
             # Build comprehensive metadata for tracking
@@ -383,7 +385,7 @@ class StripePaymentProvider(PaymentProvider):
 
             refund_params: dict[str, str | int] = {"payment_intent": payment_id}
             if amount:
-                refund_params["amount"] = int(amount.amount * 100)
+                refund_params["amount"] = int(round(amount.amount * 100))
             stripe_refund = stripe.Refund.create(**refund_params)
 
             try:
@@ -430,13 +432,8 @@ class StripePaymentProvider(PaymentProvider):
                 extra={"payment_id": payment_id},
             )
 
-            try:
-                djstripe_pi = PaymentIntent.objects.get(id=payment_id)
-                stripe_pi = stripe.PaymentIntent.retrieve(payment_id)
-                djstripe_pi = PaymentIntent.sync_from_stripe_data(stripe_pi)
-            except PaymentIntent.DoesNotExist:
-                stripe_pi = stripe.PaymentIntent.retrieve(payment_id)
-                djstripe_pi = PaymentIntent.sync_from_stripe_data(stripe_pi)
+            stripe_pi = stripe.PaymentIntent.retrieve(payment_id)
+            djstripe_pi = PaymentIntent.sync_from_stripe_data(stripe_pi)
 
             status = self._map_stripe_status(stripe_pi.status)
             status_data = {
@@ -585,7 +582,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
             )
 
             access_token = self._get_access_token()
-            viva_amount = int(amount.amount * 100)
+            viva_amount = int(round(amount.amount * 100))
 
             payload = {
                 "amount": viva_amount,
@@ -681,7 +678,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
 
             params = {}
             if amount:
-                params["amount"] = int(amount.amount * 100)
+                params["amount"] = int(round(amount.amount * 100))
 
             response = requests.delete(
                 f"{self.transactions_url}/api/transactions/{payment_id}",
@@ -808,93 +805,30 @@ class PayPalPaymentProvider(PaymentProvider):
     def create_checkout_session(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
-        return False, {"error": "Checkout sessions not supported for PayPal"}
+        raise NotImplementedError(
+            "PayPal provider is not yet implemented; use Stripe or Viva"
+        )
 
     def process_payment(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
-        try:
-            logger.info(
-                "Processing PayPal payment",
-                extra={
-                    "amount": str(amount.amount),
-                    "currency": str(amount.currency),
-                    "order_id": order_id,
-                },
-            )
-
-            payment_data = {
-                "payment_id": f"PP_{order_id}_mock",
-                "status": PaymentStatus.COMPLETED,
-                "amount": str(amount.amount),
-                "currency": str(amount.currency),
-                "provider": "paypal",
-            }
-
-            return True, payment_data
-
-        except Exception as e:
-            logger.error(
-                f"PayPal payment processing failed: {e!s}",
-                extra={"order_id": order_id, "error": str(e)},
-                exc_info=True,
-            )
-            return False, {"error": str(e)}
+        raise NotImplementedError(
+            "PayPal provider is not yet implemented; use Stripe or Viva"
+        )
 
     def refund_payment(
         self, payment_id: str, amount: Money | None = None
     ) -> tuple[bool, dict[str, Any]]:
-        try:
-            logger.info(
-                "Processing PayPal refund",
-                extra={
-                    "payment_id": payment_id,
-                    "amount": str(amount.amount) if amount else "full",
-                },
-            )
-
-            refund_data = {
-                "refund_id": f"PP_RE_{payment_id}_mock",
-                "status": PaymentStatus.REFUNDED,
-                "amount": str(amount.amount) if amount else "full refund",
-                "payment_id": payment_id,
-            }
-
-            return True, refund_data
-
-        except Exception as e:
-            logger.error(
-                f"PayPal refund failed: {e!s}",
-                extra={"payment_id": payment_id, "error": str(e)},
-                exc_info=True,
-            )
-            return False, {"error": str(e)}
+        raise NotImplementedError(
+            "PayPal provider is not yet implemented; use Stripe or Viva"
+        )
 
     def get_payment_status(
         self, payment_id: str
     ) -> tuple[PaymentStatus, dict[str, Any]]:
-        try:
-            logger.info(
-                "Getting PayPal payment status",
-                extra={"payment_id": payment_id},
-            )
-
-            status = PaymentStatus.COMPLETED
-            status_data = {
-                "payment_id": payment_id,
-                "raw_status": "COMPLETED",
-                "provider": "paypal",
-            }
-
-            return status, status_data
-
-        except Exception as e:
-            logger.error(
-                f"Failed to get PayPal payment status: {e!s}",
-                extra={"payment_id": payment_id, "error": str(e)},
-                exc_info=True,
-            )
-            return PaymentStatus.FAILED, {"error": str(e)}
+        raise NotImplementedError(
+            "PayPal provider is not yet implemented; use Stripe or Viva"
+        )
 
 
 def get_payment_provider(provider_name: str) -> PaymentProvider:

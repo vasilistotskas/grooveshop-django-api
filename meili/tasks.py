@@ -357,11 +357,9 @@ def reindex_model_task(
         total_filtered = 0
         tasks = []
 
-        # Process in batches
-        for start in range(0, total_count, batch_size):
-            batch = queryset[start : start + batch_size]
+        def _process_batch(batch: list) -> None:
+            nonlocal total_indexed, total_filtered
             documents = []
-
             for instance in batch:
                 if not instance.meili_filter():
                     total_filtered += 1
@@ -390,16 +388,34 @@ def reindex_model_task(
                 tasks.append(task)
                 total_indexed += len(documents)
 
-            # Update task progress
-            progress = min(100, int((start + batch_size) / total_count * 100))
-            self.update_state(
-                state="PROGRESS",
-                meta={
-                    "current": start + batch_size,
-                    "total": total_count,
-                    "percent": progress,
-                },
-            )
+        # Iterator-based batching avoids the LIMIT/OFFSET O(n²) scan:
+        # each OFFSET N forces Postgres to scan and discard N rows before
+        # returning the next batch.  .iterator() streams rows in a single
+        # server-side cursor pass; we buffer them manually into chunks
+        # matching batch_size before sending to Meilisearch.
+        current_batch: list = []
+        processed = 0
+        for instance in queryset.iterator(chunk_size=batch_size):
+            current_batch.append(instance)
+            if len(current_batch) >= batch_size:
+                _process_batch(current_batch)
+                processed += len(current_batch)
+                current_batch = []
+                progress = min(
+                    100,
+                    int(processed / total_count * 100) if total_count else 100,
+                )
+                self.update_state(
+                    state="PROGRESS",
+                    meta={
+                        "current": processed,
+                        "total": total_count,
+                        "percent": progress,
+                    },
+                )
+        if current_batch:
+            _process_batch(current_batch)
+            processed += len(current_batch)
 
         # Wait for all tasks
         failed_tasks = []

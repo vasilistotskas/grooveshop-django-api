@@ -40,7 +40,10 @@ def authenticate_ticket(ticket: str):
     # Resolve the Django-prefixed Redis key that the cache layer stored.
     prefixed_key = cache.make_and_validate_key(raw_key)
 
-    # Atomic GETDEL — returns bytes or None.
+    # ``cache._cache.get_client`` is Django's built-in RedisCacheClient
+    # public API (since 4.0) — calling ``getdel`` on it is the atomic
+    # single round-trip we want here. Direct ``cache.get`` + ``cache.
+    # delete`` would race under concurrent connect attempts.
     raw_value: bytes | None = cache._cache.get_client(
         prefixed_key, write=True
     ).getdel(prefixed_key)

@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from threading import Lock
+from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 
@@ -28,6 +29,33 @@ if TYPE_CHECKING:
     from facebook_business.adobjects.serverside.event import Event
 
 logger = logging.getLogger(__name__)
+
+# Cache the configured FacebookAdsApi instance keyed by (token, version)
+# so we don't re-init the global SDK state on every dispatch. The Celery
+# task pool may re-enter ``send`` concurrently; the lock prevents two
+# workers from racing on the same dict during the cold-cache window.
+_api_cache: dict[tuple[str, str], Any] = {}
+_api_cache_lock = Lock()
+
+
+def _get_api(access_token: str, api_version: str) -> Any:
+    cache_key = (access_token, api_version)
+    cached = _api_cache.get(cache_key)
+    if cached is not None:
+        return cached
+    with _api_cache_lock:
+        cached = _api_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        from facebook_business.api import FacebookAdsApi  # noqa: PLC0415
+
+        api = FacebookAdsApi.init(
+            access_token=access_token,
+            api_version=api_version,
+            crash_log=False,
+        )
+        _api_cache[cache_key] = api
+        return api
 
 
 @dataclass(frozen=True)
@@ -86,13 +114,12 @@ class MetaCapiClient:
         from facebook_business.adobjects.serverside.event_request import (
             EventRequest,
         )
-        from facebook_business.api import FacebookAdsApi
         from facebook_business.exceptions import FacebookRequestError
 
-        FacebookAdsApi.init(
-            access_token=self.access_token,
-            api_version=self.api_version,
-        )
+        # Init is cached so repeated dispatches don't reinitialise the
+        # global SDK state on every event. EventRequest reads the
+        # default api at execute() time.
+        _get_api(self.access_token, self.api_version)
 
         request = EventRequest(
             events=events,

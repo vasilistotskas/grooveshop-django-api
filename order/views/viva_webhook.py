@@ -1,3 +1,4 @@
+import hashlib
 import ipaddress
 import json
 import logging
@@ -5,9 +6,16 @@ from base64 import b64encode
 
 import requests
 from django.conf import settings
+from django.core.cache import cache
+from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.views import APIView
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory
@@ -45,27 +53,44 @@ VIVA_WEBHOOK_IPS_DEMO = [
 ]
 
 
-@require_http_methods(["GET"])
-def resolve_viva_order_code(request):
+class _ResolveOrderThrottle(UserRateThrottle):
+    """60 resolutions per hour per authenticated user."""
+
+    scope = "viva_resolve_order"
+    rate = "60/hour"
+
+
+class resolve_viva_order_code(APIView):  # noqa: N801  (function-style name kept for URL conf compat)
     """Resolve a Viva Wallet order code to an order UUID.
 
-    Used by the frontend to redirect from Viva's payment page
-    to the order success page.
+    Used by the frontend to redirect from Viva's payment page to the
+    order success page. Requires authentication so anonymous callers
+    cannot enumerate order UUIDs by brute-forcing order codes.
     """
-    order_code = request.GET.get("order_code", "")
-    if not order_code:
-        return JsonResponse({"error": "order_code required"}, status=400)
 
-    order = (
-        Order.objects.filter(metadata__viva_order_code=str(order_code))
-        .values("uuid")
-        .first()
-    )
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [_ResolveOrderThrottle]
 
-    if not order:
-        return JsonResponse({"error": "not found"}, status=404)
+    def get(self, request, *args, **kwargs):
+        order_code = request.query_params.get("order_code", "")
+        if not order_code:
+            return Response(
+                {"error": "order_code required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-    return JsonResponse({"uuid": str(order["uuid"])})
+        order = (
+            Order.objects.filter(metadata__viva_order_code=str(order_code))
+            .values("uuid")
+            .first()
+        )
+
+        if not order:
+            return Response(
+                {"error": "not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        return Response({"uuid": str(order["uuid"])})
 
 
 @csrf_exempt
@@ -76,7 +101,39 @@ def viva_wallet_webhook(request):
     return _handle_webhook_event(request)
 
 
+def _webhook_get_rate_limit(request) -> bool:
+    """Return True when the request should be blocked.
+
+    Applies a 10-req/hour per-IP cap on the GET verification endpoint.
+    Fails open on cache errors so a Redis outage doesn't take down
+    Viva's handshake.
+
+    TODO: replace with a strict Viva IP allowlist once the cluster's
+    externalTrafficPolicy is set to Local so REMOTE_ADDR carries the
+    real Viva IP (currently SNAT-ed to node IP by K3s/Flannel).
+    Reference: VIVA_WEBHOOK_IPS_PRODUCTION / VIVA_WEBHOOK_IPS_DEMO.
+    """
+    ip = request.META.get("HTTP_X_REAL_IP", "").strip() or request.META.get(
+        "REMOTE_ADDR", ""
+    )
+    key = "viva_wh_get:" + hashlib.sha256(ip.encode()).hexdigest()[:24]
+    try:
+        cache.add(key, 0, 3600)
+        count = cache.incr(key)
+        return count > 10
+    except Exception:
+        logger.warning("viva_webhook GET rate-limit: cache error, failing open")
+        return False
+
+
 def _handle_verification(request):
+    if _webhook_get_rate_limit(request):
+        logger.warning(
+            "Viva webhook GET rate limit hit | remote_addr=%s",
+            request.META.get("REMOTE_ADDR", ""),
+        )
+        return JsonResponse({"error": "Too many requests"}, status=429)
+
     logger.info(
         "Viva webhook GET verification request | "
         "remote_addr=%s | x-forwarded-for=%s",
@@ -265,14 +322,30 @@ def _handle_webhook_event(request):
         )
         return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-    logger.info("Viva webhook full payload: %s", json.dumps(body, default=str))
-
     event_data = body.get("EventData", {})
     event_type_id = body.get("EventTypeId")
 
     transaction_id = event_data.get("TransactionId", "")
     order_code = event_data.get("OrderCode")
     status_id = event_data.get("StatusId", "")
+
+    # Allowlisted log to avoid persisting PII (customer name, email,
+    # transaction details, amounts) into structured log aggregation —
+    # GDPR Art. 32. ``transaction_id`` is hashed because it can be
+    # replayed against Viva's Retrieve Transaction API.
+    txn_hash = (
+        hashlib.sha256(str(transaction_id).encode()).hexdigest()[:16]
+        if transaction_id
+        else ""
+    )
+    logger.info(
+        "Viva webhook payload | event_type=%s | order_code=%s | "
+        "status_id=%s | txn_hash=%s",
+        event_type_id,
+        order_code,
+        status_id,
+        txn_hash,
+    )
 
     logger.info(
         "Viva Wallet webhook parsed",
@@ -436,6 +509,41 @@ def _handle_payment_created(order, event_data, transaction_id):
         raise RuntimeError(
             f"Viva transaction verification failed for {transaction_id}"
         )
+    # Defence in depth: confirm the verified transaction amount matches
+    # this order's total. Without this check an attacker who knows their
+    # own valid TransactionId and another user's OrderCode could replay
+    # a low-value transaction against a high-value order — the IP gate
+    # is non-blocking and the Retrieve Transaction API only proves the
+    # transaction exists at Viva, not that it was for this order.
+    verified_amount_raw = (
+        verified_data.get("amount") if isinstance(verified_data, dict) else None
+    )
+    if verified_amount_raw is not None:
+        try:
+            from decimal import Decimal  # noqa: PLC0415
+
+            verified_amount = Decimal(str(verified_amount_raw))
+            expected_amount = order.calculate_order_total_amount().amount
+            # Allow a 1-cent tolerance for any provider-side rounding.
+            if abs(verified_amount - expected_amount) > Decimal("0.01"):
+                logger.error(
+                    "Viva transaction %s amount mismatch: verified=%s "
+                    "expected=%s for order %s — refusing to mark as paid",
+                    transaction_id,
+                    verified_amount,
+                    expected_amount,
+                    order.id,
+                )
+                order.save(update_fields=["metadata"])
+                return
+        except (TypeError, ValueError, AttributeError):
+            logger.warning(
+                "Could not parse Viva verified amount %r for order %s — "
+                "proceeding with status-only verification.",
+                verified_amount_raw,
+                order.id,
+            )
+
     if verified_status != PaymentStatus.COMPLETED:
         logger.warning(
             "Viva transaction %s not completed (status: %s) — skipping",
@@ -506,7 +614,11 @@ def _handle_payment_created(order, event_data, transaction_id):
     # Payment verified by Viva Wallet — send the confirmation email now.
     # The task is idempotent (metadata reservation + row lock), so a
     # duplicate webhook delivery or a retry will not resend.
-    send_order_confirmation_email.delay(order.id)
+    # Wrapped in on_commit so the Celery worker always sees the committed
+    # payment_status / order.status rather than an in-flight row.
+    transaction.on_commit(
+        lambda oid=order.id: send_order_confirmation_email.delay(oid)
+    )
 
     # Enqueue the carrier's delivery-request creation. Provider-agnostic
     # dispatch through the registry — Stripe's ``handle_payment_succeeded``
@@ -545,11 +657,21 @@ def _handle_payment_failed(order, event_data, transaction_id):
 
     # Notify the customer so they can retry instead of silently sitting
     # on a broken order.
-    send_payment_failed_email.delay(order.id)
+    # Wrapped in on_commit so the worker sees the committed payment_status.
+    transaction.on_commit(
+        lambda oid=order.id: send_payment_failed_email.delay(oid)
+    )
 
 
 def _handle_reversal_created(order, event_data, transaction_id):
-    from django.utils import timezone
+    """Mirrors ``handle_stripe_charge_refunded``: only ``payment_status``
+    transitions, an audit row lands in ``metadata['refunds']``, and
+    ``order_refunded`` fires so the refund email, live WS toast, and Meta
+    CAPI Refund event all run. ``Order.status`` is left untouched —
+    deciding whether a reversal also means the goods are returned is a
+    business call the admin owns.
+    """
+    from order.signals import order_refunded
 
     logger.info(
         "Viva Wallet reversal created for order %s",
@@ -558,17 +680,19 @@ def _handle_reversal_created(order, event_data, transaction_id):
 
     previous_payment_status = order.payment_status
 
-    order.payment_status = PaymentStatus.REFUNDED
-    order.status = OrderStatus.REFUNDED
-    order.status_updated_at = timezone.now()
-    order.save(
-        update_fields=[
-            "payment_status",
-            "status",
-            "status_updated_at",
-            "metadata",
-        ]
+    if not order.metadata:
+        order.metadata = {}
+    refunds = list(order.metadata.get("refunds") or [])
+    refunds.append(
+        {
+            "reversal_transaction_id": transaction_id,
+            "provider": "viva_wallet",
+        }
     )
+    order.metadata["refunds"] = refunds
+    order.payment_status = PaymentStatus.REFUNDED
+
+    order.save(update_fields=["payment_status", "metadata"])
 
     OrderHistory.log_payment_update(
         order=order,
@@ -581,3 +705,5 @@ def _handle_reversal_created(order, event_data, transaction_id):
             "provider": "viva_wallet",
         },
     )
+
+    order_refunded.send(sender=Order, order=order)

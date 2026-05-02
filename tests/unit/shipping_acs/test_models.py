@@ -22,8 +22,14 @@ def test_voucher_no_unique_allows_multiple_pending_creation_rows():
     Verifies the null=True UNIQUE constraint pattern (Postgres treats
     NULL as distinct), matching BoxNow's idempotency model.
     """
-    order_a = OrderFactory()
-    order_b = OrderFactory()
+    from order.enum.status import OrderStatus, PaymentStatus
+
+    order_a = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
+    order_b = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
     AcsShipmentFactory(order=order_a)
     AcsShipmentFactory(order=order_b)
 
@@ -32,10 +38,16 @@ def test_voucher_no_unique_allows_multiple_pending_creation_rows():
 
 
 def test_voucher_no_unique_rejects_duplicate_assigned_numbers():
-    order_a = OrderFactory()
+    from order.enum.status import OrderStatus, PaymentStatus
+
+    order_a = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
     AcsShipmentFactory(order=order_a, voucher_no="7227891234")
 
-    order_b = OrderFactory()
+    order_b = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
     with pytest.raises(Exception):
         AcsShipmentFactory(order=order_b, voucher_no="7227891234")
 

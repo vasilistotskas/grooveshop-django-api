@@ -339,6 +339,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
         NotificationCategoryEnum,
         NotificationKindEnum,
         NotificationPriorityEnum,
+        NotificationTypeEnum,
     )
     from notification.services import create_user_notification
     from shipping_acs.models import AcsShipment
@@ -405,7 +406,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
                     kind=NotificationKindEnum.SUCCESS,
                     category=NotificationCategoryEnum.SHIPPING,
                     priority=NotificationPriorityEnum.HIGH,
-                    notification_type="ACS_OUT_FOR_DELIVERY",
+                    notification_type=NotificationTypeEnum.ACS_OUT_FOR_DELIVERY,
                     link=f"/account/orders/{order.id}",
                 )
         except Exception as exc:

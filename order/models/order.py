@@ -298,6 +298,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
                 name="order_paystatus_created_ix",
             ),
             BTreeIndex(
+                fields=["status", "-created_at"],
+                name="order_status_created_ix",
+            ),
+            BTreeIndex(
                 fields=["tracking_number"], name="order_tracking_num_ix"
             ),
             BTreeIndex(fields=["payment_id"], name="order_payment_id_ix"),

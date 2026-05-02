@@ -1,4 +1,4 @@
-"""Unit tests for ``_compute_total_weight_grams`` in order/services.py.
+"""Unit tests for ``compute_total_weight_grams`` in shipping/utils.py.
 
 The helper computes the parcel weight that lands on
 ``BoxNowShipment.weight_grams`` (and from there into the BoxNow
@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
-from order.services import _compute_total_weight_grams
+from shipping.utils import (
+    compute_total_weight_grams as _compute_total_weight_grams,
+)
 
 
 def _mk_product(grams: float | None) -> Mock:

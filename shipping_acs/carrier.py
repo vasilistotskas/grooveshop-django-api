@@ -138,7 +138,7 @@ class AcsCarrier(ShippingCarrierInterface):
         Idempotent — re-runs are no-ops because the order already has
         a row at that point.
         """
-        from order.services import _compute_total_weight_grams
+        from shipping.utils import compute_total_weight_grams
         from shipping_acs.enum.charge_type import AcsChargeType
         from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
 
@@ -179,7 +179,7 @@ class AcsCarrier(ShippingCarrierInterface):
         item_quantity = 1
         if items is not None:
             items_list = list(items)
-            weight_grams = _compute_total_weight_grams(items_list)
+            weight_grams = compute_total_weight_grams(items_list)
             item_quantity = max(sum(int(q or 0) for _, q in items_list) or 1, 1)
 
         station = None
@@ -316,9 +316,23 @@ class AcsCarrier(ShippingCarrierInterface):
         )
         if amount_raw is None:
             return None
+        # ACS responses follow the same Greek locale as their request
+        # body: comma-decimal. ``float("47,01")`` raises ValueError so
+        # without the swap every live quote silently falls back to the
+        # flat rate.
+        normalised = (
+            amount_raw.replace(",", ".")
+            if isinstance(amount_raw, str)
+            else amount_raw
+        )
         try:
-            amount = float(amount_raw)
+            amount = float(normalised)
         except (TypeError, ValueError):
+            logger.warning(
+                "Could not parse ACS price quote amount %r — "
+                "falling back to flat rate.",
+                amount_raw,
+            )
             return None
 
         cache.set(cache_key, amount, timeout=300)

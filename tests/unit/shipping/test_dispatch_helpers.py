@@ -13,6 +13,7 @@ from unittest.mock import patch
 import pytest
 from django.db import transaction
 
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from shipping.factories import ShippingProviderFactory
 from shipping.services import ShippingService
@@ -36,7 +37,9 @@ def _attach_provider(order, code):
 def test_create_shipment_row_dispatches_to_boxnow_carrier():
     """When the order has provider=boxnow, the BoxNow carrier's
     create_shipment_row hook is invoked with the right kind + payload."""
-    order = OrderFactory()
+    order = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
     _attach_provider(order, "boxnow")
 
     with patch(
@@ -56,7 +59,9 @@ def test_create_shipment_row_dispatches_to_boxnow_carrier():
 def test_create_shipment_row_no_op_when_provider_unset():
     """Orders with no FK + no legacy method → adapter lookup returns
     None → service is a no-op (does not crash)."""
-    order = OrderFactory()  # no shipping_provider set
+    order = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )  # no shipping_provider set
     # Should not raise.
     ShippingService.create_shipment_row_for_order(order)
 
@@ -64,7 +69,9 @@ def test_create_shipment_row_no_op_when_provider_unset():
 def test_dispatch_task_dispatches_to_boxnow_via_provider_fk():
     """Orders with shipping_provider=boxnow attached dispatch through
     the BoxNow carrier's Celery task hook."""
-    order = OrderFactory()
+    order = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
     _attach_provider(order, "boxnow")
 
     with patch(
@@ -76,7 +83,9 @@ def test_dispatch_task_dispatches_to_boxnow_via_provider_fk():
 
 
 def test_dispatch_task_dispatches_to_acs_via_provider_fk():
-    order = OrderFactory()
+    order = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
     _attach_provider(order, "acs")
 
     with patch(
@@ -90,7 +99,9 @@ def test_dispatch_task_dispatches_to_acs_via_provider_fk():
 def test_dispatch_task_no_op_for_orders_without_provider():
     """Orders without a shipping_provider attached (e.g. legacy data,
     home delivery without a courier) must silently no-op."""
-    order = OrderFactory()  # no shipping_provider
+    order = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )  # no shipping_provider
 
     # Should not raise; nothing to assert beyond "no exception".
     ShippingService.dispatch_create_shipment_task(order)
@@ -107,7 +118,9 @@ def test_dispatch_task_does_not_fire_when_outer_txn_rolls_back():
     47, 2026-04-30). This test rolls the outer transaction back and
     asserts the carrier's per-provider dispatcher was never reached.
     """
-    order = OrderFactory()
+    order = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
     _attach_provider(order, "boxnow")
 
     with patch(
@@ -128,7 +141,9 @@ def test_dispatch_task_fires_when_outer_txn_commits():
     """Positive case: when the outer atomic block commits cleanly,
     the on_commit callback runs and the carrier's dispatcher is
     invoked exactly once."""
-    order = OrderFactory()
+    order = OrderFactory(
+        status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+    )
     _attach_provider(order, "boxnow")
 
     with patch(

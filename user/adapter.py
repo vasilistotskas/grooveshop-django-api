@@ -103,9 +103,35 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
                 "provider": sociallogin.account.provider,
             },
         )
-        # Redirect the browser to the allauth headless MFA URL so the user
-        # completes the second factor before a session/Knox token is issued.
-        # ImmediateHttpResponse aborts allauth's login pipeline cleanly.
+        # TODO(maintainers): This redirect is incorrect for headless allauth.
+        #
+        # Problem: ``ImmediateHttpResponse(HttpResponseRedirect(...))`` issues
+        # a browser redirect to ``/account/security/2fa``.  In headless mode
+        # allauth has no pending-login state at that URL — the Nuxt page
+        # receives the redirect but has no allauth session it can resume, so
+        # the user sees the security page without any actionable prompt.
+        #
+        # Correct headless pattern: remove this entire ``pre_social_login``
+        # override and rely on allauth's ``AuthenticateStage``
+        # (``allauth.mfa.stages``).  The stage pipeline is triggered
+        # automatically after social login completes and its
+        # ``_should_handle`` already calls
+        # ``is_mfa_enabled(user, [TOTP, WEBAUTHN])``, emitting a 401
+        # ``{"flows": [{"id": "mfa_authenticate", "is_pending": true}]}``
+        # JSON envelope that the Nuxt ``useAuth`` composable handles.
+        #
+        # The ``has_mfa`` guard and this block are therefore entirely
+        # redundant once the stage pipeline is trusted.  The correct fix
+        # is to delete this method, but it requires verifying that:
+        #   1. The Nuxt social-login callback path (``/account/login/callback``)
+        #      inspects the 401 pending-flows response.
+        #   2. The TOTP challenge screen is reachable from that callback before
+        #      the session expires.
+        # Until that Nuxt-side verification is done, keep the redirect as a
+        # hard block (MFA user cannot complete social login at all, which is
+        # better than silently bypassing the second factor).
+        #
+        # Audit ref: cleanup-2026-05-02 / Fix 2.
         mfa_url = f"{settings.NUXT_BASE_URL}/account/security/2fa"
         raise ImmediateHttpResponse(HttpResponseRedirect(mfa_url))
 

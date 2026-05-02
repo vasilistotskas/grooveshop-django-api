@@ -120,10 +120,13 @@ def sync_boxnow_lockers(self) -> dict[str, int]:
     from shipping_boxnow.services import BoxNowService
 
     result = BoxNowService.sync_lockers()
+    # ``extra=result`` would crash because ``result['created']`` collides with
+    # ``LogRecord.created`` (built-in timestamp attribute, raises KeyError in
+    # ``Logger.makeRecord``). Namespace the counters under a wrapper key.
     logger.info(
         "BoxNow locker sync complete: %s",
         result,
-        extra=result,
+        extra={"counters": result},
     )
     return result
 

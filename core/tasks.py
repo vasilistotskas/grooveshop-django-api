@@ -614,10 +614,20 @@ def monitor_system_health():
         errors.append(error_msg)
 
     try:
-        test_file_path = os.path.join(settings.MEDIA_ROOT, ".health_check")
-        with open(test_file_path, "w") as f:
-            f.write("ok")
-        os.remove(test_file_path)
+        # Probe the configured default storage backend (S3 in prod via
+        # ``PrivateMediaStorage``, local FS in dev). Using
+        # ``default_storage`` instead of raw ``open(MEDIA_ROOT/...)`` so
+        # the check actually exercises the bucket the app writes to —
+        # the prod media volume isn't mounted on backend pods, so the
+        # local-FS path always failed even when S3 was healthy.
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+
+        probe_name = ".health_check"
+        if default_storage.exists(probe_name):
+            default_storage.delete(probe_name)
+        saved_name = default_storage.save(probe_name, ContentFile(b"ok"))
+        default_storage.delete(saved_name)
         health_checks["storage"] = True
         logger.debug("Storage health check passed")
 

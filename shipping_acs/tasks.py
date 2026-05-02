@@ -281,14 +281,27 @@ def reconcile_acs_cod_payouts(self) -> dict[str, int]:
     Scheduled daily via Celery beat (``reconcile-acs-cod-payouts``)
     after midnight Athens time so the data set is finalised.
     Idempotent on (voucher_no, cod_payment_date).
+
+    ``cod_payment_date`` defaults to **yesterday** (Athens time) — ACS
+    rejects an empty ``COD_Payment_Date`` with ``"Error fill data"`` and
+    the beat schedule fires at 02:30 Europe/Athens, by which point
+    yesterday's data is finalised on ACS' side.
     """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
     from shipping_acs.services import AcsService
 
-    result = AcsService.reconcile_cod_payouts()
+    yesterday = (timezone.localtime() - timedelta(days=1)).date()
+    result = AcsService.reconcile_cod_payouts(cod_payment_date=yesterday)
+    # ``extra=result`` would crash because ``result['created'/'updated']``
+    # collide with built-in ``LogRecord`` attributes. Namespace under a
+    # wrapper key so the structured fields stay queryable.
     logger.info(
         "ACS COD reconciliation complete: %s",
         result,
-        extra=result,
+        extra={"counters": result},
     )
     return result
 

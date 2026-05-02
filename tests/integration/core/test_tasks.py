@@ -697,10 +697,14 @@ class TestMonitorSystemHealthTask:
         mock_cache.set.return_value = None
         mock_cache.get.return_value = "ok"
 
-        mock_open_obj = mock_open()
-        mock_open_obj.side_effect = OSError("Storage error")
-
-        with patch("core.tasks.open", mock_open_obj):
+        # The storage probe uses ``default_storage`` (django.core.files.storage)
+        # rather than raw ``open(MEDIA_ROOT/...)`` so it exercises the same
+        # backend the app writes to (S3 in prod).  Patch ``save`` to surface
+        # an OSError matching the ``except Exception`` branch in the task.
+        with patch(
+            "django.core.files.storage.default_storage.save",
+            side_effect=OSError("Storage error"),
+        ):
             result = monitor_system_health()
 
         assert result["status"] == "degraded"

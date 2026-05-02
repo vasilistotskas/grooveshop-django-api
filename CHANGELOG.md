@@ -3,6 +3,186 @@
 
 
 
+## v1.123.2 (2026-05-02)
+
+### Bug fixes
+
+* fix: comprehensive audit hardening pass (#4) ([`530e383`](https://github.com/vasilistotskas/grooveshop-django-api/commit/530e383a61905e4e9bbbac668b3f7bd2c67f54d8))
+
+* fix: comprehensive audit hardening pass
+
+Closes ~80 issues found in cross-service audit covering concurrency,
+security, schema correctness, performance, and test stability.
+
+Concurrency & data integrity:
+- Wrap 5 Celery .delay() calls in transaction.on_commit (Viva, Stripe, Meta CAPI)
+- handle_payment_succeeded uses the select_for_update lock instead of discarding
+- AcsService.cancel_voucher restructured into 3-phase claim/API/persist (no orphan vouchers)
+- Cart double-checkout race + merge_carts protected with select_for_update
+- StockManager.adjust_stock preserves audit log on admin OrderItem edits
+
+Security:
+- PayPal stub raises NotImplementedError (was auto-completing payments)
+- resolve_viva_order_code now @login_required + throttled (IDOR closed)
+- AllAuthRateLimitMiddleware fail-open on Redis errors
+- ProductImage content-type validation via PIL magic-byte
+- Synchronous Knox revoke in delete_account
+- ACCOUNT_REAUTHENTICATION_TIMEOUT enforced via did_recently_authenticate
+- TOKEN_LIMIT_PER_USER enforced in SessionTokenStrategy
+- StripeWebhookDebugMiddleware DEBUG-only
+- AllAuth rate-limiter IP precedence aligned with adapter
+
+Schema/contract:
+- ACS station/nearest endpoint declares array response
+- AcsStation lat/lng/maxWeightKg correctly typed as string
+- 3 notification enum values added (BOXNOW_PARCEL_AT_LOCKER, BOXNOW_PARCEL_DELIVERED, ACS_OUT_FOR_DELIVERY)
+- 6 missing email templates (product restock/price-drop, ACS out_for_delivery)
+- Notification copy de fallback chain (en→el)
+
+Correctness:
+- refund_order guards PARTIALLY_REFUNDED state
+- Product price-drop signal compares final_price (catches discount-only cuts)
+- ProductImage partial unique index for is_main with data dedup migration
+- ProductFavourite per-user cap (500) + bulk endpoint cap (100)
+- ProductAlert price-drop ORM filter is currency-aware
+- Money int(round()) truncation fix at 7 payment.py sites
+- cleanup_old_guest_carts only deletes empty carts
+
+Performance:
+- meili reindex_model_task .iterator() chunked (was O(n²) offset slicing)
+- Migrations 0031/0032 self-contained (no app-code import)
+
+Tests:
+- 17 new tests covering Knox revoke + ACS voucher TTL claim/orphan-prevention
+- 16 OrderFactory test calls now status-pinned per project memory
+
+Migrations: notification/0015 (enum), product/0033 (is_main partial unique with dedup)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`530e383`](https://github.com/vasilistotskas/grooveshop-django-api/commit/530e383a61905e4e9bbbac668b3f7bd2c67f54d8))
+
+* fix(audit): resolve PR-CI test regressions + finish Wave 2 pending items
+
+CI regressions fixed (caused by earlier audit changes):
+- Knox revoke tests + ACS voucher TTL test: patch ``channels.layers.get_channel_layer``
+  / ``asgiref.sync.async_to_sync`` instead of the wrong ``user.signals.*`` paths
+  (the imports are function-local, not module attributes).
+- ``test_signal_handler_is_connected``: handle Django 5.x receiver shape
+  (4-tuple with ``(dispatch_uid, sender_id)`` lookup_key, dispatch_uid at index 0).
+- Token unit tests: bypass TOKEN_LIMIT_PER_USER pruning path via monkeypatch
+  fixture so they stay DB-free (the limit branch in ``SessionTokenStrategy``
+  queries ``AuthToken.objects.filter`` which would force ``django_db``).
+- PayPal test: now expects ``NotImplementedError`` (matches Wave 1F change).
+- Stripe payment-flow tests: revert ``paid_signal_sent`` dedup to use the
+  ``_paid_signal_sent`` attribute instead of metadata save — the metadata
+  save was triggering an extra post_save which doubled the email task call.
+
+Final Wave 2 pending items addressed:
+- Cart price drift: log a warning when ``cart_item.price_at_add`` differs
+  from the live ``product.final_price`` at order creation (observability
+  only, no behaviour change). Two call sites (online + COD) covered.
+- SocialAccountAdapter.pre_social_login override removed: the headless
+  AuthenticateStage already emits the ``mfa_authenticate`` 401 envelope
+  on social-login completion and the Nuxt storefront already routes it
+  via ``handleAllAuthError`` + ``Flow2path``. The override's hard
+  ImmediateHttpResponseRedirect was incorrect for headless mode.
+
+Resolves migration-ordering uncertainty: ``order/0038_drop_shipping_method``
++ ``product/0025_remove_product_code`` are both already in production
+via the deployed v1.123.0 image (verified with ``git merge-base
+--is-ancestor``); no action needed.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`530e383`](https://github.com/vasilistotskas/grooveshop-django-api/commit/530e383a61905e4e9bbbac668b3f7bd2c67f54d8))
+
+* fix(test): storage health-check test now patches default_storage.save
+
+``monitor_system_health`` switched from raw ``open(MEDIA_ROOT/...)`` to
+``default_storage.save(...)`` so the probe exercises the bucket the app
+actually writes to (S3 in prod via ``PrivateMediaStorage``). The unit
+test still patched the now-unused ``core.tasks.open`` builtin, leaving
+``default_storage.save`` operational and the probe always returning
+``healthy``.
+
+Patch ``django.core.files.storage.default_storage.save`` instead so the
+OSError surfaces in the task's storage branch.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`530e383`](https://github.com/vasilistotskas/grooveshop-django-api/commit/530e383a61905e4e9bbbac668b3f7bd2c67f54d8))
+
+* fix: update uv.lock ([`42f8317`](https://github.com/vasilistotskas/grooveshop-django-api/commit/42f83178ae5164119e60b2c7f0be3fc7e526981c))
+
+* fix(tasks): unblock daily Celery jobs crashing on logging + ACS empty date
+
+Three recurring failures observed in prod celery-worker logs:
+
+1. ``shipping_boxnow.tasks.sync_boxnow_lockers`` raised ``KeyError(
+   "Attempt to overwrite 'created' in LogRecord")`` every 02:00. The
+   task passed ``extra=result`` to ``logger.info`` and ``result``
+   contained ``{'created', 'updated', 'deactivated'}`` counters —
+   ``created`` collides with ``LogRecord.created`` (built-in
+   timestamp), which Python's logging module rejects via ``KeyError``.
+2. ``shipping_acs.tasks.reconcile_acs_cod_payouts`` had the same
+   ``extra=result`` bug AND was called with no ``cod_payment_date``,
+   so the service forwarded ``""`` to ACS' ``ACS_COD_Beneficiary_Info``
+   endpoint, which rejects an empty date with
+   ``"ACS:Error fill data error"``.
+3. ``core.tasks.monitor_system_health`` wrote to
+   ``MEDIA_ROOT/.health_check`` via raw ``open()``. The prod media
+   volume isn't mounted on backend pods (S3 is the actual storage
+   backend), so the storage probe always failed and flagged system
+   health ``degraded`` even when S3 was up.
+
+Fixes:
+
+* Both BoxNow + ACS task wrappers now pass ``extra={"counters": result}``
+  so the structured fields stay queryable but no longer collide with
+  ``LogRecord`` built-ins.
+* ``reconcile_acs_cod_payouts`` defaults ``cod_payment_date`` to
+  yesterday in Athens local time — the beat schedule fires at 02:30
+  Europe/Athens, by which point ACS has finalised yesterday's data.
+* ``monitor_system_health`` probes ``django.core.files.storage.
+  default_storage`` via ``save()`` + ``delete()`` instead of writing
+  to the local FS, so it actually exercises the S3 bucket the app
+  writes to.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3fc6c0e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3fc6c0e3879023589dced99946b8f793964e0cc2))
+
+### Chores
+
+* chore(order): drop legacy FedEx/UPS shipping module + obsolete polling task
+
+``order/shipping.py`` was a stub from before the carrier abstraction
+landed — hardcoded ``FedExCarrier`` / ``UPSCarrier`` mock classes that
+nothing in production points at, plus a ``ShippingService.get_tracking_info``
+that didn't know about ACS or BoxNow. The companion Celery beat task
+``update_order_statuses_from_shipping`` ran every 6h, walked SHIPPED
+orders, and asked this stub for tracking — invariably failing with
+``"Unsupported shipping carrier: ACS"`` (verified in prod celery-worker
+logs).
+
+Status promotion to DELIVERED now lives in the new abstraction:
+``shipping_acs/tasks.py:poll_acs_tracking_one`` runs every 15 min
+and routes through ``AcsService._apply_order_status_transition``;
+BoxNow advances via the webhook receiver. The legacy task is fully
+redundant.
+
+Removes:
+* ``order/shipping.py`` (FedExCarrier, UPSCarrier, ShippingCarrier
+  ABC, ShippingService.get_tracking_info / get_available_shipping_options
+  / create_shipment, ShippingMethodType, ShippingOption — all unused).
+* ``order.tasks.update_order_statuses_from_shipping`` + its
+  ``CELERY_BEAT_SCHEDULE`` entry.
+* ``tests/unit/order/test_shipping.py`` (covered the deleted module).
+* The FedEx/UPS skipped tests in ``tests/integration/order/
+  test_external_service_errors.py`` (always-skipped placeholders for a
+  carrier that no longer exists).
+* The four ``test_update_order_statuses_from_shipping_*`` cases in
+  ``tests/integration/order/test_tasks.py``.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`447ae6f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/447ae6f4d8113973387a2707e8be69e7ca0212a4))
+
 ## v1.123.1 (2026-05-02)
 
 ### Bug fixes

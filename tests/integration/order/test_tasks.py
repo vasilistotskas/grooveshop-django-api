@@ -17,7 +17,6 @@ from order.tasks import (
     send_order_confirmation_email,
     send_order_status_update_email,
     send_shipping_notification_email,
-    update_order_statuses_from_shipping,
 )
 
 
@@ -434,66 +433,6 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
             self.assertEqual(result, 0)
             mock_logger.assert_called_once()
-
-    @patch("order.services.OrderService.update_order_status")
-    @patch("order.shipping.ShippingService.get_tracking_info")
-    def test_update_order_statuses_from_shipping_success(
-        self, mock_tracking, mock_update_status
-    ):
-        shipped_order = OrderFactory.create(
-            status=OrderStatus.SHIPPED,
-            tracking_number="TRACK123",
-            shipping_carrier="UPS",
-        )
-
-        mock_tracking.return_value = {"status": OrderStatus.DELIVERED}
-        mock_update_status.return_value = True
-
-        result = update_order_statuses_from_shipping()
-
-        self.assertGreaterEqual(result, 0)
-        if result > 0:
-            mock_tracking.assert_called_with("TRACK123", "UPS")
-            mock_update_status.assert_called_with(
-                shipped_order, OrderStatus.DELIVERED
-            )
-
-    @patch("order.tasks.logger.error")
-    def test_update_order_statuses_from_shipping_exception(self, mock_logger):
-        with patch("order.models.order.Order.objects.filter") as mock_filter:
-            mock_filter.side_effect = Exception("Database error")
-
-            result = update_order_statuses_from_shipping()
-
-            self.assertEqual(result, 0)
-            mock_logger.assert_called_once()
-
-    def test_update_order_statuses_from_shipping_no_carrier(self):
-        OrderFactory.create(
-            status=OrderStatus.SHIPPED,
-            tracking_number="TRACK123",
-            shipping_carrier="",
-        )
-
-        result = update_order_statuses_from_shipping()
-
-        self.assertEqual(result, 0)
-
-    @patch("order.shipping.ShippingService.get_tracking_info")
-    def test_update_order_statuses_from_shipping_not_delivered(
-        self, mock_tracking
-    ):
-        OrderFactory.create(
-            status=OrderStatus.SHIPPED,
-            tracking_number="TRACK123",
-            shipping_carrier="UPS",
-        )
-
-        mock_tracking.return_value = {"status": "IN_TRANSIT"}
-
-        result = update_order_statuses_from_shipping()
-
-        self.assertEqual(result, 0)
 
 
 @pytest.mark.django_db

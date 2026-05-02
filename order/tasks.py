@@ -20,7 +20,6 @@ from core.utils.i18n import get_order_language, get_user_language
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.services import OrderService
-from order.shipping import ShippingService
 from user.utils.subscription import build_transactional_list_headers
 
 logger = logging.getLogger(__name__)
@@ -1391,52 +1390,6 @@ def check_pending_orders() -> int:
     except Exception as e:
         logger.error(
             f"Error checking pending orders: {e!s}",
-            extra={"error": str(e)},
-        )
-        return 0
-
-
-@shared_task(
-    autoretry_for=(Exception,),
-    max_retries=3,
-    retry_backoff=True,
-    retry_jitter=True,
-)
-def update_order_statuses_from_shipping() -> int:
-    try:
-        shipped_orders = Order.objects.filter(
-            status=OrderStatus.SHIPPED, tracking_number__isnull=False
-        ).exclude(tracking_number="")
-
-        count = 0
-
-        for order in shipped_orders:
-            if not order.shipping_carrier:
-                continue
-
-            try:
-                tracking_info = ShippingService.get_tracking_info(
-                    order.tracking_number, order.shipping_carrier
-                )
-
-                if tracking_info.get("status") == OrderStatus.DELIVERED:
-                    OrderService.update_order_status(
-                        order, OrderStatus.DELIVERED
-                    )
-                    # Email is sent by handle_order_status_changed signal
-                    count += 1
-
-            except Exception as inner_e:
-                logger.error(
-                    f"Error updating shipping status for order #{order.id}: {inner_e!s}",
-                    extra={"order_id": order.id, "error": str(inner_e)},
-                )
-
-        return count
-
-    except Exception as e:
-        logger.error(
-            f"Error updating order statuses from shipping: {e!s}",
             extra={"error": str(e)},
         )
         return 0

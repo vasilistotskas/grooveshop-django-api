@@ -696,12 +696,6 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
-        "update-order-statuses-from-shipping": {
-            "task": "order.tasks.update_order_statuses_from_shipping",
-            "schedule": crontab(hour="*/6", minute="0")
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
-        },
         "process-loyalty-points-expiration": {
             "task": "loyalty.tasks.process_points_expiration",
             "schedule": SCHEDULE_PRESETS["daily_3am"]

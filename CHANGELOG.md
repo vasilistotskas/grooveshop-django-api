@@ -3,6 +3,64 @@
 
 
 
+## v1.123.3 (2026-05-02)
+
+### Bug fixes
+
+* fix(order): Viva webhook idempotency table + amount equality + redaction
+
+Replaces the order.metadata `viva_webhook_<txn>_<evt>` flag with a
+dedicated `VivaWebhookEvent` model whose `(transaction_id,
+event_type_id)` unique constraint blocks replays at the DB level — an
+admin clearing metadata can no longer reopen the door to duplicate
+mark_as_paid dispatches on Viva retries.
+
+`_handle_reversal_created` now mirrors the Stripe `charge.refunded`
+handler: only `payment_status` transitions, an audit row lands in
+`metadata['refunds']`, and `order_refunded.send` fires so the refund
+email, live WS toast, and Meta CAPI Refund event all run.
+
+`_handle_payment_created` adds a defence-in-depth amount check —
+verified `Retrieve Transaction` amount must match `order.calculate_
+order_total_amount()` within 1 cent before mark-as-paid. This is the
+verification flow Viva's own docs prescribe (OrderCode + TransactionId
++ StatusId + Amount); Viva does not sign payment-event webhooks with
+HMAC.
+
+The webhook payload INFO log is allowlisted to event_type, order_code,
+status_id, and a SHA-256 prefix of the transaction_id — full payloads
+no longer ingest into structured log aggregation (GDPR Art. 32).
+
+drf-spectacular schema gets a complete `resolveVivaOrderCode`
+operation (via `@extend_schema` + dedicated response serializers)
+instead of the prior "unable to guess serializer" warning.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`265949c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/265949c9397add5da6580adf20f148a959b2e27e))
+
+### Performance improvements
+
+* perf(order): batched stock lock, shipment serializer memo, BoxNow async webhook
+
+`OrderWriteSerializer.create` now locks all cart products in a single
+`SELECT ... FOR UPDATE WHERE pk IN (...)`. The previous per-item loop
+fired N locks + N updates per checkout — a 5-line cart did 10 round
+trips inside one transaction; now it does 1 lock + N updates.
+
+`OrderDetailSerializer` memoises the carrier shipment payload via a
+`_serialized_shipment(obj)` helper backed by `self.context`. The three
+overlapping fields (`boxnow_shipment`, `acs_shipment`, `shipment`) all
+read from the same cache instead of running the carrier serializer
+twice per order detail response.
+
+BoxNow webhook view dispatches `apply_webhook_event` to a new
+`process_boxnow_webhook_event` Celery task and returns 200 immediately.
+Daphne is no longer blocked during BoxNow retry storms; transient infra
+errors retry via `autoretry_for(BoxNowRetryableError)` instead of
+swallowing into a 200. A broker outage falls back to a 500 so BoxNow
+retries the delivery rather than dropping the event.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`494c679`](https://github.com/vasilistotskas/grooveshop-django-api/commit/494c6792bf179d10f141ca19f80c90e06a3696c1))
+
 ## v1.123.2 (2026-05-02)
 
 ### Bug fixes

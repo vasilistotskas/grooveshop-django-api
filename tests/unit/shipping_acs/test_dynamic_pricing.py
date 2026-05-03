@@ -31,6 +31,20 @@ def _clear_quote_cache():
 
 
 @pytest.fixture
+def pin_station_origin():
+    """Pin the merchant pickup station for the live-quote path so
+    tests don't depend on whether ``ACS_BILLING_CODE`` is set in the
+    environment. ``station_origin()`` returns ``None`` in CI without
+    a billing code, which would short-circuit ``_fetch_live_quote``
+    before the mocked AcsClient is reached and break every quote
+    assertion."""
+    from shipping_acs import config as acs_config
+
+    with patch.object(acs_config, "station_origin", return_value="ΑΚ"):
+        yield
+
+
+@pytest.fixture
 def dynamic_pricing_off():
     from extra_settings.models import Setting
 
@@ -83,7 +97,7 @@ def test_free_shipping_short_circuits_dynamic_pricing(dynamic_pricing_on):
     assert mock_class.called is False
 
 
-def test_live_quote_used_when_toggle_on(dynamic_pricing_on):
+def test_live_quote_used_when_toggle_on(dynamic_pricing_on, pin_station_origin):
     adapter = get_provider("acs")
 
     with patch("shipping_acs.client.AcsClient") as mock_class:
@@ -102,7 +116,9 @@ def test_live_quote_used_when_toggle_on(dynamic_pricing_on):
     assert instance.price_calculation.called
 
 
-def test_falls_back_to_flat_rate_on_api_error(dynamic_pricing_on):
+def test_falls_back_to_flat_rate_on_api_error(
+    dynamic_pricing_on, pin_station_origin
+):
     """Transient ACS API failure must never block checkout — the
     flat-rate path is the safety net."""
     from shipping_acs.exceptions import AcsAPIError
@@ -124,7 +140,9 @@ def test_falls_back_to_flat_rate_on_api_error(dynamic_pricing_on):
     assert quote == (3.5, "EUR")  # flat-rate fallback
 
 
-def test_quote_is_cached_per_country_region(dynamic_pricing_on):
+def test_quote_is_cached_per_country_region(
+    dynamic_pricing_on, pin_station_origin
+):
     """The second call with the same (country, region) tuple must
     short-circuit on cache without hitting the API.
 
@@ -186,7 +204,9 @@ def test_quote_is_cached_per_country_region(dynamic_pricing_on):
     assert len(fake_store) == 1
 
 
-def test_invalid_amount_falls_back_to_flat_rate(dynamic_pricing_on):
+def test_invalid_amount_falls_back_to_flat_rate(
+    dynamic_pricing_on, pin_station_origin
+):
     """A garbage Total_Ammount value (e.g. None / non-numeric) must
     not propagate — fall back to the flat rate."""
     adapter = get_provider("acs")
@@ -251,7 +271,9 @@ def test_bucket_weight_grams_matches_acs_brackets(
     assert AcsCarrier._bucket_weight_grams(weight_grams) == expected_bucket
 
 
-def test_live_quote_forwards_bucketed_weight_to_acs(dynamic_pricing_on):
+def test_live_quote_forwards_bucketed_weight_to_acs(
+    dynamic_pricing_on, pin_station_origin
+):
     """Heavy cart → bucketed weight reaches the ACS price-calculation
     endpoint via ``_kg_from_grams``. The voucher mint uses the SAME
     helper, so quote and charge line up exactly — the assertion below
@@ -280,7 +302,9 @@ def test_live_quote_forwards_bucketed_weight_to_acs(dynamic_pricing_on):
     assert payload["Weight"] != _kg_from_grams(3200)  # raw weight not sent
 
 
-def test_live_quote_floor_when_weight_omitted(dynamic_pricing_on):
+def test_live_quote_floor_when_weight_omitted(
+    dynamic_pricing_on, pin_station_origin
+):
     """Caller without weight info gets the historical 500g floor —
     the same behaviour ACS's published tariff applies on its side
     so the cheapest possible bracket is what shows in the sidebar.
@@ -303,7 +327,9 @@ def test_live_quote_floor_when_weight_omitted(dynamic_pricing_on):
     assert payload["Weight"] == _kg_from_grams(500)
 
 
-def test_quote_cache_buckets_collapse_near_weights(dynamic_pricing_on):
+def test_quote_cache_buckets_collapse_near_weights(
+    dynamic_pricing_on, pin_station_origin
+):
     """487g and 499g hit the same 500g bucket → one upstream call,
     not two. Without the bucketing the cache key would diverge per
     gram and ACS's API would be hammered.
@@ -449,7 +475,9 @@ def test_station_origin_parses_from_billing_code(settings):
     assert acs_config.station_origin() is None
 
 
-def test_quote_cache_separates_distinct_weight_buckets(dynamic_pricing_on):
+def test_quote_cache_separates_distinct_weight_buckets(
+    dynamic_pricing_on, pin_station_origin
+):
     """487g and 1500g hit different buckets (500g / 2 kg) → two
     upstream calls. Without bucket-keyed caching a heavy cart would
     silently reuse the light cart's quote.

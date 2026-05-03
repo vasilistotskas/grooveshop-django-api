@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.db import models
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
@@ -120,15 +121,7 @@ class ProductReviewFilter(
 
     verified_purchase = filters.BooleanFilter(
         method="filter_verified_purchase",
-        help_text=_(
-            "Filter reviews from verified purchases (if order system exists)"
-        ),
-    )
-    helpful_votes_min = filters.NumberFilter(
-        method="filter_helpful_votes_min",
-        help_text=_(
-            "Filter by minimum helpful votes (if voting system exists)"
-        ),
+        help_text=_("Filter reviews from verified purchases"),
     )
 
     user_review_count_min = filters.NumberFilter(
@@ -190,17 +183,23 @@ class ProductReviewFilter(
         return queryset
 
     def filter_verified_purchase(self, queryset, name, value):
-        """Filter reviews from verified purchases (placeholder for order system)"""
-        # This would need to be implemented when order system exists
-        # For now, just return the queryset as-is
-        # In a real system, this might check:
-        # return queryset.filter(user__orders__products=models.F('product'))
-        return queryset
+        """Filter reviews from verified purchases.
 
-    def filter_helpful_votes_min(self, queryset, name, value):
-        """Filter by minimum helpful votes (placeholder for voting system)"""
-        # This would need to be implemented when review voting system exists
-        # For now, just return the queryset as-is
+        A verified purchase means the reviewer has at least one COMPLETED
+        order containing the same product.
+        """
+        from order.enum.status import OrderStatus
+        from order.models.item import OrderItem
+
+        completed_purchase = OrderItem.objects.filter(
+            order__user=OuterRef("user"),
+            order__status=OrderStatus.COMPLETED,
+            product=OuterRef("product"),
+        )
+        if value is True:
+            return queryset.filter(Exists(completed_purchase))
+        elif value is False:
+            return queryset.exclude(Exists(completed_purchase))
         return queryset
 
     def filter_user_review_count_min(self, queryset, name, value):

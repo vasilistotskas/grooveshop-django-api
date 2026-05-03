@@ -5,6 +5,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
+from django.core.serializers.json import DjangoJSONEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def send_notification(self, event):
         logger.debug(f"Sending notification: {event}")
-        await self.send(text_data=json.dumps(event))
+        await self.send(text_data=json.dumps(event, cls=DjangoJSONEncoder))
 
     async def force_logout(self, event):
         """

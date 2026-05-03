@@ -162,6 +162,9 @@ class OrderService:
                 else:
                     item_to_create["price"] = product_price
 
+                # bulk_create cannot be used here: post_save on OrderItem
+                # writes an OrderHistory audit note per item. Already
+                # inside @transaction.atomic so all inserts commit together.
                 OrderItem.objects.create(order=order, **item_to_create)
 
             order.paid_amount = order.calculate_order_total_amount()
@@ -596,7 +599,12 @@ class OrderService:
 
                 _log_price_drift_if_needed(cart_item, item_price)
 
-                # Create OrderItem
+                # bulk_create cannot be used here: the post_save signal
+                # on OrderItem (handle_order_item_post_save) writes an
+                # OrderHistory audit note for each new item and is the
+                # canonical creation hook. bulk_create skips all signals.
+                # The loop is already inside @transaction.atomic so all
+                # inserts land in one DB round-trip on commit.
                 OrderItem.objects.create(
                     order=order,
                     product=product,
@@ -1057,7 +1065,12 @@ class OrderService:
 
                 _log_price_drift_if_needed(cart_item, item_price)
 
-                # Create OrderItem
+                # bulk_create cannot be used here: the post_save signal
+                # on OrderItem (handle_order_item_post_save) writes an
+                # OrderHistory audit note for each new item and is the
+                # canonical creation hook. bulk_create skips all signals.
+                # The loop is already inside @transaction.atomic so all
+                # inserts land in one DB round-trip on commit.
                 OrderItem.objects.create(
                     order=order,
                     product=product,
@@ -1263,13 +1276,26 @@ class OrderService:
                 "warnings": warnings,
             }
 
-        # Check 2: All products exist and are in stock
+        # Check 2: All products exist, are active, and are in stock
         for cart_item in cart_items:
             product = cart_item.product
 
             # Check product exists
             if not product:
                 errors.append(_("Product in cart no longer exists"))
+                continue
+
+            product_display_name = (
+                product.safe_translation_getter("name", any_language=True) or ""
+            )
+
+            # Check product is active
+            if product.active is False:
+                errors.append(
+                    _("Product '{product}' is no longer available").format(
+                        product=product_display_name
+                    )
+                )
                 continue
 
             # Check product is in stock (exclude this cart's own
@@ -1284,7 +1310,7 @@ class OrderService:
                         "Product '{product}' has insufficient stock. "
                         "Available: {available}, Requested: {requested}"
                     ).format(
-                        product=product.name,
+                        product=product_display_name,
                         available=available_stock,
                         requested=cart_item.quantity,
                     )

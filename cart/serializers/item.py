@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.helpers import lazy_serializer
@@ -6,6 +7,12 @@ from rest_framework import serializers
 
 from cart.models import CartItem
 from product.serializers.product import ProductSerializer
+
+# Cache TTL (seconds) for per-category recommendation results.
+# A 5-minute window eliminates the per-cart-item query storm while
+# keeping product ranking reasonably fresh.  Cache key format:
+# ``cart_recs:cat:{category_id}``.
+_CART_RECS_TTL = 300
 
 
 class CartItemSerializer(serializers.ModelSerializer[CartItem]):
@@ -100,17 +107,33 @@ class CartItemDetailSerializer(CartItemSerializer):
         )
     )
     def get_recommendations(self, obj: CartItem):
-        if obj.product.category:
-            related_products = (
-                obj.product.category.products.filter(active=True)
+        category = obj.product.category
+        if not category:
+            return []
+
+        cache_key = f"cart_recs:cat:{category.pk}"
+
+        def _fetch():
+            return list(
+                category.products.filter(active=True)
                 .exclude(id=obj.product.id)
-                .order_by("-view_count")[:3]
+                .order_by("-view_count")
+                .values_list("id", flat=True)[:3]
             )
 
-            return ProductSerializer(
-                related_products, many=True, context=self.context
-            ).data
-        return []
+        # Cache stores product IDs only; serialization happens outside
+        # the cache so the response context (request, language) is
+        # always applied fresh.  IDs are cheap (~24 bytes each) and
+        # category-scoped, so collisions between concurrent requests
+        # for different cart items in the same category are safe.
+        product_ids = cache.get_or_set(cache_key, _fetch, _CART_RECS_TTL)
+
+        from product.models.product import Product
+
+        products = Product.objects.filter(id__in=product_ids).exclude(
+            id=obj.product.id
+        )
+        return ProductSerializer(products, many=True, context=self.context).data
 
     class Meta(CartItemSerializer.Meta):
         fields = (

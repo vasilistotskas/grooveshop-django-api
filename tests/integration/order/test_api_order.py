@@ -235,9 +235,34 @@ class OrderViewSetTestCase(APITestCase):
         )
 
     def test_list_orders_unauthenticated(self):
+        # Anonymous requests must receive 401, not 200-with-empty-results.
+        # IsOwnerOrAdmin.has_permission returns False for anonymous users,
+        # which DRF translates to 401 when authentication classes are present.
         self.client.force_authenticate(user=None)
         response = self.client.get(self.orders_url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_orders_regular_user_sees_only_own_orders(self):
+        # Non-staff authenticated users must only see their own orders.
+        # get_queryset filters by user for non-staff, preventing cross-user
+        # IDOR enumeration of the order list.
+        other_user = User.objects.create_user(
+            username="otheruser",
+            email="other@example.com",
+            password="otherpassword",
+        )
+        other_order = OrderFactory(user=other_user)
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.orders_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_ids = {o["id"] for o in response.data["results"]}
+        # Must contain own orders
+        self.assertIn(self.order1.id, result_ids)
+        self.assertIn(self.order2.id, result_ids)
+        # Must NOT contain another user's order
+        self.assertNotIn(other_order.id, result_ids)
 
     def test_list_orders_admin(self):
         self.client.force_authenticate(user=self.admin_user)

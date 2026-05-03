@@ -184,7 +184,10 @@ class EmailTemplatePreviewService:
                     "id": item.id,
                     "product": {
                         "id": item.product.id,
-                        "name": item.product.name,
+                        "name": item.product.safe_translation_getter(
+                            "name", any_language=True
+                        )
+                        or "",
                     },
                     "quantity": item.quantity,
                     "price": f"€{item_price:.2f}",

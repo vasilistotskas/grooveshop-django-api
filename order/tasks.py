@@ -4,6 +4,7 @@ from datetime import timedelta
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import F
@@ -25,57 +26,145 @@ from user.utils.subscription import build_transactional_list_headers
 logger = logging.getLogger(__name__)
 
 
+# ──────────────────────────────────────────────────────────────
+# send_order_confirmation_email idempotency
+#
+# Design: two-layer guard to survive both concurrent fires AND
+# worker OOM-kills mid-send.
+#
+# Layer 1 — permanent DB timestamp (``confirmation_email_sent_at``):
+#   Written once after a successful send. Any retry that finds this
+#   key set skips immediately without touching Redis.
+#
+# Layer 2 — Redis execution lock (``CONFIRMATION_EMAIL_LOCK_TTL`` TTL):
+#   Acquired via cache.add() (atomic "set-if-not-exists") before the
+#   send attempt. Prevents concurrent workers from both sending when
+#   the DB flag has not yet been written (the window between "lock
+#   acquired" and "DB write committed"). If the worker is OOM-killed
+#   mid-send the lock auto-expires and the next retry can claim it.
+#
+# Contrast with the old pattern (boolean flag set at reserve time):
+#   Old: flag set → worker killed → flag stays True → customer never
+#         receives confirmation.
+#   New: lock acquired → worker killed → lock expires in 60 s →
+#         next retry claims lock → send succeeds → DB flag written.
+# ──────────────────────────────────────────────────────────────
+CONFIRMATION_EMAIL_SENT_AT_KEY = "confirmation_email_sent_at"
+CONFIRMATION_EMAIL_LOCK_PREFIX = "order:confirm_email_lock:"
+# TTL for the execution lock. Long enough for a slow SMTP send; short
+# enough that a dead worker's lock expires quickly so a retry can proceed.
+CONFIRMATION_EMAIL_LOCK_TTL = 90  # seconds
+
+# Legacy flag name — kept so existing metadata rows are still readable
+# by _release_confirmation_email (used in existing tests).
 CONFIRMATION_EMAIL_SENT_FLAG = "confirmation_email_sent"
 
 
-def _reserve_confirmation_email(order_id: int) -> bool:
-    """Atomically claim the confirmation-email slot for an order.
+def _confirmation_lock_key(order_id: int) -> str:
+    return f"{CONFIRMATION_EMAIL_LOCK_PREFIX}{order_id}"
 
-    Returns True if this caller won the race and should proceed with the
-    send, False if another caller has already sent (or is sending) the
-    email. Raises Order.DoesNotExist if the order is missing so the
-    caller can surface it consistently with the rest of the task.
-    """
+
+def _confirmation_already_sent(metadata: dict | None) -> bool:
+    """Return True if the permanent DB timestamp shows the email was sent."""
+    meta = metadata or {}
+    return bool(
+        meta.get(CONFIRMATION_EMAIL_SENT_AT_KEY)
+        or meta.get(CONFIRMATION_EMAIL_SENT_FLAG)
+    )
+
+
+def _mark_confirmation_sent(order_id: int) -> None:
+    """Write the permanent sent-at timestamp and release the Redis lock."""
     with transaction.atomic():
-        order = Order.objects.select_for_update().get(id=order_id)
-        if order.metadata and order.metadata.get(CONFIRMATION_EMAIL_SENT_FLAG):
-            return False
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None:
+            return
         if not order.metadata:
             order.metadata = {}
+        order.metadata[CONFIRMATION_EMAIL_SENT_AT_KEY] = (
+            timezone.now().isoformat()
+        )
+        # Also set the legacy boolean so callers that check the old key
+        # (e.g. retry_payment view that clears the flag) keep working.
         order.metadata[CONFIRMATION_EMAIL_SENT_FLAG] = True
         order.save(update_fields=["metadata"])
-    return True
+    # Release the execution lock immediately after the DB commit so the
+    # next accidental duplicate call sees the DB flag instead of waiting
+    # for the TTL.
+    cache.delete(_confirmation_lock_key(order_id))
 
 
 def _release_confirmation_email(order_id: int) -> None:
-    """Clear the confirmation-email reservation on permanent failure so an
-    admin (or a future retry path) can resend the email."""
+    """Clear the confirmation-email permanent flags so an admin or test
+    can trigger a resend. Also releases any lingering Redis lock."""
     with transaction.atomic():
         order = Order.objects.select_for_update().filter(id=order_id).first()
         if order is None or not order.metadata:
             return
-        if order.metadata.pop(CONFIRMATION_EMAIL_SENT_FLAG, None) is not None:
+        changed = False
+        for key in (
+            CONFIRMATION_EMAIL_SENT_AT_KEY,
+            CONFIRMATION_EMAIL_SENT_FLAG,
+        ):
+            if order.metadata.pop(key, None) is not None:
+                changed = True
+        if changed:
             order.save(update_fields=["metadata"])
+    cache.delete(_confirmation_lock_key(order_id))
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def send_order_confirmation_email(self, order_id: int) -> bool:
-    reserved_this_call = False
-    try:
-        # Only reserve on the first attempt. Retries are expected to
-        # re-send because the flag is held by THIS worker — releasing
-        # on every retry would defeat idempotency, and checking the
-        # flag on retry would prevent legitimate re-sends after a
-        # transient failure.
-        if self.request.retries == 0:
-            if not _reserve_confirmation_email(order_id):
-                logger.info(
-                    "Order confirmation email already sent (or reserved) for order #%s, skipping",
-                    order_id,
-                )
-                return True
-            reserved_this_call = True
+    """Send the order confirmation email exactly once per order.
 
+    Idempotency design (worker-kill safe):
+    - Permanent guard: ``confirmation_email_sent_at`` DB timestamp. Once
+      set, no further sends occur regardless of how many times the task
+      is called.
+    - Execution lock: Redis key with a short TTL. Prevents concurrent
+      workers from both sending while the DB flag is not yet written.
+      If the worker is OOM-killed mid-send the lock auto-expires so the
+      next retry can proceed — this is the fix for the bug where the old
+      boolean flag (set before the send) would permanently block resends
+      after a worker kill.
+    """
+    try:
+        # Fast path: check permanent DB flag before touching Redis.
+        # Use .values() to avoid triggering Order.__init__'s lazy-loading
+        # of deferred fields — .only() causes infinite recursion via the
+        # _original_tracking_number descriptor on Order.__init__.
+        meta_row = Order.objects.filter(id=order_id).values("metadata").first()
+        if meta_row is None:
+            logger.error(
+                "Could not send confirmation email - Order #%s not found",
+                order_id,
+                extra={"order_id": order_id},
+            )
+            return False
+
+        if _confirmation_already_sent(meta_row["metadata"]):
+            logger.info(
+                "Order confirmation email already sent for order #%s, skipping",
+                order_id,
+            )
+            return True
+
+        # Try to acquire the execution lock. cache.add() is atomic:
+        # returns True only if the key did not already exist.
+        lock_key = _confirmation_lock_key(order_id)
+        lock_acquired = cache.add(lock_key, "1", CONFIRMATION_EMAIL_LOCK_TTL)
+        if not lock_acquired:
+            # Another worker is currently in the send window. Log and
+            # bail — either that worker will succeed and set the permanent
+            # flag, or it will die and the lock will expire.
+            logger.info(
+                "Order #%s confirmation email send already in progress "
+                "(execution lock held), skipping",
+                order_id,
+            )
+            return True
+
+        # We hold the lock. Fetch the full order for rendering.
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
             .prefetch_related(
@@ -83,6 +172,17 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             )
             .get(id=order_id)
         )
+
+        # Double-check permanent flag under DB read — another worker may
+        # have committed the sent_at timestamp while we were fetching.
+        if _confirmation_already_sent(order.metadata):
+            cache.delete(lock_key)
+            logger.info(
+                "Order confirmation email already sent for order #%s "
+                "(post-lock check), skipping",
+                order_id,
+            )
+            return True
 
         pay_way = order.pay_way
         is_paid = bool(
@@ -141,8 +241,14 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
 
         msg.send()
 
+        # Write permanent flag + release lock atomically (DB commit, then
+        # cache.delete). From this point on every future call to this task
+        # will short-circuit on the DB flag.
+        _mark_confirmation_sent(order_id)
+
         logger.info(
-            f"Order confirmation email sent for order #{order.id}",
+            "Order confirmation email sent for order #%s",
+            order.id,
             extra={"order_id": order.id, "email": order.email},
         )
 
@@ -155,14 +261,17 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
 
     except Order.DoesNotExist:
         logger.error(
-            f"Could not send confirmation email - Order #{order_id} not found",
+            "Could not send confirmation email - Order #%s not found",
+            order_id,
             extra={"order_id": order_id},
         )
         return False
 
     except Exception as e:
         logger.error(
-            f"Error sending order confirmation email for order #{order_id}: {e!s}",
+            "Error sending order confirmation email for order #%s: %s",
+            order_id,
+            e,
             extra={"order_id": order_id, "error": str(e)},
         )
 
@@ -171,14 +280,17 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
 
         if retry_count < max_retries:
             logger.info(
-                f"Retrying send_order_confirmation_email for order #{order_id} "
-                f"(attempt {retry_count + 1}/{max_retries + 1})"
+                "Retrying send_order_confirmation_email for order #%s "
+                "(attempt %s/%s)",
+                order_id,
+                retry_count + 1,
+                max_retries + 1,
             )
             raise self.retry(exc=e) from e
 
-        if reserved_this_call:
-            _release_confirmation_email(order_id)
-
+        # Permanent failure: release the lock so an admin can trigger a
+        # manual resend. The DB flag is NOT set — the email was never sent.
+        cache.delete(_confirmation_lock_key(order_id))
         return False
 
 

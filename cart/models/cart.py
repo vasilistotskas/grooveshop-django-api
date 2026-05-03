@@ -46,8 +46,10 @@ class Cart(TimeStampMixinModel, UUIDModel):
             return f"Guest Cart {self.id} - Items: {self.total_items} - Total: {self.total_price}"
 
     def refresh_last_activity(self):
+        # Use UPDATE to touch only last_activity — avoids triggering
+        # pre_save/post_save signals and saves all other fields.
+        Cart.objects.filter(pk=self.pk).update(last_activity=now())
         self.last_activity = now()
-        self.save()
 
     def get_items(self):
         """Get cart items with optimized prefetching to avoid N+1 queries."""

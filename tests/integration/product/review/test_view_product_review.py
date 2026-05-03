@@ -4,6 +4,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from order.enum.status import OrderStatus
+from order.factories.item import OrderItemFactory
+from order.factories.order import OrderFactory
 from product.factories.product import ProductFactory
 from product.factories.review import ProductReviewFactory
 from product.models.review import ProductReview
@@ -84,7 +87,16 @@ class ProductReviewViewSetTestCase(APITestCase):
         )
 
     def test_create_request_response_serializers(self):
-        product_2 = ProductFactory(num_images=0, num_reviews=0)
+        product_2 = ProductFactory(num_images=0, num_reviews=0, active=True)
+        # Give the user a completed order containing product_2
+        completed_order = OrderFactory.create(
+            user=self.user,
+            status=OrderStatus.COMPLETED,
+            num_order_items=0,
+        )
+        OrderItemFactory.create(
+            order=completed_order, product=product_2, quantity=1
+        )
         payload = {
             "product": product_2.id,
             "rate": 4,

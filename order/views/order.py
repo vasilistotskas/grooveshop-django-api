@@ -478,20 +478,19 @@ class OrderViewSet(BaseModelViewSet):
         """
 
         try:
-            # Step 0: Enforce shipping-method cross-field rules.
-            # The two `_create_*` flows below read fields directly from
-            # `request.data` and skip the serializer's `validate()` —
-            # so we apply the BoxNow rules inline here. (B2B invoice
-            # rules live in OrderWriteSerializer's update path.)
-            self._validate_shipping_method_rules(request)
+            # Step 0: Validate the full request body through
+            # OrderCreateFromCartSerializer so every field is type-checked,
+            # cross-field rules (B2B, BoxNow) are applied, and the runtime
+            # shape matches what the OpenAPI schema advertises.  All
+            # subsequent helpers receive ``validated_data`` from this
+            # serializer so they no longer touch ``request.data`` directly.
+            request_serializer_class = self.get_request_serializer()
+            request_serializer = request_serializer_class(data=request.data)
+            request_serializer.is_valid(raise_exception=True)
+            validated_data = request_serializer.validated_data
 
             # Step 1: Get payment method to determine flow
-            # Note: djangorestframework_camel_case converts payWay -> pay_way
-            pay_way_id = request.data.get("pay_way_id")
-            if not pay_way_id:
-                raise ValidationError(
-                    {"pay_way_id": [_("Payment method is required")]}
-                )
+            pay_way_id = validated_data["pay_way_id"]
 
             try:
                 pay_way = PayWay.objects.get(id=pay_way_id)
@@ -515,11 +514,15 @@ class OrderViewSet(BaseModelViewSet):
                 and pay_way.provider_code not in redirect_checkout_providers
             ):
                 # Payment-first flow: Requires payment_intent_id (e.g. Stripe)
-                return self._create_with_payment_intent(request, pay_way)
+                return self._create_with_payment_intent(
+                    request, pay_way, validated_data
+                )
             else:
                 # Order-first flow: No payment_intent_id required
                 # (offline payments + redirect-based online providers like Viva Wallet)
-                return self._create_without_payment_intent(request, pay_way)
+                return self._create_without_payment_intent(
+                    request, pay_way, validated_data
+                )
 
         except InsufficientStockError as e:
             logger.warning(
@@ -633,57 +636,24 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def _validate_shipping_method_rules(self, request) -> None:
-        """Enforce BoxNow-specific cross-field rules from the request body.
-
-        These rules also live in `OrderCreateFromCartSerializer.validate()`
-        but the dual-flow `create()` does not run that serializer, so we
-        re-apply them here. Source of truth: the serializer — keep both
-        in sync.
-        """
-        provider_code = request.data.get("shipping_provider_code")
-        shipping_kind = request.data.get("shipping_kind")
-        if provider_code != "boxnow" or shipping_kind != "pickup_point":
-            return
-
-        # Master switch — defends against a stale frontend that still
-        # surfaces the option after an admin has hidden it. See
-        # ``OrderCreateFromCartSerializer.validate`` for the same check
-        # at the serializer layer; both live behind the
-        # `extra_settings.Setting` row ``BOXNOW_ENABLED``.
-        from extra_settings.models import Setting
-
-        if not Setting.get("BOXNOW_ENABLED", default=False):
-            raise ValidationError(
-                {
-                    "shipping_provider_code": [
-                        _("BoxNow locker shipping is currently unavailable.")
-                    ]
-                }
-            )
-
-        if not request.data.get("boxnow_locker_id"):
-            raise ValidationError(
-                {
-                    "boxnow_locker_id": [
-                        _("Locker ID required when shipping method is BoxNow")
-                    ]
-                }
-            )
-
-    def _create_with_payment_intent(self, request, pay_way: PayWay) -> Response:
+    def _create_with_payment_intent(
+        self, request, pay_way: PayWay, validated_data: dict
+    ) -> Response:
         """
         Create order with payment-first flow (online payments).
 
         Requires payment_intent_id to be provided and confirmed.
+        ``validated_data`` comes from ``OrderCreateFromCartSerializer``
+        and is already type-checked and cross-validated.
         """
 
         # Step 1: Get cart from request (validate cart exists first)
         cart, user = self._get_cart_and_user(request)
 
         # Step 2: Validate payment_intent_id is provided
-        # Note: djangorestframework_camel_case converts paymentIntentId -> payment_intent_id
-        payment_intent_id = request.data.get("payment_intent_id")
+        # The serializer marks this optional (offline path uses the same
+        # serializer) so we enforce the online-only requirement here.
+        payment_intent_id = validated_data.get("payment_intent_id") or ""
         if not payment_intent_id:
             raise ValidationError(
                 {
@@ -701,8 +671,10 @@ class OrderViewSet(BaseModelViewSet):
             errors = validation_result.get("errors", [])
             raise ValidationError({"cart": errors})
 
-        # Step 4: Build and validate shipping address
-        shipping_address = self._build_shipping_address(request)
+        # Step 4: Build and validate shipping address from validated data
+        shipping_address = self._build_shipping_address_from_validated(
+            validated_data
+        )
         try:
             OrderService.validate_shipping_address(
                 shipping_address, pay_way=pay_way
@@ -715,13 +687,15 @@ class OrderViewSet(BaseModelViewSet):
             )
 
         # Step 5: Get loyalty points to redeem (if any)
-        loyalty_points_to_redeem = request.data.get("loyalty_points_to_redeem")
+        loyalty_points_to_redeem = validated_data.get(
+            "loyalty_points_to_redeem"
+        )
 
         # Step 5.5: Pull Meta Pixel context (fbp/fbc/UA/IP/event_ids) the
         # storefront proxy forwarded for Conversions API matching. The
         # service-level helper ``_sanitise_meta_context`` filters this
         # against an allow-list, so it's safe to forward as-is here.
-        meta_context = request.data.get("meta")
+        meta_context = validated_data.get("meta")
 
         # Step 6: Create order from cart with payment_intent_id
         order = OrderService.create_order_from_cart(
@@ -752,7 +726,7 @@ class OrderViewSet(BaseModelViewSet):
         )
 
     def _create_without_payment_intent(
-        self, request, pay_way: PayWay
+        self, request, pay_way: PayWay, validated_data: dict
     ) -> Response:
         """
         Create order with order-first flow.
@@ -760,6 +734,8 @@ class OrderViewSet(BaseModelViewSet):
         Used for offline payments and redirect-based online providers
         (e.g. Viva Wallet). No payment_intent_id required.
         Order created with PENDING status.
+        ``validated_data`` comes from ``OrderCreateFromCartSerializer``
+        and is already type-checked and cross-validated.
         """
 
         # Step 1: Get cart from request
@@ -771,8 +747,10 @@ class OrderViewSet(BaseModelViewSet):
             errors = validation_result.get("errors", [])
             raise ValidationError({"cart": errors})
 
-        # Step 3: Build and validate shipping address
-        shipping_address = self._build_shipping_address(request)
+        # Step 3: Build and validate shipping address from validated data
+        shipping_address = self._build_shipping_address_from_validated(
+            validated_data
+        )
         try:
             OrderService.validate_shipping_address(
                 shipping_address, pay_way=pay_way
@@ -785,12 +763,14 @@ class OrderViewSet(BaseModelViewSet):
             )
 
         # Step 4: Get loyalty points to redeem (if any)
-        loyalty_points_to_redeem = request.data.get("loyalty_points_to_redeem")
+        loyalty_points_to_redeem = validated_data.get(
+            "loyalty_points_to_redeem"
+        )
 
         # Step 4.5: Pull Meta Pixel context for the offline path too —
         # COD orders trigger the canonical Purchase event from
         # ``order_paid`` so the dispatcher needs the same fbp/fbc.
-        meta_context = request.data.get("meta")
+        meta_context = validated_data.get("meta")
 
         # Step 5: Create order from cart without payment_intent_id
         order = OrderService.create_order_from_cart_offline(
@@ -868,12 +848,14 @@ class OrderViewSet(BaseModelViewSet):
 
         return cart, user
 
-    def _build_shipping_address(self, request) -> dict:
-        """
-        Helper method to build shipping address from request data.
+    def _build_shipping_address_from_validated(
+        self, validated_data: dict
+    ) -> dict:
+        """Build the shipping-address dict from serializer-validated data.
 
-        Note: djangorestframework_camel_case middleware automatically converts
-        camelCase request data to snake_case, so we only need to check snake_case keys.
+        Uses ``validated_data`` (output of ``OrderCreateFromCartSerializer``)
+        instead of ``request.data`` so callers always receive type-safe,
+        cross-validated values that match the published OpenAPI schema.
 
         IMPORTANT: this dict is the only path by which the request body
         reaches ``OrderService.create_order_from_cart`` and
@@ -883,45 +865,45 @@ class OrderViewSet(BaseModelViewSet):
         """
         return {
             # Customer + address (always present)
-            "first_name": request.data.get("first_name"),
-            "last_name": request.data.get("last_name"),
-            "email": request.data.get("email"),
-            "phone": request.data.get("phone"),
-            "street": request.data.get("street"),
-            "street_number": request.data.get("street_number"),
-            "city": request.data.get("city"),
-            "zipcode": request.data.get("zipcode"),
-            "place": request.data.get("place", ""),
-            "floor": request.data.get("floor", ""),
-            "location_type": request.data.get("location_type", ""),
-            "country_id": request.data.get("country_id"),
-            "region_id": request.data.get("region_id"),
-            "customer_notes": request.data.get("customer_notes", ""),
+            "first_name": validated_data.get("first_name"),
+            "last_name": validated_data.get("last_name"),
+            "email": validated_data.get("email"),
+            "phone": validated_data.get("phone"),
+            "street": validated_data.get("street"),
+            "street_number": validated_data.get("street_number"),
+            "city": validated_data.get("city"),
+            "zipcode": validated_data.get("zipcode"),
+            "place": validated_data.get("place", ""),
+            "floor": validated_data.get("floor", ""),
+            "location_type": validated_data.get("location_type", ""),
+            "country_id": validated_data.get("country_id"),
+            "region_id": validated_data.get("region_id"),
+            "customer_notes": validated_data.get("customer_notes", ""),
             # B2B billing identity (Tier B — Τιμολόγιο Πώλησης). Empty for retail.
-            "document_type": request.data.get("document_type"),
-            "billing_vat_id": request.data.get("billing_vat_id", ""),
-            "billing_country": request.data.get("billing_country", ""),
+            "document_type": validated_data.get("document_type"),
+            "billing_vat_id": validated_data.get("billing_vat_id", ""),
+            "billing_country": validated_data.get("billing_country", ""),
             # Registry-driven shipping dispatch: explicit
             # ``(shipping_provider_code, shipping_kind)`` flows through
             # ``_resolve_shipping_provider`` → carrier adapter.
-            "shipping_provider_code": request.data.get(
+            "shipping_provider_code": validated_data.get(
                 "shipping_provider_code"
             ),
-            "shipping_kind": request.data.get("shipping_kind"),
+            "shipping_kind": validated_data.get("shipping_kind"),
             # Carrier-specific payload keys — kept here so each
             # adapter's ``payload_keys`` ClassVar can pop what it
             # needs in ``_extract_shipment_payload``. Adding a new
             # carrier means listing its keys on the adapter, not
             # editing this dict.
-            "boxnow_locker_id": request.data.get("boxnow_locker_id", ""),
-            "boxnow_compartment_size": request.data.get(
+            "boxnow_locker_id": validated_data.get("boxnow_locker_id", ""),
+            "boxnow_compartment_size": validated_data.get(
                 "boxnow_compartment_size", 1
             ),
-            "acs_station_external_id": request.data.get(
+            "acs_station_external_id": validated_data.get(
                 "acs_station_external_id", ""
             ),
-            "acs_station_branch": request.data.get("acs_station_branch", ""),
-            "acs_charge_type": request.data.get("acs_charge_type"),
+            "acs_station_branch": validated_data.get("acs_station_branch", ""),
+            "acs_charge_type": validated_data.get("acs_charge_type"),
         }
 
     # Payment endpoints are expensive and abuse-prone (Stripe PaymentIntent
@@ -1099,7 +1081,10 @@ class OrderViewSet(BaseModelViewSet):
             # email can fire again on the (expected) new
             # payment_intent.succeeded, and the customer can be
             # re-notified of any new failure.
+            # Clear both the legacy boolean and the new timestamp key
+            # introduced by the worker-kill-safe idempotency refactor.
             locked_order.metadata.pop("confirmation_email_sent", None)
+            locked_order.metadata.pop("confirmation_email_sent_at", None)
             locked_order.metadata.pop("payment_failed_email_sent", None)
             locked_order.save(
                 update_fields=["payment_id", "payment_status", "metadata"]

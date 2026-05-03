@@ -259,7 +259,7 @@ PASSWORD_HASHERS = [
 # Rest Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "knox.auth.TokenAuthentication",
+        "core.api.tokens.BoundedTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": [
@@ -283,6 +283,7 @@ REST_FRAMEWORK = {
         "cart_mutation": None if DEBUG else "60/minute",
         "cart_mutation_anon": None if DEBUG else "30/minute",
         "search": None if DEBUG else "120/minute",
+        "view_count": None if DEBUG else "60/hour",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -1431,8 +1432,17 @@ REST_KNOX = {
     "AUTH_HEADER_PREFIX": "Bearer",
     "AUTO_REFRESH": True,
     "MIN_REFRESH_INTERVAL": 86400,  # Only extend TTL if token is >1 day old
+    # Caps how far into the future expiry can be pushed on each renewal.
+    # A fresh login gets 7 days; a long-lived active session can only
+    # push the expiry to (created + 30 days) — after that every renewal
+    # is a no-op and the session expires naturally at the 30-day wall.
+    "AUTO_REFRESH_MAX_TTL": datetime.timedelta(days=30),
     "TOKEN_LIMIT_PER_USER": 10,  # Prevent unbounded token accumulation per user
 }
+# Hard reject tokens older than this regardless of their expiry field.
+# Mirrors AUTO_REFRESH_MAX_TTL; both should be kept in sync.
+# BoundedTokenAuthentication in core/api/tokens.py reads this setting.
+KNOX_ABSOLUTE_MAX_AGE = datetime.timedelta(days=30)
 KNOX_TOKEN_MODEL = "knox.AuthToken"
 
 MEASUREMENT_BIDIMENSIONAL_SEPARATOR = "/"

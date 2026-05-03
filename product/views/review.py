@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from core.api.permissions import IsOwnerOrAdmin
@@ -16,6 +17,8 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
+from order.enum.status import OrderStatus
+from order.models.item import OrderItem
 from product.enum.review import ReviewStatus
 from product.filters.review import ProductReviewFilter
 from product.models.review import ProductReview
@@ -115,6 +118,14 @@ class ProductReviewViewSet(BaseModelViewSet):
         return super().get_permissions()
 
     def perform_create(self, serializer):
+        product = serializer.validated_data["product"]
+        has_purchase = OrderItem.objects.filter(
+            order__user=self.request.user,
+            order__status=OrderStatus.COMPLETED,
+            product=product,
+        ).exists()
+        if not has_purchase:
+            raise ValidationError({"product": _("must_have_purchased")})
         serializer.save(user=self.request.user)
 
     @action(detail=True, methods=["GET"])

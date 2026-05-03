@@ -632,6 +632,24 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         allow_blank=True,
         help_text=_("Customer notes or special instructions"),
     )
+    floor = serializers.CharField(
+        max_length=50,
+        required=False,
+        allow_blank=True,
+        help_text=_("Floor number or label (e.g. FIRST_FLOOR)"),
+    )
+    place = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        help_text=_("Place or district (optional)"),
+    )
+    location_type = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        help_text=_("Location type, e.g. HOME or OFFICE (optional)"),
+    )
 
     # B2B billing identity — required only when the buyer wants a
     # proper Τιμολόγιο Πώλησης (document_type=INVOICE). Normalised and

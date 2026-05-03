@@ -43,16 +43,20 @@ class TestOrderServiceCreateOrderFromCart:
         # Create country for shipping address
         self.country = CountryFactory.create()
 
-        # Create products with stock
+        # Create products with stock (active=True so cart validation passes)
         self.product1 = ProductFactory.create(
-            price=Money("50.00", settings.DEFAULT_CURRENCY), stock=20
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            stock=20,
+            active=True,
         )
         self.product1.set_current_language("en")
         self.product1.name = "Test Product 1"
         self.product1.save()
 
         self.product2 = ProductFactory.create(
-            price=Money("30.00", settings.DEFAULT_CURRENCY), stock=15
+            price=Money("30.00", settings.DEFAULT_CURRENCY),
+            stock=15,
+            active=True,
         )
         self.product2.set_current_language("en")
         self.product2.name = "Test Product 2"
@@ -77,7 +81,7 @@ class TestOrderServiceCreateOrderFromCart:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": self.country.alpha_2,  # Use actual country ID
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         self.payment_intent_id = "pi_test123abc"
@@ -364,7 +368,7 @@ class TestOrderServiceHandlePaymentSucceeded:
             street_number="123",
             city="Athens",
             zipcode="12345",
-            phone="+30123456789",
+            phone="+306900000000",
             shipping_price=Money("5.00", settings.DEFAULT_CURRENCY),
             paid_amount=Money("0.00", settings.DEFAULT_CURRENCY),
         )
@@ -696,7 +700,7 @@ class TestOrderServiceHandlePaymentFailed:
             street_number="123",
             city="Athens",
             zipcode="12345",
-            phone="+30123456789",
+            phone="+306900000000",
             shipping_price=Money("5.00", settings.DEFAULT_CURRENCY),
             paid_amount=Money("0.00", settings.DEFAULT_CURRENCY),
         )
@@ -1080,16 +1084,20 @@ class TestOrderServiceValidationMethods:
         """Set up test data for each test method."""
         self.user = UserAccountFactory.create()
 
-        # Create products
+        # Create products (active=True so cart validation passes)
         self.product1 = ProductFactory.create(
-            price=Money("50.00", settings.DEFAULT_CURRENCY), stock=20
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            stock=20,
+            active=True,
         )
         self.product1.set_current_language("en")
         self.product1.name = "Test Product 1"
         self.product1.save()
 
         self.product2 = ProductFactory.create(
-            price=Money("30.00", settings.DEFAULT_CURRENCY), stock=5
+            price=Money("30.00", settings.DEFAULT_CURRENCY),
+            stock=5,
+            active=True,
         )
         self.product2.set_current_language("en")
         self.product2.name = "Test Product 2"
@@ -1207,7 +1215,7 @@ class TestOrderServiceValidationMethods:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         # Should not raise exception
@@ -1225,7 +1233,7 @@ class TestOrderServiceValidationMethods:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         with pytest.raises(ValidationError) as exc_info:
@@ -1245,7 +1253,7 @@ class TestOrderServiceValidationMethods:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         with pytest.raises(ValidationError) as exc_info:
@@ -1268,7 +1276,7 @@ class TestOrderServiceValidationMethods:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         with pytest.raises(ValidationError) as exc_info:
@@ -1337,7 +1345,7 @@ class TestOrderServiceValidationMethods:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": -1,  # Invalid (negative)
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         with pytest.raises(ValidationError) as exc_info:

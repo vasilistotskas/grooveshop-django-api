@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import Signal, receiver
@@ -8,6 +9,35 @@ from django.dispatch import Signal, receiver
 from order.models.order import Order
 from order.signals import order_canceled, order_completed, order_refunded
 from user.models.account import UserAccount
+
+# Cache key + TTL for the tier-level lookup table used by
+# ``dispatch_tier_changed``.  Eliminated the original two per-save
+# ``LoyaltyTier.objects.only("required_level").get(pk=...)`` queries:
+# instead we keep a ``{tier_id: required_level}`` dict in the Django
+# cache (backed by Redis in production).  Any ``LoyaltyTier`` post_save
+# invalidates the entry so the next tier transition picks up the fresh
+# list within at most TIER_CACHE_TTL seconds.
+_TIER_LEVEL_CACHE_KEY = "loyalty:tier_level_map"
+_TIER_CACHE_TTL = 60  # seconds
+
+
+def _get_tier_level_map() -> dict[int, int]:
+    """Return {tier_id: required_level} from cache or DB (max 1 query/TTL).
+
+    Populates the cache on miss so subsequent saves inside the same TTL
+    window are pure in-memory lookups.
+    """
+    cached = cache.get(_TIER_LEVEL_CACHE_KEY)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+    from loyalty.models.tier import LoyaltyTier
+
+    mapping: dict[int, int] = dict(
+        LoyaltyTier.objects.values_list("id", "required_level")
+    )
+    cache.set(_TIER_LEVEL_CACHE_KEY, mapping, _TIER_CACHE_TTL)
+    return mapping
+
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +120,20 @@ def handle_order_refunded_loyalty(
 
 
 @receiver(
+    post_save,
+    dispatch_uid="loyalty.invalidate_tier_level_map",
+)
+def _invalidate_tier_level_map(sender: type, **kwargs: Any) -> None:
+    """Bust the tier-level cache whenever any LoyaltyTier row is saved.
+
+    Importing LoyaltyTier at module level causes circular imports so we
+    gate on a string comparison instead.
+    """
+    if sender.__name__ == "LoyaltyTier":
+        cache.delete(_TIER_LEVEL_CACHE_KEY)
+
+
+@receiver(
     pre_save,
     sender=UserAccount,
     dispatch_uid="loyalty.cache_original_loyalty_tier",
@@ -143,26 +187,21 @@ def dispatch_tier_changed(
 
     direction = "same"
     try:
-        from loyalty.models.tier import LoyaltyTier
-
         # ``LoyaltyTier.required_level`` is the canonical ordering
         # field — higher means more prestigious. Missing tier
         # (SET_NULL scenario) is treated as the lowest level so a
         # no-tier → any-tier transition counts as "up".
-        old_level = (
-            LoyaltyTier.objects.only("required_level")
-            .get(pk=old_id)
-            .required_level
-            if old_id
-            else -1
-        )
-        new_level = (
-            LoyaltyTier.objects.only("required_level")
-            .get(pk=new_id)
-            .required_level
-            if new_id
-            else -1
-        )
+        # ``_get_tier_level_map()`` is a cache-backed lookup that
+        # collapses all tier reads to at most one DB query per TTL
+        # window, eliminating the previous per-save N+1.
+        tier_map = _get_tier_level_map()
+        # loyalty_tier_id FK descriptor types the value as ``object``; we
+        # cast to ``int | None`` at the boundary so downstream lookups are
+        # fully typed.
+        _old: int | None = int(old_id) if old_id is not None else None  # ty: ignore[invalid-argument-type]
+        _new: int | None = int(new_id) if new_id is not None else None
+        old_level: int = tier_map.get(_old, -1) if _old is not None else -1
+        new_level: int = tier_map.get(_new, -1) if _new is not None else -1
         if new_level > old_level:
             direction = "up"
         elif new_level < old_level:

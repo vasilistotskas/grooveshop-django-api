@@ -89,7 +89,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             "zipcode": "12345",
             "country_id": self.country.alpha_2,  # Country uses alpha_2 as PK
             "region_id": self.region.alpha,  # Region uses alpha as PK
-            "phone": "+30123456789",
+            "phone": "+306900000000",
             "notes": "Test order",
         }
 

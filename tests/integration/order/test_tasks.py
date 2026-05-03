@@ -2,6 +2,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from django.core.cache import cache
 from django.test import TestCase as DjangoTestCase
 from django.test import override_settings
 from django.utils import timezone
@@ -10,6 +11,9 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.tasks import (
+    CONFIRMATION_EMAIL_SENT_AT_KEY,
+    CONFIRMATION_EMAIL_SENT_FLAG,
+    _confirmation_lock_key,
     _release_confirmation_email,
     check_pending_orders,
     generate_order_invoice,
@@ -112,6 +116,73 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             self.order.metadata.get("confirmation_email_sent"),
             "metadata flag must be set after a successful send",
         )
+
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_send_order_confirmation_email_worker_kill_recovery(
+        self, mock_render, mock_email
+    ):
+        """Simulate a worker OOM-kill mid-send.
+
+        The old pattern set a boolean metadata flag before the send; a
+        worker kill left the flag permanently set so the customer never
+        received the confirmation.
+
+        The new pattern uses a Redis execution lock with a short TTL:
+        - Acquire lock → send → write permanent DB timestamp → release lock.
+        - If the worker is killed the lock auto-expires; the next invocation
+          can acquire the lock and complete the send.
+
+        This test simulates the kill by manually holding the lock (as the
+        "dead" worker did) then releasing it (simulating TTL expiry) before
+        calling the task again. The second call must succeed and set the
+        permanent DB flag.
+        """
+        mock_email_instance = Mock()
+        mock_email.return_value = mock_email_instance
+        mock_render.side_effect = ["Email content", "HTML content"]
+
+        # Simulate worker-kill: hold the execution lock as if a dead worker
+        # acquired it but never released it (the lock expires naturally in
+        # production; here we force-release it to simulate the expiry).
+        lock_key = _confirmation_lock_key(self.order.id)
+        cache.set(lock_key, "1", 90)  # dead worker's lock
+
+        # First call sees the lock held and skips.
+        result_while_locked = send_order_confirmation_email(self.order.id)
+        self.assertTrue(result_while_locked)  # skips gracefully, not an error
+        mock_email_instance.send.assert_not_called()
+
+        # Simulate lock TTL expiry (worker is dead, Redis evicted the key).
+        cache.delete(lock_key)
+
+        # Second call acquires the lock, sends the email, writes DB flag.
+        result_after_expiry = send_order_confirmation_email(self.order.id)
+        self.assertTrue(result_after_expiry)
+        mock_email_instance.send.assert_called_once()
+
+        self.order.refresh_from_db()
+        self.assertIsNotNone(
+            self.order.metadata.get(CONFIRMATION_EMAIL_SENT_AT_KEY),
+            "permanent sent_at timestamp must be set after successful send",
+        )
+        self.assertTrue(
+            self.order.metadata.get(CONFIRMATION_EMAIL_SENT_FLAG),
+            "legacy boolean flag must also be set for backward compat",
+        )
+
+        # Third call: permanent DB flag present → skip without touching Redis.
+        mock_email_instance.send.reset_mock()
+        result_already_sent = send_order_confirmation_email(self.order.id)
+        self.assertTrue(result_already_sent)
+        mock_email_instance.send.assert_not_called()
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")

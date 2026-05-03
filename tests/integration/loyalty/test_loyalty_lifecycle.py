@@ -738,3 +738,85 @@ class TestRedeemPointsCappedByProductsTotal:
             )
 
         assert discount == Decimal("50")
+
+
+# ---------------------------------------------------------------------------
+# Test 6: Concurrent award_order_points — lost-update prevention
+# Requirement: race-safe XP accumulation via F() expression
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+class TestConcurrentAwardOrderPoints:
+    """Verify that two concurrent award calls sum to the total, not
+    silently lose one update (classic read-modify-write race)."""
+
+    def test_concurrent_awards_sum_correctly(self):
+        """Simulate two concurrent award_order_points calls using threads.
+
+        Each call operates on a separate order so the idempotency guard
+        (existing EARN transactions for the same order) does not block
+        them. The user's total_xp must equal the sum of both awards.
+        """
+        import threading
+
+        user = UserAccountFactory()
+        product = _create_product(
+            price=Decimal("100.00"), vat_percent=Decimal("0.0")
+        )
+        order1 = _create_order(user)
+        _create_order_item(order1, product, quantity=1)
+
+        order2 = _create_order(user)
+        _create_order_item(order2, product, quantity=2)
+
+        mock_settings = _loyalty_settings(
+            enabled=True, points_factor=1.0, price_basis="final_price"
+        )
+
+        # order1 → 100 pts, order2 → 200 pts; expected total = 300
+        errors = []
+
+        def award(order_id):
+            try:
+                with patch(
+                    "loyalty.services.Setting.get",
+                    side_effect=mock_settings,
+                ):
+                    LoyaltyService.award_order_points(order_id)
+            except Exception as exc:
+                errors.append(exc)
+
+        t1 = threading.Thread(target=award, args=(order1.id,))
+        t2 = threading.Thread(target=award, args=(order2.id,))
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert errors == [], f"Thread errors: {errors}"
+
+        user.refresh_from_db()
+        assert user.total_xp == 300
+
+    def test_idempotency_guard_prevents_double_award(self):
+        """Calling award_order_points twice for the same order returns 0
+        on the second call and does not double-credit XP."""
+        user = UserAccountFactory()
+        product = _create_product(
+            price=Decimal("50.00"), vat_percent=Decimal("0.0")
+        )
+        order = _create_order(user)
+        _create_order_item(order, product, quantity=1)
+
+        mock_settings = _loyalty_settings(enabled=True, points_factor=1.0)
+
+        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+            first = LoyaltyService.award_order_points(order.id)
+            second = LoyaltyService.award_order_points(order.id)
+
+        assert first == 50
+        assert second == 0
+
+        user.refresh_from_db()
+        assert user.total_xp == 50

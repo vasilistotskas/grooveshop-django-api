@@ -95,7 +95,9 @@ class TestTransactionFailuresRollbackCompletely:
 
         # Create product with initial stock
         product = ProductFactory.create(
-            price=Money("50.00", settings.DEFAULT_CURRENCY), stock=initial_stock
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            stock=initial_stock,
+            active=True,
         )
         product.set_current_language("en")
         product.name = "Test Product"
@@ -559,7 +561,9 @@ class TestTransactionFailuresRollbackCompletely:
         products = []
         for i in range(3):
             product = ProductFactory.create(
-                price=Money("50.00", settings.DEFAULT_CURRENCY), stock=100
+                price=Money("50.00", settings.DEFAULT_CURRENCY),
+                stock=100,
+                active=True,
             )
             product.set_current_language("en")
             product.name = f"Test Product {i + 1}"

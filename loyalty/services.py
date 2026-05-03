@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from extra_settings.models import Setting
@@ -121,23 +122,38 @@ class LoyaltyService:
         if user.loyalty_tier:
             tier_multiplier = user.loyalty_tier.points_multiplier
 
+        transactions_to_create = []
         total_points = 0
         for item in order.items.select_related("product", "product__vat").all():
             points = cls.calculate_item_points(
                 item.product, item.quantity, tier_multiplier
             )
-            PointsTransaction.objects.create(
-                user=user,
-                points=points,
-                transaction_type=TransactionType.EARN,
-                reference_order=order,
-                description=f"Points earned for {item.product} x{item.quantity}",
+            transactions_to_create.append(
+                PointsTransaction(
+                    user=user,
+                    points=points,
+                    transaction_type=TransactionType.EARN,
+                    reference_order=order,
+                    description=(
+                        f"Points earned for {item.product} x{item.quantity}"
+                    ),
+                )
             )
             total_points += points
 
-        # Update XP
-        user.total_xp += total_points
-        user.save(update_fields=["total_xp"])
+        if transactions_to_create:
+            PointsTransaction.objects.bulk_create(transactions_to_create)
+
+        # Race-safe XP increment: F() expression prevents a
+        # lost-update when two concurrent award calls run in parallel.
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        User.objects.filter(pk=user.pk).update(
+            total_xp=F("total_xp") + total_points
+        )
+        # Refresh so subsequent code in the same request sees the new value.
+        user.refresh_from_db(fields=["total_xp"])
 
         return total_points
 

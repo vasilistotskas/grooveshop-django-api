@@ -97,7 +97,8 @@ class TestPaymentConfirmationConvertsReservations:
         """
         # Setup: Create products with specified stock levels
         products = [
-            ProductFactory(stock=initial_stocks[i]) for i in range(num_products)
+            ProductFactory(stock=initial_stocks[i], active=True)
+            for i in range(num_products)
         ]
 
         # Create a cart with items
@@ -245,8 +246,8 @@ class TestPaymentConfirmationConvertsReservations:
         order creation is rolled back and no reservations are consumed.
         """
         # Setup: Create two products with sufficient stock
-        product1 = ProductFactory(stock=50)
-        product2 = ProductFactory(stock=50)
+        product1 = ProductFactory(stock=50, active=True)
+        product2 = ProductFactory(stock=50, active=True)
 
         # Create cart with items
         user = UserAccountFactory()
@@ -347,7 +348,7 @@ class TestPaymentConfirmationConvertsReservations:
         Test that reservation conversion creates correct StockLog audit entries.
         """
         # Setup: Create product
-        product = ProductFactory(stock=100)
+        product = ProductFactory(stock=100, active=True)
 
         # Create cart and reservation
         user = UserAccountFactory()

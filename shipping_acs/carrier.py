@@ -299,14 +299,35 @@ class AcsCarrier(ShippingCarrierInterface):
         from django.core.cache import cache
         from django.utils import timezone
 
+        from shipping_acs import config as acs_config
         from shipping_acs.client import AcsClient
         from shipping_acs.exceptions import AcsAPIError, AcsConfigError
         from shipping_acs.services import _kg_from_grams
 
+        # ACS_Price_Calculation requires both Origin and Destination
+        # station codes. Empty/missing values return
+        # ``Άγνωστο κατάστημα παραλαβής``. The merchant pickup branch
+        # is parsed from the billing code (or via metadata override —
+        # see ``shipping_acs/config.py::station_origin``). When we
+        # don't have a destination yet (sidebar quote pre-address)
+        # we use origin for both — ACS prices intra-region same as
+        # the merchant's home region (~+0.20€ delta to inter-region),
+        # well under the flat-rate baseline.
+        origin = acs_config.station_origin()
+        if not origin:
+            logger.warning(
+                "ACS_STATION_ORIGIN not configured — falling back to "
+                "flat rate. Set ShippingProvider(code='acs').metadata"
+                "['station_origin'] in admin or check the format of "
+                "ACS_BILLING_CODE."
+            )
+            return None
+        destination = origin
+
         bucketed_grams = cls._bucket_weight_grams(weight_grams)
         cache_key = (
             f"acs:price_quote:{country_id or '-'}:{region_id or '-'}"
-            f":{bucketed_grams}"
+            f":{bucketed_grams}:{origin}:{destination}"
         )
         cached = cache.get(cache_key)
         if cached is not None:
@@ -317,6 +338,8 @@ class AcsCarrier(ShippingCarrierInterface):
             response = client.price_calculation(
                 {
                     "Billing_Category": 2,
+                    "Acs_Station_Origin": origin,
+                    "Acs_Station_Destination": destination,
                     # ACS reads numeric strings with the Greek locale
                     # (comma-decimal). ``_kg_from_grams`` returns the
                     # already-formatted ``"0,5"`` / ``"2,5"`` string —
@@ -339,6 +362,21 @@ class AcsCarrier(ShippingCarrierInterface):
                 "Unexpected error during ACS price quote: %s — "
                 "falling back to flat rate.",
                 exc,
+            )
+            return None
+
+        # ACS returns a 200 with ``Error_Message`` populated for
+        # business errors (e.g. unknown station). Surface those in
+        # logs so an operator can correct the metadata, then fall
+        # back to the flat rate.
+        error_message = response.get("Error_Message") if response else None
+        if error_message:
+            logger.warning(
+                "ACS_Price_Calculation business error (origin=%s "
+                "dest=%s): %s — falling back to flat rate.",
+                origin,
+                destination,
+                error_message,
             )
             return None
 

@@ -161,6 +161,40 @@ def default_voucher_language() -> str:
     )
 
 
+def station_origin() -> str | None:
+    """Merchant pickup-station code for ``ACS_Price_Calculation``.
+
+    The price-calc endpoint requires both ``Acs_Station_Origin`` (the
+    merchant's pickup branch) and ``Acs_Station_Destination`` (the
+    recipient's branch, resolved via address validation). Empty values
+    return ``Άγνωστο κατάστημα παραλαβής``.
+
+    Resolution order:
+
+    1. ``ShippingProvider.metadata['station_origin']`` — operator
+       override via Django admin.
+    2. Parsed from ``settings.ACS_BILLING_CODE`` positions 1-2 — the
+       standard ACS billing code format is ``<category><station>
+       <customer_id>``, e.g. ``"2ΑΚ89587"`` → ``"ΑΚ"``.
+    3. ``None`` — the live-quote path treats this as "can't quote" and
+       falls back to the flat-rate Setting.
+
+    Returns the station code as ACS expects it (Greek 2-letter codes
+    like ``ΑΚ`` / ``ΓΣ`` / ``ΘΕ``).
+    """
+    metadata = _provider_metadata()
+    explicit = metadata.get("station_origin")
+    if explicit:
+        return str(explicit).strip().upper() or None
+
+    billing_code = getattr(django_settings, "ACS_BILLING_CODE", "") or ""
+    if len(billing_code) >= 3:
+        candidate = billing_code[1:3].strip().upper()
+        if candidate:
+            return candidate
+    return None
+
+
 def map_config() -> dict[str, Any]:
     """Map chrome (centre/zoom/tile providers) for the picker UI.
 

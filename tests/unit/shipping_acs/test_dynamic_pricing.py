@@ -346,6 +346,109 @@ def test_quote_cache_buckets_collapse_near_weights(dynamic_pricing_on):
     assert len(fake_store) == 1
 
 
+def test_live_quote_sends_station_origin_and_destination(dynamic_pricing_on):
+    """``ACS_Price_Calculation`` returns ``Άγνωστο κατάστημα παραλαβής``
+    when ``Acs_Station_Origin`` is missing — even with a valid billing
+    code. The carrier resolves origin from
+    ``shipping_acs.config.station_origin()`` (parsed from the billing
+    code by default) and uses it for both endpoints when no per-call
+    destination is supplied.
+    """
+    from shipping_acs import config as acs_config
+
+    adapter = get_provider("acs")
+
+    with (
+        patch.object(acs_config, "station_origin", return_value="ΑΚ"),
+        patch("shipping_acs.client.AcsClient") as mock_class,
+    ):
+        instance = mock_class.return_value
+        instance.price_calculation.return_value = {"Total_Ammount": 2.30}
+        adapter.calculate_shipping_cost(
+            order_value_amount=10.0,
+            currency="EUR",
+            kind=ShippingKind.HOME_DELIVERY,
+            weight_grams=2000,
+        )
+
+    assert instance.price_calculation.called
+    payload = instance.price_calculation.call_args[0][0]
+    assert payload["Acs_Station_Origin"] == "ΑΚ"
+    assert payload["Acs_Station_Destination"] == "ΑΚ"
+
+
+def test_live_quote_falls_back_when_station_origin_missing(dynamic_pricing_on):
+    """No billing code + no metadata override → adapter must fall
+    back to the flat-rate Setting instead of calling ACS with empty
+    origin (which would always return the same business error)."""
+    from shipping_acs import config as acs_config
+
+    adapter = get_provider("acs")
+
+    with (
+        patch.object(acs_config, "station_origin", return_value=None),
+        patch("shipping_acs.client.AcsClient") as mock_class,
+    ):
+        instance = mock_class.return_value
+        quote = adapter.calculate_shipping_cost(
+            order_value_amount=10.0,
+            currency="EUR",
+            kind=ShippingKind.HOME_DELIVERY,
+            weight_grams=2000,
+        )
+
+    assert instance.price_calculation.called is False
+    assert quote == (3.5, "EUR")
+
+
+def test_live_quote_business_error_falls_back_to_flat_rate(dynamic_pricing_on):
+    """ACS returns 200 with ``Error_Message`` populated (not an
+    exception) for unknown-station rejections. The adapter must
+    treat that as a fall-back, not propagate the empty
+    ``Total_Ammount`` as a 0€ quote."""
+    from shipping_acs import config as acs_config
+
+    adapter = get_provider("acs")
+
+    with (
+        patch.object(acs_config, "station_origin", return_value="ΑΚ"),
+        patch("shipping_acs.client.AcsClient") as mock_class,
+    ):
+        instance = mock_class.return_value
+        instance.price_calculation.return_value = {
+            "Total_Ammount": None,
+            "Basic_Ammount": None,
+            "Error_Message": "Άγνωστο κατάστημα παραλαβής.",
+        }
+        quote = adapter.calculate_shipping_cost(
+            order_value_amount=10.0,
+            currency="EUR",
+            kind=ShippingKind.HOME_DELIVERY,
+            weight_grams=2000,
+        )
+
+    assert quote == (3.5, "EUR")
+
+
+def test_station_origin_parses_from_billing_code(settings):
+    """Billing code format ``<category><station><customer>`` — the
+    helper extracts positions 1-2 as the station code. Greek-locale
+    billing codes (``2ΑΚ89587``) are common in Greece."""
+    from shipping_acs import config as acs_config
+
+    settings.ACS_BILLING_CODE = "2ΑΚ89587"
+    assert acs_config.station_origin() == "ΑΚ"
+
+    settings.ACS_BILLING_CODE = "2ΘΕ12345"
+    assert acs_config.station_origin() == "ΘΕ"
+
+    settings.ACS_BILLING_CODE = ""
+    assert acs_config.station_origin() is None
+
+    settings.ACS_BILLING_CODE = "2"  # too short
+    assert acs_config.station_origin() is None
+
+
 def test_quote_cache_separates_distinct_weight_buckets(dynamic_pricing_on):
     """487g and 1500g hit different buckets (500g / 2 kg) → two
     upstream calls. Without bucket-keyed caching a heavy cart would

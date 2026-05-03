@@ -36,13 +36,6 @@ serializers_config: SerializersConfig = {
         description=_("Set this address as the user's main address."),
         tags=["User Addresses"],
     ),
-    "get_main": ActionConfig(
-        response=UserAddressDetailSerializer,
-        operation_id="getMainUserAddress",
-        summary=_("Get main address"),
-        description=_("Retrieve the user's main address."),
-        tags=["User Addresses"],
-    ),
 }
 
 
@@ -101,14 +94,3 @@ class UserAddressViewSet(BaseModelViewSet):
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(address)
         return Response(response_serializer.data)
-
-    @action(detail=False, methods=["GET"])
-    def get_main(self, request):
-        main_address = UserAddress.objects.filter(
-            user=request.user, is_main=True
-        ).first()
-        if main_address:
-            response_serializer_class = self.get_response_serializer()
-            response_serializer = response_serializer_class(main_address)
-            return Response(response_serializer.data)
-        return Response({"detail": _("No main address found.")}, status=404)

@@ -3,6 +3,90 @@
 
 
 
+## v1.124.1 (2026-05-03)
+
+### Bug fixes
+
+* fix(shipping_acs): wire Acs_Station_Origin so live quotes actually return a price
+
+``ACS_Price_Calculation`` requires both ``Acs_Station_Origin`` (the
+merchant's pickup branch) and ``Acs_Station_Destination`` (the
+recipient's resolved branch). Previously we sent neither — every
+quote came back with ``Άγνωστο κατάστημα παραλαβής`` and silently
+fell back to the flat rate, defeating the whole feature. Verified by
+sweeping through plausible station codes against the production ACS
+endpoint until ``ΑΚ`` (the merchant's billing-code prefix) returned
+a real number.
+
+* New ``shipping_acs.config.station_origin()`` resolves the merchant
+  station via:
+  1. ``ShippingProvider.metadata['station_origin']`` — operator
+     override via Django admin.
+  2. Parsed from ``settings.ACS_BILLING_CODE`` positions 1-2 — ACS's
+     standard billing code format is ``<category><station><customer>``,
+     e.g. ``"2ΑΚ89587"`` → ``"ΑΚ"``.
+  3. Returns ``None`` → adapter falls back to flat rate cleanly.
+
+* ``_fetch_live_quote`` now sends both ``Acs_Station_Origin`` and
+  ``Acs_Station_Destination`` (using origin for both at sidebar time
+  — ACS pricing is largely flat across regions, ``ΑΚ→ΑΚ`` matches
+  ``ΑΚ→ΓΣ`` exactly; cross-region ``ΑΚ→ΘΕ`` is +0.20€ — still well
+  under the 3.50€ flat rate). Cache key includes both stations so a
+  per-call destination override (future) doesn't collide.
+
+* ACS returns 200 with ``Error_Message`` populated for business
+  rejections (rather than HTTP 4xx) — the adapter now logs and falls
+  back instead of propagating the empty ``Total_Ammount`` as 0€.
+
+Test additions:
+
+* ``test_live_quote_sends_station_origin_and_destination`` — fails
+  the moment the adapter forgets a field.
+* ``test_live_quote_falls_back_when_station_origin_missing`` — no
+  config → no API call, flat rate.
+* ``test_live_quote_business_error_falls_back_to_flat_rate`` —
+  catches the ``Error_Message`` 200 path the original code missed.
+* ``test_station_origin_parses_from_billing_code`` — Greek-locale
+  billing codes parse correctly; short/empty inputs return None.
+
+32 ACS dynamic-pricing tests pass.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c42898c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c42898c2028f1c1be403477a9f1299e0b684f4cc))
+
+### Chores
+
+* chore(deps): sync uv.lock to pyproject.toml 1.124.0
+
+semantic-release auto-bumped pyproject.toml during the v1.124.0
+release without regenerating uv.lock — CI's `uv sync --locked` then
+blocks every subsequent push (including the ACS station-origin fix).
+Resync.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c234cea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c234cea5c22f6b5b8e137b9542437f28aba1a116))
+
+### Testing
+
+* test(shipping_acs): pin station_origin in live-quote tests so CI doesn't depend on env
+
+The ``fix(shipping_acs)`` commit (c42898c2) added a guard in
+``_fetch_live_quote`` that returns ``None`` early when
+``station_origin()`` resolves to ``None`` — which happens in CI
+because the GitHub Actions runner doesn't set ``ACS_BILLING_CODE``.
+
+Locally my .env had the production billing code so tests passed,
+but every quote test failed in CI because ``_fetch_live_quote``
+short-circuited before the mocked ``AcsClient`` was reached:
+
+AssertionError: assert (3.5, 'EUR') == (5.21, 'EUR')
+
+Add a ``pin_station_origin`` fixture (opt-in, not autouse — the
+``test_station_origin_parses_from_billing_code`` test needs the
+real function) and wire it into every quote-path test so they run
+deterministically regardless of env state. Verified locally with
+``ACS_BILLING_CODE=""`` — all 32 tests pass.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`78564b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/78564b0e028eb1347e29bc9c9b0c4fb01abe9feb))
+
 ## v1.124.0 (2026-05-02)
 
 ### Chores

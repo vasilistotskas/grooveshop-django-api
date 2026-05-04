@@ -3,6 +3,112 @@
 
 
 
+## v1.125.0 (2026-05-04)
+
+### Bug fixes
+
+* fix(ci): drop spectacular --fail-on-warn, override CVE-fixed deps
+
+Two CI fixes from the initial Trivy + spectacular gate rollout:
+
+- ``manage.py spectacular --fail-on-warn`` failed CI because
+  drf-spectacular emits informational warnings for cross-app
+  operationId collisions (``listPayWay`` / ``retrievePayWay`` clashed
+  across 14 ViewSets) which it auto-resolves with numeric suffixes.
+  Those are noise, not real schema errors. Drop the flag — bare
+  ``--validate`` still fails on actual openapi-spec-validator errors.
+
+- Trivy filesystem scan reported 4 HIGH CVEs in transitive deps:
+  - tornado 6.5.2: CVE-2026-35536 + CVE-2026-31958 (fixed in 6.5.5)
+  - pyasn1 0.6.1: CVE-2026-30922 + CVE-2026-23490 (fixed in 0.6.3)
+  Pinned both via ``[tool.uv] override-dependencies`` so the
+  resolver bumps them regardless of what indirect parent constraint
+  pulls them in. Lock refreshed.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6dcfe79`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6dcfe79feb5662602ffc0137b8919ed515883a80))
+
+* fix(user): drop redundant /user/address/get_main endpoint
+
+The action returned 404 with ``{detail: "No main address found."}``
+whenever an authenticated user without a saved main address hit
+checkout — Django logged each as a WARNING. The frontend already
+fetches every saved address via ``/user/address`` ordered by
+``-isMain,-createdAt``, so the dedicated single-result endpoint was
+a redundant round-trip and the source of all the noise in prod logs.
+
+Drop the action, the URL, and the schema config. Manager method
+``UserAddress.objects.get_main_address`` (used internally by signals
++ admin) is unchanged. The Nuxt composable derives main from the
+saved-addresses list via ``find(a => a.isMain)`` — same behaviour,
+zero 404s.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`f8737c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f8737c467997e0c1b543f0d4e1dfd1f46331d536))
+
+### Features
+
+* feat(api): hardening, perf, and CI gates pass
+
+Security
+- Cap Knox absolute lifetime via BoundedTokenAuthentication so
+  AUTO_REFRESH no longer extends sessions indefinitely
+  (KNOX_ABSOLUTE_MAX_AGE=30d, plus AUTO_REFRESH_MAX_TTL).
+- Block deactivated products in validate_cart_for_checkout instead of
+  silently accepting them.
+- Require a completed OrderItem to write a product review; the
+  ProductReview create path now 400s with must_have_purchased.
+- Cap notifications-by-ids list at 500 to avoid an unbounded IN clause.
+- Add a dedicated 60/hour ViewCountThrottle scope for update_view_count.
+- Strip control characters from incoming X-Correlation-ID before
+  logging or echoing to prevent log injection.
+- GET /order anonymous now returns 401 (was 200 empty list).
+
+Correctness
+- Read parler-translated names via safe_translation_getter so Celery
+  contexts without an active language don't crash on product.name.
+- send_order_confirmation_email survives worker kills via a Redis lock
+  + permanent confirmation_email_sent_at timestamp.
+- order/views/order.py create() now validates through
+  OrderCreateFromCartSerializer; runtime matches the OpenAPI schema.
+- notification consumers serialize through DjangoJSONEncoder so
+  Decimal/datetime payloads no longer crash WS clients.
+
+Filters / API surface
+- product/filters/review.py: drop the no-op helpful_votes_min stub and
+  wire verified_purchase through a real Exists() subquery against
+  COMPLETED OrderItem rows.
+- prefetch translations + select_related user on the reviews action to
+  remove a per-review N+1.
+
+Performance
+- Cart.refresh_last_activity uses .update() to skip auto_now/save
+  signals on every read.
+- LoyaltyService.award_order_points: bulk_create transactions, atomic
+  F("total_xp") + delta on the user row.
+- tier_changed signal reads from a 60-second in-memory LoyaltyTier
+  cache invalidated on LoyaltyTier post_save.
+- CartItemDetailSerializer.get_recommendations reads from a 5-min
+  Redis cache keyed on category_id (was N+1 per cart item).
+- Document why OrderItem creation can't bulk_create (signal contract
+  with OrderHistory).
+
+CI
+- Add ruff check, ty check, and `manage.py spectacular --validate
+  --fail-on-warn` to the quality job.
+- Trivy filesystem scan job uploads SARIF; Docker image scan gates the
+  push step on a HIGH/CRITICAL-clean result.
+
+Tests
+- New: validate_cart_inactive_product, review_verified_purchase,
+  notifications_by_ids, correlation_id_middleware (9 cases),
+  recommendations_cache, tier_signal_cache, consumer_json_encoder,
+  create_via_serializer, plus Knox-cap unit tests.
+- Update: existing order tests use a libphonenumber-valid Greek mobile
+  (+306900000000) so OrderCreateFromCartSerializer's strict
+  PhoneNumberField passes.
+- Refresh schema.yml from the new API surface.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d813324`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d813324490e9b259ad0749218cdf661d33d70ded))
+
 ## v1.124.1 (2026-05-03)
 
 ### Bug fixes

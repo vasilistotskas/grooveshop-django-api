@@ -3,6 +3,36 @@
 
 
 
+## v1.125.2 (2026-05-04)
+
+### Bug fixes
+
+* fix(ci): docker trivy scan reports without gating push
+
+Trivy's CLI exits non-zero on any HIGH/CRITICAL finding even with
+``ignore-unfixed: true`` (the flag only filters SARIF output, not
+the exit code). Set ``exit-code: '0'`` so the publish proceeds
+while SARIF still uploads to the Security tab for visibility.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`cf3dede`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf3dedee92997b9ff05ef72302c7cc7b5f7bf2c0))
+
+### Chores
+
+* chore(deps): refresh uv.lock for v1.125.1
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1d140e7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d140e7f39205b18724f93a0b7595de96d7d1294))
+
+### Continuous integration
+
+* ci(release): auto-sync uv.lock after semantic-release version bump
+
+Refresh and commit ``uv.lock`` whenever python-semantic-release
+publishes a new version. Without this, the next push fails
+``uv sync --locked`` because the lockfile's project entry still
+points at the previous version.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d74f66a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d74f66a8354f2b836741c79c4578c0111d3cee99))
+
 ## v1.125.1 (2026-05-04)
 
 ### Bug fixes

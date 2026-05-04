@@ -3,6 +3,31 @@
 
 
 
+## v1.125.1 (2026-05-04)
+
+### Bug fixes
+
+* fix(ci): ignore-unfixed on docker image trivy scan
+
+Base image (Alpine 3.23) ships with HIGH/CRITICAL CVEs that have no
+upstream patch available — those would otherwise block every release
+indefinitely even when our own deps are clean. Add
+``ignore-unfixed: true`` so we only gate on actionable CVEs. SARIF is
+still uploaded to the Security tab so unfixed findings remain visible.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`fc71aaf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc71aafbc4ee57f91036b7ece4c0fee75ab79151))
+
+### Chores
+
+* chore(deps): refresh uv.lock for v1.125.0
+
+Semantic-release bumped pyproject.toml from 1.124.1 to 1.125.0 in
+the prior release commit but didn't regenerate uv.lock, so CI's
+``uv sync --locked`` step now fails on a stale lockfile entry.
+``uv lock`` syncs the project version.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`f049687`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f049687b9d71623ce7e595a0ff115dc9458c8f53))
+
 ## v1.125.0 (2026-05-04)
 
 ### Bug fixes

@@ -253,6 +253,24 @@ jobs:
         with:
           github_token: ${{ secrets.DJANGO_TOKEN }}
 
+      - name: Sync uv.lock to released version
+        # ``python-semantic-release`` only bumps ``pyproject.toml``;
+        # ``uv.lock`` keeps the previous version in its
+        # ``[[package]]`` entry for the project itself, so subsequent
+        # ``uv sync --locked`` runs on the next push fail with
+        # "lockfile needs to be updated". Refresh the lockfile and
+        # commit it back so main stays consistent.
+        if: steps.release.outputs.released == 'true'
+        run: |
+          uv lock
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet uv.lock; then
+            git add uv.lock
+            git commit -m "chore(deps): sync uv.lock to ${{ steps.release.outputs.version }} [skip ci]"
+            git push
+          fi
+
       - name: Install pypa/build
         run: uv add build
 

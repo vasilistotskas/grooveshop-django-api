@@ -237,6 +237,19 @@ timeout = 600
 addopts = "--tb=short --maxfail=0 -n auto --dist loadfile"
 
 # ─────────────────────────────────────────────────────────
+# uv configuration — transitive-dependency overrides for
+# CVEs found by Trivy. Both packages are indirect deps but
+# their fixed versions are drop-in compatible.
+# ─────────────────────────────────────────────────────────
+[tool.uv]
+override-dependencies = [
+    # CVE-2026-35536, CVE-2026-31958 (HIGH) — fixed in 6.5.5
+    "tornado>=6.5.5",
+    # CVE-2026-30922, CVE-2026-23490 (HIGH) — fixed in 0.6.3 / 0.6.2
+    "pyasn1>=0.6.3",
+]
+
+# ─────────────────────────────────────────────────────────
 # Django-stubs configuration
 # ─────────────────────────────────────────────────────────
 [tool.django-stubs]

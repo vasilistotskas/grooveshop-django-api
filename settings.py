@@ -499,6 +499,13 @@ CACHE_CLEAR_PREFIXES: list[str] = [
     "cache:",  # Nuxt SSR cache
 ]
 
+# Internal Nuxt URL used by ``core.cache`` to invalidate Nitro SSR
+# caches synchronously from the Django admin. In Kubernetes this is
+# the cluster-internal Service DNS (e.g. ``http://frontend-nuxt:3000``)
+# so Cloudflare/Traefik are bypassed and the call is fast.
+NUXT_INTERNAL_BASE_URL = getenv("NUXT_INTERNAL_BASE_URL", "")
+NUXT_CACHE_PURGE_TOKEN = getenv("NUXT_CACHE_PURGE_TOKEN", "")
+
 if SYSTEM_ENV == "ci":
     CACHES = {
         "default": {

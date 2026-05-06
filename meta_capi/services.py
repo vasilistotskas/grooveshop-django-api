@@ -34,12 +34,33 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ``action_source = "website"`` is the right value for any event
-# triggered by browser activity, even when the event itself is
-# minted server-side from a webhook (Stripe, COD voucher mint). Use
-# ``"system_generated"`` only for truly autonomous events with no
-# user interaction (e.g. a renewal we triggered ourselves).
-ACTION_SOURCE_WEBSITE = "website"
+
+def _action_source_website():
+    """Return the ``ActionSource.WEBSITE`` enum value.
+
+    Why a function and not a module-level constant: the SDK module
+    pulls in ``facebook_business`` which is a non-trivial import,
+    and we want ``services`` importable in test environments that
+    stub the SDK. Imported lazily inside ``_new_event``.
+
+    Why an enum and not the string ``"website"``: ``facebook_business``
+    25.0.1 tightened ``Event.action_source`` to require an
+    ``ActionSource`` member; the previous string-based assignment
+    raised ``TypeError on value: website`` at dispatch time, which
+    silently torpedoed every CAPI event in production (verified
+    2026-05-07 via a manual ``CompleteRegistration`` test event —
+    audit row landed as ``status=failed``). For browser-originated
+    events that are MINTED server-side (Stripe webhook, COD voucher
+    mint) ``WEBSITE`` is still the right value — Meta uses
+    ``SYSTEM_GENERATED`` only for fully autonomous events with no
+    user interaction (e.g. a renewal we triggered ourselves).
+    """
+
+    from facebook_business.adobjects.serverside.action_source import (
+        ActionSource,
+    )
+
+    return ActionSource.WEBSITE
 
 
 def _decimal_to_float(value: Decimal | float | int | None) -> float | None:
@@ -299,7 +320,7 @@ def _new_event(
         event_time=int(time.time()),
         event_id=event_id,
         event_source_url=event_source_url or None,
-        action_source=ACTION_SOURCE_WEBSITE,
+        action_source=_action_source_website(),
         user_data=user_data,
         custom_data=custom_data,
     )

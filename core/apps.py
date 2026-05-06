@@ -13,7 +13,10 @@ class CoreConfig(AppConfig):
 
         import core.signals.rosetta  # noqa: F401
 
+        from core.cache.surfaces import register_default_surfaces
         from core.tasks import validate_task_configuration
+
+        register_default_surfaces()
 
         try:
             validate_task_configuration()

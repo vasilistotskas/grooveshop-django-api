@@ -498,3 +498,42 @@ class SolarScheduleAdmin(ModelAdmin):
 @admin.register(ClockedSchedule)
 class ClockedScheduleAdmin(BaseClockedScheduleAdmin, ModelAdmin):
     pass
+
+
+from core.cache.models import CachePurgeLog  # noqa: E402
+
+
+@admin.register(CachePurgeLog)
+class CachePurgeLogAdmin(ModelAdmin):
+    list_display = (
+        "created_at",
+        "actor",
+        "surface_summary",
+        "total_django",
+        "total_nuxt",
+        "total_blocked",
+        "dry_run",
+    )
+    list_filter = ("dry_run", "created_at")
+    search_fields = ("actor__email", "actor__username")
+    readonly_fields = (
+        "actor",
+        "created_at",
+        "surfaces",
+        "dry_run",
+        "total_django",
+        "total_nuxt",
+        "total_blocked",
+        "detail",
+    )
+
+    @admin.display(description="Surfaces")
+    def surface_summary(self, obj):
+        codes = obj.surfaces or []
+        return ", ".join(codes) if codes else "—"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

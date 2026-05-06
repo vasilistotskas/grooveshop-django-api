@@ -247,6 +247,10 @@ override-dependencies = [
     "tornado>=6.5.5",
     # CVE-2026-30922, CVE-2026-23490 (HIGH) — fixed in 0.6.3 / 0.6.2
     "pyasn1>=0.6.3",
+    # CVE-2026-42304 (HIGH) — DoS in twisted.names DNS compression
+    # pointer chains; fixed in 26.4.0rc2 (no stable patch yet).
+    # Extras kept inline so the resolver preserves pyopenssl/h2 etc.
+    "twisted[http2,tls]>=26.4.0rc2",
 ]
 
 # ─────────────────────────────────────────────────────────

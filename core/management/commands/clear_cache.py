@@ -75,16 +75,16 @@ class Command(BaseCommand):
             )
         )
         for surface in report.surfaces:
-            self.stdout.write(
+            line = (
                 f"  {surface.code:25} django={surface.django_deleted}"
                 f" nuxt={surface.nuxt_deleted}"
                 f" blocked={surface.django_blocked + surface.nuxt_blocked}"
-                + (
-                    f" nuxt_error={surface.nuxt_error}"
-                    if surface.nuxt_error
-                    else ""
-                )
             )
+            if surface.django_error:
+                line += f" django_error={surface.django_error}"
+            if surface.nuxt_error:
+                line += f" nuxt_error={surface.nuxt_error}"
+            self.stdout.write(line)
 
     def _list_surfaces(self) -> None:
         from core.cache.registry import iter_surfaces

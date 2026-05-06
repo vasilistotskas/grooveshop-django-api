@@ -1,5 +1,6 @@
 from core.cache.registry import (
     CacheSurface,
+    expand_with_related,
     get_surface,
     iter_surfaces,
     register_surface,
@@ -11,6 +12,7 @@ __all__ = [
     "CacheSurface",
     "PurgeReport",
     "SurfaceResult",
+    "expand_with_related",
     "get_surface",
     "iter_surfaces",
     "register_surface",

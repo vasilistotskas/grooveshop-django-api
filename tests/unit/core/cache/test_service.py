@@ -4,15 +4,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.cache.registry import CacheSurface, register_surface, reset
+from core.cache.registry import CacheSurface, _reset_for_tests, register_surface
 from core.cache.service import CacheService
 
 
 @pytest.fixture
 def isolated_registry():
-    reset()
+    _reset_for_tests()
     yield
-    reset()
+    _reset_for_tests()
     from core.cache.surfaces import register_default_surfaces
 
     register_default_surfaces()
@@ -116,6 +116,41 @@ class TestPurge:
 
         assert report.surfaces == []
         cache_instance_mock.keys.assert_not_called()
+
+    def test_django_redis_failure_isolated_to_one_surface(
+        self, isolated_registry, cache_instance_mock, nuxt_client_mock
+    ):
+        register_surface(
+            CacheSurface(
+                code="broken",
+                label="Broken",
+                description="",
+                django_patterns=("*broken*",),
+            )
+        )
+        register_surface(
+            CacheSurface(
+                code="ok",
+                label="OK",
+                description="",
+                django_patterns=("*ok*",),
+            )
+        )
+        cache_instance_mock.keys.side_effect = [
+            ConnectionError("Redis down"),
+            ["redis:1:ok-key"],
+        ]
+        cache_instance_mock.delete_raw_keys.return_value = 1
+
+        report = CacheService.purge(["broken", "ok"], include_related=False)
+
+        # First surface raised but report still has both entries.
+        assert len(report.surfaces) == 2
+        assert report.surfaces[0].django_error == "Redis down"
+        assert report.surfaces[0].django_deleted == 0
+        # Second surface succeeded.
+        assert report.surfaces[1].django_error is None
+        assert report.surfaces[1].django_deleted == 1
 
     def test_related_surfaces_expand_when_enabled(
         self, isolated_registry, cache_instance_mock, nuxt_client_mock

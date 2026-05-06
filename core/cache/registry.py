@@ -72,26 +72,42 @@ def expand_with_related(codes: Iterable[str]) -> list[str]:
 
     Cycles are tolerated; each surface is visited once. Order preserves
     the user's selection so the audit log reads naturally.
+
+    ``danger=True`` surfaces are NEVER included via the related cascade
+    — they may only be purged when the operator explicitly selects
+    them. This prevents an accidental wipe of a heavyweight cache
+    (e.g. parler translations) when an admin clears a small surface
+    that happens to reference it.
     """
 
     seen: set[str] = set()
     ordered: list[str] = []
     queue: list[str] = list(codes)
+    is_top_level = True
 
     with _lock:
         while queue:
-            code = queue.pop(0)
-            if code in seen or code not in _registry:
-                continue
-            seen.add(code)
-            ordered.append(code)
-            queue.extend(_registry[code].related)
+            batch = queue
+            queue = []
+            for code in batch:
+                if code in seen or code not in _registry:
+                    continue
+                surface = _registry[code]
+                if not is_top_level and surface.danger:
+                    # Block heavy surfaces from auto-cascade; the
+                    # operator must opt in by selecting them
+                    # directly.
+                    continue
+                seen.add(code)
+                ordered.append(code)
+                queue.extend(surface.related)
+            is_top_level = False
 
     return ordered
 
 
-def reset() -> None:
-    """Test helper — clear the registry."""
+def _reset_for_tests() -> None:
+    """Test-only helper — clear the registry. Not part of the public API."""
 
     with _lock:
         _registry.clear()

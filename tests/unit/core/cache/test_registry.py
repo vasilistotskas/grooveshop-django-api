@@ -8,15 +8,15 @@ from core.cache.registry import (
     get_surface,
     iter_surfaces,
     register_surface,
-    reset,
+    _reset_for_tests,
 )
 
 
 @pytest.fixture
 def empty_registry():
-    reset()
+    _reset_for_tests()
     yield
-    reset()
+    _reset_for_tests()
     # Restore default surfaces so subsequent tests are unaffected.
     from core.cache.surfaces import register_default_surfaces
 
@@ -97,3 +97,39 @@ class TestExpandWithRelated:
         # User selection comes first; related "d" is appended at the end
         # of the BFS walk.
         assert result == ["c", "a", "b", "d"]
+
+    def test_danger_surface_blocked_in_cascade(self, empty_registry):
+        register_surface(
+            CacheSurface(
+                code="a",
+                label="A",
+                description="",
+                related=("heavy",),
+            )
+        )
+        register_surface(
+            CacheSurface(
+                code="heavy",
+                label="Heavy",
+                description="",
+                danger=True,
+            )
+        )
+
+        # heavy is danger=True so it must NOT be auto-included via the
+        # cascade.
+        assert expand_with_related(["a"]) == ["a"]
+
+    def test_danger_surface_allowed_when_top_level(self, empty_registry):
+        register_surface(
+            CacheSurface(
+                code="heavy",
+                label="Heavy",
+                description="",
+                danger=True,
+            )
+        )
+
+        # When the operator explicitly selects a danger surface it
+        # passes through unchanged.
+        assert expand_with_related(["heavy"]) == ["heavy"]

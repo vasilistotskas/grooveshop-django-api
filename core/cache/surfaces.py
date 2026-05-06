@@ -37,7 +37,6 @@ def register_default_surfaces() -> None:
             ),
             django_patterns=("*PayWayViewSet_*",),
             nuxt_patterns=_nuxt("PayWayViewSet"),
-            related=("orders",),
             icon="payments",
             group="commerce",
         )
@@ -62,24 +61,7 @@ def register_default_surfaces() -> None:
                 "shipping.acs.nearest",
                 "shipping.acs.stations",
             ),
-            related=("orders",),
             icon="local_shipping",
-            group="commerce",
-        )
-    )
-
-    register_surface(
-        CacheSurface(
-            code="orders",
-            label=_("Order serializers"),
-            description=_(
-                "Cached order detail responses (which embed PayWay and"
-                " shipping payloads). Cleared automatically when"
-                " PayWay or Shipping is purged."
-            ),
-            django_patterns=("*OrderViewSet_*",),
-            nuxt_patterns=(),
-            icon="receipt_long",
             group="commerce",
         )
     )
@@ -89,8 +71,8 @@ def register_default_surfaces() -> None:
             code="products",
             label=_("Products"),
             description=_(
-                "Product list/detail, images, reviews, tags,"
-                " attributes, related products, and the search endpoint."
+                "Product list/detail, images, attributes, related"
+                " products, and the search endpoint."
             ),
             # Django ViewSet class names (used by ``cache_methods``):
             # ``AttributeViewSet`` and ``AttributeValueViewSet`` are
@@ -101,11 +83,8 @@ def register_default_surfaces() -> None:
             django_patterns=(
                 "*ProductImageViewSet_*",
                 "*ProductCategoryImageViewSet_*",
-                "*ProductReviewViewSet_*",
                 "*AttributeViewSet_*",
                 "*AttributeValueViewSet_*",
-                "*TagViewSet_*",
-                "*TaggedItemViewSet_*",
             ),
             nuxt_patterns=_nuxt(
                 "ProductViewSet",
@@ -119,7 +98,7 @@ def register_default_surfaces() -> None:
                 "ProductAttributeValueViewSet",
                 "SearchProductViewSet",
             ),
-            related=("categories",),
+            related=("categories", "tags"),
             icon="inventory_2",
             group="catalog",
         )
@@ -190,15 +169,35 @@ def register_default_surfaces() -> None:
             label=_("Loyalty"),
             description=_(
                 "Loyalty settings, tiers, and summaries surfaced on"
-                " the storefront."
+                " the storefront. Backend Loyalty ViewSets are not"
+                " ``@cache_methods``-decorated so this purge only hits"
+                " the Nuxt SSR cache."
             ),
-            django_patterns=("*Loyalty*ViewSet_*",),
+            # Django side: Loyalty ViewSets are not ``cache_methods``-
+            # decorated. Pattern intentionally omitted.
+            django_patterns=(),
             nuxt_patterns=_nuxt(
                 "loyalty-settings",
                 "LoyaltySummaryAnon",
             ),
             icon="loyalty",
             group="commerce",
+        )
+    )
+
+    register_surface(
+        CacheSurface(
+            code="tags",
+            label=_("Tags"),
+            description=_(
+                "Generic Tag list/detail and the M2M-through"
+                " TaggedItem cache. Tags are shared by Products and"
+                " Blog posts so this surface lives outside both."
+            ),
+            django_patterns=("*TagViewSet_*", "*TaggedItemViewSet_*"),
+            nuxt_patterns=(),
+            icon="sell",
+            group="content",
         )
     )
 

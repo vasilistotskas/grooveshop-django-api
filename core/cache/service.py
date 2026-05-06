@@ -30,6 +30,7 @@ class SurfaceResult:
     nuxt_deleted: int = 0
     nuxt_blocked: int = 0
     nuxt_error: str | None = None
+    django_error: str | None = None
 
     @property
     def total_deleted(self) -> int:
@@ -106,36 +107,55 @@ class CacheService:
                 logger.warning("Skipping unknown cache surface: %s", code)
                 continue
 
-            result = SurfaceResult(code=code)
+            result = CacheService._purge_surface(surface, dry_run=dry_run)
+            report.surfaces.append(result)
 
-            for pattern in surface.django_patterns:
+        CacheService._log_audit(report, actor=actor)
+        return report
+
+    @staticmethod
+    def _purge_surface(
+        surface: CacheSurface, *, dry_run: bool
+    ) -> SurfaceResult:
+        """Process a single surface, isolating failures so one bad
+        pattern (e.g. Redis transient error) does not abort an entire
+        purge run."""
+
+        result = SurfaceResult(code=surface.code)
+
+        for pattern in surface.django_patterns:
+            try:
                 matched = cache_instance.keys(pattern)
                 safe, blocked = filter_protected(matched)
                 result.django_matched += len(matched)
                 result.django_blocked += len(blocked)
                 if safe and not dry_run:
                     deleted = cache_instance.delete_raw_keys(safe)
-                    # ``delete_raw_keys`` returns either an int or an
-                    # awaitable depending on the Redis client; we
-                    # always run it in sync mode but the type stubs
-                    # don't narrow on configuration.
+                    # ``delete_raw_keys`` is typed as int | Awaitable
+                    # depending on the Redis client; sync mode always
+                    # returns int but the type stubs don't narrow.
                     if isinstance(deleted, int):
                         result.django_deleted += deleted
-
-            if surface.nuxt_patterns:
-                nuxt_result = nuxt_client.request_purge(
-                    list(surface.nuxt_patterns), dry_run=dry_run
+            except Exception as exc:
+                logger.warning(
+                    "Django purge failed for surface=%s pattern=%s: %s",
+                    surface.code,
+                    pattern,
+                    exc,
                 )
-                result.nuxt_matched += nuxt_result.matched
-                result.nuxt_deleted += nuxt_result.deleted
-                result.nuxt_blocked += nuxt_result.blocked
-                if nuxt_result.error:
-                    result.nuxt_error = nuxt_result.error
+                result.django_error = str(exc)
 
-            report.surfaces.append(result)
+        if surface.nuxt_patterns:
+            nuxt_result = nuxt_client.request_purge(
+                list(surface.nuxt_patterns), dry_run=dry_run
+            )
+            result.nuxt_matched += nuxt_result.matched
+            result.nuxt_deleted += nuxt_result.deleted
+            result.nuxt_blocked += nuxt_result.blocked
+            if nuxt_result.error:
+                result.nuxt_error = nuxt_result.error
 
-        CacheService._log_audit(report, actor=actor)
-        return report
+        return result
 
     @staticmethod
     def purge_all(
@@ -173,6 +193,7 @@ class CacheService:
                         "django_matched": s.django_matched,
                         "django_deleted": s.django_deleted,
                         "django_blocked": s.django_blocked,
+                        "django_error": s.django_error,
                         "nuxt_matched": s.nuxt_matched,
                         "nuxt_deleted": s.nuxt_deleted,
                         "nuxt_blocked": s.nuxt_blocked,

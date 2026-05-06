@@ -3,6 +3,96 @@
 
 
 
+## v1.127.0 (2026-05-06)
+
+### Bug fixes
+
+* fix(cache): drop dead patterns and harden purge error isolation
+
+Audit cross-referenced every Django pattern in surfaces.py against
+the actual ViewSet class names in the codebase. Findings:
+
+- ``orders`` surface had no Django @cache_methods on OrderViewSet AND
+  empty Nuxt patterns; removed entirely. Cascades from pay_way and
+  shipping that referenced it are also gone.
+- ``loyalty.django_patterns`` had ``*Loyalty*ViewSet_*`` but no
+  Loyalty ViewSet is @cache_methods-decorated; emptied with a
+  comment so it's clear this is Nuxt-only by design.
+- ``products.django_patterns`` had ``*ProductReviewViewSet_*`` —
+  not @cache_methods-decorated; removed.
+- ``products.django_patterns`` had ``*TagViewSet_*`` and
+  ``*TaggedItemViewSet_*`` — Tags are a generic relation shared by
+  Products AND Blog so they belong in their own ``tags`` surface.
+  Added that surface and wired it into ``products.related``.
+
+Robustness:
+- ``CacheService.purge`` now isolates each surface inside a
+  per-surface ``_purge_surface`` helper. A transient Redis error in
+  one surface no longer aborts the whole run; the failure is captured
+  on ``SurfaceResult.django_error`` and persisted in CachePurgeLog.
+- ``expand_with_related`` now refuses to auto-cascade into
+  ``danger=True`` surfaces. Operators must opt in by selecting them
+  directly. Prevents an accidental wipe of the parler translation
+  cache when a small surface that happens to reference it is purged.
+- ``reset()`` renamed to ``_reset_for_tests()`` to discourage
+  production callers from reaching for it.
+
+Tests cover both new safety properties (47 → 48 passes).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c87450e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c87450e703f3de8fe1915082b7f430a9d9d163c3))
+
+* fix(deps): bump twisted to 26.4.0rc2 to patch CVE-2026-42304
+
+Twisted 25.5.0 has a HIGH-severity DoS vulnerability in twisted.names
+via crafted DNS compression pointer chains. The fix landed in
+26.4.0rc2 (no stable patch released yet); upstream is generally
+solid at the RC stage and this is the first version Trivy accepts.
+
+Pulled in transitively via daphne + channels — affects every ASGI
+request path, hence the gating Trivy CI step started failing on
+every branch built after the CVE was added to the database.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c87450e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c87450e703f3de8fe1915082b7f430a9d9d163c3))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.126.0 [skip ci] ([`d09c99a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d09c99ac79903563db042a6d99608eac5bfb69eb))
+
+### Features
+
+* feat(cache): scalable surface-based cache management for admin (#5) ([`c87450e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c87450e703f3de8fe1915082b7f430a9d9d163c3))
+
+* feat(cache): add scalable surface-based cache management for admin
+
+The previous /admin/clear-cache/ page advertised "Django + Nuxt" but
+only ever cleared Django (Django's Redis client connects to db 0;
+Nuxt's Nitro cache lives on db 3, so the cache: prefix matched
+nothing). It also lumped every cached endpoint together — clearing
+PayWay also wiped the throttle counters and parler translations.
+
+Replace it with a registry of named CacheSurface entries (pay_way,
+products, categories, blog, shipping, loyalty, settings, sitemap_seo,
+regions_countries, orders, translations). Each surface declares both
+its Django key patterns and its Nuxt Nitro handler patterns, plus
+related-cache cascades (e.g. pay_way → orders).
+
+CacheService.purge() walks the surfaces, executes UNLINK against
+Django Redis for matched keys (after a hard-coded deny list strips
+throttle/session/queue/health/oauth-token keys), and POSTs to a new
+Nuxt /api/admin/cache/purge endpoint that mirrors the same deny list
+on its own Redis.
+
+Audit log (CachePurgeLog) records actor + per-surface counts for
+every purge, surfaced read-only in the admin sidebar. The clear_cache
+management command takes surface codes (or --all / --dry-run / legacy
+--prefixes) and uses the same service.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c87450e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c87450e703f3de8fe1915082b7f430a9d9d163c3))
+
 ## v1.126.0 (2026-05-05)
 
 ### Chores

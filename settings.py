@@ -2380,12 +2380,34 @@ TINYMCE_DEFAULT_CONFIG = {
     "backcolor casechange permanentpen formatpainter removeformat | pagebreak | charmap emoticons | "
     "fullscreen  preview save print | insertfile image media pageembed template link anchor codesample | "
     "a11ycheck ltr rtl | showcomments addcomment code",
-    "images_upload_url": "/upload_image",
-    # Send cookies with the image upload request so Django can verify
-    # the CSRF token from the csrftoken cookie.  Without this flag
-    # TinyMCE makes a cross-origin (credentialless) fetch and Django's
-    # CsrfViewMiddleware rejects the request with 403.
-    "images_upload_credentials": True,
+    # Custom upload handler instead of `images_upload_url`. The built-in
+    # uploader sends FormData with cookies (via `images_upload_credentials`)
+    # but never attaches an `X-CSRFToken` header, so Django's
+    # CsrfViewMiddleware rejects the request with 403 before reaching
+    # `core.views.upload_image`. The handler below reads the csrftoken
+    # cookie (CSRF_COOKIE_HTTPONLY = False) and forwards it as the
+    # `X-CSRFToken` header. `init_tinymce.js` evals the string when it
+    # contains a `(`, so we inline a function literal here.
+    "images_upload_handler": (
+        "function(blobInfo, progress) {"
+        " return new Promise(function(resolve, reject) {"
+        "  var formData = new FormData();"
+        "  formData.append('file', blobInfo.blob(), blobInfo.filename());"
+        "  var csrf = (document.cookie.match(/(?:^|;\\s*)csrftoken=([^;]+)/) || [])[1] || '';"
+        "  fetch('/upload_image', {"
+        "   method: 'POST', credentials: 'include',"
+        "   headers: {'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest'},"
+        "   body: formData"
+        "  }).then(function(r) {"
+        "   if (!r.ok) { return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t); }); }"
+        "   return r.json();"
+        "  }).then(function(d) {"
+        "   if (d && d.location) { resolve(d.location); }"
+        "   else { reject({message: (d && d['Error Message']) || 'Upload failed', remove: true}); }"
+        "  }).catch(function(e) { reject({message: e.message || 'Upload failed', remove: true}); });"
+        " });"
+        "}"
+    ),
     "relative_urls": False,
     "remove_script_host": False,
     "entity_encoding": "raw",

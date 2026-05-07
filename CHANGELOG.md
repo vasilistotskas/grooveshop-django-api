@@ -3,6 +3,34 @@
 
 
 
+## v1.127.1 (2026-05-07)
+
+### Bug fixes
+
+* fix(admin): attach CSRF token to TinyMCE image uploads
+
+TinyMCE's built-in `images_upload_url` uploader sends FormData with cookies
+(via `images_upload_credentials`) but never attaches an `X-CSRFToken`
+header, so Django's CsrfViewMiddleware rejects POSTs to /upload_image
+with 403 before reaching `core.views.upload_image`. This silently broke
+"Insert > Image > Upload" inside parler-translated rich-text fields,
+where `BlogPostAdmin.formfield_overrides` cannot replace the widget
+(parler's translation form bypasses ModelAdmin overrides, so `body`
+stays TinyMCE rather than Unfold's Trix WysiwygWidget).
+
+Replace the URL config with `images_upload_handler` — a JS function
+literal that django-tinymce's `init_tinymce.js` evals at runtime.
+The handler reads the csrftoken cookie (CSRF_COOKIE_HTTPONLY = False
+allows JS access) and forwards it as `X-CSRFToken` on a fetch with
+`credentials: 'include'`. Promise resolves with the `location` URL or
+rejects with `{message, remove: true}` per the TinyMCE 7 contract.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`fe81cee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fe81cee744dfaa9de32a33c96e3bb12bb3c3601d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.127.0 [skip ci] ([`7d5e922`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d5e9225ade2de8af59cde3cdf0bad8acb29da4a))
+
 ## v1.127.0 (2026-05-06)
 
 ### Bug fixes

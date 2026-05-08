@@ -13,6 +13,7 @@ from unfold.contrib.filters.admin import (
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
+from admin.mixins import IsSuperuserOnlyModelAdmin
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.models import (
     BoxNowLocker,
@@ -762,7 +763,7 @@ class BoxNowLockerAdmin(ModelAdmin):
 
 
 @admin.register(BoxNowParcelEvent)
-class BoxNowParcelEventAdmin(ModelAdmin):
+class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     compressed_fields = True
     list_fullwidth = True
     list_filter_submit = True

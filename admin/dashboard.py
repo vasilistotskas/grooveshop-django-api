@@ -1,56 +1,93 @@
-from django.apps import apps
-from django.core.cache import cache
-from django.db.models import Count, Sum, Avg
-from django.db.models.functions import TruncDay
-from django.utils import timezone
-from django.utils.html import format_html, escape
-from django.urls import reverse
+"""Webside admin dashboard data layer.
+
+Builds the data dict consumed by ``core/templates/admin/index.html``
+in four zones:
+
+A. Hero KPIs (4 cards)
+B. Operations charts (revenue+orders bar/line, status doughnut)
+C. Action queues (recent orders, pending reviews, contact messages)
+D. System warnings (superuser-only — seller config, MyDATA, low stock,
+   failed Celery tasks)
+
+Zones A/B/C are request-independent and are cached in Redis for 5 min.
+Zone D is computed fresh per request because operational alerts must
+reflect the latest state. All visible strings are wrapped with
+``gettext_lazy`` so the dashboard renders fully in Greek when the
+admin is browsed under ``django_language=el``.
+"""
+
+from __future__ import annotations
+
 from datetime import timedelta
 
-DASHBOARD_CACHE_KEY = "admin:dashboard:data:v1"
+from django.apps import apps
+from django.core.cache import cache
+from django.db.models import Avg, Count, Sum
+from django.db.models.functions import TruncDay
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.html import escape, format_html
+from django.utils.translation import gettext_lazy as _
+
+DASHBOARD_CACHE_KEY = "admin:dashboard:data:v2"
 DASHBOARD_CACHE_TTL = 300  # 5 minutes
 
-
-def dashboard_callback(request, context):
-    """
-    Enhanced dashboard callback for Unfold admin.
-    Provides KPIs, chart data, and table data for the admin dashboard.
-
-    The underlying data is request-independent (admin-only URLs from
-    ``reverse()`` + DB aggregates) so we cache the full payload in Redis
-    for 5 minutes and invalidate on domain model writes via signals.
-    Seller-config warnings are computed fresh (not cached) so fixing
-    the setting is reflected on the admin's next page load.
-    """
-    data = cache.get_or_set(
-        DASHBOARD_CACHE_KEY, _build_dashboard_data, DASHBOARD_CACHE_TTL
-    )
-    context.update(data)
-    context["seller_config_warnings"] = _check_seller_config()
-    context["mydata_warnings"] = _check_mydata_state()
-    return context
-
-
-# Tax-mandatory seller fields. Missing values produce a red dashboard
-# alert — a fresh install MUST fill these in before issuing real
-# invoices, otherwise the PDF renders with no legal identity and
-# would not pass a tax audit.
+# Stock-mandatory seller fields surfaced as Zone D banners.
 _REQUIRED_SELLER_SETTINGS = (
-    ("INVOICE_SELLER_NAME", "Company name"),
-    ("INVOICE_SELLER_VAT_ID", "VAT ID (ΑΦΜ)"),
-    ("INVOICE_SELLER_TAX_OFFICE", "Tax office (ΔΟΥ)"),
+    ("INVOICE_SELLER_NAME", _("Company name")),
+    ("INVOICE_SELLER_VAT_ID", _("VAT ID (ΑΦΜ)")),
+    ("INVOICE_SELLER_TAX_OFFICE", _("Tax office (ΔΟΥ)")),
 )
 
 
-def _check_seller_config() -> list[dict]:
-    """Return a list of warning rows for empty required seller settings.
+def dashboard_callback(request, context):
+    """Populate ``context`` with the four-zone dashboard payload.
 
-    Empty string means "present in DB but never filled" — the
-    ``EXTRA_SETTINGS_DEFAULTS`` seed creates the row with a blank
-    value so ops can find it in the Settings admin. Non-critical
-    fields (address, phone) aren't surfaced here to avoid nagging
-    for strictly-optional info.
+    Zones A/B/C are served from the Redis cache (busted on writes via
+    ``admin/signals.py``); Zone D is recomputed on every request so
+    fixing a missing setting reflects on the next page load.
     """
+
+    payload = cache.get_or_set(
+        DASHBOARD_CACHE_KEY, _build_zones_a_b_c, DASHBOARD_CACHE_TTL
+    )
+    context.update(payload)
+    context["is_superuser"] = bool(
+        getattr(request.user, "is_authenticated", False)
+        and getattr(request.user, "is_superuser", False)
+    )
+    if context["is_superuser"]:
+        context.update(_build_zone_d())
+    else:
+        # Defaults so the template can `{% if seller_config_warnings %}`
+        # without checking superuser flag.
+        context["seller_config_warnings"] = []
+        context["mydata_warnings"] = {
+            "enabled": False,
+            "missing_creds": [],
+            "recent_rejected": 0,
+            "environment": "",
+        }
+        context["low_stock_products"] = []
+        context["failed_celery_count"] = 0
+    return context
+
+
+# ── Zone D — fresh, superuser-only ─────────────────────────────────────
+
+
+def _build_zone_d() -> dict:
+    return {
+        "seller_config_warnings": _check_seller_config(),
+        "mydata_warnings": _check_mydata_state(),
+        "low_stock_products": _check_low_stock(),
+        "failed_celery_count": _check_failed_celery(),
+    }
+
+
+def _check_seller_config() -> list[dict]:
+    """Empty required INVOICE_SELLER_* settings — red banner."""
+
     from extra_settings.models import Setting
 
     warnings = []
@@ -62,16 +99,7 @@ def _check_seller_config() -> list[dict]:
 
 
 def _check_mydata_state() -> dict:
-    """Compile myDATA-specific alert state for the dashboard banner.
-
-    Two conditions we flag loud:
-    1. Integration enabled but credentials missing — submissions will
-       fail on every attempt.
-    2. Recent rejections (last 7 days) — operator needs to reconcile
-       master data. A REJECTED invoice is an unhappy customer + a
-       missing tax registration, so quiet failure is not acceptable.
-    """
-    from datetime import timedelta
+    """Compile myDATA-specific alert state for the dashboard banner."""
 
     from extra_settings.models import Setting
 
@@ -106,795 +134,445 @@ def _check_mydata_state() -> dict:
     }
 
 
-def _build_dashboard_data():
-    """Compute every KPI/chart/table block in a single pass."""
-    User = apps.get_model("user", "UserAccount")
-    Product = apps.get_model("product", "Product")
-    Order = apps.get_model("order", "Order")
-    BlogPost = apps.get_model("blog", "BlogPost")
-    BlogComment = apps.get_model("blog", "BlogComment")
-    ProductReview = apps.get_model("product", "ProductReview")
-    UserSubscription = apps.get_model("user", "UserSubscription")
-    Contact = apps.get_model("contact", "Contact")
-    Cart = apps.get_model("cart", "Cart")
-    ProductCategory = apps.get_model("product", "ProductCategory")
-    BlogCategory = apps.get_model("blog", "BlogCategory")
-    StockLog = apps.get_model("order", "StockLog")
+def _check_low_stock() -> list[dict]:
+    """List up to 10 active products with 0 < stock < 10 (warning band).
 
-    # Import enums
-    from order.enum.status import PaymentStatus, OrderStatus
+    Excludes ``stock=0`` — that's "out of stock", a different concern
+    surfaced elsewhere. We only want the "almost out, reorder now" band.
+    """
+
+    Product = apps.get_model("product", "Product")
+    rows = (
+        Product.objects.filter(active=True, stock__gt=0, stock__lt=10)
+        .order_by("stock", "id")
+        .prefetch_related("translations")[:10]
+    )
+    out = []
+    for product in rows:
+        name = product.safe_translation_getter("name", any_language=True) or _(
+            "Unnamed"
+        )
+        out.append(
+            {
+                "id": product.id,
+                "name": name,
+                "stock": product.stock,
+                "url": reverse(
+                    "admin:product_product_change", args=[product.id]
+                ),
+            }
+        )
+    return out
+
+
+def _check_failed_celery() -> int:
+    """Failed Celery tasks in the last 24h (best-effort).
+
+    ``django_celery_results`` is optional. If the app is not installed
+    we silently report zero so the Zone D banner just hides itself.
+    """
+
+    try:
+        TaskResult = apps.get_model("django_celery_results", "TaskResult")
+    except LookupError:
+        return 0
+    cutoff = timezone.now() - timedelta(hours=24)
+    return TaskResult.objects.filter(
+        status="FAILURE", date_done__gte=cutoff
+    ).count()
+
+
+# ── Zones A/B/C — cached payload ───────────────────────────────────────
+
+
+def _build_zones_a_b_c() -> dict:
+    User = apps.get_model("user", "UserAccount")
+    Order = apps.get_model("order", "Order")
+    ProductReview = apps.get_model("product", "ProductReview")
+    Contact = apps.get_model("contact", "Contact")
+
+    from order.enum.status import OrderStatus, PaymentStatus
     from product.enum.review import ReviewStatus
 
     now = timezone.now()
-    today = now.date()
     week_ago = now - timedelta(days=7)
+    prior_week_start = now - timedelta(days=14)
     month_ago = now - timedelta(days=30)
+    today = now.date()
 
-    # ========== CORE KPIs ==========
-    total_users = User.objects.count()
-    total_products = Product.objects.filter(active=True).count()
-    total_orders = Order.objects.count()
-
-    # Revenue from completed payments
-    revenue_data = Order.objects.filter(
-        payment_status=PaymentStatus.COMPLETED
-    ).aggregate(total=Sum("paid_amount"))
-    total_revenue = revenue_data.get("total") or 0
-
-    # Pending Orders
-    pending_orders_count = Order.objects.filter(
-        status=OrderStatus.PENDING
-    ).count()
-
-    # New users today
-    new_users_today = User.objects.filter(created_at__date=today).count()
-
-    # ========== ENGAGEMENT KPIs ==========
-    total_blog_views = (
-        BlogPost.objects.aggregate(total=Sum("view_count"))["total"] or 0
-    )
-    pending_reviews_count = ProductReview.objects.filter(
-        status=ReviewStatus.NEW
-    ).count()
-    avg_rating = ProductReview.objects.aggregate(avg=Avg("rate"))["avg"] or 0
-    total_subscribers = UserSubscription.objects.filter(status="ACTIVE").count()
-
-    # ========== ADDITIONAL KPIs ==========
-    # Low stock products (stock < 10)
-    low_stock_count = Product.objects.filter(active=True, stock__lt=10).count()
-
-    # Active carts (updated in last 24 hours with items)
-    day_ago = now - timedelta(hours=24)
-    active_carts_count = Cart.objects.filter(updated_at__gte=day_ago).count()
-
-    # Total contact messages
-    total_messages = Contact.objects.count()
-
-    # Orders this month vs last month (for trend)
-    orders_this_month = Order.objects.filter(
-        created_at__date__gte=month_ago
-    ).count()
-
-    # ========== BLOG KPIs ==========
-    total_blog_posts = BlogPost.objects.count()
-    published_posts = BlogPost.objects.filter(is_published=True).count()
-    featured_posts = BlogPost.objects.filter(featured=True).count()
-    pending_blog_comments = BlogComment.objects.filter(approved=False).count()
-    total_blog_comments = BlogComment.objects.count()
-
-    # Product categories
-    total_categories = ProductCategory.objects.filter(active=True).count()
-
-    # ========== CHART DATA: Last 7 Days ==========
-
-    # Generate labels for last 7 days
-    labels_7d = []
-    for i in range(7):
-        day = (now - timedelta(days=6 - i)).strftime("%a")
-        labels_7d.append(day)
-
-    # Users chart
-    users_by_day = (
-        User.objects.filter(created_at__gte=week_ago)
-        .annotate(day=TruncDay("created_at"))
-        .values("day")
-        .annotate(count=Count("id"))
-        .order_by("day")
-    )
-    users_dict = {
-        item["day"].strftime("%Y-%m-%d"): item["count"]
-        for item in users_by_day
-        if item["day"]
+    return {
+        **_zone_a_hero_kpis(
+            Order,
+            User,
+            now,
+            today,
+            week_ago,
+            prior_week_start,
+            month_ago,
+            PaymentStatus,
+            OrderStatus,
+        ),
+        **_zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus),
+        **_zone_c_queues(Order, ProductReview, Contact, ReviewStatus),
     }
 
-    users_data = []
-    for i in range(7):
-        day_str = (now - timedelta(days=6 - i)).strftime("%Y-%m-%d")
-        users_data.append(users_dict.get(day_str, 0))
 
-    # Orders chart
-    orders_by_day = (
-        Order.objects.filter(created_at__gte=week_ago)
-        .annotate(day=TruncDay("created_at"))
-        .values("day")
-        .annotate(count=Count("id"))
-        .order_by("day")
-    )
-    orders_dict = {
-        item["day"].strftime("%Y-%m-%d"): item["count"]
-        for item in orders_by_day
-        if item["day"]
-    }
+# ── Zone A — Hero KPIs ─────────────────────────────────────────────────
 
-    orders_data = []
-    for i in range(7):
-        day_str = (now - timedelta(days=6 - i)).strftime("%Y-%m-%d")
-        orders_data.append(orders_dict.get(day_str, 0))
 
-    # Revenue chart (daily revenue from completed orders)
-    revenue_by_day = (
+def _zone_a_hero_kpis(
+    Order,
+    User,
+    now,
+    today,
+    week_ago,
+    prior_week_start,
+    month_ago,
+    PaymentStatus,
+    OrderStatus,
+) -> dict:
+    """4 hero KPI cards: revenue 7d, pending orders, new customers,
+    average order value.
+    """
+
+    revenue_7d = (
         Order.objects.filter(
-            created_at__gte=week_ago, payment_status=PaymentStatus.COMPLETED
+            payment_status=PaymentStatus.COMPLETED,
+            created_at__gte=week_ago,
+        ).aggregate(total=Sum("paid_amount"))["total"]
+        or 0
+    )
+    revenue_prior = (
+        Order.objects.filter(
+            payment_status=PaymentStatus.COMPLETED,
+            created_at__gte=prior_week_start,
+            created_at__lt=week_ago,
+        ).aggregate(total=Sum("paid_amount"))["total"]
+        or 0
+    )
+    if revenue_prior:
+        trend_pct = round(
+            (float(revenue_7d) - float(revenue_prior))
+            / float(revenue_prior)
+            * 100,
+            1,
+        )
+    else:
+        trend_pct = None  # nothing to compare against
+
+    pending_orders = Order.objects.filter(status=OrderStatus.PENDING).count()
+    new_customers_30d = User.objects.filter(created_at__gte=month_ago).count()
+    new_customers_today = User.objects.filter(created_at__date=today).count()
+    aov_30d = (
+        Order.objects.filter(created_at__gte=month_ago).aggregate(
+            avg=Avg("paid_amount")
+        )["avg"]
+        or 0
+    )
+
+    return {
+        "hero": {
+            "revenue_7d": float(revenue_7d),
+            "revenue_trend_pct": trend_pct,
+            "pending_orders": pending_orders,
+            "new_customers_30d": new_customers_30d,
+            "new_customers_today": new_customers_today,
+            "avg_order_value": round(float(aov_30d), 2),
+        },
+    }
+
+
+# ── Zone B — Operations charts ────────────────────────────────────────
+
+
+def _zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus) -> dict:
+    """Two charts: 14-day combined orders+revenue, status doughnut."""
+
+    days = 14
+    period_start = now - timedelta(days=days - 1)
+
+    # ── Combined orders + revenue (last 14 days) ──
+    orders_by_day = {
+        item["day"].date(): item["count"]
+        for item in Order.objects.filter(created_at__gte=period_start)
+        .annotate(day=TruncDay("created_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+        if item["day"]
+    }
+    revenue_by_day = {
+        item["day"].date(): float(item["total"] or 0)
+        for item in Order.objects.filter(
+            created_at__gte=period_start,
+            payment_status=PaymentStatus.COMPLETED,
         )
         .annotate(day=TruncDay("created_at"))
         .values("day")
         .annotate(total=Sum("paid_amount"))
-        .order_by("day")
-    )
-    revenue_dict = {
-        item["day"].strftime("%Y-%m-%d"): float(item["total"] or 0)
-        for item in revenue_by_day
         if item["day"]
     }
 
-    revenue_data_chart = []
-    for i in range(7):
-        day_str = (now - timedelta(days=6 - i)).strftime("%Y-%m-%d")
-        revenue_data_chart.append(revenue_dict.get(day_str, 0))
+    labels: list[str] = []
+    orders_series: list[int] = []
+    revenue_series: list[float] = []
+    for i in range(days):
+        day_val = (now - timedelta(days=days - 1 - i)).date()
+        labels.append(day_val.strftime("%d/%m"))
+        orders_series.append(orders_by_day.get(day_val, 0))
+        revenue_series.append(revenue_by_day.get(day_val, 0))
 
-    # Combined chart for orders and revenue
+    # Mixed bar/line per Chart.js v4 docs:
+    # - dataset.type required on each (defaults don't merge for mixed)
+    # - lower `order` = drawn last (on top); we want line ON TOP of bars
+    # - borderSkipped="start" keeps the bottom of each bar flat on the
+    #   x-axis baseline; only the top corners are rounded ("pill" look)
+    # - solid saturated colors so bars carry the visual weight; line
+    #   stays slim and subordinate so a single revenue spike doesn't
+    #   visually overpower the daily orders bars
     performance_chart = {
-        "labels": labels_7d,
+        "labels": labels,
         "datasets": [
             {
-                "label": "Orders",
+                "label": str(_("Orders")),
                 "type": "bar",
-                "data": orders_data,
-                "backgroundColor": "oklch(70% 0.15 270)",  # Violet
-                "borderRadius": 4,
-                "yAxisID": "y",
-            },
-            {
-                "label": "Revenue (€)",
-                "type": "line",
-                "data": revenue_data_chart,
-                "borderColor": "oklch(65% 0.2 145)",  # Green
-                "backgroundColor": "oklch(65% 0.2 145 / 0.1)",
-                "fill": True,
-                "tension": 0.4,
-                "yAxisID": "y1",
-            },
-        ],
-    }
-
-    # Users growth chart
-    users_chart = {
-        "labels": labels_7d,
-        "datasets": [
-            {
-                "label": "New Users",
-                "data": users_data,
-                "backgroundColor": "oklch(65% 0.15 280)",
-                "borderColor": "oklch(55% 0.2 280)",
-                "borderWidth": 2,
+                "data": orders_series,
+                "backgroundColor": "#6366f1",  # indigo-500
+                "hoverBackgroundColor": "#4f46e5",  # indigo-600
                 "borderRadius": 6,
-            }
+                "borderSkipped": "start",
+                "barPercentage": 0.85,
+                "categoryPercentage": 0.9,
+                "yAxisID": "y",
+                "order": 2,
+            },
+            {
+                "label": str(_("Revenue (€)")),
+                "type": "line",
+                "data": revenue_series,
+                "borderColor": "#10b981",  # emerald-500
+                "backgroundColor": "#10b981",
+                "pointBackgroundColor": "#10b981",
+                "pointBorderColor": "#ffffff",
+                "pointBorderWidth": 2,
+                "pointRadius": 4,
+                "pointHoverRadius": 6,
+                "borderWidth": 2.5,
+                "fill": False,
+                "tension": 0.3,
+                "yAxisID": "y1",
+                "order": 1,
+            },
         ],
     }
 
-    # Order Status Distribution (Doughnut)
-    status_counts = Order.objects.values("status").annotate(count=Count("id"))
-    status_labels = []
-    status_data = []
-    status_colors = {
-        "PENDING": "oklch(75% 0.15 85)",  # Yellow
-        "COMPLETED": "oklch(70% 0.15 145)",  # Green
-        "PROCESSING": "oklch(65% 0.15 250)",  # Blue
-        "SHIPPED": "oklch(70% 0.12 200)",  # Cyan
-        "CANCELLED": "oklch(65% 0.2 25)",  # Red
-        "CANCELED": "oklch(65% 0.2 25)",  # Red (alt spelling)
+    # ── Order status distribution doughnut ──
+    status_palette = {
+        OrderStatus.PENDING: "oklch(75% 0.15 85)",
+        OrderStatus.PROCESSING: "oklch(65% 0.15 250)",
+        OrderStatus.SHIPPED: "oklch(70% 0.12 200)",
+        OrderStatus.DELIVERED: "oklch(70% 0.15 145)",
+        OrderStatus.COMPLETED: "oklch(70% 0.15 145)",
+        OrderStatus.CANCELED: "oklch(65% 0.2 25)",
+        OrderStatus.RETURNED: "oklch(60% 0.15 30)",
+        OrderStatus.REFUNDED: "oklch(60% 0.15 50)",
     }
-    colors = []
+    status_label_lookup = {
+        OrderStatus.PENDING: _("Pending"),
+        OrderStatus.PROCESSING: _("Processing"),
+        OrderStatus.SHIPPED: _("Shipped"),
+        OrderStatus.DELIVERED: _("Delivered"),
+        OrderStatus.COMPLETED: _("Completed"),
+        OrderStatus.CANCELED: _("Canceled"),
+        OrderStatus.RETURNED: _("Returned"),
+        OrderStatus.REFUNDED: _("Refunded"),
+    }
+    status_counts = (
+        Order.objects.values("status")
+        .annotate(count=Count("id"))
+        .order_by("-count")
+    )
 
-    for item in status_counts:
-        status_labels.append(item["status"].replace("_", " ").title())
-        status_data.append(item["count"])
-        colors.append(status_colors.get(item["status"], "oklch(60% 0.05 250)"))
+    status_labels: list[str] = []
+    status_data: list[int] = []
+    status_colors: list[str] = []
+    for row in status_counts:
+        code = row["status"]
+        status_labels.append(
+            str(status_label_lookup.get(code, code.replace("_", " ").title()))
+        )
+        status_data.append(row["count"])
+        status_colors.append(status_palette.get(code, "oklch(60% 0.05 250)"))
 
     status_chart = {
         "labels": status_labels,
         "datasets": [
             {
                 "data": status_data,
-                "backgroundColor": colors,
-                "borderWidth": 0,
-                "spacing": 2,
+                "backgroundColor": status_colors,
+                "hoverOffset": 8,
+                "borderWidth": 2,
+                "borderColor": "#ffffff",
             }
         ],
     }
 
-    # 1. Payment Method Distribution (Pie Chart)
-    # Group by the 'pay_way' relationship to get the nice name, fallback to payment_method field
-    payment_counts = (
-        Order.objects.values("pay_way__translations__name")
-        .annotate(count=Count("id"))
-        .order_by("-count")
-    )
-
-    pay_labels = []
-    pay_data = []
-    # Vibrant palette for payment methods
-    pay_colors = [
-        "oklch(65% 0.18 200)",  # Cyan
-        "oklch(70% 0.15 300)",  # Magenta
-        "oklch(75% 0.15 60)",  # Orange
-        "oklch(60% 0.12 270)",  # Purple
-        "oklch(80% 0.12 100)",  # Yellow-Green
-    ]
-
-    for item in payment_counts:
-        name = item.get("pay_way__translations__name") or "Unknown"
-        pay_labels.append(name)
-        pay_data.append(item["count"])
-
-    payment_chart = {
-        "labels": pay_labels,
-        "datasets": [
-            {
-                "data": pay_data,
-                "backgroundColor": pay_colors[: len(pay_data)]
-                if len(pay_data) <= len(pay_colors)
-                else pay_colors * (len(pay_data) // len(pay_colors) + 1),
-                "borderWidth": 0,
-            }
-        ],
+    return {
+        "performance_chart": performance_chart,
+        "status_chart": status_chart,
     }
 
-    # 2. Top Countries by Order Volume (Bar Chart)
-    country_counts = (
-        Order.objects.values("country__alpha_2")
-        .annotate(count=Count("id"))
-        .order_by("-count")[:5]
-    )
 
-    country_labels = []
-    country_data = []
+# ── Zone C — Action queues ────────────────────────────────────────────
 
-    for item in country_counts:
-        code = item.get("country__alpha_2") or "Other"
-        country_labels.append(code.upper())
-        country_data.append(item["count"])
 
-    country_chart = {
-        "labels": country_labels,
-        "datasets": [
-            {
-                "label": "Orders",
-                "data": country_data,
-                "backgroundColor": "oklch(65% 0.15 260)",  # Blue-ish
-                "borderRadius": 4,
-                "barThickness": 20,
-            }
-        ],
-    }
+def _zone_c_queues(Order, ProductReview, Contact, ReviewStatus) -> dict:
+    """Three compact action queues for staff to triage right from /admin/."""
 
-    # 3. Average Cart Value (KPI)
-    # Calculate average of total_price for active carts.
-    # Since total_price is a property, we can't aggregate it directly in DB easily without complex queries.
-    # We will approximate this by aggregating the items' prices if possible, or iterate a small sample.
-    # BETTER APPROACH: For a dashboard, let's use the 'Order' average value as a proxy for "Cart Value" potential,
-    # OR if we strictly want Active Carts, we check the CartItem model.
-    # Let's stick to Average Order Value (AOV) as it's a solid business metric.
-    avg_order_value_data = Order.objects.aggregate(avg=Avg("paid_amount"))
-    avg_order_value = avg_order_value_data.get("avg") or 0
-
-    # 4. Total Blog Likes (KPI)
-    # BlogPost has many-to-many to User via 'likes'
-    total_blog_likes = (
-        BlogPost.objects.aggregate(total_likes=Count("likes"))["total_likes"]
-        or 0
-    )
-
-    # 5. Products with Discounts (KPI)
-    discounted_products_count = Product.objects.filter(
-        active=True, discount_percent__gt=0
-    ).count()
-
-    # 6. Active vs Inactive Users (KPI/Chart support)
-    active_users_count = User.objects.filter(is_active=True).count()
-    inactive_users_count = total_users - active_users_count
-
-    # ========== NEW CHART DATA ==========
-
-    # 1. Blog Posts by Category (Doughnut)
-    blog_category_counts = (
-        BlogCategory.objects.annotate(count=Count("blog_posts"))
-        .filter(count__gt=0)
-        .order_by("-count")[:5]
-    )
-    blog_cat_labels = []
-    blog_cat_data = []
-    for cat in blog_category_counts:
-        name = (
-            cat.safe_translation_getter("name", any_language=True) or "Unnamed"
-        )
-        blog_cat_labels.append(name)
-        blog_cat_data.append(cat.count)
-
-    blog_category_chart = {
-        "labels": blog_cat_labels,
-        "datasets": [
-            {
-                "data": blog_cat_data,
-                "backgroundColor": [
-                    "oklch(60% 0.15 280)",  # Purple
-                    "oklch(65% 0.15 300)",  # Magenta
-                    "oklch(70% 0.15 320)",  # Pink
-                    "oklch(75% 0.15 340)",  # Rose
-                    "oklch(80% 0.15 360)",  # Red
-                ],
-                "borderWidth": 0,
-            }
-        ],
-    }
-
-    # 2. Products by Category (Bar/Pie)
-    product_category_counts = (
-        ProductCategory.objects.annotate(count=Count("products"))
-        .filter(count__gt=0)
-        .order_by("-count")[:5]
-    )
-    prod_cat_labels = []
-    prod_cat_data = []
-    for cat in product_category_counts:
-        name = (
-            cat.safe_translation_getter("name", any_language=True) or "Unnamed"
-        )
-        prod_cat_labels.append(name)
-        prod_cat_data.append(cat.count)
-
-    product_category_chart = {
-        "labels": prod_cat_labels,
-        "datasets": [
-            {
-                "label": "Products",
-                "data": prod_cat_data,
-                "backgroundColor": "oklch(70% 0.15 85)",  # Orange/Yellow
-                "borderRadius": 4,
-            }
-        ],
-    }
-
-    # 3. Subscription Growth (Line Chart - Last 30 Days)
-    subs_by_day = (
-        UserSubscription.objects.filter(created_at__gte=month_ago)
-        .annotate(day=TruncDay("created_at"))
-        .values("day")
-        .annotate(count=Count("id"))
-        .order_by("day")
-    )
-    subs_dict = {
-        item["day"].strftime("%Y-%m-%d"): item["count"]
-        for item in subs_by_day
-        if item["day"]
-    }
-    subs_labels_30d = []
-    subs_data_30d = []
-    for i in range(30):
-        day_val = now - timedelta(days=29 - i)
-        day_str = day_val.strftime("%Y-%m-%d")
-        subs_labels_30d.append(day_val.strftime("%b %d"))
-        subs_data_30d.append(subs_dict.get(day_str, 0))
-
-    subscription_chart = {
-        "labels": subs_labels_30d,
-        "datasets": [
-            {
-                "label": "New Subscriptions",
-                "data": subs_data_30d,
-                "borderColor": "oklch(65% 0.2 145)",  # Green
-                "backgroundColor": "oklch(65% 0.2 145 / 0.1)",
-                "fill": True,
-                "tension": 0.4,
-            }
-        ],
-    }
-
-    # 4. Cart Abandonment (Pie)
-    # Active carts (updated < 24h) vs Abandoned carts (updated > 24h but < 30 days)
-    # We already have active_carts_count (<24h)
-    abandoned_threshold = now - timedelta(hours=24)
-    old_threshold = now - timedelta(days=30)
-    abandoned_carts_count = Cart.objects.filter(
-        updated_at__lt=abandoned_threshold, updated_at__gte=old_threshold
-    ).count()
-
-    cart_chart = {
-        "labels": ["Active (<24h)", "Abandoned (24h-30d)"],
-        "datasets": [
-            {
-                "data": [active_carts_count, abandoned_carts_count],
-                "backgroundColor": [
-                    "oklch(70% 0.15 145)",  # Green (Active)
-                    "oklch(65% 0.2 25)",  # Red (Abandoned)
-                ],
-                "borderWidth": 0,
-            }
-        ],
-    }
-
-    # ========== TABLE DATA (Unfold format) ==========
-
-    # Recent Orders Table
+    # Recent orders (top 6) — focus on action items, drop noise rows.
+    # Don't use .only() with paid_amount: djmoney's MoneyField needs the
+    # paired currency column loaded together or __set__ raises KeyError.
     recent_orders = Order.objects.select_related("user").order_by(
         "-created_at"
-    )[:8]
+    )[:6]
     orders_table_rows = []
     for order in recent_orders:
-        status_badge = _get_status_badge(order.status)
+        status_badge = _status_badge(order.status)
+        # `paid_amount` is a djmoney Money instance — `.amount` is the
+        # Decimal; `float(Money(...))` raises.
+        paid = getattr(order.paid_amount, "amount", order.paid_amount) or 0
+        amount = format_html(
+            '<span class="font-semibold tabular-nums">€{}</span>',
+            f"{float(paid):.2f}",
+        )
         orders_table_rows.append(
             [
                 format_html(
-                    '<a href="{}" class="text-primary-600 dark:text-primary-400 font-medium hover:underline">#{}</a>',
+                    '<a href="{}" class="text-primary-600 dark:text-primary-400'
+                    ' font-medium hover:underline">#{}</a>',
                     reverse("admin:order_order_change", args=[order.id]),
                     order.id,
                 ),
-                escape(order.email or "N/A"),
-                order.created_at.strftime("%b %d, %Y"),
+                escape(order.email or "—"),
                 status_badge,
+                amount,
+                order.created_at.strftime("%d/%m %H:%M"),
             ]
         )
 
     orders_table = {
-        "headers": ["Order #", "Customer", "Date", "Status"],
+        "headers": [
+            _("Order #"),
+            _("Customer"),
+            _("Status"),
+            _("Total"),
+            _("Date"),
+        ],
         "rows": orders_table_rows,
     }
 
-    # Top Products Table
-    top_products = Product.objects.prefetch_related("translations").order_by(
-        "-view_count"
-    )[:5]
-    products_table_rows = []
-    for product in top_products:
-        name = (
-            product.safe_translation_getter("name", any_language=True)
-            or "Unnamed"
-        )
-        stock_badge = _get_stock_badge(product.stock)
-        products_table_rows.append(
-            [
-                format_html(
-                    '<a href="{}" class="text-primary-600 dark:text-primary-400 font-medium hover:underline">{}</a>',
-                    reverse("admin:product_product_change", args=[product.id]),
-                    escape(name[:30]),
-                ),
-                format_html(
-                    '<span class="font-semibold">{}</span>', product.view_count
-                ),
-                stock_badge,
-            ]
-        )
-
-    products_table = {
-        "headers": ["Product", "Views", "Stock"],
-        "rows": products_table_rows,
-    }
-
-    # Recent Reviews Table
-    recent_reviews = (
-        ProductReview.objects.select_related("product", "user")
+    # Pending reviews — only NEW, max 5
+    pending_reviews = (
+        ProductReview.objects.filter(status=ReviewStatus.NEW)
+        .select_related("product", "user")
         .prefetch_related("product__translations")
         .order_by("-created_at")[:5]
     )
     reviews_table_rows = []
-    for review in recent_reviews:
+    for review in pending_reviews:
         product_name = (
             review.product.safe_translation_getter("name", any_language=True)
-            or "Unknown"
+            or "—"
         )
-        rating_stars = _get_rating_stars(review.rate)
-        status_badge = _get_review_status_badge(review.status)
         reviews_table_rows.append(
             [
-                escape(product_name[:25]),
-                escape(review.user.email[:25] if review.user else "Anonymous"),
-                rating_stars,
-                status_badge,
+                format_html(
+                    '<a href="{}" class="text-primary-600 dark:text-primary-400'
+                    ' font-medium hover:underline">{}</a>',
+                    reverse(
+                        "admin:product_productreview_change", args=[review.id]
+                    ),
+                    escape(product_name[:30]),
+                ),
+                escape(
+                    (review.user.email if review.user else _("Anonymous"))[:25]
+                ),
+                _rating_stars(review.rate),
+                review.created_at.strftime("%d/%m"),
             ]
         )
-
     reviews_table = {
-        "headers": ["Product", "User", "Rating", "Status"],
+        "headers": [_("Product"), _("User"), _("Rating"), _("Date")],
         "rows": reviews_table_rows,
     }
 
-    # Recent Messages Table
+    # Recent messages — last 5
     recent_messages = Contact.objects.order_by("-created_at")[:5]
     messages_table_rows = []
     for msg in recent_messages:
         messages_table_rows.append(
             [
                 format_html(
-                    '<div class="font-medium">{}</div><div class="text-xs text-base-600 dark:text-base-300">{}</div>',
-                    escape(msg.name),
-                    escape(msg.email),
+                    '<a href="{}" class="text-primary-600 dark:text-primary-400'
+                    ' font-medium hover:underline">{}</a>',
+                    reverse("admin:contact_contact_change", args=[msg.id]),
+                    escape(msg.name or msg.email or "—"),
                 ),
-                msg.created_at.strftime("%b %d"),
+                escape(msg.email or "—"),
                 escape(
-                    msg.message[:40] + "..."
-                    if len(msg.message) > 40
-                    else msg.message
+                    (msg.message or "")[:60]
+                    + ("…" if len(msg.message or "") > 60 else "")
                 ),
+                msg.created_at.strftime("%d/%m"),
             ]
         )
-
     messages_table = {
-        "headers": ["From", "Date", "Message"],
+        "headers": [_("From"), _("Email"), _("Message"), _("Date")],
         "rows": messages_table_rows,
     }
 
-    # Low Stock Products Table
-    low_stock_products = (
-        Product.objects.filter(active=True, stock__lt=10)
-        .prefetch_related("translations")
-        .order_by("stock")[:5]
-    )
-    low_stock_rows = []
-    for product in low_stock_products:
-        name = (
-            product.safe_translation_getter("name", any_language=True)
-            or "Unnamed"
-        )
-        stock_badge = _get_stock_badge(product.stock)
-        low_stock_rows.append(
-            [
-                format_html(
-                    '<a href="{}" class="text-primary-600 dark:text-primary-400 hover:underline">{}</a>',
-                    reverse("admin:product_product_change", args=[product.id]),
-                    name[:30],
-                ),
-                stock_badge,
-            ]
-        )
-
-    low_stock_table = {
-        "headers": ["Product", "Stock"],
-        "rows": low_stock_rows,
-    }
-
-    # Recent Stock Logs Table
-    recent_stock_logs = (
-        StockLog.objects.select_related("product", "performed_by")
-        .prefetch_related("product__translations")
-        .order_by("-created_at")[:5]
-    )
-    stock_log_rows = []
-    for log in recent_stock_logs:
-        product_name = (
-            log.product.safe_translation_getter("name", any_language=True)
-            or "Unknown"
-        )
-        # Determine color based on operation type
-        op_color = "text-gray-600"
-        if log.operation_type == "INCREMENT":
-            op_color = "text-green-600"
-        elif log.operation_type == "DECREMENT":
-            op_color = "text-red-600"
-        elif log.operation_type == "RESERVE":
-            op_color = "text-yellow-600"
-
-        stock_log_rows.append(
-            [
-                format_html(
-                    '<span class="font-medium">{}</span>', product_name[:25]
-                ),
-                format_html(
-                    '<span class="{}">{}</span>',
-                    op_color,
-                    log.get_operation_type_display(),
-                ),
-                log.quantity_delta,
-                log.created_at.strftime("%b %d, %H:%M"),
-            ]
-        )
-
-    stock_log_table = {
-        "headers": ["Product", "Operation", "Qty", "Time"],
-        "rows": stock_log_rows,
-    }
-
-    # ========== PROGRESS BARS ==========
-
-    # Inventory health (percentage of products in stock).
-    # ``total_products`` counted active products above — reuse it.
-    in_stock_products = Product.objects.filter(active=True, stock__gt=0).count()
-    inventory_health = (
-        (in_stock_products / total_products * 100) if total_products > 0 else 0
-    )
-
-    inventory_progress = {
-        "title": "Inventory Health",
-        "description": f"{in_stock_products}/{total_products} products in stock",
-        "value": round(inventory_health, 1),
-    }
-
-    # ========== QUICK LINKS ==========
-    quick_links = [
-        {
-            "title": "Add Product",
-            "url": reverse("admin:product_product_add"),
-            "icon": "add_circle",
-        },
-        {
-            "title": "View Orders",
-            "url": reverse("admin:order_order_changelist"),
-            "icon": "shopping_cart",
-        },
-        {
-            "title": "Manage Users",
-            "url": reverse("admin:user_useraccount_changelist"),
-            "icon": "group",
-        },
-        {
-            "title": "Blog Posts",
-            "url": reverse("admin:blog_blogpost_changelist"),
-            "icon": "article",
-        },
-    ]
-
-    # ========== ASSEMBLE PAYLOAD ==========
     return {
-        # Core KPIs
-        "kpi": {
-            "users": total_users,
-            "new_users_today": new_users_today,
-            "products": total_products,
-            "orders": total_orders,
-            "revenue": total_revenue,
-            "pending_orders": pending_orders_count,
-            "blog_views": total_blog_views,
-            "pending_reviews": pending_reviews_count,
-            "avg_rating": round(avg_rating, 1) if avg_rating else 0,
-            "subscribers": total_subscribers,
-            "low_stock": low_stock_count,
-            "active_carts": active_carts_count,
-            "messages": total_messages,
-            "orders_this_month": orders_this_month,
-            "avg_order_value": round(avg_order_value, 2),
-            "total_blog_likes": total_blog_likes,
-            # Blog KPIs
-            "blog_posts": total_blog_posts,
-            "published_posts": published_posts,
-            "featured_posts": featured_posts,
-            "pending_comments": pending_blog_comments,
-            "total_comments": total_blog_comments,
-            # Categories
-            "categories": total_categories,
-        },
-        # Charts (JSON strings for Chart.js)
-        "performance_chart": performance_chart,
-        "users_chart": users_chart,
-        "status_chart": status_chart,
-        "payment_chart": payment_chart,
-        "country_chart": country_chart,
-        "blog_category_chart": blog_category_chart,
-        "product_category_chart": product_category_chart,
-        "subscription_chart": subscription_chart,
-        "cart_chart": cart_chart,
-        # Tables (Unfold format)
         "orders_table": orders_table,
-        "products_table": products_table,
         "reviews_table": reviews_table,
         "messages_table": messages_table,
-        "low_stock_table": low_stock_table,
-        "stock_log_table": stock_log_table,
-        # Progress bars
-        "inventory_progress": inventory_progress,
-        # Quick links
-        "quick_links": quick_links,
-        "active_users": active_users_count,
-        "inactive_users": inactive_users_count,
-        "abandoned_carts": abandoned_carts_count,
-        "discounted_products": discounted_products_count,
-        # The ``*_table`` entries above carry fully rendered rows — raw
-        # queryset results are intentionally omitted from the cache payload
-        # so the Unfold template can't trigger surprise ORM fetches
-        # (e.g. lazy `.user` / `.translations` lookups) on a cache hit.
     }
 
 
-def _get_status_badge(status):
-    """Generate HTML badge for order status."""
-    colors = {
-        "PENDING": "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-        "PROCESSING": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-        "SHIPPED": "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300",
-        "COMPLETED": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-        "CANCELLED": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
-        "CANCELED": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+# ── Display helpers ────────────────────────────────────────────────────
+
+
+def _status_badge(status: str):
+    """Render a coloured pill for an order status code."""
+
+    palette = {
+        "PENDING": ("amber", _("Pending")),
+        "PROCESSING": ("sky", _("Processing")),
+        "SHIPPED": ("cyan", _("Shipped")),
+        "DELIVERED": ("emerald", _("Delivered")),
+        "COMPLETED": ("emerald", _("Completed")),
+        "CANCELED": ("rose", _("Canceled")),
+        "RETURNED": ("orange", _("Returned")),
+        "REFUNDED": ("violet", _("Refunded")),
     }
-    color_class = colors.get(
-        status, "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
-    )
-    label = status.replace("_", " ").title()
-    return format_html(
-        '<span class="px-2 py-1 text-xs font-semibold rounded-full {}">{}</span>',
-        color_class,
-        label,
-    )
-
-
-def _get_stock_badge(stock):
-    """Generate HTML badge for stock level."""
-    if stock == 0:
-        return format_html(
-            '<span class="px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">{}</span>',
-            "Out of Stock",
-        )
-    elif stock < 10:
-        return format_html(
-            '<span class="px-2 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">{}</span>',
-            stock,
-        )
-    else:
-        return format_html(
-            '<span class="px-2 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">{}</span>',
-            stock,
-        )
-
-
-def _get_rating_stars(rate):
-    """Render a 5-star display from a 1-10 rate field."""
-    stars = max(0, min(5, round((rate or 0) / 2)))
-    filled = "★" * stars
-    empty = "☆" * (5 - stars)
-    return format_html(
-        '<span class="inline-flex items-center gap-1 font-mono">'
-        '<span class="text-amber-500">{}</span>'
-        '<span class="text-base-300 dark:text-base-600">{}</span>'
-        '<span class="text-xs text-base-500 dark:text-base-400 ml-1">{}/10</span>'
-        "</span>",
-        filled,
-        empty,
-        rate or 0,
-    )
-
-
-def _get_review_status_badge(status):
-    """Generate HTML badge for review status (NEW / TRUE / FALSE)."""
-    styles = {
-        "NEW": (
-            "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-            "New",
-        ),
-        "TRUE": (
-            "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-            "Approved",
-        ),
-        "FALSE": (
-            "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300",
-            "Rejected",
-        ),
-    }
-    color_class, label = styles.get(
-        status,
-        (
-            "bg-base-100 text-base-700 dark:bg-base-800 dark:text-base-300",
-            str(status).title() if status else "—",
-        ),
+    tone, label = palette.get(
+        status, ("base", status.replace("_", " ").title())
     )
     return format_html(
-        '<span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full {}">{}</span>',
-        color_class,
-        label,
+        '<span class="inline-flex items-center rounded-full px-2 py-0.5 '
+        "text-xs font-medium bg-{tone}-100 text-{tone}-700 "
+        'dark:bg-{tone}-900/40 dark:text-{tone}-300">{label}</span>',
+        tone=tone,
+        label=label,
+    )
+
+
+def _rating_stars(rate) -> str:
+    """Render the ``rate`` (1-10 in this project) as a compact pill."""
+
+    rate = max(0, min(10, int(round(float(rate or 0)))))
+    return format_html(
+        '<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5'
+        " text-xs font-medium bg-amber-100 text-amber-700"
+        ' dark:bg-amber-900/40 dark:text-amber-300 tabular-nums">'
+        "★ {rate}/10</span>",
+        rate=rate,
     )

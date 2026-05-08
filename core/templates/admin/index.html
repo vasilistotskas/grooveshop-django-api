@@ -12,73 +12,46 @@
 {% block extrahead %}
 {{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<style>
-    /* Ensure chart containers fill available height */
-    .chart-container {
-        position: relative;
-        width: 100%;
-    }
-</style>
 {% endblock %}
 
 {% block content %}
 <div class="flex flex-col gap-6">
-    {# myDATA alert: integration enabled but misconfigured or recent rejections #}
-    {% if mydata_warnings.enabled %}
-        {% if mydata_warnings.missing_creds %}
-        <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
-            <div class="flex items-start gap-3">
-                <span class="material-symbols-outlined text-red-600 dark:text-red-300 flex-shrink-0">cloud_off</span>
-                <div class="flex-1">
-                    <h3 class="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
-                        {% trans "myDATA integration is enabled but credentials are missing" %}
-                    </h3>
-                    <p class="text-sm text-red-800 dark:text-red-200 mb-2">
-                        {% trans "Every submission to AADE will fail until these are filled in via Settings." %}
-                    </p>
-                    <ul class="text-sm text-red-800 dark:text-red-200 list-disc ml-5 mb-3">
-                        {% for key in mydata_warnings.missing_creds %}
-                        <li><code class="text-xs px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/60">{{ key }}</code></li>
-                        {% endfor %}
-                    </ul>
-                    <a href="{% url 'admin:extra_settings_setting_changelist' %}?q=MYDATA_"
-                       class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:underline">
-                        {% trans "Fix in Settings" %}
-                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
-                    </a>
-                </div>
-            </div>
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# Header                                                          #}
+    {# ────────────────────────────────────────────────────────────── #}
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-base-900 dark:text-base-50">
+                {% trans "Dashboard" %}
+            </h1>
+            <p class="text-base-600 dark:text-base-300 mt-1 text-sm">
+                {% trans "Overview of revenue, orders, and customer activity." %}
+            </p>
         </div>
-        {% endif %}
-        {% if mydata_warnings.recent_rejected %}
-        <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4">
-            <div class="flex items-start gap-3">
-                <span class="material-symbols-outlined text-amber-600 dark:text-amber-300 flex-shrink-0">warning</span>
-                <div class="flex-1">
-                    <h3 class="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
-                        {% blocktrans count counter=mydata_warnings.recent_rejected %}{{ counter }} invoice rejected by myDATA in the last 7 days{% plural %}{{ counter }} invoices rejected by myDATA in the last 7 days{% endblocktrans %}
-                    </h3>
-                    <p class="text-sm text-amber-800 dark:text-amber-200 mb-3">
-                        {% trans "Each REJECTED row represents an unshipped tax registration. Open the invoice admin, read the error code, fix the root cause (master data / VAT / buyer ΑΦΜ), and resubmit via the order's 'Send to myDATA' action." %}
-                    </p>
-                    <a href="{% url 'admin:order_invoice_changelist' %}?mydata_status__exact=REJECTED"
-                       class="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 hover:underline">
-                        {% trans "Review rejected invoices" %}
-                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
-                    </a>
-                </div>
-            </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{% url 'admin:product_product_add' %}"
+                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-base-200 dark:border-base-700 bg-white dark:bg-base-900 text-base-700 dark:text-base-200 hover:border-primary-400 dark:hover:border-primary-600 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-medium transition-colors">
+                <span class="material-symbols-outlined text-base!">add_circle</span>
+                {% trans "New Product" %}
+            </a>
+            <a href="{% url 'admin:order_order_changelist' %}?status__exact=PENDING"
+                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-base-200 dark:border-base-700 bg-white dark:bg-base-900 text-base-700 dark:text-base-200 hover:border-primary-400 dark:hover:border-primary-600 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-medium transition-colors">
+                <span class="material-symbols-outlined text-base!">pending_actions</span>
+                {% trans "Pending Orders" %}
+            </a>
+            <a href="{% url 'admin:user_useraccount_changelist' %}"
+                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-base-200 dark:border-base-700 bg-white dark:bg-base-900 text-base-700 dark:text-base-200 hover:border-primary-400 dark:hover:border-primary-600 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-medium transition-colors">
+                <span class="material-symbols-outlined text-base!">group</span>
+                {% trans "Customers" %}
+            </a>
         </div>
-        {% endif %}
-        {% if mydata_warnings.environment == 'dev' and not mydata_warnings.missing_creds %}
-        <div class="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-3">
-            <div class="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200">
-                <span class="material-symbols-outlined text-blue-600 dark:text-blue-300 text-base!">science</span>
-                <span>{% trans "myDATA is pointing at the AADE sandbox (dev). Switch MYDATA_ENVIRONMENT to 'prod' when ready." %}</span>
-            </div>
-        </div>
-        {% endif %}
-    {% endif %}
+    </div>
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# ZONE D — Superuser-only system warnings                        #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {% if is_superuser %}
 
     {# Seller-config alert: empty required INVOICE_SELLER_* settings #}
     {% if seller_config_warnings %}
@@ -101,7 +74,7 @@
                     {% endfor %}
                 </ul>
                 <a href="{% url 'admin:extra_settings_setting_changelist' %}?q=INVOICE_SELLER_"
-                   class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:underline">
+                    class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:underline">
                     {% trans "Fix in Settings" %}
                     <span class="material-symbols-outlined text-sm">arrow_forward</span>
                 </a>
@@ -110,280 +83,232 @@
     </div>
     {% endif %}
 
-    {# Header #}
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-            <h1 class="text-2xl font-bold text-base-900 dark:text-base-50">{% trans "Dashboard" %}</h1>
-            <p class="text-base-600 dark:text-base-300 mt-1">
-                {% trans "Welcome back! Here's what's happening with your store." %}
-            </p>
+    {# myDATA alerts #}
+    {% if mydata_warnings.enabled %}
+        {% if mydata_warnings.missing_creds %}
+        <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
+            <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-red-600 dark:text-red-300 flex-shrink-0">cloud_off</span>
+                <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
+                        {% trans "myDATA integration is enabled but credentials are missing" %}
+                    </h3>
+                    <p class="text-sm text-red-800 dark:text-red-200 mb-2">
+                        {% trans "Every submission to AADE will fail until these are filled in via Settings." %}
+                    </p>
+                    <ul class="text-sm text-red-800 dark:text-red-200 list-disc ml-5 mb-3">
+                        {% for key in mydata_warnings.missing_creds %}
+                        <li><code class="text-xs px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/60">{{ key }}</code></li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{% url 'admin:extra_settings_setting_changelist' %}?q=MYDATA_"
+                        class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:underline">
+                        {% trans "Fix in Settings" %}
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
         </div>
-        <div class="flex flex-wrap gap-2">
-            {% for link in quick_links %}
-            <a href="{{ link.url }}"
-                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-base-200 dark:border-base-700 bg-white dark:bg-base-900 text-base-700 dark:text-base-200 hover:border-primary-400 dark:hover:border-primary-600 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-medium transition-colors">
-                <span class="material-symbols-outlined text-base!">{{ link.icon }}</span>
-                {{ link.title }}
-            </a>
-            {% endfor %}
+        {% endif %}
+        {% if mydata_warnings.recent_rejected %}
+        <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4">
+            <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-amber-600 dark:text-amber-300 flex-shrink-0">warning</span>
+                <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                        {% blocktrans count counter=mydata_warnings.recent_rejected %}{{ counter }} invoice rejected by myDATA in the last 7 days{% plural %}{{ counter }} invoices rejected by myDATA in the last 7 days{% endblocktrans %}
+                    </h3>
+                    <a href="{% url 'admin:order_invoice_changelist' %}?mydata_status__exact=REJECTED"
+                        class="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 hover:underline">
+                        {% trans "Review rejected invoices" %}
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% if mydata_warnings.environment == 'dev' and not mydata_warnings.missing_creds %}
+        <div class="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-3">
+            <div class="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200">
+                <span class="material-symbols-outlined text-blue-600 dark:text-blue-300 text-base!">science</span>
+                <span>{% trans "myDATA is pointing at the AADE sandbox (dev). Switch MYDATA_ENVIRONMENT to 'prod' when ready." %}</span>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+
+    {# Failed Celery tasks last 24h #}
+    {% if failed_celery_count %}
+    <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3">
+        <div class="flex items-center justify-between gap-2 text-sm text-amber-800 dark:text-amber-200">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-600 dark:text-amber-300 text-base!">error</span>
+                <span>
+                    {% blocktrans count counter=failed_celery_count %}{{ counter }} background task failed in the last 24h{% plural %}{{ counter }} background tasks failed in the last 24h{% endblocktrans %}
+                </span>
+            </div>
+            <a href="/admin/django_celery_results/taskresult/?status__exact=FAILURE"
+                class="font-medium underline">{% trans "Review" %}</a>
         </div>
     </div>
+    {% endif %}
 
-    {# KPI Cards Row 1: Primary Metrics — clean cards, subtle icon chip, color-coded accent #}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {# Total Revenue #}
-        <div class="group relative rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
+    {% endif %}{# end is_superuser #}
+
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# ZONE A — 4 Hero KPI cards                                       #}
+    {# ────────────────────────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+
+        {# Revenue 7d with trend #}
+        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
             <div class="flex items-start justify-between">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-950 text-primary-600 dark:text-primary-300">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
                     <span class="material-symbols-outlined">payments</span>
+                </div>
+                {% if hero.revenue_trend_pct is not None %}
+                    {% if hero.revenue_trend_pct >= 0 %}
+                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-medium tabular-nums">
+                        <span class="material-symbols-outlined text-sm!">trending_up</span>
+                        +{{ hero.revenue_trend_pct }}%
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 text-[11px] font-medium tabular-nums">
+                        <span class="material-symbols-outlined text-sm!">trending_down</span>
+                        {{ hero.revenue_trend_pct }}%
+                    </span>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">
+                €{{ hero.revenue_7d|floatformat:2 }}
+            </p>
+            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Revenue (7d)" %}</p>
+            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">
+                {% trans "vs. prior 7 days" %}
+            </p>
+        </div>
+
+        {# Pending orders #}
+        <a href="{% url 'admin:order_order_changelist' %}?status__exact=PENDING"
+            class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md hover:border-primary-300 dark:hover:border-primary-700 transition-all">
+            <div class="flex items-start justify-between">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-300">
+                    <span class="material-symbols-outlined">pending_actions</span>
+                </div>
+            </div>
+            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ hero.pending_orders }}</p>
+            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Pending Orders" %}</p>
+            <p class="mt-0.5 text-xs text-primary-600 dark:text-primary-400">
+                {% trans "Tap to triage" %} →
+            </p>
+        </a>
+
+        {# New customers (30d) with sub-line of today #}
+        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-300">
+                    <span class="material-symbols-outlined">person_add</span>
+                </div>
+                {% if hero.new_customers_today %}
+                <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-2 py-0.5 text-[11px] font-medium tabular-nums">
+                    +{{ hero.new_customers_today }} {% trans "today" %}
+                </span>
+                {% endif %}
+            </div>
+            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ hero.new_customers_30d }}</p>
+            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "New Customers (30d)" %}</p>
+            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">{% trans "Last 30 days" %}</p>
+        </div>
+
+        {# Average order value #}
+        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-300">
+                    <span class="material-symbols-outlined">receipt</span>
                 </div>
             </div>
             <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">
-                €{{ kpi.revenue|floatformat:2|default:"0.00" }}
+                €{{ hero.avg_order_value|floatformat:2 }}
             </p>
-            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Total Revenue" %}</p>
-            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">
-                {% blocktrans with v=kpi.avg_order_value %}Avg order €{{ v }}{% endblocktrans %}
-            </p>
+            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Average Order Value" %}</p>
+            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">{% trans "Last 30 days" %}</p>
         </div>
 
-        {# Total Orders #}
-        <div class="group relative rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
-            <div class="flex items-start justify-between">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-300">
-                    <span class="material-symbols-outlined">receipt_long</span>
-                </div>
-                {% if kpi.pending_orders > 0 %}
-                <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[11px] font-medium">
-                    <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
-                    {{ kpi.pending_orders }} {% trans "pending" %}
-                </span>
-                {% endif %}
-            </div>
-            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.orders|default:"0" }}</p>
-            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Total Orders" %}</p>
-            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">
-                {% blocktrans with v=kpi.orders_this_month %}{{ v }} this month{% endblocktrans %}
-            </p>
-        </div>
-
-        {# Total Users #}
-        <div class="group relative rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
-            <div class="flex items-start justify-between">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
-                    <span class="material-symbols-outlined">group</span>
-                </div>
-                {% if kpi.new_users_today > 0 %}
-                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-medium">
-                    +{{ kpi.new_users_today }} {% trans "today" %}
-                </span>
-                {% endif %}
-            </div>
-            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.users|default:"0" }}</p>
-            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Total Users" %}</p>
-            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">
-                {% blocktrans with a=active_users i=inactive_users %}{{ a }} active · {{ i }} inactive{% endblocktrans %}
-            </p>
-        </div>
-
-        {# Active Products #}
-        <div class="group relative rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
-            <div class="flex items-start justify-between">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-300">
-                    <span class="material-symbols-outlined">inventory_2</span>
-                </div>
-                {% if kpi.low_stock > 0 %}
-                <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 text-[11px] font-medium">
-                    <span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
-                    {{ kpi.low_stock }} {% trans "low stock" %}
-                </span>
-                {% endif %}
-            </div>
-            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.products|default:"0" }}</p>
-            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Active Products" %}</p>
-            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">
-                {% blocktrans with v=kpi.categories %}{{ v }} categories{% endblocktrans %}
-            </p>
-        </div>
     </div>
 
-    {# KPI Cards Row 2: Secondary Metrics — compact, matches hero card styling #}
-    <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
-        <div class="rounded-xl bg-white dark:bg-base-900 p-4 border border-base-200 dark:border-base-800">
-            <div class="flex items-center gap-2 text-base-500 dark:text-base-400">
-                <span class="material-symbols-outlined text-base!">receipt</span>
-                <span class="text-xs font-medium truncate">{% trans "Avg Order Value" %}</span>
-            </div>
-            <p class="mt-2 text-xl font-semibold text-base-900 dark:text-base-50 tabular-nums">€{{ kpi.avg_order_value }}</p>
-        </div>
 
-        <div class="rounded-xl bg-white dark:bg-base-900 p-4 border border-base-200 dark:border-base-800">
-            <div class="flex items-center gap-2 text-base-500 dark:text-base-400">
-                <span class="material-symbols-outlined text-base! text-amber-500">star</span>
-                <span class="text-xs font-medium truncate">{% trans "Avg Product Rating" %}</span>
-            </div>
-            <p class="mt-2 text-xl font-semibold text-base-900 dark:text-base-50 tabular-nums">
-                {{ kpi.avg_rating }}<span class="text-sm text-base-500 dark:text-base-400 font-normal">/10</span>
-            </p>
-        </div>
-
-        <div class="rounded-xl bg-white dark:bg-base-900 p-4 border border-base-200 dark:border-base-800">
-            <div class="flex items-center gap-2 text-base-500 dark:text-base-400">
-                <span class="material-symbols-outlined text-base!">visibility</span>
-                <span class="text-xs font-medium truncate">{% trans "Blog Views" %}</span>
-            </div>
-            <p class="mt-2 text-xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.blog_views }}</p>
-        </div>
-
-        <div class="rounded-xl bg-white dark:bg-base-900 p-4 border border-base-200 dark:border-base-800">
-            <div class="flex items-center gap-2 text-base-500 dark:text-base-400">
-                <span class="material-symbols-outlined text-base! text-rose-500">favorite</span>
-                <span class="text-xs font-medium truncate">{% trans "Blog Likes" %}</span>
-            </div>
-            <p class="mt-2 text-xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.total_blog_likes }}</p>
-        </div>
-
-        <div class="rounded-xl bg-white dark:bg-base-900 p-4 border border-base-200 dark:border-base-800">
-            <div class="flex items-center gap-2 text-base-500 dark:text-base-400">
-                <span class="material-symbols-outlined text-base!">mail</span>
-                <span class="text-xs font-medium truncate">{% trans "Subscribers" %}</span>
-            </div>
-            <p class="mt-2 text-xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.subscribers }}</p>
-        </div>
-
-        <a href="{% url 'admin:product_productreview_changelist' %}?status__exact=NEW"
-           class="rounded-xl bg-white dark:bg-base-900 p-4 border border-base-200 dark:border-base-800 hover:border-primary-400 dark:hover:border-primary-700 transition-colors">
-            <div class="flex items-center gap-2 text-base-500 dark:text-base-400">
-                <span class="material-symbols-outlined text-base!">rate_review</span>
-                <span class="text-xs font-medium truncate">{% trans "Pending Reviews" %}</span>
-            </div>
-            <p class="mt-2 text-xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.pending_reviews }}</p>
-        </a>
-    </div>
-
-    {# Charts Row 1: Performance #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {# ZONE B — Operations charts (2)                                  #}
+    {# ────────────────────────────────────────────────────────────── #}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div
-            class="lg:col-span-2 rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
+
+        <div class="lg:col-span-2 rounded-xl bg-white dark:bg-base-900 p-6 border border-base-200 dark:border-base-800">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "Performance Overview" %}
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">
+                    {% trans "Revenue & Orders" %}
                 </h3>
-                <span class="text-xs text-base-600 dark:text-base-300 bg-base-100 dark:bg-base-700 px-2 py-1 rounded">
-                    {% trans "Last 7 days" %}
+                <span class="text-xs text-base-600 dark:text-base-300 bg-base-100 dark:bg-base-800 px-2 py-1 rounded">
+                    {% trans "Last 14 days" %}
                 </span>
             </div>
             <div style="position: relative; height: 320px;"><canvas id="performanceChart"></canvas></div>
         </div>
 
-        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
+        <div class="rounded-xl bg-white dark:bg-base-900 p-6 border border-base-200 dark:border-base-800">
             <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "Order Status" %}</h3>
+                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">
+                    {% trans "Order Status" %}
+                </h3>
             </div>
-            <div style="position: relative; height: 320px;" class="flex items-center justify-center"><canvas
-                    id="statusChart"></canvas></div>
+            <div style="position: relative; height: 320px;" class="flex items-center justify-center">
+                <canvas id="statusChart"></canvas>
+            </div>
         </div>
+
     </div>
 
-    {# Users & Subscriptions Row #}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {# Users Growth Chart #}
-        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "User Registrations" %}</h3>
-                <span class="text-xs text-base-600 dark:text-base-300 bg-base-100 dark:bg-base-700 px-2 py-1 rounded">
-                    {% trans "Last 7 days" %}
-                </span>
-            </div>
-            <div style="position: relative; height: 250px;"><canvas id="usersChart"></canvas></div>
-        </div>
 
-        {# Subscription Growth Chart #}
-        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "New Subscriptions" %}</h3>
-                <span class="text-xs text-base-600 dark:text-base-300 bg-base-100 dark:bg-base-700 px-2 py-1 rounded">
-                    {% trans "Last 30 days" %}
-                </span>
-            </div>
-            <div style="position: relative; height: 250px;"><canvas id="subscriptionChart"></canvas></div>
-        </div>
-    </div>
+    {# ────────────────────────────────────────────────────────────── #}
+    {# ZONE C — 3 action queues                                        #}
+    {# Stack on smaller screens; jump to 3 cols only at 2xl so each     #}
+    {# table's 4-5 columns have room without cropping date/amount.     #}
+    {# ────────────────────────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 2xl:grid-cols-3 gap-6">
 
-    {# Blog & Content Management Section #}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {# Blog Stats Card #}
-        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-950 text-primary-600 dark:text-primary-300">
-                    <span class="material-symbols-outlined">article</span>
-                </div>
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "Blog Management" %}</h3>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div class="rounded-lg bg-base-50 dark:bg-base-900 p-3 border border-base-200/60 dark:border-base-700/60">
-                    <p class="text-2xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.blog_posts }}</p>
-                    <p class="text-xs text-base-500 dark:text-base-400">{% trans "Total Posts" %}</p>
-                </div>
-                <div class="rounded-lg bg-base-50 dark:bg-base-900 p-3 border border-base-200/60 dark:border-base-700/60">
-                    <p class="text-2xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.published_posts }}</p>
-                    <p class="text-xs text-base-500 dark:text-base-400">{% trans "Published" %}</p>
-                </div>
-                <div class="rounded-lg bg-base-50 dark:bg-base-900 p-3 border border-base-200/60 dark:border-base-700/60">
-                    <p class="text-2xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.featured_posts }}</p>
-                    <p class="text-xs text-base-500 dark:text-base-400">{% trans "Featured" %}</p>
-                </div>
-                <div class="rounded-lg bg-base-50 dark:bg-base-900 p-3 border border-base-200/60 dark:border-base-700/60">
-                    <p class="text-2xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ kpi.total_comments }}</p>
-                    <p class="text-xs text-base-500 dark:text-base-400">{% trans "Comments" %}</p>
-                </div>
-            </div>
-            {% if kpi.pending_comments > 0 %}
-            <a href="{% url 'admin:blog_blogcomment_changelist' %}?approved__exact=0"
-                class="mt-4 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors">
-                <span class="material-symbols-outlined text-sm!">pending</span>
-                {{ kpi.pending_comments }} {% trans "pending comments" %}
-            </a>
-            {% endif %}
-
-            <div class="mt-6">
-                <h4 class="text-sm font-semibold mb-2 text-base-700 dark:text-base-200">{% trans "Posts by Category" %}</h4>
-                <div style="position: relative; height: 180px;"><canvas id="blogCatChart"></canvas></div>
-            </div>
-        </div>
-
-        {# Recent Orders Table #}
-        <div
-            class="lg:col-span-2 rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+        {# Recent orders #}
+        <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
+            <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
                     <span class="material-symbols-outlined text-primary-500">receipt_long</span>
                     {% trans "Recent Orders" %}
                 </h3>
                 <a href="{% url 'admin:order_order_changelist' %}"
-                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View All" %} →
+                    class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
+                    {% trans "View all" %} →
                 </a>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
+                <table class="w-full text-xs">
+                    <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
                         <tr>
                             {% for header in orders_table.headers %}
-                            <th class="px-4 py-3 text-left">{{ header }}</th>
+                            <th class="px-3 py-2 text-left font-medium">{{ header }}</th>
                             {% endfor %}
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
+                    <tbody class="divide-y divide-base-200 dark:divide-base-800">
                         {% for row in orders_table.rows %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50">
+                        <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
                             {% for cell in row %}
-                            <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
                             {% endfor %}
                         </tr>
                         {% empty %}
                         <tr>
                             <td colspan="{{ orders_table.headers|length }}"
-                                class="px-4 py-8 text-center text-base-600 dark:text-base-300">
+                                class="px-3 py-6 text-center text-base-600 dark:text-base-300">
                                 {% trans "No orders yet" %}
                             </td>
                         </tr>
@@ -392,173 +317,41 @@
                 </table>
             </div>
         </div>
-    </div>
 
-    {# Inventory & Low Stock #}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
-            <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2 mb-4">
-                <span class="material-symbols-outlined text-base-400">inventory</span>
-                {% trans "Inventory Health" %}
-            </h3>
-            <div class="mb-4">
-                <div class="flex justify-between text-sm mb-1">
-                    <span class="text-base-600 dark:text-base-400">{{ inventory_progress.title }}</span>
-                    <span class="font-medium text-base-900 dark:text-base-50">{{ inventory_progress.value }}%</span>
-                </div>
-                <div class="w-full bg-base-200 dark:bg-base-700 rounded-full h-3">
-                    <div class="h-3 rounded-full transition-all duration-500"
-                        style="width: {{ inventory_progress.value }}%; background: linear-gradient(90deg, #10b981, #059669);">
-                    </div>
-                </div>
-                <p class="text-xs text-base-600 dark:text-base-300 mt-1">{{ inventory_progress.description }}</p>
-            </div>
-            <div class="grid grid-cols-2 gap-4 text-center">
-                <div class="rounded-lg bg-base-50 dark:bg-base-900 p-3">
-                    <p class="text-xl font-bold text-base-900 dark:text-base-50">{{ kpi.products }}</p>
-                    <p class="text-xs text-base-600 dark:text-base-300">{% trans "Active" %}</p>
-                </div>
-                <div class="rounded-lg bg-base-50 dark:bg-base-900 p-3">
-                    <p class="text-xl font-bold text-red-600 dark:text-red-400">{{ kpi.low_stock }}</p>
-                    <p class="text-xs text-base-600 dark:text-base-300">{% trans "Low Stock" %}</p>
-                </div>
-            </div>
-        </div>
-
-        <div
-            class="lg:col-span-2 rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-red-500">warning</span>
-                    {% trans "Low Stock Alert" %}
+        {# Pending reviews #}
+        <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
+            <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-amber-500">star_rate</span>
+                    {% trans "Pending Reviews" %}
                 </h3>
-                <a href="{% url 'admin:product_product_changelist' %}?stock__lt=10"
-                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View All" %} →
+                <a href="{% url 'admin:product_productreview_changelist' %}?status__exact=NEW"
+                    class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
+                    {% trans "View all" %} →
                 </a>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
-                        <tr>
-                            {% for header in low_stock_table.headers %}
-                            <th class="px-4 py-3 text-left">{{ header }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
-                        {% for row in low_stock_table.rows %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50">
-                            {% for cell in row %}
-                            <td class="px-4 py-3 text-base-700 dark:text-base-200 {% if forloop.last %}whitespace-nowrap text-right{% endif %}">{{ cell|safe }}</td>
-                            {% endfor %}
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="{{ low_stock_table.headers|length }}"
-                                class="px-4 py-8 text-center text-green-600 dark:text-green-400"><span
-                                    class="material-symbols-outlined align-middle mr-1">check_circle</span> All products
-                                are well stocked!</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    {# Product Analysis & Top Products #}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {# Product Categories Chart #}
-        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
-            <div class="flex items-center justify-between mb-4 gap-3">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "Product Categories" %}</h3>
-                <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap">
-                    <span class="material-symbols-outlined text-sm!">sell</span>
-                    {{ discounted_products }} {% trans "on discount" %}
-                </span>
-            </div>
-            <div style="position: relative; height: 250px;"><canvas id="prodCatChart"></canvas></div>
-        </div>
-
-        {# Top Products Table #}
-        <div
-            class="lg:col-span-2 rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-blue-500">trending_up</span>
-                    {% trans "Top Products" %}
-                </h3>
-                <a href="{% url 'admin:product_product_changelist' %}"
-                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View All" %} →
-                </a>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
-                        <tr>
-                            {% for header in products_table.headers %}
-                            <th class="px-4 py-3 text-left">{{ header }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
-                        {% for row in products_table.rows %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50">
-                            {% for cell in row %}
-                            <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
-                            {% endfor %}
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="{{ products_table.headers|length }}"
-                                class="px-4 py-8 text-center text-base-600 dark:text-base-300">
-                                {% trans "No products yet" %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    {# Reviews & Messages #}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {# Recent Reviews Table #}
-        <div
-            class="rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-yellow-500">star_rate</span>
-                    {% trans "Recent Reviews" %}
-                </h3>
-                <a href="{% url 'admin:product_productreview_changelist' %}"
-                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View All" %} →
-                </a>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
+                <table class="w-full text-xs">
+                    <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
                         <tr>
                             {% for header in reviews_table.headers %}
-                            <th class="px-4 py-3 text-left">{{ header }}</th>
+                            <th class="px-3 py-2 text-left font-medium">{{ header }}</th>
                             {% endfor %}
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
+                    <tbody class="divide-y divide-base-200 dark:divide-base-800">
                         {% for row in reviews_table.rows %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50">
+                        <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
                             {% for cell in row %}
-                            <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
                             {% endfor %}
                         </tr>
                         {% empty %}
                         <tr>
                             <td colspan="{{ reviews_table.headers|length }}"
-                                class="px-4 py-8 text-center text-base-600 dark:text-base-300">{% trans "No reviews yet" %}
+                                class="px-3 py-6 text-center text-emerald-600 dark:text-emerald-400">
+                                <span class="material-symbols-outlined align-middle mr-1">check_circle</span>
+                                {% trans "No pending reviews" %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -567,82 +360,39 @@
             </div>
         </div>
 
-        {# Recent Messages #}
-        <div
-            class="rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-green-500">contact_mail</span>
-                    {% trans "Recent Contact Messages" %}
+        {# Recent contact messages #}
+        <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
+            <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-emerald-500">contact_mail</span>
+                    {% trans "Contact Messages" %}
                 </h3>
                 <a href="{% url 'admin:contact_contact_changelist' %}"
-                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View All" %} →
+                    class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
+                    {% trans "View all" %} →
                 </a>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
+                <table class="w-full text-xs">
+                    <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
                         <tr>
                             {% for header in messages_table.headers %}
-                            <th class="px-4 py-3 text-left">{{ header }}</th>
+                            <th class="px-3 py-2 text-left font-medium">{{ header }}</th>
                             {% endfor %}
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
+                    <tbody class="divide-y divide-base-200 dark:divide-base-800">
                         {% for row in messages_table.rows %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50">
+                        <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
                             {% for cell in row %}
-                            <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
                             {% endfor %}
                         </tr>
                         {% empty %}
                         <tr>
                             <td colspan="{{ messages_table.headers|length }}"
-                                class="px-4 py-8 text-center text-base-600 dark:text-base-300">{% trans "No messages yet" %}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    {# Stock Logs & Cart Health #}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div
-            class="lg:col-span-2 rounded-xl bg-white dark:bg-base-800 shadow-sm border border-base-200 dark:border-base-700 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-700 flex items-center justify-between">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-base-500">history</span>
-                    {% trans "Recent Stock Operations" %}
-                </h3>
-                <a href="{% url 'admin:order_stocklog_changelist' %}"
-                    class="text-sm text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View All" %} →
-                </a>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-base-50 dark:bg-base-900 text-base-600 dark:text-base-400 text-xs uppercase">
-                        <tr>
-                            {% for header in stock_log_table.headers %}
-                            <th class="px-4 py-3 text-left">{{ header }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-base-200 dark:divide-base-700">
-                        {% for row in stock_log_table.rows %}
-                        <tr class="hover:bg-base-50 dark:hover:bg-base-700/50">
-                            {% for cell in row %}
-                            <td class="px-4 py-3 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
-                            {% endfor %}
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="{{ stock_log_table.headers|length }}"
-                                class="px-4 py-8 text-center text-base-600 dark:text-base-300">
-                                {% trans "No stock operations yet" %}
+                                class="px-3 py-6 text-center text-base-600 dark:text-base-300">
+                                {% trans "No messages yet" %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -651,75 +401,54 @@
             </div>
         </div>
 
-        <div class="rounded-xl bg-white dark:bg-base-800 p-6 shadow-sm border border-base-200 dark:border-base-700">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">{% trans "Cart Health" %}</h3>
-            </div>
-            {% if kpi.active_carts > 0 or abandoned_carts > 0 %}
-            <div style="position: relative; height: 200px;" class="flex items-center justify-center">
-                <canvas id="cartChart"></canvas>
-            </div>
-            <div class="mt-4 grid grid-cols-2 gap-3 text-center">
-                <div class="rounded-lg bg-emerald-50 dark:bg-emerald-950/40 p-3">
-                    <p class="text-xl font-semibold text-emerald-700 dark:text-emerald-300 tabular-nums">{{ kpi.active_carts }}</p>
-                    <p class="text-xs text-base-500 dark:text-base-400">{% trans "Active" %}</p>
-                </div>
-                <div class="rounded-lg bg-rose-50 dark:bg-rose-950/40 p-3">
-                    <p class="text-xl font-semibold text-rose-700 dark:text-rose-300 tabular-nums">{{ abandoned_carts|default:0 }}</p>
-                    <p class="text-xs text-base-500 dark:text-base-400">{% trans "Abandoned" %}</p>
-                </div>
-            </div>
-            {% else %}
-            <div style="height: 200px;" class="flex flex-col items-center justify-center text-center gap-2">
-                <span class="material-symbols-outlined text-4xl text-base-400 dark:text-base-500">shopping_cart_off</span>
-                <p class="text-sm text-base-500 dark:text-base-400">{% trans "No recent cart activity" %}</p>
-            </div>
-            {% endif %}
-        </div>
     </div>
 
-    {# Footer Stats #}
-    <div
-        class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-base-50 dark:bg-base-900 border border-base-200 dark:border-base-700">
-        <div class="text-center">
-            <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.orders_this_month }}</p>
-            <p class="text-xs text-base-600 dark:text-base-300">{% trans "Orders this month" %}</p>
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# ZONE D — Low stock list (superuser-only, only when present)    #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {% if is_superuser and low_stock_products %}
+    <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
+        <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                <span class="material-symbols-outlined text-rose-500">inventory</span>
+                {% trans "Low Stock — replenish soon" %}
+            </h3>
+            <a href="{% url 'admin:product_product_changelist' %}?stock__lt=10"
+                class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
+                {% trans "View all" %} →
+            </a>
         </div>
-        <div class="text-center">
-            <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.active_carts }}</p>
-            <p class="text-xs text-base-600 dark:text-base-300">{% trans "Active Carts" %}</p>
-        </div>
-        <div class="text-center">
-            <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.messages }}</p>
-            <p class="text-xs text-base-600 dark:text-base-300">{% trans "Contact Messages" %}</p>
-        </div>
-        <div class="text-center">
-            <p class="text-lg font-bold text-base-900 dark:text-base-50">{{ kpi.subscribers }}</p>
-            <p class="text-xs text-base-600 dark:text-base-300">{% trans "Newsletter Subscribers" %}</p>
-        </div>
+        <ul class="divide-y divide-base-200 dark:divide-base-800">
+            {% for p in low_stock_products %}
+            <li class="px-4 py-2 flex items-center justify-between gap-3">
+                <a href="{{ p.url }}" class="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate">
+                    {{ p.name }}
+                </a>
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 tabular-nums">
+                    {{ p.stock }}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
     </div>
+    {% endif %}
+
 </div>
 
-{# Data Injection #}
+
+{# ───────────────────── Chart data injection ──────────────────────── #}
 {{ performance_chart|json_script:"performance-data" }}
 {{ status_chart|json_script:"status-data" }}
-{{ users_chart|json_script:"users-data" }}
-{{ blog_category_chart|json_script:"blog-cat-data" }}
-{{ product_category_chart|json_script:"prod-cat-data" }}
-{{ subscription_chart|json_script:"sub-data" }}
-{{ cart_chart|json_script:"cart-data" }}
 
-{# Chart.js Initialization #}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const isDark = document.documentElement.classList.contains('dark');
-        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
         const textColor = isDark ? '#e5e5e5' : '#525252';
-
         Chart.defaults.color = textColor;
         Chart.defaults.borderColor = gridColor;
 
-        // Helper to safely get data
         function getData(id) {
             try {
                 const el = document.getElementById(id);
@@ -731,40 +460,74 @@
             }
         }
 
-        // Performance
+        // ── Performance combined chart (bar + line on dual y-axis) ──
         const perfData = getData('performance-data');
         const perfCtx = document.getElementById('performanceChart');
         if (perfCtx && perfData && perfData.datasets) {
-            perfData.datasets.forEach(d => {
-                d.type = 'line';
-                d.borderWidth = 3;
-                d.pointRadius = 4;
-                d.tension = 0.3;
-                if (d.yAxisID === 'y') {
-                    d.borderColor = '#3b82f6';
-                    d.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-                } else {
-                    d.borderColor = '#8b5cf6';
-                    d.backgroundColor = 'rgba(139, 92, 246, 0.1)';
-                }
-            });
             new Chart(perfCtx, {
-                type: 'line',
+                type: 'bar',
                 data: perfData,
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { position: 'top' } },
+                    layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            align: 'end',
+                            labels: { boxWidth: 14, boxHeight: 10, padding: 14, usePointStyle: true }
+                        },
+                        tooltip: {
+                            backgroundColor: isDark ? '#0a0a0a' : '#ffffff',
+                            titleColor: textColor,
+                            bodyColor: textColor,
+                            borderColor: gridColor,
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: true,
+                            callbacks: {
+                                label: function(ctx) {
+                                    const lbl = ctx.dataset.label || '';
+                                    const val = ctx.parsed.y;
+                                    if (ctx.dataset.yAxisID === 'y1') return `${lbl}: €${val.toLocaleString('el-GR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                                    return `${lbl}: ${val}`;
+                                }
+                            }
+                        }
+                    },
                     scales: {
-                        y: { type: 'linear', position: 'left', beginAtZero: true, suggestedMax: 5, ticks: { precision: 0 }, title: { display: true, text: 'Orders' }, grid: { color: gridColor } },
-                        y1: { type: 'linear', position: 'right', beginAtZero: true, suggestedMax: 10, title: { display: true, text: 'Revenue (€)' }, grid: { drawOnChartArea: false } }
+                        x: {
+                            grid: { display: false },
+                            border: { display: false },
+                            ticks: { color: textColor, font: { size: 11 }, maxRotation: 0 }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            ticks: { precision: 0, color: textColor, font: { size: 11 } },
+                            grid: { color: gridColor },
+                            border: { display: false }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            beginAtZero: true,
+                            ticks: {
+                                color: textColor,
+                                font: { size: 11 },
+                                callback: function(v) { return '€' + v.toLocaleString('el-GR'); }
+                            },
+                            grid: { drawOnChartArea: false },
+                            border: { display: false }
+                        }
                     }
                 }
             });
         }
 
-        // Status
+        // ── Order status doughnut ──
         const statusData = getData('status-data');
         const statusCtx = document.getElementById('statusChart');
         if (statusCtx && statusData) {
@@ -774,143 +537,54 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } },
-                    cutout: '60%'
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 12, boxHeight: 12, padding: 12, usePointStyle: true, font: { size: 11 } }
+                        },
+                        tooltip: {
+                            backgroundColor: isDark ? '#0a0a0a' : '#ffffff',
+                            titleColor: textColor,
+                            bodyColor: textColor,
+                            borderColor: gridColor,
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                label: function(ctx) {
+                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                    const pct = total ? Math.round(ctx.parsed / total * 100) : 0;
+                                    return `${ctx.label}: ${ctx.parsed} (${pct}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '64%',
+                    layout: { padding: 8 }
                 }
             });
         }
-
-        // Users
-        const usersData = getData('users-data');
-        const usersCtx = document.getElementById('usersChart');
-        if (usersCtx && usersData) {
-            new Chart(usersCtx, {
-                type: 'bar',
-                data: usersData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, suggestedMax: 5, ticks: { stepSize: 1, precision: 0 }, grid: { color: gridColor } } }
-                }
-            });
-        }
-
-        // Subscription Chart
-        const subData = getData('sub-data');
-        const subCtx = document.getElementById('subscriptionChart');
-        if (subCtx && subData) {
-            new Chart(subCtx, {
-                type: 'line',
-                data: subData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true, suggestedMax: 5, ticks: { stepSize: 1, precision: 0 }, grid: { color: gridColor } } }
-                }
-            });
-        }
-
-        // Blog Category Chart
-        const blogCatData = getData('blog-cat-data');
-        const blogCatCtx = document.getElementById('blogCatChart');
-        if (blogCatCtx && blogCatData) {
-            new Chart(blogCatCtx, {
-                type: 'doughnut',
-                data: blogCatData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right', labels: { boxWidth: 10, color: textColor } } },
-                    cutout: '60%',
-                    layout: { padding: 0 }
-                }
-            });
-        }
-
-        // Product Category Chart
-        const prodCatData = getData('prod-cat-data');
-        const prodCatCtx = document.getElementById('prodCatChart');
-        if (prodCatCtx && prodCatData) {
-            new Chart(prodCatCtx, {
-                type: 'bar',
-                data: prodCatData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, suggestedMax: 5, ticks: { precision: 0 }, grid: { color: gridColor } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        // Cart Chart
-        const cartData = getData('cart-data');
-        const cartCtx = document.getElementById('cartChart');
-        if (cartCtx && cartData) {
-            new Chart(cartCtx, {
-                type: 'pie',
-                data: cartData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } }
-                }
-            });
-        }
-
     });
 
-    // Helper to update chart colors on theme change
-    function updateCharts() {
-        const isDark = document.documentElement.classList.contains('dark');
-        const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
-        const textColor = isDark ? '#e5e5e5' : '#525252';
-
-        Chart.defaults.color = textColor;
-        Chart.defaults.borderColor = gridColor;
-
-        Object.values(Chart.instances).forEach(chart => {
-            // Update scales if they exist
-            if (chart.options.scales) {
-                ['x', 'y'].forEach(axis => {
-                    if (chart.options.scales[axis]) {
-                        if (chart.options.scales[axis].grid) {
-                            chart.options.scales[axis].grid.color = gridColor;
-                        }
-                        if (chart.options.scales[axis].ticks) {
-                            chart.options.scales[axis].ticks.color = textColor;
-                        }
-                    }
-                });
-            }
-
-            // Update specific charts
-            if (chart.canvas.id === 'blogCatChart') {
-                if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
-                    chart.options.plugins.legend.labels.color = textColor;
-                }
-            }
-
-            chart.update();
-        });
-    }
-
-    // Observer for theme changes
+    // ── Theme-change observer keeps tick/grid colours in sync ──
     const observer = new MutationObserver(function (mutations) {
-        mutations.forEach(function (mutation) {
-            if (mutation.attributeName === 'class') {
-                updateCharts();
-            }
+        mutations.forEach(function (m) {
+            if (m.attributeName !== 'class') return;
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+            const textColor = isDark ? '#e5e5e5' : '#525252';
+            Chart.defaults.color = textColor;
+            Chart.defaults.borderColor = gridColor;
+            Object.values(Chart.instances).forEach(c => {
+                if (c.options.scales) {
+                    Object.values(c.options.scales).forEach(s => {
+                        if (s.grid) s.grid.color = gridColor;
+                        if (s.ticks) s.ticks.color = textColor;
+                    });
+                }
+                c.update();
+            });
         });
     });
-
-    observer.observe(document.documentElement, {
-        attributes: true
-    });
+    observer.observe(document.documentElement, { attributes: true });
 </script>
 {% endblock %}

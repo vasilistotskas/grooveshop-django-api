@@ -171,6 +171,7 @@ MIDDLEWARE = [
     "django.middleware.gzip.GZipMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
+    "core.middleware.admin_locale.AdminDefaultGreekMiddleware",
     "core.middleware.translation_reload.TranslationReloadMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -1826,6 +1827,7 @@ UNFOLD = {
         "show_search": True,
         "show_all_applications": False,
         "navigation": [
+            # ── Dashboard ─────────────────────────────────────────────
             {
                 "title": _("Navigation"),
                 "separator": True,
@@ -1837,6 +1839,7 @@ UNFOLD = {
                     },
                 ],
             },
+            # ── Catalog (catalog management) ──────────────────────────
             {
                 "title": _("Catalog"),
                 "separator": True,
@@ -1848,6 +1851,7 @@ UNFOLD = {
                         "link": reverse_lazy(
                             "admin:product_product_changelist"
                         ),
+                        "badge": "admin.badges.low_stock_badge",
                     },
                     {
                         "title": _("Categories"),
@@ -1885,6 +1889,7 @@ UNFOLD = {
                     },
                 ],
             },
+            # ── Sales (day-to-day order operations) ───────────────────
             {
                 "title": _("Sales"),
                 "separator": True,
@@ -1902,6 +1907,11 @@ UNFOLD = {
                         "link": reverse_lazy("admin:cart_cart_changelist"),
                     },
                     {
+                        "title": _("Invoices"),
+                        "icon": "receipt",
+                        "link": reverse_lazy("admin:order_invoice_changelist"),
+                    },
+                    {
                         "title": _("Payment Methods"),
                         "icon": "payments",
                         "link": reverse_lazy("admin:pay_way_payway_changelist"),
@@ -1911,49 +1921,81 @@ UNFOLD = {
                         "icon": "percent",
                         "link": reverse_lazy("admin:vat_vat_changelist"),
                     },
+                    # Content nests under Sales as a subtree — blog,
+                    # notifications, and contact messages all feed the
+                    # storefront sales funnel, so grouping them with
+                    # the order/payment items keeps related work in
+                    # one place.
                     {
-                        "title": _("Invoices"),
-                        "icon": "receipt",
-                        "link": reverse_lazy("admin:order_invoice_changelist"),
-                    },
-                    {
-                        "title": _("Stock Logs"),
-                        "icon": "inventory",
-                        "link": reverse_lazy("admin:order_stocklog_changelist"),
+                        "title": _("Content"),
+                        "icon": "edit_square",
+                        "items": [
+                            {
+                                "title": _("Blog Posts"),
+                                "icon": "article",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogpost_changelist"
+                                ),
+                            },
+                            {
+                                "title": _("Blog Categories"),
+                                "icon": "folder_open",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogcategory_changelist"
+                                ),
+                            },
+                            {
+                                "title": _("Blog Authors"),
+                                "icon": "edit_note",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogauthor_changelist"
+                                ),
+                            },
+                            {
+                                "title": _("Blog Comments"),
+                                "icon": "chat_bubble",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogcomment_changelist"
+                                ),
+                                "badge": "admin.badges.pending_comments_badge",
+                            },
+                            {
+                                "title": _("Blog Tags"),
+                                "icon": "tag",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogtag_changelist"
+                                ),
+                            },
+                            {
+                                "title": _("Notifications"),
+                                "icon": "notifications_active",
+                                "link": reverse_lazy(
+                                    "admin:notification_notification_changelist"
+                                ),
+                            },
+                            {
+                                "title": _("Contact Messages"),
+                                "icon": "contact_mail",
+                                "link": reverse_lazy(
+                                    "admin:contact_contact_changelist"
+                                ),
+                                "badge": "admin.badges.unread_messages_badge",
+                            },
+                        ],
                     },
                 ],
             },
+            # ── Shipping (carrier-facing fulfilment) ─────────────────
             {
                 "title": _("Shipping"),
                 "separator": True,
                 "collapsible": True,
                 "items": [
                     {
-                        "title": _("Shipping Providers"),
-                        "icon": "local_shipping",
-                        "link": reverse_lazy(
-                            "admin:shipping_shippingprovider_changelist"
-                        ),
-                    },
-                    {
                         "title": _("BoxNow Shipments"),
                         "icon": "package_2",
                         "link": reverse_lazy(
                             "admin:shipping_boxnow_boxnowshipment_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("BoxNow Lockers"),
-                        "icon": "lock",
-                        "link": reverse_lazy(
-                            "admin:shipping_boxnow_boxnowlocker_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("BoxNow Events"),
-                        "icon": "event_note",
-                        "link": reverse_lazy(
-                            "admin:shipping_boxnow_boxnowparcelevent_changelist"
                         ),
                     },
                     {
@@ -1964,30 +2006,24 @@ UNFOLD = {
                         ),
                     },
                     {
+                        "title": _("BoxNow Lockers"),
+                        "icon": "lock",
+                        "link": reverse_lazy(
+                            "admin:shipping_boxnow_boxnowlocker_changelist"
+                        ),
+                    },
+                    {
                         "title": _("ACS Stations"),
                         "icon": "store",
                         "link": reverse_lazy(
                             "admin:shipping_acs_acsstation_changelist"
                         ),
                     },
-                    {
-                        "title": _("ACS Pickup Lists"),
-                        "icon": "assignment",
-                        "link": reverse_lazy(
-                            "admin:shipping_acs_acspickuplist_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("ACS COD Payouts"),
-                        "icon": "account_balance",
-                        "link": reverse_lazy(
-                            "admin:shipping_acs_acscodpayout_changelist"
-                        ),
-                    },
                 ],
             },
+            # ── Customers ────────────────────────────────────────────
             {
-                "title": _("Users & Engagement"),
+                "title": _("Customers"),
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -2012,81 +2048,9 @@ UNFOLD = {
                             "admin:user_usersubscription_changelist"
                         ),
                     },
-                    {
-                        "title": _("Subscription Topics"),
-                        "icon": "topic",
-                        "link": reverse_lazy(
-                            "admin:user_subscriptiontopic_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("Groups"),
-                        "icon": "shield_person",
-                        "link": reverse_lazy("admin:auth_group_changelist"),
-                    },
                 ],
             },
-            {
-                "title": _("Blog & Content"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Blog Posts"),
-                        "icon": "article",
-                        "link": reverse_lazy("admin:blog_blogpost_changelist"),
-                    },
-                    {
-                        "title": _("Blog Authors"),
-                        "icon": "edit_note",
-                        "link": reverse_lazy(
-                            "admin:blog_blogauthor_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("Blog Categories"),
-                        "icon": "folder_open",
-                        "link": reverse_lazy(
-                            "admin:blog_blogcategory_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("Blog Comments"),
-                        "icon": "chat_bubble",
-                        "link": reverse_lazy(
-                            "admin:blog_blogcomment_changelist"
-                        ),
-                        "badge": "admin.badges.pending_comments_badge",
-                    },
-                    {
-                        "title": _("Blog Tags"),
-                        "icon": "tag",
-                        "link": reverse_lazy("admin:blog_blogtag_changelist"),
-                    },
-                ],
-            },
-            {
-                "title": _("Communications"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Notifications"),
-                        "icon": "notifications_active",
-                        "link": reverse_lazy(
-                            "admin:notification_notification_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("Contact Messages"),
-                        "icon": "contact_mail",
-                        "link": reverse_lazy(
-                            "admin:contact_contact_changelist"
-                        ),
-                        "badge": "admin.badges.unread_messages_badge",
-                    },
-                ],
-            },
+            # ── Loyalty ──────────────────────────────────────────────
             {
                 "title": _("Loyalty"),
                 "separator": True,
@@ -2108,87 +2072,402 @@ UNFOLD = {
                     },
                 ],
             },
+            # ──────────────────────────────────────────────────────────
+            # SYSTEM ZONE — superuser-only. One parent group with four
+            # nested subtrees (Configuration / Audit & Logs /
+            # Reconciliation / Background Jobs). The nested rendering
+            # is provided by our `core/templates/unfold/helpers/
+            # app_list{,_item}.html` overrides — unfold's Python layer
+            # already recursively processes child `items` arrays
+            # (`UnfoldAdminSite._get_navigation_items`), so the only
+            # custom code is the recursive template partial.
+            # ──────────────────────────────────────────────────────────
             {
-                "title": _("System Settings"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Countries"),
-                        "icon": "public",
-                        "link": reverse_lazy(
-                            "admin:country_country_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("Regions"),
-                        "icon": "map",
-                        "link": reverse_lazy("admin:region_region_changelist"),
-                    },
-                    {
-                        "title": _("Sites"),
-                        "icon": "language",
-                        "link": reverse_lazy("admin:sites_site_changelist"),
-                    },
-                    {
-                        "title": _("Extra Settings"),
-                        "icon": "settings",
-                        "link": reverse_lazy(
-                            "admin:extra_settings_setting_changelist"
-                        ),
-                    },
-                ],
-            },
-            {
-                "title": _("Background Jobs"),
+                "title": _("System"),
                 "separator": True,
                 "collapsible": True,
                 "permission": "admin.permissions.is_superuser",
                 "items": [
                     {
-                        "title": _("Periodic Tasks"),
-                        "icon": "task_alt",
-                        "link": reverse_lazy(
-                            "admin:django_celery_beat_periodictask_changelist"
-                        ),
+                        "title": _("Configuration"),
+                        "icon": "tune",
                         "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("Countries"),
+                                "icon": "public",
+                                "link": reverse_lazy(
+                                    "admin:country_country_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Regions"),
+                                "icon": "map",
+                                "link": reverse_lazy(
+                                    "admin:region_region_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Sites"),
+                                "icon": "language",
+                                "link": reverse_lazy(
+                                    "admin:sites_site_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Extra Settings"),
+                                "icon": "settings",
+                                "link": reverse_lazy(
+                                    "admin:extra_settings_setting_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Subscription Topics"),
+                                "icon": "topic",
+                                "link": reverse_lazy(
+                                    "admin:user_subscriptiontopic_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Shipping Providers"),
+                                "icon": "local_shipping",
+                                "link": reverse_lazy(
+                                    "admin:shipping_shippingprovider_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Groups"),
+                                "icon": "shield_person",
+                                "link": reverse_lazy(
+                                    "admin:auth_group_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
                     },
                     {
-                        "title": _("Crontab Schedules"),
-                        "icon": "more_time",
-                        "link": reverse_lazy(
-                            "admin:django_celery_beat_crontabschedule_changelist"
-                        ),
+                        "title": _("Audit & Logs"),
+                        "icon": "fact_check",
                         "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("Stock Logs"),
+                                "icon": "inventory",
+                                "link": reverse_lazy(
+                                    "admin:order_stocklog_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Order History"),
+                                "icon": "history",
+                                "link": reverse_lazy(
+                                    "admin:order_orderhistory_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Order Item History"),
+                                "icon": "manage_history",
+                                "link": reverse_lazy(
+                                    "admin:order_orderitemhistory_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("BoxNow Events"),
+                                "icon": "event_note",
+                                "link": reverse_lazy(
+                                    "admin:shipping_boxnow_boxnowparcelevent_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("ACS Tracking Events"),
+                                "icon": "track_changes",
+                                "link": reverse_lazy(
+                                    "admin:shipping_acs_acstrackingevent_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Viva Webhook Events"),
+                                "icon": "webhook",
+                                "link": reverse_lazy(
+                                    "admin:order_vivawebhookevent_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Meta CAPI Event Log"),
+                                "icon": "share",
+                                "link": reverse_lazy(
+                                    "admin:meta_capi_metacapieventlog_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Cache Purge Log"),
+                                "icon": "cleaning_services",
+                                "link": reverse_lazy(
+                                    "admin:core_cachepurgelog_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("User Data Exports"),
+                                "icon": "download",
+                                "link": reverse_lazy(
+                                    "admin:user_userdataexport_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
                     },
                     {
-                        "title": _("Interval Schedules"),
-                        "icon": "update",
-                        "link": reverse_lazy(
-                            "admin:django_celery_beat_intervalschedule_changelist"
-                        ),
+                        "title": _("Reconciliation"),
+                        "icon": "balance",
                         "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("ACS Pickup Lists"),
+                                "icon": "assignment",
+                                "link": reverse_lazy(
+                                    "admin:shipping_acs_acspickuplist_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("ACS COD Payouts"),
+                                "icon": "account_balance",
+                                "link": reverse_lazy(
+                                    "admin:shipping_acs_acscodpayout_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Invoice Counter"),
+                                "icon": "tag",
+                                "link": reverse_lazy(
+                                    "admin:order_invoicecounter_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
                     },
                     {
-                        "title": _("Clocked Schedules"),
-                        "icon": "alarm",
-                        "link": reverse_lazy(
-                            "admin:django_celery_beat_clockedschedule_changelist"
-                        ),
+                        "title": _("Background Jobs"),
+                        "icon": "schedule",
                         "permission": "admin.permissions.is_superuser",
-                    },
-                    {
-                        "title": _("Solar Schedules"),
-                        "icon": "wb_sunny",
-                        "link": reverse_lazy(
-                            "admin:django_celery_beat_solarschedule_changelist"
-                        ),
-                        "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("Periodic Tasks"),
+                                "icon": "task_alt",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_periodictask_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Crontab Schedules"),
+                                "icon": "more_time",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_crontabschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Interval Schedules"),
+                                "icon": "update",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_intervalschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Clocked Schedules"),
+                                "icon": "alarm",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_clockedschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Solar Schedules"),
+                                "icon": "wb_sunny",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_solarschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
                     },
                 ],
             },
         ],
     },
+    # Cross-model tab strips that appear on related changelist / detail
+    # pages. Lets staff hop across linked admins (Order → Invoice;
+    # BoxNow shipment → locker → events) without bouncing through the
+    # sidebar. Tabs gated on `is_superuser` are hidden for staff.
+    "TABS": [
+        {
+            "models": [
+                "order.order",
+                "order.invoice",
+                "order.stocklog",
+                "order.orderhistory",
+                "order.orderitemhistory",
+            ],
+            "items": [
+                {
+                    "title": _("Orders"),
+                    "link": reverse_lazy("admin:order_order_changelist"),
+                },
+                {
+                    "title": _("Invoices"),
+                    "link": reverse_lazy("admin:order_invoice_changelist"),
+                },
+                {
+                    "title": _("Stock Logs"),
+                    "link": reverse_lazy("admin:order_stocklog_changelist"),
+                    "permission": "admin.permissions.is_superuser",
+                },
+                {
+                    "title": _("Order History"),
+                    "link": reverse_lazy("admin:order_orderhistory_changelist"),
+                    "permission": "admin.permissions.is_superuser",
+                },
+            ],
+        },
+        {
+            "models": [
+                "shipping_boxnow.boxnowshipment",
+                "shipping_boxnow.boxnowlocker",
+                "shipping_boxnow.boxnowparcelevent",
+            ],
+            "items": [
+                {
+                    "title": _("BoxNow Shipments"),
+                    "link": reverse_lazy(
+                        "admin:shipping_boxnow_boxnowshipment_changelist"
+                    ),
+                },
+                {
+                    "title": _("BoxNow Lockers"),
+                    "link": reverse_lazy(
+                        "admin:shipping_boxnow_boxnowlocker_changelist"
+                    ),
+                },
+                {
+                    "title": _("BoxNow Events"),
+                    "link": reverse_lazy(
+                        "admin:shipping_boxnow_boxnowparcelevent_changelist"
+                    ),
+                    "permission": "admin.permissions.is_superuser",
+                },
+            ],
+        },
+        {
+            "models": [
+                "shipping_acs.acsshipment",
+                "shipping_acs.acsstation",
+                "shipping_acs.acspickuplist",
+                "shipping_acs.acscodpayout",
+                "shipping_acs.acstrackingevent",
+            ],
+            "items": [
+                {
+                    "title": _("ACS Shipments"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acsshipment_changelist"
+                    ),
+                },
+                {
+                    "title": _("ACS Stations"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acsstation_changelist"
+                    ),
+                },
+                {
+                    "title": _("ACS Pickup Lists"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acspickuplist_changelist"
+                    ),
+                    "permission": "admin.permissions.is_superuser",
+                },
+                {
+                    "title": _("ACS COD Payouts"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acscodpayout_changelist"
+                    ),
+                    "permission": "admin.permissions.is_superuser",
+                },
+                {
+                    "title": _("ACS Tracking Events"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acstrackingevent_changelist"
+                    ),
+                    "permission": "admin.permissions.is_superuser",
+                },
+            ],
+        },
+        {
+            "models": [
+                "product.attribute",
+                "product.attributevalue",
+            ],
+            "items": [
+                {
+                    "title": _("Attributes"),
+                    "link": reverse_lazy("admin:product_attribute_changelist"),
+                },
+                {
+                    "title": _("Attribute Values"),
+                    "link": reverse_lazy(
+                        "admin:product_attributevalue_changelist"
+                    ),
+                },
+            ],
+        },
+        {
+            "models": [
+                "blog.blogpost",
+                "blog.blogcategory",
+                "blog.blogauthor",
+                "blog.blogcomment",
+                "blog.blogtag",
+            ],
+            "items": [
+                {
+                    "title": _("Blog Posts"),
+                    "link": reverse_lazy("admin:blog_blogpost_changelist"),
+                },
+                {
+                    "title": _("Categories"),
+                    "link": reverse_lazy("admin:blog_blogcategory_changelist"),
+                },
+                {
+                    "title": _("Authors"),
+                    "link": reverse_lazy("admin:blog_blogauthor_changelist"),
+                },
+                {
+                    "title": _("Comments"),
+                    "link": reverse_lazy("admin:blog_blogcomment_changelist"),
+                },
+                {
+                    "title": _("Tags"),
+                    "link": reverse_lazy("admin:blog_blogtag_changelist"),
+                },
+            ],
+        },
+    ],
     "SITE_DROPDOWN": [
         {
             "icon": "translate",

@@ -19,6 +19,7 @@ from unfold.contrib.filters.admin import (
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
+from admin.mixins import IsSuperuserOnlyModelAdmin
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.models import (
     AcsCodPayout,
@@ -219,7 +220,7 @@ class AcsStationAdmin(ModelAdmin):
 
 
 @admin.register(AcsPickupList)
-class AcsPickupListAdmin(ModelAdmin):
+class AcsPickupListAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     list_display = (
         "pickup_list_no",
         "issued_at",
@@ -240,7 +241,7 @@ class AcsPickupListAdmin(ModelAdmin):
 
 
 @admin.register(AcsCodPayout)
-class AcsCodPayoutAdmin(ModelAdmin):
+class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     """Read-only ledger of ACS COD payouts (Phase 4c).
 
     Populated by the daily ``reconcile_acs_cod_payouts`` Celery task.
@@ -296,3 +297,44 @@ class AcsCodPayoutAdmin(ModelAdmin):
 
         reconcile_acs_cod_payouts.delay()
         messages.info(request, _("COD reconciliation task dispatched."))
+
+
+@admin.register(AcsTrackingEvent)
+class AcsTrackingEventAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+    """Read-only audit trail of ACS tracking webhook deliveries."""
+
+    compressed_fields = True
+    list_fullwidth = True
+    list_filter_sheet = True
+
+    list_display = (
+        "shipment",
+        "event_time",
+        "checkpoint_action",
+        "checkpoint_location",
+        "received_at",
+    )
+    list_filter = (
+        "checkpoint_action",
+        ("received_at", RangeDateTimeFilter),
+    )
+    search_fields = (
+        "shipment__voucher_no",
+        "checkpoint_action",
+        "checkpoint_location",
+    )
+    readonly_fields = (
+        "shipment",
+        "event_time",
+        "checkpoint_action",
+        "checkpoint_location",
+        "notes",
+        "raw_payload",
+        "received_at",
+        "created_at",
+        "updated_at",
+    )
+    ordering = ("-received_at",)
+
+    def has_add_permission(self, request):
+        return False

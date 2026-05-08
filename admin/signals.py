@@ -13,32 +13,22 @@ def _invalidate_dashboard_cache(*args, **kwargs):
 def _connect_dashboard_invalidation():
     """Bust the admin dashboard cache on writes to domain models it reads.
 
-    Kept as a function so the import of model classes is deferred until
-    apps are loaded (avoids circular imports at module import time).
+    The new (Stage 2) dashboard surfaces revenue, orders, customers,
+    pending reviews, and contact messages — anything that affects those
+    numbers must invalidate the cache. Stock writes invalidate too via
+    Order/Product saves; we don't subscribe to ``StockLog`` directly
+    because the data feeds Zone D (low stock), which is already
+    computed fresh per request.
     """
-    from blog.models.comment import BlogComment
-    from blog.models.post import BlogPost
-    from cart.models import Cart
+
     from contact.models import Contact
+    from order.models.invoice import Invoice
     from order.models.order import Order
-    from order.models.stock_log import StockLog
     from product.models.product import Product
     from product.models.review import ProductReview
     from user.models.account import UserAccount
-    from user.models.subscription import UserSubscription
 
-    for model in (
-        Order,
-        Product,
-        ProductReview,
-        BlogPost,
-        BlogComment,
-        UserAccount,
-        UserSubscription,
-        Cart,
-        Contact,
-        StockLog,
-    ):
+    for model in (Order, Invoice, Product, ProductReview, UserAccount, Contact):
         sender_uid = f"admin.dashboard_invalidate:{model._meta.label}"
         post_save.connect(
             _invalidate_dashboard_cache,

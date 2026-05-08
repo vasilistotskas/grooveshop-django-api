@@ -35,6 +35,8 @@ from parler.models import TranslatableModel
 from unfold.admin import ModelAdmin
 from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
+from admin.mixins import IsSuperuserOnlyModelAdmin
+
 logger = logging.getLogger(__name__)
 
 admin.site.unregister(Setting)
@@ -504,7 +506,7 @@ from core.cache.models import CachePurgeLog  # noqa: E402
 
 
 @admin.register(CachePurgeLog)
-class CachePurgeLogAdmin(ModelAdmin):
+class CachePurgeLogAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     list_display = (
         "created_at",
         "actor",

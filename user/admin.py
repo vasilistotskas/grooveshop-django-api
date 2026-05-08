@@ -27,11 +27,13 @@ from unfold.forms import (
     UserCreationForm,
 )
 
+from admin.mixins import IsSuperuserOnlyModelAdmin
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
 from user.models import UserAccount
 from user.models.address import UserAddress
+from user.models.data_export import UserDataExport
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
 admin.site.unregister(Group)
@@ -1143,3 +1145,42 @@ class UserSubscriptionAdmin(ModelAdmin):
             request,
             _("%(count)d subscriptions were deactivated.") % {"count": updated},
         )
+
+
+@admin.register(UserDataExport)
+class UserDataExportAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+    """Read-only ledger of GDPR data-export requests."""
+
+    compressed_fields = True
+    list_fullwidth = True
+    list_filter_sheet = True
+
+    list_display = (
+        "user",
+        "status",
+        "file_size",
+        "expires_at",
+        "created_at",
+    )
+    list_filter = (
+        "status",
+        ("created_at", RangeDateTimeFilter),
+        ("expires_at", RangeDateTimeFilter),
+    )
+    search_fields = ("user__email", "user__username", "token")
+    readonly_fields = (
+        "user",
+        "status",
+        "file_path",
+        "file_size",
+        "token",
+        "expires_at",
+        "error_message",
+        "created_at",
+        "updated_at",
+        "uuid",
+    )
+    ordering = ("-created_at",)
+
+    def has_add_permission(self, request):
+        return False

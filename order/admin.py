@@ -23,6 +23,7 @@ from unfold.contrib.filters.admin import (
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
+from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.invoicing import generate_invoice
@@ -31,6 +32,7 @@ from order.models.invoice import Invoice, InvoiceCounter
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.stock_log import StockLog
+from order.models.viva_webhook_event import VivaWebhookEvent
 from order.services import OrderService
 
 logger = logging.getLogger(__name__)
@@ -491,7 +493,7 @@ class OrderAdmin(ModelAdmin):
                     "updated_at",
                     "status_updated_at",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
@@ -505,7 +507,7 @@ class OrderAdmin(ModelAdmin):
                     "phone",
                     "customer_summary",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
@@ -523,7 +525,7 @@ class OrderAdmin(ModelAdmin):
                     "place",
                     "shipping_summary",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
@@ -537,7 +539,7 @@ class OrderAdmin(ModelAdmin):
                     "paid_amount",
                     "financial_summary",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
                 "description": _(
                     "⚠️ Note: Ensure all money fields use the same currency (EUR preferred) to avoid calculation errors."
                 ),
@@ -554,7 +556,7 @@ class OrderAdmin(ModelAdmin):
                     "shipping_carrier",
                     "boxnow_summary",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
                 "description": _(
                     "💡 Shipping price currency should match item currencies to avoid total calculation errors."
                 ),
@@ -567,7 +569,7 @@ class OrderAdmin(ModelAdmin):
                     "customer_notes",
                     "order_analytics",
                 ),
-                "classes": ("collapse",),
+                "classes": ("tab",),
             },
         ),
     )
@@ -1939,7 +1941,7 @@ class OrderItemAdmin(ModelAdmin):
 
 
 @admin.register(OrderHistory)
-class OrderHistoryAdmin(ModelAdmin):
+class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     compressed_fields = True
     list_fullwidth = True
     list_filter_sheet = True
@@ -2089,7 +2091,7 @@ class OrderHistoryAdmin(ModelAdmin):
 
 
 @admin.register(OrderItemHistory)
-class OrderItemHistoryAdmin(ModelAdmin):
+class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     compressed_fields = True
     list_fullwidth = True
     list_filter_sheet = True
@@ -2205,7 +2207,7 @@ class OrderItemHistoryAdmin(ModelAdmin):
 
 
 @admin.register(StockLog)
-class StockLogAdmin(ModelAdmin):
+class StockLogAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     list_display = (
         "product",
         "operation_type",
@@ -2516,7 +2518,7 @@ class InvoiceAdmin(ModelAdmin):
 
 
 @admin.register(InvoiceCounter)
-class InvoiceCounterAdmin(ModelAdmin):
+class InvoiceCounterAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     """Per-year sequential invoice counter.
 
     Editable by superusers only — bumping ``next_number`` is an ops
@@ -2532,11 +2534,42 @@ class InvoiceCounterAdmin(ModelAdmin):
     ordering = ("-year",)
     readonly_fields = ()
 
+
+@admin.register(VivaWebhookEvent)
+class VivaWebhookEventAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+    """Read-only audit trail of Viva Wallet webhook deliveries."""
+
+    compressed_fields = True
+    list_fullwidth = True
+    list_filter_sheet = True
+
+    list_display = (
+        "transaction_id",
+        "event_type_id",
+        "outcome",
+        "order",
+        "order_code",
+        "status_id",
+        "received_at",
+    )
+    list_filter = (
+        "event_type_id",
+        "outcome",
+        ("received_at", RangeDateTimeFilter),
+    )
+    search_fields = ("transaction_id", "order_code", "order__id")
+    ordering = ("-received_at",)
+    readonly_fields = (
+        "transaction_id",
+        "event_type_id",
+        "order",
+        "order_code",
+        "status_id",
+        "outcome",
+        "received_at",
+        "created_at",
+        "updated_at",
+    )
+
     def has_add_permission(self, request):
-        return bool(request.user and request.user.is_superuser)
-
-    def has_change_permission(self, request, obj=None):
-        return bool(request.user and request.user.is_superuser)
-
-    def has_delete_permission(self, request, obj=None):
-        return bool(request.user and request.user.is_superuser)
+        return False

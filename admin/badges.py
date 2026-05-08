@@ -54,3 +54,21 @@ def unread_messages_badge(request):
         "contact",
         "Contact",
     )
+
+
+def low_stock_badge(request):
+    """Active products with `0 < stock < 10` — the "replenish soon" band.
+
+    Out-of-stock items (`stock=0`) are intentionally excluded because
+    that's a separate operational concern (deactivate or restock); we
+    only badge the warning band so staff can act before things sell out.
+    """
+
+    return _cached_count(
+        "admin:badge:low_stock",
+        "product",
+        "Product",
+        active=True,
+        stock__gt=0,
+        stock__lt=10,
+    )

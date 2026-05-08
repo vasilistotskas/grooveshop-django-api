@@ -1,0 +1,60 @@
+{% comment %}
+Override of django-unfold's `unfold/helpers/app_list.html` that adds
+support for nested sidebar items.
+
+Unfold's Python layer (`UnfoldAdminSite._get_navigation_items`) already
+recursively processes child `items` arrays — applying `has_permission`,
+`active`, `link_callback`, and `badge` to each level. Only the upstream
+template renders flat (one level), so a custom template is enough to
+unlock subtree navigation. We render each item via the recursive
+`unfold/helpers/app_list_item.html` partial; an item that carries its
+own `items` list becomes a collapsible subtree (Alpine.js drives the
+expand/collapse exactly like top-level collapsible groups do).
+
+Keep this file in sync when bumping django-unfold past 0.92.x — diff
+against the upstream `app_list.html` to pick up new top-level features.
+{% endcomment %}
+{% load i18n unfold %}
+
+{% if sidebar_navigation %}
+    <div id="nav-sidebar-apps" class="h-0 grow overflow-auto" data-simplebar>
+        {% for group in sidebar_navigation %}
+            {% if group.items %}
+                {% has_nav_item_active group.items as has_active %}
+
+                <div class="hidden mb-1.5 has-[ol]:has-[li]:block" {% if group.collapsible %}x-data="{navigationOpen: {% if has_active %}true{% else %}false{% endif %}}"{% endif %}>
+                    {% if group.separator %}
+                        <hr class="border-t border-base-200 mx-6 my-2 dark:border-base-800" />
+                    {% endif %}
+
+                    {% if group.title %}
+                        <h2 class="font-semibold flex flex-row group items-center mb-1 mx-3 py-1.5 px-3 select-none text-font-important-light text-sm dark:text-font-important-dark {% if group.collapsible %}cursor-pointer hover:text-primary-600 dark:hover:text-primary-500{% endif %}" {% if group.collapsible %}x-on:click="navigationOpen = !navigationOpen"{% endif %}>
+                            {{ group.title }}
+
+                            {% include "unfold/helpers/app_list_badge.html" with item=group %}
+
+                            {% if group.collapsible %}
+                                <span class="material-symbols-outlined ml-auto transition-transform group-hover:text-primary-600 dark:group-hover:text-primary-500" x-bind:class="{'rotate-90': navigationOpen}">
+                                    chevron_right
+                                </span>
+                            {% endif %}
+                        </h2>
+                    {% endif %}
+
+                    <ol class="flex flex-col gap-0.5 px-6" {% if group.collapsible %}x-show="navigationOpen"{% endif %}>
+                        {% for item in group.items %}
+                            {% include "unfold/helpers/app_list_item.html" with item=item depth=0 %}
+                        {% endfor %}
+                    </ol>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    {% include "unfold/helpers/app_list_all.html" %}
+{% else %}
+    <p>
+        {% trans "You don't have permission to view or edit anything." as error_message %}
+        {% include "unfold/helpers/messages/error.html" with error=error_message %}
+    </p>
+{% endif %}

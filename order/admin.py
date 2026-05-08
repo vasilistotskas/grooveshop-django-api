@@ -466,6 +466,12 @@ class OrderAdmin(ModelAdmin):
         "boxnow_shipment__delivery_request_id",
         "boxnow_shipment__locker_external_id",
     ]
+    search_help_text = _(
+        "Search by order ID, UUID, customer email/name/phone, city, "
+        "tracking number, payment ID, or BoxNow voucher / locker ID."
+    )
+    autocomplete_fields = ["user", "country", "region", "pay_way"]
+    list_per_page = 25
     readonly_fields = (
         "uuid",
         "created_at",
@@ -587,6 +593,13 @@ class OrderAdmin(ModelAdmin):
         "send_invoice_to_mydata_now",
         "cancel_mydata_invoice_now",
         "download_shipping_voucher",
+    ]
+    # Per-row quick actions: avoid the detail-page round-trip for the
+    # two ops the support team does most (download voucher PDF, jump
+    # to the customer's other orders).
+    actions_row = [
+        "download_shipping_voucher",
+        "view_customer_orders_row",
     ]
     inlines = [OrderItemInline, InvoiceInline, OrderHistoryInline]
     save_on_top = True
@@ -1708,6 +1721,33 @@ class OrderAdmin(ModelAdmin):
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         response["Content-Length"] = str(len(pdf_bytes))
         return response
+
+    @action(
+        description=str(_("Customer's orders")),
+        icon="person_search",
+        variant=ActionVariant.INFO,
+    )
+    def view_customer_orders_row(self, request, object_id):
+        """Jump from a row to the changelist filtered by the same customer.
+
+        Saves a click for support tickets where the agent is on order N
+        and needs to see the customer's other orders. We use email as
+        the join key because guest orders share email but not user_id.
+        """
+        try:
+            order = Order.objects.only("id", "user_id", "email").get(
+                pk=object_id
+            )
+        except Order.DoesNotExist:
+            messages.error(request, _("Order not found."))
+            return redirect("admin:order_order_changelist")
+
+        url = reverse("admin:order_order_changelist")
+        # Prefer linking by user FK when authenticated; fall back to
+        # email for guest checkouts. `q=<email>` hits search_fields.
+        if order.user_id:
+            return redirect(f"{url}?user__id__exact={order.user_id}")
+        return redirect(f"{url}?q={order.email}")
 
 
 @admin.register(OrderItem)

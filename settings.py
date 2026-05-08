@@ -1905,6 +1905,7 @@ UNFOLD = {
                         "title": _("Carts"),
                         "icon": "shopping_cart",
                         "link": reverse_lazy("admin:cart_cart_changelist"),
+                        "badge": "admin.badges.abandoned_carts_badge",
                     },
                     {
                         "title": _("Invoices"),
@@ -1936,6 +1937,7 @@ UNFOLD = {
                                 "link": reverse_lazy(
                                     "admin:blog_blogpost_changelist"
                                 ),
+                                "badge": "admin.badges.draft_blog_posts_badge",
                             },
                             {
                                 "title": _("Blog Categories"),
@@ -2484,6 +2486,54 @@ UNFOLD = {
             "title": _("Email Templates"),
             "link": reverse_lazy("email_templates:management"),
         },
+        # Ops links — open in new tab; URLs are env-driven so they
+        # work in both local docker (localhost) and production
+        # (subdomains/internal hosts). Empty env var hides the link.
+        *[
+            {
+                "icon": entry["icon"],
+                "title": entry["title"],
+                "link": entry["link"],
+                "attrs": {"target": "_blank", "rel": "noopener"},
+            }
+            for entry in [
+                {
+                    "icon": "monitoring",
+                    "title": _("Flower (Celery)"),
+                    "link": getenv("ADMIN_FLOWER_URL", "http://localhost:5556"),
+                },
+                {
+                    "icon": "mark_email_unread",
+                    "title": _("Mailpit"),
+                    "link": getenv(
+                        "ADMIN_MAILPIT_URL", "http://localhost:8025"
+                    ),
+                },
+                {
+                    "icon": "schema",
+                    "title": _("API Swagger"),
+                    "link": getenv(
+                        "ADMIN_SWAGGER_URL",
+                        "/api/v1/schema/swagger-ui/",
+                    ),
+                },
+                {
+                    "icon": "search",
+                    "title": _("Meilisearch"),
+                    "link": getenv(
+                        "ADMIN_MEILISEARCH_URL", "http://localhost:7700"
+                    ),
+                },
+                {
+                    "icon": "router",
+                    "title": _("RabbitMQ"),
+                    "link": getenv(
+                        "ADMIN_RABBITMQ_URL", "http://localhost:15672"
+                    ),
+                },
+            ]
+            if entry["link"]
+        ],
     ],
 }
 

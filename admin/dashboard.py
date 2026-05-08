@@ -29,7 +29,7 @@ from django.utils import timezone
 from django.utils.html import escape, format_html
 from django.utils.translation import gettext_lazy as _
 
-DASHBOARD_CACHE_KEY = "admin:dashboard:data:v2"
+DASHBOARD_CACHE_KEY = "admin:dashboard:data:v3"
 DASHBOARD_CACHE_TTL = 300  # 5 minutes
 
 # Stock-mandatory seller fields surfaced as Zone D banners.
@@ -214,6 +214,97 @@ def _build_zones_a_b_c() -> dict:
         ),
         **_zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus),
         **_zone_c_queues(Order, ProductReview, Contact, ReviewStatus),
+        **_zone_e_growth(Order, User, now, month_ago, PaymentStatus),
+    }
+
+
+# ── Zone E — Growth & retention ───────────────────────────────────────
+
+
+def _zone_e_growth(
+    Order,
+    User,
+    now,
+    month_ago,
+    PaymentStatus,
+) -> dict:
+    """Funnel + retention KPIs + Top Products by views.
+
+    The funnel is computed from raw counts (no separate event store):
+    carts_count > orders_count > paid_orders_count, all over 30 days.
+    Repeat-purchase rate counts customers with ≥ 2 paid orders in the
+    same window over total paying customers — a coarse but cheap LTV
+    proxy.
+    """
+
+    from django.db.models import Count
+
+    Cart = apps.get_model("cart", "Cart")
+    Product = apps.get_model("product", "Product")
+
+    carts_30d = Cart.objects.filter(created_at__gte=month_ago).count()
+    orders_30d = Order.objects.filter(created_at__gte=month_ago).count()
+    paid_30d = Order.objects.filter(
+        created_at__gte=month_ago,
+        payment_status=PaymentStatus.COMPLETED,
+    ).count()
+
+    def _pct(num: int, den: int) -> float:
+        return round(num / den * 100, 1) if den else 0.0
+
+    # Repeat-purchase rate: customers with > 1 paid order in window /
+    # total paying customers in window (unique on user_id; guests with
+    # no user_id are excluded — they have no cohort identity anyway).
+    paying_customers = (
+        Order.objects.filter(
+            created_at__gte=month_ago,
+            payment_status=PaymentStatus.COMPLETED,
+            user_id__isnull=False,
+        )
+        .values("user_id")
+        .annotate(c=Count("id"))
+    )
+    paying_total = paying_customers.count()
+    paying_repeat = sum(1 for row in paying_customers if row["c"] > 1)
+
+    # Top 5 products by all-time view_count — cheap (single index hit).
+    top_products = (
+        Product.objects.filter(active=True)
+        .order_by("-view_count")
+        .prefetch_related("translations")[:5]
+    )
+    top_products_rows = []
+    for product in top_products:
+        name = product.safe_translation_getter("name", any_language=True) or _(
+            "Unnamed"
+        )
+        top_products_rows.append(
+            {
+                "id": product.id,
+                "name": name,
+                "views": product.view_count or 0,
+                "stock": product.stock,
+                "url": reverse(
+                    "admin:product_product_change", args=[product.id]
+                ),
+            }
+        )
+
+    return {
+        "funnel": {
+            "carts": carts_30d,
+            "orders": orders_30d,
+            "paid": paid_30d,
+            "cart_to_order_pct": _pct(orders_30d, carts_30d),
+            "order_to_paid_pct": _pct(paid_30d, orders_30d),
+            "overall_pct": _pct(paid_30d, carts_30d),
+        },
+        "retention": {
+            "paying_customers": paying_total,
+            "repeat_customers": paying_repeat,
+            "repeat_rate_pct": _pct(paying_repeat, paying_total),
+        },
+        "top_products": top_products_rows,
     }
 
 

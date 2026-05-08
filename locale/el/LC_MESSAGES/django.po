@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-05-08 21:56+0300\n"
+"POT-Creation-Date: 2026-05-09 00:16+0300\n"
 "PO-Revision-Date: 2026-04-17 12:58+0300\n"
 "Last-Translator: Webside Admin <webside@hotmail.gr>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -68,20 +68,20 @@ msgstr ""
 msgid "Tax office (ΔΟΥ)"
 msgstr "ΔΟΥ"
 
-#: admin/dashboard.py:154
+#: admin/dashboard.py:153 admin/dashboard.py:279
 msgid "Unnamed"
 msgstr "Χωρίς όνομα"
 
-#: admin/dashboard.py:329 order/models/order.py:271 settings.py:1899
-#: settings.py:2310
+#: admin/dashboard.py:427 core/templates/admin/index.html:427
+#: order/models/order.py:271 settings.py:1899 settings.py:2332
 msgid "Orders"
 msgstr "Παραγγελίες"
 
-#: admin/dashboard.py:337
+#: admin/dashboard.py:440
 msgid "Revenue (€)"
 msgstr "Έσοδα (€)"
 
-#: admin/dashboard.py:361 admin/dashboard.py:528 core/email/sample_data.py:166
+#: admin/dashboard.py:471 admin/dashboard.py:638 core/email/sample_data.py:166
 #: core/templates/emails/order/order_pending_reminder.html:21
 #: core/templates/emails/order/order_pending_reminder.txt:7
 #: meta_capi/models.py:10 order/admin.py:88 order/enum/status.py:6
@@ -89,32 +89,32 @@ msgstr "Έσοδα (€)"
 msgid "Pending"
 msgstr "Εκκρεμεί"
 
-#: admin/dashboard.py:362 admin/dashboard.py:529 core/email/sample_data.py:167
+#: admin/dashboard.py:472 admin/dashboard.py:639 core/email/sample_data.py:167
 #: order/admin.py:89 order/enum/status.py:7 order/enum/status.py:35
 #: user/models/data_export.py:21
 msgid "Processing"
 msgstr "Σε επεξεργασία"
 
-#: admin/dashboard.py:363 admin/dashboard.py:530 core/email/sample_data.py:168
+#: admin/dashboard.py:473 admin/dashboard.py:640 core/email/sample_data.py:168
 #: core/templates/emails/order/order_shipped.html:15 order/enum/status.py:8
 msgid "Shipped"
 msgstr "Απεστάλη"
 
-#: admin/dashboard.py:364 admin/dashboard.py:531 core/email/sample_data.py:169
+#: admin/dashboard.py:474 admin/dashboard.py:641 core/email/sample_data.py:169
 #: core/templates/emails/order/order_delivered.html:16 order/enum/status.py:9
 #: shipping_acs/enum/shipment_state.py:26
 #: shipping_boxnow/enum/parcel_state.py:10
 msgid "Delivered"
 msgstr "Παραδόθηκε"
 
-#: admin/dashboard.py:365 admin/dashboard.py:532 core/email/sample_data.py:170
+#: admin/dashboard.py:475 admin/dashboard.py:642 core/email/sample_data.py:170
 #: core/templates/emails/order/order_completed.html:24
 #: core/templates/emails/order/order_completed.txt:18 order/admin.py:87
 #: order/enum/status.py:10 order/enum/status.py:36 shipping_boxnow/admin.py:142
 msgid "Completed"
 msgstr "Ολοκληρώθηκε"
 
-#: admin/dashboard.py:366 admin/dashboard.py:533 core/email/sample_data.py:171
+#: admin/dashboard.py:476 admin/dashboard.py:643 core/email/sample_data.py:171
 #: core/templates/emails/order/order_canceled.html:17 order/admin.py:93
 #: order/enum/status.py:11 order/enum/status.py:40
 #: shipping_acs/enum/shipment_state.py:29
@@ -122,28 +122,28 @@ msgstr "Ολοκληρώθηκε"
 msgid "Canceled"
 msgstr "Ακυρώθηκε"
 
-#: admin/dashboard.py:367 admin/dashboard.py:534 core/email/sample_data.py:173
+#: admin/dashboard.py:477 admin/dashboard.py:644 core/email/sample_data.py:173
 #: order/enum/status.py:12 shipping_acs/enum/shipment_state.py:28
 #: shipping_boxnow/enum/parcel_state.py:11
 msgid "Returned"
 msgstr "Επιστράφηκε"
 
-#: admin/dashboard.py:368 admin/dashboard.py:535 core/email/sample_data.py:172
+#: admin/dashboard.py:478 admin/dashboard.py:645 core/email/sample_data.py:172
 #: order/admin.py:91 order/enum/status.py:13 order/enum/status.py:38
 msgid "Refunded"
 msgstr "Επιστροφή Χρημάτων"
 
 # Greek translations added by fill_admin_greek_translations.py
-#: admin/dashboard.py:445
+#: admin/dashboard.py:555
 msgid "Order #"
 msgstr "Παραγγελία #"
 
-#: admin/dashboard.py:446 order/admin.py:639
+#: admin/dashboard.py:556 order/admin.py:652
 msgid "Customer"
 msgstr "Πελάτης"
 
-#: admin/dashboard.py:447 blog/admin.py:366 blog/admin.py:723
-#: blog/admin.py:1051 core/templates/emails/order/order_canceled.html:15
+#: admin/dashboard.py:557 blog/admin.py:366 blog/admin.py:726
+#: blog/admin.py:1054 core/templates/emails/order/order_canceled.html:15
 #: core/templates/emails/order/order_completed.html:22
 #: core/templates/emails/order/order_completed.txt:18
 #: core/templates/emails/order/order_confirmation.html:14
@@ -154,16 +154,16 @@ msgstr "Πελάτης"
 #: core/templates/emails/order/order_shipped.html:13
 #: core/templates/invoices/invoice.html:207 meta_capi/models.py:57
 #: notification/admin.py:369 notification/admin.py:658
-#: notification/admin.py:726 order/admin.py:947 order/models/order.py:136
+#: notification/admin.py:726 order/admin.py:960 order/models/order.py:136
 #: pay_way/admin.py:265 product/admin.py:440 product/admin.py:719
-#: product/admin.py:1008 product/admin.py:1635 product/admin.py:2387
-#: product/admin.py:2650 product/admin.py:2947 product/models/review.py:29
-#: tag/admin.py:229 user/admin.py:444 user/admin.py:936 user/admin.py:1070
+#: product/admin.py:1008 product/admin.py:1629 product/admin.py:2449
+#: product/admin.py:2712 product/admin.py:3009 product/models/review.py:29
+#: tag/admin.py:229 user/admin.py:447 user/admin.py:939 user/admin.py:1073
 #: user/models/data_export.py:33 user/models/subscription.py:117
 msgid "Status"
 msgstr "Κατάσταση"
 
-#: admin/dashboard.py:448 cart/admin.py:154 cart/admin.py:339
+#: admin/dashboard.py:558 cart/admin.py:154 cart/admin.py:339
 #: core/templates/admin/product/apply_discount.html:139
 #: core/templates/emails/order/order_confirmation.html:36
 #: core/templates/emails/order/order_confirmation.html:54
@@ -176,11 +176,11 @@ msgstr "Κατάσταση"
 #: core/templates/emails/order/payment_failed.html:19
 #: core/templates/emails/order/payment_failed.txt:8
 #: core/templates/invoices/invoice.html:263 order/admin.py:261
-#: order/admin.py:2429
+#: order/admin.py:2469
 msgid "Total"
 msgstr "Σύνολο"
 
-#: admin/dashboard.py:449 admin/dashboard.py:485 admin/dashboard.py:510
+#: admin/dashboard.py:559 admin/dashboard.py:595 admin/dashboard.py:620
 #: core/templates/emails/order/order_confirmation.html:12
 #: core/templates/emails/order/order_confirmation.txt:6
 #: core/templates/emails/order/order_delivered.html:12
@@ -194,11 +194,11 @@ msgstr "Σύνολο"
 msgid "Date"
 msgstr "Ημερομηνία"
 
-#: admin/dashboard.py:478
+#: admin/dashboard.py:588
 msgid "Anonymous"
 msgstr "Ανώνυμος"
 
-#: admin/dashboard.py:485 cart/admin.py:114 cart/admin.py:504
+#: admin/dashboard.py:595 cart/admin.py:114 cart/admin.py:504
 #: core/templates/emails/cart/checkout_abandoned.html:15
 #: core/templates/emails/marketing/newsletter.html:24
 #: core/templates/emails/order/order_confirmation.html:33
@@ -206,34 +206,34 @@ msgstr "Ανώνυμος"
 #: core/templates/emails/order/order_received.html:43
 #: core/templates/emails/order/order_status_generic.html:86
 #: core/templates/emails/product/low_stock_alert.html:13
-#: notification/enum.py:26 order/admin.py:236 order/admin.py:1834
-#: product/admin.py:1458 product/admin.py:2588 product/admin.py:2799
-#: product/admin.py:3036 product/models/product.py:148
+#: notification/enum.py:26 order/admin.py:236 order/admin.py:1874
+#: product/admin.py:1452 product/admin.py:2650 product/admin.py:2861
+#: product/admin.py:3098 product/models/product.py:148
 msgid "Product"
 msgstr "Προϊόν"
 
-#: admin/dashboard.py:485 blog/admin.py:240 blog/admin.py:1005
-#: notification/admin.py:688 product/admin.py:2609 product/admin.py:2786
-#: user/admin.py:1051 user/models/data_export.py:30
+#: admin/dashboard.py:595 blog/admin.py:240 blog/admin.py:1008
+#: notification/admin.py:688 product/admin.py:2671 product/admin.py:2848
+#: user/admin.py:1054 user/models/data_export.py:30
 #: user/models/subscription.py:108
 msgid "User"
 msgstr "Χρήστης"
 
-#: admin/dashboard.py:485 product/admin.py:2627
+#: admin/dashboard.py:595 product/admin.py:2689
 msgid "Rating"
 msgstr "Βαθμολογία"
 
-#: admin/dashboard.py:510
+#: admin/dashboard.py:620
 msgid "From"
 msgstr "Από"
 
-#: admin/dashboard.py:510 contact/models.py:15
+#: admin/dashboard.py:620 contact/models.py:15
 #: core/templates/invoices/invoice.html:169 order/models/order.py:123
 #: product/models/alert.py:49
 msgid "Email"
 msgstr "Email"
 
-#: admin/dashboard.py:510 contact/admin.py:115 contact/admin.py:178
+#: admin/dashboard.py:620 contact/admin.py:115 contact/admin.py:178
 #: contact/models.py:16 notification/models/notification.py:62
 msgid "Message"
 msgstr "Μήνυμα"
@@ -258,12 +258,12 @@ msgstr "Development"
 msgid "Likes"
 msgstr ""
 
-#: blog/admin.py:56 settings.py:2441
+#: blog/admin.py:56 settings.py:2463
 msgid "Comments"
 msgstr "Σχόλια"
 
 #: blog/admin.py:82 core/cache/surfaces.py:191 settings.py:1872
-#: settings.py:2445 tag/admin.py:111 tag/admin.py:772 tag/models/tag.py:27
+#: settings.py:2467 tag/admin.py:111 tag/admin.py:772 tag/models/tag.py:27
 msgid "Tags"
 msgstr "Ετικέτες"
 
@@ -320,8 +320,8 @@ msgstr ""
 msgid "Tag Information"
 msgstr ""
 
-#: blog/admin.py:340 blog/admin.py:449 blog/admin.py:610 product/admin.py:2869
-#: product/admin.py:3008 region/admin.py:379 tag/admin.py:164
+#: blog/admin.py:340 blog/admin.py:449 blog/admin.py:613 product/admin.py:2931
+#: product/admin.py:3070 region/admin.py:379 tag/admin.py:164
 msgid "Organization"
 msgstr ""
 
@@ -335,7 +335,7 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
-#: blog/admin.py:428 product/admin.py:2283
+#: blog/admin.py:428 product/admin.py:2345
 msgid "Category Information"
 msgstr ""
 
@@ -343,12 +343,12 @@ msgstr ""
 msgid "URL"
 msgstr ""
 
-#: blog/admin.py:442 blog/admin.py:603
+#: blog/admin.py:442 blog/admin.py:606
 msgid "Media"
 msgstr ""
 
 #: blog/admin.py:479 blog/models/category.py:24 blog/models/post.py:29
-#: product/admin.py:2406 product/models/category_image.py:26
+#: product/admin.py:2468 product/models/category_image.py:26
 #: product/models/image.py:25 user/models/account.py:79
 msgid "Image"
 msgstr "Εικόνα"
@@ -361,149 +361,153 @@ msgstr ""
 msgid "Total Posts (Tree)"
 msgstr ""
 
-#: blog/admin.py:596 blog/models/comment.py:44 pay_way/admin.py:197
-#: product/admin.py:2290 product/admin.py:2552 product/admin.py:2862
-#: product/admin.py:3001 settings.py:1993
+#: blog/admin.py:572
+msgid "Search by title, subtitle, slug, body, or author email/username."
+msgstr ""
+
+#: blog/admin.py:599 blog/models/comment.py:44 pay_way/admin.py:197
+#: product/admin.py:2352 product/admin.py:2614 product/admin.py:2924
+#: product/admin.py:3063 settings.py:1931
 msgid "Content"
 msgstr "Περιεχόμενο"
 
-#: blog/admin.py:617
+#: blog/admin.py:620
 msgid "Publishing"
 msgstr ""
 
-#: blog/admin.py:629 blog/admin.py:752 blog/admin.py:988 blog/admin.py:1071
-#: notification/admin.py:417 user/admin.py:487
+#: blog/admin.py:632 blog/admin.py:755 blog/admin.py:991 blog/admin.py:1074
+#: notification/admin.py:417 user/admin.py:490
 msgid "Engagement"
 msgstr "Συμμετοχή"
 
-#: blog/admin.py:636 product/admin.py:2297
+#: blog/admin.py:639 product/admin.py:1330 product/admin.py:2359
 msgid "SEO"
 msgstr "SEO"
 
-#: blog/admin.py:648 cart/admin.py:473 notification/enum.py:30
+#: blog/admin.py:651 cart/admin.py:473 notification/enum.py:30 settings.py:2088
 msgid "System"
 msgstr "Σύστημα"
 
-#: blog/admin.py:667 blog/models/post.py:143
+#: blog/admin.py:670 blog/models/post.py:143
 #: notification/models/notification.py:61 product/models/category_image.py:36
 #: product/models/image.py:28 shipping_boxnow/models/locker.py:51
 #: user/models/address.py:20
 msgid "Title"
 msgstr "Τίτλος"
 
-#: blog/admin.py:678 core/templates/emails/subscription/confirmation.html:27
+#: blog/admin.py:681 core/templates/emails/subscription/confirmation.html:27
 #: core/templates/emails/subscription/confirmation.txt:16
 #: notification/admin.py:282 notification/models/notification.py:32
-#: product/admin.py:1491 product/admin.py:2340 product/admin.py:2897
-#: user/admin.py:921 user/models/subscription.py:34 vat/admin.py:182
+#: product/admin.py:1485 product/admin.py:2402 product/admin.py:2959
+#: user/admin.py:924 user/models/subscription.py:34 vat/admin.py:182
 msgid "Category"
 msgstr "Κατηγορία"
 
-#: blog/admin.py:698
+#: blog/admin.py:701
 msgid "Author"
 msgstr "Συντάκτης"
 
-#: blog/admin.py:710 blog/models/post.py:49
+#: blog/admin.py:713 blog/models/post.py:49
 msgid "Featured"
 msgstr "Προβεβλημένο"
 
-#: blog/admin.py:777
+#: blog/admin.py:780
 msgid "SEO Score"
 msgstr ""
 
-#: blog/admin.py:833
+#: blog/admin.py:836
 msgid "Mark selected posts as featured"
 msgstr ""
 
-#: blog/admin.py:842
+#: blog/admin.py:845
 #, python-format
 msgid "%(count)d posts were successfully marked as featured."
 msgstr ""
 
-#: blog/admin.py:847
+#: blog/admin.py:850
 msgid "Remove featured mark from selected posts"
 msgstr ""
 
-#: blog/admin.py:856
+#: blog/admin.py:859
 #, python-format
 msgid "%(count)d posts were successfully unmarked as featured."
 msgstr ""
 
-#: blog/admin.py:861
+#: blog/admin.py:864
 msgid "Publish selected posts"
 msgstr ""
 
-#: blog/admin.py:872
+#: blog/admin.py:875
 #, python-format
 msgid "%(count)d posts were successfully published."
 msgstr ""
 
-#: blog/admin.py:877
+#: blog/admin.py:880
 msgid "Unpublish selected posts"
 msgstr ""
 
-#: blog/admin.py:886
+#: blog/admin.py:889
 #, python-format
 msgid "%(count)d posts were successfully unpublished."
 msgstr ""
 
-#: blog/admin.py:891
+#: blog/admin.py:894
 msgid "Increment view count by 100"
 msgstr ""
 
-#: blog/admin.py:902
+#: blog/admin.py:905
 #, python-format
 msgid "View count increased by 100 for %(count)d posts."
 msgstr ""
 
-#: blog/admin.py:907
+#: blog/admin.py:910
 msgid "Reset view count to zero"
 msgstr ""
 
-#: blog/admin.py:915
+#: blog/admin.py:918
 #, python-format
 msgid "View count reset to zero for %(count)d posts."
 msgstr ""
 
-#: blog/admin.py:967
+#: blog/admin.py:970
 msgid "Comment Content"
 msgstr "Περιεχόμενο Σχολίου"
 
-#: blog/admin.py:974
+#: blog/admin.py:977
 msgid "Relations"
 msgstr ""
 
-#: blog/admin.py:981
+#: blog/admin.py:984
 msgid "Moderation"
 msgstr ""
 
-#: blog/admin.py:1027
+#: blog/admin.py:1030
 msgid "Post"
 msgstr ""
 
-#: blog/admin.py:1092
+#: blog/admin.py:1095
 msgid "Approve selected comments"
 msgstr "Έγκριση επιλεγμένων σχολίων"
 
-#: blog/admin.py:1101
+#: blog/admin.py:1104
 #, python-format
 msgid "%(count)d comments were successfully approved."
 msgstr ""
 
-#: blog/admin.py:1106
+#: blog/admin.py:1109
 msgid "Unapprove selected comments"
 msgstr ""
 
-#: blog/admin.py:1115
+#: blog/admin.py:1118
 #, python-format
 msgid "%(count)d comments were successfully unapproved."
 msgstr ""
 
-#: blog/admin.py:1120
+#: blog/admin.py:1123
 msgid "Mark as spam and delete"
 msgstr ""
 
-#: blog/admin.py:1129
+#: blog/admin.py:1132
 #, python-format
 msgid "%(count)d comments were marked as spam and deleted."
 msgstr ""
@@ -911,7 +915,7 @@ msgstr ""
 msgid "Blog Author"
 msgstr "Συντάκτης Blog"
 
-#: blog/models/author.py:25 settings.py:2010
+#: blog/models/author.py:25 settings.py:1950
 msgid "Blog Authors"
 msgstr "Συντάκτες Blog"
 
@@ -923,8 +927,8 @@ msgstr ""
 
 #: blog/models/category.py:35 core/admin.py:462
 #: core/templates/invoices/invoice.html:215 loyalty/models/tier.py:83
-#: loyalty/models/transaction.py:36 order/admin.py:317 order/admin.py:2061
-#: order/admin.py:2182 order/models/history.py:26 order/models/history.py:232
+#: loyalty/models/transaction.py:36 order/admin.py:317 order/admin.py:2101
+#: order/admin.py:2222 order/models/history.py:26 order/models/history.py:232
 #: pay_way/models.py:74 product/models/category.py:38
 #: product/models/product.py:367 user/models/subscription.py:68
 msgid "Description"
@@ -934,7 +938,7 @@ msgstr "Περιγραφή"
 msgid "Blog Category"
 msgstr "Κατηγορία Blog"
 
-#: blog/models/category.py:42 settings.py:2003
+#: blog/models/category.py:42 settings.py:1943
 msgid "Blog Categories"
 msgstr "Κατηγορίες Blog"
 
@@ -946,7 +950,7 @@ msgstr "Εγκεκριμένο"
 msgid "Blog Comment"
 msgstr "Σχόλιο Blog"
 
-#: blog/models/comment.py:55 settings.py:2017
+#: blog/models/comment.py:55 settings.py:1957
 msgid "Blog Comments"
 msgstr "Σχόλια Blog"
 
@@ -958,7 +962,7 @@ msgstr ""
 msgid "Blog Post"
 msgstr "Άρθρο Blog"
 
-#: blog/models/post.py:56 settings.py:1998 settings.py:2429
+#: blog/models/post.py:56 settings.py:1935 settings.py:2451
 msgid "Blog Posts"
 msgstr "Άρθρα Blog"
 
@@ -993,7 +997,7 @@ msgstr "Ενεργή"
 msgid "Blog Tag"
 msgstr "Ετικέτα Blog"
 
-#: blog/models/tag.py:27 settings.py:2025
+#: blog/models/tag.py:27 settings.py:1965
 msgid "Blog Tags"
 msgstr "Ετικέτες Blog"
 
@@ -1398,7 +1402,7 @@ msgid "Summary"
 msgstr ""
 
 #: cart/admin.py:274 core/admin.py:435 pay_way/admin.py:281
-#: product/admin.py:2907 product/admin.py:3053
+#: product/admin.py:2969 product/admin.py:3115
 #: shipping_boxnow/models/locker.py:30
 msgid "Type"
 msgstr "Τύπος"
@@ -1411,7 +1415,7 @@ msgstr "Είδη"
 msgid "Cart Summary"
 msgstr ""
 
-#: cart/admin.py:391 order/admin.py:1175
+#: cart/admin.py:391 order/admin.py:1188
 msgid "Financial Summary"
 msgstr ""
 
@@ -1431,8 +1435,8 @@ msgstr "Καλάθι"
 msgid "Qty"
 msgstr "Ποσ."
 
-#: cart/admin.py:531 order/admin.py:1875 pay_way/admin.py:212
-#: product/admin.py:1271 product/admin.py:1522
+#: cart/admin.py:531 order/admin.py:1915 pay_way/admin.py:212
+#: product/admin.py:1516
 msgid "Pricing"
 msgstr ""
 
@@ -1656,11 +1660,11 @@ msgstr ""
 msgid "Filter by cart last activity before date"
 msgstr ""
 
-#: cart/models/cart.py:25 user/admin.py:503
+#: cart/models/cart.py:25 user/admin.py:506
 msgid "Last Activity"
 msgstr ""
 
-#: cart/models/cart.py:31 settings.py:1905
+#: cart/models/cart.py:31 core/templates/admin/index.html:423 settings.py:1905
 msgid "Carts"
 msgstr "Καλάθια"
 
@@ -1668,7 +1672,7 @@ msgstr "Καλάθια"
 #: core/templates/emails/order/order_confirmation.html:34
 #: core/templates/emails/order/order_payment_confirmed.html:40
 #: core/templates/emails/order/order_received.html:44
-#: core/templates/emails/order/order_status_generic.html:87 order/admin.py:1851
+#: core/templates/emails/order/order_status_generic.html:87 order/admin.py:1891
 #: order/models/item.py:28 order/models/stock_reservation.py:35
 msgid "Quantity"
 msgstr "Ποσότητα"
@@ -1962,14 +1966,14 @@ msgstr ""
 msgid "This Quarter"
 msgstr ""
 
-#: contact/admin.py:108 user/admin.py:776
+#: contact/admin.py:108 user/admin.py:779
 msgid "Contact Information"
 msgstr "Στοιχεία Επικοινωνίας"
 
 #: contact/admin.py:122 notification/admin.py:177 notification/admin.py:487
 #: notification/admin.py:665 notification/admin.py:838 product/admin.py:518
-#: product/admin.py:783 product/admin.py:1353 product/admin.py:2304
-#: region/admin.py:383 tag/admin.py:166
+#: product/admin.py:783 product/admin.py:2366 region/admin.py:383
+#: tag/admin.py:166
 msgid "Analytics"
 msgstr ""
 
@@ -1978,16 +1982,16 @@ msgid "Timing Information"
 msgstr ""
 
 #: contact/admin.py:136 country/admin.py:115 notification/admin.py:191
-#: notification/admin.py:672 order/admin.py:1791 pay_way/admin.py:230
-#: product/admin.py:399 product/admin.py:662 product/admin.py:1360
-#: product/admin.py:2315 product/admin.py:2559 product/admin.py:2876
-#: product/admin.py:3015 region/admin.py:390 tag/admin.py:177 tag/admin.py:627
-#: user/admin.py:351 user/admin.py:780 user/admin.py:885 vat/admin.py:137
+#: notification/admin.py:672 order/admin.py:1831 pay_way/admin.py:230
+#: product/admin.py:399 product/admin.py:662 product/admin.py:1354
+#: product/admin.py:2377 product/admin.py:2621 product/admin.py:2938
+#: product/admin.py:3077 region/admin.py:390 tag/admin.py:177 tag/admin.py:627
+#: user/admin.py:354 user/admin.py:783 user/admin.py:888 vat/admin.py:137
 msgid "System Information"
 msgstr ""
 
 #: contact/admin.py:150 contact/models.py:29 country/admin.py:213
-#: user/admin.py:405
+#: user/admin.py:408
 msgid "Contact"
 msgstr "Επικοινωνία"
 
@@ -2000,7 +2004,7 @@ msgid "Timing"
 msgstr ""
 
 #: contact/admin.py:287 notification/admin.py:240 notification/admin.py:774
-#: notification/models/notification.py:38 order/admin.py:913
+#: notification/models/notification.py:38 order/admin.py:926
 #: shipping/models/provider.py:60
 msgid "Priority"
 msgstr "Προτεραιότητα"
@@ -2281,7 +2285,7 @@ msgid ""
 "endpoint."
 msgstr ""
 
-#: core/cache/surfaces.py:110 settings.py:1857 settings.py:2433
+#: core/cache/surfaces.py:110 settings.py:1857 settings.py:2455
 msgid "Categories"
 msgstr "Κατηγορίες"
 
@@ -2311,7 +2315,7 @@ msgstr "Χώρες"
 msgid "Country and region pickers used during checkout address selection."
 msgstr ""
 
-#: core/cache/surfaces.py:169 settings.py:2048
+#: core/cache/surfaces.py:169 settings.py:2057
 msgid "Loyalty"
 msgstr "Πιστότητα"
 
@@ -2396,8 +2400,8 @@ msgstr ""
 #: core/enum.py:17 core/templates/admin/clear_cache.html:10
 #: core/templates/admin/email_template_management.html:14
 #: core/templates/admin/product/apply_discount.html:15
-#: core/templates/admin/product/stock_history.html:12 product/admin.py:2006
-#: product/admin.py:2077
+#: core/templates/admin/product/stock_history.html:12 product/admin.py:2000
+#: product/admin.py:2071
 msgid "Home"
 msgstr ""
 
@@ -2838,7 +2842,7 @@ msgstr "Παραγγελία"
 #: core/templates/emails/order/payment_failed.html:11
 #: core/templates/emails/order/payment_failed.txt:5
 #: core/templates/invoices/invoice.html:181 notification/enum.py:22
-#: order/admin.py:1799 order/admin.py:1983 order/admin.py:2419
+#: order/admin.py:1839 order/admin.py:2023 order/admin.py:2459
 #: order/models/order.py:270 order/models/viva_webhook_event.py:57
 #: pay_way/admin.py:361 shipping_acs/admin.py:175
 #: shipping_acs/models/shipment.py:44 shipping_boxnow/admin.py:395
@@ -2896,7 +2900,7 @@ msgid "Pending Orders"
 msgstr "Εκκρεμείς Παραγγελίες"
 
 # Greek translations added by fill_admin_greek_translations.py
-#: core/templates/admin/index.html:46 settings.py:1964
+#: core/templates/admin/index.html:46 settings.py:2028
 msgid "Customers"
 msgstr "Πελάτες"
 
@@ -2910,7 +2914,8 @@ msgid ""
 "without a legal identity and will not pass a tax audit."
 msgstr ""
 "Τα παρακάτω απαιτούμενα πεδία είναι κενά. Τα τιμολόγια που εκδίδονται τώρα "
-"θα παραχθούν χωρίς νόμιμη ταυτότητα εκδότη και δεν θα περάσουν φορολογικό έλεγχο."
+"θα παραχθούν χωρίς νόμιμη ταυτότητα εκδότη και δεν θα περάσουν φορολογικό "
+"έλεγχο."
 
 #: core/templates/admin/index.html:78 core/templates/admin/index.html:106
 msgid "Fix in Settings"
@@ -2924,14 +2929,17 @@ msgstr "Η ενσωμάτωση myDATA είναι ενεργή αλλά λείπ
 msgid ""
 "Every submission to AADE will fail until these are filled in via Settings."
 msgstr ""
-"Κάθε υποβολή στην ΑΑΔΕ θα αποτυγχάνει μέχρι να συμπληρωθούν αυτά μέσω των Ρυθμίσεων."
+"Κάθε υποβολή στην ΑΑΔΕ θα αποτυγχάνει μέχρι να συμπληρωθούν αυτά μέσω των "
+"Ρυθμίσεων."
 
 #: core/templates/admin/index.html:119
 #, python-format
 msgid "%(counter)s invoice rejected by myDATA in the last 7 days"
 msgid_plural "%(counter)s invoices rejected by myDATA in the last 7 days"
-msgstr[0] "%(counter)s τιμολόγιο απορρίφθηκε από το myDATA τις τελευταίες 7 ημέρες"
-msgstr[1] "%(counter)s τιμολόγια απορρίφθηκαν από το myDATA τις τελευταίες 7 ημέρες"
+msgstr[0] ""
+"%(counter)s τιμολόγιο απορρίφθηκε από το myDATA τις τελευταίες 7 ημέρες"
+msgstr[1] ""
+"%(counter)s τιμολόγια απορρίφθηκαν από το myDATA τις τελευταίες 7 ημέρες"
 
 #: core/templates/admin/index.html:123
 msgid "Review rejected invoices"
@@ -2953,7 +2961,7 @@ msgstr[0] "%(counter)s εργασία απέτυχε τις τελευταίες
 msgstr[1] "%(counter)s εργασίες απέτυχαν τις τελευταίες 24 ώρες"
 
 #: core/templates/admin/index.html:151 notification/enum.py:31
-#: product/admin.py:2567
+#: product/admin.py:2629
 msgid "Review"
 msgstr "Εξέταση"
 
@@ -2978,6 +2986,7 @@ msgid "New Customers (30d)"
 msgstr "Νέοι Πελάτες (30 ημ)"
 
 #: core/templates/admin/index.html:222 core/templates/admin/index.html:236
+#: core/templates/admin/index.html:419 core/templates/admin/index.html:454
 msgid "Last 30 days"
 msgstr "Τελευταίες 30 ημέρες"
 
@@ -2999,37 +3008,75 @@ msgstr "Τελευταίες 14 ημέρες"
 msgid "Order Status"
 msgstr "Κατάσταση Παραγγελίας"
 
-#: core/templates/admin/index.html:283 order/admin.py:189
+#: core/templates/admin/index.html:285 order/admin.py:189
 msgid "Recent Orders"
 msgstr "Πρόσφατες Παραγγελίες"
 
-#: core/templates/admin/index.html:287 core/templates/admin/index.html:328
-#: core/templates/admin/index.html:370 core/templates/admin/index.html:417
+#: core/templates/admin/index.html:289 core/templates/admin/index.html:330
+#: core/templates/admin/index.html:372 core/templates/admin/index.html:472
+#: core/templates/admin/index.html:509
 msgid "View all"
 msgstr "Προβολή όλων"
 
-#: core/templates/admin/index.html:310
+#: core/templates/admin/index.html:312
 msgid "No orders yet"
 msgstr "Δεν υπάρχουν παραγγελίες ακόμα"
 
-#: core/templates/admin/index.html:324
+#: core/templates/admin/index.html:326
 msgid "Pending Reviews"
 msgstr "Κριτικές προς Έγκριση"
 
-#: core/templates/admin/index.html:352
+#: core/templates/admin/index.html:354
 msgid "No pending reviews"
 msgstr "Δεν υπάρχουν κριτικές σε εκκρεμότητα"
 
-#: core/templates/admin/index.html:366
-#: core/templates/admin/partials/footer_stats.html:15 settings.py:2037
+#: core/templates/admin/index.html:368
+#: core/templates/admin/partials/footer_stats.html:15 settings.py:1979
 msgid "Contact Messages"
 msgstr "Μηνύματα Επικοινωνίας"
 
-#: core/templates/admin/index.html:393
+#: core/templates/admin/index.html:395
 msgid "No messages yet"
 msgstr "Δεν υπάρχουν μηνύματα ακόμα"
 
-#: core/templates/admin/index.html:413
+#: core/templates/admin/index.html:417
+msgid "Conversion Funnel"
+msgstr "Χωνί Μετατροπών"
+
+#: core/templates/admin/index.html:434
+#: core/templates/emails/order/order_payment_confirmed.html:16
+#: core/templates/emails/order/order_payment_confirmed.txt:7
+msgid "Paid"
+msgstr "Πληρώθηκε"
+
+#: core/templates/admin/index.html:441
+msgid "End-to-end"
+msgstr "Συνολικά"
+
+# Greek translations added by fill_admin_greek_translations.py
+#: core/templates/admin/index.html:452
+#, fuzzy
+#| msgid "Customers"
+msgid "Repeat Customers"
+msgstr "Πελάτες"
+
+#: core/templates/admin/index.html:459
+msgid "made a 2nd purchase"
+msgstr "έκαναν 2η αγορά"
+
+#: core/templates/admin/index.html:468
+#, fuzzy
+#| msgid "Total Products"
+msgid "Top Products"
+msgstr "Σύνολο Προϊόντων"
+
+#: core/templates/admin/index.html:488
+#, fuzzy
+#| msgid "No orders yet"
+msgid "No products yet"
+msgstr "Δεν υπάρχουν παραγγελίες ακόμα"
+
+#: core/templates/admin/index.html:505
 msgid "Low Stock — replenish soon"
 msgstr "Χαμηλό Απόθεμα — επανεφοδιασμός σύντομα"
 
@@ -3057,8 +3104,8 @@ msgstr ""
 
 #: core/templates/admin/product/apply_discount.html:21
 #: core/templates/admin/product/apply_discount.html:28
-#: core/templates/admin/product/apply_discount.html:35 product/admin.py:1996
-#: product/admin.py:2011 product/admin.py:2065 product/admin.py:2082
+#: core/templates/admin/product/apply_discount.html:35 product/admin.py:1990
+#: product/admin.py:2005 product/admin.py:2059 product/admin.py:2076
 msgid "Apply Custom Discount"
 msgstr "Εφαρμογή Προσαρμοσμένης Έκπτωσης"
 
@@ -3634,7 +3681,7 @@ msgstr "Ευχαριστούμε για την παραγγελία σας!"
 
 #: core/templates/emails/order/order_confirmation.html:20
 #: core/templates/emails/order/order_payment_confirmed.html:26
-#: core/templates/emails/order/order_received.html:30 order/admin.py:514
+#: core/templates/emails/order/order_received.html:30 order/admin.py:520
 msgid "Shipping Address"
 msgstr "Διεύθυνση Αποστολής"
 
@@ -3667,7 +3714,7 @@ msgstr "Υποσύνολο"
 #: core/templates/emails/order/order_status_generic.html:106
 #: core/templates/emails/order/order_status_generic.txt:38
 #: core/templates/invoices/invoice.html:252 notification/enum.py:24
-#: order/admin.py:859 settings.py:1928 shipping/apps.py:7
+#: order/admin.py:872 settings.py:1992 shipping/apps.py:7
 msgid "Shipping"
 msgstr "Μεταφορικά"
 
@@ -3775,11 +3822,6 @@ msgstr "Η επιστροφή σας έχει ληφθεί και είναι υ�
 #: order/models/order.py:173
 msgid "Payment Status"
 msgstr "Κατάσταση πληρωμής"
-
-#: core/templates/emails/order/order_payment_confirmed.html:16
-#: core/templates/emails/order/order_payment_confirmed.txt:7
-msgid "Paid"
-msgstr "Πληρώθηκε"
 
 #: core/templates/emails/order/order_payment_confirmed.html:60
 #: core/templates/emails/order/order_payment_confirmed.txt:21
@@ -4223,13 +4265,13 @@ msgstr "Επιβεβαίωση Εγγραφής"
 msgid "If the button doesn't work, copy and paste this link into your browser:"
 msgstr ""
 
-#: core/templates/emails/subscription/confirmation.html:25 user/admin.py:1020
+#: core/templates/emails/subscription/confirmation.html:25 user/admin.py:1023
 msgid "Subscription Details"
 msgstr "Λεπτομέρειες εγγραφής"
 
 #: core/templates/emails/subscription/confirmation.html:26
-#: core/templates/emails/subscription/confirmation.txt:15 user/admin.py:910
-#: user/admin.py:1059 user/models/subscription.py:114
+#: core/templates/emails/subscription/confirmation.txt:15 user/admin.py:913
+#: user/admin.py:1062 user/models/subscription.py:114
 msgid "Topic"
 msgstr "Θέμα"
 
@@ -4529,7 +4571,7 @@ msgid "Bill to"
 msgstr "Προς"
 
 #: core/templates/invoices/invoice.html:205 notification/enum.py:23
-#: order/admin.py:688
+#: order/admin.py:701
 msgid "Payment"
 msgstr "Πληρωμή"
 
@@ -4582,6 +4624,10 @@ msgstr "Καθαρό"
 #: core/templates/invoices/invoice.html:277
 msgid "Gross"
 msgstr "Μικτό"
+
+#: core/templates/unfold/helpers/app_list.html:57
+msgid "You don't have permission to view or edit anything."
+msgstr ""
 
 #: core/urls.py:61
 msgid "admin/email-templates/"
@@ -4712,9 +4758,9 @@ msgstr ""
 msgid "Completeness"
 msgstr ""
 
-#: country/admin.py:291 order/admin.py:885 product/admin.py:491
-#: product/admin.py:756 product/admin.py:1704 product/admin.py:2422
-#: product/admin.py:2690 product/admin.py:2816 region/admin.py:592
+#: country/admin.py:291 order/admin.py:898 product/admin.py:491
+#: product/admin.py:756 product/admin.py:1698 product/admin.py:2484
+#: product/admin.py:2752 product/admin.py:2878 region/admin.py:592
 #: tag/admin.py:405 tag/admin.py:752 tests/unit/region/test_region_admin.py:581
 #: vat/admin.py:294
 msgid "Created"
@@ -4842,7 +4888,7 @@ msgstr ""
 msgid "Image Flag"
 msgstr ""
 
-#: country/models.py:56 settings.py:2081
+#: country/models.py:56 settings.py:2099
 msgid "Countries"
 msgstr "Χώρες"
 
@@ -5026,7 +5072,7 @@ msgstr ""
 msgid "Loyalty Tier"
 msgstr "Επίπεδο Πιστότητας"
 
-#: loyalty/models/tier.py:44 settings.py:2053
+#: loyalty/models/tier.py:44 settings.py:2062
 msgid "Loyalty Tiers"
 msgstr "Επίπεδα Πιστότητας"
 
@@ -5050,7 +5096,7 @@ msgstr ""
 msgid "Points Transaction"
 msgstr "Συναλλαγή Πόντων"
 
-#: loyalty/models/transaction.py:50 settings.py:2060
+#: loyalty/models/transaction.py:50 settings.py:2069
 msgid "Points Transactions"
 msgstr "Συναλλαγές Πόντων"
 
@@ -5660,7 +5706,7 @@ msgstr ""
 msgid "Expiry Date"
 msgstr "Ημερομηνία Λήξης"
 
-#: notification/models/notification.py:76 settings.py:2030
+#: notification/models/notification.py:76 settings.py:1972
 msgid "Notifications"
 msgstr "Ειδοποιήσεις"
 
@@ -5796,7 +5842,7 @@ msgstr "Μερική επιστροφή"
 msgid "Needs Attention (Failed/Pending)"
 msgstr ""
 
-#: order/admin.py:131 order/admin.py:1071 order/models/order.py:154
+#: order/admin.py:131 order/admin.py:1084 order/models/order.py:154
 msgid "Document Type"
 msgstr "Τύπος Εγγράφου"
 
@@ -5805,7 +5851,7 @@ msgstr "Τύπος Εγγράφου"
 msgid "Receipt"
 msgstr ""
 
-#: order/admin.py:137 order/admin.py:2350 order/enum/document_type.py:7
+#: order/admin.py:137 order/admin.py:2390 order/enum/document_type.py:7
 #: order/enum/document_type.py:17 order/models/invoice.py:362
 msgid "Invoice"
 msgstr "Τιμολόγιο"
@@ -5834,167 +5880,173 @@ msgstr ""
 msgid "Urgent (24h+ Pending)"
 msgstr ""
 
-#: order/admin.py:267 order/admin.py:1890
+#: order/admin.py:267 order/admin.py:1930
 msgid "Refund Status"
 msgstr ""
 
-#: order/admin.py:331 order/admin.py:2080 order/admin.py:2196
+#: order/admin.py:331 order/admin.py:2120 order/admin.py:2236
 msgid "Changed By"
 msgstr "Άλλαξε από"
 
-#: order/admin.py:384 order/admin.py:2435
+#: order/admin.py:384 order/admin.py:2475
 msgid "Document"
 msgstr "Έγγραφο"
 
-#: order/admin.py:486
+#: order/admin.py:470
+msgid ""
+"Search by order ID, UUID, customer email/name/phone, city, tracking number, "
+"payment ID, or BoxNow voucher / locker ID."
+msgstr ""
+
+#: order/admin.py:492
 msgid "Order Information"
 msgstr "Στοιχεία Παραγγελίας"
 
-#: order/admin.py:500
+#: order/admin.py:506
 msgid "Customer Information"
 msgstr "Στοιχεία Πελάτη"
 
-#: order/admin.py:532
+#: order/admin.py:538
 msgid "Payment Information"
 msgstr ""
 
-#: order/admin.py:544
+#: order/admin.py:550
 msgid ""
 "⚠️ Note: Ensure all money fields use the same currency (EUR preferred) to "
 "avoid calculation errors."
 msgstr ""
 
-#: order/admin.py:549
+#: order/admin.py:555
 msgid "Shipping & Tracking"
 msgstr ""
 
-#: order/admin.py:561
+#: order/admin.py:567
 msgid ""
 "💡 Shipping price currency should match item currencies to avoid total "
 "calculation errors."
 msgstr ""
 
-#: order/admin.py:566 order/admin.py:1784
-#: shipping_boxnow/models/parcel_event.py:73 user/admin.py:769
+#: order/admin.py:572 order/admin.py:1824
+#: shipping_boxnow/models/parcel_event.py:73 user/admin.py:772
 msgid "Additional Information"
 msgstr ""
 
-#: order/admin.py:655
+#: order/admin.py:668
 msgid "Order Summary"
 msgstr "Σύνοψη Παραγγελίας"
 
-#: order/admin.py:704
+#: order/admin.py:717
 #, fuzzy
 #| msgid "Customer Summary"
 msgid "Shipment Summary"
 msgstr "Σύνοψη Πελάτη"
 
-#: order/admin.py:725
+#: order/admin.py:738
 msgid "No carrier-specific shipment for this order."
 msgstr ""
 
-#: order/admin.py:735
+#: order/admin.py:748
 msgid ""
 "shipping_provider=boxnow but no BoxNowShipment row — order created before "
 "the BoxNow integration shipped, or a service-layer bug. Inspect order."
 "history for clues."
 msgstr ""
 
-#: order/admin.py:766
+#: order/admin.py:779
 msgid "Voucher pending — fires after payment"
 msgstr ""
 
-#: order/admin.py:800
+#: order/admin.py:813
 msgid ""
 "ACS order without an AcsShipment row — likely a race during order creation "
 "or an upgrade-time data gap. Inspect order.history for clues."
 msgstr ""
 
-#: order/admin.py:827
+#: order/admin.py:840
 msgid "Voucher pending — fires after order creation"
 msgstr ""
 
-#: order/admin.py:1126 order/models/invoice.py:226
+#: order/admin.py:1139 order/models/invoice.py:226
 msgid "Currency"
 msgstr "Νόμισμα"
 
-#: order/admin.py:1156
+#: order/admin.py:1169
 msgid "Customer Summary"
 msgstr "Σύνοψη Πελάτη"
 
-#: order/admin.py:1220
+#: order/admin.py:1233
 msgid "Shipping Summary"
 msgstr ""
 
-#: order/admin.py:1243
+#: order/admin.py:1256
 msgid "Order Analytics"
 msgstr ""
 
-#: order/admin.py:1303
+#: order/admin.py:1316
 msgid "Mark selected orders as processing"
 msgstr ""
 
-#: order/admin.py:1316
+#: order/admin.py:1329
 #, python-format
 msgid "Order %(order_id)s marked as processing"
 msgstr ""
 
-#: order/admin.py:1323
+#: order/admin.py:1336
 msgid "Mark selected orders as shipped"
 msgstr ""
 
-#: order/admin.py:1334
+#: order/admin.py:1347
 #, python-format
 msgid "Order %(order_id)s marked as shipped"
 msgstr ""
 
-#: order/admin.py:1341
+#: order/admin.py:1354
 msgid "Mark selected orders as delivered"
 msgstr ""
 
-#: order/admin.py:1354
+#: order/admin.py:1367
 #, python-format
 msgid "Order %(order_id)s marked as delivered"
 msgstr ""
 
-#: order/admin.py:1361
+#: order/admin.py:1374
 msgid "Mark selected orders as completed"
 msgstr ""
 
-#: order/admin.py:1374
+#: order/admin.py:1387
 #, python-format
 msgid "Order %(order_id)s marked as completed"
 msgstr ""
 
-#: order/admin.py:1381
+#: order/admin.py:1394
 msgid "Cancel selected orders and restore stock"
 msgstr ""
 
-#: order/admin.py:1392
+#: order/admin.py:1405
 #, python-format
 msgid "Order %(order_id)s marked as canceled"
 msgstr ""
 
-#: order/admin.py:1424
+#: order/admin.py:1437
 msgid "Invoice not found."
 msgstr ""
 
-#: order/admin.py:1426
+#: order/admin.py:1439
 msgid "Invoice PDF has not been generated yet."
 msgstr ""
 
-#: order/admin.py:1438
+#: order/admin.py:1451
 msgid "Generate invoice"
 msgstr ""
 
-#: order/admin.py:1453 order/admin.py:1514 order/admin.py:1554
-#: order/admin.py:1609 order/admin.py:1661
+#: order/admin.py:1466 order/admin.py:1527 order/admin.py:1567
+#: order/admin.py:1622 order/admin.py:1674 order/admin.py:1742
 #, fuzzy
 #| msgid "Order Details"
 msgid "Order not found."
 msgstr "Λεπτομέρειες Παραγγελίας"
 
-#: order/admin.py:1460
+#: order/admin.py:1473
 #, python-format
 msgid ""
 "Order #%(order_id)s has document_type=%(doc)s, not INVOICE. Generating "
@@ -6002,161 +6054,167 @@ msgid ""
 "this is ongoing."
 msgstr ""
 
-#: order/admin.py:1476
+#: order/admin.py:1489
 #, python-format
 msgid "Invoice generation failed: %(err)s"
 msgstr ""
 
-#: order/admin.py:1483
+#: order/admin.py:1496
 #, python-format
 msgid "Invoice %(num)s ready for order #%(order_id)s."
 msgstr ""
 
-#: order/admin.py:1490
+#: order/admin.py:1503
 #, python-format
 msgid ""
 "Invoice row %(num)s exists but the PDF was not rendered — check server logs."
 msgstr ""
 
-#: order/admin.py:1498
+#: order/admin.py:1511
 msgid "Regenerate invoice (same number)"
 msgstr ""
 
-#: order/admin.py:1525
+#: order/admin.py:1538
 #, python-format
 msgid "Invoice regeneration failed: %(err)s"
 msgstr ""
 
-#: order/admin.py:1532
+#: order/admin.py:1545
 #, python-format
 msgid ""
 "Invoice %(num)s refreshed for order #%(order_id)s (number preserved; PDF + "
 "snapshots regenerated)."
 msgstr ""
 
-#: order/admin.py:1540
+#: order/admin.py:1553
 msgid "Send invoice to myDATA"
 msgstr ""
 
-#: order/admin.py:1562
+#: order/admin.py:1575
 #, python-format
 msgid ""
 "Order #%(order_id)s has no rendered invoice yet — generate the invoice "
 "first, then submit to myDATA."
 msgstr ""
 
-#: order/admin.py:1576
+#: order/admin.py:1589
 msgid ""
 "myDATA integration is not ready — check MYDATA_ENABLED and credentials in "
 "Settings before retrying."
 msgstr ""
 
-#: order/admin.py:1586
+#: order/admin.py:1599
 #, python-format
 msgid ""
 "Scheduled myDATA submission for invoice %(num)s (order #%(order_id)s). "
 "Refresh the Invoice admin to see the MARK once AADE responds."
 msgstr ""
 
-#: order/admin.py:1595
+#: order/admin.py:1608
 msgid "Cancel invoice in myDATA"
-msgstr ""
-
-#: order/admin.py:1617
-#, python-format
-msgid "No myDATA MARK on file for order #%(order_id)s — nothing to cancel."
 msgstr ""
 
 #: order/admin.py:1630
 #, python-format
+msgid "No myDATA MARK on file for order #%(order_id)s — nothing to cancel."
+msgstr ""
+
+#: order/admin.py:1643
+#, python-format
 msgid "Scheduled myDATA cancellation for MARK %(mark)s (order #%(order_id)s)."
 msgstr ""
 
-#: order/admin.py:1638
+#: order/admin.py:1651
 msgid "Download shipping voucher (PDF)"
 msgstr ""
 
-#: order/admin.py:1669
+#: order/admin.py:1682
 #, python-format
 msgid ""
 "Order #%(order_id)s has no shipping carrier attached — nothing to download."
 msgstr ""
 
-#: order/admin.py:1681
+#: order/admin.py:1694
 #, python-format
 msgid ""
 "No shipment row for order #%(order_id)s — the create-shipment task has not "
 "run yet."
 msgstr ""
 
-#: order/admin.py:1697
+#: order/admin.py:1710
 #, python-format
 msgid "Failed to fetch voucher: %(err)s"
 msgstr ""
 
-#: order/admin.py:1759
+#: order/admin.py:1726
+#, fuzzy
+#| msgid "Customer Notes"
+msgid "Customer's orders"
+msgstr "Σημειώσεις Πελάτη"
+
+#: order/admin.py:1799
 msgid "Order Item Information"
 msgstr ""
 
-#: order/admin.py:1766
+#: order/admin.py:1806
 msgid "Refund Information"
 msgstr ""
 
-#: order/admin.py:1777
+#: order/admin.py:1817
 msgid "Calculations"
 msgstr ""
 
-#: order/admin.py:1917
+#: order/admin.py:1957
 msgid "Item Analytics"
 msgstr ""
 
-#: order/admin.py:1996 order/admin.py:2145 order/models/history.py:47
+#: order/admin.py:2036 order/admin.py:2185 order/models/history.py:47
 #: order/models/history.py:253
 msgid "Change Type"
 msgstr "Τύπος Αλλαγής"
 
-#: order/admin.py:2129 order/models/item.py:39
+#: order/admin.py:2169 order/models/item.py:39
 msgid "Order Item"
 msgstr "Είδος Παραγγελίας"
 
-#: order/admin.py:2248
+#: order/admin.py:2288
 msgid "Has PDF"
 msgstr ""
 
-#: order/admin.py:2253
+#: order/admin.py:2293
 #, fuzzy
 #| msgid "Date Ordered"
 msgid "Rendered"
 msgstr "Ημερομηνία Παραγγελίας"
 
-#: order/admin.py:2254
+#: order/admin.py:2294
 #, fuzzy
 #| msgid "Pending"
 msgid "Pending render"
 msgstr "Εκκρεμεί"
 
-#: order/admin.py:2363
+#: order/admin.py:2403
 #, fuzzy
 #| msgid "Total"
 msgid "Totals"
 msgstr "Σύνολο"
 
-#: order/admin.py:2375
+#: order/admin.py:2415
 msgid "Snapshots"
 msgstr ""
 
-#: order/admin.py:2382
+#: order/admin.py:2422
 msgid "myDATA (AADE)"
 msgstr ""
 
-#: order/admin.py:2401
+#: order/admin.py:2441
 msgid ""
 "Populated by the automated submission pipeline (``order.mydata``). Read-only "
 "— edit master data (seller / buyer / VAT rates) and use the Order admin's "
 "'Send to myDATA' action to regenerate."
 msgstr ""
 
-#: order/admin.py:2456
+#: order/admin.py:2496
 msgid "myDATA"
 msgstr ""
 
@@ -6548,8 +6606,8 @@ msgstr ""
 msgid "User agent of the browser/client that made the change."
 msgstr ""
 
-#: order/models/history.py:79 order/models/history.py:80 settings.py:2146
-#: settings.py:2323
+#: order/models/history.py:79 order/models/history.py:80 settings.py:2170
+#: settings.py:2345
 msgid "Order History"
 msgstr "Ιστορικό Παραγγελιών"
 
@@ -6565,7 +6623,7 @@ msgstr ""
 msgid "Item Refund"
 msgstr ""
 
-#: order/models/history.py:272 order/models/history.py:273 settings.py:2154
+#: order/models/history.py:272 order/models/history.py:273 settings.py:2178
 msgid "Order Item History"
 msgstr "Ιστορικό Ειδών Παραγγελίας"
 
@@ -6605,7 +6663,7 @@ msgstr ""
 msgid "Next Number"
 msgstr "Αριθμός Παραγγελίας"
 
-#: order/models/invoice.py:118 settings.py:2235
+#: order/models/invoice.py:118 settings.py:2257
 msgid "Invoice Counter"
 msgstr "Μετρητής Τιμολογίων"
 
@@ -6827,7 +6885,7 @@ msgstr "Η πληρωμή επιβεβαιώθηκε"
 msgid "Timestamp AADE assigned the MARK."
 msgstr ""
 
-#: order/models/invoice.py:363 settings.py:1910 settings.py:2314
+#: order/models/invoice.py:363 settings.py:1911 settings.py:2336
 msgid "Invoices"
 msgstr "Τιμολόγια"
 
@@ -7103,7 +7161,7 @@ msgstr ""
 msgid "Stock Log"
 msgstr "Καταχώρηση Αποθέματος"
 
-#: order/models/stock_log.py:105 settings.py:2140 settings.py:2318
+#: order/models/stock_log.py:105 settings.py:2162 settings.py:2340
 msgid "Stock Logs"
 msgstr "Καταχωρήσεις Αποθέματος"
 
@@ -7252,7 +7310,7 @@ msgstr "Παραλάβαμε την παραγγελία σας"
 msgid "Viva Webhook Event"
 msgstr "Συμβάν Viva Webhook"
 
-#: order/models/viva_webhook_event.py:86 settings.py:2178
+#: order/models/viva_webhook_event.py:86 settings.py:2202
 msgid "Viva Webhook Events"
 msgstr "Συμβάντα Viva Webhook"
 
@@ -8306,7 +8364,7 @@ msgstr "Κόστος"
 msgid "Free Threshold"
 msgstr ""
 
-#: pay_way/admin.py:338
+#: pay_way/admin.py:338 settings.py:2094
 msgid "Configuration"
 msgstr "Διαμόρφωση"
 
@@ -8739,8 +8797,8 @@ msgstr "Χαρακτηριστικό Προϊόντος"
 msgid "Product Attributes"
 msgstr ""
 
-#: product/admin.py:887 product/admin.py:2228 product/admin.py:2884
-#: product/admin.py:3023
+#: product/admin.py:887 product/admin.py:2290 product/admin.py:2946
+#: product/admin.py:3085
 msgid "Preview"
 msgstr ""
 
@@ -8790,23 +8848,27 @@ msgstr "Παραγγελία"
 msgid "Time"
 msgstr ""
 
-#: product/admin.py:1258
+#: product/admin.py:1250
+msgid "Search by ID, SKU, name, description, or category name."
+msgstr ""
+
+#: product/admin.py:1265
 msgid "Product Information"
 msgstr ""
 
-#: product/admin.py:1283
+#: product/admin.py:1278
+msgid "Pricing & Inventory"
+msgstr ""
+
+#: product/admin.py:1293
 msgid "Loyalty Points"
 msgstr ""
 
-#: product/admin.py:1291
+#: product/admin.py:1301
 msgid ""
 "Configure loyalty points earning for this product. Points coefficient "
 "multiplies the global points factor, and bonus points are awarded as a fixed "
 "amount on purchase."
-msgstr ""
-
-#: product/admin.py:1298
-msgid "Inventory"
 msgstr ""
 
 #: product/admin.py:1308
@@ -8822,164 +8884,179 @@ msgid ""
 msgstr ""
 
 #: product/admin.py:1320
-msgid "Stock Management & Audit"
-msgstr ""
+#, fuzzy
+#| msgid "Stock"
+msgid "Stock Audit"
+msgstr "Απόθεμα"
 
 #: product/admin.py:1325
 msgid ""
 "View active stock reservations and recent stock operations for this product."
 msgstr ""
 
-#: product/admin.py:1330
-msgid "SEO & Marketing"
-msgstr ""
-
-#: product/admin.py:1342
-msgid "Performance Metrics"
-msgstr ""
-
-#: product/admin.py:1554 product/models/product.py:76
-msgid "Stock"
-msgstr "Απόθεμα"
-
-#: product/admin.py:1615
+#: product/admin.py:1342 product/admin.py:1609
 msgid "Performance"
 msgstr ""
 
-#: product/admin.py:1730
+#: product/admin.py:1548 product/models/product.py:76
+msgid "Stock"
+msgstr "Απόθεμα"
+
+#: product/admin.py:1724
 msgid "Pricing Summary"
 msgstr ""
 
-#: product/admin.py:1760
+#: product/admin.py:1754
 msgid "Performance Summary"
 msgstr ""
 
-#: product/admin.py:1794
+#: product/admin.py:1788
 msgid "Stock Reservation Summary"
 msgstr ""
 
-#: product/admin.py:1861
+#: product/admin.py:1855
 msgid "Open full stock history chart →"
 msgstr ""
 
-#: product/admin.py:1895
+#: product/admin.py:1889
 msgid "Product Analytics"
 msgstr ""
 
-#: product/admin.py:1939
+#: product/admin.py:1933
 msgid "Activate selected products"
 msgstr "Ενεργοποίηση επιλεγμένων προϊόντων"
 
-#: product/admin.py:1948
+#: product/admin.py:1942
 #, python-format
 msgid "%(count)d product was successfully activated."
 msgid_plural "%(count)d products were successfully activated."
 msgstr[0] ""
 msgstr[1] ""
 
-#: product/admin.py:1957
+#: product/admin.py:1951
 msgid "Deactivate selected products"
 msgstr "Απενεργοποίηση επιλεγμένων προϊόντων"
 
-#: product/admin.py:1966
+#: product/admin.py:1960
 #, python-format
 msgid "%(count)d product was successfully deactivated."
 msgid_plural "%(count)d products were successfully deactivated."
 msgstr[0] ""
 msgstr[1] ""
 
-#: product/admin.py:1975
+#: product/admin.py:1969
 msgid "Apply custom discount to selected products"
 msgstr ""
 
-#: product/admin.py:2024
+#: product/admin.py:2018
 msgid "No products selected. Please try again."
 msgstr ""
 
-#: product/admin.py:2047
+#: product/admin.py:2041
 #, python-format
 msgid "Applied %(discount)s%% discount to %(count)d product."
 msgid_plural "Applied %(discount)s%% discount to %(count)d products."
 msgstr[0] ""
 msgstr[1] ""
 
-#: product/admin.py:2095
+#: product/admin.py:2089
 msgid "Clear discount from selected products"
 msgstr ""
 
-#: product/admin.py:2104
+#: product/admin.py:2098
 #, python-format
 msgid "%(count)d product's discount was cleared."
 msgid_plural "%(count)d products' discounts were cleared."
 msgstr[0] ""
 msgstr[1] ""
 
-#: product/admin.py:2135
+#: product/admin.py:2107
+msgid "Duplicate as draft"
+msgstr "Αντιγραφή ως πρόχειρο"
+
+#: product/admin.py:2124 product/views/alert.py:98
+#, fuzzy
+#| msgid "Order Details"
+msgid "Product not found."
+msgstr "Λεπτομέρειες Παραγγελίας"
+
+#: product/admin.py:2157
+msgid "Couldn't find a free slug — try renaming the source."
+msgstr ""
+
+#: product/admin.py:2167
+#, python-format
+msgid ""
+"Cloned product #%(orig)s → draft #%(clone)s. Edit the copy and re-activate "
+"when ready."
+msgstr ""
+
+#: product/admin.py:2197
 msgid "Product not found"
 msgstr ""
 
-#: product/admin.py:2203
+#: product/admin.py:2265
 #, python-format
 msgid "Stock History — %(name)s"
 msgstr ""
 
-#: product/admin.py:2368
+#: product/admin.py:2430
 msgid "Product Stats"
 msgstr ""
 
-#: product/admin.py:2428
+#: product/admin.py:2490
 msgid "Category Analytics"
 msgstr ""
 
-#: product/admin.py:2459
+#: product/admin.py:2521
 msgid "Direct Products"
 msgstr ""
 
-#: product/admin.py:2471
+#: product/admin.py:2533
 msgid "Total Products"
 msgstr "Σύνολο Προϊόντων"
 
-#: product/admin.py:2545
+#: product/admin.py:2607
 msgid "Review Information"
 msgstr ""
 
-#: product/admin.py:2699
+#: product/admin.py:2761
 msgid "Approve selected reviews"
 msgstr "Έγκριση επιλεγμένων κριτικών"
 
-#: product/admin.py:2708
+#: product/admin.py:2770
 #, python-format
 msgid "%(count)d review was approved."
 msgid_plural "%(count)d reviews were approved."
 msgstr[0] ""
 msgstr[1] ""
 
-#: product/admin.py:2717
+#: product/admin.py:2779
 msgid "Reject selected reviews"
 msgstr ""
 
-#: product/admin.py:2726
+#: product/admin.py:2788
 #, python-format
 msgid "%(count)d review was rejected."
 msgid_plural "%(count)d reviews were rejected."
 msgstr[0] ""
 msgstr[1] ""
 
-#: product/admin.py:2739
+#: product/admin.py:2801
 #, python-format
 msgid "%(count)d comment was successfully marked as published."
 msgid_plural "%(count)d comments were successfully marked as published."
 msgstr[0] ""
 msgstr[1] ""
 
-#: product/admin.py:2752
+#: product/admin.py:2814
 #, python-format
 msgid "%(count)d comment was successfully marked as unpublished."
 msgid_plural "%(count)d comments were successfully marked as unpublished."
 msgstr[0] ""
 msgstr[1] ""
 
-#: product/admin.py:2855 product/admin.py:2994
+#: product/admin.py:2917 product/admin.py:3056
 msgid "Image Information"
 msgstr ""
 
@@ -9267,7 +9344,7 @@ msgstr ""
 msgid "target_price is required for price-drop alerts."
 msgstr ""
 
-#: product/models/attribute.py:31 settings.py:1877 settings.py:2408
+#: product/models/attribute.py:31 settings.py:1877 settings.py:2430
 msgid "Attributes"
 msgstr "Χαρακτηριστικά"
 
@@ -9275,7 +9352,7 @@ msgstr "Χαρακτηριστικά"
 msgid "Attribute Value"
 msgstr "Τιμή Χαρακτηριστικού"
 
-#: product/models/attribute_value.py:36 settings.py:1884 settings.py:2412
+#: product/models/attribute_value.py:36 settings.py:1884 settings.py:2434
 msgid "Attribute Values"
 msgstr "Τιμές Χαρακτηριστικών"
 
@@ -9476,12 +9553,6 @@ msgstr ""
 #, python-brace-format
 msgid "[{site}] Price drop: {name} is now at your target"
 msgstr ""
-
-#: product/views/alert.py:98
-#, fuzzy
-#| msgid "Order Details"
-msgid "Product not found."
-msgstr "Λεπτομέρειες Παραγγελίας"
 
 #: product/views/alert.py:105
 msgid "Price-drop alerts are not enabled for this product."
@@ -9686,7 +9757,7 @@ msgstr ""
 msgid "Region Code"
 msgstr ""
 
-#: region/models.py:26 settings.py:2089
+#: region/models.py:26 settings.py:2107
 msgid "Regions"
 msgstr "Περιοχές"
 
@@ -9909,141 +9980,157 @@ msgstr "Κριτικές"
 msgid "Sales"
 msgstr "Πωλήσεις"
 
-#: settings.py:1915
+#: settings.py:1916
 msgid "Payment Methods"
 msgstr "Μέθοδοι Πληρωμής"
 
-#: settings.py:1920
+#: settings.py:1921
 msgid "VAT Rates"
 msgstr "Συντελεστές ΦΠΑ"
 
-#: settings.py:1933 settings.py:2337 shipping_boxnow/models/shipment.py:167
+#: settings.py:1997 settings.py:2359 shipping_boxnow/models/shipment.py:167
 msgid "BoxNow Shipments"
 msgstr "Αποστολές BoxNow"
 
-#: settings.py:1940 settings.py:2367
+#: settings.py:2004 settings.py:2389
 msgid "ACS Shipments"
 msgstr "Αποστολές ACS"
 
-#: settings.py:1947 settings.py:2343 shipping_boxnow/models/locker.py:79
+#: settings.py:2011 settings.py:2365 shipping_boxnow/models/locker.py:79
 msgid "BoxNow Lockers"
 msgstr "Lockers BoxNow"
 
-#: settings.py:1954 settings.py:2373
+#: settings.py:2018 settings.py:2395
 msgid "ACS Stations"
 msgstr "Καταστήματα ACS"
 
-#: settings.py:1969
+#: settings.py:2033
 msgid "Users"
 msgstr "Χρήστες"
 
-#: settings.py:1976 user/models/address.py:65
+#: settings.py:2040 user/models/address.py:65
 msgid "User Addresses"
 msgstr "Διευθύνσεις Χρηστών"
 
-#: settings.py:1983
+#: settings.py:2047
 msgid "Subscriptions"
 msgstr "Συνδρομές"
 
-#: settings.py:2075
-msgid "System · Configuration"
-msgstr "Σύστημα · Ρυθμίσεις"
-
-#: settings.py:2095
+#: settings.py:2115
 msgid "Sites"
 msgstr "Sites"
 
-#: settings.py:2101
+#: settings.py:2123
 msgid "Extra Settings"
 msgstr "Πρόσθετες Ρυθμίσεις"
 
-#: settings.py:2109 user/models/subscription.py:80
+#: settings.py:2131 user/models/subscription.py:80
 msgid "Subscription Topics"
 msgstr "Θέματα Συνδρομών"
 
-#: settings.py:2117 shipping/models/provider.py:76
+#: settings.py:2139 shipping/models/provider.py:76
 msgid "Shipping Providers"
 msgstr "Πάροχοι Αποστολών"
 
-#: settings.py:2125
+#: settings.py:2147
 msgid "Groups"
 msgstr "Ομάδες"
 
-#: settings.py:2134
-msgid "System · Audit & Logs"
-msgstr "Σύστημα · Καταχωρήσεις & Logs"
+#: settings.py:2157
+msgid "Audit & Logs"
+msgstr "Καταχωρήσεις & Logs"
 
-#: settings.py:2162 settings.py:2349
+#: settings.py:2186 settings.py:2371
 msgid "BoxNow Events"
 msgstr "Συμβάντα BoxNow"
 
-#: settings.py:2170 settings.py:2393
+#: settings.py:2194 settings.py:2415
 msgid "ACS Tracking Events"
 msgstr "Συμβάντα Παρακολούθησης ACS"
 
-#: settings.py:2186
+#: settings.py:2210
 msgid "Meta CAPI Event Log"
 msgstr "Καταχωρήσεις Meta CAPI"
 
-#: settings.py:2194
+#: settings.py:2218
 msgid "Cache Purge Log"
 msgstr "Καταχωρήσεις Καθαρισμού Cache"
 
-#: settings.py:2202 user/models/data_export.py:71
+#: settings.py:2226 user/models/data_export.py:71
 msgid "User Data Exports"
 msgstr "Εξαγωγές Δεδομένων Χρηστών"
 
-#: settings.py:2213
-msgid "System · Reconciliation"
-msgstr "Σύστημα · Συμφωνίες"
+#: settings.py:2236
+msgid "Reconciliation"
+msgstr "Συμφωνίες"
 
-#: settings.py:2219 settings.py:2379
+#: settings.py:2241 settings.py:2401
 msgid "ACS Pickup Lists"
 msgstr "Λίστες Παραλαβής ACS"
 
-#: settings.py:2227 settings.py:2386
+#: settings.py:2249 settings.py:2408
 msgid "ACS COD Payouts"
 msgstr "Αποδόσεις COD ACS"
 
-#: settings.py:2246
-msgid "System · Background Jobs"
-msgstr "Σύστημα · Εργασίες"
+#: settings.py:2267
+msgid "Background Jobs"
+msgstr "Εργασίες Συστήματος"
 
-#: settings.py:2252
+#: settings.py:2272
 msgid "Periodic Tasks"
 msgstr "Περιοδικές Εργασίες"
 
-#: settings.py:2260
+#: settings.py:2280
 msgid "Crontab Schedules"
 msgstr "Προγραμματισμοί Crontab"
 
-#: settings.py:2268
+#: settings.py:2288
 msgid "Interval Schedules"
 msgstr "Προγραμματισμοί Διαστημάτων"
 
-#: settings.py:2276
+#: settings.py:2296
 msgid "Clocked Schedules"
 msgstr "Προγραμματισμοί με Ώρα"
 
-#: settings.py:2284
+#: settings.py:2304
 msgid "Solar Schedules"
 msgstr "Προγραμματισμοί Ηλιακοί"
 
-#: settings.py:2437
+#: settings.py:2459
 msgid "Authors"
 msgstr "Συντάκτες"
 
-#: settings.py:2454
+#: settings.py:2476
 msgid "Rosetta"
 msgstr "Rosetta"
 
-#: settings.py:2459
+#: settings.py:2481
 msgid "Cache"
 msgstr "Cache"
 
-#: settings.py:2464
+#: settings.py:2486
 msgid "Email Templates"
 msgstr "Πρότυπα Email"
+
+#: settings.py:2502
+msgid "Flower (Celery)"
+msgstr "Flower (Celery)"
+
+#: settings.py:2507
+msgid "Mailpit"
+msgstr "Mailpit"
+
+#: settings.py:2514
+msgid "API Swagger"
+msgstr "API Swagger"
+
+#: settings.py:2522
+msgid "Meilisearch"
+msgstr "Meilisearch"
+
+#: settings.py:2529
+msgid "RabbitMQ"
+msgstr "RabbitMQ"
 
 #: shipping/admin.py:41
 msgid "Capabilities"
@@ -10055,7 +10142,7 @@ msgstr ""
 msgid "Metadata"
 msgstr "Μεταδεδομένα"
 
-#: shipping/admin.py:58 shipping_boxnow/admin.py:358 user/admin.py:1024
+#: shipping/admin.py:58 shipping_boxnow/admin.py:358 user/admin.py:1027
 msgid "Timestamps"
 msgstr ""
 
@@ -10951,8 +11038,8 @@ msgstr ""
 msgid "Identification"
 msgstr "Ειδοποίηση"
 
-#: shipping_boxnow/admin.py:694 shipping_boxnow/admin.py:820 user/admin.py:429
-#: user/admin.py:803
+#: shipping_boxnow/admin.py:694 shipping_boxnow/admin.py:820 user/admin.py:432
+#: user/admin.py:806
 msgid "Location"
 msgstr ""
 
@@ -11781,173 +11868,177 @@ msgstr ""
 msgid "Topic Category"
 msgstr ""
 
-#: user/admin.py:270
+#: user/admin.py:248
+msgid "Search by email, username, name, phone, city, address, or bio."
+msgstr ""
+
+#: user/admin.py:273
 msgid "Account Credentials"
 msgstr "Λογαριασμός Ανενεργός"
 
-#: user/admin.py:274
+#: user/admin.py:277
 msgid "Personal Information"
 msgstr ""
 
-#: user/admin.py:286
+#: user/admin.py:289
 msgid "Bio & Description"
 msgstr ""
 
-#: user/admin.py:288
+#: user/admin.py:291
 msgid "Location & Address"
 msgstr ""
 
-#: user/admin.py:303
+#: user/admin.py:306
 msgid "Social Media & Website"
 msgstr ""
 
-#: user/admin.py:319
+#: user/admin.py:322
 msgid "Account Permissions"
 msgstr ""
 
-#: user/admin.py:332
+#: user/admin.py:335
 msgid "Subscriptions & Engagement"
 msgstr ""
 
-#: user/admin.py:339
+#: user/admin.py:342
 msgid "Loyalty & Rewards"
 msgstr ""
 
-#: user/admin.py:386
+#: user/admin.py:389
 msgid "Profile"
 msgstr "Προφίλ"
 
-#: user/admin.py:467
+#: user/admin.py:470
 msgid "Social"
 msgstr ""
 
-#: user/admin.py:514
+#: user/admin.py:517
 msgid "Social Links Summary"
 msgstr ""
 
-#: user/admin.py:541
+#: user/admin.py:544
 msgid "Subscription Summary"
 msgstr ""
 
-#: user/admin.py:559
+#: user/admin.py:562
 msgid "Address Summary"
 msgstr "Σύνοψη Διεύθυνσης"
 
-#: user/admin.py:572
+#: user/admin.py:575
 msgid "Points Balance"
 msgstr ""
 
-#: user/admin.py:583 user/models/account.py:92
+#: user/admin.py:586 user/models/account.py:92
 #, fuzzy
 #| msgid "Total"
 msgid "Total XP"
 msgstr "Σύνολο"
 
-#: user/admin.py:593
+#: user/admin.py:596
 msgid "Level"
 msgstr ""
 
-#: user/admin.py:604
+#: user/admin.py:607
 msgid "Tier"
 msgstr ""
 
-#: user/admin.py:619
+#: user/admin.py:622
 msgid "Adjust loyalty points for this user"
 msgstr ""
 
-#: user/admin.py:641
+#: user/admin.py:644
 msgid "Only superusers may adjust loyalty points directly."
 msgstr ""
 
-#: user/admin.py:660
+#: user/admin.py:663
 #, python-format
 msgid "Invalid points amount: %(val)s"
 msgstr ""
 
-#: user/admin.py:668
+#: user/admin.py:671
 #, python-format
 msgid ""
 "Points amount %(val)d is out of range (must be between -10000 and 10000)."
 msgstr ""
 
-#: user/admin.py:678
+#: user/admin.py:681
 msgid "User not found."
 msgstr ""
 
-#: user/admin.py:691
+#: user/admin.py:694
 #, python-format
 msgid ""
 "Admin adjustment of %(points)d points applied to %(user)s. This action is "
 "logged and cannot be undone."
 msgstr ""
 
-#: user/admin.py:698
+#: user/admin.py:701
 #, python-format
 msgid "%(user)s received a %(points)d loyalty points adjustment."
 msgstr ""
 
-#: user/admin.py:747
+#: user/admin.py:750
 msgid "Address Owner"
 msgstr "Κάτοχος Διεύθυνσης"
 
-#: user/admin.py:751 user/admin.py:796
+#: user/admin.py:754 user/admin.py:799
 msgid "Contact Person"
 msgstr "Άτομο Επικοινωνίας"
 
-#: user/admin.py:755
+#: user/admin.py:758
 msgid "Address Details"
 msgstr "Στοιχεία Διεύθυνσης"
 
-#: user/admin.py:788 user/models/account.py:59
+#: user/admin.py:791 user/models/account.py:59
 msgid "Address"
 msgstr "Διεύθυνση"
 
-#: user/admin.py:814
+#: user/admin.py:817
 msgid "Main"
 msgstr ""
 
-#: user/admin.py:822
+#: user/admin.py:825
 msgid "Contact Numbers"
 msgstr ""
 
-#: user/admin.py:871
+#: user/admin.py:874
 msgid "Topic Information"
 msgstr ""
 
-#: user/admin.py:878 user/admin.py:944
+#: user/admin.py:881 user/admin.py:947
 msgid "Settings"
 msgstr "Ρυθμίσεις"
 
-#: user/admin.py:965
+#: user/admin.py:968
 msgid "Subscribers"
 msgstr ""
 
-#: user/admin.py:1036
+#: user/admin.py:1039
 msgid "Additional Data"
 msgstr ""
 
-#: user/admin.py:1044
+#: user/admin.py:1047
 msgid "Subscription"
 msgstr ""
 
-#: user/admin.py:1094
+#: user/admin.py:1097
 msgid "Dates"
 msgstr ""
 
-#: user/admin.py:1107
+#: user/admin.py:1110
 msgid "Activate selected subscriptions"
 msgstr ""
 
-#: user/admin.py:1126
+#: user/admin.py:1129
 #, python-format
 msgid "%(count)d subscriptions were activated."
 msgstr ""
 
-#: user/admin.py:1130
+#: user/admin.py:1133
 msgid "Deactivate selected subscriptions"
 msgstr ""
 
-#: user/admin.py:1146
+#: user/admin.py:1149
 #, python-format
 msgid "%(count)d subscriptions were deactivated."
 msgstr ""
@@ -12804,158 +12895,3 @@ msgstr ""
 #: vat/models.py:40
 msgid "Vats"
 msgstr ""
-
-# Greek translations added by fill_admin_greek_translations.py
-
-msgid "Users & Engagement"
-msgstr "Πελάτες"
-
-msgid "Blog & Content"
-msgstr "Περιεχόμενο"
-
-msgid "Communications"
-msgstr "Επικοινωνίες"
-
-msgid "System Settings"
-msgstr "Ρυθμίσεις Συστήματος"
-
-msgid "Background Jobs"
-msgstr "Εργασίες Συστήματος"
-
-msgid "Updated at"
-msgstr "Ενημερώθηκε"
-
-msgid "Product Alert"
-msgstr "Ειδοποίηση Προϊόντος"
-
-msgid "ACS Station"
-msgstr "Κατάστημα ACS"
-
-msgid "ACS Pickup List"
-msgstr "Λίστα Παραλαβής ACS"
-
-msgid "ACS COD Payout"
-msgstr "Απόδοση COD ACS"
-
-msgid "ACS Tracking Event"
-msgstr "Συμβάν Παρακολούθησης ACS"
-
-msgid "Site"
-msgstr "Site"
-
-msgid "Setting"
-msgstr "Ρύθμιση"
-
-msgid "Cache Purge Log Entry"
-msgstr "Καταχώρηση Καθαρισμού Cache"
-
-msgid "Audit & Logs"
-msgstr "Καταχωρήσεις & Logs"
-
-msgid "Reconciliation"
-msgstr "Συμφωνίες"
-
-msgid "Abandoned"
-msgstr "Εγκαταλελειμμένο"
-
-msgid "Documents"
-msgstr "Έγγραφα"
-
-msgid "Full Name"
-msgstr "Ονοματεπώνυμο"
-
-msgid "Gender"
-msgstr "Φύλο"
-
-msgid "General Information"
-msgstr "Γενικές Πληροφορίες"
-
-msgid "Images"
-msgstr "Εικόνες"
-
-msgid "Item"
-msgstr "Είδος"
-
-msgid "Loading..."
-msgstr "Φόρτωση..."
-
-msgid "Logout"
-msgstr "Αποσύνδεση"
-
-msgid "Login"
-msgstr "Σύνδεση"
-
-msgid "Manage Categories"
-msgstr "Διαχείριση Κατηγοριών"
-
-msgid "Manage Users"
-msgstr "Διαχείριση Χρηστών"
-
-msgid "Mark as paid"
-msgstr "Σήμανση ως Πληρωμένη"
-
-msgid "Mark as shipped"
-msgstr "Σήμανση ως Απεσταλμένη"
-
-msgid "Mark as delivered"
-msgstr "Σήμανση ως Παραδομένη"
-
-msgid "More info"
-msgstr "Περισσότερες πληροφορίες"
-
-msgid "Owner"
-msgstr "Κάτοχος"
-
-msgid "Password"
-msgstr "Κωδικός Πρόσβασης"
-
-msgid "Permissions"
-msgstr "Δικαιώματα"
-
-msgid "Save"
-msgstr "Αποθήκευση"
-
-msgid "Search"
-msgstr "Αναζήτηση"
-
-msgid "Send"
-msgstr "Αποστολή"
-
-msgid "SEO Information"
-msgstr "Πληροφορίες SEO"
-
-msgid "SEO Title"
-msgstr "Τίτλος SEO"
-
-msgid "SEO Description"
-msgstr "Περιγραφή SEO"
-
-msgid "SEO Keywords"
-msgstr "Λέξεις-κλειδιά SEO"
-
-msgid "Stock Information"
-msgstr "Στοιχεία Αποθέματος"
-
-msgid "Subject"
-msgstr "Θέμα"
-
-msgid "Submit"
-msgstr "Υποβολή"
-
-msgid "Total Orders"
-msgstr "Σύνολο Παραγγελιών"
-
-msgid "Total Revenue"
-msgstr "Συνολικά Έσοδα"
-
-msgid "Total Users"
-msgstr "Σύνολο Χρηστών"
-
-msgid "Update"
-msgstr "Ενημέρωση"
-
-msgid "VAT Information"
-msgstr "Στοιχεία ΦΠΑ"
-
-msgid "View Orders"
-msgstr "Προβολή Παραγγελιών"

@@ -6,7 +6,7 @@ from django.contrib import admin, messages
 from django.db.models import F, Q, Sum, Count, Avg, Prefetch
 from django.db.models.functions import TruncDay
 from django.http import HttpResponseRedirect, Http404
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import path, reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.html import conditional_escape
@@ -1245,12 +1245,19 @@ class ProductAdmin(
     )
     list_select_related = ["category", "vat", "changed_by"]
     list_per_page = 25
+    autocomplete_fields = ["category", "vat"]
+    search_help_text = _(
+        "Search by ID, SKU, name, description, or category name."
+    )
     actions = [
         "make_active",
         "make_inactive",
         "apply_custom_discount",
         "clear_discount",
     ]
+    # Per-row quick action: clone a product into a new draft for the
+    # catalog team to riff on without leaving the list page.
+    actions_row = ["duplicate_product_row"]
     date_hierarchy = "created_at"
 
     fieldsets = (
@@ -1264,19 +1271,22 @@ class ProductAdmin(
                     "name",
                     "description",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
-            _("Pricing"),
+            _("Pricing & Inventory"),
             {
                 "fields": (
                     "price",
                     "discount_percent",
                     "vat",
                     "pricing_summary",
+                    "stock",
+                    "weight",
+                    "low_stock_threshold",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
             },
         ),
         (
@@ -1286,7 +1296,7 @@ class ProductAdmin(
                     "points_coefficient",
                     "points",
                 ),
-                "classes": ("wide",),
+                "classes": ("tab",),
                 "description": _(
                     "Configure loyalty points earning for this product. "
                     "Points coefficient multiplies the global points factor, "
@@ -1295,20 +1305,10 @@ class ProductAdmin(
             },
         ),
         (
-            _("Inventory"),
-            {
-                "fields": (
-                    "stock",
-                    "weight",
-                ),
-                "classes": ("wide",),
-            },
-        ),
-        (
             _("Customer Alerts"),
             {
                 "fields": ("price_drop_alerts_enabled",),
-                "classes": ("wide",),
+                "classes": ("tab",),
                 "description": _(
                     "Control which self-service alert features customers "
                     "can subscribe to for this product. Disabled by default "
@@ -1317,17 +1317,17 @@ class ProductAdmin(
             },
         ),
         (
-            _("Stock Management & Audit"),
+            _("Stock Audit"),
             {
                 "fields": ("stock_reservation_summary",),
-                "classes": ("collapse",),
+                "classes": ("tab",),
                 "description": _(
                     "View active stock reservations and recent stock operations for this product."
                 ),
             },
         ),
         (
-            _("SEO & Marketing"),
+            _("SEO"),
             {
                 "fields": (
                     "slug",
@@ -1335,25 +1335,19 @@ class ProductAdmin(
                     "seo_description",
                     "seo_keywords",
                 ),
-                "classes": ("collapse",),
+                "classes": ("tab",),
             },
         ),
         (
-            _("Performance Metrics"),
+            _("Performance"),
             {
                 "fields": (
                     "view_count",
                     "likes_count",
                     "performance_summary",
+                    "product_analytics",
                 ),
-                "classes": ("collapse",),
-            },
-        ),
-        (
-            _("Analytics"),
-            {
-                "fields": ("product_analytics",),
-                "classes": ("collapse",),
+                "classes": ("tab",),
             },
         ),
         (
@@ -1366,7 +1360,7 @@ class ProductAdmin(
                     "updated_at",
                     "changed_by",
                 ),
-                "classes": ("collapse",),
+                "classes": ("tab",),
             },
         ),
     )
@@ -2108,6 +2102,74 @@ class ProductAdmin(
             % {"count": updated},
             messages.SUCCESS,
         )
+
+    @action(
+        description=str(_("Duplicate as draft")),
+        icon="content_copy",
+        variant=ActionVariant.INFO,
+    )
+    def duplicate_product_row(self, request, object_id):
+        """Clone the row into an inactive draft and open it for editing.
+
+        We deliberately do NOT copy translations, images, attributes,
+        or stock — the catalog team uses the duplicate as a starting
+        skeleton. ``slug`` and ``sku`` get a ``-copy-<n>`` suffix so
+        the unique constraints hold; ``active=False`` keeps the draft
+        out of the storefront until edits are finished.
+        """
+
+        try:
+            original = Product.objects.get(pk=object_id)
+        except Product.DoesNotExist:
+            messages.error(request, _("Product not found."))
+            return redirect("admin:product_product_changelist")
+
+        clone = Product.objects.get(pk=object_id)
+        clone.pk = None
+        clone.id = None
+        clone.uuid = None  # SoftDeleteModel/UUIDModel — regenerates
+        clone.active = False
+        clone.stock = 0
+        clone.view_count = 0
+        clone.low_stock_alert_sent = False
+
+        # Append a numeric suffix to slug/sku until both are unique.
+        n = 1
+        base_slug = original.slug
+        base_sku = getattr(original, "sku", "") or ""
+        while True:
+            candidate_slug = f"{base_slug}-copy-{n}"
+            candidate_sku = f"{base_sku}-COPY-{n}" if base_sku else ""
+            slug_taken = Product.objects.filter(slug=candidate_slug).exists()
+            sku_taken = (
+                bool(candidate_sku)
+                and Product.objects.filter(sku=candidate_sku).exists()
+            )
+            if not slug_taken and not sku_taken:
+                clone.slug = candidate_slug
+                if candidate_sku:
+                    clone.sku = candidate_sku
+                break
+            n += 1
+            if n > 100:
+                messages.error(
+                    request,
+                    _("Couldn't find a free slug — try renaming the source."),
+                )
+                return redirect(
+                    "admin:product_product_change", object_id=object_id
+                )
+
+        clone.save()
+        messages.success(
+            request,
+            _(
+                "Cloned product #%(orig)s → draft #%(clone)s. Edit the copy "
+                "and re-activate when ready."
+            )
+            % {"orig": original.id, "clone": clone.id},
+        )
+        return redirect("admin:product_product_change", object_id=clone.id)
 
     def get_urls(self):
         urls = super().get_urls()

@@ -405,6 +405,96 @@
 
 
     {# ────────────────────────────────────────────────────────────── #}
+    {# ZONE E — Growth: funnel + retention + top products             #}
+    {# ────────────────────────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {# Funnel: Carts → Orders → Paid #}
+        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary-500">filter_alt</span>
+                    {% trans "Conversion Funnel" %}
+                </h3>
+                <span class="text-[11px] text-base-500 dark:text-base-400">{% trans "Last 30 days" %}</span>
+            </div>
+            <ul class="flex flex-col gap-2 text-sm">
+                <li class="flex items-center justify-between">
+                    <span class="text-base-700 dark:text-base-200">{% trans "Carts" %}</span>
+                    <span class="font-semibold tabular-nums">{{ funnel.carts }}</span>
+                </li>
+                <li class="flex items-center justify-between">
+                    <span class="text-base-700 dark:text-base-200">{% trans "Orders" %}</span>
+                    <span class="font-semibold tabular-nums">
+                        {{ funnel.orders }}
+                        <span class="ml-2 text-[11px] text-emerald-600 dark:text-emerald-400">{{ funnel.cart_to_order_pct }}%</span>
+                    </span>
+                </li>
+                <li class="flex items-center justify-between">
+                    <span class="text-base-700 dark:text-base-200">{% trans "Paid" %}</span>
+                    <span class="font-semibold tabular-nums">
+                        {{ funnel.paid }}
+                        <span class="ml-2 text-[11px] text-emerald-600 dark:text-emerald-400">{{ funnel.order_to_paid_pct }}%</span>
+                    </span>
+                </li>
+                <li class="flex items-center justify-between border-t border-base-200 dark:border-base-800 pt-2 mt-1">
+                    <span class="text-base-900 dark:text-base-50 font-semibold">{% trans "End-to-end" %}</span>
+                    <span class="font-semibold tabular-nums text-primary-600 dark:text-primary-400">{{ funnel.overall_pct }}%</span>
+                </li>
+            </ul>
+        </div>
+
+        {# Retention #}
+        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-emerald-500">replay</span>
+                    {% trans "Repeat Customers" %}
+                </h3>
+                <span class="text-[11px] text-base-500 dark:text-base-400">{% trans "Last 30 days" %}</span>
+            </div>
+            <p class="text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ retention.repeat_rate_pct }}%</p>
+            <p class="mt-2 text-sm text-base-600 dark:text-base-300">
+                {{ retention.repeat_customers }} / {{ retention.paying_customers }}
+                <span class="text-base-500 dark:text-base-400">{% trans "made a 2nd purchase" %}</span>
+            </p>
+        </div>
+
+        {# Top Products by views #}
+        <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
+            <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-violet-500">trending_up</span>
+                    {% trans "Top Products" %}
+                </h3>
+                <a href="{% url 'admin:product_product_changelist' %}?o=-7"
+                    class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
+                    {% trans "View all" %} →
+                </a>
+            </div>
+            <ul class="divide-y divide-base-200 dark:divide-base-800">
+                {% for p in top_products %}
+                <li class="px-4 py-2 flex items-center justify-between gap-3">
+                    <a href="{{ p.url }}" class="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate">
+                        {{ p.name }}
+                    </a>
+                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 tabular-nums">
+                        <span class="material-symbols-outlined text-[12px]!">visibility</span>
+                        {{ p.views }}
+                    </span>
+                </li>
+                {% empty %}
+                <li class="px-4 py-6 text-center text-base-600 dark:text-base-300 text-sm">
+                    {% trans "No products yet" %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+    </div>
+
+
+    {# ────────────────────────────────────────────────────────────── #}
     {# ZONE D — Low stock list (superuser-only, only when present)    #}
     {# ────────────────────────────────────────────────────────────── #}
     {% if is_superuser and low_stock_products %}

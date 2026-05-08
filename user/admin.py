@@ -244,6 +244,9 @@ class UserAdmin(ModelAdmin):
         "address",
         "bio",
     ]
+    search_help_text = _(
+        "Search by email, username, name, phone, city, address, or bio."
+    )
 
     list_select_related = ["country", "region"]
     readonly_fields = [

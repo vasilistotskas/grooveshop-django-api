@@ -568,6 +568,9 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         "author__user__email",
         "author__user__username",
     )
+    search_help_text = _(
+        "Search by title, subtitle, slug, body, or author email/username."
+    )
     autocomplete_fields = ["category", "author", "tags"]
     readonly_fields = [
         "id",

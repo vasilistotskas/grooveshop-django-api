@@ -455,13 +455,16 @@ class SettingAdmin(ModelAdmin):
                 value,
             )
         except Exception:
-            return format_html(
+            from django.utils.safestring import mark_safe  # noqa: PLC0415
+
+            return mark_safe(
                 '<span style="font-style: italic; opacity: 0.6;">-</span>'
             )
 
     @admin.display(description=_("Description"))
     def description_preview(self, obj):
         from django.utils.html import format_html  # noqa: PLC0415
+        from django.utils.safestring import mark_safe  # noqa: PLC0415
 
         if obj.description:
             desc = obj.description
@@ -471,7 +474,7 @@ class SettingAdmin(ModelAdmin):
                 '<span style="font-size: 0.875rem; opacity: 0.8;">{}</span>',
                 desc,
             )
-        return format_html(
+        return mark_safe(
             '<span style="font-style: italic; opacity: 0.6;">-</span>'
         )
 

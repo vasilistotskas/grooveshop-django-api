@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.db.models import Count
 from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import (
@@ -181,7 +182,7 @@ class VatAdmin(ModelAdmin):
         value = obj.value
 
         if value == 0:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 "
                 'rounded-full gap-1">'
@@ -189,7 +190,7 @@ class VatAdmin(ModelAdmin):
                 "</span>"
             )
         if value <= 5:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 "
                 'rounded-full gap-1">'
@@ -197,7 +198,7 @@ class VatAdmin(ModelAdmin):
                 "</span>"
             )
         if value <= 15:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 "
                 'rounded-full gap-1">'
@@ -205,7 +206,7 @@ class VatAdmin(ModelAdmin):
                 "</span>"
             )
         if value <= 25:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 "
                 'rounded-full gap-1">'
@@ -213,14 +214,14 @@ class VatAdmin(ModelAdmin):
                 "</span>"
             )
         if value <= 35:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 "
                 'rounded-full gap-1">'
                 "<span>📈</span><span>High</span>"
                 "</span>"
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
             "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 "
             'rounded-full gap-1">'
@@ -233,7 +234,7 @@ class VatAdmin(ModelAdmin):
         products_count = getattr(obj, "products_count", 0)
 
         if products_count == 0:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300 "
                 'rounded-full">'
@@ -331,7 +332,7 @@ class VatAdmin(ModelAdmin):
                 status=status_text,
             )
         except Exception:
-            return format_html(
+            return mark_safe(
                 '<span class="text-gray-500">Data unavailable</span>'
             )
 
@@ -363,7 +364,7 @@ class VatAdmin(ModelAdmin):
             products_count = getattr(obj, "products_count", 0)
 
             if products_count == 0:
-                return format_html(
+                return mark_safe(
                     '<div class="text-sm text-gray-500 dark:text-gray-400 italic">'
                     "No products currently using this VAT rate"
                     "</div>"
@@ -381,7 +382,7 @@ class VatAdmin(ModelAdmin):
                 count=products_count,
             )
         except Exception:
-            return format_html(
+            return mark_safe(
                 '<span class="text-gray-500">Data unavailable</span>'
             )
 

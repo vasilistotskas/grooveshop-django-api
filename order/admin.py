@@ -8,7 +8,7 @@ from django.http import FileResponse, Http404
 from django.shortcuts import redirect
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import conditional_escape, format_html, format_html_join
+from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
@@ -244,7 +244,9 @@ class OrderItemInline(TabularInline):
                 '<div class="text-base-600 dark:text-base-300">ID: {id}</div>'
                 "</div>",
                 name=(
-                    obj.product.safe_translation_getter("name", any_language=True)
+                    obj.product.safe_translation_getter(
+                        "name", any_language=True
+                    )
                     or "Unnamed Product"
                 ),
                 id=obj.product.id,
@@ -268,14 +270,14 @@ class OrderItemInline(TabularInline):
     @admin.display(description=_("Refund Status"))
     def refund_status(self, obj):
         if obj.is_refunded:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "↩️ Refunded"
                 "</span>"
             )
         if obj.refunded_quantity > 0:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
                 "⚠️ Partial"
@@ -334,7 +336,7 @@ class OrderHistoryInline(TabularInline):
                 '<div class="text-sm text-base-700 dark:text-base-300">{name}</div>',
                 name=obj.user.full_name or obj.user.username,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">System</span>'
         )
 
@@ -382,11 +384,11 @@ class InvoiceInline(TabularInline):
     @admin.display(description=_("Document"))
     def document_status(self, obj):
         if not obj or not obj.pk:
-            return format_html(
+            return mark_safe(
                 '<span class="text-base-600 dark:text-base-300 italic">—</span>'
             )
         if not obj.has_document():
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
                 "⏳ Pending render"
@@ -926,21 +928,21 @@ class OrderAdmin(BaseModelAdmin):
         age = now - obj.created_at
 
         if obj.status == OrderStatus.PENDING and age > timedelta(hours=24):
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "🚨 Urgent"
                 "</span>"
             )
         if obj.status == OrderStatus.PROCESSING and age > timedelta(days=3):
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
                 "⚠️ Delayed"
                 "</span>"
             )
         if obj.status == OrderStatus.SHIPPED and age > timedelta(days=7):
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
                 "📦 Follow up"
@@ -1118,16 +1120,17 @@ class OrderAdmin(BaseModelAdmin):
             },
         )
 
-        safe_doc = conditional_escape(obj.get_document_type_display())
-
-        html = (
-            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
-            f"<span>{config['icon']}</span>"
-            f"<span>{safe_doc}</span>"
-            "</span>"
+        return format_html(
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            '{bg} {text_class} rounded-full gap-1">'
+            "<span>{icon}</span>"
+            "<span>{label}</span>"
+            "</span>",
+            bg=config["bg"],
+            text_class=config["text"],
+            icon=config["icon"],
+            label=obj.get_document_type_display(),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Currency"))
     def currency_status(self, obj):
@@ -1136,115 +1139,98 @@ class OrderAdmin(BaseModelAdmin):
             shipping_currency = obj.shipping_price.currency
 
             if items_currency == shipping_currency:
-                safe_currency = conditional_escape(str(items_currency))
-                html = (
+                return format_html(
                     '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                     'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                    f"✅ {safe_currency}"
-                    "</span>"
+                    "✅ {currency}"
+                    "</span>",
+                    currency=str(items_currency),
                 )
-            else:
-                html = (
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                    'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                    "⚠️ Mixed"
-                    "</span>"
-                )
+            return mark_safe(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
+                "⚠️ Mixed"
+                "</span>"
+            )
         except ValueError:
-            html = (
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "❌ Mismatch"
                 "</span>"
             )
-        return mark_safe(html)
 
     @admin.display(description=_("Customer Summary"))
     def customer_summary(self, obj):
-        safe_name = conditional_escape(obj.customer_full_name)
-        safe_email = conditional_escape(obj.email)
-        safe_phone = conditional_escape(obj.phone or "Not provided")
-        account_status = "Registered User" if obj.user else "Guest"
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Full Name:</strong></div><div>{safe_name}</div>"
-            f"<div><strong>Email:</strong></div><div>{safe_email}</div>"
-            f"<div><strong>Phone:</strong></div><div>{safe_phone}</div>"
-            f"<div><strong>Account:</strong></div><div>{account_status}</div>"
+            "<div><strong>Full Name:</strong></div><div>{name}</div>"
+            "<div><strong>Email:</strong></div><div>{email}</div>"
+            "<div><strong>Phone:</strong></div><div>{phone}</div>"
+            "<div><strong>Account:</strong></div><div>{account}</div>"
             "</div>"
-            "</div>"
+            "</div>",
+            name=obj.customer_full_name,
+            email=obj.email,
+            phone=obj.phone or "Not provided",
+            account="Registered User" if obj.user else "Guest",
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Financial Summary"))
     def financial_summary(self, obj):
-        shipping = obj.shipping_price
-        items_total = obj.total_price_items
-
-        safe_shipping = conditional_escape(str(shipping))
-        safe_items = conditional_escape(str(items_total))
-
         try:
-            total = obj.total_price
-            total_display = conditional_escape(str(total))
-            currency_warning = ""
+            total_display = format_html("{}", str(obj.total_price))
+            currency_warning = mark_safe("")
         except ValueError as e:
-            total_display = '<span class="text-red-600 dark:text-red-400">Currency Mismatch</span>'
-            safe_error = conditional_escape(str(e))
-            currency_warning = (
+            total_display = mark_safe(
+                '<span class="text-red-600 dark:text-red-400">Currency Mismatch</span>'
+            )
+            currency_warning = format_html(
                 "<div><strong>Currency Issue:</strong></div>"
-                f'<div class="text-red-600 dark:text-red-400 text-xs">{safe_error}</div>'
+                '<div class="text-red-600 dark:text-red-400 text-xs">{err}</div>',
+                err=str(e),
             )
 
-        safe_paid = conditional_escape(str(obj.paid_amount or "Not paid"))
-        safe_payment_status = conditional_escape(
-            obj.get_payment_status_display()
-        )
-        safe_payment_method = conditional_escape(
-            obj.payment_method or "Not specified"
-        )
-        safe_doc_type = conditional_escape(obj.get_document_type_display())
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Items Total:</strong></div><div>{safe_items}</div>"
-            f"<div><strong>Shipping:</strong></div><div>{safe_shipping}</div>"
-            f'<div><strong>Grand Total:</strong></div><div class="font-bold">{total_display}</div>'
-            f"<div><strong>Paid Amount:</strong></div><div>{safe_paid}</div>"
-            f"<div><strong>Payment Status:</strong></div><div>{safe_payment_status}</div>"
-            f"<div><strong>Payment Method:</strong></div><div>{safe_payment_method}</div>"
-            f"<div><strong>Document Type:</strong></div><div>{safe_doc_type}</div>"
-            f"{currency_warning}"
+            "<div><strong>Items Total:</strong></div><div>{items}</div>"
+            "<div><strong>Shipping:</strong></div><div>{shipping}</div>"
+            '<div><strong>Grand Total:</strong></div><div class="font-bold">{total}</div>'
+            "<div><strong>Paid Amount:</strong></div><div>{paid}</div>"
+            "<div><strong>Payment Status:</strong></div><div>{pstatus}</div>"
+            "<div><strong>Payment Method:</strong></div><div>{pmethod}</div>"
+            "<div><strong>Document Type:</strong></div><div>{doc}</div>"
+            "{warning}"
             "</div>"
-            "</div>"
+            "</div>",
+            items=str(obj.total_price_items),
+            shipping=str(obj.shipping_price),
+            total=total_display,
+            paid=str(obj.paid_amount or "Not paid"),
+            pstatus=obj.get_payment_status_display(),
+            pmethod=obj.payment_method or "Not specified",
+            doc=obj.get_document_type_display(),
+            warning=currency_warning,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Shipping Summary"))
     def shipping_summary(self, obj):
-        safe_address = conditional_escape(obj.full_address)
-        safe_tracking = conditional_escape(
-            obj.tracking_number or "Not assigned"
-        )
-        safe_carrier = conditional_escape(
-            obj.shipping_carrier or "Not assigned"
-        )
-        safe_price = conditional_escape(str(obj.shipping_price))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Full Address:</strong></div><div>{safe_address}</div>"
-            f"<div><strong>Tracking:</strong></div><div>{safe_tracking}</div>"
-            f"<div><strong>Carrier:</strong></div><div>{safe_carrier}</div>"
-            f"<div><strong>Shipping Cost:</strong></div><div>{safe_price}</div>"
+            "<div><strong>Full Address:</strong></div><div>{address}</div>"
+            "<div><strong>Tracking:</strong></div><div>{tracking}</div>"
+            "<div><strong>Carrier:</strong></div><div>{carrier}</div>"
+            "<div><strong>Shipping Cost:</strong></div><div>{price}</div>"
             "</div>"
-            "</div>"
+            "</div>",
+            address=obj.full_address,
+            tracking=obj.tracking_number or "Not assigned",
+            carrier=obj.shipping_carrier or "Not assigned",
+            price=str(obj.shipping_price),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Order Analytics"))
     def order_analytics(self, obj):
@@ -1275,35 +1261,34 @@ class OrderAdmin(BaseModelAdmin):
         except ValueError:
             currency_status = "Mismatch Error"
 
-        safe_days = conditional_escape(str(age.days))
-        safe_hours = conditional_escape(str(age.seconds // 3600))
-        safe_processing = conditional_escape(processing_time or "N/A")
-        safe_count = conditional_escape(str(getattr(obj, "item_count", 0)))
-        can_cancel = "Yes" if obj.can_be_canceled else "No"
-        is_paid = "Yes" if obj.is_paid else "No"
-        safe_currency = conditional_escape(currency_status)
-        safe_docs = conditional_escape(doc_types)
-
         currency_class = (
             "text-red-600 dark:text-red-400"
             if "Mismatch" in currency_status or "Mixed" in currency_status
             else ""
         )
 
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Order Age:</strong></div><div>{safe_days}d {safe_hours}h</div>"
-            f"<div><strong>Status Age:</strong></div><div>{safe_processing}</div>"
-            f"<div><strong>Items Count:</strong></div><div>{safe_count}</div>"
-            f"<div><strong>Can Cancel:</strong></div><div>{can_cancel}</div>"
-            f"<div><strong>Is Paid:</strong></div><div>{is_paid}</div>"
-            f'<div><strong>Currency Status:</strong></div><div class="{currency_class}">{safe_currency}</div>'
-            f'<div><strong>Available Docs:</strong></div><div class="text-xs">{safe_docs}</div>'
+            "<div><strong>Order Age:</strong></div><div>{days}d {hours}h</div>"
+            "<div><strong>Status Age:</strong></div><div>{processing}</div>"
+            "<div><strong>Items Count:</strong></div><div>{count}</div>"
+            "<div><strong>Can Cancel:</strong></div><div>{can_cancel}</div>"
+            "<div><strong>Is Paid:</strong></div><div>{is_paid}</div>"
+            '<div><strong>Currency Status:</strong></div><div class="{cls}">{currency}</div>'
+            '<div><strong>Available Docs:</strong></div><div class="text-xs">{docs}</div>'
             "</div>"
-            "</div>"
+            "</div>",
+            days=age.days,
+            hours=age.seconds // 3600,
+            processing=processing_time or "N/A",
+            count=getattr(obj, "item_count", 0),
+            can_cancel="Yes" if obj.can_be_canceled else "No",
+            is_paid="Yes" if obj.is_paid else "No",
+            cls=currency_class,
+            currency=currency_status,
+            docs=doc_types,
         )
-        return mark_safe(html)
 
     @action(
         description=str(_("Mark selected orders as processing")),
@@ -1825,19 +1810,15 @@ class OrderItemAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
-        safe_url = conditional_escape(
-            f"/admin/order/order/{obj.order.id}/change/"
-        )
-        safe_id = conditional_escape(str(obj.order.id))
-        status_badge = self.order_status_mini(obj.order)
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Order #{safe_id}</a>'
-            f"<div>{status_badge}</div>"
-            "</div>"
+            '<a href="{url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Order #{id}</a>'
+            "<div>{badge}</div>"
+            "</div>",
+            url=f"/admin/order/order/{obj.order.id}/change/",
+            id=obj.order.id,
+            badge=self.order_status_mini(obj.order),
         )
-        return mark_safe(html)
 
     def order_status_mini(self, order):
         status_colors = {
@@ -1853,123 +1834,109 @@ class OrderItemAdmin(BaseModelAdmin):
         color = status_colors.get(
             order.status, "text-base-600 dark:text-base-400"
         )
-        safe_status = conditional_escape(order.get_status_display())
-
-        html = f'<span class="{color}">{safe_status}</span>'
-        return mark_safe(html)
+        return format_html(
+            '<span class="{color}">{status}</span>',
+            color=color,
+            status=order.get_status_display(),
+        )
 
     @admin.display(description=_("Product"))
     def product_display(self, obj):
-        product_name = (
-            obj.product.safe_translation_getter("name", any_language=True)
-            or "Unnamed Product"
-        )
-        safe_name = conditional_escape(product_name)
-        safe_id = conditional_escape(str(obj.product.id))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="text-base-600 dark:text-base-300">ID: {safe_id}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
+            '<div class="text-base-600 dark:text-base-300">ID: {id}</div>'
+            "</div>",
+            name=(
+                obj.product.safe_translation_getter("name", any_language=True)
+                or "Unnamed Product"
+            ),
+            id=obj.product.id,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Quantity"))
     def quantity_display(self, obj):
         if obj.refunded_quantity > 0:
-            safe_qty = conditional_escape(str(obj.quantity))
-            safe_refunded = conditional_escape(str(obj.refunded_quantity))
-            safe_net = conditional_escape(str(obj.net_quantity))
-
-            html = (
+            return format_html(
                 '<div class="text-sm">'
-                f'<div class="font-medium text-base-900 dark:text-base-100">Total: {safe_qty}</div>'
-                f'<div class="text-red-600 dark:text-red-400">Refunded: {safe_refunded}</div>'
-                f'<div class="text-green-600 dark:text-green-400">Net: {safe_net}</div>'
-                "</div>"
+                '<div class="font-medium text-base-900 dark:text-base-100">Total: {qty}</div>'
+                '<div class="text-red-600 dark:text-red-400">Refunded: {refunded}</div>'
+                '<div class="text-green-600 dark:text-green-400">Net: {net}</div>'
+                "</div>",
+                qty=obj.quantity,
+                refunded=obj.refunded_quantity,
+                net=obj.net_quantity,
             )
-        else:
-            safe_qty = conditional_escape(str(obj.quantity))
-            html = (
-                f'<span class="inline-flex items-center px-3 py-1 text-sm font-medium '
-                f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-                f"x{safe_qty}"
-                "</span>"
-            )
-        return mark_safe(html)
+        return format_html(
+            '<span class="inline-flex items-center px-3 py-1 text-sm font-medium '
+            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            "x{qty}"
+            "</span>",
+            qty=obj.quantity,
+        )
 
     @admin.display(description=_("Pricing"))
     def pricing_info(self, obj):
-        safe_price = conditional_escape(str(obj.price))
-        safe_total = conditional_escape(str(obj.total_price))
-        safe_net = conditional_escape(str(obj.net_price))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_price} each</div>'
-            f'<div class="font-bold text-base-900 dark:text-base-100">Total: {safe_total}</div>'
-            f'<div class="text-green-600 dark:text-green-400">Net: {safe_net}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{price} each</div>'
+            '<div class="font-bold text-base-900 dark:text-base-100">Total: {total}</div>'
+            '<div class="text-green-600 dark:text-green-400">Net: {net}</div>'
+            "</div>",
+            price=str(obj.price),
+            total=str(obj.total_price),
+            net=str(obj.net_price),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Refund Status"))
     def refund_status_display(self, obj):
         if obj.is_refunded:
-            html = (
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
                 "↩️ Fully Refunded"
                 "</span>"
             )
-        elif obj.refunded_quantity > 0:
-            safe_refunded = conditional_escape(str(obj.refunded_quantity))
-            safe_qty = conditional_escape(str(obj.quantity))
-            html = (
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                f"⚠️ Partial ({safe_refunded}/{safe_qty})"
-                "</span>"
-            )
-        else:
-            html = (
+        if obj.refunded_quantity > 0:
+            return format_html(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "✅ Active"
-                "</span>"
+                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
+                "⚠️ Partial ({refunded}/{qty})"
+                "</span>",
+                refunded=obj.refunded_quantity,
+                qty=obj.quantity,
             )
-        return mark_safe(html)
+        return mark_safe(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
+            "✅ Active"
+            "</span>"
+        )
 
     @admin.display(description=_("Item Analytics"))
     def item_analytics(self, obj):
-        safe_original = conditional_escape(
-            str(obj.original_quantity or obj.quantity)
-        )
-        safe_current = conditional_escape(str(obj.quantity))
-        safe_refunded = conditional_escape(str(obj.refunded_quantity))
-        safe_net_qty = conditional_escape(str(obj.net_quantity))
-        safe_refunded_amt = conditional_escape(str(obj.refunded_amount))
-        safe_net_price = conditional_escape(str(obj.net_price))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Original Qty:</strong></div><div>{safe_original}</div>"
-            f"<div><strong>Current Qty:</strong></div><div>{safe_current}</div>"
-            f"<div><strong>Refunded Qty:</strong></div><div>{safe_refunded}</div>"
-            f"<div><strong>Net Qty:</strong></div><div>{safe_net_qty}</div>"
-            f"<div><strong>Refunded Amount:</strong></div><div>{safe_refunded_amt}</div>"
-            f"<div><strong>Net Amount:</strong></div><div>{safe_net_price}</div>"
+            "<div><strong>Original Qty:</strong></div><div>{orig}</div>"
+            "<div><strong>Current Qty:</strong></div><div>{current}</div>"
+            "<div><strong>Refunded Qty:</strong></div><div>{refunded}</div>"
+            "<div><strong>Net Qty:</strong></div><div>{net_qty}</div>"
+            "<div><strong>Refunded Amount:</strong></div><div>{refunded_amt}</div>"
+            "<div><strong>Net Amount:</strong></div><div>{net_price}</div>"
             "</div>"
-            "</div>"
+            "</div>",
+            orig=str(obj.original_quantity or obj.quantity),
+            current=obj.quantity,
+            refunded=obj.refunded_quantity,
+            net_qty=obj.net_quantity,
+            refunded_amt=str(obj.refunded_amount),
+            net_price=str(obj.net_price),
         )
-        return mark_safe(html)
 
 
 @admin.register(OrderHistory)
 class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
-
     list_display = [
         "order_link",
         "change_type_badge",
@@ -2006,16 +1973,12 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
-        safe_url = conditional_escape(
-            f"/admin/order/order/{obj.order.id}/change/"
+        return format_html(
+            '<a href="{url}" class="font-medium text-blue-600 dark:text-blue-400 '
+            'hover:text-blue-800 dark:hover:text-blue-300">Order #{id}</a>',
+            url=f"/admin/order/order/{obj.order.id}/change/",
+            id=obj.order.id,
         )
-        safe_id = conditional_escape(str(obj.order.id))
-
-        html = (
-            f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 '
-            f'hover:text-blue-800 dark:hover:text-blue-300">Order #{safe_id}</a>'
-        )
-        return mark_safe(html)
 
     @admin.display(description=_("Change Type"))
     def change_type_badge(self, obj):
@@ -2071,16 +2034,17 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
             },
         )
 
-        safe_type = conditional_escape(obj.get_change_type_display())
-
-        html = (
-            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
-            f"<span>{config['icon']}</span>"
-            f"<span>{safe_type}</span>"
-            "</span>"
+        return format_html(
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            '{bg} {text_class} rounded-full gap-1">'
+            "<span>{icon}</span>"
+            "<span>{label}</span>"
+            "</span>",
+            bg=config["bg"],
+            text_class=config["text"],
+            icon=config["icon"],
+            label=obj.get_change_type_display(),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Description"))
     def description_display(self, obj):
@@ -2091,24 +2055,21 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         desc_display = (
             description[:80] + "..." if len(description) > 80 else description
         )
-        safe_desc = conditional_escape(description)
-        safe_display = conditional_escape(desc_display)
-
-        html = (
-            f'<div class="text-sm text-base-700 dark:text-base-300" title="{safe_desc}">'
-            f"{safe_display}"
-            "</div>"
+        return format_html(
+            '<div class="text-sm text-base-700 dark:text-base-300" title="{title}">'
+            "{display}"
+            "</div>",
+            title=description,
+            display=desc_display,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Changed By"))
     def user_display(self, obj):
         if obj.user:
-            safe_name = conditional_escape(
-                obj.user.full_name or obj.user.username
+            return format_html(
+                '<div class="text-sm text-base-700 dark:text-base-300">{name}</div>',
+                name=obj.user.full_name or obj.user.username,
             )
-            html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_name}</div>'
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">System</span>'
         )
@@ -2148,19 +2109,15 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
     @admin.display(description=_("Order Item"))
     def order_item_link(self, obj):
-        safe_url = conditional_escape(
-            f"/admin/order/orderitem/{obj.order_item.id}/change/"
-        )
-        safe_item_id = conditional_escape(str(obj.order_item.id))
-        safe_order_id = conditional_escape(str(obj.order_item.order.id))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<a href="{safe_url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Item #{safe_item_id}</a>'
-            f'<div class="text-base-600 dark:text-base-300">Order #{safe_order_id}</div>'
-            "</div>"
+            '<a href="{url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Item #{item_id}</a>'
+            '<div class="text-base-600 dark:text-base-300">Order #{order_id}</div>'
+            "</div>",
+            url=f"/admin/order/orderitem/{obj.order_item.id}/change/",
+            item_id=obj.order_item.id,
+            order_id=obj.order_item.order.id,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Change Type"))
     def change_type_badge(self, obj):
@@ -2188,16 +2145,17 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         }
 
         config = type_config.get(obj.change_type, type_config["OTHER"])
-        safe_type = conditional_escape(obj.get_change_type_display())
-
-        html = (
-            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
-            f"<span>{config['icon']}</span>"
-            f"<span>{safe_type}</span>"
-            "</span>"
+        return format_html(
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            '{bg} {text_class} rounded-full gap-1">'
+            "<span>{icon}</span>"
+            "<span>{label}</span>"
+            "</span>",
+            bg=config["bg"],
+            text_class=config["text"],
+            icon=config["icon"],
+            label=obj.get_change_type_display(),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Description"))
     def description_display(self, obj):
@@ -2208,19 +2166,18 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
         desc_display = (
             description[:60] + "..." if len(description) > 60 else description
         )
-        safe_desc = conditional_escape(desc_display)
-
-        html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_desc}</div>'
-        return mark_safe(html)
+        return format_html(
+            '<div class="text-sm text-base-700 dark:text-base-300">{desc}</div>',
+            desc=desc_display,
+        )
 
     @admin.display(description=_("Changed By"))
     def user_display(self, obj):
         if obj.user:
-            safe_name = conditional_escape(
-                obj.user.full_name or obj.user.username
+            return format_html(
+                '<div class="text-sm text-base-700 dark:text-base-300">{name}</div>',
+                name=obj.user.full_name or obj.user.username,
             )
-            html = f'<div class="text-sm text-base-700 dark:text-base-300">{safe_name}</div>'
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">System</span>'
         )
@@ -2435,17 +2392,18 @@ class InvoiceAdmin(BaseModelAdmin):
     def order_link(self, obj):
         if not obj.order_id:
             return "—"
-        url = reverse("admin:order_order_change", args=[obj.order_id])
-        safe_url = conditional_escape(url)
-        safe_id = conditional_escape(str(obj.order_id))
-        html = f'<a href="{safe_url}" class="underline">#{safe_id}</a>'
-        return mark_safe(html)
+        return format_html(
+            '<a href="{url}" class="underline">#{id}</a>',
+            url=reverse("admin:order_order_change", args=[obj.order_id]),
+            id=obj.order_id,
+        )
 
     @admin.display(description=_("Total"))
     def total_display(self, obj):
-        safe_total = conditional_escape(str(obj.total))
-        html = f'<div class="text-sm font-bold">{safe_total}</div>'
-        return mark_safe(html)
+        return format_html(
+            '<div class="text-sm font-bold">{total}</div>',
+            total=str(obj.total),
+        )
 
     @admin.display(description=_("Document"))
     def document_badge(self, obj):
@@ -2456,17 +2414,15 @@ class InvoiceAdmin(BaseModelAdmin):
                 "⏳ Pending"
                 "</span>"
             )
-        url = _invoice_download_url(obj)
-        safe_url = conditional_escape(url or "")
-        html = (
-            '<a href="' + safe_url + '" target="_blank" rel="noopener" '
+        return format_html(
+            '<a href="{url}" target="_blank" rel="noopener" '
             'class="inline-flex items-center px-2 py-1 text-xs font-medium '
             "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 "
             'rounded-full hover:underline">'
             "📄 Download"
-            "</a>"
+            "</a>",
+            url=_invoice_download_url(obj) or "",
         )
-        return mark_safe(html)
 
     @admin.display(description=_("myDATA"))
     def mydata_status_badge(self, obj):
@@ -2518,18 +2474,26 @@ class InvoiceAdmin(BaseModelAdmin):
         cfg = state_config.get(
             obj.mydata_status, state_config[MyDataStatus.NOT_SENT]
         )
-        mark_suffix = ""
         if obj.mydata_mark:
-            mark_suffix = f' <span class="ml-1 text-[10px] opacity-75">#{obj.mydata_mark}</span>'
-        html = (
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            f'{cfg["bg"]} {cfg["text"]} rounded-full gap-1">'
-            f"<span>{cfg['icon']}</span>"
-            f"<span>{conditional_escape(cfg['label'])}</span>"
-            f"{mark_suffix}"
-            "</span>"
+            mark_suffix = format_html(
+                ' <span class="ml-1 text-[10px] opacity-75">#{mark}</span>',
+                mark=obj.mydata_mark,
+            )
+        else:
+            mark_suffix = mark_safe("")
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            '{bg} {text_class} rounded-full gap-1">'
+            "<span>{icon}</span>"
+            "<span>{label}</span>"
+            "{mark_suffix}"
+            "</span>",
+            bg=cfg["bg"],
+            text_class=cfg["text"],
+            icon=cfg["icon"],
+            label=cfg["label"],
+            mark_suffix=mark_suffix,
         )
-        return mark_safe(html)
 
 
 @admin.register(InvoiceCounter)

@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 from django.db import models
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin
@@ -162,7 +163,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
                 ' rgba(0,0,0,0.1);" /></div>',
                 url=obj.image_flag.url,
             )
-        return format_html(
+        return mark_safe(
             '<div style="width: 48px; height: 32px; '
             "background: linear-gradient(45deg, #f3f4f6 25%, transparent 25%), "
             "linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), "
@@ -224,7 +225,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
                 badge_class=badge_class,
                 code=code_str,
             )
-        return format_html(
+        return mark_safe(
             '<div class="text-sm"><div>'
             '<span class="inline-flex items-center px-2 py-1 text-xs'
             " font-medium bg-gray-50 dark:bg-gray-900 text-base-600"

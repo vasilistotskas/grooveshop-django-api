@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.db.models.functions import Length
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import (
@@ -194,21 +195,21 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
 
         # Badges
         if char_count < 100:
-            length_badge = format_html(
+            length_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-full">'
                 "📝 Short"
                 "</span>"
             )
         elif char_count < 500:
-            length_badge = format_html(
+            length_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded-full">'
                 "📄 Medium"
                 "</span>"
             )
         else:
-            length_badge = format_html(
+            length_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full">'
                 "📋 Long"
@@ -235,7 +236,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         date_str = obj.created_at.strftime("%Y-%m-%d")
 
         if diff < timedelta(hours=1):
-            time_badge = format_html(
+            time_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">'
                 "🚨 Just Now"
@@ -258,7 +259,7 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
                 d=diff.days,
             )
         else:
-            time_badge = format_html(
+            time_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-200 rounded-full">'
                 "📆 Old"

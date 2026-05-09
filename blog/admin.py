@@ -3,6 +3,7 @@ from django.db import models, transaction
 from django.db.models import Count
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
@@ -358,14 +359,14 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Status"))
     def active_badge(self, obj):
         if obj.active:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                 "<span>✓</span>"
                 "<span>Active</span>"
                 "</span>"
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
             'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
             "<span>✗</span>"
@@ -472,7 +473,7 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
                 'style="max-height: 40px; max-width: 80px; border-radius: 4px;" />',
                 url=obj.image.url,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No image</span>'
         )
 
@@ -677,7 +678,7 @@ class BlogPostAdmin(ExportActionMixin, ModelAdmin, TranslatableAdmin):
                 "</span>",
                 name=category_name,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No category</span>'
         )
 
@@ -689,14 +690,14 @@ class BlogPostAdmin(ExportActionMixin, ModelAdmin, TranslatableAdmin):
                 '<span class="font-medium text-base-700 dark:text-base-300">{name}</span>',
                 name=author_name,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No author</span>'
         )
 
     @admin.display(description=_("Featured"))
     def featured_badge(self, obj):
         if obj.featured:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full gap-1">'
                 "<span>⭐</span>"
@@ -709,21 +710,21 @@ class BlogPostAdmin(ExportActionMixin, ModelAdmin, TranslatableAdmin):
     def publish_status_badge(self, obj):
         if obj.is_published and obj.published_at:
             if obj.published_at <= timezone.now():
-                return format_html(
+                return mark_safe(
                     '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                     'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                     "<span>✓</span>"
                     "<span>Published</span>"
                     "</span>"
                 )
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1">'
                 "<span>📅</span>"
                 "<span>Scheduled</span>"
                 "</span>"
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
             'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full gap-1">'
             "<span>📝</span>"
@@ -795,7 +796,7 @@ class BlogPostAdmin(ExportActionMixin, ModelAdmin, TranslatableAdmin):
                 'style="max-height: 100px; max-width: 80px; border-radius: 4px; object-fit: cover;" />',
                 url=obj.image.url,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No image</span>'
         )
 
@@ -989,7 +990,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
                 name=display_name,
                 email=obj.user.email,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">Anonymous</span>'
         )
 
@@ -1009,21 +1010,21 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
                 url=f"/admin/blog/blogpost/{obj.post.id}/change/",
                 title=title_display,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No post</span>'
         )
 
     @admin.display(description=_("Status"))
     def approval_badge(self, obj):
         if obj.approved:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                 "<span>✓</span>"
                 "<span>Approved</span>"
                 "</span>"
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
             'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
             "<span>⏳</span>"

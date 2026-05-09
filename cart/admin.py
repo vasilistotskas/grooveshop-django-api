@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
@@ -266,13 +267,13 @@ class CartAdmin(ModelAdmin):
     @admin.display(description=_("Type"))
     def cart_type_badge(self, obj):
         if obj.user:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
                 "👤 User"
                 "</span>"
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
             'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
             "🛒 Guest"
@@ -580,7 +581,7 @@ class CartItemAdmin(ModelAdmin):
                 value=str(getattr(obj, "discount_value", "N/A")),
                 total=str(getattr(obj, "total_discount_value", "N/A")),
             )
-        return format_html(
+        return mark_safe(
             '<div class="text-sm text-base-600 dark:text-base-300">No discounts applied</div>'
         )
 

@@ -5,6 +5,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _, ngettext
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin
@@ -226,14 +227,14 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Status"))
     def status_badge(self, obj):
         if obj.active:
-            status = format_html(
+            status = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-full">'
                 "✅ Active"
                 "</span>"
             )
         else:
-            status = format_html(
+            status = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">'
                 "❌ Inactive"
@@ -243,21 +244,21 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         label = obj.safe_translation_getter("label", any_language=True) or ""
         length = len(label)
         if length == 0:
-            label_badge = format_html(
+            label_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded mt-1">'
                 "📝 No Label"
                 "</span>"
             )
         elif length < 3:
-            label_badge = format_html(
+            label_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded mt-1">'
                 "📝 Short"
                 "</span>"
             )
         else:
-            label_badge = format_html(
+            label_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded mt-1">'
                 "📝 Good"
@@ -277,35 +278,35 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
     def usage_stats(self, obj):
         usage = getattr(obj, "usage_count", 0)
         if usage == 0:
-            badge = format_html(
+            badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-base-50 dark:bg-base-800 text-base-700 dark:text-base-700 rounded">'
                 "🚫 Unused"
                 "</span>"
             )
         elif usage == 1:
-            badge = format_html(
+            badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded">'
                 "⚠️ Single"
                 "</span>"
             )
         elif usage <= 10:
-            badge = format_html(
+            badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">'
                 "📊 Low"
                 "</span>"
             )
         elif usage <= 50:
-            badge = format_html(
+            badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">'
                 "📈 Popular"
                 "</span>"
             )
         else:
-            badge = format_html(
+            badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded">'
                 "🌟 Trending"
@@ -334,21 +335,21 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
             top, count = _("None"), 0
 
         if ct_count == 0:
-            div_badge = format_html(
+            div_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-base-50 dark:bg-base-800 text-base-700 dark:text-base-700 rounded">'
                 "📊 No Data"
                 "</span>"
             )
         elif ct_count == 1:
-            div_badge = format_html(
+            div_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">'
                 "📌 Focused"
                 "</span>"
             )
         else:
-            div_badge = format_html(
+            div_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">'
                 "🌐 Diverse"
@@ -673,11 +674,11 @@ class TaggedItemAdmin(ModelAdmin):
                     text=display,
                     oid=obj.object_id,
                 )
-            return format_html(
+            return mark_safe(
                 '<div class="text-sm text-red-600 dark:text-red-400">Object not found</div>'
             )
         except Exception:
-            return format_html(
+            return mark_safe(
                 '<div class="text-sm text-red-600 dark:text-red-400">Error loading object</div>'
             )
 

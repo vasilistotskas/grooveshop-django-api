@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.db import models
 from django.db.models import Q
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin
@@ -254,7 +255,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
                 "</span>",
                 code=obj.provider_code,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">'
             "No provider"
             "</span>"
@@ -263,13 +264,13 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Status"))
     def active_status(self, obj):
         if obj.active:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                 "<span>✓</span><span>Active</span>"
                 "</span>"
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
             'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
             "<span>✗</span><span>Inactive</span>"
@@ -279,20 +280,20 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Type"))
     def payment_type_display(self, obj):
         if obj.is_online_payment:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1">'
                 "<span>🌐</span><span>Online</span>"
                 "</span>"
             )
         if obj.requires_confirmation:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full gap-1">'
                 "<span>⏱️</span><span>Offline (Confirm)</span>"
                 "</span>"
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
             'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full gap-1">'
             "<span>📝</span><span>Offline</span>"
@@ -310,7 +311,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
                 amount=str(obj.cost.amount),
                 currency=str(obj.cost.currency),
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
             'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
             "Free"
@@ -327,27 +328,27 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
                 amount=str(obj.free_threshold.amount),
                 currency=str(obj.free_threshold.currency),
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No threshold</span>'
         )
 
     @admin.display(description=_("Configuration"))
     def configuration_status(self, obj):
         if not obj.is_online_payment:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-base-50 dark:bg-base-900 text-base-700 dark:text-base-300 rounded-full">'
                 "N/A"
                 "</span>"
             )
         if obj.is_configured:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                 "<span>✓</span><span>Configured</span>"
                 "</span>"
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
             'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
             "<span>⚠️</span><span>Missing Config</span>"
@@ -364,7 +365,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
                 "</span>",
                 order=obj.sort_order,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">-</span>'
         )
 
@@ -376,14 +377,14 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
                 'border-radius: 4px; object-fit: contain;" />',
                 url=obj.icon.url,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No icon</span>'
         )
 
     @admin.display(description=_("Configuration Preview"))
     def configuration_preview(self, obj):
         if not obj.configuration:
-            return format_html(
+            return mark_safe(
                 '<span class="text-base-600 dark:text-base-300 italic">No configuration</span>'
             )
         keys = list(obj.configuration.keys())
@@ -415,13 +416,13 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Ready Status"))
     def is_configured_status(self, obj):
         if obj.is_configured:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                 "<span>✓</span><span>Ready to use</span>"
                 "</span>"
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
             'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
             "<span>⚠️</span><span>Requires setup</span>"

@@ -5,6 +5,7 @@ from django.db import models
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin
@@ -371,14 +372,14 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         is_expired = obj.expiry_date and now > obj.expiry_date
 
         if is_expired:
-            status_badge = format_html(
+            status_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">'
                 "❌ Expired"
                 "</span>"
             )
         else:
-            status_badge = format_html(
+            status_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-full">'
                 "✅ Active"
@@ -459,7 +460,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
 
         if obj.expiry_date:
             if now > obj.expiry_date:
-                expiry_status = format_html(
+                expiry_status = mark_safe(
                     '<span class="text-red-600 dark:text-red-400">Expired</span>'
                 )
             else:
@@ -475,7 +476,7 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
                         h=time_left.seconds // 3600,
                     )
         else:
-            expiry_status = format_html(
+            expiry_status = mark_safe(
                 '<span class="text-blue-600 dark:text-blue-400">No expiry</span>'
             )
 
@@ -743,7 +744,9 @@ class NotificationUserAdmin(ModelAdmin):
         age = now - obj.created_at
 
         if age > timedelta(days=7):
-            urgency_class = "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200"
+            urgency_class = (
+                "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200"
+            )
             icon = "🚨"
         elif age > timedelta(days=1):
             urgency_class = "bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-200"
@@ -800,11 +803,11 @@ class NotificationUserAdmin(ModelAdmin):
         )
 
         if is_expired:
-            status_display = format_html(
+            status_display = mark_safe(
                 '<span class="text-red-600 dark:text-red-400">Expired</span>'
             )
         else:
-            status_display = format_html(
+            status_display = mark_safe(
                 '<span class="text-green-600 dark:text-green-400">Active</span>'
             )
 

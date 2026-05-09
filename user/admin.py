@@ -7,6 +7,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin, TabularInline
@@ -428,7 +429,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                 '<div class="text-sm text-base-700 dark:text-base-300 space-y-1">{parts}</div>',
                 parts=format_html_join("", "{}", ((p,) for p in parts)),
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No contact info</span>'
         )
 
@@ -446,7 +447,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                 "</div>",
                 text=", ".join(loc_parts),
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No location</span>'
         )
 
@@ -455,25 +456,25 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         badges = []
         if obj.is_superuser:
             badges.append(
-                format_html(
+                mark_safe(
                     '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1"><span>👑</span><span>Super</span></span>'
                 )
             )
         elif obj.is_staff:
             badges.append(
-                format_html(
+                mark_safe(
                     '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full gap-1"><span>⚡</span><span>Staff</span></span>'
                 )
             )
         if obj.is_active:
             badges.append(
-                format_html(
+                mark_safe(
                     '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1"><span>✓</span><span>Active</span></span>'
                 )
             )
         else:
             badges.append(
-                format_html(
+                mark_safe(
                     '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1"><span>✗</span><span>Inactive</span></span>'
                 )
             )
@@ -498,7 +499,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                 '<div class="flex gap-1">{icons}</div>',
                 icons=format_html_join("", "{}", ((i,) for i in icons)),
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">-</span>'
         )
 
@@ -560,7 +561,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                     "<br>", "{}", ((link,) for link in links)
                 ),
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">No social media links</span>'
         )
 
@@ -568,7 +569,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
     def subscription_summary(self, obj):
         subs = list(obj.subscriptions.select_related("topic").all())
         if not subs:
-            return format_html(
+            return mark_safe(
                 '<span class="text-base-600 dark:text-base-300 italic">No subscriptions</span>'
             )
         active = sum(
@@ -588,7 +589,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
     def address_summary(self, obj):
         addrs = list(obj.addresses.all())
         if not addrs:
-            return format_html(
+            return mark_safe(
                 '<span class="text-base-600 dark:text-base-300 italic">No addresses</span>'
             )
         main = next((a for a in addrs if a.is_main), None)
@@ -640,7 +641,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                 ' rounded-full gap-1"><span>🏆</span><span>{name}</span></span>',
                 name=str(tier),
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">No tier</span>'
         )
 
@@ -845,7 +846,7 @@ class UserAddressAdmin(BaseModelAdmin):
     @admin.display(description=_("Main"))
     def main_address_badge(self, obj):
         if obj.is_main:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1"><span>⭐</span><span>Main</span></span>'
             )
         return ""
@@ -859,7 +860,7 @@ class UserAddressAdmin(BaseModelAdmin):
                 "</div>",
                 phone=obj.phone,
             )
-        return format_html(
+        return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No phone</span>'
         )
 
@@ -963,10 +964,10 @@ class SubscriptionTopicAdmin(BaseModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Status"))
     def active_status(self, obj):
         if obj.is_active:
-            return format_html(
+            return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1"><span>✓</span><span>Active</span></span>'
             )
-        return format_html(
+        return mark_safe(
             '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1"><span>✗</span><span>Inactive</span></span>'
         )
 
@@ -975,13 +976,13 @@ class SubscriptionTopicAdmin(BaseModelAdmin, TranslatableAdmin):
         badges = []
         if obj.is_default:
             badges.append(
-                format_html(
+                mark_safe(
                     '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1"><span>⭐</span><span>Default</span></span>'
                 )
             )
         if obj.requires_confirmation:
             badges.append(
-                format_html(
+                mark_safe(
                     '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full gap-1"><span>✉️</span><span>Confirm</span></span>'
                 )
             )

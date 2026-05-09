@@ -3,6 +3,7 @@ from django.contrib import admin, messages
 from django.db import models
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin, TranslatableTabularInline
 from unfold.admin import ModelAdmin
@@ -451,7 +452,7 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
                 url=country.image_flag.url,
             )
         else:
-            flag_html = format_html(
+            flag_html = mark_safe(
                 '<div style="width:24px;height:16px;background:#f3f4f6;border-radius:2px;'
                 "border:1px solid #e5e7eb;margin-right:8px;display:flex;align-items:center;"
                 'justify-content:center;font-size:8px;">🏳️</div>'
@@ -486,15 +487,15 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         is_alpha = obj.alpha.isalpha()
 
         if is_num:
-            badge = format_html(
+            badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">🔢 Numeric</span>'
             )
         elif is_alpha:
-            badge = format_html(
+            badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">🔤 Alpha</span>'
             )
         else:
-            badge = format_html(
+            badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded">🔀 Mixed</span>'
             )
 

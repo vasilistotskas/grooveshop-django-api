@@ -90,17 +90,6 @@ class TestFanoutTaskWrappers:
         run.assert_called_once_with("order.tasks.check_pending_orders")
 
     @pytest.mark.django_db
-    def test_fanout_update_order_statuses_from_shipping(self):
-        from tenant import tasks as tenant_tasks
-
-        with patch("tenant.tasks.run_for_all_tenants") as run:
-            tenant_tasks.fanout_update_order_statuses_from_shipping()
-
-        run.assert_called_once_with(
-            "order.tasks.update_order_statuses_from_shipping"
-        )
-
-    @pytest.mark.django_db
     def test_fanout_auto_cancel_stuck_pending_orders(self):
         from tenant import tasks as tenant_tasks
 

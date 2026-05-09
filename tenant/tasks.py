@@ -65,13 +65,6 @@ def fanout_check_pending_orders():
 
 
 @celery_app.task(base=TenantTask)
-def fanout_update_order_statuses_from_shipping():
-    return run_for_all_tenants(
-        "order.tasks.update_order_statuses_from_shipping"
-    )
-
-
-@celery_app.task(base=TenantTask)
 def fanout_auto_cancel_stuck_pending_orders():
     return run_for_all_tenants("order.tasks.auto_cancel_stuck_pending_orders")
 

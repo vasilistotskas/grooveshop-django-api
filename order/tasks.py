@@ -20,6 +20,7 @@ from core import celery_app
 from core.tasks import MonitoredTask
 from core.utils.i18n import get_order_language, get_user_language
 from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
+from tenant.credentials import tenant_contact_email, tenant_from_email
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.services import OrderService
@@ -223,7 +224,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                 "payment_instructions": payment_instructions,
                 "is_paid": is_paid,
                 "SITE_NAME": settings.SITE_NAME,
-                "INFO_EMAIL": settings.INFO_EMAIL,
+                "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
@@ -234,9 +235,9 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            tenant_from_email(),
             [order.email],
-            reply_to=[settings.INFO_EMAIL],
+            reply_to=[tenant_contact_email()],
             headers=build_transactional_list_headers(
                 list_id="order_confirmation"
             ),
@@ -373,7 +374,7 @@ def send_dispute_notification_email(
             "dispute_id": dispute_id,
             "reason": reason,
             "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
@@ -407,10 +408,10 @@ def send_dispute_notification_email(
                 f"<p>Please review this dispute in the Stripe dashboard.</p>"
             )
 
-        staff_email = getattr(settings, "INFO_EMAIL", None)
+        staff_email = tenant_contact_email()
         if not staff_email:
             logger.warning(
-                "send_dispute_notification_email: no INFO_EMAIL configured — skipping",
+                "send_dispute_notification_email: no contact email configured — skipping",
                 extra={"order_id": order_id, "dispute_id": dispute_id},
             )
             return False
@@ -418,7 +419,7 @@ def send_dispute_notification_email(
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            tenant_from_email(),
             [staff_email],
         )
         msg.attach_alternative(html_content, "text/html")
@@ -509,7 +510,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
             "order": order,
             "retry_url": retry_url,
             "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
@@ -528,9 +529,9 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            tenant_from_email(),
             [order.email],
-            reply_to=[settings.INFO_EMAIL],
+            reply_to=[tenant_contact_email()],
             headers=build_transactional_list_headers(list_id="payment_failed"),
         )
         msg.attach_alternative(html_content, "text/html")
@@ -658,7 +659,7 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             else "Refunded",
             "items": order.items.all(),
             "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
@@ -677,9 +678,9 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            tenant_from_email(),
             [order.email],
-            reply_to=[settings.INFO_EMAIL],
+            reply_to=[tenant_contact_email()],
             headers=build_transactional_list_headers(
                 list_id="refund_confirmation"
             ),
@@ -787,7 +788,7 @@ def send_order_status_update_email(
             "status": status,
             "status_display": OrderStatus(status).label,
             "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
@@ -823,9 +824,9 @@ def send_order_status_update_email(
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            tenant_from_email(),
             [order.email],
-            reply_to=[settings.INFO_EMAIL],
+            reply_to=[tenant_contact_email()],
             headers=build_transactional_list_headers(list_id="order_status"),
         )
         msg.attach_alternative(html_content, "text/html")
@@ -945,7 +946,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             "tracking_number": order.tracking_number,
             "carrier": order.shipping_carrier,
             "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
@@ -964,9 +965,9 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            tenant_from_email(),
             [order.email],
-            reply_to=[settings.INFO_EMAIL],
+            reply_to=[tenant_contact_email()],
             headers=build_transactional_list_headers(
                 list_id="shipping_notification"
             ),
@@ -1150,7 +1151,7 @@ def send_invoice_email(self, order_id: int) -> bool:
                 "order": order,
                 "invoice": invoice,
                 "SITE_NAME": settings.SITE_NAME,
-                "INFO_EMAIL": settings.INFO_EMAIL,
+                "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
@@ -1164,9 +1165,9 @@ def send_invoice_email(self, order_id: int) -> bool:
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            tenant_from_email(),
             [order.email],
-            reply_to=[settings.INFO_EMAIL],
+            reply_to=[tenant_contact_email()],
             headers=build_transactional_list_headers(list_id="order_invoice"),
         )
         msg.attach_alternative(html_content, "text/html")
@@ -1468,7 +1469,7 @@ def check_pending_orders() -> int:
             context = {
                 "order": order,
                 "SITE_NAME": settings.SITE_NAME,
-                "INFO_EMAIL": settings.INFO_EMAIL,
+                "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
@@ -1487,9 +1488,9 @@ def check_pending_orders() -> int:
             msg = EmailMultiAlternatives(
                 subject,
                 text_content,
-                settings.DEFAULT_FROM_EMAIL,
+                tenant_from_email(),
                 [order.email],
-                reply_to=[settings.INFO_EMAIL],
+                reply_to=[tenant_contact_email()],
             )
             msg.attach_alternative(html_content, "text/html")
 
@@ -1765,7 +1766,7 @@ def send_checkout_abandonment_emails() -> int:
                 ),
                 "unsubscribe_url": unsubscribe_url,
                 "SITE_NAME": settings.SITE_NAME,
-                "INFO_EMAIL": settings.INFO_EMAIL,
+                "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
@@ -1782,16 +1783,16 @@ def send_checkout_abandonment_emails() -> int:
             headers = {"List-ID": f"abandoned-cart.{settings.SITE_NAME}"}
             if unsubscribe_url:
                 headers["List-Unsubscribe"] = (
-                    f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
+                    f"<mailto:{tenant_contact_email()}?subject=unsubscribe>, "
                     f"<{unsubscribe_url}>"
                 )
                 headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
             msg = EmailMultiAlternatives(
                 subject,
                 text_content,
-                settings.DEFAULT_FROM_EMAIL,
+                tenant_from_email(),
                 [cart.user.email],
-                reply_to=[settings.INFO_EMAIL],
+                reply_to=[tenant_contact_email()],
                 headers=headers,
             )
             msg.attach_alternative(html_content, "text/html")

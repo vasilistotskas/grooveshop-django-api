@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from core import celery_app
 from core.tasks import MonitoredTask
 from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
+from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
 
@@ -249,8 +250,8 @@ def check_low_stock_products() -> dict:
             low_stock_alert_sent=True
         )
 
-    admin_email = getattr(settings, "ADMIN_EMAIL", None) or getattr(
-        settings, "INFO_EMAIL", None
+    admin_email = (
+        getattr(settings, "ADMIN_EMAIL", None) or tenant_contact_email()
     )
     if not admin_email:
         logger.warning(
@@ -282,7 +283,7 @@ def check_low_stock_products() -> dict:
     context = {
         "products": rows,
         "SITE_NAME": settings.SITE_NAME,
-        "INFO_EMAIL": settings.INFO_EMAIL,
+        "INFO_EMAIL": tenant_contact_email(),
         "SITE_URL": get_tenant_base_url(),
         "STATIC_BASE_URL": settings.STATIC_BASE_URL,
     }
@@ -299,7 +300,7 @@ def check_low_stock_products() -> dict:
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            tenant_from_email(),
             [admin_email],
         )
         msg.attach_alternative(html_content, "text/html")
@@ -378,7 +379,7 @@ def _send_product_alert_email(
         msg = EmailMultiAlternatives(
             subject,
             text_content,
-            settings.DEFAULT_FROM_EMAIL,
+            tenant_from_email(),
             [recipient],
             headers=headers,
         )
@@ -438,7 +439,7 @@ def send_product_alert_restock(product_id: int) -> dict:
             "product_name": product_name,
             "product_url": product_url,
             "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
@@ -516,7 +517,7 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
             "new_price": new_price,
             "target_price": str(alert.target_price.amount),
             "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }

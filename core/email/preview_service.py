@@ -8,6 +8,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 
 from core.email.config import EmailTemplateConfig
+from tenant.credentials import tenant_contact_email
 from core.email.sample_data import SampleOrderDataGenerator
 from order.models import Order
 
@@ -272,7 +273,7 @@ class EmailTemplatePreviewService:
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             "SITE_NAME": settings.SITE_NAME,
             "SITE_URL": settings.NUXT_BASE_URL,
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "LANGUAGE_CODE": translation.get_language()
             or settings.LANGUAGE_CODE,
         }

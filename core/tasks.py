@@ -21,6 +21,7 @@ from django.utils.translation import gettext as _
 
 from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import get_tenant_base_url
+from tenant.credentials import tenant_contact_email, tenant_from_email
 
 from extra_settings.models import Setting
 
@@ -506,7 +507,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                 },
                 "unsubscribe_url": unsubscribe_url,
                 "SITE_NAME": settings.SITE_NAME,
-                "INFO_EMAIL": settings.INFO_EMAIL,
+                "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
@@ -523,9 +524,9 @@ def send_inactive_user_notifications() -> dict[str, Any]:
             email_msg = EmailMultiAlternatives(
                 subject=mail_subject,
                 body=text_body,
-                from_email=settings.DEFAULT_FROM_EMAIL,
+                from_email=tenant_from_email(),
                 to=[user.email],
-                reply_to=[settings.INFO_EMAIL],
+                reply_to=[tenant_contact_email()],
                 headers=build_list_unsubscribe_headers(
                     unsubscribe_url, list_id="reengagement"
                 ),
@@ -649,7 +650,7 @@ def monitor_system_health():
                 subject="CRITICAL: System Health Check Failed",
                 message="Critical system components have failed health checks:\n\n"
                 + "\n".join(errors),
-                from_email=settings.DEFAULT_FROM_EMAIL,
+                from_email=tenant_from_email(),
                 recipient_list=[settings.ADMIN_EMAIL],
                 fail_silently=False,
             )
@@ -822,7 +823,7 @@ def scheduled_database_backup():
                 subject="ALERT: Scheduled Database Backup Failed",
                 message=f"The scheduled database backup failed with error: {e!s}\n\n"
                 f"Please check the system logs and ensure the backup system is working properly.",
-                from_email=settings.DEFAULT_FROM_EMAIL,
+                from_email=tenant_from_email(),
                 recipient_list=[settings.ADMIN_EMAIL],
                 fail_silently=True,
             )

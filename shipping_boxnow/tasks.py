@@ -8,6 +8,7 @@ from django.conf import settings
 from django.utils import translation
 
 from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowRetryableError
+from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
 
@@ -267,9 +268,9 @@ def boxnow_send_arrival_notification(
     msg = EmailMultiAlternatives(
         subject=str(subject),
         body=text_body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=tenant_from_email(),
         to=[order.email],
-        reply_to=[getattr(settings, "INFO_EMAIL", settings.DEFAULT_FROM_EMAIL)],
+        reply_to=[tenant_contact_email() or tenant_from_email()],
     )
     msg.attach_alternative(html_body, "text/html")
     msg.send(fail_silently=False)

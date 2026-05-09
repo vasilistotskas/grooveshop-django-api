@@ -42,6 +42,7 @@ from django.utils import timezone
 from django.utils.translation import override as translation_override
 
 from core.utils.tenant_urls import get_tenant_frontend_url
+from tenant.credentials import tenant_contact_email
 from extra_settings.models import Setting
 
 from core.utils.i18n import get_order_language
@@ -80,7 +81,7 @@ def _seller_snapshot() -> dict[str, str]:
     install render SOMETHING without failing at render time.
     """
     default_name = getattr(settings, "SITE_NAME", "Grooveshop")
-    default_email = getattr(settings, "INFO_EMAIL", "")
+    default_email = tenant_contact_email()
     resolved = {}
     for field, key in INVOICE_SELLER_SETTING_KEYS.items():
         default = ""

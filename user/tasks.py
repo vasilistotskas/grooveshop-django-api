@@ -116,6 +116,7 @@ def export_user_data_task(self, export_id: int) -> dict:
         get_tenant_base_url,
         get_tenant_frontend_url,
     )
+    from tenant.credentials import tenant_contact_email, tenant_from_email
     from user.models.data_export import UserDataExport
     from user.services.gdpr import (
         EXPORT_TTL,
@@ -180,7 +181,7 @@ def export_user_data_task(self, export_id: int) -> dict:
             "expires_at": export.expires_at,
             "file_size_kb": round(export.file_size / 1024, 1),
             "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
@@ -197,9 +198,9 @@ def export_user_data_task(self, export_id: int) -> dict:
         msg = EmailMultiAlternatives(
             subject=subject,
             body=text_body,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=tenant_from_email(),
             to=[user.email],
-            reply_to=[settings.INFO_EMAIL],
+            reply_to=[tenant_contact_email()],
         )
         msg.attach_alternative(html_body, "text/html")
         msg.send(fail_silently=False)

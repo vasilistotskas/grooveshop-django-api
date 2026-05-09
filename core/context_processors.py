@@ -9,6 +9,7 @@ from django.conf import settings
 from django.http import HttpRequest
 
 from core.utils.tenant_urls import get_tenant_base_url
+from tenant.credentials import tenant_contact_email
 
 
 @lru_cache(maxsize=1)
@@ -71,7 +72,7 @@ def metadata(request: HttpRequest) -> dict[str, Any]:
         "SITE_KEYWORDS": site_keywords,
         "SITE_AUTHOR": site_author,
         "SITE_URL": get_tenant_base_url(),
-        "INFO_EMAIL": settings.INFO_EMAIL,
+        "INFO_EMAIL": tenant_contact_email(),
         "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         "REQUEST_DETAILS": request_details,
     }

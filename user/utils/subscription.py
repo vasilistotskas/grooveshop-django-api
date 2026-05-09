@@ -9,6 +9,7 @@ from extra_settings.models import Setting
 from django.conf import settings
 
 from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
+from tenant.credentials import tenant_contact_email, tenant_from_email
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
@@ -86,7 +87,7 @@ def send_subscription_confirmation(
             "confirmation_url": confirmation_url,
             "SITE_NAME": settings.SITE_NAME,
             "SITE_URL": get_tenant_base_url(),
-            "INFO_EMAIL": settings.INFO_EMAIL,
+            "INFO_EMAIL": tenant_contact_email(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             "LANGUAGE_CODE": language,
         }
@@ -105,9 +106,9 @@ def send_subscription_confirmation(
         email = EmailMultiAlternatives(
             subject=subject,
             body=text_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
+            from_email=tenant_from_email(),
             to=[user.email],
-            reply_to=[settings.INFO_EMAIL],
+            reply_to=[tenant_contact_email()],
         )
         email.attach_alternative(html_message, "text/html")
         email.send()
@@ -184,7 +185,7 @@ def build_list_unsubscribe_headers(
     """
     return {
         "List-Unsubscribe": (
-            f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
+            f"<mailto:{tenant_contact_email()}?subject=unsubscribe>, "
             f"<{unsubscribe_url}>"
         ),
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
@@ -208,7 +209,7 @@ def build_transactional_list_headers(*, list_id: str) -> dict[str, str]:
     """
     return {
         "List-Unsubscribe": (
-            f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>"
+            f"<mailto:{tenant_contact_email()}?subject=unsubscribe>"
         ),
         "List-ID": f"{list_id}.{settings.SITE_NAME}",
     }
@@ -266,7 +267,7 @@ def send_newsletter(
                 ),
                 "SITE_NAME": settings.SITE_NAME,
                 "SITE_URL": get_tenant_base_url(),
-                "INFO_EMAIL": settings.INFO_EMAIL,
+                "INFO_EMAIL": tenant_contact_email(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
         )
@@ -283,9 +284,9 @@ def send_newsletter(
             email = EmailMultiAlternatives(
                 subject=subject,
                 body=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
+                from_email=tenant_from_email(),
                 to=[user.email],
-                reply_to=[settings.INFO_EMAIL],
+                reply_to=[tenant_contact_email()],
                 headers=build_list_unsubscribe_headers(
                     unsubscribe_url, list_id=topic.slug
                 ),

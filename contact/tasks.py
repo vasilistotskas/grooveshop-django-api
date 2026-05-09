@@ -13,6 +13,7 @@ from django.core.mail import send_mail
 
 from core import celery_app
 from core.tasks import MonitoredTask
+from tenant.credentials import tenant_from_email
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
     send_mail(
         subject=subject,
         message=message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=tenant_from_email(),
         recipient_list=recipient_list,
         fail_silently=False,
     )

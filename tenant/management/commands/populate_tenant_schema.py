@@ -9,13 +9,36 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
+    """One-shot bootstrap helper to copy public-schema seed data into a
+    tenant schema after ``migrate_schemas`` has created it.
+
+    This is NOT intended for routine operations — run it once per new
+    tenant when you need to populate lookup tables (countries, VAT rates,
+    pay-ways, etc.) that are maintained in the public schema during
+    development and then cloned into each tenant on first boot.
+
+    It is idempotent: any table that already has rows in the target schema
+    is skipped untouched, so re-running it is safe.
+    """
+
     help = (
-        "Copy data from public schema to the webside tenant schema. "
-        "Idempotent: skips tables that already have data in the target."
+        "Copy data from the public schema into a tenant schema. "
+        "Idempotent: skips tables that already have data in the target. "
+        "One-shot bootstrap helper — not for routine use."
     )
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--schema",
+            default="webside",
+            help=(
+                "Target tenant schema name (default: webside). "
+                "Must already exist — run migrate_schemas first."
+            ),
+        )
+
     def handle(self, *args, **options):
-        schema = "webside"
+        schema = options["schema"]
 
         if not self._schema_exists(schema):
             self.stdout.write(

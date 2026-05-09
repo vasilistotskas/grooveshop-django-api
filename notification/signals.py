@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -57,4 +58,4 @@ def handle_notification_created(
         "translations": _get_translations(instance.notification),
     }
 
-    send_notification_task.delay_on_commit(data)
+    transaction.on_commit(lambda: send_notification_task.delay(data))

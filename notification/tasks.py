@@ -2,9 +2,11 @@ import logging
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.db import connection
 
 from core import celery_app
 from core.tasks import MonitoredTask
+from notification.groups import user_group
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +30,14 @@ def send_notification_task(self, data: dict, *args, **kwargs):
         logger.error("send_notification_task: channel layer is not configured")
         return
 
+    # Use the schema currently active on this worker connection.  The task
+    # is dispatched via TenantTask (or MonitoredTask with a _schema_name
+    # header) so connection.schema_name is set correctly by the time we run.
+    schema_name = getattr(connection, "schema_name", None) or "public"
+    group = user_group(schema_name, user_id)
+
     async_to_sync(channel_layer.group_send)(
-        f"user_{user_id}",
+        group,
         {
             "type": "send_notification",
             "user": user_id,

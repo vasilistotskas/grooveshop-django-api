@@ -37,15 +37,25 @@ def _revoke_knox_tokens(user) -> int:
 
 
 def _broadcast_force_logout(user) -> None:
-    """Push a force.logout event to the user's WebSocket group."""
+    """Push a force.logout event to the user's WebSocket group.
+
+    Uses the tenant-aware group name from notification.groups so the
+    message reaches the correct channel-layer group.  The schema_name is
+    read from the active DB connection — allauth signals always run inside
+    a request/response cycle where TenantMiddleware has already switched
+    the connection to the right schema.
+    """
     from asgiref.sync import async_to_sync  # noqa: PLC0415
     from channels.layers import get_channel_layer  # noqa: PLC0415
+    from django.db import connection  # noqa: PLC0415
+
+    from notification.groups import user_group  # noqa: PLC0415
 
     layer = get_channel_layer()
     if layer:
-        async_to_sync(layer.group_send)(
-            f"user_{user.pk}", {"type": "force.logout"}
-        )
+        schema_name = getattr(connection, "schema_name", None) or "public"
+        group = user_group(schema_name, user.pk)
+        async_to_sync(layer.group_send)(group, {"type": "force.logout"})
 
 
 @receiver(

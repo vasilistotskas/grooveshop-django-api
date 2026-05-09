@@ -7,6 +7,8 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.core.serializers.json import DjangoJSONEncoder
 
+from notification.groups import admins_group, user_group
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -17,7 +19,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     group_name: str | None = None
     admin_group_name: str | None = None
 
-    def _get_tenant_prefix(self) -> str:
+    def _get_schema_name(self) -> str:
         tenant = self.scope.get("tenant")
         if tenant:
             return tenant.schema_name
@@ -42,12 +44,12 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 await self.accept()
                 await self.close(code=4003)
             else:
-                prefix = self._get_tenant_prefix()
+                schema_name = self._get_schema_name()
                 logger.debug(
                     f"Authenticated user: {self.user.username} "
                     f"(ID: {self.user.id})"
                 )
-                self.group_name = f"tenant_{prefix}_user_{self.user.id}"
+                self.group_name = user_group(schema_name, self.user.id)
 
                 logger.debug(f"Adding user to group: {self.group_name}")
                 await self.channel_layer.group_add(
@@ -55,7 +57,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 )
 
                 if self.user.is_staff:
-                    self.admin_group_name = f"tenant_{prefix}_admins"
+                    self.admin_group_name = admins_group(schema_name)
                     logger.debug("User is staff, adding to admins group")
                     await self.channel_layer.group_add(
                         self.admin_group_name, self.channel_name

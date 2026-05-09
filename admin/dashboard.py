@@ -22,6 +22,7 @@ from datetime import timedelta
 
 from django.apps import apps
 from django.core.cache import cache
+from django.db import connection
 from django.db.models import Avg, Count, Sum
 from django.db.models.functions import TruncDay
 from django.urls import reverse
@@ -85,8 +86,38 @@ def _build_zone_d() -> dict:
     }
 
 
+def _is_public_schema() -> bool:
+    """Return True when the current DB connection is on the public schema.
+
+    The public schema has no ``extra_settings`` rows — any attempt to read
+    ``Setting.get(...)`` from it either returns the default or raises, and
+    the values are meaningless for dashboard alerts which are intended to
+    reflect a specific tenant's config state.
+    """
+    from django_tenants.utils import get_public_schema_name
+
+    return connection.schema_name == get_public_schema_name()
+
+
+_PUBLIC_SCHEMA_PLACEHOLDER_SELLER: list[dict] = []
+_PUBLIC_SCHEMA_PLACEHOLDER_MYDATA: dict = {
+    "enabled": False,
+    "environment": "",
+    "missing_creds": [],
+    "recent_rejected": 0,
+    # Extra key signals to the template that no tenant is active.
+    "public_schema": True,
+}
+
+
 def _check_seller_config() -> list[dict]:
-    """Empty required INVOICE_SELLER_* settings — red banner."""
+    """Empty required INVOICE_SELLER_* settings — red banner.
+
+    Returns an empty list (no warnings) when running in the public schema,
+    because the public schema holds no per-tenant settings.
+    """
+    if _is_public_schema():
+        return _PUBLIC_SCHEMA_PLACEHOLDER_SELLER
 
     from extra_settings.models import Setting
 
@@ -99,7 +130,13 @@ def _check_seller_config() -> list[dict]:
 
 
 def _check_mydata_state() -> dict:
-    """Compile myDATA-specific alert state for the dashboard banner."""
+    """Compile myDATA-specific alert state for the dashboard banner.
+
+    Returns a placeholder dict when running in the public schema so that
+    the template can distinguish "not configured" from "no tenant selected".
+    """
+    if _is_public_schema():
+        return _PUBLIC_SCHEMA_PLACEHOLDER_MYDATA
 
     from extra_settings.models import Setting
 

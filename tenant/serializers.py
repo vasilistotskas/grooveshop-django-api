@@ -27,6 +27,13 @@ class TenantConfigSerializer(serializers.Serializer):
     primary_domain = serializers.SerializerMethodField()
     loyalty_enabled = serializers.BooleanField(read_only=True)
     blog_enabled = serializers.BooleanField(read_only=True)
+    # Public Stripe publishable key — pk_test_* / pk_live_* only.
+    # Empty string means "use the platform-wide key from settings."
+    stripe_publishable_key = serializers.CharField(read_only=True)
+    # Additional CSP origins for connect-src/img-src/script-src/frame-src.
+    allowed_csp_sources = serializers.ListField(
+        child=serializers.CharField(), read_only=True
+    )
     # NOTE: ``plan`` is intentionally excluded — it is billing-sensitive
     # and must not be exposed to unauthenticated callers via tenant/resolve.
     # Platform admins can read it via TenantAdminSerializer.
@@ -76,6 +83,8 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "loyalty_enabled",
             "blog_enabled",
             "stripe_connect_account_id",
+            "stripe_publishable_key",
+            "allowed_csp_sources",
             "created_at",
             "updated_at",
             "domains",

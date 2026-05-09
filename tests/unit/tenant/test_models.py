@@ -1,9 +1,10 @@
-"""Tests for tenant.models.UserTenantMembership."""
+"""Tests for tenant.models.UserTenantMembership and Tenant validation."""
 
 from __future__ import annotations
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 
 from tenant.models import (
@@ -141,3 +142,118 @@ def test_same_user_can_belong_to_two_tenants(user):
     )
     assert m_a.tenant_id != m_b.tenant_id
     assert user.tenant_memberships.count() == 2
+
+
+# ---------------------------------------------------------------------------
+# Tenant.clean() — stripe_publishable_key validation
+# ---------------------------------------------------------------------------
+
+
+def _unsaved_tenant(**kwargs) -> Tenant:
+    """Return an unsaved Tenant instance for clean() testing (no DB needed)."""
+    defaults = dict(
+        schema_name="clean_test",
+        name="Clean Test",
+        slug="clean-test",
+        owner_email="owner@clean.example.com",
+    )
+    defaults.update(kwargs)
+    t = Tenant(**defaults)
+    t.auto_create_schema = False
+    return t
+
+
+def test_stripe_publishable_key_empty_is_valid():
+    t = _unsaved_tenant(stripe_publishable_key="")
+    t.clean()  # must not raise
+
+
+def test_stripe_publishable_key_pk_live_is_valid():
+    t = _unsaved_tenant(stripe_publishable_key="pk_live_abc123")
+    t.clean()  # must not raise
+
+
+def test_stripe_publishable_key_pk_test_is_valid():
+    t = _unsaved_tenant(stripe_publishable_key="pk_test_abc123")
+    t.clean()  # must not raise
+
+
+def test_stripe_publishable_key_sk_live_raises():
+    """Secret key must be rejected with a meaningful error."""
+    t = _unsaved_tenant(stripe_publishable_key="sk_live_abc123")
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "stripe_publishable_key" in exc_info.value.message_dict
+    msg = " ".join(exc_info.value.message_dict["stripe_publishable_key"])
+    assert "pk_test_" in msg or "pk_live_" in msg
+
+
+def test_stripe_publishable_key_sk_test_raises():
+    t = _unsaved_tenant(stripe_publishable_key="sk_test_abc123")
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "stripe_publishable_key" in exc_info.value.message_dict
+
+
+def test_stripe_publishable_key_random_string_raises():
+    t = _unsaved_tenant(stripe_publishable_key="not_a_key")
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
+# ---------------------------------------------------------------------------
+# Tenant.clean() — allowed_csp_sources validation
+# ---------------------------------------------------------------------------
+
+
+def test_allowed_csp_sources_empty_list_is_valid():
+    t = _unsaved_tenant(allowed_csp_sources=[])
+    t.clean()  # must not raise
+
+
+def test_allowed_csp_sources_https_is_valid():
+    t = _unsaved_tenant(
+        allowed_csp_sources=["https://example.com", "https://cdn.example.com"]
+    )
+    t.clean()  # must not raise
+
+
+def test_allowed_csp_sources_wss_is_valid():
+    t = _unsaved_tenant(allowed_csp_sources=["wss://ws.example.com"])
+    t.clean()  # must not raise
+
+
+def test_allowed_csp_sources_localhost_http_is_valid():
+    t = _unsaved_tenant(allowed_csp_sources=["http://localhost:3000"])
+    t.clean()  # must not raise
+
+
+def test_allowed_csp_sources_http_non_localhost_raises():
+    t = _unsaved_tenant(allowed_csp_sources=["http://evil.example.com"])
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "allowed_csp_sources" in exc_info.value.message_dict
+
+
+def test_allowed_csp_sources_bare_domain_raises():
+    t = _unsaved_tenant(allowed_csp_sources=["example.com"])
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "allowed_csp_sources" in exc_info.value.message_dict
+
+
+def test_allowed_csp_sources_non_string_entry_raises():
+    t = _unsaved_tenant(allowed_csp_sources=[123])
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "allowed_csp_sources" in exc_info.value.message_dict
+
+
+def test_allowed_csp_sources_mixed_valid_invalid_raises():
+    """A single invalid entry in an otherwise valid list must still fail."""
+    t = _unsaved_tenant(
+        allowed_csp_sources=["https://ok.com", "http://evil.com"]
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "allowed_csp_sources" in exc_info.value.message_dict

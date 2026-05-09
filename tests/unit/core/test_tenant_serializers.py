@@ -37,8 +37,24 @@ class TestTenantConfigSerializer:
             "primary_domain",
             "loyalty_enabled",
             "blog_enabled",
+            # public-safe fields added for Nuxt consumers
+            "stripe_publishable_key",
+            "allowed_csp_sources",
         }
         assert expected.issubset(set(serializer.fields.keys()))
+
+    def test_stripe_publishable_key_in_public_fields(self):
+        serializer = TenantConfigSerializer()
+        assert "stripe_publishable_key" in serializer.fields
+
+    def test_allowed_csp_sources_in_public_fields(self):
+        serializer = TenantConfigSerializer()
+        assert "allowed_csp_sources" in serializer.fields
+
+    def test_stripe_connect_account_id_not_in_public_fields(self):
+        """Secret Stripe Connect ID must not be exposed publicly."""
+        serializer = TenantConfigSerializer()
+        assert "stripe_connect_account_id" not in serializer.fields
 
 
 class TestTenantAdminSerializer:

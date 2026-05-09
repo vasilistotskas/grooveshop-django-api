@@ -40107,8 +40107,17 @@ components:
         blogEnabled:
           type: boolean
           readOnly: true
+        stripePublishableKey:
+          type: string
+          readOnly: true
+        allowedCspSources:
+          type: array
+          items:
+            type: string
+          readOnly: true
       required:
       - accentHex
+      - allowedCspSources
       - blogEnabled
       - defaultCurrency
       - defaultLocale
@@ -40125,6 +40134,7 @@ components:
       - schemaName
       - storeDescription
       - storeName
+      - stripePublishableKey
       - successHex
       - themeMetadata
       - themePreset

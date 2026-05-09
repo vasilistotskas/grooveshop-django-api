@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -156,6 +157,36 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default="",
     )
 
+    # Public Stripe key — safe to expose to unauthenticated callers.
+    # Use the per-tenant ``pk_live_*`` / ``pk_test_*`` key here.
+    # Empty string means "fall back to the platform-wide key from
+    # settings.STRIPE_PUBLISHABLE_KEY (NUXT_PUBLIC_STRIPE_KEY)."
+    stripe_publishable_key = models.CharField(
+        _("Stripe publishable key"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "Per-tenant Stripe publishable key (pk_live_* or pk_test_*). "
+            "This value is public by design and is safe to expose to "
+            "unauthenticated callers. Leave blank to use the platform-wide key."
+        ),
+    )
+
+    # Extra CSP origins for the storefront.
+    # Each entry must be a string starting with https://, http://localhost,
+    # or wss:// so that only safe origins can be added.
+    allowed_csp_sources = models.JSONField(
+        _("Allowed CSP sources"),
+        default=list,
+        blank=True,
+        help_text=_(
+            "Additional origins allowed by the storefront CSP "
+            "(connect-src, img-src, script-src, frame-src). "
+            "Each entry must start with https://, http://localhost, or wss://."
+        ),
+    )
+
     auto_create_schema = True
 
     class Meta:
@@ -164,6 +195,61 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
 
     def __str__(self):
         return self.name
+
+    def clean(self) -> None:
+        super().clean()
+        self._validate_stripe_publishable_key()
+        self._validate_allowed_csp_sources()
+
+    def _validate_stripe_publishable_key(self) -> None:
+        key = self.stripe_publishable_key
+        if not key:
+            return
+        if not (key.startswith("pk_test_") or key.startswith("pk_live_")):
+            raise ValidationError(
+                {
+                    "stripe_publishable_key": _(
+                        "Stripe publishable key must start with "
+                        "'pk_test_' or 'pk_live_'. "
+                        "Never store secret keys (sk_*) here."
+                    )
+                }
+            )
+
+    def _validate_allowed_csp_sources(self) -> None:
+        sources = self.allowed_csp_sources
+        if not sources:
+            return
+        if not isinstance(sources, list):
+            raise ValidationError(
+                {
+                    "allowed_csp_sources": _(
+                        "allowed_csp_sources must be a list of strings."
+                    )
+                }
+            )
+        _VALID_PREFIXES = (
+            "https://",
+            "http://localhost",
+            "wss://",
+        )
+        bad = [
+            s
+            for s in sources
+            if not isinstance(s, str)
+            or not any(s.startswith(p) for p in _VALID_PREFIXES)
+        ]
+        if bad:
+            raise ValidationError(
+                {
+                    "allowed_csp_sources": _(
+                        "Each CSP source must start with 'https://', "
+                        "'http://localhost', or 'wss://'. "
+                        "Invalid entries: %(bad)s"
+                    )
+                    % {"bad": ", ".join(str(b) for b in bad)}
+                }
+            )
 
 
 class TenantDomain(DomainMixin):

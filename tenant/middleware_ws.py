@@ -4,7 +4,6 @@ import logging
 from urllib.parse import urlparse
 
 from channels.db import database_sync_to_async
-from django.db import connection
 
 from tenant.models import TenantDomain
 
@@ -31,7 +30,12 @@ class TenantWebsocketMiddleware:
             return
 
         scope["tenant"] = tenant
-        connection.set_tenant(tenant)
+        # NOTE: We deliberately do NOT call connection.set_tenant() here.
+        # connection is a thread-local proxy; calling it from an async
+        # context routes through asgiref's SyncToAsync executor and mutates
+        # a thread-local that belongs to a pool thread, not the current
+        # coroutine.  The consumer reads tenant context from scope["tenant"],
+        # which is the correct ASGI pattern.
         await self.inner(scope, receive, send)
 
     @database_sync_to_async

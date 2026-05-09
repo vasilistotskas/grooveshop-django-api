@@ -375,7 +375,7 @@ class BoxNowShipmentAdmin(ModelAdmin):
         ),
     )
     inlines = [BoxNowParcelEventInline]
-    actions = ["cancel_parcels", "resync_label"]
+    actions = ["cancel_parcels", "resync_label", "download_labels_zip"]
     actions_detail = ["download_voucher_action", "cancel_parcel_action"]
     list_select_related = ["order", "locker"]
     save_on_top = True
@@ -496,6 +496,81 @@ class BoxNowShipmentAdmin(ModelAdmin):
                 _("%(count)d shipment(s) skipped — no parcel ID assigned yet.")
                 % {"count": no_id_count},
             )
+
+    @action(
+        description=str(_("Download voucher PDFs (zip)")),
+        variant=ActionVariant.PRIMARY,
+        icon="folder_zip",
+    )
+    def download_labels_zip(self, request, queryset):
+        """Stream a single zip containing voucher PDFs for the queryset.
+
+        Saves the warehouse team N round-trips when batching pickups —
+        select the day's shipments, click the action, get one zip with
+        all the labels named ``boxnow-voucher-<parcel_id>.pdf``.
+        Shipments without a ``parcel_id`` are silently skipped (the
+        BoxNow API has no voucher to issue yet).
+        """
+
+        import io  # noqa: PLC0415
+        import zipfile  # noqa: PLC0415
+
+        from django.http import HttpResponse  # noqa: PLC0415
+
+        from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
+
+        eligible = queryset.exclude(parcel_id__isnull=True).exclude(
+            parcel_id__exact=""
+        )
+        if not eligible.exists():
+            messages.warning(
+                request,
+                _(
+                    "Selection contains no shipments with a parcel_id — "
+                    "nothing to bundle."
+                ),
+            )
+            return None
+
+        buf = io.BytesIO()
+        ok = err = 0
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for shipment in eligible:
+                try:
+                    pdf = BoxNowService.fetch_label_bytes(shipment)
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "download_labels_zip failed for shipment %s",
+                        shipment.pk,
+                    )
+                    err += 1
+                    continue
+                zf.writestr(f"boxnow-voucher-{shipment.parcel_id}.pdf", pdf)
+                ok += 1
+
+        if not ok:
+            messages.error(
+                request,
+                _("All %(err)d shipment(s) failed — see server logs.")
+                % {"err": err},
+            )
+            return None
+        if err:
+            messages.warning(
+                request,
+                _(
+                    "%(err)d shipment(s) failed and were skipped — "
+                    "see server logs."
+                )
+                % {"err": err},
+            )
+
+        buf.seek(0)
+        response = HttpResponse(buf.read(), content_type="application/zip")
+        response["Content-Disposition"] = (
+            'attachment; filename="boxnow-vouchers.zip"'
+        )
+        return response
 
     # ── Detail actions ──────────────────────────────────────────────
 

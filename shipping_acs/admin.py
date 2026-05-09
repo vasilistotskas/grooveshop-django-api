@@ -171,6 +171,33 @@ class AcsShipmentAdmin(ModelAdmin):
     )
     inlines = [AcsTrackingEventInline]
     actions_row = ["repoll_tracking", "issue_voucher_now"]
+    actions = ["bulk_repoll_tracking"]
+
+    @action(
+        description=str(_("Re-poll tracking for selected shipments")),
+        icon="refresh",
+        variant=ActionVariant.INFO,
+    )
+    def bulk_repoll_tracking(self, request, queryset):
+        """Fan out a poll task per selected shipment.
+
+        Useful when several shipments are stuck on a stale state —
+        ACS doesn't push, we poll. We dispatch one Celery task per
+        shipment instead of making the admin block on N HTTP calls.
+        """
+
+        from shipping_acs.tasks import poll_acs_tracking_one
+
+        count = 0
+        for shipment_id in queryset.values_list("id", flat=True):
+            poll_acs_tracking_one.delay(int(shipment_id))
+            count += 1
+        self.message_user(
+            request,
+            _("Dispatched tracking poll for %(count)d shipment(s).")
+            % {"count": count},
+            messages.INFO,
+        )
 
     @admin.display(description=_("Order"))
     def order_link(self, obj: AcsShipment) -> str:

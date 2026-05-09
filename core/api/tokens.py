@@ -30,13 +30,24 @@ KNOX_ABSOLUTE_MAX_AGE: timedelta = getattr(
 
 
 class BoundedTokenAuthentication(KnoxTokenAuthentication):
-    """Knox TokenAuthentication with an absolute per-token lifetime cap.
+    """Knox TokenAuthentication with an absolute per-token lifetime cap and
+    tenant-binding check.
 
-    Knox's AUTO_REFRESH_MAX_TTL setting prevents the *expiry* field from
-    being bumped indefinitely, but it does not invalidate tokens that were
-    issued before the cap was configured. This subclass adds a hard check
-    on ``token.created``: if the token is older than KNOX_ABSOLUTE_MAX_AGE
-    it is rejected with 401 regardless of its expiry field.
+    Two defences layered on top of stock Knox authentication:
+
+    1. **Absolute age cap** — rejects tokens older than KNOX_ABSOLUTE_MAX_AGE
+       regardless of their ``expiry`` field (see module-level docstring).
+
+    2. **Tenant binding** — after Knox validates the token, verifies that the
+       authenticated user has an active ``UserTenantMembership`` for the
+       current ``connection.tenant``.  Knox already isolates token tables per
+       schema (TENANT_APPS placement), but this defence-in-depth check at the
+       authentication layer ensures that even if a future code-path changes
+       the Knox configuration, a token from tenant-A is still rejected on
+       tenant-B's domain before it reaches any permission class.
+
+       The check is skipped when the connection is in the public schema
+       (admin paths, health probes) so platform-level tooling keeps working.
 
     Wired into ``REST_FRAMEWORK.DEFAULT_AUTHENTICATION_CLASSES`` in settings
     in place of ``knox.auth.TokenAuthentication``.
@@ -44,14 +55,31 @@ class BoundedTokenAuthentication(KnoxTokenAuthentication):
 
     def authenticate_credentials(self, token):
         user, auth_token = super().authenticate_credentials(token)
+
+        # 1. Absolute age cap.
         age = timezone.now() - auth_token.created
         if age > KNOX_ABSOLUTE_MAX_AGE:
             auth_token.delete()
             raise exceptions.AuthenticationFailed(
                 _(
-                    "Token has exceeded its maximum lifetime. Please log in again."
+                    "Token has exceeded its maximum lifetime. "
+                    "Please log in again."
                 )
             )
+
+        # 2. Tenant binding — only enforced when a non-public tenant is active.
+
+        from tenant.membership import (  # noqa: PLC0415
+            get_current_tenant,
+            user_has_tenant_access,
+        )
+
+        tenant = get_current_tenant()
+        if tenant is not None and not user_has_tenant_access(user, tenant):
+            raise exceptions.PermissionDenied(
+                _("You do not have access to this store.")
+            )
+
         return user, auth_token
 
 

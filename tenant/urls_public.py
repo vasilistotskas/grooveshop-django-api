@@ -13,24 +13,28 @@ instead of using ``include("core.urls")`` because ``core.urls`` uses
 ``i18n_patterns`` inside an ``include()``.
 """
 
-from django.urls import include, path
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
 from core.urls import urlpatterns as core_urlpatterns
 from tenant.views import TenantAdminViewSet
 
-router = DefaultRouter()
-router.register(
-    r"api/v1/tenant/admin",
-    TenantAdminViewSet,
-    basename="tenant-admin",
+# Manual path() patterns — consistent with the rest of the codebase which
+# uses explicit urlpatterns instead of DefaultRouter auto-registration.
+_admin_list = TenantAdminViewSet.as_view({"get": "list", "post": "create"})
+_admin_detail = TenantAdminViewSet.as_view(
+    {
+        "get": "retrieve",
+        "put": "update",
+        "patch": "partial_update",
+        "delete": "destroy",
+    }
 )
 
 urlpatterns = [
-    # TenantAdminViewSet is public-schema only (guarded at the view
-    # level too) and has no tenant.urls equivalent — register it here.
-    # ``tenant/resolve`` and ``tenant/memberships/mine`` come through
-    # ``core_urlpatterns`` below via ``include("tenant.urls")``; no need
-    # to duplicate them here.
-    path("", include(router.urls)),
+    path("api/v1/tenant/admin/", _admin_list, name="tenant-admin-list"),
+    path(
+        "api/v1/tenant/admin/<int:pk>/",
+        _admin_detail,
+        name="tenant-admin-detail",
+    ),
 ] + core_urlpatterns

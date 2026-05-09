@@ -60,25 +60,6 @@ settings.CACHES = {
     },
 }
 
-# CRITICAL — Django's ``caches`` connection handler caches the settings dict
-# at first access. By the time this conftest module runs the override above,
-# any earlier import (admin app load, celery autodiscover, etc.) may have
-# already materialised the production CACHES dict and cached the Redis
-# backend instance. Reset the connection handler so the LocMem override
-# actually reaches every ``cache.get/set`` call — without this, CI tests
-# that ``cache.set`` arbitrary objects (including patched ``MagicMock``s)
-# fail to pickle through the still-active Redis backend.
-from django.core.cache import caches as _caches  # noqa: E402
-
-_caches._connections = type(_caches._connections)()
-if hasattr(_caches, "_settings"):
-    _caches._settings = None
-if hasattr(_caches, "settings"):
-    try:
-        del _caches.settings
-    except AttributeError:
-        pass
-
 
 # Route django-extra-settings through a DummyCache so every ``Setting.get``
 # falls through to the DB. The package's ``post_save`` hook updates the

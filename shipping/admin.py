@@ -1,12 +1,12 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import ModelAdmin
 
+from admin.base import BaseModelAdmin
 from shipping.models import ShippingProvider
 
 
 @admin.register(ShippingProvider)
-class ShippingProviderAdmin(ModelAdmin):
+class ShippingProviderAdmin(BaseModelAdmin):
     list_display = (
         "code",
         "name",

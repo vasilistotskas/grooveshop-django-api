@@ -11,6 +11,8 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin, TabularInline
+
+from admin.base import BaseModelAdmin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateFilter,
@@ -195,12 +197,7 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
 
 
 @admin.register(UserAccount)
-class UserAdmin(ModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
+class UserAdmin(BaseModelAdmin):
 
     form = UserChangeForm
     add_form = UserCreationForm
@@ -265,8 +262,6 @@ class UserAdmin(ModelAdmin):
 
     ordering = ["-created_at"]
     date_hierarchy = "created_at"
-    save_on_top = True
-    list_per_page = 25
 
     fieldsets = (
         (
@@ -713,12 +708,7 @@ class UserAdmin(ModelAdmin):
 
 
 @admin.register(UserAddress)
-class UserAddressAdmin(ModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
+class UserAddressAdmin(BaseModelAdmin):
 
     list_display = [
         "address_display",
@@ -849,12 +839,10 @@ class UserAddressAdmin(ModelAdmin):
 
 
 @admin.register(SubscriptionTopic)
-class SubscriptionTopicAdmin(ModelAdmin, TranslatableAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
+class SubscriptionTopicAdmin(BaseModelAdmin, TranslatableAdmin):
+    # Override: this admin's list is intentionally narrow (fixed-width
+    # for scanning of the small ~10-row topic catalogue).
     list_fullwidth = False
-    list_filter_submit = True
-    list_filter_sheet = True
 
     list_display = [
         "name_display",
@@ -980,12 +968,7 @@ class SubscriptionTopicAdmin(ModelAdmin, TranslatableAdmin):
 
 
 @admin.register(UserSubscription)
-class UserSubscriptionAdmin(ModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
+class UserSubscriptionAdmin(BaseModelAdmin):
 
     list_display = [
         "subscription_info",
@@ -1157,12 +1140,8 @@ class UserSubscriptionAdmin(ModelAdmin):
 
 
 @admin.register(UserDataExport)
-class UserDataExportAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+class UserDataExportAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     """Read-only ledger of GDPR data-export requests."""
-
-    compressed_fields = True
-    list_fullwidth = True
-    list_filter_sheet = True
 
     list_display = (
         "user",

@@ -11,7 +11,9 @@ from django.utils import timezone
 from django.utils.html import conditional_escape
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import TabularInline
+
+from admin.base import BaseModelAdmin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateFilter,
@@ -408,13 +410,7 @@ class InvoiceInline(TabularInline):
 
 
 @admin.register(Order)
-class OrderAdmin(ModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
+class OrderAdmin(BaseModelAdmin):
     list_display = [
         "status_badge",
         "customer_info",
@@ -471,7 +467,6 @@ class OrderAdmin(ModelAdmin):
         "tracking number, payment ID, or BoxNow voucher / locker ID."
     )
     autocomplete_fields = ["user", "country", "region", "pay_way"]
-    list_per_page = 25
     readonly_fields = (
         "uuid",
         "created_at",
@@ -612,7 +607,6 @@ class OrderAdmin(ModelAdmin):
         "view_customer_orders_row",
     ]
     inlines = [OrderItemInline, InvoiceInline, OrderHistoryInline]
-    save_on_top = True
     date_hierarchy = "created_at"
     list_select_related = ["user", "country", "region", "pay_way"]
 
@@ -1761,13 +1755,7 @@ class OrderAdmin(ModelAdmin):
 
 
 @admin.register(OrderItem)
-class OrderItemAdmin(ModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
+class OrderItemAdmin(BaseModelAdmin):
     list_display = [
         "order_link",
         "product_display",
@@ -1991,10 +1979,7 @@ class OrderItemAdmin(ModelAdmin):
 
 
 @admin.register(OrderHistory)
-class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
-    compressed_fields = True
-    list_fullwidth = True
-    list_filter_sheet = True
+class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
     list_display = [
         "order_link",
@@ -2141,11 +2126,7 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
 
 
 @admin.register(OrderItemHistory)
-class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
-    compressed_fields = True
-    list_fullwidth = True
-    list_filter_sheet = True
-
+class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     list_display = [
         "order_item_link",
         "change_type_badge",
@@ -2257,7 +2238,7 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
 
 
 @admin.register(StockLog)
-class StockLogAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+class StockLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     list_display = (
         "product",
         "operation_type",
@@ -2319,7 +2300,7 @@ class HasDocumentFilter(DropdownFilter):
 
 
 @admin.register(Invoice)
-class InvoiceAdmin(ModelAdmin):
+class InvoiceAdmin(BaseModelAdmin):
     """Read-mostly archive of rendered invoices.
 
     Invoices are immutable by convention — Greek tax law forbids edits
@@ -2328,11 +2309,6 @@ class InvoiceAdmin(ModelAdmin):
     detail action to create invoices; ``Regenerate`` there is the only
     way to replace one (consumes a new counter slot).
     """
-
-    compressed_fields = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
 
     list_display = (
         "invoice_number",
@@ -2568,7 +2544,7 @@ class InvoiceAdmin(ModelAdmin):
 
 
 @admin.register(InvoiceCounter)
-class InvoiceCounterAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+class InvoiceCounterAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     """Per-year sequential invoice counter.
 
     Editable by superusers only — bumping ``next_number`` is an ops
@@ -2577,21 +2553,14 @@ class InvoiceCounterAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     sequence across all future invoices that year.
     """
 
-    compressed_fields = True
-    list_fullwidth = True
-
     list_display = ("year", "next_number")
     ordering = ("-year",)
     readonly_fields = ()
 
 
 @admin.register(VivaWebhookEvent)
-class VivaWebhookEventAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+class VivaWebhookEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     """Read-only audit trail of Viva Wallet webhook deliveries."""
-
-    compressed_fields = True
-    list_fullwidth = True
-    list_filter_sheet = True
 
     list_display = (
         "transaction_id",

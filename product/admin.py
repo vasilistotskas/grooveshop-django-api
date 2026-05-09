@@ -16,7 +16,9 @@ from django.utils.translation import ngettext
 from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
 from simple_history.admin import SimpleHistoryAdmin
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import TabularInline
+
+from admin.base import BaseModelAdmin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
@@ -328,14 +330,8 @@ class AttributeValueInline(TabularInline):
 
 
 @admin.register(Attribute)
-class AttributeAdmin(TranslatableAdmin, ModelAdmin):
+class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
     """Admin interface for managing product attributes."""
-
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
 
     list_display = [
         "attribute_info",
@@ -366,7 +362,6 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
         "attribute_analytics",
     )
     list_select_related = []
-    list_per_page = 25
     actions = [
         "activate_attributes",
         "deactivate_attributes",
@@ -591,14 +586,8 @@ class AttributeAdmin(TranslatableAdmin, ModelAdmin):
 
 
 @admin.register(AttributeValue)
-class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
+class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
     """Admin interface for managing attribute values."""
-
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
 
     list_display = [
         "value_info",
@@ -629,7 +618,6 @@ class AttributeValueAdmin(TranslatableAdmin, ModelAdmin):
         "value_analytics",
     )
     list_select_related = ["attribute"]
-    list_per_page = 25
     actions = [
         "activate_values",
         "deactivate_values",
@@ -1180,14 +1168,8 @@ class StockLogInline(TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(
-    TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin, ModelAdmin
+    TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin, BaseModelAdmin
 ):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
     list_display = [
         "product_info",
         "category_display",
@@ -1244,7 +1226,6 @@ class ProductAdmin(
         "stock_reservation_summary",
     )
     list_select_related = ["category", "vat", "changed_by"]
-    list_per_page = 25
     autocomplete_fields = ["category", "vat"]
     search_help_text = _(
         "Search by ID, SKU, name, description, or category name."
@@ -2302,15 +2283,8 @@ class ProductCategoryImageInline(TabularInline):
 
 
 @admin.register(ProductCategory)
-class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
+class ProductCategoryAdmin(BaseModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     mptt_indent_field = "translations__name"
-    list_per_page = 25
     list_display = (
         "tree_actions",
         "indented_title",
@@ -2544,11 +2518,7 @@ class ProductCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
 
 
 @admin.register(ProductReview)
-class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
-    compressed_fields = True
-    list_fullwidth = True
-    list_filter_sheet = True
-    list_per_page = 25  # Limit to 25 reviews per page for better performance
+class ProductReviewAdmin(BaseModelAdmin, TranslatableAdmin):
     show_full_result_count = False  # Disable expensive COUNT(*) query
 
     list_display = [
@@ -2821,10 +2791,7 @@ class ProductReviewAdmin(ModelAdmin, TranslatableAdmin):
 
 
 @admin.register(ProductFavourite)
-class ProductFavouriteAdmin(ModelAdmin):
-    compressed_fields = True
-    list_fullwidth = True
-
+class ProductFavouriteAdmin(BaseModelAdmin):
     list_display = [
         "user_display",
         "product_display",
@@ -2885,10 +2852,7 @@ class ProductFavouriteAdmin(ModelAdmin):
 
 
 @admin.register(ProductCategoryImage)
-class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
-    compressed_fields = True
-    list_fullwidth = True
-
+class ProductCategoryImageAdmin(BaseModelAdmin, TranslatableAdmin):
     list_display = [
         "image_preview",
         "category_name",
@@ -3026,10 +2990,7 @@ class ProductCategoryImageAdmin(ModelAdmin, TranslatableAdmin):
 
 
 @admin.register(ProductImage)
-class ProductImageAdmin(ModelAdmin, TranslatableAdmin):
-    compressed_fields = True
-    list_fullwidth = True
-
+class ProductImageAdmin(BaseModelAdmin, TranslatableAdmin):
     list_display = [
         "image_preview",
         "product_name",

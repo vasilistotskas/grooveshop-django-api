@@ -8,42 +8,30 @@ improving response times for write operations.
 import logging
 from typing import Any
 
-from celery import Task, shared_task
+from celery import shared_task
 from django.apps import apps
 from django.conf import settings
+
+from tenant.celery import TenantTask
 
 logger = logging.getLogger(__name__)
 
 
-class MeiliTask(Task):
-    """Base task class with retry configuration and tenant schema propagation."""
+class MeiliTask(TenantTask):
+    """Base task class for Meilisearch operations.
+
+    Inherits tenant schema propagation (apply_async stamps _schema_name
+    header; __call__ wraps execution in schema_context) from TenantTask so
+    that indexing operations always run against the correct tenant's schema.
+
+    Adds Meilisearch-specific retry configuration and structured logging.
+    """
 
     autoretry_for = (Exception,)
     retry_backoff = True
     retry_backoff_max = 600  # 10 minutes max backoff
     retry_jitter = True
     max_retries = 5
-
-    def apply_async(self, args=None, kwargs=None, **options):
-        from django.db import connection
-
-        headers = options.pop("headers", {}) or {}
-        headers.setdefault(
-            "_schema_name",
-            getattr(connection, "schema_name", "public"),
-        )
-        options["headers"] = headers
-        return super().apply_async(args=args, kwargs=kwargs, **options)
-
-    def __call__(self, *args, **kwargs):
-        schema_name = (
-            self.request.get("_schema_name") if self.request else None
-        ) or "public"
-
-        from django_tenants.utils import schema_context
-
-        with schema_context(schema_name):
-            return super().__call__(*args, **kwargs)
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         logger.error(

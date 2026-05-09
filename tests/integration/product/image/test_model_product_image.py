@@ -44,5 +44,10 @@ class ProductImageModelTestCase(TestCase):
         self.assertEqual(queryset.first(), self.product_image)
 
     def test_main_image_path(self):
-        expected_filename = f"media/uploads/products/{os.path.basename(self.product_image.image.name)}"
+        from django.db import connection
+
+        expected_filename = (
+            f"media/{connection.schema_name}/uploads/products/"
+            f"{os.path.basename(self.product_image.image.name)}"
+        )
         self.assertEqual(self.product_image.main_image_path, expected_filename)

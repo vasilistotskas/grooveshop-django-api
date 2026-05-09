@@ -36,7 +36,10 @@ class BlogCategoryModelTestCase(TestCase):
         self.assertEqual(self.category.post_count, 0)
 
     def test_main_image_path(self):
+        from django.db import connection
+
         expected_filename = (
-            f"media/uploads/blog/{os.path.basename(self.category.image.name)}"
+            f"media/{connection.schema_name}/uploads/blog/"
+            f"{os.path.basename(self.category.image.name)}"
         )
         self.assertEqual(self.category.main_image_path, expected_filename)

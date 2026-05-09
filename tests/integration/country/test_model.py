@@ -41,5 +41,10 @@ class CountryModelTestCase(TestCase):
         self.assertTrue(self.country in queryset)
 
     def test_main_image_path(self):
-        expected_filename = f"media/uploads/country/{os.path.basename(self.country.image_flag.name)}"
+        from django.db import connection
+
+        expected_filename = (
+            f"media/{connection.schema_name}/uploads/country/"
+            f"{os.path.basename(self.country.image_flag.name)}"
+        )
         self.assertEqual(self.country.main_image_path, expected_filename)

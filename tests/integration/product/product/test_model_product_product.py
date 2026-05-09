@@ -150,9 +150,12 @@ class ProductModelTestCase(TestCase):
         self.assertEqual(product.tags.count(), 3)
 
     def test_main_image_path(self):
+        from django.db import connection
+
         main_image = self.product.images.filter(is_main=True).first()
         expected_filename = (
-            f"media/uploads/products/{os.path.basename(main_image.image.name)}"
+            f"media/{connection.schema_name}/uploads/products/"
+            f"{os.path.basename(main_image.image.name)}"
         )
         self.assertEqual(self.product.main_image_path, expected_filename)
 

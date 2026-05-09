@@ -3,7 +3,6 @@ import logging
 from django.contrib import admin, messages
 from django.urls import reverse
 from django.utils.html import conditional_escape, format_html
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, StackedInline, TabularInline
 from unfold.contrib.filters.admin import (
@@ -256,15 +255,21 @@ _FALLBACK_BADGE = {
 
 def _render_state_badge(state: str, display: str) -> str:
     config = _STATE_BADGE_CONFIG.get(state, _FALLBACK_BADGE)
-    safe_display = conditional_escape(display)
-    html = (
-        f'<span class="inline-flex items-center justify-center px-2 py-1 '
-        f'text-xs font-medium {config["bg"]} {config["text"]} rounded-full gap-1">'
-        f"<span>{config['icon']}</span>"
-        f"<span>{safe_display}</span>"
-        "</span>"
+    # `config["bg"]`, `config["text"]`, and `config["icon"]` come from
+    # the static `_STATE_BADGE_CONFIG` dict above (no user input);
+    # `display` is the only externally-derived value and goes through
+    # format_html's auto-escaping.
+    return format_html(
+        '<span class="inline-flex items-center justify-center px-2 py-1 '
+        'text-xs font-medium {bg} {text_class} rounded-full gap-1">'
+        "<span>{icon}</span>"
+        "<span>{display}</span>"
+        "</span>",
+        bg=config["bg"],
+        text_class=config["text"],
+        icon=config["icon"],
+        display=display,
     )
-    return mark_safe(html)
 
 
 # ── BoxNowShipment admin ────────────────────────────────────────────────────

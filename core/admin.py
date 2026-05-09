@@ -425,54 +425,53 @@ class SettingAdmin(ModelAdmin):
 
     @admin.display(description=_("Name"))
     def name_display(self, obj):
-        from django.utils.html import conditional_escape
-        from django.utils.safestring import mark_safe
+        from django.utils.html import format_html  # noqa: PLC0415
 
-        safe_name = conditional_escape(obj.name)
-        html = f'<strong style="font-weight: 600;">{safe_name}</strong>'
-        return mark_safe(html)
+        return format_html(
+            '<strong style="font-weight: 600;">{}</strong>', obj.name
+        )
 
     @admin.display(description=_("Type"))
     def value_type_badge(self, obj):
-        from django.utils.html import conditional_escape
-        from django.utils.safestring import mark_safe
+        from django.utils.html import format_html  # noqa: PLC0415
 
-        safe_type = conditional_escape(obj.value_type)
-        html = f'<span class="setting-type-badge" data-type="{safe_type}">{safe_type}</span>'
-        return mark_safe(html)
+        return format_html(
+            '<span class="setting-type-badge" data-type="{type}">{type}</span>',
+            type=obj.value_type,
+        )
 
     @admin.display(description=_("Current Value"))
     def value_preview(self, obj):
-        from django.utils.html import conditional_escape
-        from django.utils.safestring import mark_safe
+        from django.utils.html import format_html  # noqa: PLC0415
 
         try:
             value = str(obj.value)
             if len(value) > 50:
                 value = value[:50] + "..."
-            safe_value = conditional_escape(value)
-
-            html = f'<code style="font-size: 0.875rem; padding: 0.125rem 0.25rem; background-color: rgba(0,0,0,0.05); border-radius: 0.25rem;">{safe_value}</code>'
-            return mark_safe(html)
+            return format_html(
+                '<code style="font-size: 0.875rem; padding: 0.125rem 0.25rem;'
+                " background-color: rgba(0,0,0,0.05); border-radius:"
+                ' 0.25rem;">{}</code>',
+                value,
+            )
         except Exception:
-            return mark_safe(
+            return format_html(
                 '<span style="font-style: italic; opacity: 0.6;">-</span>'
             )
 
     @admin.display(description=_("Description"))
     def description_preview(self, obj):
-        from django.utils.html import conditional_escape
-        from django.utils.safestring import mark_safe
+        from django.utils.html import format_html  # noqa: PLC0415
 
         if obj.description:
             desc = obj.description
             if len(desc) > 60:
                 desc = desc[:60] + "..."
-            safe_desc = conditional_escape(desc)
-            return mark_safe(
-                f'<span style="font-size: 0.875rem; opacity: 0.8;">{safe_desc}</span>'
+            return format_html(
+                '<span style="font-size: 0.875rem; opacity: 0.8;">{}</span>',
+                desc,
             )
-        return mark_safe(
+        return format_html(
             '<span style="font-style: italic; opacity: 0.6;">-</span>'
         )
 

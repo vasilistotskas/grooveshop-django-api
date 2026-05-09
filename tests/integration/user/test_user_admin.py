@@ -399,7 +399,7 @@ class TestUserAdmin:
 
         result = admin.last_activity(user)
 
-        assert "Updated:" in result
+        assert "tabular-nums" in result
 
     def test_social_links_summary(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())

@@ -539,17 +539,23 @@ class TestReviewAdmin:
         assert "⭐" in result
 
     def test_status_badge_approved(self, review_admin):
+        from django.utils import translation
+
         review = ProductReviewFactory(status="TRUE")
 
-        result = review_admin.status_badge(review)
+        with translation.override("en"):
+            result = review_admin.status_badge(review)
 
         assert "✅" in result
         assert "True" in result
 
     def test_status_badge_pending(self, review_admin):
+        from django.utils import translation
+
         review = ProductReviewFactory(status="NEW")
 
-        result = review_admin.status_badge(review)
+        with translation.override("en"):
+            result = review_admin.status_badge(review)
 
         assert "🆕" in result
         assert "New" in result

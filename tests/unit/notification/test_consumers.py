@@ -162,6 +162,10 @@ class TestNotificationConsumer(TransactionTestCase):
 
         consumer = NotificationConsumer()
         consumer.scope = {"user": anonymous_user}
+        # connect() now calls accept() BEFORE close(code=4003) on anonymous
+        # users — Channels protocol requires the handshake to complete
+        # before application close codes are delivered. Mock both.
+        consumer.accept = AsyncMock()
         consumer.close = AsyncMock()
 
         await consumer.connect()

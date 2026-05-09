@@ -11,6 +11,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
+from core.cache.models import CachePurgeLog  # noqa: F401
+
 
 class SeoModel(models.Model):
     """

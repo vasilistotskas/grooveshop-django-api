@@ -392,7 +392,9 @@ class TestCorrectExceptionTypesAreRaised:
         """
         # Create a valid product and cart for testing
         product = ProductFactory.create(
-            price=Money("50.00", settings.DEFAULT_CURRENCY), stock=10
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            stock=10,
+            active=True,
         )
         product.set_current_language("en")
         product.name = "Test Product"

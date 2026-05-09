@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.db.models import Count
-from django.utils.html import conditional_escape
+from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
@@ -167,17 +167,15 @@ class VatAdmin(ModelAdmin):
             color_class = "text-red-600 dark:text-red-400"
             icon = "🔥"
 
-        safe_icon = conditional_escape(icon)
-        safe_value = conditional_escape(formatted_value)
-        safe_color_class = conditional_escape(color_class)
-
-        html = (
-            f'<div class="flex items-center gap-2">'
-            f'<span class="text-lg">{safe_icon}</span>'
-            f'<div class="text-lg font-bold {safe_color_class}">{safe_value}</div>'
-            f"</div>"
+        return format_html(
+            '<div class="flex items-center gap-2">'
+            '<span class="text-lg">{icon}</span>'
+            '<div class="text-lg font-bold {color_class}">{value}</div>'
+            "</div>",
+            icon=icon,
+            color_class=color_class,
+            value=formatted_value,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Category"))
     def vat_category_badge(self, obj):
@@ -191,7 +189,7 @@ class VatAdmin(ModelAdmin):
                 "<span>🆓</span><span>Tax Free</span>"
                 "</span>"
             )
-        elif value <= 5:
+        if value <= 5:
             return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 "
@@ -199,7 +197,7 @@ class VatAdmin(ModelAdmin):
                 "<span>📉</span><span>Reduced</span>"
                 "</span>"
             )
-        elif value <= 15:
+        if value <= 15:
             return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 "
@@ -207,7 +205,7 @@ class VatAdmin(ModelAdmin):
                 "<span>📊</span><span>Low</span>"
                 "</span>"
             )
-        elif value <= 25:
+        if value <= 25:
             return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 "
@@ -215,7 +213,7 @@ class VatAdmin(ModelAdmin):
                 "<span>⚖️</span><span>Standard</span>"
                 "</span>"
             )
-        elif value <= 35:
+        if value <= 35:
             return mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 "bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 "
@@ -223,14 +221,13 @@ class VatAdmin(ModelAdmin):
                 "<span>📈</span><span>High</span>"
                 "</span>"
             )
-        else:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 "
-                'rounded-full gap-1">'
-                "<span>🔥</span><span>Premium</span>"
-                "</span>"
-            )
+        return mark_safe(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 "
+            'rounded-full gap-1">'
+            "<span>🔥</span><span>Premium</span>"
+            "</span>"
+        )
 
     @admin.display(description=_("Usage"))
     def usage_metrics(self, obj):
@@ -245,34 +242,32 @@ class VatAdmin(ModelAdmin):
                 "</span>"
             )
 
-        safe_count = conditional_escape(str(products_count))
-
         if products_count <= 2:
-            html = (
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f"bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 "
-                f'rounded-full">'
-                f"📊 {safe_count} products"
-                f"</span>"
+            return format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                "bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 "
+                'rounded-full">'
+                "📊 {count} products"
+                "</span>",
+                count=products_count,
             )
-        elif products_count <= 10:
-            html = (
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f"bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 "
-                f'rounded-full">'
-                f"📈 {safe_count} products"
-                f"</span>"
+        if products_count <= 10:
+            return format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 "
+                'rounded-full">'
+                "📈 {count} products"
+                "</span>",
+                count=products_count,
             )
-        else:
-            html = (
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f"bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 "
-                f'rounded-full">'
-                f"🔥 {safe_count} products"
-                f"</span>"
-            )
-
-        return mark_safe(html)
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 "
+            'rounded-full">'
+            "🔥 {count} products"
+            "</span>",
+            count=products_count,
+        )
 
     @admin.display(description=_("Price Examples"))
     def calculation_preview(self, obj):
@@ -283,28 +278,25 @@ class VatAdmin(ModelAdmin):
             total = price + vat_amount
             examples.append(f"€{price} → €{total:.2f}")
 
-        safe_examples = conditional_escape(" | ".join(examples))
-        html = (
-            f'<div class="text-xs text-gray-600 dark:text-gray-400">'
-            f'<div class="font-mono">{safe_examples}</div>'
-            f"</div>"
+        return format_html(
+            '<div class="text-xs text-gray-600 dark:text-gray-400">'
+            '<div class="font-mono">{examples}</div>'
+            "</div>",
+            examples=" | ".join(examples),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Created"))
     def created_display(self, obj):
-        date_str = obj.created_at.strftime("%Y-%m-%d")
-        safe_date = conditional_escape(date_str)
-        return mark_safe(
-            f'<div class="text-sm text-gray-600 dark:text-gray-400">{safe_date}</div>'
+        return format_html(
+            '<div class="text-sm text-gray-600 dark:text-gray-400">{date}</div>',
+            date=obj.created_at.strftime("%Y-%m-%d"),
         )
 
     @admin.display(description=_("Updated"))
     def updated_display(self, obj):
-        date_str = obj.updated_at.strftime("%Y-%m-%d")
-        safe_date = conditional_escape(date_str)
-        return mark_safe(
-            f'<div class="text-sm text-gray-600 dark:text-gray-400">{safe_date}</div>'
+        return format_html(
+            '<div class="text-sm text-gray-600 dark:text-gray-400">{date}</div>',
+            date=obj.updated_at.strftime("%Y-%m-%d"),
         )
 
     @admin.display(description=_("Usage Analytics"))
@@ -321,26 +313,24 @@ class VatAdmin(ModelAdmin):
             category_text = self._get_vat_category_text(obj.value)
             status_text = "In Use" if products_count > 0 else "Unused"
 
-            safe_products = conditional_escape(str(products_count))
-            safe_value = conditional_escape(value_formatted)
-            safe_vat = conditional_escape(vat_formatted)
-            safe_total = conditional_escape(total_formatted)
-            safe_category = conditional_escape(category_text)
-            safe_status = conditional_escape(status_text)
-
-            html = (
-                f'<div class="text-sm">'
-                f'<div class="grid grid-cols-2 gap-2">'
-                f"<div><strong>Products Using:</strong></div><div>{safe_products}</div>"
-                f"<div><strong>VAT Rate:</strong></div><div>{safe_value}</div>"
-                f"<div><strong>Sample VAT on €1000:</strong></div><div>{safe_vat}</div>"
-                f"<div><strong>Total with VAT:</strong></div><div>{safe_total}</div>"
-                f"<div><strong>Category:</strong></div><div>{safe_category}</div>"
-                f"<div><strong>Status:</strong></div><div>{safe_status}</div>"
-                f"</div>"
-                f"</div>"
+            return format_html(
+                '<div class="text-sm">'
+                '<div class="grid grid-cols-2 gap-2">'
+                "<div><strong>Products Using:</strong></div><div>{products}</div>"
+                "<div><strong>VAT Rate:</strong></div><div>{value}</div>"
+                "<div><strong>Sample VAT on €1000:</strong></div><div>{vat}</div>"
+                "<div><strong>Total with VAT:</strong></div><div>{total}</div>"
+                "<div><strong>Category:</strong></div><div>{category}</div>"
+                "<div><strong>Status:</strong></div><div>{status}</div>"
+                "</div>"
+                "</div>",
+                products=products_count,
+                value=value_formatted,
+                vat=vat_formatted,
+                total=total_formatted,
+                category=category_text,
+                status=status_text,
             )
-            return mark_safe(html)
         except Exception:
             return mark_safe(
                 '<span class="text-gray-500">Data unavailable</span>'
@@ -356,17 +346,17 @@ class VatAdmin(ModelAdmin):
             total = amount + vat_amount
             examples.append(f"€{amount:g} + VAT = €{total:.2f}")
 
-        safe_items = "".join(
-            f"<div>{conditional_escape(example)}</div>" for example in examples
+        items = format_html_join(
+            "", "<div>{}</div>", ((example,) for example in examples)
         )
-        html = (
-            f'<div class="text-sm">'
-            f'<div class="grid grid-cols-2 gap-2">'
-            f"{safe_items}"
-            f"</div>"
-            f"</div>"
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="grid grid-cols-2 gap-2">'
+            "{items}"
+            "</div>"
+            "</div>",
+            items=items,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Products Using This VAT"))
     def products_using_vat(self, obj):
@@ -380,18 +370,17 @@ class VatAdmin(ModelAdmin):
                     "</div>"
                 )
 
-            safe_count = conditional_escape(str(products_count))
-            html = (
-                f'<div class="text-sm">'
-                f'<div class="font-medium text-gray-900 dark:text-gray-100">'
-                f"{safe_count} products using this VAT rate"
-                f"</div>"
-                f'<div class="text-gray-500 dark:text-gray-400 mt-1">'
-                f"Click to view products →"
-                f"</div>"
-                f"</div>"
+            return format_html(
+                '<div class="text-sm">'
+                '<div class="font-medium text-gray-900 dark:text-gray-100">'
+                "{count} products using this VAT rate"
+                "</div>"
+                '<div class="text-gray-500 dark:text-gray-400 mt-1">'
+                "Click to view products →"
+                "</div>"
+                "</div>",
+                count=products_count,
             )
-            return mark_safe(html)
         except Exception:
             return mark_safe(
                 '<span class="text-gray-500">Data unavailable</span>'

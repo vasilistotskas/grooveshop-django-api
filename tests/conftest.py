@@ -57,12 +57,69 @@ settings.CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "LOCATION": "test-cache",
-    }
+    },
 }
+
+
+# Route django-extra-settings through a DummyCache so every ``Setting.get``
+# falls through to the DB. The package's ``post_save`` hook updates the
+# cache eagerly, but under EAGER + the on_commit-immediate fixture the
+# cache state can drift in ways that are hard to reproduce (a signal-fired
+# task body can clear/repopulate it mid-test). Using DummyCache means
+# tests always read the just-written DB row, eliminating an entire class
+# of "setting was set but reads back empty" flakes (e.g. mydata tests'
+# ``INVOICE_SELLER_VAT_ID``). Cost is one extra DB read per ``Setting.get``,
+# which is dwarfed by the EAGER signal cascades the same tests trigger.
+#
+# Patch the package's ``_get_cache`` directly rather than registering a
+# new "extra_settings" alias in CACHES — Django's ``caches`` connection
+# handler materialises its settings dict lazily via a cached_property at
+# app-load time, so adding new aliases here would require resetting that
+# registry, which in turn forces every cache lookup (including the one
+# in ``cache._cache.get_client`` patched by Channels middleware tests)
+# to rebuild against the test settings instead of the production
+# Redis-backed registry the tests assume.
+def _dummy_extra_settings_cache():
+    from django.core.cache.backends.dummy import DummyCache as _DummyCache
+
+    return _DummyCache("extra-settings-dummy", {})
+
+
+import extra_settings.cache as _extra_settings_cache  # noqa: E402
+
+_extra_settings_cache._get_cache = _dummy_extra_settings_cache
 
 settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
 settings.DATABASES["default"]["AUTOCOMMIT"] = True
 settings.DATABASES["default"]["CONN_MAX_AGE"] = 0
+# Drop the production statement_timeout / idle-in-transaction guards for
+# the test suite. Under heavy parallel xdist load (-n auto), inline EAGER
+# task bodies fired by signal handlers can hold connections long enough
+# for the 30s production timeout to fire, producing
+# ``OperationalError('canceling statement due to statement timeout')``
+# flakes that have nothing to do with the test under inspection.
+# Tests still time out at the pytest level via ``timeout = 600`` in
+# pyproject.toml, so removing the per-statement guard does not let a
+# real hang slip through silently.
+_test_db_options = dict(settings.DATABASES["default"].get("OPTIONS", {}))
+_test_db_options["options"] = (
+    "-c statement_timeout=0 -c idle_in_transaction_session_timeout=0"
+)
+# Disable the psycopg connection pool for the test suite. Pooling
+# extends connection lifetimes per-process so that ``conn.close()`` on
+# a Django wrapper hands the underlying socket back to the pool rather
+# than terminating the Postgres session. That bites on
+# TransactionTestCase teardown: pytest-django's ``flush`` step issues
+# TRUNCATE against every table, which blocks behind any other session
+# still holding row-level locks (e.g. an async test's lingering
+# ``database_sync_to_async`` connection). When the truncate stalls or
+# fails, the next test in the same worker observes leaked rows
+# (e.g. ``InvoiceCounter`` for year 2026 already present, breaking
+# ``test_allocate_creates_counter_on_first_call``). With pooling off,
+# ``conn.close()`` actually terminates the session, freeing locks
+# immediately.
+_test_db_options.pop("pool", None)
+settings.DATABASES["default"]["OPTIONS"] = _test_db_options
 
 # Disable multi-tenancy for tests — all tables in public schema.
 # Multi-tenancy schema isolation is tested separately; unit/integration
@@ -116,6 +173,46 @@ def clear_caches():
 
 
 @pytest.fixture(autouse=True)
+def _run_transaction_on_commit_immediately(request, monkeypatch):
+    """Execute ``transaction.on_commit`` callbacks synchronously in tests.
+
+    Signal handlers and Celery dispatches across the codebase wrap work in
+    ``transaction.on_commit`` so that workers see committed rows (production
+    correctness). Django's ``TestCase`` wraps every test in a savepoint that
+    is rolled back at the end — the outer transaction never commits, so the
+    callbacks would never run, and tests asserting on dispatch behaviour
+    would see empty mocks.
+
+    This fixture replaces ``transaction.on_commit`` with a direct call for
+    the duration of each test. Tests that explicitly ``@patch`` it to verify
+    deferral still work because the per-test patch takes precedence.
+
+    Skipped when the test explicitly uses ``transaction=True`` django_db
+    mode (TransactionTestCase), since those commit normally.
+    """
+    marker = request.node.get_closest_marker("django_db")
+    if marker and marker.kwargs.get("transaction", False):
+        return
+
+    from django.db import transaction as _tx
+
+    def _immediate(func, using=None, robust=False):
+        # Swallow callback exceptions. Under CELERY_TASK_ALWAYS_EAGER, a
+        # ``task.delay()`` inside an on_commit callback actually executes
+        # the task body — some tasks (e.g. PDF invoicing via WeasyPrint)
+        # need native libs that aren't available in the test environment
+        # and raise Celery Retry exceptions. In production, ``.delay()``
+        # only enqueues; the task body runs in a worker. Swallowing here
+        # makes the fixture behave like ``on_commit(..., robust=True)``.
+        try:
+            func()
+        except Exception:  # pragma: no cover - swallow like robust=True
+            pass
+
+    monkeypatch.setattr(_tx, "on_commit", _immediate)
+
+
+@pytest.fixture(autouse=True)
 def reset_db_queries():
     reset_queries()
     yield
@@ -124,33 +221,30 @@ def reset_db_queries():
 
 @pytest.fixture(autouse=True)
 def _close_db_connections_after_test(request):
-    """Close database connections after TransactionTestCase-style tests.
+    """Release idle DB connections at the end of every test.
 
-    Prevents 'database is being accessed by other users' errors during
-    TransactionTestCase teardown in parallel execution (-n auto).
-    Stale connections from async tests or channels can keep the database
-    locked, causing table truncation to fail and data to leak between tests.
+    Prevents two failure modes that surface under parallel xdist:
+
+    1. ``OperationalError('database "test_postgres_gwN" is being
+       accessed by other users')`` during ``TransactionTestCase``
+       teardown — async helpers, Channels async-to-sync wrappers, and
+       Celery EAGER task bodies leave per-thread connections behind that
+       the test runner's ``flush`` step can't preempt.
+    2. Pool exhaustion mid-suite — psycopg's pool caps connections per
+       process, and EAGER signal cascades open many short-lived ones
+       that linger on the pool's free-list well after the test ends.
+
+    Closing every non-atomic connection at the end of each test bounds
+    both. The pool reopens connections lazily on next use, so this is
+    cheap.
     """
     yield
-    is_transaction_test = False
-    marker = request.node.get_closest_marker("django_db")
-    if marker and marker.kwargs.get("transaction", False):
-        is_transaction_test = True
-    elif hasattr(request, "cls") and request.cls:
-        from django.test import TransactionTestCase as DjangoTransactionTestCase
-        from django.test import TestCase as DjangoTestCase
-
-        # Only target actual TransactionTestCase, not TestCase
-        # (TestCase subclasses TransactionTestCase but uses different isolation)
-        if issubclass(
-            request.cls, DjangoTransactionTestCase
-        ) and not issubclass(request.cls, DjangoTestCase):
-            is_transaction_test = True
-
-    if is_transaction_test:
-        for conn in connections.all():
-            if conn.connection is not None and not conn.in_atomic_block:
+    for conn in connections.all():
+        if conn.connection is not None and not conn.in_atomic_block:
+            try:
                 conn.close()
+            except Exception:  # pragma: no cover - close is best-effort
+                pass
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -193,6 +287,19 @@ def _django_clear_cache(request):
 
 
 @pytest.fixture(autouse=True)
+def _reset_payment_events_redis_client():
+    """Drop the cached Redis client between tests so per-test
+    ``patch('redis.Redis')`` mocks aren't bypassed by a stale instance
+    saved by an earlier test in the same process.
+    """
+    import order.payment_events as payment_events_module
+
+    payment_events_module._redis_client = None
+    yield
+    payment_events_module._redis_client = None
+
+
+@pytest.fixture(autouse=True)
 def _reseed_extra_settings(request):
     """Ensure ``EXTRA_SETTINGS_DEFAULTS`` rows exist before every DB test.
 
@@ -215,6 +322,104 @@ def _reseed_extra_settings(request):
 
             Setting.set_defaults_from_settings()
         except Exception:
+            pass
+
+
+@pytest.fixture(autouse=True)
+def _reseed_shipping_providers(request):
+    """Restore the ``ShippingProvider`` seed rows for every DB test.
+
+    The ``shipping/migrations/0002_seed_providers.py`` data migration
+    only runs once at DB creation. Same issue as the
+    ``_reseed_extra_settings`` fixture above: any test marked
+    ``@pytest.mark.django_db(transaction=True)`` flushes every table on
+    teardown, wiping the ``acs`` / ``boxnow`` rows.
+
+    Subsequent tests that ``ShippingProvider.objects.get(code="acs")``
+    (e.g. via the carrier registry, the order serializer, or the
+    ``available_options`` view) then explode with ``DoesNotExist`` —
+    one or two unlucky tests at random per ``-n auto`` run.
+
+    Idempotent: ``update_or_create`` is a no-op when the seed rows
+    are still in place, restorative when they are not.
+    """
+    if request.node.get_closest_marker("django_db"):
+        try:
+            from shipping.models import ShippingProvider
+
+            ShippingProvider.objects.update_or_create(
+                code="boxnow",
+                defaults={
+                    "name": "BOX NOW",
+                    "is_active": False,
+                    "supports_home_delivery": False,
+                    "supports_pickup_point": True,
+                    "live_mode": False,
+                    "priority": 20,
+                    "metadata": {
+                        "supported_countries": ["GR"],
+                        "locker_picker_kind": "boxnow_widget",
+                        "tagline_key": "shipping.method.boxnow.tagline",
+                        "tagline_color": "info",
+                        "logo": "/img/shipping/boxnow.png",
+                        "uses_generic_picker": False,
+                    },
+                },
+            )
+            ShippingProvider.objects.update_or_create(
+                code="acs",
+                defaults={
+                    "name": "ACS Courier",
+                    "is_active": False,
+                    "supports_home_delivery": True,
+                    "supports_pickup_point": True,
+                    "live_mode": False,
+                    "priority": 10,
+                    # Mirror the seed in ``shipping/migrations/
+                    # 0004_seed_provider_metadata.py``. Keep these in
+                    # sync — the metadata-driven config tests rely on
+                    # the keys being present on every test row, and
+                    # production reads the same keys.
+                    "metadata": {
+                        "supported_countries": ["GR"],
+                        "locker_picker_kind": "acs_db_picker",
+                        "logo": "/img/shipping/acs.png",
+                        "shop_kinds_by_country": {
+                            "GR": [7, 8],
+                            "CY": [7],
+                        },
+                        "nearest_limit": 20,
+                        "min_weight_kg": "0.5",
+                        "max_weight_kg": "999",
+                        "default_voucher_language": "GR",
+                        "default_map_center": [37.9838, 23.7275],
+                        "default_map_zoom": 11,
+                        "tile_provider": {
+                            "light": {
+                                "url": (
+                                    "https://{s}.basemaps.cartocdn.com/"
+                                    "light_all/{z}/{x}/{y}{r}.png"
+                                ),
+                                "attribution": "© OSM © CARTO",
+                                "max_zoom": 19,
+                                "subdomains": "abcd",
+                            },
+                            "dark": {
+                                "url": (
+                                    "https://{s}.basemaps.cartocdn.com/"
+                                    "dark_all/{z}/{x}/{y}{r}.png"
+                                ),
+                                "attribution": "© OSM © CARTO",
+                                "max_zoom": 19,
+                                "subdomains": "abcd",
+                            },
+                        },
+                    },
+                },
+            )
+        except Exception:
+            # The fixture is best-effort — a transient DB connection
+            # error must not mask the real failure of the test itself.
             pass
 
 

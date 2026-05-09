@@ -23,3 +23,9 @@ class CartMutationAnonThrottle(AnonRateThrottle):
 
 class SearchThrottle(AnonRateThrottle):
     scope = "search"
+
+
+class ViewCountThrottle(AnonRateThrottle):
+    """Tight per-IP throttle for the product view-count increment endpoint."""
+
+    scope = "view_count"

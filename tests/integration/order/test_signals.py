@@ -320,3 +320,34 @@ class OrderSignalsTestCase(TestCase):
         ).exists()
 
         self.assertTrue(note_exists)
+
+    @patch("order.signals.handlers.send_shipping_notification_email.delay")
+    def test_tracking_info_set_dispatches_shipping_email(self, mock_email_task):
+        """Setting tracking_number + shipping_carrier on an order
+        with neither previously set fires the shipping notification
+        email task. PR #4 Q1."""
+        self.order.tracking_number = ""
+        self.order.shipping_carrier = ""
+        self.order.save()
+        # Reset call history because the save above is the baseline.
+        mock_email_task.reset_mock()
+
+        self.order.tracking_number = "TRACK-9876"
+        self.order.shipping_carrier = "acs"
+        self.order.save()
+
+        mock_email_task.assert_called_once_with(self.order.id)
+
+    @patch("order.signals.handlers.send_shipping_notification_email.delay")
+    def test_tracking_info_unchanged_does_not_redispatch(self, mock_email_task):
+        """Re-saving the same tracking value (e.g. admin re-edits the
+        field with no change) must NOT re-fire the email."""
+        self.order.tracking_number = "TRACK-9876"
+        self.order.shipping_carrier = "acs"
+        self.order.save()
+        mock_email_task.reset_mock()
+
+        # Same values — no transition, no signal, no email.
+        self.order.save()
+
+        mock_email_task.assert_not_called()

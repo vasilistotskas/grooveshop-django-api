@@ -43,7 +43,7 @@ from notification.serializers.notification import NotificationSerializer
 @permission_classes([IsAuthenticated])
 def notifications_by_ids(request):
     seen_query = request.query_params.get("seen", None)
-    notification_ids = request.data.get("ids", [])
+    notification_ids = (request.data.get("ids") or [])[:500]
 
     if not notification_ids:
         return Response(
@@ -51,7 +51,10 @@ def notifications_by_ids(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    notifications = Notification.objects.filter(id__in=notification_ids)
+    notifications = Notification.objects.filter(
+        id__in=notification_ids,
+        notification_users__user=request.user,
+    ).distinct()
 
     if seen_query is not None:
         user = request.user
@@ -59,7 +62,8 @@ def notifications_by_ids(request):
 
         if seen_value:
             notifications = notifications.filter(
-                user__user=user, user__seen=True
+                notification_users__user=user,
+                notification_users__seen=True,
             )
         else:
             seen_notification_ids = NotificationUser.objects.filter(

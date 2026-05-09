@@ -2,8 +2,9 @@ from datetime import timedelta
 
 from django.contrib import admin
 from django.db import models
+from django.db.models import Count, Q
 from django.utils import timezone
-from django.utils.html import conditional_escape
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
@@ -196,7 +197,14 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("user__user")
+        qs = super().get_queryset(request).prefetch_related("user__user")
+        return qs.annotate(
+            nu_total=Count("notification_users"),
+            nu_seen=Count(
+                "notification_users",
+                filter=Q(notification_users__seen=True),
+            ),
+        )
 
     @admin.display(description=_("Notification"))
     def notification_info(self, obj):
@@ -212,22 +220,20 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         title_display = title[:40] + "..." if len(title) > 40 else title
         message_preview = message[:60] + "..." if len(message) > 60 else message
 
-        safe_title = conditional_escape(title_display)
-        safe_message = conditional_escape(message_preview)
-        safe_id = conditional_escape(str(obj.id))
-        link_icon = "🔗" if obj.link else ""
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
-            f"<span>{safe_title}</span>"
-            f'<span class="text-blue-500">{link_icon}</span>'
+            "<span>{title}</span>"
+            '<span class="text-blue-500">{link_icon}</span>'
             "</div>"
-            f'<div class="text-base-600 dark:text-base-400">{safe_message}</div>'
-            f'<div class="text-xs text-base-600 dark:text-base-300">ID: {safe_id}</div>'
-            "</div>"
+            '<div class="text-base-600 dark:text-base-400">{message}</div>'
+            '<div class="text-xs text-base-600 dark:text-base-300">ID: {id}</div>'
+            "</div>",
+            title=title_display,
+            link_icon="🔗" if obj.link else "",
+            message=message_preview,
+            id=obj.id,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Priority"))
     def priority_badge(self, obj):
@@ -260,16 +266,17 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         }
 
         config = priority_config.get(obj.priority, priority_config["NORMAL"])
-        safe_priority = conditional_escape(obj.get_priority_display())
-
-        html = (
-            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            f'{config["bg"]} {config["text"]} rounded-full gap-1">'
-            f"<span>{config['icon']}</span>"
-            f"<span>{safe_priority}</span>"
-            "</span>"
+        return format_html(
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            '{bg} {text_class} rounded-full gap-1">'
+            "<span>{icon}</span>"
+            "<span>{priority}</span>"
+            "</span>",
+            bg=config["bg"],
+            text_class=config["text"],
+            icon=config["icon"],
+            priority=obj.get_priority_display(),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Category"))
     def category_badge(self, obj):
@@ -347,16 +354,17 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         }
 
         config = category_config.get(obj.category, category_config["SYSTEM"])
-        safe_category = conditional_escape(obj.get_category_display())
-
-        html = (
-            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            f'{config["bg"]} {config["text"]} rounded border gap-1">'
-            f"<span>{config['icon']}</span>"
-            f"<span>{safe_category}</span>"
-            "</span>"
+        return format_html(
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            '{bg} {text_class} rounded border gap-1">'
+            "<span>{icon}</span>"
+            "<span>{category}</span>"
+            "</span>",
+            bg=config["bg"],
+            text_class=config["text"],
+            icon=config["icon"],
+            category=obj.get_category_display(),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Status"))
     def status_display(self, obj):
@@ -364,14 +372,14 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         is_expired = obj.expiry_date and now > obj.expiry_date
 
         if is_expired:
-            status_badge = (
+            status_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-full">'
                 "❌ Expired"
                 "</span>"
             )
         else:
-            status_badge = (
+            status_badge = mark_safe(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-full">'
                 "✅ Active"
@@ -393,23 +401,26 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         }
 
         kind_display = kind_config.get(obj.kind, kind_config["INFO"])
-        safe_kind = conditional_escape(obj.get_kind_display())
-
-        html = (
+        return format_html(
             '<div class="text-sm space-y-1">'
-            f"<div>{status_badge}</div>"
+            "<div>{status_badge}</div>"
             '<div class="flex items-center gap-1">'
-            f'<span class="{kind_display["color"]}">{kind_display["icon"]}</span>'
-            f'<span class="text-base-600 dark:text-base-400">{safe_kind}</span>'
+            '<span class="{kind_color}">{kind_icon}</span>'
+            '<span class="text-base-600 dark:text-base-400">{kind_label}</span>'
             "</div>"
-            "</div>"
+            "</div>",
+            status_badge=status_badge,
+            kind_color=kind_display["color"],
+            kind_icon=kind_display["icon"],
+            kind_label=obj.get_kind_display(),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Engagement"))
     def engagement_stats(self, obj):
-        total_users = obj.notification_users.count()
-        seen_users = obj.notification_users.filter(seen=True).count()
+        total_users = getattr(obj, "nu_total", obj.notification_users.count())
+        seen_users = getattr(
+            obj, "nu_seen", obj.notification_users.filter(seen=True).count()
+        )
         unseen_users = total_users - seen_users
 
         engagement_rate = (seen_users / max(total_users, 1)) * 100
@@ -424,21 +435,20 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
             rate_color = "text-red-600 dark:text-red-400"
             rate_icon = "📉"
 
-        rate_formatted = f"{engagement_rate:.1f}%"
-        safe_total = conditional_escape(str(total_users))
-        safe_seen = conditional_escape(str(seen_users))
-        safe_unseen = conditional_escape(str(unseen_users))
-        safe_rate = conditional_escape(rate_formatted)
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">👥 {safe_total}</div>'
-            f'<div class="text-green-600 dark:text-green-400">👁️ {safe_seen}</div>'
-            f'<div class="text-base-600 dark:text-base-400">👓 {safe_unseen}</div>'
-            f'<div class="flex items-center gap-1 {rate_color}"><span>{rate_icon}</span><span>{safe_rate}</span></div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">👥 {total}</div>'
+            '<div class="text-green-600 dark:text-green-400">👁️ {seen}</div>'
+            '<div class="text-base-600 dark:text-base-400">👓 {unseen}</div>'
+            '<div class="flex items-center gap-1 {rate_color}"><span>{rate_icon}</span><span>{rate}</span></div>'
+            "</div>",
+            total=total_users,
+            seen=seen_users,
+            unseen=unseen_users,
+            rate_color=rate_color,
+            rate_icon=rate_icon,
+            rate=f"{engagement_rate:.1f}%",
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Timing"))
     def timing_info(self, obj):
@@ -447,32 +457,39 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
 
         now = timezone.now()
         age = now - obj.created_at
-        safe_date = conditional_escape(obj.created_at.strftime("%m-%d"))
-        safe_age = conditional_escape(str(age.days))
 
         if obj.expiry_date:
             if now > obj.expiry_date:
-                expiry_status = '<span class="text-red-600 dark:text-red-400">Expired</span>'
+                expiry_status = mark_safe(
+                    '<span class="text-red-600 dark:text-red-400">Expired</span>'
+                )
             else:
                 time_left = obj.expiry_date - now
                 if time_left.days > 0:
-                    safe_days = conditional_escape(str(time_left.days))
-                    expiry_status = f'<span class="text-green-600 dark:text-green-400">{safe_days}d left</span>'
+                    expiry_status = format_html(
+                        '<span class="text-green-600 dark:text-green-400">{d}d left</span>',
+                        d=time_left.days,
+                    )
                 else:
-                    hours_left = time_left.seconds // 3600
-                    safe_hours = conditional_escape(str(hours_left))
-                    expiry_status = f'<span class="text-orange-600 dark:text-orange-400">{safe_hours}h left</span>'
+                    expiry_status = format_html(
+                        '<span class="text-orange-600 dark:text-orange-400">{h}h left</span>',
+                        h=time_left.seconds // 3600,
+                    )
         else:
-            expiry_status = '<span class="text-blue-600 dark:text-blue-400">No expiry</span>'
+            expiry_status = mark_safe(
+                '<span class="text-blue-600 dark:text-blue-400">No expiry</span>'
+            )
 
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_date}</div>'
-            f'<div class="text-base-600 dark:text-base-400">{safe_age}d ago</div>'
-            f"<div>{expiry_status}</div>"
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{date}</div>'
+            '<div class="text-base-600 dark:text-base-400">{age}d ago</div>'
+            "<div>{expiry}</div>"
+            "</div>",
+            date=obj.created_at.strftime("%m-%d"),
+            age=age.days,
+            expiry=expiry_status,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Analytics"))
     def notification_analytics(self, obj):
@@ -492,36 +509,36 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         has_link = bool(obj.link)
         has_type = bool(obj.notification_type)
 
-        safe_days = conditional_escape(str(age.days))
-        safe_hours = conditional_escape(str(age.seconds // 3600))
-        safe_title_len = conditional_escape(str(title_length))
-        safe_msg_len = conditional_escape(str(message_length))
-        link_status = "Yes" if has_link else "No"
-        type_status = "Yes" if has_type else "No"
-        readability = (
-            "Good"
-            if 10 <= title_length <= 50 and 20 <= message_length <= 200
-            else "Review"
-        )
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Age:</strong></div><div>{safe_days}d {safe_hours}h</div>"
-            f"<div><strong>Title Length:</strong></div><div>{safe_title_len} chars</div>"
-            f"<div><strong>Message Length:</strong></div><div>{safe_msg_len} chars</div>"
-            f"<div><strong>Has Link:</strong></div><div>{link_status}</div>"
-            f"<div><strong>Has Type:</strong></div><div>{type_status}</div>"
-            f"<div><strong>Readability:</strong></div><div>{readability}</div>"
+            "<div><strong>Age:</strong></div><div>{days}d {hours}h</div>"
+            "<div><strong>Title Length:</strong></div><div>{title_len} chars</div>"
+            "<div><strong>Message Length:</strong></div><div>{msg_len} chars</div>"
+            "<div><strong>Has Link:</strong></div><div>{link}</div>"
+            "<div><strong>Has Type:</strong></div><div>{type}</div>"
+            "<div><strong>Readability:</strong></div><div>{readability}</div>"
             "</div>"
-            "</div>"
+            "</div>",
+            days=age.days,
+            hours=age.seconds // 3600,
+            title_len=title_length,
+            msg_len=message_length,
+            link="Yes" if has_link else "No",
+            type="Yes" if has_type else "No",
+            readability=(
+                "Good"
+                if 10 <= title_length <= 50 and 20 <= message_length <= 200
+                else "Review"
+            ),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Engagement Summary"))
     def engagement_summary(self, obj):
-        total_users = obj.notification_users.count()
-        seen_users = obj.notification_users.filter(seen=True).count()
+        total_users = getattr(obj, "nu_total", obj.notification_users.count())
+        seen_users = getattr(
+            obj, "nu_seen", obj.notification_users.filter(seen=True).count()
+        )
         unseen_users = total_users - seen_users
 
         if total_users > 0:
@@ -540,24 +557,24 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
             else "Poor"
         )
 
-        safe_total = conditional_escape(str(total_users))
-        safe_seen = conditional_escape(str(seen_users))
-        safe_unseen = conditional_escape(str(unseen_users))
-        safe_rate = conditional_escape(rate_formatted)
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Total Recipients:</strong></div><div>{safe_total}</div>"
-            f"<div><strong>Seen:</strong></div><div>{safe_seen}</div>"
-            f"<div><strong>Unseen:</strong></div><div>{safe_unseen}</div>"
-            f"<div><strong>Engagement Rate:</strong></div><div>{safe_rate}</div>"
-            f"<div><strong>Avg. Time to See:</strong></div><div>{avg_time_to_see}</div>"
-            f"<div><strong>Performance:</strong></div><div>{performance}</div>"
+            "<div><strong>Total Recipients:</strong></div><div>{total}</div>"
+            "<div><strong>Seen:</strong></div><div>{seen}</div>"
+            "<div><strong>Unseen:</strong></div><div>{unseen}</div>"
+            "<div><strong>Engagement Rate:</strong></div><div>{rate}</div>"
+            "<div><strong>Avg. Time to See:</strong></div><div>{avg_time}</div>"
+            "<div><strong>Performance:</strong></div><div>{performance}</div>"
             "</div>"
-            "</div>"
+            "</div>",
+            total=total_users,
+            seen=seen_users,
+            unseen=unseen_users,
+            rate=rate_formatted,
+            avg_time=avg_time_to_see,
+            performance=performance,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Timing Summary"))
     def timing_summary(self, obj):
@@ -569,33 +586,29 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
         is_business_hours = 9 <= obj.created_at.hour <= 17
         is_weekend = obj.created_at.weekday() >= 5
 
-        safe_created = conditional_escape(
-            obj.created_at.strftime("%Y-%m-%d %H:%M")
-        )
-        safe_days = conditional_escape(str(created_age.days))
-        safe_hours = conditional_escape(str(created_age.seconds // 3600))
-        safe_expiry = (
-            conditional_escape(obj.expiry_date.strftime("%Y-%m-%d"))
-            if obj.expiry_date
-            else "Never"
-        )
-        status = "Expired" if is_expired else "Active"
-        business_hours_status = "Yes" if is_business_hours else "No"
-        weekend_status = "Yes" if is_weekend else "No"
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Created:</strong></div><div>{safe_created}</div>"
-            f"<div><strong>Age:</strong></div><div>{safe_days}d {safe_hours}h</div>"
-            f"<div><strong>Expires:</strong></div><div>{safe_expiry}</div>"
-            f"<div><strong>Status:</strong></div><div>{status}</div>"
-            f"<div><strong>Business Hours:</strong></div><div>{business_hours_status}</div>"
-            f"<div><strong>Weekend:</strong></div><div>{weekend_status}</div>"
+            "<div><strong>Created:</strong></div><div>{created}</div>"
+            "<div><strong>Age:</strong></div><div>{days}d {hours}h</div>"
+            "<div><strong>Expires:</strong></div><div>{expiry}</div>"
+            "<div><strong>Status:</strong></div><div>{status}</div>"
+            "<div><strong>Business Hours:</strong></div><div>{bhours}</div>"
+            "<div><strong>Weekend:</strong></div><div>{weekend}</div>"
             "</div>"
-            "</div>"
+            "</div>",
+            created=obj.created_at.strftime("%Y-%m-%d %H:%M"),
+            days=created_age.days,
+            hours=created_age.seconds // 3600,
+            expiry=(
+                obj.expiry_date.strftime("%Y-%m-%d")
+                if obj.expiry_date
+                else "Never"
+            ),
+            status="Expired" if is_expired else "Active",
+            bhours="Yes" if is_business_hours else "No",
+            weekend="Yes" if is_weekend else "No",
         )
-        return mark_safe(html)
 
 
 @admin.register(NotificationUser)
@@ -676,18 +689,16 @@ class NotificationUserAdmin(ModelAdmin):
     @admin.display(description=_("User"))
     def user_info(self, obj):
         user = obj.user
-        safe_name = conditional_escape(user.full_name or user.username)
-        safe_email = conditional_escape(user.email)
-        safe_id = conditional_escape(str(user.id))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="text-base-600 dark:text-base-400">{safe_email}</div>'
-            f'<div class="text-xs text-base-600 dark:text-base-300">ID: {safe_id}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
+            '<div class="text-base-600 dark:text-base-400">{email}</div>'
+            '<div class="text-xs text-base-600 dark:text-base-300">ID: {id}</div>'
+            "</div>",
+            name=user.full_name or user.username,
+            email=user.email,
+            id=user.id,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Notification"))
     def notification_info(self, obj):
@@ -697,19 +708,16 @@ class NotificationUserAdmin(ModelAdmin):
             or "No Title"
         )
         title_display = title[:30] + "..." if len(title) > 30 else title
-
-        safe_title = conditional_escape(title_display)
-        safe_kind = conditional_escape(notification.get_kind_display())
-        safe_id = conditional_escape(str(notification.id))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_title}</div>'
-            f'<div class="text-base-600 dark:text-base-400">{safe_kind}</div>'
-            f'<div class="text-xs text-base-600 dark:text-base-300">#{safe_id}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{title}</div>'
+            '<div class="text-base-600 dark:text-base-400">{kind}</div>'
+            '<div class="text-xs text-base-600 dark:text-base-300">#{id}</div>'
+            "</div>",
+            title=title_display,
+            kind=notification.get_kind_display(),
+            id=notification.id,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Status"))
     def seen_status(self, obj):
@@ -722,42 +730,38 @@ class NotificationUserAdmin(ModelAdmin):
                 now = timezone.now()
                 diff = now - obj.seen_at
                 if diff.days > 0:
-                    safe_days = conditional_escape(str(diff.days))
-                    time_diff = f" ({safe_days}d ago)"
+                    time_diff = f" ({diff.days}d ago)"
                 else:
-                    hours = diff.seconds // 3600
-                    safe_hours = conditional_escape(str(hours))
-                    time_diff = f" ({safe_hours}h ago)"
-
-            html = (
+                    time_diff = f" ({diff.seconds // 3600}h ago)"
+            return format_html(
                 '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded-full">'
-                f"✅ Seen{time_diff}"
-                "</span>"
+                "✅ Seen{time_diff}"
+                "</span>",
+                time_diff=time_diff,
             )
-            return mark_safe(html)
+        now = timezone.now()
+        age = now - obj.created_at
+
+        if age > timedelta(days=7):
+            urgency_class = (
+                "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200"
+            )
+            icon = "🚨"
+        elif age > timedelta(days=1):
+            urgency_class = "bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-200"
+            icon = "⚠️"
         else:
-            now = timezone.now()
-            age = now - obj.created_at
+            urgency_class = "bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200"
+            icon = "👁️"
 
-            if age > timedelta(days=7):
-                urgency_class = (
-                    "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200"
-                )
-                icon = "🚨"
-            elif age > timedelta(days=1):
-                urgency_class = "bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-200"
-                icon = "⚠️"
-            else:
-                urgency_class = "bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200"
-                icon = "👁️"
-
-            html = (
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium {urgency_class} rounded-full">'
-                f"{icon} Unseen"
-                "</span>"
-            )
-            return mark_safe(html)
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {cls} rounded-full">'
+            "{icon} Unseen"
+            "</span>",
+            cls=urgency_class,
+            icon=icon,
+        )
 
     @admin.display(description=_("Priority"))
     def priority_indicator(self, obj):
@@ -772,23 +776,19 @@ class NotificationUserAdmin(ModelAdmin):
         }
 
         config = priority_config.get(priority, priority_config["NORMAL"])
-        safe_priority = conditional_escape(
-            obj.notification.get_priority_display()
-        )
-        safe_category = conditional_escape(
-            obj.notification.get_category_display()
-        )
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="flex items-center gap-1 {config["color"]}">'
-            f"<span>{config['icon']}</span>"
-            f"<span>{safe_priority}</span>"
+            '<div class="flex items-center gap-1 {color}">'
+            "<span>{icon}</span>"
+            "<span>{priority}</span>"
             "</div>"
-            f'<div class="text-xs text-base-600 dark:text-base-300">{safe_category}</div>'
-            "</div>"
+            '<div class="text-xs text-base-600 dark:text-base-300">{category}</div>'
+            "</div>",
+            color=config["color"],
+            icon=config["icon"],
+            priority=obj.notification.get_priority_display(),
+            category=obj.notification.get_category_display(),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Timing"))
     def timing_display(self, obj):
@@ -803,25 +803,24 @@ class NotificationUserAdmin(ModelAdmin):
         )
 
         if is_expired:
-            status_display = (
+            status_display = mark_safe(
                 '<span class="text-red-600 dark:text-red-400">Expired</span>'
             )
         else:
-            status_display = (
+            status_display = mark_safe(
                 '<span class="text-green-600 dark:text-green-400">Active</span>'
             )
 
-        safe_date = conditional_escape(obj.created_at.strftime("%m-%d"))
-        safe_age = conditional_escape(str(age.days))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_date}</div>'
-            f'<div class="text-base-600 dark:text-base-400">{safe_age}d ago</div>'
-            f"<div>{status_display}</div>"
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{date}</div>'
+            '<div class="text-base-600 dark:text-base-400">{age}d ago</div>'
+            "<div>{status}</div>"
+            "</div>",
+            date=obj.created_at.strftime("%m-%d"),
+            age=age.days,
+            status=status_display,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Analytics"))
     def user_notification_analytics(self, obj):
@@ -844,28 +843,22 @@ class NotificationUserAdmin(ModelAdmin):
             obj.notification.expiry_date and now > obj.notification.expiry_date
         )
 
-        safe_days = conditional_escape(str(age.days))
-        safe_hours = conditional_escape(str(age.seconds // 3600))
-        safe_response = conditional_escape(response_time)
-        status = "Expired" if is_expired else "Active"
-        safe_priority = conditional_escape(
-            obj.notification.get_priority_display()
-        )
-        safe_category = conditional_escape(
-            obj.notification.get_category_display()
-        )
-        engagement = "Good" if obj.seen else "Pending"
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Age:</strong></div><div>{safe_days}d {safe_hours}h</div>"
-            f"<div><strong>Response Time:</strong></div><div>{safe_response}</div>"
-            f"<div><strong>Notification Status:</strong></div><div>{status}</div>"
-            f"<div><strong>Priority Level:</strong></div><div>{safe_priority}</div>"
-            f"<div><strong>Category:</strong></div><div>{safe_category}</div>"
-            f"<div><strong>Engagement:</strong></div><div>{engagement}</div>"
+            "<div><strong>Age:</strong></div><div>{days}d {hours}h</div>"
+            "<div><strong>Response Time:</strong></div><div>{response}</div>"
+            "<div><strong>Notification Status:</strong></div><div>{status}</div>"
+            "<div><strong>Priority Level:</strong></div><div>{priority}</div>"
+            "<div><strong>Category:</strong></div><div>{category}</div>"
+            "<div><strong>Engagement:</strong></div><div>{engagement}</div>"
             "</div>"
-            "</div>"
+            "</div>",
+            days=age.days,
+            hours=age.seconds // 3600,
+            response=response_time,
+            status="Expired" if is_expired else "Active",
+            priority=obj.notification.get_priority_display(),
+            category=obj.notification.get_category_display(),
+            engagement="Good" if obj.seen else "Pending",
         )
-        return mark_safe(html)

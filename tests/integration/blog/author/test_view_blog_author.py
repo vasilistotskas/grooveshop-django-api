@@ -234,6 +234,10 @@ class BlogAuthorViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_create_duplicate_user_validation(self):
+        # author_user already has a BlogAuthor profile (created in setUp).
+        # Admin pointing a new author at that same user must produce a 400
+        # via the validate() guard — the model's unique=True would
+        # otherwise raise IntegrityError → 500.
         payload = {
             "user": self.author_user.id,
             "website": "https://example.com",
@@ -247,10 +251,14 @@ class BlogAuthorViewSetTestCase(TestURLFixerMixin, APITestCase):
         url = self.get_blog_author_list_url()
         response = self.client.post(url, data=payload, format="json")
 
+        # DRF's ModelSerializer auto-generates a UniqueValidator from the
+        # model's `user` unique=True. The exact message is locale-dependent
+        # (Greek in tests since `el` is the default), so just verify the
+        # 400 status with a `user` field error and a `unique` code.
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn(
-            "This user already has an author profile", str(response.data)
-        )
+        self.assertIn("user", response.data)
+        codes = {getattr(err, "code", None) for err in response.data["user"]}
+        self.assertIn("unique", codes)
 
     def test_posts_endpoint(self):
         url = self.get_blog_author_posts_url(self.blog_author.id)

@@ -183,6 +183,8 @@ class ProductImageWriteSerializer(
         )
 
     def validate_image(self, value: ImageFieldFile) -> ImageFieldFile:
+        from PIL import Image as PILImage  # noqa: PLC0415
+
         if not value:
             raise serializers.ValidationError("Image file is required.")
 
@@ -191,18 +193,41 @@ class ProductImageWriteSerializer(
                 "Image file size cannot exceed 5MB."
             )
 
-        if hasattr(value, "content_type"):
-            allowed_types = [
-                "image/jpeg",
-                "image/jpg",
-                "image/png",
-                "image/webp",
-                "image/svg+xml",
-            ]
-            if value.content_type not in allowed_types:
+        # Use PIL magic-byte verification instead of the browser-supplied
+        # content_type header, which is attacker-controlled.
+        allowed_raster_formats = {"JPEG", "PNG", "WEBP", "AVIF"}
+        filename = getattr(value, "name", "") or ""
+
+        if filename.lower().endswith(".svg"):
+            # SVG validation is handled at the form/field level via
+            # ImageAndSvgField — pass through without PIL (PIL cannot
+            # parse SVGs and UnidentifiedImageError would be a false positive).
+            pass
+        else:
+            try:
+                with PILImage.open(value) as img:
+                    img.verify()
+                    if img.format not in allowed_raster_formats:
+                        raise serializers.ValidationError(
+                            f"Unsupported image format: {img.format}. "
+                            f"Allowed: {', '.join(sorted(allowed_raster_formats))}"
+                        )
+            except serializers.ValidationError:
+                raise
+            except (
+                PILImage.UnidentifiedImageError,
+                OSError,
+                ValueError,
+            ) as exc:
                 raise serializers.ValidationError(
-                    f"Unsupported file type. Allowed types: {', '.join(allowed_types)}"
-                )
+                    "Invalid image file."
+                ) from exc
+            finally:
+                # Reset stream position so downstream readers (storage
+                # backends, etc.) see the full file.  InMemoryUploadedFile
+                # and TemporaryUploadedFile both support seek(0).
+                if hasattr(value, "seek"):
+                    value.seek(0)
 
         return value
 

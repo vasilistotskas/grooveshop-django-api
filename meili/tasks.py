@@ -169,8 +169,8 @@ def delete_document_task(
     try:
         task = _client.get_index(index_name).delete_document(document_pk)
 
-        # Wait for task completion
-        finished = _client.wait_for_task(task.task_uid)
+        # Bounded wait — consistent with index_document_task timeout.
+        finished = _client.wait_for_task(task.task_uid, timeout_in_ms=5000)
 
         if finished.status == "failed":
             # Document not found is not an error
@@ -244,14 +244,11 @@ def bulk_index_task(
 
         total_indexed = 0
         total_filtered = 0
-        tasks = []
+        meili_tasks = []
 
-        # Process in batches
-        instances = list(queryset)
-        for i in range(0, len(instances), batch_size):
-            batch = instances[i : i + batch_size]
+        def _process_batch(batch: list) -> None:
+            nonlocal total_indexed, total_filtered
             documents = []
-
             for instance in batch:
                 if not instance.meili_filter():
                     total_filtered += 1
@@ -277,32 +274,44 @@ def bulk_index_task(
 
             if documents:
                 task = _client.get_index(index_name).add_documents(documents)
-                tasks.append(task)
+                meili_tasks.append(task)
                 total_indexed += len(documents)
 
-        # Wait for all tasks
+        # Iterator-based batching avoids loading the full queryset into memory.
+        current_batch: list = []
+        for instance in queryset.iterator(chunk_size=batch_size):
+            current_batch.append(instance)
+            if len(current_batch) >= batch_size:
+                _process_batch(current_batch)
+                current_batch = []
+        if current_batch:
+            _process_batch(current_batch)
+
+        # Wait for all Meilisearch tasks and collect failures.
         failed_tasks = []
-        for task in tasks:
+        for task in meili_tasks:
             finished = _client.wait_for_task(task.task_uid)
             if finished.status == "failed":
                 failed_tasks.append(
                     {"task_uid": task.task_uid, "error": str(finished.error)}
                 )
 
-        if failed_tasks:
-            logger.warning(f"Some bulk indexing tasks failed: {failed_tasks}")
-
         logger.info(
             f"Bulk indexed {total_indexed} documents to {index_name}, "
             f"{total_filtered} filtered out, {len(failed_tasks)} tasks failed"
         )
 
+        if failed_tasks:
+            raise Exception(
+                f"Bulk indexing to {index_name} had {len(failed_tasks)} "
+                f"failed Meilisearch tasks: {failed_tasks}"
+            )
+
         return {
-            "status": "success" if not failed_tasks else "partial",
+            "status": "success",
             "index": index_name,
             "total_indexed": total_indexed,
             "total_filtered": total_filtered,
-            "failed_tasks": failed_tasks,
         }
 
     except Exception as e:
@@ -369,11 +378,9 @@ def reindex_model_task(
         total_filtered = 0
         tasks = []
 
-        # Process in batches
-        for start in range(0, total_count, batch_size):
-            batch = queryset[start : start + batch_size]
+        def _process_batch(batch: list) -> None:
+            nonlocal total_indexed, total_filtered
             documents = []
-
             for instance in batch:
                 if not instance.meili_filter():
                     total_filtered += 1
@@ -402,16 +409,34 @@ def reindex_model_task(
                 tasks.append(task)
                 total_indexed += len(documents)
 
-            # Update task progress
-            progress = min(100, int((start + batch_size) / total_count * 100))
-            self.update_state(
-                state="PROGRESS",
-                meta={
-                    "current": start + batch_size,
-                    "total": total_count,
-                    "percent": progress,
-                },
-            )
+        # Iterator-based batching avoids the LIMIT/OFFSET O(n²) scan:
+        # each OFFSET N forces Postgres to scan and discard N rows before
+        # returning the next batch.  .iterator() streams rows in a single
+        # server-side cursor pass; we buffer them manually into chunks
+        # matching batch_size before sending to Meilisearch.
+        current_batch: list = []
+        processed = 0
+        for instance in queryset.iterator(chunk_size=batch_size):
+            current_batch.append(instance)
+            if len(current_batch) >= batch_size:
+                _process_batch(current_batch)
+                processed += len(current_batch)
+                current_batch = []
+                progress = min(
+                    100,
+                    int(processed / total_count * 100) if total_count else 100,
+                )
+                self.update_state(
+                    state="PROGRESS",
+                    meta={
+                        "current": processed,
+                        "total": total_count,
+                        "percent": progress,
+                    },
+                )
+        if current_batch:
+            _process_batch(current_batch)
+            processed += len(current_batch)
 
         # Wait for all tasks
         failed_tasks = []
@@ -427,13 +452,19 @@ def reindex_model_task(
             f"{total_filtered} filtered out"
         )
 
+        if failed_tasks:
+            raise RuntimeError(
+                f"reindex_model_task partial failure for {index_name}: "
+                f"{len(failed_tasks)} Meilisearch task(s) failed: "
+                f"{failed_tasks}"
+            )
+
         return {
-            "status": "success" if not failed_tasks else "partial",
+            "status": "success",
             "index": index_name,
             "total_indexed": total_indexed,
             "total_filtered": total_filtered,
             "total_records": total_count,
-            "failed_tasks": failed_tasks,
         }
 
     except Exception as e:

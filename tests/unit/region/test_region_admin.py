@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase
 from django.utils import timezone
+from django.utils.translation import gettext
 
 from country.models import Country
 from region.admin import (
@@ -66,7 +67,7 @@ class TestRegionStatusFilter(TestCase):
         filter_instance = RegionStatusFilter(
             self.request, {}, Region, self.model_admin
         )
-        self.assertEqual(filter_instance.title, "Region Status")
+        self.assertEqual(str(filter_instance.title), gettext("Region Status"))
         self.assertEqual(filter_instance.parameter_name, "region_status")
 
     def test_lookups(self):

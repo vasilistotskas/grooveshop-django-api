@@ -41,6 +41,13 @@ class ProductImage(
                 name="prod_img_product_is_main_ix",
             ),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product"],
+                condition=models.Q(is_main=True),
+                name="unique_main_product_image",
+            ),
+        ]
 
     def __str__(self):
         product_name = self.product.safe_translation_getter(
@@ -53,15 +60,12 @@ class ProductImage(
         return self.product.images.all()
 
     def save(self, *args, **kwargs):
-        from django.db import transaction
+        if self.is_main and self.product_id:
+            ProductImage.objects.filter(
+                product_id=self.product_id, is_main=True
+            ).exclude(pk=self.pk).update(is_main=False)
 
-        with transaction.atomic():
-            if self.is_main and self.product_id:
-                ProductImage.objects.filter(
-                    product_id=self.product_id, is_main=True
-                ).exclude(pk=self.pk).update(is_main=False)
-
-            super().save(*args, **kwargs)
+        super().save(*args, **kwargs)
 
     @property
     def main_image_path(self) -> str:

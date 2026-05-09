@@ -1,12 +1,12 @@
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import QuerySet
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import get_language, gettext_lazy as _
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -16,6 +16,8 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    PaymentAmountMismatchError,
+    PaymentCurrencyMismatchError,
     PaymentError,
     PaymentNotFoundError,
     ProductNotFoundError,
@@ -27,7 +29,45 @@ from order.models.stock_reservation import StockReservation
 from order.signals import order_refunded
 from order.stock import StockManager
 
+# Re-export under the legacy private name so existing tests keep
+# passing without churn. The canonical home is ``shipping.utils``;
+# new call sites should import from there.
+from shipping.utils import (
+    compute_total_weight_grams as _compute_total_weight_grams,
+)
+
 logger = logging.getLogger(__name__)
+
+__all__ = ["OrderService", "_compute_total_weight_grams"]
+
+
+def _log_price_drift_if_needed(cart_item, current_price) -> None:
+    """Emit a warning when the live product price differs from the price the
+    customer saw at add-to-cart time.
+
+    This is observability only — we still charge the live price. Operators can
+    monitor warnings to detect runaway price changes between add-to-cart and
+    checkout, then decide whether to enforce price-match (block checkout when
+    drift exceeds a threshold) or warn-and-confirm (UX hop) as a follow-up.
+    """
+    frozen = getattr(cart_item, "price_at_add", None)
+    if frozen is None or current_price is None:
+        return
+    try:
+        if (
+            frozen.amount == current_price.amount
+            and frozen.currency == current_price.currency
+        ):
+            return
+    except (AttributeError, TypeError):
+        return
+    logger.warning(
+        "Cart price drift at checkout: cart_item=%s product=%s price_at_add=%s charged=%s",
+        getattr(cart_item, "id", "?"),
+        getattr(getattr(cart_item, "product", None), "id", "?"),
+        frozen,
+        current_price,
+    )
 
 
 class OrderService:
@@ -53,7 +93,28 @@ class OrderService:
             if user and user.is_authenticated:
                 order_data["user"] = user
 
+            # Pop provider-specific fields before Order.objects.create —
+            # they are not Order columns. The full dict is then handed
+            # to the registered carrier adapter so each provider reads
+            # its own keys.
+            shipment_payload = cls._extract_shipment_payload(order_data)
+            cls._resolve_shipping_provider(order_data)
+            cls._seed_language_code(order_data)
+
             order = Order.objects.create(**order_data)
+
+            items_pairs = [
+                (item.get("product"), item.get("quantity", 0))
+                for item in items_data
+            ]
+
+            # One generic dispatch — provider's create_shipment_row
+            # handles its own filtering on shipping_method / kind.
+            from shipping.services import ShippingService
+
+            ShippingService.create_shipment_row_for_order(
+                order, payload=shipment_payload, items=items_pairs
+            )
 
             target_currency = (
                 order.shipping_price.currency
@@ -101,6 +162,9 @@ class OrderService:
                 else:
                     item_to_create["price"] = product_price
 
+                # bulk_create cannot be used here: post_save on OrderItem
+                # writes an OrderHistory audit note per item. Already
+                # inside @transaction.atomic so all inserts commit together.
                 OrderItem.objects.create(order=order, **item_to_create)
 
             order.paid_amount = order.calculate_order_total_amount()
@@ -138,6 +202,7 @@ class OrderService:
         pay_way,
         user=None,
         loyalty_points_to_redeem: int | None = None,
+        meta_context: dict[str, Any] | None = None,
     ) -> Order:
         """
         Create order from cart after payment confirmation (payment-first flow).
@@ -189,6 +254,13 @@ class OrderService:
             ... )
         """
         try:
+            from cart.models import Cart  # noqa: PLC0415
+
+            # Lock the Cart row immediately so concurrent checkouts on the
+            # same cart are serialised.  Must happen before any reads so
+            # validate_cart_for_checkout sees the locked snapshot.
+            cart = Cart.objects.select_for_update().get(pk=cart.pk)
+
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
             if not validation_result.get("valid", False):
@@ -199,7 +271,7 @@ class OrderService:
                 )
 
             # Step 2: Validate shipping address
-            cls.validate_shipping_address(shipping_address)
+            cls.validate_shipping_address(shipping_address, pay_way=pay_way)
 
             # Step 3: Validate payment intent exists
             from order.payment import get_payment_provider
@@ -231,6 +303,80 @@ class OrderService:
                     )
                 )
 
+            # Verify the provider amount matches the server-calculated total.
+            # The Stripe PaymentIntent's amount (in cents) must equal the
+            # cart total + shipping + payment fee to prevent a tampered client
+            # submitting a PI created for a lower amount.
+            # payment_data["amount"] is in euros (stripe_pi.amount / 100).
+            # We calculate the expected total using the same logic as Step 5.
+            from shipping.utils import compute_total_weight_grams
+
+            _cart_total = cart.total_price
+            _cart_weight_grams = compute_total_weight_grams(
+                (item.product, item.quantity) for item in cart.items.all()
+            )
+            _shipping_cost = cls.calculate_shipping_cost(
+                order_value=_cart_total,
+                country_id=shipping_address.get("country_id"),
+                region_id=shipping_address.get("region_id"),
+                shipping_provider_code=shipping_address.get(
+                    "shipping_provider_code"
+                ),
+                shipping_kind=shipping_address.get("shipping_kind"),
+                weight_grams=_cart_weight_grams,
+            )
+            _order_subtotal = Money(
+                _cart_total.amount + _shipping_cost.amount,
+                _cart_total.currency,
+            )
+            _payment_fee = cls.calculate_payment_method_fee(
+                pay_way=pay_way,
+                order_value=_order_subtotal,
+            )
+            _expected_total = (
+                _cart_total.amount + _shipping_cost.amount + _payment_fee.amount
+            )
+            calculated_total_cents = int(round(_expected_total * 100))
+            # The Stripe provider returns amount already divided by 100
+            # (see payment.py StripePaymentProvider.get_payment_status) and
+            # also returns a currency code. Some providers/tests return a
+            # stripped payload without amount/currency — only enforce the
+            # check when the provider actually supplied those fields.
+            expected_currency = settings.DEFAULT_CURRENCY.lower()
+
+            if "amount" in payment_data and payment_data["amount"] is not None:
+                provider_amount_cents = int(round(payment_data["amount"] * 100))
+                if provider_amount_cents != calculated_total_cents:
+                    logger.warning(
+                        "Payment amount mismatch for intent %s: "
+                        "provider=%d cents, calculated=%d cents",
+                        payment_intent_id,
+                        provider_amount_cents,
+                        calculated_total_cents,
+                    )
+                    raise PaymentAmountMismatchError(
+                        provider_amount_cents=provider_amount_cents,
+                        calculated_amount_cents=calculated_total_cents,
+                    )
+
+            if payment_data.get("currency"):
+                provider_currency = payment_data["currency"].lower()
+                if provider_currency not in {
+                    "eur",
+                    expected_currency,
+                }:
+                    logger.warning(
+                        "Payment currency mismatch for intent %s: "
+                        "provider='%s', expected='%s'",
+                        payment_intent_id,
+                        provider_currency,
+                        expected_currency,
+                    )
+                    raise PaymentCurrencyMismatchError(
+                        provider_currency=provider_currency,
+                        expected_currency=expected_currency,
+                    )
+
             # Step 4: Get stock reservations for cart session
             # Reservations are identified by cart.uuid (session_id)
             reservations = list(
@@ -239,8 +385,16 @@ class OrderService:
                 ).select_related("product")
             )
 
-            # Validate we have reservations for all cart items
-            cart_items = cart.get_items()
+            # Validate we have reservations for all cart items.
+            # Materialize the queryset eagerly: the order_created signal
+            # handler schedules ``cart.delete()`` via ``transaction.on_commit``;
+            # if anything causes that callback to fire before this loop
+            # executes, the lazy queryset would resolve to zero rows.
+            # Also lock the CartItem rows within the same transaction to
+            # prevent concurrent mutations while we process them.
+            cart_items = list(
+                cart.items.select_for_update().select_related("product")
+            )
 
             # Check if any reservations have expired
             expired_reservations = [r for r in reservations if r.is_expired]
@@ -333,12 +487,24 @@ class OrderService:
                 ),
             }
 
-            # Calculate shipping cost
+            # Calculate shipping cost — pass cart weight so ACS live
+            # quotes match the weight-banded tariff bracket the voucher
+            # mint will charge (no surprise upcharge after order create).
+            from shipping.utils import compute_total_weight_grams
+
             cart_total = cart.total_price
+            cart_weight_grams = compute_total_weight_grams(
+                (ci.product, ci.quantity) for ci in cart_items
+            )
             shipping_cost = cls.calculate_shipping_cost(
                 order_value=cart_total,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
+                shipping_provider_code=shipping_address.get(
+                    "shipping_provider_code"
+                ),
+                shipping_kind=shipping_address.get("shipping_kind"),
+                weight_grams=cart_weight_grams,
             )
             order_data["shipping_price"] = shipping_cost
 
@@ -354,8 +520,31 @@ class OrderService:
             )
             order_data["payment_method_fee"] = payment_fee
 
-            # Create the order
+            # Resolve provider FK + kind, then create the order.
+            order_data.setdefault(
+                "shipping_provider_code",
+                shipping_address.get("shipping_provider_code"),
+            )
+            order_data.setdefault(
+                "shipping_kind", shipping_address.get("shipping_kind")
+            )
+            cls._resolve_shipping_provider(order_data)
+            cls._seed_language_code(order_data)
             order = Order.objects.create(**order_data)
+
+            # Reuse the already-locked/materialised cart_items list rather
+            # than issuing a second SELECT on the same rows.
+            cart_items_pairs = [(ci.product, ci.quantity) for ci in cart_items]
+
+            # Provider-agnostic shipment row creation. The carrier
+            # adapter reads its own keys out of ``shipping_address``
+            # (boxnow_locker_id, acs_station_external_id, etc.) and
+            # filters on ``shipping_kind`` itself.
+            from shipping.services import ShippingService
+
+            ShippingService.create_shipment_row_for_order(
+                order, payload=shipping_address, items=cart_items_pairs
+            )
 
             # Initialize metadata with cart snapshot
             order.metadata = {
@@ -367,6 +556,13 @@ class OrderService:
                     "currency": str(cart.total_price.currency),
                 },
             }
+            # Meta Pixel context forwarded by the storefront proxy.
+            # Persisted alongside cart_snapshot so the CAPI dispatcher
+            # can build a UserData payload with the same fbp/fbc the
+            # browser pixel saw.
+            sanitised_meta = cls._sanitise_meta_context(meta_context)
+            if sanitised_meta:
+                order.metadata["meta"] = sanitised_meta
 
             # Track reservation IDs for this order
             reservation_ids = []
@@ -401,7 +597,14 @@ class OrderService:
                 else:
                     item_price = product_price
 
-                # Create OrderItem
+                _log_price_drift_if_needed(cart_item, item_price)
+
+                # bulk_create cannot be used here: the post_save signal
+                # on OrderItem (handle_order_item_post_save) writes an
+                # OrderHistory audit note for each new item and is the
+                # canonical creation hook. bulk_create skips all signals.
+                # The loop is already inside @transaction.atomic so all
+                # inserts land in one DB round-trip on commit.
                 OrderItem.objects.create(
                     order=order,
                     product=product,
@@ -568,6 +771,7 @@ class OrderService:
         pay_way,
         user=None,
         loyalty_points_to_redeem: int | None = None,
+        meta_context: dict[str, Any] | None = None,
     ) -> Order:
         """
         Create order from cart using the order-first flow.
@@ -620,6 +824,13 @@ class OrderService:
             ... )
         """
         try:
+            from cart.models import Cart  # noqa: PLC0415
+
+            # Lock the Cart row immediately so concurrent checkouts on the
+            # same cart are serialised.  Must happen before any reads so
+            # validate_cart_for_checkout sees the locked snapshot.
+            cart = Cart.objects.select_for_update().get(pk=cart.pk)
+
             # Step 1: Validate cart for checkout
             validation_result = cls.validate_cart_for_checkout(cart)
             if not validation_result.get("valid", False):
@@ -630,7 +841,7 @@ class OrderService:
                 )
 
             # Step 2: Validate shipping address
-            cls.validate_shipping_address(shipping_address)
+            cls.validate_shipping_address(shipping_address, pay_way=pay_way)
 
             # Step 3: Get stock reservations for cart session
             # Reservations are identified by cart.uuid (session_id)
@@ -640,8 +851,16 @@ class OrderService:
                 ).select_related("product")
             )
 
-            # Validate we have reservations for all cart items
-            cart_items = cart.get_items()
+            # Validate we have reservations for all cart items.
+            # Materialize the queryset eagerly: the order_created signal
+            # handler schedules ``cart.delete()`` via ``transaction.on_commit``;
+            # if anything causes that callback to fire before this loop
+            # executes, the lazy queryset would resolve to zero rows.
+            # Also lock the CartItem rows within the same transaction to
+            # prevent concurrent mutations while we process them.
+            cart_items = list(
+                cart.items.select_for_update().select_related("product")
+            )
 
             # Check if any reservations have expired
             expired_reservations = [r for r in reservations if r.is_expired]
@@ -733,12 +952,24 @@ class OrderService:
                 ),
             }
 
-            # Calculate shipping cost
+            # Calculate shipping cost — pass cart weight so ACS live
+            # quotes match the weight-banded tariff bracket the voucher
+            # mint will charge.
+            from shipping.utils import compute_total_weight_grams
+
             cart_total = cart.total_price
+            cart_weight_grams = compute_total_weight_grams(
+                (ci.product, ci.quantity) for ci in cart_items
+            )
             shipping_cost = cls.calculate_shipping_cost(
                 order_value=cart_total,
                 country_id=shipping_address.get("country_id"),
                 region_id=shipping_address.get("region_id"),
+                shipping_provider_code=shipping_address.get(
+                    "shipping_provider_code"
+                ),
+                shipping_kind=shipping_address.get("shipping_kind"),
+                weight_grams=cart_weight_grams,
             )
             order_data["shipping_price"] = shipping_cost
 
@@ -754,7 +985,16 @@ class OrderService:
             )
             order_data["payment_method_fee"] = payment_fee
 
-            # Create the order
+            order_data.setdefault(
+                "shipping_provider_code",
+                shipping_address.get("shipping_provider_code"),
+            )
+            order_data.setdefault(
+                "shipping_kind", shipping_address.get("shipping_kind")
+            )
+            cls._resolve_shipping_provider(order_data)
+            cls._seed_language_code(order_data)
+
             order = Order.objects.create(**order_data)
 
             # Set payment_id for offline payments only.
@@ -763,6 +1003,17 @@ class OrderService:
             if not pay_way.is_online_payment:
                 order.payment_id = f"offline_{order.uuid}"
                 order.save(update_fields=["payment_id"])
+
+            # Reuse the already-locked/materialised cart_items list rather
+            # than issuing a second SELECT on the same rows.
+            cart_items_pairs = [(ci.product, ci.quantity) for ci in cart_items]
+
+            # Provider-agnostic shipment row creation via the registry.
+            from shipping.services import ShippingService
+
+            ShippingService.create_shipment_row_for_order(
+                order, payload=shipping_address, items=cart_items_pairs
+            )
 
             # Initialize metadata with cart snapshot
             order.metadata = {
@@ -775,6 +1026,9 @@ class OrderService:
                 },
                 "payment_type": "offline",
             }
+            sanitised_meta = cls._sanitise_meta_context(meta_context)
+            if sanitised_meta:
+                order.metadata["meta"] = sanitised_meta
 
             # Track reservation IDs for this order
             reservation_ids = []
@@ -809,7 +1063,14 @@ class OrderService:
                 else:
                     item_price = product_price
 
-                # Create OrderItem
+                _log_price_drift_if_needed(cart_item, item_price)
+
+                # bulk_create cannot be used here: the post_save signal
+                # on OrderItem (handle_order_item_post_save) writes an
+                # OrderHistory audit note for each new item and is the
+                # canonical creation hook. bulk_create skips all signals.
+                # The loop is already inside @transaction.atomic so all
+                # inserts land in one DB round-trip on commit.
                 OrderItem.objects.create(
                     order=order,
                     product=product,
@@ -938,7 +1199,15 @@ class OrderService:
             cart.items.all().delete()
             logger.info("Cleared cart %s after order creation", cart.uuid)
 
-            # Step 8: Return order in PENDING status
+            # Step 8: Dispatch shipment creation for true offline payments
+            # (COD, Bank Transfer). Online providers that route through
+            # this method (Viva Wallet) defer dispatch to the payment
+            # webhook so the courier voucher only mints after the
+            # shopper actually pays.
+            if not pay_way.is_online_payment:
+                cls._dispatch_shipment_creation_task(order)
+
+            # Step 9: Return order in PENDING status
             logger.info(
                 "Order %s created successfully from cart %s (order-first, %s)",
                 order.id,
@@ -1007,13 +1276,26 @@ class OrderService:
                 "warnings": warnings,
             }
 
-        # Check 2: All products exist and are in stock
+        # Check 2: All products exist, are active, and are in stock
         for cart_item in cart_items:
             product = cart_item.product
 
             # Check product exists
             if not product:
                 errors.append(_("Product in cart no longer exists"))
+                continue
+
+            product_display_name = (
+                product.safe_translation_getter("name", any_language=True) or ""
+            )
+
+            # Check product is active
+            if product.active is False:
+                errors.append(
+                    _("Product '{product}' is no longer available").format(
+                        product=product_display_name
+                    )
+                )
                 continue
 
             # Check product is in stock (exclude this cart's own
@@ -1028,7 +1310,7 @@ class OrderService:
                         "Product '{product}' has insufficient stock. "
                         "Available: {available}, Requested: {requested}"
                     ).format(
-                        product=product.name,
+                        product=product_display_name,
                         available=available_stock,
                         requested=cart_item.quantity,
                     )
@@ -1042,7 +1324,12 @@ class OrderService:
         }
 
     @classmethod
-    def validate_shipping_address(cls, address: dict[str, Any]) -> None:
+    def validate_shipping_address(
+        cls,
+        address: dict[str, Any],
+        *,
+        pay_way: Any | None = None,
+    ) -> None:
         """
         Validate shipping address completeness.
 
@@ -1097,6 +1384,32 @@ class OrderService:
         for field in required_fields:
             if not address.get(field):
                 errors[field] = [_("This field is required")]
+
+        # Carrier-specific validation runs through the registry below
+        # (see ``ShippingService.validate_order_payload``) — each
+        # provider adapter owns its own field-level rules so this
+        # method stays carrier-agnostic.
+        validation_payload = dict(address)
+
+        provider_code = address.get("shipping_provider_code")
+        kind_value = address.get("shipping_kind")
+        if provider_code and kind_value:
+            from shipping.exceptions import ShippingProviderNotFoundError
+            from shipping.services import ShippingService
+
+            try:
+                provider_errors = ShippingService.validate_order_payload(
+                    provider_code=provider_code,
+                    kind=kind_value,
+                    payload=validation_payload,
+                )
+            except ShippingProviderNotFoundError:
+                errors["shipping_provider_code"] = [
+                    _("Unknown shipping provider.")
+                ]
+            else:
+                for field, messages in provider_errors.items():
+                    errors.setdefault(field, []).extend(messages)
 
         # Validate email format if provided
         email = address.get("email")
@@ -1209,6 +1522,102 @@ class OrderService:
 
         except InvalidStatusTransitionError:
             raise
+
+    @classmethod
+    def _suppress_customer_status_notifications(
+        cls, order: Order, new_status: str
+    ) -> None:
+        """Pre-stamp metadata so the next ``new_status`` transition
+        skips the customer email + WS toast.
+
+        Used by chained transitions (DELIVERED → COMPLETED auto-advance,
+        admin tracking promotion that hops PENDING → PROCESSING → SHIPPED,
+        online payment succeeded firing PENDING → PROCESSING right
+        before the order_received confirmation email lands) where the
+        chained-into status would arrive at the customer's inbox /
+        notification bell within ~ms of the previous one and feel like
+        spam.
+
+        Internal state still flows: ``order_status_changed`` signal
+        fires, OrderHistory logs the transition, the post-save handler
+        runs. Only the user-visible ``send_order_status_update_email``
+        + ``notify_order_status_changed_live`` dispatches are skipped.
+
+        ``_status_update_reservation_key`` is the same key the email
+        task uses to dedupe — pre-stamping it makes the task short-
+        circuit. The matching ``suppress_status_ws_<status>`` flag
+        is read by ``handle_order_status_changed`` for the live-
+        notification dispatch.
+        """
+        from order.tasks import _status_update_reservation_key
+
+        email_flag = _status_update_reservation_key(order.id, new_status)
+        ws_flag = f"suppress_status_ws_{new_status}"
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[email_flag] = True
+        order.metadata[ws_flag] = True
+        order.save(update_fields=["metadata"])
+
+    @classmethod
+    def maybe_advance_to_completed(
+        cls, order: Order, *, silent_for_customer: bool = False
+    ) -> Order:
+        """Auto-advance ``order`` from DELIVERED to COMPLETED when paid.
+
+        The canonical state-machine table allows DELIVERED → COMPLETED,
+        but nothing in the wild was actually invoking it: online orders
+        ended at DELIVERED, COD orders ended at DELIVERED + payment_
+        status=PENDING (until the reconcile pass flips them). Without
+        this helper, "completed" was an admin-only manual flip.
+
+        Triggers from two call-sites:
+        * Carrier event handlers (ACS poll, BoxNow webhook) right after
+          they advance to DELIVERED for an already-paid online order.
+          Pass ``silent_for_customer=True`` here — the customer just
+          got the DELIVERED email + toast and a COMPLETED message ~ms
+          later would feel like a duplicate.
+        * COD reconcile, after flipping payment_status to COMPLETED.
+          Leave ``silent_for_customer=False`` (default) — DELIVERED
+          fired hours/days earlier, so a fresh "thanks for your loyalty
+          points" message is welcome, not redundant.
+
+        Idempotent and silent when the order is not eligible — a
+        non-paid order or one already past DELIVERED no-ops.
+
+        Status fields are read with ``values_list`` rather than
+        ``refresh_from_db(fields=...)``: the latter leaves other
+        columns deferred, and ``Order.__init__`` lazy-loads them when
+        it snapshots ``_original_tracking_number`` etc., which
+        recurses through the manager.
+        """
+        row = (
+            Order.objects.filter(pk=order.pk)
+            .values("status", "payment_status")
+            .first()
+        )
+        if not row:
+            return order
+        if row["status"] != OrderStatus.DELIVERED:
+            return order
+        if row["payment_status"] != PaymentStatus.COMPLETED:
+            return order
+        order.status = row["status"]
+        order.payment_status = row["payment_status"]
+        if silent_for_customer:
+            cls._suppress_customer_status_notifications(
+                order, OrderStatus.COMPLETED.value
+            )
+        try:
+            return cls.update_order_status(order, OrderStatus.COMPLETED)
+        except InvalidStatusTransitionError as exc:
+            logger.warning(
+                "Order %s DELIVERED -> COMPLETED auto-advance rejected by "
+                "state machine: %s",
+                order.id,
+                exc,
+            )
+            return order
 
     @classmethod
     def get_user_orders(cls, user_id: int) -> QuerySet:
@@ -1411,6 +1820,14 @@ class OrderService:
                 old_status,
             )
 
+            # Cascade to the courier voucher when one is attached. ACS
+            # rejects cancellation once the voucher is in a daily
+            # pickup list (the parcel is already with the courier);
+            # we log + record on the order and continue, so admins
+            # can still cancel the order at our end while the courier
+            # handles the in-transit return out of band.
+            cls._cancel_attached_shipment(order, reason)
+
             refund_info = None
             if (
                 refund_payment
@@ -1481,7 +1898,10 @@ class OrderService:
         if not order.is_paid:
             raise PaymentError(_("This order has not been paid yet."))
 
-        if order.payment_status == PaymentStatus.REFUNDED:
+        if order.payment_status in (
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+        ):
             raise PaymentError(_("This order has already been refunded."))
 
         if not order.pay_way:
@@ -1602,6 +2022,16 @@ class OrderService:
         elif order.status == OrderStatus.PROCESSING:
             cls.update_order_status(order, OrderStatus.SHIPPED)
         elif order.status == OrderStatus.PENDING:
+            # Two-hop chain → suppress the intermediate PROCESSING
+            # email + WS toast. The customer cares that the order has
+            # SHIPPED; getting "your order is being prepared" then
+            # "your order is shipped" within the same second is the
+            # admin path's only remaining duplicate. The PROCESSING
+            # transition still fires the signal + OrderHistory row,
+            # only the user-visible dispatches are skipped.
+            cls._suppress_customer_status_notifications(
+                order, OrderStatus.PROCESSING.value
+            )
             cls.update_order_status(order, OrderStatus.PROCESSING)
             cls.update_order_status(order, OrderStatus.SHIPPED)
         else:
@@ -1618,13 +2048,272 @@ class OrderService:
         return order
 
     @classmethod
+    def _resolve_shipping_provider(cls, order_data: dict[str, Any]) -> None:
+        """Resolve ``shipping_provider_code`` → ``shipping_provider`` FK.
+
+        Mutates ``order_data`` in place: removes ``shipping_provider_code``
+        and replaces it with the resolved ``shipping_provider`` (a
+        ``ShippingProvider`` instance). Defaults ``shipping_kind`` to
+        ``home_delivery`` when not supplied.
+
+        Dispatch is registry-driven from the explicit
+        ``(shipping_provider_code, shipping_kind)`` pair only.
+        ``home_delivery`` orders without an explicit code auto-route
+        to whichever active provider advertises
+        ``supports_home_delivery=True`` — adding a new courier (ELTA,
+        Speedex …) is then a one-row admin change.
+        """
+        from shipping.models import ShippingProvider
+
+        code = order_data.pop("shipping_provider_code", None) or None
+        kind = order_data.get("shipping_kind") or "home_delivery"
+
+        # Dynamic-routing fallback: a plain ``home_delivery`` request
+        # auto-routes to whichever active provider advertises
+        # ``supports_home_delivery=True``.  Lower ``priority`` wins
+        # the tie.  Adding a new courier (ELTA, Speedex …) is then a
+        # one-row Django admin change — no order-flow code touched.
+        if not code and kind == "home_delivery":
+            picked = (
+                ShippingProvider.objects.filter(
+                    is_active=True, supports_home_delivery=True
+                )
+                .order_by("priority", "code")
+                .first()
+            )
+            if picked is not None:
+                code = picked.code
+
+        if code:
+            provider = ShippingProvider.objects.filter(code=code).first()
+            if provider is None:
+                logger.warning(
+                    "Unknown shipping_provider_code=%r — leaving Order "
+                    "unlinked.",
+                    code,
+                )
+            else:
+                order_data["shipping_provider"] = provider
+
+        order_data["shipping_kind"] = kind
+
+    @classmethod
+    def _extract_shipment_payload(
+        cls, order_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Pop carrier-specific keys off ``order_data`` and return them.
+
+        Mutates ``order_data`` in place — the popped keys would otherwise
+        cause ``Order.objects.create(**order_data)`` to crash with an
+        unexpected-kwarg ``TypeError``.  The returned dict is handed to
+        the carrier registry so each adapter reads what it needs.
+
+        The key list is the union of every registered carrier's
+        ``payload_keys`` ClassVar, so adding a new carrier (ELTA,
+        Speedex …) means writing one new adapter file with its
+        ``payload_keys`` declared — no edit to ``order/services.py``.
+        """
+        from shipping.interfaces import all_payload_keys
+
+        return {
+            key: order_data.pop(key)
+            for key in all_payload_keys()
+            if key in order_data
+        }
+
+    @staticmethod
+    def _seed_language_code(order_data: dict[str, Any]) -> None:
+        """Capture the active locale into ``Order.language_code`` at create.
+
+        ``Order.language_code`` exists for the email tasks
+        (``send_order_confirmation_email``, ``send_order_status_update_
+        email``, etc.) — they activate ``translation.override(get_order_
+        language(order))`` before rendering. Without seeding here the
+        column defaults to ``settings.LANGUAGE_CODE`` ("el") regardless
+        of what locale the request was in, so a German shopper would
+        get Greek emails for the rest of their order's lifecycle.
+
+        Pulled from ``django.utils.translation.get_language`` (set
+        by ``LocaleMiddleware`` from the i18n cookie + Accept-Language
+        header) so views don't need to thread a ``request`` argument
+        through. Validated against ``settings.LANGUAGES`` so a stray
+        unknown code never lands in the DB.
+        """
+        if order_data.get("language_code"):
+            return
+        candidate = (get_language() or "").split("-")[0].strip().lower()
+        valid = {code for code, _name in settings.LANGUAGES}
+        order_data["language_code"] = (
+            candidate if candidate in valid else settings.LANGUAGE_CODE
+        )
+
+    # Allow-list for keys we accept on ``order.metadata['meta']``. The
+    # storefront proxy can only forward what's here; everything else
+    # is dropped silently. Keeps the column from drifting into a free-
+    # for-all and protects against a malicious client trying to stuff
+    # PII into Meta event logs.
+    _META_CONTEXT_KEYS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "fbp",
+            "fbc",
+            "client_user_agent",
+            "client_ip_address",
+            "event_ids",
+            "consent",
+        }
+    )
+    _META_EVENT_ID_KEYS: ClassVar[frozenset[str]] = frozenset(
+        {"purchase", "initiate_checkout", "add_payment_info"}
+    )
+
+    @classmethod
+    def _sanitise_meta_context(
+        cls, raw: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Filter the storefront-supplied meta dict down to known keys.
+
+        Returns an empty dict when input is missing or malformed. The
+        empty result is special-cased upstream to skip the ``meta``
+        field on ``order.metadata`` entirely so it doesn't show up in
+        admin as a phantom empty bag.
+        """
+        if not raw or not isinstance(raw, dict):
+            return {}
+        out: dict[str, Any] = {}
+        for key in cls._META_CONTEXT_KEYS:
+            if key not in raw:
+                continue
+            value = raw[key]
+            if key == "event_ids" and isinstance(value, dict):
+                event_ids = {
+                    sub_key: str(sub_val)
+                    for sub_key, sub_val in value.items()
+                    if sub_key in cls._META_EVENT_ID_KEYS
+                    and isinstance(sub_val, (str, int))
+                    and str(sub_val)
+                }
+                if event_ids:
+                    out["event_ids"] = event_ids
+                continue
+            if key == "consent" and isinstance(value, dict):
+                # Only keep boolean fields we understand. ``ads`` is
+                # the master gate — without it set to True the CAPI
+                # dispatcher refuses to send.
+                consent = {"ads": bool(value.get("ads"))}
+                out["consent"] = consent
+                continue
+            if isinstance(value, str) and value.strip():
+                # Cap raw strings at a sane length so a malicious
+                # client can't bloat order rows.
+                out[key] = value.strip()[:512]
+        return out
+
+    @classmethod
+    def _cancel_attached_shipment(cls, order: Order, reason: str) -> None:
+        """Best-effort: cancel the courier voucher when the order is canceled.
+
+        Routed through ``ShippingService.cancel_shipment`` so each
+        carrier enforces its own cancellability rules. Common
+        rejections (ACS voucher already in a pickup list, BoxNow
+        parcel already accepted at a locker) are recorded on
+        ``order.metadata['cancellation']['shipment_cancel']`` so the
+        admin can see why the cascade didn't reach the courier and
+        coordinate the in-transit return out of band.
+
+        Never raises — order cancellation must be allowed to complete
+        even when the courier-side cancel fails.
+        """
+        from shipping.services import ShippingService
+
+        info: dict[str, Any] = {}
+        try:
+            dispatched = ShippingService.cancel_shipment(order, reason=reason)
+            info = {
+                "attempted": True,
+                "dispatched": dispatched,
+            }
+        except Exception as exc:  # pragma: no cover - logged below
+            info = {
+                "attempted": True,
+                "dispatched": False,
+                "error": str(exc),
+            }
+            logger.warning(
+                "Order %s canceled, but courier voucher cancel failed: %s",
+                order.id,
+                exc,
+                exc_info=True,
+            )
+
+        if not order.metadata:
+            order.metadata = {}
+        cancellation = order.metadata.setdefault("cancellation", {})
+        cancellation["shipment_cancel"] = info
+        order.save(update_fields=["metadata"])
+
+    @classmethod
+    def _dispatch_shipment_creation_task(cls, order: Order) -> None:
+        """Enqueue the provider's create-shipment Celery task.
+
+        Routes via :class:`shipping.services.ShippingService`, which
+        looks up the carrier adapter from ``order.shipping_provider``
+        (FK → ``ShippingProvider`` row → registered adapter). Orders
+        without a provider attached silently no-op. Each provider's
+        task is idempotent on its shipment row, so duplicate
+        dispatches under payment-provider retries are harmless.
+        """
+        from shipping.services import ShippingService
+
+        ShippingService.dispatch_create_shipment_task(order)
+
+    @classmethod
     @transaction.atomic
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
         from order.payment_events import publish_payment_status
 
-        try:
-            order = Order.objects.for_detail().get(payment_id=payment_intent_id)
-        except Order.DoesNotExist:
+        # Acquire a row lock and hydrate related objects in one query.
+        # ``for_detail()`` adds COUNT/SUM annotations which Postgres
+        # rejects under FOR UPDATE (aggregate in locked query). We
+        # replicate the select_related/prefetch_related chains from
+        # for_detail() manually, skipping with_counts() / with_total_amounts().
+        from django.db.models import Prefetch
+
+        from order.models.history import OrderHistory
+
+        # ``of=("self",)`` restricts the row lock to the Order table.
+        # Without it Postgres rejects the query with ``FOR UPDATE cannot
+        # be applied to the nullable side of an outer join`` because
+        # several of the FKs on Order are nullable (user, pay_way,
+        # country, region, shipping_provider) and ``select_related``
+        # joins them with LEFT OUTER JOIN.
+        order = (
+            Order.objects.select_for_update(of=("self",))
+            .select_related(
+                "user",
+                "pay_way",
+                "country",
+                "region",
+                "shipping_provider",
+            )
+            .prefetch_related(
+                "items__product__translations",
+                "items__product__images__translations",
+                Prefetch(
+                    "history",
+                    queryset=OrderHistory.objects.select_related(
+                        "user"
+                    ).order_by("created_at"),
+                ),
+                "boxnow_shipment",
+                "acs_shipment",
+                "acs_shipment__events",
+                "acs_shipment__station_destination",
+                "invoice",
+            )
+            .filter(payment_id=payment_intent_id)
+            .first()
+        )
+        if order is None:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
             )
@@ -1635,7 +2324,26 @@ class OrderService:
         )
 
         if order.status == OrderStatus.PENDING:
+            # The Stripe webhook handler dispatches
+            # ``send_order_confirmation_email`` immediately after this
+            # method returns — that email already conveys "we received
+            # your order, processing it now". Suppress this transition's
+            # status-update email + WS toast so the customer doesn't get
+            # back-to-back messages saying essentially the same thing.
+            # The COD path doesn't go through this method, so the
+            # PENDING → PROCESSING advance for COD voucher mints
+            # (AcsService._advance_pending_order_to_processing) keeps
+            # firing its email as before.
+            cls._suppress_customer_status_notifications(
+                order, OrderStatus.PROCESSING.value
+            )
             cls.update_order_status(order, OrderStatus.PROCESSING)
+
+        # Enqueue provider-specific shipment creation after payment.
+        # ShippingService.dispatch_create_shipment_task wraps the
+        # delay() in transaction.on_commit so the worker only sees the
+        # committed row.
+        cls._dispatch_shipment_creation_task(order)
 
         publish_payment_status(order)
         logger.info("Order %s marked as paid successfully", order.id)
@@ -1646,9 +2354,20 @@ class OrderService:
     def handle_payment_failed(cls, payment_intent_id: str) -> Order | None:
         from order.payment_events import publish_payment_status
 
-        try:
-            order = Order.objects.for_detail().get(payment_id=payment_intent_id)
-        except Order.DoesNotExist:
+        # ``of=("self",)`` — see ``handle_payment_succeeded`` for why.
+        order = (
+            Order.objects.select_for_update(of=("self",))
+            .select_related(
+                "user",
+                "pay_way",
+                "country",
+                "region",
+                "shipping_provider",
+            )
+            .filter(payment_id=payment_intent_id)
+            .first()
+        )
+        if order is None:
             logger.error(
                 "Order not found for payment_intent: %s", payment_intent_id
             )
@@ -1667,9 +2386,37 @@ class OrderService:
         order_value: Money,
         country_id: int | None = None,
         region_id: int | None = None,
+        shipping_provider_code: str | None = None,
+        shipping_kind: str | None = None,
+        weight_grams: int | None = None,
     ) -> Money:
         from extra_settings.models import Setting
 
+        # When the request carries a (provider, kind) pair, dispatch
+        # through the registry so each provider owns its own pricing
+        # rules. The provider's adapter has full control over flat
+        # rate, dynamic quotes, free-shipping thresholds, and per-
+        # country/region overrides — keeping per-carrier logic out of
+        # this generic dispatcher.
+        if shipping_provider_code and shipping_kind:
+            from shipping.services import ShippingService
+
+            quote = ShippingService.calculate_shipping_cost(
+                provider_code=shipping_provider_code,
+                kind=shipping_kind,
+                order_value_amount=float(order_value.amount),
+                currency=str(order_value.currency),
+                country_id=str(country_id) if country_id else None,
+                region_id=str(region_id) if region_id else None,
+                weight_grams=weight_grams,
+            )
+            if quote is not None:
+                amount, currency = quote
+                return Money(amount, currency)
+
+        # Generic fallback for orders without a courier adapter — the
+        # platform's flat-rate home-delivery price, country/region
+        # overrides applied below.
         base_shipping_cost = Setting.get(
             "CHECKOUT_SHIPPING_PRICE", default=3.00
         )

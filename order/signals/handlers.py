@@ -35,9 +35,12 @@ from order.notifications import (
 )
 from order.tasks import (
     generate_order_invoice,
+    send_dispute_notification_email,
     send_order_confirmation_email,
     send_order_status_update_email,
     send_payment_failed_email,
+    send_refund_confirmation_email,
+    send_shipping_notification_email,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,18 +67,32 @@ def handle_order_post_save(
         hasattr(instance, "_original_status")
         and instance._original_status != instance.status
     ):
-        order_status_changed.send(
-            sender=sender,
-            order=instance,
-            old_status=instance._original_status,
-            new_status=instance.status,
-        )
-        logger.debug(
-            "Sent order_status_changed signal for order %s (%s -> %s)",
-            instance.id,
-            instance._original_status,
-            instance.status,
-        )
+        # Defer to on_commit so the Celery task dispatched by the
+        # signal handler sees the committed row (same pattern as
+        # the `created` branch above).
+        _old = instance._original_status
+        _new = instance.status
+
+        def send_status_changed_signal(
+            _sender=sender,
+            _instance=instance,
+            _old=_old,
+            _new=_new,
+        ):
+            order_status_changed.send(
+                sender=_sender,
+                order=_instance,
+                old_status=_old,
+                new_status=_new,
+            )
+            logger.debug(
+                "Sent order_status_changed signal for order %s (%s -> %s)",
+                _instance.id,
+                _old,
+                _new,
+            )
+
+        transaction.on_commit(send_status_changed_signal)
 
     # Detect the null → set transition on tracking info. We treat an
     # empty string the same as None because the field is declared with
@@ -220,14 +237,29 @@ def handle_order_status_changed(
         order=order, previous_status=old_status, new_status=new_status
     )
 
-    send_order_status_update_email.delay(order.id, new_status)
+    # Customer-notifications suppression flag (set by
+    # OrderService._suppress_customer_status_notifications for chained
+    # transitions where the customer just got the previous status's
+    # email/toast and a second one ms later would feel like spam).
+    # The email task already short-circuits via its own metadata flag;
+    # checking the WS-flag here keeps the toast in lockstep with that.
+    suppress_customer = bool(
+        order.metadata
+        and order.metadata.get(f"suppress_status_ws_{new_status}")
+    )
+
+    transaction.on_commit(
+        lambda oid=order.id, s=new_status: send_order_status_update_email.delay(
+            oid, s
+        )
+    )
 
     # Live in-app notification. ``notify_order_status_changed_live``
     # filters internally for statuses we actually want to surface in the
     # bell (PROCESSING, SHIPPED, DELIVERED, COMPLETED, CANCELED), so
     # dispatching unconditionally is safe and centralises the policy in
     # one place (``order/notifications.py::_ORDER_STATUS_COPY``).
-    if order.user_id:
+    if order.user_id and not suppress_customer:
         transaction.on_commit(
             lambda oid=order.id, s=new_status: (
                 notify_order_status_changed_live.delay(oid, s)
@@ -241,7 +273,9 @@ def handle_order_status_changed(
         order_delivered.send(sender=sender, order=order)
 
     elif new_status == OrderStatus.CANCELED.value:
-        order_canceled.send(sender=sender, order=order)
+        order_canceled.send(
+            sender=sender, order=order, previous_status=old_status
+        )
 
     elif new_status == OrderStatus.COMPLETED.value:
         order_completed.send(sender=sender, order=order)
@@ -279,6 +313,35 @@ def notify_shipment_dispatched(
     if not order.user_id:
         return
     notify_order_shipment_dispatched_live.delay(order.id)
+
+
+@receiver(
+    order_shipment_dispatched,
+    dispatch_uid="order.email_shipment_dispatched",
+)
+def email_shipment_dispatched(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """Send the customer their carrier-tracking email.
+
+    Fires alongside the live in-app notification: when the order
+    transitions from "no tracking" to "has tracking + carrier" — i.e.
+    a courier voucher minted and the parcel ID is on the order. Both
+    online (Stripe / Viva → handle_payment_succeeded → courier
+    dispatch) and COD (offline create → courier dispatch) paths land
+    here because both end in ``order.add_tracking_info(...)`` →
+    post-save → ``order_shipment_dispatched`` signal.
+
+    The shipping-notification task itself is idempotent on the
+    ``shipping_notification_email_sent`` metadata flag, so a duplicate
+    fire (e.g. tracking re-set by an admin correction) won't email
+    twice. Deferred to ``transaction.on_commit`` for the same reason
+    the live notification is — the worker must see the persisted
+    tracking_number.
+    """
+    transaction.on_commit(
+        lambda oid=order.id: send_shipping_notification_email.delay(oid)
+    )
 
 
 @receiver(
@@ -342,13 +405,15 @@ def handle_order_item_post_save(
         hasattr(instance, "_original_quantity")
         and instance._original_quantity != instance.quantity
     ):
-        from django.db.models import F, Value
-        from django.db.models.functions import Greatest
+        from order.stock import StockManager  # noqa: PLC0415
 
         product = instance.product
         stock_difference = instance._original_quantity - instance.quantity
-        type(product).objects.filter(pk=product.pk).update(
-            stock=Greatest(F("stock") + stock_difference, Value(0))
+        StockManager.adjust_stock(
+            product=product,
+            delta=stock_difference,
+            reason="admin order item edit",
+            performed_by=None,
         )
 
         OrderItemHistory.log_quantity_change(
@@ -513,6 +578,18 @@ def handle_order_refunded(
                 lambda oid=order.id: notify_order_refunded_live.delay(oid)
             )
 
+        # Email confirmation. Idempotent via the
+        # ``refund_confirmation_email_sent`` reservation flag, so the
+        # in-app refund path (OrderService.refund_order) and the
+        # Stripe ``charge.refunded`` webhook both firing
+        # ``order_refunded.send`` for the same order can't double-
+        # email the customer. Guest orders DO get the email — unlike
+        # the live notification which is account-bound, the email
+        # uses ``order.email`` as the recipient.
+        transaction.on_commit(
+            lambda oid=order.id: send_refund_confirmation_email.delay(oid)
+        )
+
         logger.info("Order %s refunded", order.id)
 
     except Exception as e:
@@ -610,6 +687,10 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
             # metadata reservation, so parallel webhook deliveries or a
             # subsequent checkout.session.completed event cannot cause
             # a duplicate send.
+            # Direct .delay(): handle_payment_succeeded() has already
+            # returned and committed its own @transaction.atomic block;
+            # there is no outer transaction here so on_commit would be
+            # a no-op wrapper.  Both task dispatches use the same pattern.
             send_order_confirmation_email.delay(order.id)
 
             # Live notification for the same event. The event-level
@@ -618,11 +699,7 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
             # redeliveries; the task itself is a single INSERT, so this
             # is safe at-most-once per event.
             if order.user_id:
-                transaction.on_commit(
-                    lambda oid=order.id: notify_payment_confirmed_live.delay(
-                        oid
-                    )
-                )
+                notify_payment_confirmed_live.delay(order.id)
 
     except Exception as e:
         logger.error(
@@ -687,7 +764,11 @@ def handle_stripe_payment_failed(sender, **kwargs):
             )
             # Notify the customer so they can retry instead of silently
             # sitting on a broken order.
-            send_payment_failed_email.delay(order.id)
+            # Wrapped in on_commit: handle_payment_failed runs inside
+            # @transaction.atomic; the worker must see the committed row.
+            transaction.on_commit(
+                lambda oid=order.id: send_payment_failed_email.delay(oid)
+            )
 
             # Parallel live notification — same idempotency story as
             # the succeeded branch above (guarded by the event-level
@@ -738,17 +819,195 @@ def handle_stripe_payment_requires_action(sender, **kwargs):
         )
 
 
+@djstripe_receiver("charge.refunded")
+def handle_stripe_charge_refunded(sender, **kwargs):
+    """Handle Stripe ``charge.refunded`` webhook (full + partial).
+
+    Stripe fires this after a refund issued from the dashboard, the
+    Stripe API, or our own ``OrderService.refund_order`` path. Without
+    a handler, refunds initiated outside our admin would never hit the
+    DB and the order would silently look paid.
+
+    Mapping:
+    * ``amount_refunded == amount`` → ``PaymentStatus.REFUNDED``
+    * ``amount_refunded < amount``  → ``PaymentStatus.PARTIALLY_REFUNDED``
+
+    ``Order.status`` is intentionally NOT changed — the canonical
+    transition table only reaches ``REFUNDED`` from ``RETURNED``, and
+    deciding whether a refund means the goods were also returned is a
+    business call. Admin can drive that from the order page.
+
+    Idempotency: ``webhook_processed_{event_id}`` flag mirrors the
+    succeeded / failed handlers; redeliveries are no-ops.
+    """
+    logger.debug("Processing charge.refunded webhook")
+
+    try:
+        event: Event = kwargs["event"]
+        charge = event.data["object"]
+        event_id = event.id
+        payment_intent_id = charge.get("payment_intent") or ""
+        amount = int(charge.get("amount") or 0)
+        amount_refunded = int(charge.get("amount_refunded") or 0)
+
+        if not payment_intent_id:
+            logger.warning(
+                "charge.refunded event %s has no payment_intent — skipping",
+                event_id,
+            )
+            return
+
+        logger.info(
+            "Stripe charge refunded: payment_intent=%s amount_refunded=%s/%s",
+            payment_intent_id,
+            amount_refunded,
+            amount,
+        )
+
+        is_full_refund = amount_refunded >= amount > 0
+        new_payment_status = (
+            PaymentStatus.REFUNDED
+            if is_full_refund
+            else PaymentStatus.PARTIALLY_REFUNDED
+        )
+
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .filter(payment_id=payment_intent_id)
+                .first()
+            )
+            if order is None:
+                logger.warning(
+                    "No order found for refunded payment_intent %s "
+                    "(charge event=%s)",
+                    payment_intent_id,
+                    event_id,
+                )
+                return
+
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                return
+
+            previous_payment_status = order.payment_status
+            order.payment_status = new_payment_status
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata[f"webhook_processed_{event_id}"] = True
+            refunds = list(order.metadata.get("refunds") or [])
+            refunds.append(
+                {
+                    "stripe_event_id": event_id,
+                    "amount_refunded": amount_refunded,
+                    "amount": amount,
+                    "currency": (charge.get("currency") or "").lower(),
+                    "is_full_refund": is_full_refund,
+                    "payment_intent": payment_intent_id,
+                }
+            )
+            order.metadata["refunds"] = refunds
+            order.save(update_fields=["payment_status", "metadata"])
+
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={"payment_status": str(previous_payment_status)},
+            new_value={
+                "payment_status": str(new_payment_status),
+                "amount_refunded": amount_refunded,
+                "is_full_refund": is_full_refund,
+            },
+        )
+
+        if is_full_refund:
+            order_refunded.send(sender=Order, order=order)
+
+    except Exception as e:
+        logger.error("Error handling charge.refunded: %s", e, exc_info=True)
+
+
 @djstripe_receiver("charge.dispute.created")
 def handle_stripe_dispute_created(sender, **kwargs):
-    """Handle Stripe dispute creation webhook."""
+    """Handle Stripe dispute creation webhook.
+
+    Looks up the order by charge/payment_id, flags it in metadata so
+    staff can see the dispute state in the admin, and dispatches a staff
+    notification email.  Order status is NOT changed automatically —
+    that is a manual staff decision.
+    """
     logger.debug("Processing charge.dispute.created webhook")
 
     try:
         event: Event = kwargs["event"]
         dispute_data = event.data["object"]
-        charge_id = dispute_data["charge"]
+        charge_id = dispute_data.get("charge", "")
+        dispute_id = dispute_data.get("id", "")
+        reason = dispute_data.get("reason", "")
 
-        logger.warning("Stripe dispute created for charge: %s", charge_id)
+        logger.warning(
+            "Stripe dispute created",
+            extra={
+                "charge_id": charge_id,
+                "dispute_id": dispute_id,
+                "reason": reason,
+            },
+        )
+
+        if not charge_id:
+            logger.error(
+                "charge.dispute.created event missing charge id: %s",
+                event.id,
+            )
+            return
+
+        order = Order.objects.filter(payment_id=charge_id).first()
+        if order is None:
+            logger.warning(
+                "No order found for disputed charge %s (dispute=%s)",
+                charge_id,
+                dispute_id,
+            )
+            return
+
+        # Flag the order for staff review. Do NOT change order status —
+        # refund/acceptance is a manual decision.
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata["disputed"] = True
+        order.metadata["dispute_id"] = dispute_id
+        order.metadata["dispute_reason"] = reason
+        order.save(update_fields=["metadata"])
+
+        OrderHistory.log_note(
+            order=order,
+            note=(
+                f"Stripe dispute created: dispute_id={dispute_id}, "
+                f"charge_id={charge_id}, reason={reason}"
+            ),
+        )
+
+        logger.warning(
+            "Order #%s flagged as disputed",
+            order.id,
+            extra={
+                "order_id": order.id,
+                "dispute_id": dispute_id,
+                "charge_id": charge_id,
+                "reason": reason,
+            },
+        )
+
+        transaction.on_commit(
+            lambda oid=order.id, did=dispute_id: (
+                send_dispute_notification_email.delay(oid, did)
+            )
+        )
 
     except Exception as e:
         logger.error(

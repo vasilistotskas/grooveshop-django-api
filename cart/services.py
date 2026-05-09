@@ -148,10 +148,16 @@ class CartService:
         if target_cart.id == source_cart.id:
             return
 
-        for item in source_cart.items.all():
-            existing_item = CartItem.objects.filter(
-                cart=target_cart, product=item.product
-            ).first()
+        for item in (
+            source_cart.items.select_for_update()
+            .select_related("product")
+            .all()
+        ):
+            existing_item = (
+                CartItem.objects.select_for_update()
+                .filter(cart=target_cart, product=item.product)
+                .first()
+            )
 
             if existing_item:
                 existing_item.quantity += item.quantity

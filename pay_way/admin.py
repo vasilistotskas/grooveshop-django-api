@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.db import models
 from django.db.models import Q
-from django.utils.html import conditional_escape
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
@@ -160,11 +160,19 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         "id",
         "created_at",
         "updated_at",
+        "configuration",
         "configuration_preview",
         "effective_cost_display",
         "is_configured_status",
         "sort_order",
     ]
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        # Superusers may edit the raw configuration JSON directly.
+        if request.user.is_superuser and "configuration" in fields:
+            fields.remove("configuration")
+        return fields
 
     ordering = ["sort_order", "id"]
 
@@ -229,25 +237,24 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Name"))
     def name_display(self, obj):
-        name = (
-            obj.safe_translation_getter("name", any_language=True)
-            or "Unnamed Payment Method"
+        return format_html(
+            '<strong class="text-base-900 dark:text-base-100">{name}</strong>',
+            name=(
+                obj.safe_translation_getter("name", any_language=True)
+                or "Unnamed Payment Method"
+            ),
         )
-        safe_name = conditional_escape(name)
-        html = f'<strong class="text-base-900 dark:text-base-100">{safe_name}</strong>'
-        return mark_safe(html)
 
     @admin.display(description=_("Provider"))
     def provider_code_badge(self, obj):
         if obj.provider_code:
-            safe_code = conditional_escape(obj.provider_code)
-            html = (
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f'bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full">'
-                f"{safe_code}"
-                f"</span>"
+            return format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full">'
+                "{code}"
+                "</span>",
+                code=obj.provider_code,
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">'
             "No provider"
@@ -279,7 +286,7 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
                 "<span>🌐</span><span>Online</span>"
                 "</span>"
             )
-        elif obj.requires_confirmation:
+        if obj.requires_confirmation:
             return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full gap-1">'
@@ -296,15 +303,14 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Cost"))
     def cost_display(self, obj):
         if obj.cost and obj.cost.amount > 0:
-            safe_amount = conditional_escape(str(obj.cost.amount))
-            safe_currency = conditional_escape(obj.cost.currency)
-            html = (
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                f"{safe_amount} {safe_currency}"
-                f"</span>"
+            return format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
+                "{amount} {currency}"
+                "</span>",
+                amount=str(obj.cost.amount),
+                currency=str(obj.cost.currency),
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
             'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
@@ -315,14 +321,13 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Free Threshold"))
     def free_threshold_display(self, obj):
         if obj.free_threshold and obj.free_threshold.amount > 0:
-            safe_amount = conditional_escape(str(obj.free_threshold.amount))
-            safe_currency = conditional_escape(obj.free_threshold.currency)
-            html = (
-                f'<span class="text-sm text-base-700 dark:text-base-300">'
-                f"Free above {safe_amount} {safe_currency}"
-                f"</span>"
+            return format_html(
+                '<span class="text-sm text-base-700 dark:text-base-300">'
+                "Free above {amount} {currency}"
+                "</span>",
+                amount=str(obj.free_threshold.amount),
+                currency=str(obj.free_threshold.currency),
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No threshold</span>'
         )
@@ -353,14 +358,13 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Order"))
     def sort_order_display(self, obj):
         if obj.sort_order is not None:
-            safe_order = conditional_escape(str(obj.sort_order))
-            html = (
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f'bg-base-50 dark:bg-base-900 text-base-700 dark:text-base-300 rounded-full">'
-                f"#{safe_order}"
-                f"</span>"
+            return format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-base-50 dark:bg-base-900 text-base-700 dark:text-base-300 rounded-full">'
+                "#{order}"
+                "</span>",
+                order=obj.sort_order,
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">-</span>'
         )
@@ -368,12 +372,11 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Icon"))
     def icon_preview(self, obj):
         if obj.icon:
-            safe_url = conditional_escape(obj.icon.url)
-            html = (
-                f'<img src="{safe_url}" style="max-height: 32px; max-width: 64px; '
-                'border-radius: 4px; object-fit: contain;" />'
+            return format_html(
+                '<img src="{url}" style="max-height: 32px; max-width: 64px; '
+                'border-radius: 4px; object-fit: contain;" />',
+                url=obj.icon.url,
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No icon</span>'
         )
@@ -389,14 +392,13 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             display = keys[:3] + [f"... and {len(keys) - 3} more"]
         else:
             display = keys
-        safe_list = conditional_escape(", ".join(display))
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="font-medium text-base-700 dark:text-base-300">Configuration Keys:</div>'
-            f'<div class="text-base-600 dark:text-base-300">{safe_list}</div>'
-            "</div>"
+            '<div class="text-base-600 dark:text-base-300">{keys}</div>'
+            "</div>",
+            keys=", ".join(display),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Effective Cost"))
     def effective_cost_display(self, obj):
@@ -404,13 +406,12 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
             formatted = f"{obj.effective_cost} {obj.cost.currency}"
         else:
             formatted = "0"
-        safe_fmt = conditional_escape(formatted)
-        html = (
-            f'<span class="text-sm font-medium text-base-700 dark:text-base-300">'
-            f"{safe_fmt}"
-            "</span>"
+        return format_html(
+            '<span class="text-sm font-medium text-base-700 dark:text-base-300">'
+            "{fmt}"
+            "</span>",
+            fmt=formatted,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Ready Status"))
     def is_configured_status(self, obj):

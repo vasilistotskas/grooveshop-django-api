@@ -89,13 +89,15 @@ class TestTransactionFailuresRollbackCompletely:
         mock_provider = Mock()
         mock_provider.get_payment_status.return_value = (
             PaymentStatus.COMPLETED,
-            {"status": "succeeded", "amount": order_quantity * 5000},
+            {"status": "succeeded"},
         )
         mock_get_provider.return_value = mock_provider
 
         # Create product with initial stock
         product = ProductFactory.create(
-            price=Money("50.00", settings.DEFAULT_CURRENCY), stock=initial_stock
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            stock=initial_stock,
+            active=True,
         )
         product.set_current_language("en")
         product.name = "Test Product"
@@ -559,7 +561,9 @@ class TestTransactionFailuresRollbackCompletely:
         products = []
         for i in range(3):
             product = ProductFactory.create(
-                price=Money("50.00", settings.DEFAULT_CURRENCY), stock=100
+                price=Money("50.00", settings.DEFAULT_CURRENCY),
+                stock=100,
+                active=True,
             )
             product.set_current_language("en")
             product.name = f"Test Product {i + 1}"
@@ -584,7 +588,7 @@ class TestTransactionFailuresRollbackCompletely:
             mock_provider = Mock()
             mock_provider.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,
-                {"status": "succeeded", "amount": 150000},
+                {"status": "succeeded"},
             )
             mock_get_provider.return_value = mock_provider
 

@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.helpers import lazy_serializer
@@ -6,6 +7,12 @@ from rest_framework import serializers
 
 from cart.models import CartItem
 from product.serializers.product import ProductSerializer
+
+# Cache TTL (seconds) for per-category recommendation results.
+# A 5-minute window eliminates the per-cart-item query storm while
+# keeping product ranking reasonably fresh.  Cache key format:
+# ``cart_recs:cat:{category_id}``.
+_CART_RECS_TTL = 300
 
 
 class CartItemSerializer(serializers.ModelSerializer[CartItem]):
@@ -100,17 +107,33 @@ class CartItemDetailSerializer(CartItemSerializer):
         )
     )
     def get_recommendations(self, obj: CartItem):
-        if obj.product.category:
-            related_products = (
-                obj.product.category.products.filter(active=True)
+        category = obj.product.category
+        if not category:
+            return []
+
+        cache_key = f"cart_recs:cat:{category.pk}"
+
+        def _fetch():
+            return list(
+                category.products.filter(active=True)
                 .exclude(id=obj.product.id)
-                .order_by("-view_count")[:3]
+                .order_by("-view_count")
+                .values_list("id", flat=True)[:3]
             )
 
-            return ProductSerializer(
-                related_products, many=True, context=self.context
-            ).data
-        return []
+        # Cache stores product IDs only; serialization happens outside
+        # the cache so the response context (request, language) is
+        # always applied fresh.  IDs are cheap (~24 bytes each) and
+        # category-scoped, so collisions between concurrent requests
+        # for different cart items in the same category are safe.
+        product_ids = cache.get_or_set(cache_key, _fetch, _CART_RECS_TTL)
+
+        from product.models.product import Product
+
+        products = Product.objects.filter(id__in=product_ids).exclude(
+            id=obj.product.id
+        )
+        return ProductSerializer(products, many=True, context=self.context).data
 
     class Meta(CartItemSerializer.Meta):
         fields = (
@@ -129,13 +152,13 @@ class CartItemWriteSerializer(serializers.ModelSerializer[CartItem]):
             raise serializers.ValidationError(_("Quantity cannot exceed 999."))
         return value
 
-    def validate(self, data: dict) -> dict:
+    def validate(self, attrs: dict) -> dict:
         if self.instance:
             product = self.instance.product
-            quantity = data.get("quantity", self.instance.quantity)
+            quantity = attrs.get("quantity", self.instance.quantity)
         else:
-            product = data.get("product")
-            quantity = data.get("quantity", 1)
+            product = attrs.get("product")
+            quantity = attrs.get("quantity", 1)
 
         if product:
             if not product.active:
@@ -160,7 +183,7 @@ class CartItemWriteSerializer(serializers.ModelSerializer[CartItem]):
                     )
                 )
 
-        return data
+        return attrs
 
     def create(self, validated_data: dict) -> CartItem:
         cart = self.context.get("cart") or validated_data.get("cart")
@@ -200,9 +223,9 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
             raise serializers.ValidationError(_("Quantity cannot exceed 999."))
         return value
 
-    def validate(self, data: dict) -> dict:
-        product = data.get("product")
-        quantity = data.get("quantity", 1)
+    def validate(self, attrs: dict) -> dict:
+        product = attrs.get("product")
+        quantity = attrs.get("quantity", 1)
 
         if product:
             if not product.active:
@@ -226,7 +249,7 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
                         quantity=quantity,
                     )
                 )
-        return data
+        return attrs
 
     def create(self, validated_data: dict) -> CartItem:
         cart = self.context.get("cart") or validated_data.get("cart")
@@ -265,11 +288,11 @@ class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):
             raise serializers.ValidationError(_("Quantity cannot exceed 999."))
         return value
 
-    def validate(self, data: dict) -> dict:
+    def validate(self, attrs: dict) -> dict:
         instance = self.instance
         if instance:
             product = instance.product
-            quantity = data.get("quantity", instance.quantity)
+            quantity = attrs.get("quantity", instance.quantity)
 
             if product and product.stock < quantity:
                 raise serializers.ValidationError(
@@ -283,7 +306,7 @@ class CartItemUpdateSerializer(serializers.ModelSerializer[CartItem]):
                         quantity=quantity,
                     )
                 )
-        return data
+        return attrs
 
     def update(self, instance: CartItem, validated_data: dict) -> CartItem:
         quantity = validated_data.get("quantity", instance.quantity)

@@ -147,18 +147,18 @@ class MeasurementSerializerField(serializers.Field):
         super().__init__(*args, **kwargs)
         self.measurement = measurement
 
-    def to_representation(self, obj: Any) -> Representation:
-        if hasattr(obj, "unit") and hasattr(obj, "value"):
-            return {"unit": obj.unit, "value": obj.value}
-        elif isinstance(obj, decimal.Decimal | float | int):
+    def to_representation(self, value: Any) -> Representation:
+        if hasattr(value, "unit") and hasattr(value, "value"):
+            return {"unit": value.unit, "value": value.value}
+        elif isinstance(value, decimal.Decimal | float | int):
             return {
-                "value": float(obj),
+                "value": float(value),
                 "unit": self.measurement.STANDARD_UNIT
                 if hasattr(self.measurement, "STANDARD_UNIT")
                 else "unknown",
             }
         else:
-            return {"value": str(obj), "unit": "unknown"}
+            return {"value": str(value), "unit": "unknown"}
 
     def to_internal_value(self, data: Representation):
         if (

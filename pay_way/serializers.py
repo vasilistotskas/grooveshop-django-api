@@ -87,13 +87,13 @@ class PayWayWriteSerializer(
             )
         return value
 
-    def validate(self, data):
-        if data.get("is_online_payment") and not data.get("provider_code"):
+    def validate(self, attrs):
+        if attrs.get("is_online_payment") and not attrs.get("provider_code"):
             raise serializers.ValidationError(
                 _("Online payment methods must have a provider code.")
             )
 
-        return data
+        return attrs
 
     class Meta:
         model = PayWay

@@ -197,6 +197,9 @@ def test_middleware_refreshes_once_per_version_tick():
     import core.middleware.translation_reload as mw_module
 
     mw_module._local_translation_version = None
+    # Reset the 30s per-process debounce so each process_request call
+    # actually reaches the Redis version check.
+    mw_module._last_check_monotonic = 0.0
     cache.set(TRANSLATION_VERSION_CACHE_KEY, 42.0, timeout=None)
 
     with (
@@ -211,11 +214,13 @@ def test_middleware_refreshes_once_per_version_tick():
         reload_.assert_called_once()
 
         # Second call with the same version must not re-trigger.
+        mw_module._last_check_monotonic = 0.0
         mw.process_request(MagicMock())
         assert overlay.call_count == 1
         assert reload_.call_count == 1
 
         # Bump the version — now the next request refreshes again.
+        mw_module._last_check_monotonic = 0.0
         cache.set(TRANSLATION_VERSION_CACHE_KEY, 43.0, timeout=None)
         mw.process_request(MagicMock())
         assert overlay.call_count == 2

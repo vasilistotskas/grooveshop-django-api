@@ -57,9 +57,9 @@ class RegionWriteSerializer(
             )
         return value.upper() if value else value
 
-    def validate(self, data):
-        country = data.get("country")
-        alpha = data.get("alpha")
+    def validate(self, attrs):
+        country = attrs.get("country")
+        alpha = attrs.get("alpha")
 
         if country and alpha:
             existing = Region.objects.filter(country=country, alpha=alpha)
@@ -76,7 +76,7 @@ class RegionWriteSerializer(
                     )
                 )
 
-        return data
+        return attrs
 
     class Meta:
         model = Region

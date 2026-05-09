@@ -6,6 +6,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.db import models
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.html import escape
 from django.utils.translation import gettext_lazy as _
 
 from core import celery_app
@@ -199,7 +200,15 @@ def send_price_drop_notifications(
     }
 
 
-@celery_app.task(base=MonitoredTask)
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+    soft_time_limit=600,
+    time_limit=900,
+)
 def check_low_stock_products() -> dict:
     """Send a single consolidated low-stock alert to the admin.
 
@@ -316,8 +325,28 @@ def check_low_stock_products() -> dict:
 
 
 def _send_product_alert_email(
-    *, recipient: str, subject: str, context: dict, template_basename: str
+    *,
+    recipient: str,
+    subject: str,
+    context: dict,
+    template_basename: str,
+    user=None,
+    list_id: str = "product-alerts",
 ) -> bool:
+    """Send a product-alert email with RFC 8058 unsubscribe headers.
+
+    When ``user`` is provided the email carries a ``List-Unsubscribe``
+    header pointing to the blanket-unsubscribe URL so Gmail/Outlook
+    surface a one-click control. Anonymous alerts (``ProductAlert``
+    rows with only ``email``, no ``user``) skip the header — there's
+    no token we can mint for them — and the email is delivered without
+    one-click semantics. Both paths are otherwise identical.
+    """
+    from user.utils.subscription import (
+        build_list_unsubscribe_headers,
+        generate_blanket_unsubscribe_link,
+    )
+
     try:
         text_content = render_to_string(
             f"emails/product/{template_basename}.txt", context
@@ -328,12 +357,21 @@ def _send_product_alert_email(
     except Exception:  # noqa: BLE001 — template may not exist yet
         # Minimal plain-text fallback keeps the feature working even if
         # the dedicated template has not been authored yet.
-        text_content = (
-            f"{subject}\n\nCheck it out: {context.get('product_url', '')}\n"
-        )
+        # Strip CR/LF from subject so it cannot be used for header
+        # injection if the caller ever passes it directly into headers.
+        safe_subject = subject.replace("\r", "").replace("\n", "")
+        product_url = context.get("product_url", "")
+        text_content = f"{safe_subject}\n\nCheck it out: {product_url}\n"
         html_content = (
-            f"<p>{subject}</p>"
-            f"<p><a href='{context.get('product_url', '')}'>View product</a></p>"
+            f"<p>{escape(safe_subject)}</p>"
+            f"<p><a href='{escape(product_url)}'>View product</a></p>"
+        )
+
+    headers: dict[str, str] | None = None
+    if user is not None and getattr(user, "pk", None) is not None:
+        unsubscribe_url = generate_blanket_unsubscribe_link(user)
+        headers = build_list_unsubscribe_headers(
+            unsubscribe_url, list_id=list_id
         )
 
     try:
@@ -342,6 +380,7 @@ def _send_product_alert_email(
             text_content,
             settings.DEFAULT_FROM_EMAIL,
             [recipient],
+            headers=headers,
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()
@@ -399,6 +438,9 @@ def send_product_alert_restock(product_id: int) -> dict:
             "product_name": product_name,
             "product_url": product_url,
             "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": get_tenant_base_url(),
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
         subject = _("[{site}] {name} is back in stock").format(
             site=settings.SITE_NAME, name=product_name
@@ -408,6 +450,8 @@ def send_product_alert_restock(product_id: int) -> dict:
             subject=str(subject),
             context=context,
             template_basename="restock_alert",
+            user=alert.user if alert.user_id else None,
+            list_id="product-restock-alerts",
         ):
             sent += 1
 
@@ -455,6 +499,7 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
         is_active=True,
         notified_at__isnull=True,
         target_price__gte=new_price_dec,
+        target_price_currency=getattr(settings, "DEFAULT_CURRENCY", "EUR"),
     ).select_related("user")
 
     sent = 0
@@ -471,6 +516,9 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
             "new_price": new_price,
             "target_price": str(alert.target_price.amount),
             "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": get_tenant_base_url(),
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
         subject = _("[{site}] Price drop: {name} is now at your target").format(
             site=settings.SITE_NAME, name=product_name
@@ -480,6 +528,8 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
             subject=str(subject),
             context=context,
             template_basename="price_drop_alert",
+            user=alert.user if alert.user_id else None,
+            list_id="product-price-drop-alerts",
         ):
             sent += 1
         triggered_ids.append(alert.id)

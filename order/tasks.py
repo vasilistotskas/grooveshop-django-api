@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import F
@@ -22,64 +23,152 @@ from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.services import OrderService
-from order.shipping import ShippingService
+from user.utils.subscription import build_transactional_list_headers
 
 logger = logging.getLogger(__name__)
 
 
+# ──────────────────────────────────────────────────────────────
+# send_order_confirmation_email idempotency
+#
+# Design: two-layer guard to survive both concurrent fires AND
+# worker OOM-kills mid-send.
+#
+# Layer 1 — permanent DB timestamp (``confirmation_email_sent_at``):
+#   Written once after a successful send. Any retry that finds this
+#   key set skips immediately without touching Redis.
+#
+# Layer 2 — Redis execution lock (``CONFIRMATION_EMAIL_LOCK_TTL`` TTL):
+#   Acquired via cache.add() (atomic "set-if-not-exists") before the
+#   send attempt. Prevents concurrent workers from both sending when
+#   the DB flag has not yet been written (the window between "lock
+#   acquired" and "DB write committed"). If the worker is OOM-killed
+#   mid-send the lock auto-expires and the next retry can claim it.
+#
+# Contrast with the old pattern (boolean flag set at reserve time):
+#   Old: flag set → worker killed → flag stays True → customer never
+#         receives confirmation.
+#   New: lock acquired → worker killed → lock expires in 60 s →
+#         next retry claims lock → send succeeds → DB flag written.
+# ──────────────────────────────────────────────────────────────
+CONFIRMATION_EMAIL_SENT_AT_KEY = "confirmation_email_sent_at"
+CONFIRMATION_EMAIL_LOCK_PREFIX = "order:confirm_email_lock:"
+# TTL for the execution lock. Long enough for a slow SMTP send; short
+# enough that a dead worker's lock expires quickly so a retry can proceed.
+CONFIRMATION_EMAIL_LOCK_TTL = 90  # seconds
+
+# Legacy flag name — kept so existing metadata rows are still readable
+# by _release_confirmation_email (used in existing tests).
 CONFIRMATION_EMAIL_SENT_FLAG = "confirmation_email_sent"
 
 
-def _reserve_confirmation_email(order_id: int) -> bool:
-    """Atomically claim the confirmation-email slot for an order.
+def _confirmation_lock_key(order_id: int) -> str:
+    return f"{CONFIRMATION_EMAIL_LOCK_PREFIX}{order_id}"
 
-    Returns True if this caller won the race and should proceed with the
-    send, False if another caller has already sent (or is sending) the
-    email. Raises Order.DoesNotExist if the order is missing so the
-    caller can surface it consistently with the rest of the task.
-    """
+
+def _confirmation_already_sent(metadata: dict | None) -> bool:
+    """Return True if the permanent DB timestamp shows the email was sent."""
+    meta = metadata or {}
+    return bool(
+        meta.get(CONFIRMATION_EMAIL_SENT_AT_KEY)
+        or meta.get(CONFIRMATION_EMAIL_SENT_FLAG)
+    )
+
+
+def _mark_confirmation_sent(order_id: int) -> None:
+    """Write the permanent sent-at timestamp and release the Redis lock."""
     with transaction.atomic():
-        order = Order.objects.select_for_update().get(id=order_id)
-        if order.metadata and order.metadata.get(CONFIRMATION_EMAIL_SENT_FLAG):
-            return False
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None:
+            return
         if not order.metadata:
             order.metadata = {}
+        order.metadata[CONFIRMATION_EMAIL_SENT_AT_KEY] = (
+            timezone.now().isoformat()
+        )
+        # Also set the legacy boolean so callers that check the old key
+        # (e.g. retry_payment view that clears the flag) keep working.
         order.metadata[CONFIRMATION_EMAIL_SENT_FLAG] = True
         order.save(update_fields=["metadata"])
-    return True
+    # Release the execution lock immediately after the DB commit so the
+    # next accidental duplicate call sees the DB flag instead of waiting
+    # for the TTL.
+    cache.delete(_confirmation_lock_key(order_id))
 
 
 def _release_confirmation_email(order_id: int) -> None:
-    """Clear the confirmation-email reservation on permanent failure so an
-    admin (or a future retry path) can resend the email."""
+    """Clear the confirmation-email permanent flags so an admin or test
+    can trigger a resend. Also releases any lingering Redis lock."""
     with transaction.atomic():
         order = Order.objects.select_for_update().filter(id=order_id).first()
         if order is None or not order.metadata:
             return
-        if order.metadata.pop(CONFIRMATION_EMAIL_SENT_FLAG, None) is not None:
+        changed = False
+        for key in (
+            CONFIRMATION_EMAIL_SENT_AT_KEY,
+            CONFIRMATION_EMAIL_SENT_FLAG,
+        ):
+            if order.metadata.pop(key, None) is not None:
+                changed = True
+        if changed:
             order.save(update_fields=["metadata"])
+    cache.delete(_confirmation_lock_key(order_id))
 
 
 @celery_app.task(
     base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
 )
 def send_order_confirmation_email(self, order_id: int) -> bool:
-    reserved_this_call = False
-    try:
-        # Only reserve on the first attempt. Retries are expected to
-        # re-send because the flag is held by THIS worker — releasing
-        # on every retry would defeat idempotency, and checking the
-        # flag on retry would prevent legitimate re-sends after a
-        # transient failure.
-        if self.request.retries == 0:
-            if not _reserve_confirmation_email(order_id):
-                logger.info(
-                    "Order confirmation email already sent (or reserved) for order #%s, skipping",
-                    order_id,
-                )
-                return True
-            reserved_this_call = True
+    """Send the order confirmation email exactly once per order.
 
+    Idempotency design (worker-kill safe):
+    - Permanent guard: ``confirmation_email_sent_at`` DB timestamp. Once
+      set, no further sends occur regardless of how many times the task
+      is called.
+    - Execution lock: Redis key with a short TTL. Prevents concurrent
+      workers from both sending while the DB flag is not yet written.
+      If the worker is OOM-killed mid-send the lock auto-expires so the
+      next retry can proceed — this is the fix for the bug where the old
+      boolean flag (set before the send) would permanently block resends
+      after a worker kill.
+    """
+    try:
+        # Fast path: check permanent DB flag before touching Redis.
+        # Use .values() to avoid triggering Order.__init__'s lazy-loading
+        # of deferred fields — .only() causes infinite recursion via the
+        # _original_tracking_number descriptor on Order.__init__.
+        meta_row = Order.objects.filter(id=order_id).values("metadata").first()
+        if meta_row is None:
+            logger.error(
+                "Could not send confirmation email - Order #%s not found",
+                order_id,
+                extra={"order_id": order_id},
+            )
+            return False
+
+        if _confirmation_already_sent(meta_row["metadata"]):
+            logger.info(
+                "Order confirmation email already sent for order #%s, skipping",
+                order_id,
+            )
+            return True
+
+        # Try to acquire the execution lock. cache.add() is atomic:
+        # returns True only if the key did not already exist.
+        lock_key = _confirmation_lock_key(order_id)
+        lock_acquired = cache.add(lock_key, "1", CONFIRMATION_EMAIL_LOCK_TTL)
+        if not lock_acquired:
+            # Another worker is currently in the send window. Log and
+            # bail — either that worker will succeed and set the permanent
+            # flag, or it will die and the lock will expire.
+            logger.info(
+                "Order #%s confirmation email send already in progress "
+                "(execution lock held), skipping",
+                order_id,
+            )
+            return True
+
+        # We hold the lock. Fetch the full order for rendering.
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
             .prefetch_related(
@@ -87,6 +176,17 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             )
             .get(id=order_id)
         )
+
+        # Double-check permanent flag under DB read — another worker may
+        # have committed the sent_at timestamp while we were fetching.
+        if _confirmation_already_sent(order.metadata):
+            cache.delete(lock_key)
+            logger.info(
+                "Order confirmation email already sent for order #%s "
+                "(post-lock check), skipping",
+                order_id,
+            )
+            return True
 
         pay_way = order.pay_way
         is_paid = bool(
@@ -137,13 +237,22 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(
+                list_id="order_confirmation"
+            ),
         )
         msg.attach_alternative(html_content, "text/html")
 
         msg.send()
 
+        # Write permanent flag + release lock atomically (DB commit, then
+        # cache.delete). From this point on every future call to this task
+        # will short-circuit on the DB flag.
+        _mark_confirmation_sent(order_id)
+
         logger.info(
-            f"Order confirmation email sent for order #{order.id}",
+            "Order confirmation email sent for order #%s",
+            order.id,
             extra={"order_id": order.id, "email": order.email},
         )
 
@@ -156,14 +265,17 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
 
     except Order.DoesNotExist:
         logger.error(
-            f"Could not send confirmation email - Order #{order_id} not found",
+            "Could not send confirmation email - Order #%s not found",
+            order_id,
             extra={"order_id": order_id},
         )
         return False
 
     except Exception as e:
         logger.error(
-            f"Error sending order confirmation email for order #{order_id}: {e!s}",
+            "Error sending order confirmation email for order #%s: %s",
+            order_id,
+            e,
             extra={"order_id": order_id, "error": str(e)},
         )
 
@@ -172,14 +284,160 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
 
         if retry_count < max_retries:
             logger.info(
-                f"Retrying send_order_confirmation_email for order #{order_id} "
-                f"(attempt {retry_count + 1}/{max_retries + 1})"
+                "Retrying send_order_confirmation_email for order #%s "
+                "(attempt %s/%s)",
+                order_id,
+                retry_count + 1,
+                max_retries + 1,
             )
             raise self.retry(exc=e) from e
 
-        if reserved_this_call:
-            _release_confirmation_email(order_id)
+        # Permanent failure: release the lock so an admin can trigger a
+        # manual resend. The DB flag is NOT set — the email was never sent.
+        cache.delete(_confirmation_lock_key(order_id))
+        return False
 
+
+STATUS_UPDATE_EMAIL_SENT_FLAG = "status_update_email_sent"
+# TTL to hold the reservation after a successful send, so retry cycles
+# triggered by transient ack failures don't re-send to the customer.
+FINAL_RESERVATION_TTL = 86_400  # 24 hours
+
+
+def _status_update_reservation_key(order_id: int, new_status: str) -> str:
+    """Build the metadata key for a specific order+status combination.
+
+    Different status transitions for the same order are independent —
+    the PROCESSING email must not block the SHIPPED email.
+    """
+    return f"{STATUS_UPDATE_EMAIL_SENT_FLAG}_{new_status}"
+
+
+def _reserve_status_update_email(order_id: int, new_status: str) -> bool:
+    """Atomically claim the status-update-email slot for (order, status).
+
+    Returns True if this caller won the race and should proceed with the
+    send, False if another caller has already sent (or is sending) the
+    email. The reservation includes BOTH order_id AND new_status so
+    different status transitions remain independent.
+    Raises Order.DoesNotExist if the order is missing.
+    """
+    flag_key = _status_update_reservation_key(order_id, new_status)
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.metadata and order.metadata.get(flag_key):
+            return False
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[flag_key] = True
+        order.save(update_fields=["metadata"])
+    return True
+
+
+def _release_status_update_email(order_id: int, new_status: str) -> None:
+    """Clear the status-update-email reservation on permanent failure."""
+    flag_key = _status_update_reservation_key(order_id, new_status)
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None or not order.metadata:
+            return
+        if order.metadata.pop(flag_key, None) is not None:
+            order.save(update_fields=["metadata"])
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_dispute_notification_email(
+    self, order_id: int, dispute_id: str
+) -> bool:
+    """Notify staff that a Stripe dispute has been opened for an order.
+
+    Sends to the staff group email configured via ``INFO_EMAIL``.  Does NOT
+    change order status — that is a manual decision.  Includes structured
+    log fields so ops can correlate the Celery log line with the Stripe
+    dashboard entry.
+    """
+    try:
+        order = Order.objects.select_related("user", "pay_way").get(id=order_id)
+
+        reason = (order.metadata or {}).get("dispute_reason", "unknown")
+
+        context = {
+            "order": order,
+            "dispute_id": dispute_id,
+            "reason": reason,
+            "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": get_tenant_base_url(),
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+        }
+
+        subject = (
+            f"[{settings.SITE_NAME}] Stripe dispute opened — Order #{order_id}"
+        )
+
+        try:
+            text_content = render_to_string(
+                "emails/order/dispute_notification.txt", context
+            )
+            html_content = render_to_string(
+                "emails/order/dispute_notification.html", context
+            )
+        except Exception:
+            # Fallback plain-text if template not yet authored
+            text_content = (
+                f"A Stripe dispute has been opened for Order #{order_id}.\n"
+                f"Dispute ID: {dispute_id}\n"
+                f"Reason: {reason}\n\n"
+                f"Please review this dispute in the Stripe dashboard and take action."
+            )
+            html_content = (
+                f"<p>A Stripe dispute has been opened for "
+                f"<strong>Order #{order_id}</strong>.</p>"
+                f"<ul>"
+                f"<li>Dispute ID: {dispute_id}</li>"
+                f"<li>Reason: {reason}</li>"
+                f"</ul>"
+                f"<p>Please review this dispute in the Stripe dashboard.</p>"
+            )
+
+        staff_email = getattr(settings, "INFO_EMAIL", None)
+        if not staff_email:
+            logger.warning(
+                "send_dispute_notification_email: no INFO_EMAIL configured — skipping",
+                extra={"order_id": order_id, "dispute_id": dispute_id},
+            )
+            return False
+
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            settings.DEFAULT_FROM_EMAIL,
+            [staff_email],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+        logger.info(
+            "Dispute notification email sent for order #%s (dispute=%s)",
+            order_id,
+            dispute_id,
+            extra={"order_id": order_id, "dispute_id": dispute_id},
+        )
+        return True
+
+    except Order.DoesNotExist:
+        logger.error(
+            "Could not send dispute notification — Order #%s not found",
+            order_id,
+            extra={"order_id": order_id, "dispute_id": dispute_id},
+        )
         return False
 
 
@@ -273,6 +531,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(list_id="payment_failed"),
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()
@@ -308,13 +567,193 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         return False
 
 
+REFUND_CONFIRMATION_EMAIL_SENT_FLAG = "refund_confirmation_email_sent"
+
+
+def _reserve_refund_confirmation_email(order_id: int) -> bool:
+    """Atomically claim the refund-confirmation-email slot for an order.
+
+    Both ``OrderService.refund_order`` (the in-app admin-initiated
+    path) and ``handle_stripe_charge_refunded`` (the webhook path)
+    fire ``order_refunded.send`` for the same order. Without this
+    reservation, the customer would get two refund emails — one when
+    we hit the Stripe API, another when Stripe redelivers the event
+    back to us.
+
+    Returns True if this caller won the race. Raises
+    ``Order.DoesNotExist`` so the caller can surface a missing order
+    consistently with the rest of the file.
+    """
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.metadata and order.metadata.get(
+            REFUND_CONFIRMATION_EMAIL_SENT_FLAG
+        ):
+            return False
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[REFUND_CONFIRMATION_EMAIL_SENT_FLAG] = True
+        order.save(update_fields=["metadata"])
+    return True
+
+
+def _release_refund_confirmation_email(order_id: int) -> None:
+    """Clear the refund-confirmation-email reservation on permanent failure."""
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None or not order.metadata:
+            return
+        if (
+            order.metadata.pop(REFUND_CONFIRMATION_EMAIL_SENT_FLAG, None)
+            is not None
+        ):
+            order.save(update_fields=["metadata"])
+
+
 @celery_app.task(
     base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
+)
+def send_refund_confirmation_email(self, order_id: int) -> bool:
+    """Send the customer the refund-confirmation email.
+
+    Triggered from ``handle_order_refunded`` so both refund paths
+    converge here — admin-initiated refunds via
+    ``OrderService.refund_order`` and Stripe-dashboard refunds
+    arriving as ``charge.refunded`` webhooks.
+
+    Renders ``emails/order/order_refunded.html`` (which inherits from
+    ``order_status_generic.html``'s REFUNDED branch). Reuses the
+    transactional ``List-Unsubscribe`` headers added in PR #4.
+    """
+    reserved_this_call = False
+    try:
+        if self.request.retries == 0:
+            try:
+                if not _reserve_refund_confirmation_email(order_id):
+                    logger.info(
+                        "Refund confirmation email already sent (or reserved) "
+                        "for order #%s, skipping",
+                        order_id,
+                    )
+                    return True
+                reserved_this_call = True
+            except Order.DoesNotExist:
+                logger.error(
+                    "Could not reserve refund confirmation email — Order #%s "
+                    "not found",
+                    order_id,
+                    extra={"order_id": order_id},
+                )
+                return False
+
+        order = Order.objects.select_related(
+            "user", "country", "region", "pay_way"
+        ).get(id=order_id)
+
+        context = {
+            "order": order,
+            "status": "REFUNDED",
+            "status_display": order.get_payment_status_display()
+            if order.payment_status
+            else "Refunded",
+            "items": order.items.all(),
+            "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": get_tenant_base_url(),
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+        }
+
+        with translation.override(get_order_language(order)):
+            subject = _("Refund Processed - Order #{order_id}").format(
+                order_id=order.id
+            )
+            text_content = render_to_string(
+                "emails/order/order_refunded.txt", context
+            )
+            html_content = render_to_string(
+                "emails/order/order_refunded.html", context
+            )
+
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            settings.DEFAULT_FROM_EMAIL,
+            [order.email],
+            reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(
+                list_id="refund_confirmation"
+            ),
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+        OrderHistory.log_note(
+            order=order,
+            note=f"Refund confirmation email sent to {order.email}",
+        )
+
+        logger.info(
+            "Refund confirmation email sent for order #%s",
+            order.id,
+            extra={"order_id": order.id, "email": order.email},
+        )
+        return True
+
+    except Order.DoesNotExist:
+        logger.error(
+            "Could not send refund confirmation email — Order #%s not found",
+            order_id,
+            extra={"order_id": order_id},
+        )
+        return False
+
+    except Exception as e:
+        logger.error(
+            "Error sending refund confirmation email for order #%s: %s",
+            order_id,
+            e,
+            extra={"order_id": order_id, "error": str(e)},
+        )
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=e) from e
+        if reserved_this_call:
+            _release_refund_confirmation_email(order_id)
+        return False
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=3,
+    default_retry_delay=300,
+    retry_backoff=True,
+    retry_jitter=True,
 )
 def send_order_status_update_email(
     self, order_id: int, status: OrderStatus
 ) -> bool:
+    """Send a status-update email for an order.
+
+    Idempotent via a per-(order, status) metadata reservation so concurrent
+    retries and signal re-fires cannot double-send for the same transition.
+    On permanent failure the reservation is released so an admin can
+    trigger a manual resend.
+    """
+    reserved_this_call = False
     try:
+        # Only reserve on the first attempt to prevent the flag from
+        # blocking legitimate retries after a transient failure.
+        if self.request.retries == 0:
+            if not _reserve_status_update_email(order_id, status):
+                logger.info(
+                    "Status update email already sent (or reserved) "
+                    "for order #%s status=%s, skipping",
+                    order_id,
+                    status,
+                )
+                return True
+            reserved_this_call = True
+
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
             .prefetch_related("items__product__translations")
@@ -387,6 +826,7 @@ def send_order_status_update_email(
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(list_id="order_status"),
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -428,7 +868,36 @@ def send_order_status_update_email(
             )
             raise self.retry(exc=e) from e
 
+        if reserved_this_call:
+            _release_status_update_email(order_id, status)
+
         return False
+
+
+SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG = "shipping_notification_email_sent"
+
+
+def _reserve_shipping_notification_email(order_id: int) -> bool:
+    """Atomically claim the shipping-notification-email slot for an order.
+
+    Mirrors ``_reserve_confirmation_email`` so concurrent fires of the
+    ``order_shipment_dispatched`` signal (e.g. an admin manually
+    re-saving tracking + a carrier event arriving in the same window)
+    can't email the customer twice. Raises ``Order.DoesNotExist`` if
+    the order is missing so the caller's logging path stays
+    consistent with the rest of the file.
+    """
+    with transaction.atomic():
+        order = Order.objects.select_for_update().get(id=order_id)
+        if order.metadata and order.metadata.get(
+            SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG
+        ):
+            return False
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG] = True
+        order.save(update_fields=["metadata"])
+    return True
 
 
 @celery_app.task(
@@ -436,6 +905,28 @@ def send_order_status_update_email(
 )
 def send_shipping_notification_email(self, order_id: int) -> bool:
     try:
+        # Only reserve on the first attempt. Retries are expected to
+        # re-send because the flag is held by this worker; releasing
+        # on every retry would defeat idempotency, and re-checking
+        # would block a legitimate retry after a transient failure.
+        if self.request.retries == 0:
+            try:
+                if not _reserve_shipping_notification_email(order_id):
+                    logger.info(
+                        "Shipping notification email already sent (or reserved) "
+                        "for order #%s, skipping",
+                        order_id,
+                    )
+                    return True
+            except Order.DoesNotExist:
+                logger.error(
+                    "Could not reserve shipping notification email — Order #%s "
+                    "not found",
+                    order_id,
+                    extra={"order_id": order_id},
+                )
+                return False
+
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
             .prefetch_related("items__product__translations")
@@ -476,6 +967,9 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(
+                list_id="shipping_notification"
+            ),
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -673,6 +1167,7 @@ def send_invoice_email(self, order_id: int) -> bool:
             settings.DEFAULT_FROM_EMAIL,
             [order.email],
             reply_to=[settings.INFO_EMAIL],
+            headers=build_transactional_list_headers(list_id="order_invoice"),
         )
         msg.attach_alternative(html_content, "text/html")
 
@@ -1024,53 +1519,6 @@ def check_pending_orders() -> int:
     except Exception as e:
         logger.error(
             f"Error checking pending orders: {e!s}",
-            extra={"error": str(e)},
-        )
-        return 0
-
-
-@celery_app.task(
-    base=MonitoredTask,
-    autoretry_for=(Exception,),
-    max_retries=3,
-    retry_backoff=True,
-    retry_jitter=True,
-)
-def update_order_statuses_from_shipping() -> int:
-    try:
-        shipped_orders = Order.objects.filter(
-            status=OrderStatus.SHIPPED, tracking_number__isnull=False
-        ).exclude(tracking_number="")
-
-        count = 0
-
-        for order in shipped_orders:
-            if not order.shipping_carrier:
-                continue
-
-            try:
-                tracking_info = ShippingService.get_tracking_info(
-                    order.tracking_number, order.shipping_carrier
-                )
-
-                if tracking_info.get("status") == OrderStatus.DELIVERED:
-                    OrderService.update_order_status(
-                        order, OrderStatus.DELIVERED
-                    )
-                    # Email is sent by handle_order_status_changed signal
-                    count += 1
-
-            except Exception as inner_e:
-                logger.error(
-                    f"Error updating shipping status for order #{order.id}: {inner_e!s}",
-                    extra={"order_id": order.id, "error": str(inner_e)},
-                )
-
-        return count
-
-    except Exception as e:
-        logger.error(
-            f"Error updating order statuses from shipping: {e!s}",
             extra={"error": str(e)},
         )
         return 0

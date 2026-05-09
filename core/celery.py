@@ -2,7 +2,13 @@ import logging
 import os
 
 from celery import Celery
-from celery.signals import setup_logging, task_prerun, worker_process_init
+from celery.signals import (
+    before_task_publish,
+    setup_logging,
+    task_postrun,
+    task_prerun,
+    worker_process_init,
+)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
 
@@ -126,6 +132,63 @@ def create_celery_app():
 
         close_old_connections()
         logger.info("Worker process shutting down")
+
+    # ------------------------------------------------------------------ #
+    # Correlation-ID propagation: web → Celery task                       #
+    # ------------------------------------------------------------------ #
+    # Inject the active correlation-id into every task's headers at the
+    # moment the task is published.  The worker side reads it back in the
+    # task_prerun handler below and binds it to the ContextVar so all log
+    # records emitted during the task carry the same correlation_id that
+    # the originating HTTP request had.
+    @before_task_publish.connect(
+        dispatch_uid="core.celery.inject_correlation_id"
+    )
+    def inject_correlation_id(headers: dict, **kwargs) -> None:
+        """Stamp the outgoing task message with the current correlation id."""
+        from core.middleware.correlation_id import get_correlation_id
+
+        cid = get_correlation_id()
+        if cid and cid != "-":
+            headers["correlation_id"] = cid
+
+    # Maps task_id → ContextVar token so we can reset after the task.
+    _cid_tokens: dict = {}
+
+    @task_prerun.connect(dispatch_uid="core.celery.restore_correlation_id")
+    def restore_correlation_id(task_id: str, task, **kwargs) -> None:
+        """Restore correlation id from task headers into the worker context.
+
+        Celery merges ``task.request.headers`` from the message at this
+        point, so ``task.request.get("correlation_id")`` is already
+        populated.  Binding it to the ContextVar makes the value
+        available to ``CorrelationIdFilter`` so every log line the task
+        emits carries the originating request's correlation id.
+
+        The reset token is stashed in ``_cid_tokens`` so the matching
+        ``cleanup_correlation_id`` handler can restore the previous value
+        and prevent the correlation id from leaking into subsequent tasks
+        on the same worker thread.
+        """
+        from core.middleware.correlation_id import set_correlation_id
+
+        cid = (task.request.headers or {}).get("correlation_id")
+        if cid:
+            token = set_correlation_id(cid)
+            _cid_tokens[task_id] = token
+
+    @task_postrun.connect(dispatch_uid="core.celery.cleanup_correlation_id")
+    def cleanup_correlation_id(task_id: str, **kwargs) -> None:
+        """Reset the correlation id ContextVar after the task completes.
+
+        Prevents the correlation id set in ``restore_correlation_id`` from
+        leaking into the next task executed on the same worker thread.
+        """
+        from core.middleware.correlation_id import reset_correlation_id
+
+        token = _cid_tokens.pop(task_id, None)
+        if token is not None:
+            reset_correlation_id(token)
 
     return tasker
 

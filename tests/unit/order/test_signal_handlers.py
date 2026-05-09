@@ -51,13 +51,24 @@ class OrderSignalHandlersTestCase(TestCase):
         mock_signal.assert_not_called()
 
     @patch("order.signals.order_status_changed.send")
-    def test_handle_order_post_save_status_changed(self, mock_signal):
+    @patch("django.db.transaction.on_commit")
+    def test_handle_order_post_save_status_changed(
+        self, mock_on_commit, mock_signal
+    ):
+        """Status-change signal is deferred via transaction.on_commit."""
         self.order.status = OrderStatus.PROCESSING
         self.order._original_status = OrderStatus.PENDING
 
         handle_order_post_save(
             sender=self.sender, instance=self.order, created=False
         )
+
+        # Signal should NOT fire immediately — it is deferred until commit.
+        mock_signal.assert_not_called()
+        mock_on_commit.assert_called_once()
+
+        # Execute the deferred callback to verify it emits the signal.
+        mock_on_commit.call_args[0][0]()
 
         mock_signal.assert_called_once_with(
             sender=self.sender,

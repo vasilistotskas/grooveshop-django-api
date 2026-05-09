@@ -41,8 +41,10 @@ class TestCreateOrderFromCart:
         user = UserAccountFactory()
         country = CountryFactory()
         cart = CartFactory(user=user)
-        product1 = ProductFactory(stock=10, price=Money(100, "EUR"))
-        product2 = ProductFactory(stock=5, price=Money(50, "EUR"))
+        product1 = ProductFactory(
+            stock=10, price=Money(100, "EUR"), active=True
+        )
+        product2 = ProductFactory(stock=5, price=Money(50, "EUR"), active=True)
 
         CartItemFactory(cart=cart, product=product1, quantity=2)
         CartItemFactory(cart=cart, product=product2, quantity=1)
@@ -72,7 +74,7 @@ class TestCreateOrderFromCart:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": country.alpha_2,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         payment_intent_id = "pi_test_123"
@@ -144,7 +146,7 @@ class TestCreateOrderFromCart:
         user = UserAccountFactory()
         country = CountryFactory()
         cart = CartFactory(user=user)
-        product = ProductFactory(stock=10, price=Money(100, "EUR"))
+        product = ProductFactory(stock=10, price=Money(100, "EUR"), active=True)
         CartItemFactory(cart=cart, product=product, quantity=2)
         pay_way = PayWayFactory(provider_code="stripe")
 
@@ -157,7 +159,7 @@ class TestCreateOrderFromCart:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": country.alpha_2,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         payment_intent_id = "pi_test_456"
@@ -203,7 +205,7 @@ class TestCreateOrderFromCart:
         # Setup
         user = UserAccountFactory()
         cart = CartFactory(user=user)
-        product = ProductFactory(stock=10)
+        product = ProductFactory(stock=10, active=True)
         CartItemFactory(cart=cart, product=product, quantity=2)
         pay_way = PayWayFactory(provider_code="stripe")
 
@@ -216,7 +218,7 @@ class TestCreateOrderFromCart:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         # Execute & Verify
@@ -251,7 +253,7 @@ class TestCreateOrderFromCart:
         user = UserAccountFactory()
         country = CountryFactory()
         cart = CartFactory(user=user)
-        product = ProductFactory(stock=10)
+        product = ProductFactory(stock=10, active=True)
         CartItemFactory(cart=cart, product=product, quantity=2)
         pay_way = PayWayFactory(provider_code="stripe")
 
@@ -264,7 +266,7 @@ class TestCreateOrderFromCart:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": country.alpha_2,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         payment_intent_id = "pi_test_unconfirmed"
@@ -309,7 +311,7 @@ class TestCreateOrderFromCart:
         user = UserAccountFactory()
         country = CountryFactory()
         cart = CartFactory(user=user)
-        product = ProductFactory(stock=1)  # Only 1 in stock
+        product = ProductFactory(stock=1, active=True)  # Only 1 in stock
         CartItemFactory(cart=cart, product=product, quantity=5)  # Requesting 5
         pay_way = PayWayFactory(provider_code="stripe")
 
@@ -322,7 +324,7 @@ class TestCreateOrderFromCart:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": country.alpha_2,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         payment_intent_id = "pi_test_789"
@@ -374,7 +376,7 @@ class TestValidateCartForCheckout:
         from product.factories import ProductFactory
 
         cart = CartFactory()
-        product = ProductFactory(stock=10, price=Money(100, "EUR"))
+        product = ProductFactory(stock=10, price=Money(100, "EUR"), active=True)
         CartItemFactory(cart=cart, product=product, quantity=2)
 
         result = OrderService.validate_cart_for_checkout(cart)
@@ -388,7 +390,7 @@ class TestValidateCartForCheckout:
         from product.factories import ProductFactory
 
         cart = CartFactory()
-        product = ProductFactory(stock=1, price=Money(100, "EUR"))
+        product = ProductFactory(stock=1, price=Money(100, "EUR"), active=True)
         CartItemFactory(cart=cart, product=product, quantity=5)
 
         result = OrderService.validate_cart_for_checkout(cart)
@@ -408,7 +410,11 @@ class TestValidateCartForCheckout:
         # Price changed from 100 to 104 (4% change - within 5% tolerance)
         # Disable VAT and discount to avoid price inflation/deflation
         product = ProductFactory(
-            stock=10, price=Money(104, "EUR"), vat=None, discount_percent=0
+            stock=10,
+            price=Money(104, "EUR"),
+            vat=None,
+            discount_percent=0,
+            active=True,
         )
         cart_item = CartItemFactory(cart=cart, product=product, quantity=2)
 
@@ -430,7 +436,7 @@ class TestValidateCartForCheckout:
 
         cart = CartFactory()
         # Price changed from 100 to 120 (20% change - exceeds 5% tolerance)
-        product = ProductFactory(stock=10, price=Money(120, "EUR"))
+        product = ProductFactory(stock=10, price=Money(120, "EUR"), active=True)
         CartItemFactory(cart=cart, product=product, quantity=2)
 
         # This test would need proper mocking of the price comparison
@@ -459,7 +465,7 @@ class TestValidateShippingAddress:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         # Should not raise any exception
@@ -491,7 +497,7 @@ class TestValidateShippingAddress:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         with pytest.raises(ValidationError) as exc_info:
@@ -531,7 +537,7 @@ class TestValidateShippingAddress:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": -1,  # Invalid (negative)
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         with pytest.raises(ValidationError) as exc_info:

@@ -50,10 +50,12 @@ def create_user_notification(
     """Create a notification for a single user with multi-locale content.
 
     ``translations`` is a mapping ``{language_code: {"title": ..., "message": ...}}``.
-    Language codes outside ``PARLER_LANGUAGES[SITE_ID]`` are silently
-    dropped so callers can ship an ``en``/``el``/``de`` dict even in
-    environments where only a subset is configured — the alternative
-    (raising) would make tests brittle against settings drift.
+    Locales present in ``PARLER_LANGUAGES[SITE_ID]`` but absent from the
+    caller's dict fall back to the ``en`` entry, then ``el``.  This means
+    German-locale users see English copy until proper ``de`` translations
+    are added to each task — silent blank rows are never written.
+    Extra keys in ``translations`` that are not in ``PARLER_LANGUAGES`` are
+    ignored so callers can pass a larger dict without environment coupling.
 
     Wrapped in an atomic block so a partial translation-save failure
     cannot leak a half-populated Notification row.
@@ -66,18 +68,26 @@ def create_user_notification(
         link=link,
     )
 
-    supported = set(supported_notification_languages())
-    for language, fields in translations.items():
-        if language not in supported:
+    supported = supported_notification_languages()
+    # Fallback chain used when a locale has no entry in the caller's
+    # ``translations`` dict (e.g. "de" is not yet translated).  "en" is
+    # tried first; if absent, "el" is used.  de-locale users therefore
+    # see English copy until proper German translations are added.
+    _fallback_keys = ["en", "el"]
+
+    for code in supported:
+        entry = translations.get(code) or next(
+            (translations[k] for k in _fallback_keys if k in translations),
+            None,
+        )
+        if entry is None:
             continue
-        title = fields.get("title", "")
-        message = fields.get("message", "")
-        # Skip languages where the caller has no copy for the event —
-        # better to fall back to parler's own fallback chain than to
-        # save an empty ``title`` that the UI would render blank.
+        title = entry.get("title", "")
+        message = entry.get("message", "")
+        # Skip if the resolved entry is also empty — nothing useful to write.
         if not title and not message:
             continue
-        notification.set_current_language(language)
+        notification.set_current_language(code)
         notification.title = title
         notification.message = message
         notification.save()

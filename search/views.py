@@ -45,6 +45,31 @@ _VALID_LANGUAGE_CODES = frozenset(
     code for code, _name in django_settings.LANGUAGES
 )
 
+# Allowlists for sort fields and facets accepted from external callers.
+# Reject anything not in these sets to prevent filter-injection into
+# the Meilisearch query DSL.
+_ALLOWED_PRODUCT_SORT_FIELDS: frozenset[str] = frozenset(
+    {
+        "finalPrice",
+        "-finalPrice",
+        "likesCount",
+        "-likesCount",
+        "viewCount",
+        "-viewCount",
+        "createdAt",
+        "-createdAt",
+    }
+)
+_ALLOWED_PRODUCT_FACETS: frozenset[str] = frozenset(
+    {
+        "category",
+        "brand",
+        "price_range",
+        "final_price",
+        "language_code",
+    }
+)
+
 
 def _get_max_search_limit() -> int:
     return Setting.get("SEARCH_MAX_LIMIT", default=100)
@@ -112,6 +137,7 @@ def _validate_language_code(language_code: str | None) -> str | None:
     ],
 )
 @api_view(["GET"])
+@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
 def blog_post_meili_search(request):
     query = request.query_params.get("query")
     if not query:
@@ -233,7 +259,7 @@ def blog_post_meili_search(request):
             required=False,
         ),
         OpenApiParameter(
-            name="attribute_value",
+            name="attributeValues",
             type=str,
             location=OpenApiParameter.QUERY,
             description=_(
@@ -276,6 +302,7 @@ def blog_post_meili_search(request):
     ],
 )
 @api_view(["GET"])
+@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
 def product_meili_search(request):
     """Search products with advanced filtering via Meilisearch."""
 
@@ -296,12 +323,20 @@ def product_meili_search(request):
     likes_min = request.query_params.get("likes_min")
     views_min = request.query_params.get("views_min")
     categories_param = request.query_params.get("categories", "")
-    attribute_value_param = request.query_params.get("attribute_value", "")
+    # Prefer plural camelCase key; fall back to the legacy singular name.
+    attribute_value_param = request.query_params.get(
+        "attributeValues",
+        request.query_params.get("attribute_value", ""),
+    )
     sort_param = request.query_params.get("sort")
 
-    # Parse facets parameter
+    # Parse facets parameter — restrict to known-safe facet fields.
     facets_param = request.query_params.get("facets", "")
-    facets = [f.strip() for f in facets_param.split(",") if f.strip()]
+    facets = [
+        f
+        for f in (fs.strip() for fs in facets_param.split(","))
+        if f and f in _ALLOWED_PRODUCT_FACETS
+    ]
 
     # Parse categories (comma-separated)
     categories = [c.strip() for c in categories_param.split(",") if c.strip()]
@@ -350,8 +385,8 @@ def product_meili_search(request):
                 attribute_values__in=attribute_value_ids
             )
 
-    # Apply sort
-    if sort_param:
+    # Apply sort — silently drop unknown sort fields to prevent DSL injection.
+    if sort_param and sort_param in _ALLOWED_PRODUCT_SORT_FIELDS:
         search_qs = search_qs.order_by(sort_param)
 
     # Add facets for dynamic filter counts and stats
@@ -438,6 +473,7 @@ def product_meili_search(request):
     ],
 )
 @api_view(["GET"])
+@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
 def federated_search(request):
     """
     Execute federated search using Meilisearch multi_search API.
@@ -479,8 +515,9 @@ def federated_search(request):
     blog_filters = []
 
     if language_code:
-        product_filters.append(f"language_code = '{language_code}'")
-        blog_filters.append(f"language_code = '{language_code}'")
+        escaped_lang = language_code.replace("\\", "\\\\").replace("'", "\\'")
+        product_filters.append(f"language_code = '{escaped_lang}'")
+        blog_filters.append(f"language_code = '{escaped_lang}'")
 
     # Content filtering: exclude inactive/deleted products
     product_filters.append("active = true")
@@ -902,46 +939,46 @@ def search_trending(request):
         raise ValidationError({"language_code": _("Unsupported language.")})
 
     cache_key = f"search:trending:{content_type}:{language_code}:{limit}"
-    cached = caches["default"].get(cache_key)
-    if cached is not None:
-        return Response(cached, status=status.HTTP_200_OK)
 
-    cutoff = timezone.now() - timedelta(hours=_TRENDING_WINDOW_HOURS)
-    qs = (
-        SearchQuery.objects.filter(
-            timestamp__gte=cutoff,
-            results_count__gt=0,
-            content_type=content_type,
+    def _compute_trending():
+        cutoff = timezone.now() - timedelta(hours=_TRENDING_WINDOW_HOURS)
+        qs = (
+            SearchQuery.objects.filter(
+                timestamp__gte=cutoff,
+                results_count__gt=0,
+                content_type=content_type,
+            )
+            .exclude(query__isnull=True)
+            .exclude(query__exact="")
         )
-        .exclude(query__isnull=True)
-        .exclude(query__exact="")
-    )
-    if language_code:
-        qs = qs.filter(language_code=language_code)
+        if language_code:
+            qs = qs.filter(language_code=language_code)
 
-    top = (
-        qs.values("query")
-        .annotate(count=Count("id"))
-        .order_by("-count")[: limit * 2]
-    )
+        top = (
+            qs.values("query")
+            .annotate(count=Count("id"))
+            .order_by("-count")[: limit * 2]
+        )
 
-    results: list[dict] = []
-    for row in top:
-        query_text = (row.get("query") or "").strip()
-        if len(query_text) < _TRENDING_MIN_QUERY_LENGTH:
-            continue
-        results.append({"query": query_text, "count": row["count"]})
-        if len(results) >= limit:
-            break
+        results: list[dict] = []
+        for row in top:
+            query_text = (row.get("query") or "").strip()
+            if len(query_text) < _TRENDING_MIN_QUERY_LENGTH:
+                continue
+            results.append({"query": query_text, "count": row["count"]})
+            if len(results) >= limit:
+                break
 
-    payload = {
-        "window_hours": _TRENDING_WINDOW_HOURS,
-        "content_type": content_type,
-        "language_code": language_code or None,
-        "results": results,
-    }
+        return {
+            "window_hours": _TRENDING_WINDOW_HOURS,
+            "content_type": content_type,
+            "language_code": language_code or None,
+            "results": results,
+        }
 
-    caches["default"].set(
-        cache_key, payload, timeout=_TRENDING_CACHE_TTL_SECONDS
+    # get_or_set uses an atomic add() internally, avoiding cache stampede
+    # when multiple requests race on an expired key.
+    payload = caches["default"].get_or_set(
+        cache_key, _compute_trending, timeout=_TRENDING_CACHE_TTL_SECONDS
     )
     return Response(payload, status=status.HTTP_200_OK)

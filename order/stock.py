@@ -521,6 +521,61 @@ class StockManager:
         )
 
     @classmethod
+    @transaction.atomic
+    def adjust_stock(
+        cls,
+        product,
+        delta: int,
+        reason: str = "admin order item edit",
+        performed_by=None,
+    ) -> None:
+        """
+        Adjust a product's stock by a signed delta with a full audit log.
+
+        Positive delta → INCREMENT (stock increases).
+        Negative delta → DECREMENT (stock decreases, floored at 0).
+        Zero delta is a no-op.
+
+        Uses SELECT FOR UPDATE on the product row so concurrent adjustments
+        are serialised. Writes a StockLog row for every non-zero change.
+
+        Args:
+            product:      Product instance (must already exist in the DB).
+            delta:        Signed integer change. Positive = restock, negative =
+                          consume.
+            reason:       Human-readable reason written to StockLog.
+            performed_by: Optional UserAccount instance (None for system ops).
+        """
+        if delta == 0:
+            return
+
+        # Lock the product row before reading/writing stock.
+        locked = type(product).objects.select_for_update().get(pk=product.pk)
+        stock_before = locked.stock
+
+        if delta > 0:
+            locked.stock += delta
+            operation_type = StockLog.OPERATION_INCREMENT
+        else:
+            # Floor at 0 — mirror the Greatest(F("stock") + delta, 0) guard.
+            locked.stock = max(0, locked.stock + delta)
+            operation_type = StockLog.OPERATION_DECREMENT
+
+        locked._change_reason = "StockManager: adjust_stock"
+        locked.save(update_fields=["stock", "updated_at"])
+
+        StockLog.objects.create(
+            product=locked,
+            order=None,
+            operation_type=operation_type,
+            quantity_delta=delta,
+            stock_before=stock_before,
+            stock_after=locked.stock,
+            reason=reason,
+            performed_by=performed_by,
+        )
+
+    @classmethod
     def get_available_stock(
         cls,
         product_id: int,

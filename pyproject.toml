@@ -1,5 +1,5 @@
 [project]
-version = "1.110.1"
+version = "1.127.1"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -14,21 +14,21 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.11.1",
-  "boto3==1.42.90",
+  "boto3==1.43.3",
   "charset_normalizer==3.4.7",
   "channels[daphne]==4.3.2",
   "channels-redis==4.3.0",
-  "cryptography==46.0.7",
+  "cryptography==48.0.0",
   "django==6.0.4",
   "django-admin-thumbnails==1.0.0",
-  "django-allauth==65.16.0",
+  "django-allauth==65.16.1",
   "django-extra-settings==0.14.1",
   "django-celery-beat==2.9.0",
   "django-celery-results==2.6.0",
   "django-cors-headers==4.9.0",
   "django-simple-history==3.11.0",
   "django-filter==25.2",
-  "django-unfold==0.90.0",
+  "django-unfold==0.92.0",
   "django-money==3.6.0",
   "django-mptt==0.18.0",
   "django-parler==2.3.0",
@@ -43,29 +43,31 @@ dependencies = [
   "drf-spectacular==0.29.0",
   "fido2==2.2.0",
   "flower==2.0.1",
-  "gunicorn==25.3.0",
+  "gunicorn==26.0.0",
   "importlib-resources==6.5.2",
   "measurement==3.2.2",
-  "meilisearch==0.40.0",
-  "phonenumbers==9.0.28",
+  "meilisearch==0.41.0",
+  "phonenumbers==9.0.29",
   "pillow==12.2.0",
-  "psycopg[binary,pool] == 3.3.3",
+  "psycopg[binary,pool] == 3.3.4",
   "python-dotenv==1.2.2",
   "qrcode==8.2",
   "urllib3==2.6.3",
-  "uvicorn==0.44.0",
+  "uvicorn==0.46.0",
   "celery[redis] >=5.6.3,<6.0.0",
-  "disposable-email-domains==0.0.170",
-  "django-stubs-ext==6.0.2",
+  "disposable-email-domains==0.0.180",
+  "django-stubs-ext==6.0.3",
   "twisted[http2,tls]==25.5.0",
   "dj-stripe==2.10.3",
   "defusedxml>=0.7.1",
   "django-tenants>=3.7.0,<4.0.0",
-  "nh3>=0.3.4",
+  "nh3>=0.3.5",
   "pyjwt==2.12.1",
   "weasyprint>=68.1",
-  "requests==2.32.5",
-  "xmlschema==4.2.0",
+  "requests==2.33.1",
+  "xmlschema==4.3.1",
+  "argon2-cffi>=25.1.0",
+  "facebook-business==25.0.1",
 ]
 
 [project.urls]
@@ -79,14 +81,14 @@ dev = [
     "coverage[toml]==7.13.5",
     "djangorestframework-stubs==3.16.9",
     "django-debug-toolbar==6.3.0",
-    "django-stubs==6.0.2",
-    "Faker==40.13.0",
+    "django-stubs==6.0.3",
+    "Faker==40.15.0",
     "factory-boy==3.3.3",
-    "gitpython==3.1.46",
+    "gitpython==3.1.49",
     "types-setuptools==82.0.0.20260408",
-    "pre-commit==4.5.1",
-    "pip-upgrader==2.4.4",
-    "pydantic==2.13.2",
+    "pre-commit==4.6.0",
+    "pip-upgrader==2.4.5",
+    "pydantic==2.13.3",
     "pylint==4.0.5",
     "pytest==9.0.3",
     "pytest-asyncio==1.3.0",
@@ -95,13 +97,13 @@ dev = [
     "pytest-timeout==2.4.0",
     "pytest-cov==7.1.0",
     "python-semantic-release==10.5.3",
-    "ruff==0.15.11",
+    "ruff==0.15.12",
     "rpds-py==0.30.0",
     "celery-stubs==0.1.3",
     "psutil==7.2.2",
     "msgpack==1.1.2",
-    "hypothesis==6.152.1",
-    "ty==0.0.31",
+    "hypothesis==6.152.4",
+    "ty==0.0.34",
 ]
 
 # ─────────────────────────────────────────────────────────
@@ -138,7 +140,7 @@ relative_files = true
 [tool.coverage.report]
 precision = 2
 skip_covered = true
-fail_under = 50
+fail_under = 70
 show_missing = true
 exclude_lines = [
     "pragma: no cover",
@@ -223,7 +225,34 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 timeout = 600
-addopts = "--tb=short --maxfail=0 -n auto --dist worksteal"
+# ``--dist loadfile`` keeps every test inside a file pinned to one xdist
+# worker. With ``worksteal``, tests from different files end up
+# interleaved on the same process — fine for pure unit tests but
+# corrosive here, because module-level singletons (e.g.
+# ``core.middleware.translation_reload._local_translation_version``,
+# extra-settings cache, factory random state) carry over between
+# unrelated tests, and EAGER signal cascades from one test's
+# OrderFactory call can pollute another test's mocks. ``loadfile``
+# costs ~30% more wall-time but is the difference between a stable
+# suite and 1-3 random flakes per run.
+addopts = "--tb=short --maxfail=0 -n auto --dist loadfile"
+
+# ─────────────────────────────────────────────────────────
+# uv configuration — transitive-dependency overrides for
+# CVEs found by Trivy. Both packages are indirect deps but
+# their fixed versions are drop-in compatible.
+# ─────────────────────────────────────────────────────────
+[tool.uv]
+override-dependencies = [
+    # CVE-2026-35536, CVE-2026-31958 (HIGH) — fixed in 6.5.5
+    "tornado>=6.5.5",
+    # CVE-2026-30922, CVE-2026-23490 (HIGH) — fixed in 0.6.3 / 0.6.2
+    "pyasn1>=0.6.3",
+    # CVE-2026-42304 (HIGH) — DoS in twisted.names DNS compression
+    # pointer chains; fixed in 26.4.0rc2 (no stable patch yet).
+    # Extras kept inline so the resolver preserves pyopenssl/h2 etc.
+    "twisted[http2,tls]>=26.4.0rc2",
+]
 
 # ─────────────────────────────────────────────────────────
 # Django-stubs configuration
@@ -252,11 +281,14 @@ python-version = "3.14"
 # Django ORM metaclass: reverse relations, FK _id accessors,
 # get_*_display(), AbstractBaseUser attrs, Celery .delay(),
 # Parler/MPTT methods — ty lacks django-stubs mypy plugin support
+# (https://github.com/astral-sh/ty/blob/main/docs/reference/typing-faq.md)
 unresolved-attribute = "ignore"
-possibly-missing-attribute = "ignore"
-# DRF standard pattern: serializer validate() overrides with
-# different signatures are idiomatic and expected
-invalid-method-override = "ignore"
+# Django `objects = SomeManager()` and `REQUIRED_FIELDS = [...]` are
+# the canonical Django patterns, but django-stubs declares both as
+# ClassVar on the base class, so ty (since 0.0.33) flags every model
+# for "instance variable cannot override class variable". django-stubs'
+# mypy plugin reconciles this via descriptor handling; ty cannot.
+invalid-attribute-override = "ignore"
 
 [tool.ty.src]
 exclude = [
@@ -314,7 +346,27 @@ invalid-assignment = "ignore"
 not-subscriptable = "ignore"
 not-iterable = "ignore"
 call-non-callable = "ignore"
-no-matching-overload = "ignore"
 too-many-positional-arguments = "ignore"
 unsupported-operator = "ignore"
 invalid-return-type = "ignore"
+
+# django-unfold's @action decorator is annotated as `-> Action`
+# but actually returns the inner decorator callable, so ty flags
+# every `@action(...)` usage as call-non-callable. Suppress for
+# all per-app admin modules until upstream stubs are fixed.
+[[tool.ty.overrides]]
+include = ["**/admin.py"]
+
+[tool.ty.overrides.rules]
+call-non-callable = "ignore"
+
+# Stripe SDK uses `Unpack[TypedDict]` for **kwargs on create() methods
+# (e.g. SessionCreateParams). We build payload dicts incrementally with
+# heterogeneous values, so the dict's inferred type is a union that
+# can't satisfy each TypedDict field individually. ty (since 0.0.33)
+# emits one diagnostic per field, producing ~75 errors per call site.
+[[tool.ty.overrides]]
+include = ["order/payment.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"

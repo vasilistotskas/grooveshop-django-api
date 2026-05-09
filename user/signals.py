@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import logging
 
-from allauth.account.signals import password_changed, user_signed_up
+from allauth.account.signals import (
+    email_changed,
+    password_changed,
+    user_signed_up,
+)
 from django.dispatch import receiver
 
 from typing import TYPE_CHECKING
@@ -24,6 +28,26 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+def _revoke_knox_tokens(user) -> int:
+    """Delete all Knox tokens for *user* and return the count removed."""
+    from knox.models import get_token_model  # noqa: PLC0415
+
+    result = get_token_model().objects.filter(user=user).delete()
+    return result[0]
+
+
+def _broadcast_force_logout(user) -> None:
+    """Push a force.logout event to the user's WebSocket group."""
+    from asgiref.sync import async_to_sync  # noqa: PLC0415
+    from channels.layers import get_channel_layer  # noqa: PLC0415
+
+    layer = get_channel_layer()
+    if layer:
+        async_to_sync(layer.group_send)(
+            f"user_{user.pk}", {"type": "force.logout"}
+        )
+
+
 @receiver(
     password_changed, dispatch_uid="user.revoke_knox_tokens_on_password_change"
 )
@@ -34,13 +58,37 @@ def revoke_knox_tokens_on_password_change(request, user, **kwargs):
     this ensures Knox tokens (used for REST API + WebSocket) are also
     invalidated so any active API clients lose access immediately.
     """
-    from knox.models import get_token_model  # noqa: PLC0415
-
-    revoked = get_token_model().objects.filter(user=user).delete()
+    revoked = _revoke_knox_tokens(user)
     logger.info(
         "Revoked Knox tokens after password change",
-        extra={"user_id": user.pk, "revoked_count": revoked[0]},
+        extra={"user_id": user.pk, "revoked_count": revoked},
     )
+    _broadcast_force_logout(user)
+
+
+@receiver(email_changed, dispatch_uid="user.revoke_knox_tokens_on_email_change")
+def revoke_knox_tokens_on_email_change(
+    request, user, from_email_address, to_email_address, **kwargs
+):
+    """
+    Revoke all Knox access tokens when the user changes their primary email.
+
+    A changed email is equivalent to a changed identity — existing tokens
+    may have been issued on the basis of the old email and should be
+    considered stale.  ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE handles allauth
+    sessions; we mirror that behaviour for Knox tokens + WebSocket here.
+    """
+    revoked = _revoke_knox_tokens(user)
+    logger.info(
+        "Revoked Knox tokens after email change",
+        extra={
+            "user_id": user.pk,
+            "revoked_count": revoked,
+            "from_email": str(from_email_address),
+            "to_email": str(to_email_address),
+        },
+    )
+    _broadcast_force_logout(user)
 
 
 @receiver(user_signed_up, dispatch_uid="user.populate_profile")
@@ -75,11 +123,16 @@ def populate_profile(
             logger.warning("Unsupported social provider: %s", provider)
 
     if picture_url:
-        # Dispatch to Celery task to avoid blocking the HTTP response
-        from user.tasks import download_social_avatar_task
+        # Dispatch after the outer transaction commits so the worker can
+        # always read the new user row.  (Social signups run inside an
+        # atomic block; firing bare .delay() risks the task reading before
+        # the INSERT is visible to the Celery worker's DB connection.)
+        from user.tasks import download_social_avatar_task  # noqa: PLC0415
 
-        download_social_avatar_task.delay(
-            user_id=user.pk, picture_url=picture_url
+        transaction.on_commit(
+            lambda url=picture_url: download_social_avatar_task.delay(
+                user_id=user.pk, picture_url=url
+            )
         )
 
 

@@ -555,8 +555,20 @@ class UserAccountViewSet(BaseModelViewSet):
         actual scrub runs in ``delete_user_account_task``; we respond
         immediately and the session is invalidated on the next
         request when the User row is gone.
+
+        The caller must have re-authenticated within
+        ``ACCOUNT_REAUTHENTICATION_TIMEOUT`` seconds (default 300).
+        Staff users acting on behalf of another account are exempt
+        from this check.
         """
-        from user.tasks import delete_user_account_task
+        from allauth.account.internal.flows.reauthentication import (  # noqa: PLC0415
+            did_recently_authenticate,
+        )
+        from user.tasks import delete_user_account_task  # noqa: PLC0415
+        from user.signals import (  # noqa: PLC0415
+            _broadcast_force_logout,
+            _revoke_knox_tokens,
+        )
 
         user = self.get_object()
 
@@ -566,8 +578,22 @@ class UserAccountViewSet(BaseModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        # Require recent reauthentication for the account owner.
+        # Staff acting on behalf of another user are exempt.
+        if request.user == user and not did_recently_authenticate(request):
+            return Response(
+                {"detail": _("Re-authentication required.")},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         req_serializer = DeleteAccountRequestSerializer(data=request.data)
         req_serializer.is_valid(raise_exception=True)
+
+        # Revoke all Knox tokens synchronously BEFORE the task fires so
+        # the tokens are invalid immediately — not after the Celery worker
+        # picks up the job (which may take seconds or longer under load).
+        _revoke_knox_tokens(user)
+        _broadcast_force_logout(user)
 
         delete_user_account_task.delay(user.id)
 

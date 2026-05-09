@@ -18,6 +18,10 @@ from order.serializers.item import (
 from pay_way.models import PayWay
 from product.models.product import Product
 from region.models import Region
+from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
+from shipping_boxnow.serializers.shipment import (
+    BoxNowShipmentDetailSerializer,
+)
 
 CARRIER_TRACKING_URLS: dict[str, str] = {
     "elta": "https://www.elta.gr/en/tracking?code={number}",
@@ -52,11 +56,40 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
     )
     phone = PhoneNumberField()
     status_display = serializers.SerializerMethodField("get_status_display")
+    payment_status_display = serializers.SerializerMethodField(
+        "get_payment_status_display",
+        help_text=(
+            "Localised label for ``payment_status`` (mirrors "
+            "``status_display``). Frontend renders this rather than the "
+            "raw enum value so Greek/English/German locales all work "
+            "without per-locale string maps in the UI."
+        ),
+    )
+    is_online_payment = serializers.SerializerMethodField(
+        help_text=(
+            "True when the order's PayWay charges the shopper online "
+            "(Stripe, Viva); false for cash-on-delivery / bank "
+            "transfer. Surfaced on both list + detail so both views "
+            "can suppress misleading 'outstanding amount' warnings "
+            "for COD orders where the shopper intentionally paid €0 "
+            "at checkout."
+        ),
+    )
     can_be_canceled = serializers.BooleanField(read_only=True)
     is_paid = serializers.BooleanField(read_only=True)
 
+    @extend_schema_field({"type": "string"})
     def get_status_display(self, order: Order) -> str:
         return order.get_status_display()
+
+    @extend_schema_field({"type": "string"})
+    def get_payment_status_display(self, order: Order) -> str:
+        return order.get_payment_status_display()
+
+    @extend_schema_field({"type": "boolean"})
+    def get_is_online_payment(self, order: Order) -> bool:
+        pay_way = getattr(order, "pay_way", None)
+        return bool(pay_way and pay_way.is_online_payment)
 
     class Meta:
         model = Order
@@ -94,7 +127,9 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "full_address",
             "payment_id",
             "payment_status",
+            "payment_status_display",
             "payment_method",
+            "is_online_payment",
             "can_be_canceled",
             "is_paid",
         )
@@ -111,6 +146,7 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "status_updated_at",
             "can_be_canceled",
             "is_paid",
+            "is_online_payment",
         )
 
 
@@ -132,12 +168,223 @@ class OrderDetailSerializer(OrderSerializer):
             "request to the invoice endpoint to find out."
         )
     )
+    boxnow_shipment = serializers.SerializerMethodField(
+        help_text=(
+            "BoxNow shipment details when shipping_provider.code is "
+            "'boxnow', else null."
+        )
+    )
+    acs_shipment = serializers.SerializerMethodField(
+        help_text=(
+            "ACS shipment details when the order's shipping provider "
+            "is ACS, else null."
+        )
+    )
+    shipment = serializers.SerializerMethodField(
+        help_text=(
+            "Provider-agnostic shipment payload — frontends can read "
+            "this single field instead of branching on boxnow_shipment "
+            "/ acs_shipment.  Returns the active provider's detail "
+            "serializer dict (shape depends on the provider) or null "
+            "when no shipment exists."
+        )
+    )
+    shipment_provider_code = serializers.SerializerMethodField(
+        help_text=(
+            "Identifier of the carrier handling this order — 'acs', "
+            "'boxnow', or null when no provider is attached.  Lets "
+            "frontends switch on a stable code instead of inspecting "
+            "the shipment shape."
+        )
+    )
+    cancellation = serializers.SerializerMethodField(
+        help_text=(
+            "Cancellation context for CANCELED orders — exposes the "
+            "operator-supplied reason, timestamp, and shipment-cancel "
+            "outcome from ``order.metadata['cancellation']``. Returns "
+            "null when the order was not canceled. Internal flags from "
+            "the metadata bag (webhook idempotency markers, mint "
+            "tickets) are intentionally not surfaced."
+        )
+    )
+    meta_event_ids = serializers.SerializerMethodField(
+        help_text=(
+            "Meta Pixel ``eventID`` values the browser must reuse when "
+            "firing the matching pixel call on the success page so "
+            "Meta dedups the browser event against the server-side "
+            "Conversions API event. Only the keys minted at order "
+            "creation are surfaced (purchase, initiate_checkout, "
+            "add_payment_info). Empty dict when the customer declined "
+            "marketing cookies — in that case the browser should not "
+            "fire the matching pixel either."
+        )
+    )
+    currency = serializers.SerializerMethodField(
+        help_text=(
+            "ISO 4217 currency code for every monetary field on the "
+            "order (paidAmount, shippingPrice, totalPriceItems, …). "
+            "Surfaced as a top-level field because djmoney serialises "
+            "money fields as bare numbers — without this, the "
+            "frontend has no way to know whether ``59.98`` is EUR or "
+            "USD, which breaks ad-pixel attribution and cart "
+            "totals in multi-currency reports."
+        )
+    )
     phone = PhoneNumberField(read_only=True)
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "description": (
+                "Per-event-name UUIDs for Meta Pixel deduplication."
+            ),
+        }
+    )
+    def get_meta_event_ids(self, obj: Order) -> dict[str, str]:
+        meta = obj.metadata or {}
+        meta_ctx = meta.get("meta") or {}
+        if not isinstance(meta_ctx, dict):
+            return {}
+        event_ids = meta_ctx.get("event_ids") or {}
+        if not isinstance(event_ids, dict):
+            return {}
+        return {
+            key: str(value)
+            for key, value in event_ids.items()
+            if isinstance(value, (str, int)) and str(value)
+        }
+
+    @extend_schema_field({"type": "string", "example": "EUR"})
+    def get_currency(self, obj: Order) -> str:
+        # ``paid_amount`` is the canonical reference: it's the field
+        # the customer actually paid in. Falls back to total_price_items
+        # for orders where paid_amount may be a zero Money (COD before
+        # reconciliation), and finally to the project default. Walking
+        # multiple sources keeps us safe against the rare case where
+        # the order was created with one currency and reconciled in
+        # another (shouldn't happen, but cheap to guard against).
+        from django.conf import settings
+
+        for source_name in (
+            "paid_amount",
+            "total_price_items",
+            "shipping_price",
+        ):
+            money = getattr(obj, source_name, None)
+            currency = getattr(money, "currency", None) if money else None
+            if currency is not None:
+                return str(currency).upper()
+        return settings.DEFAULT_CURRENCY
 
     @extend_schema_field({"type": "boolean"})
     def get_has_invoice(self, obj: Order) -> bool:
         invoice = getattr(obj, "invoice", None)
         return bool(invoice and invoice.has_document())
+
+    def _serialized_shipment(self, obj: Order) -> dict | None:
+        """Compute the carrier shipment payload once per response.
+
+        ``get_boxnow_shipment``, ``get_acs_shipment`` and the generic
+        ``get_shipment`` all need the same dict. Without memoisation
+        the carrier serializer ran twice per OrderDetail response (one
+        carrier-specific call + the generic dispatcher).
+        """
+        cache: dict = self.context.setdefault("_shipment_cache", {})
+        sentinel = object()
+        cached = cache.get(obj.pk, sentinel)
+        if cached is not sentinel:
+            return cached
+        from shipping.services import ShippingService
+
+        result = ShippingService.serialize_shipment(obj, context=self.context)
+        cache[obj.pk] = result
+        return result
+
+    @extend_schema_field(BoxNowShipmentDetailSerializer(allow_null=True))
+    def get_boxnow_shipment(self, obj: Order) -> dict | None:
+        # Mirror ``get_acs_shipment`` — gate on the registry-backed
+        # ``shipping_provider`` FK rather than the denormalised
+        # ``shipping_method`` enum so the field stays consistent
+        # across carriers and the legacy column can be dropped.
+        provider = getattr(obj, "shipping_provider", None)
+        if provider is None or provider.code != "boxnow":
+            return None
+        return self._serialized_shipment(obj)
+
+    @extend_schema_field(AcsShipmentDetailSerializer(allow_null=True))
+    def get_acs_shipment(self, obj: Order) -> dict | None:
+        provider = getattr(obj, "shipping_provider", None)
+        if provider is None or provider.code != "acs":
+            return None
+        return self._serialized_shipment(obj)
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "nullable": True,
+            "additionalProperties": True,
+            "description": (
+                "Provider-shipment detail payload. Shape varies by "
+                "carrier — frontends should read shipmentProviderCode "
+                "to decide which fields to render."
+            ),
+        }
+    )
+    def get_shipment(self, obj: Order) -> dict | None:
+        """Generic provider-agnostic shipment payload.
+
+        Dispatches via ``ShippingService.serialize_shipment(order)``
+        which looks up the order's carrier adapter and returns its
+        detail-serializer dict.  Frontends migrating off the
+        provider-specific fields (``boxnow_shipment`` /
+        ``acs_shipment``) should consume this one.
+        """
+        return self._serialized_shipment(obj)
+
+    @extend_schema_field({"type": "string", "nullable": True})
+    def get_shipment_provider_code(self, obj: Order) -> str | None:
+        provider = getattr(obj, "shipping_provider", None)
+        return provider.code if provider is not None else None
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "nullable": True,
+            "properties": {
+                "reason": {"type": "string"},
+                "canceled_at": {"type": "string", "format": "date-time"},
+                "previous_status": {"type": "string"},
+                "shipment_cancel": {
+                    "type": "object",
+                    "nullable": True,
+                    "properties": {
+                        "attempted": {"type": "boolean"},
+                        "dispatched": {"type": "boolean"},
+                        "error": {"type": "string", "nullable": True},
+                    },
+                },
+            },
+        }
+    )
+    def get_cancellation(self, obj: Order) -> dict | None:
+        meta = obj.metadata or {}
+        cancellation = meta.get("cancellation")
+        if not isinstance(cancellation, dict):
+            return None
+        out: dict[str, object] = {}
+        for key in ("reason", "canceled_at", "previous_status"):
+            value = cancellation.get(key)
+            if value is not None:
+                out[key] = value
+        shipment_cancel = cancellation.get("shipment_cancel")
+        if isinstance(shipment_cancel, dict):
+            out["shipment_cancel"] = {
+                "attempted": bool(shipment_cancel.get("attempted")),
+                "dispatched": bool(shipment_cancel.get("dispatched")),
+                "error": shipment_cancel.get("error"),
+            }
+        return out or None
 
     @extend_schema_field(
         {
@@ -283,6 +530,11 @@ class OrderDetailSerializer(OrderSerializer):
             "pricing_breakdown",
             "tracking_details",
             "has_invoice",
+            "boxnow_shipment",
+            "acs_shipment",
+            "shipment",
+            "shipment_provider_code",
+            "cancellation",
             "phone",
             "document_type",
             "payment_id",
@@ -294,6 +546,8 @@ class OrderDetailSerializer(OrderSerializer):
             "is_completed",
             "is_canceled",
             "full_address",
+            "meta_event_ids",
+            "currency",
         )
         read_only_fields = (
             *OrderSerializer.Meta.read_only_fields,
@@ -301,6 +555,10 @@ class OrderDetailSerializer(OrderSerializer):
             "pricing_breakdown",
             "tracking_details",
             "has_invoice",
+            "boxnow_shipment",
+            "acs_shipment",
+            "shipment",
+            "shipment_provider_code",
         )
 
 
@@ -374,6 +632,24 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         allow_blank=True,
         help_text=_("Customer notes or special instructions"),
     )
+    floor = serializers.CharField(
+        max_length=50,
+        required=False,
+        allow_blank=True,
+        help_text=_("Floor number or label (e.g. FIRST_FLOOR)"),
+    )
+    place = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        help_text=_("Place or district (optional)"),
+    )
+    location_type = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        help_text=_("Location type, e.g. HOME or OFFICE (optional)"),
+    )
 
     # B2B billing identity — required only when the buyer wants a
     # proper Τιμολόγιο Πώλησης (document_type=INVOICE). Normalised and
@@ -416,6 +692,84 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         min_value=0,
         help_text=_(
             "Number of loyalty points to redeem for discount on this order"
+        ),
+    )
+
+    # BoxNow locker fields (required when carrier=boxnow + kind=pickup_point)
+    boxnow_locker_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        help_text=_("BoxNow APM locker ID from the widget"),
+    )
+    boxnow_compartment_size = serializers.IntegerField(
+        min_value=1,
+        max_value=3,
+        required=False,
+        default=1,
+        help_text=_("BoxNow compartment size: 1=Small, 2=Medium, 3=Large"),
+    )
+
+    # Shipping abstraction: ``(shipping_provider_code, shipping_kind)``
+    # is the single source of truth for carrier dispatch. Validated
+    # against the in-memory carrier registry; the dynamic home-delivery
+    # auto-router fills ``shipping_provider`` server-side when callers
+    # send only ``shipping_kind="home_delivery"``.
+    shipping_provider_code = serializers.SlugField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_("Carrier code from /api/v1/shipping/options (e.g. 'acs')."),
+    )
+    shipping_kind = serializers.ChoiceField(
+        choices=[
+            ("home_delivery", _("Home delivery")),
+            ("pickup_point", _("Pickup point / locker")),
+        ],
+        required=False,
+        help_text=_("Generic fulfilment kind, independent of provider."),
+    )
+    # ACS-specific fields, only honoured when shipping_provider_code='acs'.
+    acs_station_external_id = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "ACS Smartpoint / shop external ID (Phase 2 pickup-point flow)."
+        ),
+    )
+    acs_station_branch = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_("ACS_Station_Branch_Destination value."),
+    )
+    acs_charge_type = serializers.ChoiceField(
+        choices=[(1, _("Prepaid")), (2, _("Cash on delivery"))],
+        required=False,
+        default=1,
+    )
+
+    # ---------- Meta Conversions API context ----------
+    # Forwarded by the Nuxt ``server/api/orders/index.post.ts`` proxy
+    # at order creation. Persisted on ``order.metadata['meta']`` so
+    # the server-side Purchase/InitiateCheckout/Refund dispatchers
+    # can build a ``UserData`` payload with the same fbp/fbc cookies
+    # the browser pixel saw — the *only* way to reach a high
+    # Event Match Quality score on Meta's side. Strictly write-only;
+    # never serialised on Order detail responses.
+    meta = serializers.DictField(
+        required=False,
+        allow_null=True,
+        write_only=True,
+        help_text=_(
+            "Meta Pixel context: keys ``fbp``, ``fbc``, "
+            "``client_user_agent``, ``client_ip_address``, "
+            "``event_ids`` (dict of {purchase, initiate_checkout, "
+            "add_payment_info}), ``consent`` (dict with ``ads`` "
+            "boolean). Empty dict / null when the customer declined "
+            "marketing cookies; the CAPI dispatcher then skips the "
+            "send."
         ),
     )
 
@@ -465,7 +819,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         return cleaned
 
     def validate(self, attrs):
-        """Cross-field rules for B2B invoicing.
+        """Cross-field rules for B2B invoicing and BoxNow shipping.
 
         1. ``B2B_INVOICING_ENABLED`` gates the feature site-wide — when
            off, ``document_type=INVOICE`` is rejected so the API can't
@@ -473,6 +827,9 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         2. ``document_type=INVOICE`` ⇒ ``billing_vat_id`` required.
            Otherwise the myDATA submission would silently downgrade to
            11.1 (tax-fraud-adjacent) or hard-fail at the worker.
+        3. ``(shipping_provider_code='boxnow', shipping_kind='pickup_point')``
+           ⇒ ``boxnow_locker_id`` required and ``pay_way`` must be an
+           online-payment method (BoxNow rejects COD at lockers).
         """
         from extra_settings.models import Setting
 
@@ -493,6 +850,38 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                     )
                 }
             )
+
+        # BoxNow cross-field validation. Trigger condition is the
+        # registry-driven ``(shipping_provider_code, shipping_kind)``
+        # pair — the legacy ``shipping_method`` enum no longer drives
+        # carrier selection.
+        is_boxnow_pickup = (
+            attrs.get("shipping_provider_code") == "boxnow"
+            and attrs.get("shipping_kind") == "pickup_point"
+        )
+        if is_boxnow_pickup:
+            # Master switch — admin can hide BoxNow without redeploy.
+            # Production starts disabled (BOXNOW_ENABLED defaults to
+            # False); we only allow BoxNow locker orders once an admin
+            # has flipped the Setting row to True. Defends against a
+            # stale frontend cache surfacing the option.
+            if not Setting.get("BOXNOW_ENABLED", default=False):
+                raise serializers.ValidationError(
+                    {
+                        "shipping_provider_code": _(
+                            "BoxNow locker shipping is currently unavailable."
+                        )
+                    }
+                )
+            if not attrs.get("boxnow_locker_id"):
+                raise serializers.ValidationError(
+                    {
+                        "boxnow_locker_id": _(
+                            "Locker ID required when shipping method is BoxNow"
+                        )
+                    }
+                )
+
         return attrs
 
 
@@ -510,9 +899,6 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         max_digits=11, decimal_places=2, read_only=True
     )
     phone = PhoneNumberField()
-    payment_id = serializers.CharField(required=False)
-    payment_status = serializers.CharField(required=False)
-    payment_method = serializers.CharField(required=False)
 
     def validate_items(self, value: list[dict]) -> list[dict]:
         if not value:
@@ -539,8 +925,8 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             )
         return value
 
-    def validate(self, data):
-        items_data = data.get("items", [])
+    def validate(self, attrs):
+        items_data = attrs.get("items", [])
 
         # Batch-fetch all products in a single query to avoid N+1.
         product_ids = []
@@ -591,7 +977,7 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                     )
                 )
 
-        return data
+        return attrs
 
     def create(self, validated_data):
         from django.conf import settings
@@ -641,17 +1027,30 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                 except (ValueError, TypeError):
                     pass
 
-        # Validate and lock stock BEFORE creating order
+        # Validate and lock stock BEFORE creating order. Locking all
+        # products in one ``SELECT … FOR UPDATE WHERE pk IN (…)`` is
+        # one round-trip regardless of cart size — the previous
+        # per-item loop fired N locks + N updates inside the same
+        # transaction, scaling round-trips linearly with cart depth.
         from product.models import Product
+
+        product_ids = [item["product"].pk for item in items_data]
+        locked_products = {
+            p.pk: p
+            for p in Product.objects.select_for_update().filter(
+                pk__in=product_ids
+            )
+        }
 
         for item_data in items_data:
             product = item_data.get("product")
             quantity = item_data.get("quantity", 1)
-
-            # Lock product row for update to prevent race conditions
-            locked_product = Product.objects.select_for_update().get(
-                pk=product.pk
-            )
+            locked_product = locked_products.get(product.pk)
+            if locked_product is None:
+                # Product disappeared between cart load and order create.
+                raise serializers.ValidationError(
+                    {"items": [f"Product {product.pk} no longer available."]}
+                )
 
             if locked_product.stock < quantity:
                 raise serializers.ValidationError(
@@ -746,6 +1145,12 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "payment_method_fee",
             "total_price_items",
             "total_price_extra",
+            "status",
+            "payment_id",
+            "payment_status",
+            "payment_method",
+            "tracking_number",
+            "shipping_carrier",
         )
         extra_kwargs = {
             "user": {

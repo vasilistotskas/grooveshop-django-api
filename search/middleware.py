@@ -12,7 +12,6 @@ import json
 import logging
 from typing import Callable, cast
 
-from django.db import transaction
 from django.http import HttpRequest, HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
 
@@ -119,23 +118,22 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             ip_address = self._get_client_ip(request)
             user_agent = request.META.get("HTTP_USER_AGENT", "")
 
-            # Dispatch to Celery after the current transaction commits so the
-            # DB write does not block the response path.
+            # Celery .delay() is the fire-and-forget primitive here —
+            # no transaction.on_commit() wrapper needed (and it would be
+            # a no-op in autocommit mode anyway).
             from search.tasks import save_search_query
 
-            transaction.on_commit(
-                lambda: save_search_query.delay(
-                    query=query,
-                    language_code=language_code,
-                    content_type=content_type,
-                    results_count=results_count,
-                    estimated_total_hits=estimated_total_hits,
-                    processing_time_ms=processing_time_ms,
-                    user_id=user.pk if user else None,
-                    session_key=session_key,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                )
+            save_search_query.delay(
+                query=query,
+                language_code=language_code,
+                content_type=content_type,
+                results_count=results_count,
+                estimated_total_hits=estimated_total_hits,
+                processing_time_ms=processing_time_ms,
+                user_id=user.pk if user else None,
+                session_key=session_key,
+                ip_address=ip_address,
+                user_agent=user_agent,
             )
 
             logger.debug(

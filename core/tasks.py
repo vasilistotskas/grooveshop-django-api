@@ -10,9 +10,6 @@ from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import EmailMultiAlternatives, send_mail
-from django.contrib.auth.tokens import default_token_generator
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
 from django.db import connections, transaction
 from django.db.models import F
 from django.template.loader import render_to_string
@@ -36,6 +33,24 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
+_SECRET_KEYS = frozenset(
+    {"password", "token", "key", "secret", "auth", "credential", "passwd"}
+)
+_ARG_TRUNCATE = 500
+
+
+def _safe_repr(value: Any, key: str | None = None) -> str:
+    """Return a truncated repr of *value*, masking secret-looking keys."""
+    if key is not None:
+        lower = str(key).lower()
+        if any(sk in lower for sk in _SECRET_KEYS):
+            return "***"
+    text = repr(value)
+    if len(text) > _ARG_TRUNCATE:
+        return text[:_ARG_TRUNCATE] + "…"
+    return text
+
+
 class MonitoredTask(TenantTask):
     """Base task with tenant context propagation and monitoring."""
 
@@ -45,9 +60,24 @@ class MonitoredTask(TenantTask):
         )
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
+        safe_args = [_safe_repr(a) for a in (args or [])]
+        safe_kwargs = {
+            k: _safe_repr(v, key=k) for k, v in (kwargs or {}).items()
+        }
         logger.error(
-            f"Task {self.name} failed. Task ID: {task_id}, Error: {exc}"
+            "Task %s failed. Task ID: %s, Error: %s, args=%s, kwargs=%s",
+            self.name,
+            task_id,
+            exc,
+            safe_args,
+            safe_kwargs,
         )
+        if einfo is not None:
+            logger.debug(
+                "Task %s traceback:\n%s",
+                self.name,
+                einfo.traceback,
+            )
 
 
 @celery_app.task(
@@ -289,6 +319,7 @@ def cleanup_old_guest_carts():
         count, _ = Cart.objects.filter(
             user__isnull=True,
             last_activity__lt=cutoff_date,
+            items__isnull=True,  # only empty guest carts
         ).delete()
 
         message = (
@@ -459,11 +490,12 @@ def send_inactive_user_notifications() -> dict[str, Any]:
         total_users += 1
 
         try:
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
-            unsubscribe_url = (
-                f"{settings.API_BASE_URL}/api/v1/user/unsubscribe/{uid}/{token}"
+            from user.utils.subscription import (
+                build_list_unsubscribe_headers,
+                generate_blanket_unsubscribe_link,
             )
+
+            unsubscribe_url = generate_blanket_unsubscribe_link(user)
 
             context = {
                 "user": {
@@ -494,14 +526,9 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 to=[user.email],
                 reply_to=[settings.INFO_EMAIL],
-                headers={
-                    "List-Unsubscribe": (
-                        f"<mailto:{settings.INFO_EMAIL}?subject=unsubscribe>, "
-                        f"<{unsubscribe_url}>"
-                    ),
-                    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-                    "List-ID": f"reengagement.{settings.SITE_NAME}",
-                },
+                headers=build_list_unsubscribe_headers(
+                    unsubscribe_url, list_id="reengagement"
+                ),
             )
             email_msg.attach_alternative(html_body, "text/html")
             email_msg.send(fail_silently=False)
@@ -591,10 +618,20 @@ def monitor_system_health():
         errors.append(error_msg)
 
     try:
-        test_file_path = os.path.join(settings.MEDIA_ROOT, ".health_check")
-        with open(test_file_path, "w") as f:
-            f.write("ok")
-        os.remove(test_file_path)
+        # Probe the configured default storage backend (S3 in prod via
+        # ``PrivateMediaStorage``, local FS in dev). Using
+        # ``default_storage`` instead of raw ``open(MEDIA_ROOT/...)`` so
+        # the check actually exercises the bucket the app writes to —
+        # the prod media volume isn't mounted on backend pods, so the
+        # local-FS path always failed even when S3 was healthy.
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+
+        probe_name = ".health_check"
+        if default_storage.exists(probe_name):
+            default_storage.delete(probe_name)
+        saved_name = default_storage.save(probe_name, ContentFile(b"ok"))
+        default_storage.delete(saved_name)
         health_checks["storage"] = True
         logger.debug("Storage health check passed")
 

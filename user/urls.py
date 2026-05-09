@@ -61,11 +61,6 @@ urlpatterns = [
         name="user-account-liked-blog-posts",
     ),
     path(
-        "user/account/<int:pk>/liked_blog_posts",
-        UserAccountViewSet.as_view({"get": "liked_blog_posts"}),
-        name="user-account-liked-blog-posts",
-    ),
-    path(
         "user/account/<int:pk>/notifications",
         UserAccountViewSet.as_view({"get": "notifications"}),
         name="user-account-notifications",
@@ -99,13 +94,6 @@ urlpatterns = [
         "user/address",
         UserAddressViewSet.as_view({"get": "list", "post": "create"}),
         name="user-address-list",
-    ),
-    # ``get_main`` must be declared BEFORE the ``<int:pk>`` catch-all so
-    # Django's URL resolver doesn't try to parse "get_main" as an integer id.
-    path(
-        "user/address/get_main",
-        UserAddressViewSet.as_view({"get": "get_main"}),
-        name="user-address-get-main",
     ),
     path(
         "user/address/<int:pk>",

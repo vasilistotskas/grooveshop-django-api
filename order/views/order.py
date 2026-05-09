@@ -39,6 +39,8 @@ from order.exceptions import (
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
+    PaymentAmountMismatchError,
+    PaymentCurrencyMismatchError,
     PaymentNotFoundError,
 )
 from order.filters import OrderFilter
@@ -202,6 +204,74 @@ serializers_config: SerializersConfig = {
         ),
         tags=["Orders"],
     ),
+    "boxnow_cancel": ActionConfig(
+        operation_id="cancelBoxNowShipmentForOrder",
+        summary=_("Cancel the BoxNow shipment for an order"),
+        description=_(
+            "Admin-only. Requests parcel cancellation via the BoxNow API. "
+            "Only valid when the parcel state is NEW (BoxNow error P420 "
+            "otherwise). Accepts an optional ``reason`` field in the "
+            "request body."
+        ),
+        tags=["Orders"],
+    ),
+    "boxnow_label": ActionConfig(
+        operation_id="getBoxNowLabelForOrder",
+        summary=_("Download the BoxNow parcel label PDF for an order"),
+        description=_(
+            "Streams the BoxNow label PDF through Django auth. "
+            "Accessible by the order owner, staff, or a guest with the "
+            "order UUID. Returns 404 when no BoxNow shipment exists for "
+            "the order or the parcel ID has not yet been assigned."
+        ),
+        tags=["Orders"],
+    ),
+    "acs_cancel": ActionConfig(
+        operation_id="cancelAcsShipmentForOrder",
+        summary=_("Cancel the ACS shipment for an order"),
+        description=_(
+            "Admin-only. Calls ACS_Delete_Voucher. Only valid before "
+            "the voucher is finalised in a pickup list."
+        ),
+        tags=["Orders"],
+    ),
+    "acs_label": ActionConfig(
+        operation_id="getAcsLabelForOrder",
+        summary=_("Download the ACS voucher label PDF for an order"),
+        description=_(
+            "Streams the ACS label PDF through Django auth. "
+            "Accessible by the order owner, staff, or a guest with the "
+            "order UUID. Returns 404 when no ACS shipment exists for "
+            "the order or the voucher has not been minted yet."
+        ),
+        tags=["Orders"],
+    ),
+    "shipment_label": ActionConfig(
+        response=OrderDetailSerializer,
+        operation_id="getShipmentLabelForOrder",
+        summary=_("Download the carrier label PDF for an order"),
+        description=_(
+            "Provider-agnostic label download. Looks up the order's "
+            "shipping provider and dispatches to the matching carrier "
+            "adapter via the shipping registry — frontends can call "
+            "the same endpoint regardless of which courier is "
+            "fulfilling the order."
+        ),
+        tags=["Orders"],
+    ),
+    "shipment_cancel": ActionConfig(
+        response=OrderDetailSerializer,
+        operation_id="cancelShipmentForOrder",
+        summary=_("Cancel the carrier shipment for an order"),
+        description=_(
+            "Admin-only. Provider-agnostic cancellation: looks up the "
+            "order's shipping provider and dispatches to the carrier "
+            "adapter. The provider's own rules apply (BoxNow only "
+            "cancels parcels in NEW state; ACS only cancels vouchers "
+            "not yet finalised in a pickup list)."
+        ),
+        tags=["Orders"],
+    ),
 }
 
 
@@ -253,9 +323,15 @@ class OrderViewSet(BaseModelViewSet):
 
         Uses Order.objects.for_list() for list views and
         Order.objects.for_detail() for detail views to avoid N+1 queries.
+
+        Non-staff users on the list action only see their own orders to
+        prevent IDOR enumeration of all orders.
         """
         if self.action == "list":
-            return Order.objects.for_list()
+            qs = Order.objects.for_list()
+            if not self.request.user.is_staff:
+                qs = qs.filter(user=self.request.user)
+            return qs
         elif self.action == "my_orders":
             return Order.objects.for_list()
         return Order.objects.for_detail()
@@ -271,6 +347,9 @@ class OrderViewSet(BaseModelViewSet):
             "reorder",
             "invoice",
             "invoice_download",
+            "boxnow_label",
+            "acs_label",
+            "shipment_label",
         }
         guest_allowed_actions = {
             "retrieve_by_uuid",
@@ -280,7 +359,14 @@ class OrderViewSet(BaseModelViewSet):
             "create_checkout_session",
             "retry_payment",
         }
-        admin_only_actions = {"add_tracking", "update_status", "refund_order"}
+        admin_only_actions = {
+            "add_tracking",
+            "update_status",
+            "refund_order",
+            "boxnow_cancel",
+            "acs_cancel",
+            "shipment_cancel",
+        }
         public_actions = {"create"}
 
         if self.action in owner_or_admin_actions:
@@ -392,13 +478,19 @@ class OrderViewSet(BaseModelViewSet):
         """
 
         try:
+            # Step 0: Validate the full request body through
+            # OrderCreateFromCartSerializer so every field is type-checked,
+            # cross-field rules (B2B, BoxNow) are applied, and the runtime
+            # shape matches what the OpenAPI schema advertises.  All
+            # subsequent helpers receive ``validated_data`` from this
+            # serializer so they no longer touch ``request.data`` directly.
+            request_serializer_class = self.get_request_serializer()
+            request_serializer = request_serializer_class(data=request.data)
+            request_serializer.is_valid(raise_exception=True)
+            validated_data = request_serializer.validated_data
+
             # Step 1: Get payment method to determine flow
-            # Note: djangorestframework_camel_case converts payWay -> pay_way
-            pay_way_id = request.data.get("pay_way_id")
-            if not pay_way_id:
-                raise ValidationError(
-                    {"pay_way_id": [_("Payment method is required")]}
-                )
+            pay_way_id = validated_data["pay_way_id"]
 
             try:
                 pay_way = PayWay.objects.get(id=pay_way_id)
@@ -422,11 +514,15 @@ class OrderViewSet(BaseModelViewSet):
                 and pay_way.provider_code not in redirect_checkout_providers
             ):
                 # Payment-first flow: Requires payment_intent_id (e.g. Stripe)
-                return self._create_with_payment_intent(request, pay_way)
+                return self._create_with_payment_intent(
+                    request, pay_way, validated_data
+                )
             else:
                 # Order-first flow: No payment_intent_id required
                 # (offline payments + redirect-based online providers like Viva Wallet)
-                return self._create_without_payment_intent(request, pay_way)
+                return self._create_without_payment_intent(
+                    request, pay_way, validated_data
+                )
 
         except InsufficientStockError as e:
             logger.warning(
@@ -475,6 +571,40 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        except PaymentAmountMismatchError as e:
+            logger.warning(
+                "Payment amount mismatch: provider=%d cents, calculated=%d cents",
+                e.provider_amount_cents,
+                e.calculated_amount_cents,
+            )
+            return Response(
+                {
+                    "detail": _("Payment amount does not match order total."),
+                    "error": {
+                        "type": "payment_amount_mismatch",
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except PaymentCurrencyMismatchError as e:
+            logger.warning(
+                "Payment currency mismatch: provider='%s', expected='%s'",
+                e.provider_currency,
+                e.expected_currency,
+            )
+            return Response(
+                {
+                    "detail": _(
+                        "Payment currency does not match order currency."
+                    ),
+                    "error": {
+                        "type": "payment_currency_mismatch",
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         except ValidationError as e:
             logger.warning("Validation error: %s", e)
             error_detail = (
@@ -506,19 +636,24 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def _create_with_payment_intent(self, request, pay_way: PayWay) -> Response:
+    def _create_with_payment_intent(
+        self, request, pay_way: PayWay, validated_data: dict
+    ) -> Response:
         """
         Create order with payment-first flow (online payments).
 
         Requires payment_intent_id to be provided and confirmed.
+        ``validated_data`` comes from ``OrderCreateFromCartSerializer``
+        and is already type-checked and cross-validated.
         """
 
         # Step 1: Get cart from request (validate cart exists first)
         cart, user = self._get_cart_and_user(request)
 
         # Step 2: Validate payment_intent_id is provided
-        # Note: djangorestframework_camel_case converts paymentIntentId -> payment_intent_id
-        payment_intent_id = request.data.get("payment_intent_id")
+        # The serializer marks this optional (offline path uses the same
+        # serializer) so we enforce the online-only requirement here.
+        payment_intent_id = validated_data.get("payment_intent_id") or ""
         if not payment_intent_id:
             raise ValidationError(
                 {
@@ -536,10 +671,14 @@ class OrderViewSet(BaseModelViewSet):
             errors = validation_result.get("errors", [])
             raise ValidationError({"cart": errors})
 
-        # Step 4: Build and validate shipping address
-        shipping_address = self._build_shipping_address(request)
+        # Step 4: Build and validate shipping address from validated data
+        shipping_address = self._build_shipping_address_from_validated(
+            validated_data
+        )
         try:
-            OrderService.validate_shipping_address(shipping_address)
+            OrderService.validate_shipping_address(
+                shipping_address, pay_way=pay_way
+            )
         except DjangoValidationError as e:
             raise ValidationError(
                 e.message_dict
@@ -548,7 +687,15 @@ class OrderViewSet(BaseModelViewSet):
             )
 
         # Step 5: Get loyalty points to redeem (if any)
-        loyalty_points_to_redeem = request.data.get("loyalty_points_to_redeem")
+        loyalty_points_to_redeem = validated_data.get(
+            "loyalty_points_to_redeem"
+        )
+
+        # Step 5.5: Pull Meta Pixel context (fbp/fbc/UA/IP/event_ids) the
+        # storefront proxy forwarded for Conversions API matching. The
+        # service-level helper ``_sanitise_meta_context`` filters this
+        # against an allow-list, so it's safe to forward as-is here.
+        meta_context = validated_data.get("meta")
 
         # Step 6: Create order from cart with payment_intent_id
         order = OrderService.create_order_from_cart(
@@ -558,6 +705,7 @@ class OrderViewSet(BaseModelViewSet):
             pay_way=pay_way,
             user=user,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
+            meta_context=meta_context,
         )
 
         # Return order details
@@ -578,7 +726,7 @@ class OrderViewSet(BaseModelViewSet):
         )
 
     def _create_without_payment_intent(
-        self, request, pay_way: PayWay
+        self, request, pay_way: PayWay, validated_data: dict
     ) -> Response:
         """
         Create order with order-first flow.
@@ -586,6 +734,8 @@ class OrderViewSet(BaseModelViewSet):
         Used for offline payments and redirect-based online providers
         (e.g. Viva Wallet). No payment_intent_id required.
         Order created with PENDING status.
+        ``validated_data`` comes from ``OrderCreateFromCartSerializer``
+        and is already type-checked and cross-validated.
         """
 
         # Step 1: Get cart from request
@@ -597,10 +747,14 @@ class OrderViewSet(BaseModelViewSet):
             errors = validation_result.get("errors", [])
             raise ValidationError({"cart": errors})
 
-        # Step 3: Build and validate shipping address
-        shipping_address = self._build_shipping_address(request)
+        # Step 3: Build and validate shipping address from validated data
+        shipping_address = self._build_shipping_address_from_validated(
+            validated_data
+        )
         try:
-            OrderService.validate_shipping_address(shipping_address)
+            OrderService.validate_shipping_address(
+                shipping_address, pay_way=pay_way
+            )
         except DjangoValidationError as e:
             raise ValidationError(
                 e.message_dict
@@ -609,7 +763,14 @@ class OrderViewSet(BaseModelViewSet):
             )
 
         # Step 4: Get loyalty points to redeem (if any)
-        loyalty_points_to_redeem = request.data.get("loyalty_points_to_redeem")
+        loyalty_points_to_redeem = validated_data.get(
+            "loyalty_points_to_redeem"
+        )
+
+        # Step 4.5: Pull Meta Pixel context for the offline path too —
+        # COD orders trigger the canonical Purchase event from
+        # ``order_paid`` so the dispatcher needs the same fbp/fbc.
+        meta_context = validated_data.get("meta")
 
         # Step 5: Create order from cart without payment_intent_id
         order = OrderService.create_order_from_cart_offline(
@@ -618,6 +779,7 @@ class OrderViewSet(BaseModelViewSet):
             pay_way=pay_way,
             user=user,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
+            meta_context=meta_context,
         )
 
         # Return order details
@@ -686,26 +848,62 @@ class OrderViewSet(BaseModelViewSet):
 
         return cart, user
 
-    def _build_shipping_address(self, request) -> dict:
-        """
-        Helper method to build shipping address from request data.
+    def _build_shipping_address_from_validated(
+        self, validated_data: dict
+    ) -> dict:
+        """Build the shipping-address dict from serializer-validated data.
 
-        Note: djangorestframework_camel_case middleware automatically converts
-        camelCase request data to snake_case, so we only need to check snake_case keys.
+        Uses ``validated_data`` (output of ``OrderCreateFromCartSerializer``)
+        instead of ``request.data`` so callers always receive type-safe,
+        cross-validated values that match the published OpenAPI schema.
+
+        IMPORTANT: this dict is the only path by which the request body
+        reaches ``OrderService.create_order_from_cart`` and
+        ``create_order_from_cart_offline``. Every field the service reads
+        must be forwarded here — silently dropping a key means the field
+        is lost on the order without any error to the caller.
         """
-        phone = request.data.get("phone")
         return {
-            "first_name": request.data.get("first_name"),
-            "last_name": request.data.get("last_name"),
-            "email": request.data.get("email"),
-            "street": request.data.get("street"),
-            "street_number": request.data.get("street_number"),
-            "city": request.data.get("city"),
-            "zipcode": request.data.get("zipcode"),
-            "country_id": request.data.get("country_id"),
-            "region_id": request.data.get("region_id"),
-            "phone": phone,
-            "customer_notes": request.data.get("customer_notes", ""),
+            # Customer + address (always present)
+            "first_name": validated_data.get("first_name"),
+            "last_name": validated_data.get("last_name"),
+            "email": validated_data.get("email"),
+            "phone": validated_data.get("phone"),
+            "street": validated_data.get("street"),
+            "street_number": validated_data.get("street_number"),
+            "city": validated_data.get("city"),
+            "zipcode": validated_data.get("zipcode"),
+            "place": validated_data.get("place", ""),
+            "floor": validated_data.get("floor", ""),
+            "location_type": validated_data.get("location_type", ""),
+            "country_id": validated_data.get("country_id"),
+            "region_id": validated_data.get("region_id"),
+            "customer_notes": validated_data.get("customer_notes", ""),
+            # B2B billing identity (Tier B — Τιμολόγιο Πώλησης). Empty for retail.
+            "document_type": validated_data.get("document_type"),
+            "billing_vat_id": validated_data.get("billing_vat_id", ""),
+            "billing_country": validated_data.get("billing_country", ""),
+            # Registry-driven shipping dispatch: explicit
+            # ``(shipping_provider_code, shipping_kind)`` flows through
+            # ``_resolve_shipping_provider`` → carrier adapter.
+            "shipping_provider_code": validated_data.get(
+                "shipping_provider_code"
+            ),
+            "shipping_kind": validated_data.get("shipping_kind"),
+            # Carrier-specific payload keys — kept here so each
+            # adapter's ``payload_keys`` ClassVar can pop what it
+            # needs in ``_extract_shipment_payload``. Adding a new
+            # carrier means listing its keys on the adapter, not
+            # editing this dict.
+            "boxnow_locker_id": validated_data.get("boxnow_locker_id", ""),
+            "boxnow_compartment_size": validated_data.get(
+                "boxnow_compartment_size", 1
+            ),
+            "acs_station_external_id": validated_data.get(
+                "acs_station_external_id", ""
+            ),
+            "acs_station_branch": validated_data.get("acs_station_branch", ""),
+            "acs_charge_type": validated_data.get("acs_charge_type"),
         }
 
     # Payment endpoints are expensive and abuse-prone (Stripe PaymentIntent
@@ -778,7 +976,17 @@ class OrderViewSet(BaseModelViewSet):
 
         return Response(response_serializer.validated_data)
 
-    @action(detail=True, methods=["POST"], url_path="retry-payment")
+    @action(
+        detail=True,
+        methods=["POST"],
+        url_path="retry-payment",
+        throttle_classes=[
+            AnonRateThrottle,
+            UserRateThrottle,
+            PaymentAttemptThrottle,
+            PaymentAttemptAnonThrottle,
+        ],
+    )
     def retry_payment(self, request, *args, **kwargs):
         """Create a fresh Stripe PaymentIntent for a failed/pending order.
 
@@ -873,7 +1081,10 @@ class OrderViewSet(BaseModelViewSet):
             # email can fire again on the (expected) new
             # payment_intent.succeeded, and the customer can be
             # re-notified of any new failure.
+            # Clear both the legacy boolean and the new timestamp key
+            # introduced by the worker-kill-safe idempotency refactor.
             locked_order.metadata.pop("confirmation_email_sent", None)
+            locked_order.metadata.pop("confirmation_email_sent_at", None)
             locked_order.metadata.pop("payment_failed_email_sent", None)
             locked_order.save(
                 update_fields=["payment_id", "payment_status", "metadata"]
@@ -1404,3 +1615,224 @@ class OrderViewSet(BaseModelViewSet):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="boxnow_cancel",
+        permission_classes=[IsAdminUser],
+    )
+    def boxnow_cancel(self, request, pk=None):
+        """Cancel the BoxNow shipment for an order (admin-only)."""
+        from shipping_boxnow.exceptions import BoxNowAPIError
+        from shipping_boxnow.services import BoxNowService
+
+        order = self.get_object()
+
+        shipment = getattr(order, "boxnow_shipment", None)
+        if shipment is None:
+            raise NotFound(_("This order does not have a BoxNow shipment."))
+
+        reason: str = request.data.get("reason", "")
+
+        try:
+            BoxNowService.cancel_shipment(shipment, reason=reason)
+        except BoxNowAPIError as exc:
+            logger.warning(
+                "BoxNow cancel (order-action) failed | order=%s"
+                " | parcel_id=%s | code=%s | msg=%s",
+                order.id,
+                shipment.parcel_id,
+                exc.code,
+                exc,
+            )
+            return Response(
+                {"detail": str(exc), "code": exc.code},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = OrderService.get_order_by_id(order.id)
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(
+            order, context=self.get_serializer_context()
+        )
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="boxnow_label",
+    )
+    def boxnow_label(self, request, pk=None):
+        """Download the BoxNow parcel label PDF for an order."""
+        from io import BytesIO
+
+        from shipping_boxnow.services import BoxNowService
+
+        order = self.get_object()
+
+        shipment = getattr(order, "boxnow_shipment", None)
+        if shipment is None or not shipment.parcel_id:
+            raise NotFound(
+                _("No BoxNow shipment or parcel ID found for this order.")
+            )
+
+        label_bytes: bytes = BoxNowService.fetch_label_bytes(shipment)
+        return FileResponse(
+            BytesIO(label_bytes),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"boxnow-{shipment.parcel_id}.pdf",
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="acs_cancel",
+        permission_classes=[IsAdminUser],
+    )
+    def acs_cancel(self, request, pk=None):
+        """Cancel the ACS shipment for an order (admin-only)."""
+        from shipping_acs.exceptions import AcsAPIError
+        from shipping_acs.services import AcsService
+
+        order = self.get_object()
+
+        shipment = getattr(order, "acs_shipment", None)
+        if shipment is None:
+            raise NotFound(_("This order does not have an ACS shipment."))
+
+        reason: str = request.data.get("reason", "")
+        try:
+            AcsService.cancel_voucher(shipment, reason=reason)
+        except AcsAPIError as exc:
+            logger.warning(
+                "ACS cancel (order-action) failed | order=%s | "
+                "voucher_no=%s | msg=%s",
+                order.id,
+                shipment.voucher_no,
+                exc,
+            )
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = OrderService.get_order_by_id(order.id)
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(
+            order, context=self.get_serializer_context()
+        )
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="acs_label",
+    )
+    def acs_label(self, request, pk=None):
+        """Download the ACS voucher label PDF for an order."""
+        from io import BytesIO
+
+        from shipping_acs.services import AcsService
+
+        order = self.get_object()
+
+        shipment = getattr(order, "acs_shipment", None)
+        if shipment is None or not shipment.voucher_no:
+            raise NotFound(
+                _("No ACS shipment or voucher found for this order.")
+            )
+
+        label_bytes: bytes = AcsService.fetch_label_bytes(shipment)
+        return FileResponse(
+            BytesIO(label_bytes),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"acs-{shipment.voucher_no}.pdf",
+        )
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="shipment_label",
+    )
+    def shipment_label(self, request, pk=None):
+        """Download the carrier label PDF — provider-agnostic.
+
+        Looks up the order's ``shipping_provider`` and dispatches to
+        the matching carrier adapter via the shipping registry.  Lets
+        the frontend hit a single endpoint regardless of which courier
+        is fulfilling the order.
+        """
+        from io import BytesIO
+
+        from shipping.services import ShippingService
+
+        order = self.get_object()
+
+        adapter = ShippingService.adapter_for_order(order)
+        if adapter is None:
+            raise NotFound(_("No carrier shipment found for this order."))
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            raise NotFound(_("No carrier shipment found for this order."))
+
+        label_bytes: bytes = adapter.fetch_label_bytes(shipment)
+        provider_code = order.shipping_provider.code
+        return FileResponse(
+            BytesIO(label_bytes),
+            content_type="application/pdf",
+            as_attachment=True,
+            filename=f"{provider_code}-{order.id}.pdf",
+        )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="shipment_cancel",
+        permission_classes=[IsAdminUser],
+    )
+    def shipment_cancel(self, request, pk=None):
+        """Cancel the carrier shipment — provider-agnostic.
+
+        Admin-only.  Dispatches to the order's carrier adapter; the
+        provider's own state-machine rules apply (BoxNow rejects
+        already-shipped parcels with P420; ACS rejects vouchers
+        already in a pickup list).
+        """
+        from shipping.services import ShippingService
+        from shipping_acs.exceptions import AcsAPIError
+        from shipping_boxnow.exceptions import BoxNowAPIError
+
+        order = self.get_object()
+
+        adapter = ShippingService.adapter_for_order(order)
+        if adapter is None:
+            raise NotFound(_("No carrier shipment found for this order."))
+        shipment = adapter.shipment_for_order(order)
+        if shipment is None:
+            raise NotFound(_("No carrier shipment found for this order."))
+
+        reason: str = request.data.get("reason", "")
+        try:
+            adapter.cancel_shipment(shipment, reason=reason)
+        except (BoxNowAPIError, AcsAPIError) as exc:
+            logger.warning(
+                "Shipment cancel (generic) failed | order=%s | "
+                "provider=%s | msg=%s",
+                order.id,
+                order.shipping_provider.code,
+                exc,
+            )
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = OrderService.get_order_by_id(order.id)
+        response_serializer_class = self.get_response_serializer()
+        serializer = response_serializer_class(
+            order, context=self.get_serializer_context()
+        )
+        return Response(serializer.data)

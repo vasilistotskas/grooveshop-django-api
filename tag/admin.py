@@ -4,7 +4,7 @@ from django.contrib.contenttypes.admin import GenericTabularInline
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
-from django.utils.html import conditional_escape
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _, ngettext
 from parler.admin import TranslatableAdmin
@@ -208,23 +208,21 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
             else "text-base-600 dark:text-base-300"
         )
         usage_icon = "🏷️"
-        esc_color = conditional_escape(usage_color)
-        esc_icon = conditional_escape(usage_icon)
-        esc_label = conditional_escape(display)
-        esc_id = conditional_escape(str(obj.id))
-        esc_sort = conditional_escape(str(obj.sort_order or _("No order")))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
-            f'<span class="{esc_color}">{esc_icon}</span>'
-            f"<span>{esc_label}</span>"
+            '<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
+            '<span class="{color}">{icon}</span>'
+            "<span>{label}</span>"
             "</div>"
-            f'<div class="text-base-600 dark:text-base-400">ID: {esc_id}</div>'
-            f'<div class="text-xs text-base-600 dark:text-base-300">Sort: {esc_sort}</div>'
-            "</div>"
+            '<div class="text-base-600 dark:text-base-400">ID: {id}</div>'
+            '<div class="text-xs text-base-600 dark:text-base-300">Sort: {sort}</div>'
+            "</div>",
+            color=usage_color,
+            icon=usage_icon,
+            label=display,
+            id=obj.id,
+            sort=str(obj.sort_order or _("No order")),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Status"))
     def status_badge(self, obj):
@@ -267,13 +265,14 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
                 "</span>"
             )
 
-        html = (
+        return format_html(
             '<div class="space-y-1">'
-            f"<div>{status}</div>"
-            f"<div>{label_badge}</div>"
-            "</div>"
+            "<div>{status}</div>"
+            "<div>{label_badge}</div>"
+            "</div>",
+            status=status,
+            label_badge=label_badge,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Usage"))
     def usage_stats(self, obj):
@@ -314,14 +313,14 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
                 "</span>"
             )
 
-        esc_usage = conditional_escape(str(usage))
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_usage} uses</div>'
-            f'<div class="mt-1">{badge}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{usage} uses</div>'
+            '<div class="mt-1">{badge}</div>'
+            "</div>",
+            usage=usage,
+            badge=badge,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Content Types"))
     def content_distribution(self, obj):
@@ -357,20 +356,17 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
                 "</span>"
             )
 
-        esc_ct = conditional_escape(str(ct_count))
-        esc_top = conditional_escape(
-            top.title() if top != _("None") else _("No usage")
-        )
-        esc_count = conditional_escape(str(count or ""))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_ct} types</div>'
-            f'<div class="text-base-600 dark:text-base-400">{esc_top}: {esc_count}</div>'
-            f'<div class="mt-1">{div_badge}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{ct} types</div>'
+            '<div class="text-base-600 dark:text-base-400">{top}: {count}</div>'
+            '<div class="mt-1">{badge}</div>'
+            "</div>",
+            ct=ct_count,
+            top=top.title() if top != _("None") else _("No usage"),
+            count=count or "",
+            badge=div_badge,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Sort Order"))
     def sort_display(self, obj):
@@ -385,36 +381,29 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
             cls = "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200"
             icon, label = "📋", f"#{order}"
 
-        esc_order = conditional_escape(
-            str(order if order is not None else _("None"))
-        )
-        esc_cls = conditional_escape(cls)
-        esc_icon = conditional_escape(icon)
-        esc_label = conditional_escape(label)
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_order}</div>'
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium {esc_cls} rounded gap-1">'
-            f"<span>{esc_icon}</span><span>{esc_label}</span>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{order}</div>'
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {cls} rounded gap-1">'
+            "<span>{icon}</span><span>{label}</span>"
             "</span>"
-            "</div>"
+            "</div>",
+            order=str(order if order is not None else _("None")),
+            cls=cls,
+            icon=icon,
+            label=label,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Created"))
     def created_display(self, obj):
-        d = obj.created_at.strftime("%Y-%m-%d")
-        t = obj.created_at.strftime("%H:%M")
-        esc_d = conditional_escape(d)
-        esc_t = conditional_escape(t)
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_d}</div>'
-            f'<div class="text-base-600 dark:text-base-400">{esc_t}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{d}</div>'
+            '<div class="text-base-600 dark:text-base-400">{t}</div>'
+            "</div>",
+            d=obj.created_at.strftime("%Y-%m-%d"),
+            t=obj.created_at.strftime("%H:%M"),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Tag Analytics"))
     def tag_analytics(self, obj):
@@ -428,24 +417,22 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
             obj.sort_order if obj.sort_order is not None else _("Not Set")
         )
 
-        esc_chars = conditional_escape(str(chars))
-        esc_words = conditional_escape(str(words))
-        esc_uses = conditional_escape(str(uses))
-        esc_status = conditional_escape(status)
-        esc_has = conditional_escape(has_lbl)
-        esc_sort = conditional_escape(str(sort_val))
-
-        html = (
+        return format_html(
             '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Label Length:</strong></div><div>{esc_chars} chars</div>"
-            f"<div><strong>Word Count:</strong></div><div>{esc_words} words</div>"
-            f"<div><strong>Total Usage:</strong></div><div>{esc_uses} items</div>"
-            f"<div><strong>Active Status:</strong></div><div>{esc_status}</div>"
-            f"<div><strong>Has Label:</strong></div><div>{esc_has}</div>"
-            f"<div><strong>Sort Position:</strong></div><div>{esc_sort}</div>"
-            "</div></div>"
+            "<div><strong>Label Length:</strong></div><div>{chars} chars</div>"
+            "<div><strong>Word Count:</strong></div><div>{words} words</div>"
+            "<div><strong>Total Usage:</strong></div><div>{uses} items</div>"
+            "<div><strong>Active Status:</strong></div><div>{status}</div>"
+            "<div><strong>Has Label:</strong></div><div>{has}</div>"
+            "<div><strong>Sort Position:</strong></div><div>{sort}</div>"
+            "</div></div>",
+            chars=chars,
+            words=words,
+            uses=uses,
+            status=status,
+            has=has_lbl,
+            sort=str(sort_val),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Usage Analytics"))
     def usage_analytics(self, obj):
@@ -459,20 +446,18 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
             _("High") if total > 20 else _("Medium") if total > 5 else _("Low")
         )
 
-        esc_total = conditional_escape(str(total))
-        esc_recent = conditional_escape(str(recent))
-        esc_types = conditional_escape(str(types))
-        esc_rate = conditional_escape(rate)
-
-        html = (
+        return format_html(
             '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Total Usage:</strong></div><div>{esc_total}</div>"
-            f"<div><strong>Recent Usage:</strong></div><div>{esc_recent} (30d)</div>"
-            f"<div><strong>Content Types:</strong></div><div>{esc_types}</div>"
-            f"<div><strong>Usage Rate:</strong></div><div>{esc_rate}</div>"
-            "</div></div>"
+            "<div><strong>Total Usage:</strong></div><div>{total}</div>"
+            "<div><strong>Recent Usage:</strong></div><div>{recent} (30d)</div>"
+            "<div><strong>Content Types:</strong></div><div>{types}</div>"
+            "<div><strong>Usage Rate:</strong></div><div>{rate}</div>"
+            "</div></div>",
+            total=total,
+            recent=recent,
+            types=types,
+            rate=rate,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Content Analytics"))
     def content_analytics(self, obj):
@@ -495,22 +480,18 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
             else _("Mixed")
         )
 
-        esc_div = conditional_escape(str(diversity))
-        esc_top = conditional_escape(
-            top.title() if top != _("None") else _("No data")
-        )
-        esc_count = conditional_escape(str(top_count))
-        esc_spec = conditional_escape(spec)
-
-        html = (
+        return format_html(
             '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Diversity Score:</strong></div><div>{esc_div} types</div>"
-            f"<div><strong>Most Used Type:</strong></div><div>{esc_top}</div>"
-            f"<div><strong>Type Usage:</strong></div><div>{esc_count} items</div>"
-            f"<div><strong>Specialization:</strong></div><div>{esc_spec}</div>"
-            "</div></div>"
+            "<div><strong>Diversity Score:</strong></div><div>{div} types</div>"
+            "<div><strong>Most Used Type:</strong></div><div>{top}</div>"
+            "<div><strong>Type Usage:</strong></div><div>{count} items</div>"
+            "<div><strong>Specialization:</strong></div><div>{spec}</div>"
+            "</div></div>",
+            div=diversity,
+            top=top.title() if top != _("None") else _("No data"),
+            count=top_count,
+            spec=spec,
         )
-        return mark_safe(html)
 
     @action(
         description=str(_("Activate selected tags")),
@@ -642,17 +623,16 @@ class TaggedItemAdmin(ModelAdmin):
 
     @admin.display(description=_("Tagged Item"))
     def tagged_item_info(self, obj):
-        esc_id = conditional_escape(str(obj.id))
-        esc_obj = conditional_escape(str(obj.object_id))
-        esc_uuid = conditional_escape(str(obj.uuid)[:8])
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">Item #{esc_id}</div>'
-            f'<div class="text-base-600 dark:text-base-400">Object ID: {esc_obj}</div>'
-            f'<div class="text-xs text-base-600 dark:text-base-300">UUID: {esc_uuid}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">Item #{id}</div>'
+            '<div class="text-base-600 dark:text-base-400">Object ID: {obj_id}</div>'
+            '<div class="text-xs text-base-600 dark:text-base-300">UUID: {uuid}</div>'
+            "</div>",
+            id=obj.id,
+            obj_id=obj.object_id,
+            uuid=str(obj.uuid)[:8],
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Tag"))
     def tag_display(self, obj):
@@ -666,19 +646,18 @@ class TaggedItemAdmin(ModelAdmin):
             else "text-red-600 dark:text-red-400"
         )
         status_icon = "✅" if t.active else "❌"
-        esc_label = conditional_escape(label)
-        esc_color = conditional_escape(status_color)
-        esc_icon = conditional_escape(status_icon)
-        esc_tid = conditional_escape(str(t.id))
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_label}</div>'
-            f'<div class="flex items-center gap-1 {esc_color}">'
-            f"<span>{esc_icon}</span><span>Tag #{esc_tid}</span>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{label}</div>'
+            '<div class="flex items-center gap-1 {color}">'
+            "<span>{icon}</span><span>Tag #{tid}</span>"
             "</div>"
-            "</div>"
+            "</div>",
+            label=label,
+            color=status_color,
+            icon=status_icon,
+            tid=t.id,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Content Object"))
     def content_object_display(self, obj):
@@ -687,15 +666,14 @@ class TaggedItemAdmin(ModelAdmin):
             if co:
                 text = str(co)
                 display = text[:40] + ("…" if len(text) > 40 else "")
-                esc_text = conditional_escape(display)
-                esc_oid = conditional_escape(str(obj.object_id))
-                html = (
+                return format_html(
                     '<div class="text-sm">'
-                    f'<div class="font-medium text-base-900 dark:text-base-100">{esc_text}</div>'
-                    f'<div class="text-base-600 dark:text-base-400">ID: {esc_oid}</div>'
-                    "</div>"
+                    '<div class="font-medium text-base-900 dark:text-base-100">{text}</div>'
+                    '<div class="text-base-600 dark:text-base-400">ID: {oid}</div>'
+                    "</div>",
+                    text=display,
+                    oid=obj.object_id,
                 )
-                return mark_safe(html)
             return mark_safe(
                 '<div class="text-sm text-red-600 dark:text-red-400">Object not found</div>'
             )
@@ -737,31 +715,27 @@ class TaggedItemAdmin(ModelAdmin):
             ),
         )
         bg, text, icon = cfg
-        esc_bg = conditional_escape(bg)
-        esc_text = conditional_escape(text)
-        esc_icon = conditional_escape(icon)
-        esc_name = conditional_escape(name.title())
-        html = (
+        return format_html(
             '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            f'{esc_bg} {esc_text} rounded border gap-1">'
-            f"<span>{esc_icon}</span><span>{esc_name}</span>"
-            "</span>"
+            '{bg} {text_class} rounded border gap-1">'
+            "<span>{icon}</span><span>{name}</span>"
+            "</span>",
+            bg=bg,
+            text_class=text,
+            icon=icon,
+            name=name.title(),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Created"))
     def created_display(self, obj):
-        d = obj.created_at.strftime("%Y-%m-%d")
-        t = obj.created_at.strftime("%H:%M")
-        esc_d = conditional_escape(d)
-        esc_t = conditional_escape(t)
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{esc_d}</div>'
-            f'<div class="text-base-600 dark:text-base-400">{esc_t}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{d}</div>'
+            '<div class="text-base-600 dark:text-base-400">{t}</div>'
+            "</div>",
+            d=obj.created_at.strftime("%Y-%m-%d"),
+            t=obj.created_at.strftime("%H:%M"),
         )
-        return mark_safe(html)
 
 
 class TaggedItemInline(GenericTabularInline):

@@ -19,7 +19,7 @@ class TestAddressValidation:
                     "city": "Athens",
                     "zipcode": "12345",
                     "country_id": 1,
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             (
@@ -32,7 +32,7 @@ class TestAddressValidation:
                     "city": "Athens",
                     "zipcode": "12345",
                     "country_id": 1,
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             (
@@ -45,7 +45,7 @@ class TestAddressValidation:
                     "city": "Athens",
                     "zipcode": "12345",
                     "country_id": 1,
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             (
@@ -58,7 +58,7 @@ class TestAddressValidation:
                     "city": "Athens",
                     "zipcode": "12345",
                     "country_id": 1,
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             (
@@ -71,7 +71,7 @@ class TestAddressValidation:
                     "city": "Athens",
                     "zipcode": "12345",
                     "country_id": 1,
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             (
@@ -84,7 +84,7 @@ class TestAddressValidation:
                     "street_number": "123",
                     "zipcode": "12345",
                     "country_id": 1,
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             (
@@ -97,7 +97,7 @@ class TestAddressValidation:
                     "street_number": "123",
                     "city": "Athens",
                     "country_id": 1,
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             (
@@ -110,7 +110,7 @@ class TestAddressValidation:
                     "street_number": "123",
                     "city": "Athens",
                     "zipcode": "12345",
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             (
@@ -186,7 +186,7 @@ class TestAddressValidation:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
         address_data[field] = empty_value
 
@@ -225,7 +225,7 @@ class TestAddressValidation:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         with pytest.raises(ValidationError) as exc_info:
@@ -261,7 +261,7 @@ class TestAddressValidation:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         # Should not raise any exception
@@ -303,7 +303,7 @@ class TestAddressValidation:
     @pytest.mark.parametrize(
         "valid_phone",
         [
-            "+30123456789",  # International format
+            "+306900000000",  # International format
             "1234567890",  # 10 digits
             "+1-555-123-4567",  # US format with dashes
             "(555) 123-4567",  # US format with parentheses
@@ -359,7 +359,7 @@ class TestAddressValidation:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": invalid_country_id,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         with pytest.raises(ValidationError) as exc_info:
@@ -393,7 +393,7 @@ class TestAddressValidation:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": valid_country_id,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         # Should not raise any exception
@@ -414,7 +414,7 @@ class TestAddressValidation:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         # Should not raise any exception
@@ -433,7 +433,7 @@ class TestAddressValidation:
                     "city": "Athens",
                     "zipcode": "12345",
                     "country_id": 1,
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             (
@@ -456,7 +456,7 @@ class TestAddressValidation:
                     "email": "john@example.com",
                     "zipcode": "12345",
                     "country_id": 1,
-                    "phone": "+30123456789",
+                    "phone": "+306900000000",
                 },
             ),
             # All fields missing
@@ -533,7 +533,7 @@ class TestAddressValidation:
             "city": "Athens",
             "zipcode": "12345",
             "country_id": 1,
-            "phone": "+30123456789",
+            "phone": "+306900000000",
         }
 
         with pytest.raises(ValidationError) as exc_info:

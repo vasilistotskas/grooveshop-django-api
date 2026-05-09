@@ -1,0 +1,64 @@
+{% load i18n %}<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% blocktrans %}Your BOX NOW parcel arrived{% endblocktrans %}</title>
+  <style>
+    body { font-family: sans-serif; color: #1a1a1a; margin: 0; padding: 0; background: #f5f5f5; }
+    .wrapper { max-width: 600px; margin: 0 auto; background: #ffffff; }
+    .header { background: #1c2d5e; padding: 24px 32px; }
+    .header h1 { color: #ffffff; font-size: 20px; margin: 0; }
+    .body { padding: 32px; }
+    .detail-table { width: 100%; border-collapse: collapse; margin: 24px 0; }
+    .detail-table td { padding: 10px 12px; border-bottom: 1px solid #e5e5e5; font-size: 14px; }
+    .detail-table td:first-child { font-weight: 600; width: 40%; }
+    .cta { display: inline-block; margin-top: 24px; padding: 12px 28px; background: #1c2d5e; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: 600; font-size: 15px; }
+    .footer { padding: 20px 32px; background: #f5f5f5; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1>{% blocktrans %}Your BOX NOW parcel has arrived!{% endblocktrans %}</h1>
+    </div>
+    <div class="body">
+      <p>{% blocktrans with first_name=order.first_name %}Hello {{ first_name }},{% endblocktrans %}</p>
+      <p>
+        {% blocktrans with order_id=order.id %}
+          Great news! Your parcel for order <strong>#{{ order_id }}</strong> has arrived at the
+          BOX NOW locker and is ready for pickup.
+        {% endblocktrans %}
+      </p>
+
+      <table class="detail-table">
+        <tr>
+          <td>{% blocktrans %}Voucher number{% endblocktrans %}</td>
+          <td><strong>{{ shipment.parcel_id }}</strong></td>
+        </tr>
+        <tr>
+          <td>{% blocktrans %}Locker address{% endblocktrans %}</td>
+          <td>{{ locker_address }}</td>
+        </tr>
+        {% if locker %}
+        <tr>
+          <td>{% blocktrans %}Locker name{% endblocktrans %}</td>
+          <td>{{ locker.name }}</td>
+        </tr>
+        {% endif %}
+      </table>
+
+      <p>{% blocktrans %}Your parcel is available for pickup 24 hours a day, 7 days a week.{% endblocktrans %}</p>
+
+      {% if SITE_URL %}
+      <a class="cta" href="{{ SITE_URL }}/account/orders/{{ order.id }}">
+        {% blocktrans %}View Order{% endblocktrans %}
+      </a>
+      {% endif %}
+    </div>
+    <div class="footer">
+      <p>{% blocktrans with site_name=SITE_NAME %}This is an automated message from {{ site_name }}.{% endblocktrans %}</p>
+    </div>
+  </div>
+</body>
+</html>

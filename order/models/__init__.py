@@ -4,6 +4,7 @@ from .item import OrderItem
 from .order import Order
 from .stock_log import StockLog
 from .stock_reservation import StockReservation
+from .viva_webhook_event import VivaWebhookEvent
 
 __all__ = [
     "Invoice",
@@ -14,4 +15,5 @@ __all__ = [
     "OrderItemHistory",
     "StockLog",
     "StockReservation",
+    "VivaWebhookEvent",
 ]

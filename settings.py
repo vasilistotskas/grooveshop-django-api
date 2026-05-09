@@ -38,6 +38,9 @@ if not SECRET_KEY:
         )
     SECRET_KEY = "insecure-dev-key-do-not-use-in-production"
 
+_fallback = getenv("SECRET_KEY_FALLBACK", "")
+SECRET_KEY_FALLBACKS = [_fallback] if _fallback else []
+
 DEBUG = getenv("DEBUG", "False") == "True"
 
 DJANGO_ADMIN_FORCE_ALLAUTH = (
@@ -79,6 +82,14 @@ USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "True") == "True"
 # SHARED_APPS live in the public schema (platform infrastructure + global data).
 # TENANT_APPS live in each tenant schema (store-specific data).
 # Apps in BOTH must appear in both lists (e.g. contenttypes, auth).
+
+if SYSTEM_ENV == "production" and not USE_X_FORWARDED_HOST:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "USE_X_FORWARDED_HOST must be True in production — the Nuxt proxy always "
+        "sets the X-Forwarded-Host header and DRF pagination links rely on it."
+    )
 
 SHARED_APPS = [
     "django_tenants",
@@ -153,6 +164,10 @@ TENANT_APPS = [
     "contact",
     "loyalty",
     "page_config",
+    "shipping",
+    "shipping_boxnow",
+    "shipping_acs",
+    "meta_capi",
     # Per-tenant reference data
     "vat",
     "pay_way",
@@ -182,11 +197,12 @@ INSTALLED_APPS = list(SHARED_APPS) + [
 MIDDLEWARE = [
     "django_tenants.middleware.main.TenantMainMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "core.middleware.correlation_id.CorrelationIdMiddleware",
     "django.middleware.gzip.GZipMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
+    "core.middleware.admin_locale.AdminDefaultGreekMiddleware",
     "core.middleware.translation_reload.TranslationReloadMiddleware",
     "django.middleware.common.CommonMiddleware",
     "tenant.middleware.TenantCsrfMiddleware",
@@ -201,7 +217,6 @@ MIDDLEWARE = [
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "simple_history.middleware.HistoryRequestMiddleware",
     "core.middleware.asgi_compat.ASGICompatMiddleware",  # ASGI compatibility for Rosetta
-    "core.middleware.stripe_webhook.StripeWebhookDebugMiddleware",  # Stripe webhook debugging
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -265,10 +280,18 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+]
+
 # Rest Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "knox.auth.TokenAuthentication",
+        "core.api.tokens.BoundedTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": [
@@ -292,6 +315,7 @@ REST_FRAMEWORK = {
         "cart_mutation": None if DEBUG else "60/minute",
         "cart_mutation_anon": None if DEBUG else "30/minute",
         "search": None if DEBUG else "120/minute",
+        "view_count": None if DEBUG else "60/hour",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -303,7 +327,13 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 12,
     "DEFAULT_RENDERER_CLASSES": (
         "djangorestframework_camel_case.render.CamelCaseJSONRenderer",
-        "djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer",
+        *(
+            (
+                "djangorestframework_camel_case.render.CamelCaseBrowsableAPIRenderer",
+            )
+            if DEBUG
+            else ()
+        ),
     ),
     "DEFAULT_PARSER_CLASSES": (
         "djangorestframework_camel_case.parser.CamelCaseFormParser",
@@ -317,6 +347,13 @@ REST_FRAMEWORK = {
 APPEND_SLASH = getenv("APPEND_SLASH", "False") == "True"
 
 DEEPL_AUTH_KEY = getenv("DEEPL_AUTH_KEY", "changeme")
+if DEEPL_AUTH_KEY == "changeme" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "DEEPL_AUTH_KEY must be set in production "
+        "(current value is the insecure default 'changeme')."
+    )
 
 LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 
@@ -326,6 +363,11 @@ ADMINS = [
     ("Admin", getenv("ADMIN_EMAIL", "")),
     ("Info", getenv("INFO_EMAIL", "")),
 ]
+
+if DEBUG:
+    MIDDLEWARE += [
+        "core.middleware.stripe_webhook.StripeWebhookDebugMiddleware",
+    ]
 
 if ENABLE_DEBUG_TOOLBAR:
     INSTALLED_APPS += ["debug_toolbar"]
@@ -434,6 +476,9 @@ ALLAUTH_USER_CODE_FORMAT = {"numeric": True, "dashed": False, "length": 6}
 ACCOUNT_SIGNUP_FORM_HONEYPOT_FIELD = "email_confirm"
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = "http" if DEBUG else "https"
 ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
+ACCOUNT_REAUTHENTICATION_TIMEOUT = int(
+    getenv("ACCOUNT_REAUTHENTICATION_TIMEOUT", "300")
+)
 ACCOUNT_EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
 
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
@@ -487,6 +532,13 @@ CACHE_CLEAR_PREFIXES: list[str] = [
     "cache:",  # Nuxt SSR cache
 ]
 
+# Internal Nuxt URL used by ``core.cache`` to invalidate Nitro SSR
+# caches synchronously from the Django admin. In Kubernetes this is
+# the cluster-internal Service DNS (e.g. ``http://frontend-nuxt:3000``)
+# so Cloudflare/Traefik are bypassed and the call is fast.
+NUXT_INTERNAL_BASE_URL = getenv("NUXT_INTERNAL_BASE_URL", "")
+NUXT_CACHE_PURGE_TOKEN = getenv("NUXT_CACHE_PURGE_TOKEN", "")
+
 if SYSTEM_ENV == "ci":
     CACHES = {
         "default": {
@@ -498,9 +550,15 @@ if SYSTEM_ENV == "ci":
 
 
 # Broker & Results
-CELERY_BROKER_URL = getenv(
-    "CELERY_BROKER_URL", "amqp://guest:guest@rabbitmq:5672//"
-)
+CELERY_BROKER_URL = getenv("CELERY_BROKER_URL", "")
+if not CELERY_BROKER_URL:
+    if SYSTEM_ENV == "production":
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured(
+            "CELERY_BROKER_URL must be set in production."
+        )
+    CELERY_BROKER_URL = "amqp://guest:guest@rabbitmq:5672//"
 CELERY_RESULT_BACKEND = getenv("CELERY_RESULT_BACKEND", "django-db")
 CELERY_CACHE_BACKEND = getenv("CELERY_CACHE_BACKEND", "django-cache")
 
@@ -687,12 +745,6 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
-        "update-order-statuses-from-shipping": {
-            "task": "tenant.tasks.fanout_update_order_statuses_from_shipping",
-            "schedule": crontab(hour="*/6", minute="0")
-            if not DEBUG
-            else SCHEDULE_PRESETS["every_hour"],
-        },
         "process-loyalty-points-expiration": {
             "task": "tenant.tasks.fanout_process_points_expiration",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
@@ -712,6 +764,56 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["daily_6am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
+        },
+        "sync-boxnow-lockers": {
+            "task": "shipping_boxnow.tasks.sync_boxnow_lockers",
+            "schedule": SCHEDULE_PRESETS["daily_2am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery", "expires": 300},
+        },
+        # ACS — daily station sync at 03:00 Athens (Phase 2 only fires
+        # when the AcsStation cache is in use; harmless to schedule now
+        # since the task no-ops when ACS provider is inactive).
+        # ``expires=300`` discards stale enqueues so a beat-pod restart
+        # mid-DST-fallback hour (Europe/Athens transitions twice yearly)
+        # can't re-fire the task against a stale ``last_run_at``.
+        "sync-acs-stations": {
+            "task": "shipping_acs.tasks.sync_acs_stations",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery", "expires": 300},
+        },
+        # Issue the daily ACS pickup list Mon-Fri at 16:30 Athens.
+        # Beats the close of the courier's daily collection window and
+        # keeps the path matched to admin's manual override.
+        "issue-acs-pickup-list": {
+            "task": "shipping_acs.tasks.issue_daily_acs_pickup_list",
+            "schedule": crontab(hour="16", minute="30", day_of_week="mon-fri"),
+            "options": {"queue": "celery", "expires": 300},
+        },
+        # Poll ACS_Trackingsummary every 15 min for non-terminal
+        # shipments. Sub-tasks fan out internally with a 0.2s
+        # countdown stagger so we stay well within ACS's 10 req/sec
+        # cap. Distributed mutex inside the task body prevents two
+        # workers from each running the full fan-out concurrently.
+        "poll-acs-tracking": {
+            "task": "shipping_acs.tasks.poll_acs_tracking_batch",
+            "schedule": crontab(minute="*/15"),
+            "options": {"queue": "celery", "expires": 300},
+        },
+        # Reconcile yesterday's COD payouts daily at 02:30 Athens —
+        # safely after midnight so ACS's books for the prior day are
+        # finalised.  The service method is idempotent on
+        # (voucher_no, cod_payment_date) so an early run or a re-run
+        # is harmless.
+        "reconcile-acs-cod-payouts": {
+            "task": "shipping_acs.tasks.reconcile_acs_cod_payouts",
+            "schedule": crontab(hour="2", minute="30")
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery", "expires": 300},
         },
     }
 
@@ -736,7 +838,11 @@ CELERY_BEAT_SCHEDULE = get_celery_beat_schedule()
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [REDIS_URL]},
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+            "capacity": 1500,
+            "expiry": 300,
+        },
     },
 }
 
@@ -744,6 +850,13 @@ CHANNEL_LAYERS = {
 APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
 API_BASE_URL = getenv("API_BASE_URL", "http://localhost:8000")
 AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME", "changeme")
+if AWS_STORAGE_BUCKET_NAME == "changeme" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "AWS_STORAGE_BUCKET_NAME must be set in production "
+        "(current value is the insecure default 'changeme')."
+    )
 AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
 CORS_EXPOSE_HEADERS = [
@@ -758,10 +871,6 @@ CORS_ALLOWED_ORIGINS = [
     MEDIA_STREAM_BASE_URL,
     STATIC_BASE_URL,
     f"https://{AWS_S3_CUSTOM_DOMAIN}",
-    "http://backend-service:80",
-    "http://frontend-nuxt-service:80",
-    "http://media-stream-service:80",
-    "http://localhost:1337",
 ]
 # All origins allowed — django-tenants validates domains at middleware level.
 # Each tenant domain is a distinct origin; static CORS list can't cover them.
@@ -785,7 +894,14 @@ CORS_ALLOW_HEADERS = (
 CSRF_USE_SESSIONS = False
 CSRF_COOKIE_NAME = "csrftoken"
 CSRF_COOKIE_AGE = 60 * 60 * 24 * 7 * 52  # 1 year
-CSRF_COOKIE_DOMAIN = getenv("CSRF_COOKIE_DOMAIN") or None
+_csrf_cookie_domain = getenv("CSRF_COOKIE_DOMAIN", "") or None
+if SYSTEM_ENV == "production" and not _csrf_cookie_domain:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "CSRF_COOKIE_DOMAIN must be set in production (e.g. .webside.gr)."
+    )
+CSRF_COOKIE_DOMAIN = _csrf_cookie_domain
 CSRF_COOKIE_PATH = "/"
 CSRF_COOKIE_SECURE = (
     not DEBUG
@@ -804,15 +920,15 @@ CSRF_TRUSTED_ORIGINS = [
     MEDIA_STREAM_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     STATIC_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     f"https://{AWS_S3_CUSTOM_DOMAIN}",
-    "http://backend-service:80",
-    "http://frontend-nuxt-service:80",
-    "http://media-stream-service:80",
 ]
 
-# Local development URLs should only be in the list if in DEBUG mode
+# Internal K8s service URLs and local dev origins are only valid in non-production
 if DEBUG:
     CSRF_TRUSTED_ORIGINS.extend(
         [
+            "http://backend-service:80",
+            "http://frontend-nuxt-service:80",
+            "http://media-stream-service:80",
             "http://localhost:3000",
         ]
     )
@@ -824,20 +940,24 @@ SECURE_SSL_REDIRECT = (
 SECURE_PROXY_SSL_HEADER = (
     ("HTTP_X_FORWARDED_PROTO", "https") if not DEBUG else None
 )
-_default_hsts = 0 if not DEBUG else 3600
+_default_hsts = 0 if DEBUG else 31536000
 SECURE_HSTS_SECONDS = int(getenv("SECURE_HSTS_SECONDS", str(_default_hsts)))
-SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0 and not DEBUG
-SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0 and not DEBUG
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
+SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0
 
 # Currency
 DEFAULT_CURRENCY = getenv("DEFAULT_CURRENCY", "EUR")
 CURRENCIES = ("EUR", "USD")
 CURRENCY_CHOICES = [("EUR", "EUR €"), ("USD", "USD $")]
 
+# Product favourites — per-user cap
+MAX_FAVOURITES_PER_USER = int(getenv("MAX_FAVOURITES_PER_USER", "500"))
+
 CONN_HEALTH_CHECKS = True
 ATOMIC_REQUESTS = False
 INDEX_MAXIMUM_EXPR_COUNT = 8000
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
+DATA_UPLOAD_MAX_MEMORY_SIZE = 2621440  # 2.5 MB (Django default, made explicit)
 
 # Use psycopg connection pool to bound DB connections per process. Each
 # process maintains a pool of <DB_POOL_MAX_SIZE> connections regardless of
@@ -853,6 +973,7 @@ DB_POOL_TIMEOUT = float(getenv("DB_POOL_TIMEOUT", "10"))
 _db_options: dict = {
     "connect_timeout": 5,
     "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
+    "sslmode": getenv("DB_SSLMODE", "prefer"),
 }
 if DB_POOL_ENABLED:
     _db_options["pool"] = {
@@ -860,6 +981,15 @@ if DB_POOL_ENABLED:
         "max_size": DB_POOL_MAX_SIZE,
         "timeout": DB_POOL_TIMEOUT,
     }
+
+DB_PASSWORD = getenv("DB_PASSWORD", "postgres")
+if DB_PASSWORD == "postgres" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "DB_PASSWORD must be set in production "
+        "(current value is the insecure default 'postgres')."
+    )
 
 DATABASES = {
     "default": {
@@ -875,7 +1005,7 @@ DATABASES = {
         "HOST": getenv("DB_HOST", "db"),
         "NAME": getenv("DB_NAME", "postgres"),
         "USER": getenv("DB_USER", "postgres"),
-        "PASSWORD": getenv("DB_PASSWORD", "postgres"),
+        "PASSWORD": DB_PASSWORD,
         "PORT": getenv("DB_PORT", "5432"),
         "OPTIONS": _db_options,
     },
@@ -892,23 +1022,31 @@ if SYSTEM_ENV == "ci":
             "ENGINE": "django_tenants.postgresql_backend",
             "NAME": "postgres",
             "USER": getenv("DB_USER", "postgres"),
-            "PASSWORD": getenv("DB_PASSWORD", "postgres"),
+            "PASSWORD": DB_PASSWORD,
             "HOST": "127.0.0.1",
             "PORT": "5432",
         }
     }
 
 # Maili settings
+_meili_master_key = getenv("MEILI_MASTER_KEY", "changeme")
+if _meili_master_key == "changeme" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "MEILI_MASTER_KEY must be set in production "
+        "(current value is the insecure default 'changeme')."
+    )
 MEILISEARCH = {
     "HTTPS": getenv("MEILI_HTTPS", "False") == "True",
     "HOST": getenv("MEILI_HOST", "localhost"),
-    "MASTER_KEY": getenv("MEILI_MASTER_KEY", "changeme"),
+    "MASTER_KEY": _meili_master_key,
     "PORT": int(getenv("MEILI_PORT", "7700")),
     "TIMEOUT": int(getenv("MEILI_TIMEOUT", "30")),
     "CLIENT_AGENTS": None,
     "DEBUG": DEBUG,
     "SYNC": DEBUG,
-    "ASYNC_INDEXING": getenv("MEILI_ASYNC_INDEXING", "False") == "True",
+    "ASYNC_INDEXING": getenv("MEILI_ASYNC_INDEXING", "True") == "True",
     "OFFLINE": getenv("MEILI_OFFLINE", "False") == "True",
     "DEFAULT_BATCH_SIZE": int(getenv("MEILI_DEFAULT_BATCH_SIZE", "5000")),
 }
@@ -926,6 +1064,81 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "FREE_SHIPPING_THRESHOLD",
         "type": "decimal",
         "value": 50.00,
+    },
+    {
+        "name": "BOXNOW_SHIPPING_PRICE",
+        "type": "decimal",
+        "value": 2.50,
+        "description": (
+            "Flat shipping cost in EUR when the customer ships to a "
+            "BoxNow locker. BoxNow's contractual rate; admin-tunable."
+        ),
+    },
+    {
+        "name": "BOXNOW_FREE_SHIPPING_THRESHOLD",
+        "type": "decimal",
+        "value": 30.00,
+        "description": (
+            "Cart subtotal in EUR above which BoxNow shipping becomes "
+            "free. Admin-tunable; mirrors FREE_SHIPPING_THRESHOLD for "
+            "the home-delivery flow."
+        ),
+    },
+    {
+        "name": "BOXNOW_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Master switch for the BoxNow locker shipping option in "
+            "checkout. Defaults to False so a fresh production deploy "
+            "doesn't expose the option to customers until BoxNow has "
+            "explicitly approved the partner account for live traffic "
+            "(stage credentials return 403 against api-production.boxnow.gr "
+            "until they activate). Flip to True in Django admin once "
+            "BoxNow confirms."
+        ),
+    },
+    {
+        "name": "ACS_SHIPPING_PRICE",
+        "type": "decimal",
+        "value": 3.50,
+        "description": (
+            "Flat ACS home-delivery / Smartpoint shipping cost in EUR. "
+            "Phase 4 may switch to live ACS_Price_Calculation; for now "
+            "this admin-tunable Setting is the source of truth."
+        ),
+    },
+    {
+        "name": "ACS_FREE_SHIPPING_THRESHOLD",
+        "type": "decimal",
+        "value": 40.00,
+        "description": (
+            "Cart subtotal in EUR above which ACS shipping becomes "
+            "free. Mirrors the BoxNow + checkout-default thresholds."
+        ),
+    },
+    {
+        "name": "ACS_SMARTPOINT_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Customer-facing toggle for the ACS Smartpoint locker "
+            "pickup option. Defaults False so a fresh deploy hides "
+            "the option until ops have synced AcsStation rows and "
+            "verified the picker; flip in Django admin to expose."
+        ),
+    },
+    {
+        "name": "ACS_DYNAMIC_PRICING_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "When True the ACS carrier asks the courier API for a "
+            "live shipping quote (ACS_Price_Calculation) at checkout. "
+            "Falls back to ACS_SHIPPING_PRICE on any API failure so "
+            "a transient outage cannot block checkout. Defaults False "
+            "until ops have run end-to-end pricing tests on stage."
+        ),
     },
     {
         "name": "CART_ABANDONED_HOURS",
@@ -971,6 +1184,33 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "CHECKOUT_ABANDONMENT_HOURS",
         "type": "int",
         "value": 2,
+    },
+    # Meta Conversions API
+    {
+        "name": "META_CAPI_ENABLED",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Master kill switch for the server-side Meta Conversions "
+            "API dispatcher. Defaults False so a fresh deploy doesn't "
+            "leak unintended events when ``META_PIXEL_ID`` / "
+            "``META_CAPI_ACCESS_TOKEN`` are still placeholders. Flip "
+            "to True in Django admin once Meta credentials are in "
+            "place and the Test Events feed in Events Manager looks "
+            "right. The browser pixel is independent — it gates on "
+            "the ``ad_storage`` cookie consent on the storefront."
+        ),
+    },
+    # Storefront UI toggles
+    {
+        "name": "RECENTLY_VIEWED_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the 'Recently Viewed' rail on the storefront home page. "
+            "The history itself is stored client-side in localStorage; "
+            "this flag only controls whether the rail renders."
+        ),
     },
     # Loyalty system settings
     {
@@ -1223,7 +1463,14 @@ EMAIL_HOST = getenv("EMAIL_HOST", "localhost")
 EMAIL_PORT = getenv("EMAIL_PORT", "25")
 EMAIL_HOST_USER = getenv("EMAIL_HOST_USER", "localhost@gmail.com")
 EMAIL_HOST_PASSWORD = getenv("EMAIL_HOST_PASSWORD", "changeme")
-EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "False") == "True"
+if EMAIL_HOST_PASSWORD == "changeme" and SYSTEM_ENV == "production":
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "EMAIL_HOST_PASSWORD must be set in production "
+        "(current value is the insecure default 'changeme')."
+    )
+EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "True") == "True"
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
 ADMIN_EMAIL = getenv("ADMIN_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
@@ -1233,7 +1480,17 @@ REST_KNOX = {
     "AUTH_HEADER_PREFIX": "Bearer",
     "AUTO_REFRESH": True,
     "MIN_REFRESH_INTERVAL": 86400,  # Only extend TTL if token is >1 day old
+    # Caps how far into the future expiry can be pushed on each renewal.
+    # A fresh login gets 7 days; a long-lived active session can only
+    # push the expiry to (created + 30 days) — after that every renewal
+    # is a no-op and the session expires naturally at the 30-day wall.
+    "AUTO_REFRESH_MAX_TTL": datetime.timedelta(days=30),
+    "TOKEN_LIMIT_PER_USER": 10,  # Prevent unbounded token accumulation per user
 }
+# Hard reject tokens older than this regardless of their expiry field.
+# Mirrors AUTO_REFRESH_MAX_TTL; both should be kept in sync.
+# BoundedTokenAuthentication in core/api/tokens.py reads this setting.
+KNOX_ABSOLUTE_MAX_AGE = datetime.timedelta(days=30)
 KNOX_TOKEN_MODEL = "knox.AuthToken"
 
 MEASUREMENT_BIDIMENSIONAL_SEPARATOR = "/"
@@ -1596,11 +1853,23 @@ UNFOLD = {
         lambda request: static("css/admin.css"),
         "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200",
     ],
+    # Loads on every admin page. ``tinymce_save_sync.js`` patches the
+    # missing django-tinymce ↔ unfold form-submit handoff so that
+    # rich-text edits in HTMLField (Product description, BlogPost body,
+    # etc.) are actually copied from the TinyMCE iframe to the underlying
+    # <textarea> before the form is POSTed. Without it the save returns
+    # 302 success and django-simple-history writes a row, but the field
+    # value is unchanged because the form body has the page-load
+    # textarea value, not the edited iframe content.
+    "SCRIPTS": [
+        lambda request: static("admin/js/tinymce_save_sync.js"),
+    ],
     "DASHBOARD_CALLBACK": "admin.dashboard.dashboard_callback",
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": False,
         "navigation": [
+            # ── Dashboard ─────────────────────────────────────────────
             {
                 "title": _("Navigation"),
                 "separator": True,
@@ -1612,6 +1881,7 @@ UNFOLD = {
                     },
                 ],
             },
+            # ── Catalog (catalog management) ──────────────────────────
             {
                 "title": _("Catalog"),
                 "separator": True,
@@ -1623,6 +1893,7 @@ UNFOLD = {
                         "link": reverse_lazy(
                             "admin:product_product_changelist"
                         ),
+                        "badge": "admin.badges.low_stock_badge",
                     },
                     {
                         "title": _("Categories"),
@@ -1660,6 +1931,7 @@ UNFOLD = {
                     },
                 ],
             },
+            # ── Sales (day-to-day order operations) ───────────────────
             {
                 "title": _("Sales"),
                 "separator": True,
@@ -1675,6 +1947,12 @@ UNFOLD = {
                         "title": _("Carts"),
                         "icon": "shopping_cart",
                         "link": reverse_lazy("admin:cart_cart_changelist"),
+                        "badge": "admin.badges.abandoned_carts_badge",
+                    },
+                    {
+                        "title": _("Invoices"),
+                        "icon": "receipt",
+                        "link": reverse_lazy("admin:order_invoice_changelist"),
                     },
                     {
                         "title": _("Payment Methods"),
@@ -1686,10 +1964,110 @@ UNFOLD = {
                         "icon": "percent",
                         "link": reverse_lazy("admin:vat_vat_changelist"),
                     },
+                    # Content nests under Sales as a subtree — blog,
+                    # notifications, and contact messages all feed the
+                    # storefront sales funnel, so grouping them with
+                    # the order/payment items keeps related work in
+                    # one place.
+                    {
+                        "title": _("Content"),
+                        "icon": "edit_square",
+                        "items": [
+                            {
+                                "title": _("Blog Posts"),
+                                "icon": "article",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogpost_changelist"
+                                ),
+                                "badge": "admin.badges.draft_blog_posts_badge",
+                            },
+                            {
+                                "title": _("Blog Categories"),
+                                "icon": "folder_open",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogcategory_changelist"
+                                ),
+                            },
+                            {
+                                "title": _("Blog Authors"),
+                                "icon": "edit_note",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogauthor_changelist"
+                                ),
+                            },
+                            {
+                                "title": _("Blog Comments"),
+                                "icon": "chat_bubble",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogcomment_changelist"
+                                ),
+                                "badge": "admin.badges.pending_comments_badge",
+                            },
+                            {
+                                "title": _("Blog Tags"),
+                                "icon": "tag",
+                                "link": reverse_lazy(
+                                    "admin:blog_blogtag_changelist"
+                                ),
+                            },
+                            {
+                                "title": _("Notifications"),
+                                "icon": "notifications_active",
+                                "link": reverse_lazy(
+                                    "admin:notification_notification_changelist"
+                                ),
+                            },
+                            {
+                                "title": _("Contact Messages"),
+                                "icon": "contact_mail",
+                                "link": reverse_lazy(
+                                    "admin:contact_contact_changelist"
+                                ),
+                                "badge": "admin.badges.unread_messages_badge",
+                            },
+                        ],
+                    },
                 ],
             },
+            # ── Shipping (carrier-facing fulfilment) ─────────────────
             {
-                "title": _("Users & Engagement"),
+                "title": _("Shipping"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("BoxNow Shipments"),
+                        "icon": "package_2",
+                        "link": reverse_lazy(
+                            "admin:shipping_boxnow_boxnowshipment_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("ACS Shipments"),
+                        "icon": "local_post_office",
+                        "link": reverse_lazy(
+                            "admin:shipping_acs_acsshipment_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("BoxNow Lockers"),
+                        "icon": "lock",
+                        "link": reverse_lazy(
+                            "admin:shipping_boxnow_boxnowlocker_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("ACS Stations"),
+                        "icon": "store",
+                        "link": reverse_lazy(
+                            "admin:shipping_acs_acsstation_changelist"
+                        ),
+                    },
+                ],
+            },
+            # ── Customers ────────────────────────────────────────────
+            {
+                "title": _("Customers"),
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -1701,87 +2079,22 @@ UNFOLD = {
                         ),
                     },
                     {
+                        "title": _("User Addresses"),
+                        "icon": "home",
+                        "link": reverse_lazy(
+                            "admin:user_useraddress_changelist"
+                        ),
+                    },
+                    {
                         "title": _("Subscriptions"),
                         "icon": "mail",
                         "link": reverse_lazy(
                             "admin:user_usersubscription_changelist"
                         ),
                     },
-                    {
-                        "title": _("Subscription Topics"),
-                        "icon": "topic",
-                        "link": reverse_lazy(
-                            "admin:user_subscriptiontopic_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("Groups"),
-                        "icon": "shield_person",
-                        "link": reverse_lazy("admin:auth_group_changelist"),
-                    },
                 ],
             },
-            {
-                "title": _("Blog & Content"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Blog Posts"),
-                        "icon": "article",
-                        "link": reverse_lazy("admin:blog_blogpost_changelist"),
-                    },
-                    {
-                        "title": _("Blog Authors"),
-                        "icon": "edit_note",
-                        "link": reverse_lazy(
-                            "admin:blog_blogauthor_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("Blog Categories"),
-                        "icon": "folder_open",
-                        "link": reverse_lazy(
-                            "admin:blog_blogcategory_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("Blog Comments"),
-                        "icon": "chat_bubble",
-                        "link": reverse_lazy(
-                            "admin:blog_blogcomment_changelist"
-                        ),
-                        "badge": "admin.badges.pending_comments_badge",
-                    },
-                    {
-                        "title": _("Blog Tags"),
-                        "icon": "tag",
-                        "link": reverse_lazy("admin:blog_blogtag_changelist"),
-                    },
-                ],
-            },
-            {
-                "title": _("Communications"),
-                "separator": True,
-                "collapsible": True,
-                "items": [
-                    {
-                        "title": _("Notifications"),
-                        "icon": "notifications_active",
-                        "link": reverse_lazy(
-                            "admin:notification_notification_changelist"
-                        ),
-                    },
-                    {
-                        "title": _("Contact Messages"),
-                        "icon": "contact_mail",
-                        "link": reverse_lazy(
-                            "admin:contact_contact_changelist"
-                        ),
-                        "badge": "admin.badges.unread_messages_badge",
-                    },
-                ],
-            },
+            # ── Loyalty ──────────────────────────────────────────────
             {
                 "title": _("Loyalty"),
                 "separator": True,
@@ -1803,39 +2116,402 @@ UNFOLD = {
                     },
                 ],
             },
+            # ──────────────────────────────────────────────────────────
+            # SYSTEM ZONE — superuser-only. One parent group with four
+            # nested subtrees (Configuration / Audit & Logs /
+            # Reconciliation / Background Jobs). The nested rendering
+            # is provided by our `core/templates/unfold/helpers/
+            # app_list{,_item}.html` overrides — unfold's Python layer
+            # already recursively processes child `items` arrays
+            # (`UnfoldAdminSite._get_navigation_items`), so the only
+            # custom code is the recursive template partial.
+            # ──────────────────────────────────────────────────────────
             {
-                "title": _("System Settings"),
+                "title": _("System"),
                 "separator": True,
                 "collapsible": True,
+                "permission": "admin.permissions.is_superuser",
                 "items": [
                     {
-                        "title": _("Countries"),
-                        "icon": "public",
-                        "link": reverse_lazy(
-                            "admin:country_country_changelist"
-                        ),
+                        "title": _("Configuration"),
+                        "icon": "tune",
+                        "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("Countries"),
+                                "icon": "public",
+                                "link": reverse_lazy(
+                                    "admin:country_country_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Regions"),
+                                "icon": "map",
+                                "link": reverse_lazy(
+                                    "admin:region_region_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Sites"),
+                                "icon": "language",
+                                "link": reverse_lazy(
+                                    "admin:sites_site_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Extra Settings"),
+                                "icon": "settings",
+                                "link": reverse_lazy(
+                                    "admin:extra_settings_setting_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Subscription Topics"),
+                                "icon": "topic",
+                                "link": reverse_lazy(
+                                    "admin:user_subscriptiontopic_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Shipping Providers"),
+                                "icon": "local_shipping",
+                                "link": reverse_lazy(
+                                    "admin:shipping_shippingprovider_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Groups"),
+                                "icon": "shield_person",
+                                "link": reverse_lazy(
+                                    "admin:auth_group_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
                     },
                     {
-                        "title": _("Regions"),
-                        "icon": "map",
-                        "link": reverse_lazy("admin:region_region_changelist"),
+                        "title": _("Audit & Logs"),
+                        "icon": "fact_check",
+                        "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("Stock Logs"),
+                                "icon": "inventory",
+                                "link": reverse_lazy(
+                                    "admin:order_stocklog_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Order History"),
+                                "icon": "history",
+                                "link": reverse_lazy(
+                                    "admin:order_orderhistory_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Order Item History"),
+                                "icon": "manage_history",
+                                "link": reverse_lazy(
+                                    "admin:order_orderitemhistory_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("BoxNow Events"),
+                                "icon": "event_note",
+                                "link": reverse_lazy(
+                                    "admin:shipping_boxnow_boxnowparcelevent_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("ACS Tracking Events"),
+                                "icon": "track_changes",
+                                "link": reverse_lazy(
+                                    "admin:shipping_acs_acstrackingevent_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Viva Webhook Events"),
+                                "icon": "webhook",
+                                "link": reverse_lazy(
+                                    "admin:order_vivawebhookevent_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Meta CAPI Event Log"),
+                                "icon": "share",
+                                "link": reverse_lazy(
+                                    "admin:meta_capi_metacapieventlog_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Cache Purge Log"),
+                                "icon": "cleaning_services",
+                                "link": reverse_lazy(
+                                    "admin:core_cachepurgelog_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("User Data Exports"),
+                                "icon": "download",
+                                "link": reverse_lazy(
+                                    "admin:user_userdataexport_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
                     },
                     {
-                        "title": _("Sites"),
-                        "icon": "language",
-                        "link": reverse_lazy("admin:sites_site_changelist"),
+                        "title": _("Reconciliation"),
+                        "icon": "balance",
+                        "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("ACS Pickup Lists"),
+                                "icon": "assignment",
+                                "link": reverse_lazy(
+                                    "admin:shipping_acs_acspickuplist_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("ACS COD Payouts"),
+                                "icon": "account_balance",
+                                "link": reverse_lazy(
+                                    "admin:shipping_acs_acscodpayout_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Invoice Counter"),
+                                "icon": "tag",
+                                "link": reverse_lazy(
+                                    "admin:order_invoicecounter_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
                     },
                     {
-                        "title": _("Extra Settings"),
-                        "icon": "settings",
-                        "link": reverse_lazy(
-                            "admin:extra_settings_setting_changelist"
-                        ),
+                        "title": _("Background Jobs"),
+                        "icon": "schedule",
+                        "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("Periodic Tasks"),
+                                "icon": "task_alt",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_periodictask_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Crontab Schedules"),
+                                "icon": "more_time",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_crontabschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Interval Schedules"),
+                                "icon": "update",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_intervalschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Clocked Schedules"),
+                                "icon": "alarm",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_clockedschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Solar Schedules"),
+                                "icon": "wb_sunny",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_beat_solarschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
                     },
                 ],
             },
         ],
     },
+    # Cross-model tab strips that appear on related changelist / detail
+    # pages. Lets staff hop across linked admins (Order → Invoice;
+    # BoxNow shipment → locker → events) without bouncing through the
+    # sidebar. Tabs gated on `is_superuser` are hidden for staff.
+    "TABS": [
+        {
+            "models": [
+                "order.order",
+                "order.invoice",
+                "order.stocklog",
+                "order.orderhistory",
+                "order.orderitemhistory",
+            ],
+            "items": [
+                {
+                    "title": _("Orders"),
+                    "link": reverse_lazy("admin:order_order_changelist"),
+                },
+                {
+                    "title": _("Invoices"),
+                    "link": reverse_lazy("admin:order_invoice_changelist"),
+                },
+                {
+                    "title": _("Stock Logs"),
+                    "link": reverse_lazy("admin:order_stocklog_changelist"),
+                    "permission": "admin.permissions.is_superuser",
+                },
+                {
+                    "title": _("Order History"),
+                    "link": reverse_lazy("admin:order_orderhistory_changelist"),
+                    "permission": "admin.permissions.is_superuser",
+                },
+            ],
+        },
+        {
+            "models": [
+                "shipping_boxnow.boxnowshipment",
+                "shipping_boxnow.boxnowlocker",
+                "shipping_boxnow.boxnowparcelevent",
+            ],
+            "items": [
+                {
+                    "title": _("BoxNow Shipments"),
+                    "link": reverse_lazy(
+                        "admin:shipping_boxnow_boxnowshipment_changelist"
+                    ),
+                },
+                {
+                    "title": _("BoxNow Lockers"),
+                    "link": reverse_lazy(
+                        "admin:shipping_boxnow_boxnowlocker_changelist"
+                    ),
+                },
+                {
+                    "title": _("BoxNow Events"),
+                    "link": reverse_lazy(
+                        "admin:shipping_boxnow_boxnowparcelevent_changelist"
+                    ),
+                    "permission": "admin.permissions.is_superuser",
+                },
+            ],
+        },
+        {
+            "models": [
+                "shipping_acs.acsshipment",
+                "shipping_acs.acsstation",
+                "shipping_acs.acspickuplist",
+                "shipping_acs.acscodpayout",
+                "shipping_acs.acstrackingevent",
+            ],
+            "items": [
+                {
+                    "title": _("ACS Shipments"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acsshipment_changelist"
+                    ),
+                },
+                {
+                    "title": _("ACS Stations"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acsstation_changelist"
+                    ),
+                },
+                {
+                    "title": _("ACS Pickup Lists"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acspickuplist_changelist"
+                    ),
+                    "permission": "admin.permissions.is_superuser",
+                },
+                {
+                    "title": _("ACS COD Payouts"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acscodpayout_changelist"
+                    ),
+                    "permission": "admin.permissions.is_superuser",
+                },
+                {
+                    "title": _("ACS Tracking Events"),
+                    "link": reverse_lazy(
+                        "admin:shipping_acs_acstrackingevent_changelist"
+                    ),
+                    "permission": "admin.permissions.is_superuser",
+                },
+            ],
+        },
+        {
+            "models": [
+                "product.attribute",
+                "product.attributevalue",
+            ],
+            "items": [
+                {
+                    "title": _("Attributes"),
+                    "link": reverse_lazy("admin:product_attribute_changelist"),
+                },
+                {
+                    "title": _("Attribute Values"),
+                    "link": reverse_lazy(
+                        "admin:product_attributevalue_changelist"
+                    ),
+                },
+            ],
+        },
+        {
+            "models": [
+                "blog.blogpost",
+                "blog.blogcategory",
+                "blog.blogauthor",
+                "blog.blogcomment",
+                "blog.blogtag",
+            ],
+            "items": [
+                {
+                    "title": _("Blog Posts"),
+                    "link": reverse_lazy("admin:blog_blogpost_changelist"),
+                },
+                {
+                    "title": _("Categories"),
+                    "link": reverse_lazy("admin:blog_blogcategory_changelist"),
+                },
+                {
+                    "title": _("Authors"),
+                    "link": reverse_lazy("admin:blog_blogauthor_changelist"),
+                },
+                {
+                    "title": _("Comments"),
+                    "link": reverse_lazy("admin:blog_blogcomment_changelist"),
+                },
+                {
+                    "title": _("Tags"),
+                    "link": reverse_lazy("admin:blog_blogtag_changelist"),
+                },
+            ],
+        },
+    ],
     "SITE_DROPDOWN": [
         {
             "icon": "translate",
@@ -1852,13 +2528,68 @@ UNFOLD = {
             "title": _("Email Templates"),
             "link": reverse_lazy("email_templates:management"),
         },
+        # API Swagger always works — same Django process serves both
+        # the admin and the schema, so reverse_lazy gives the right
+        # URL in dev and prod regardless of host. The route name is
+        # `swagger-ui` and matches `/api/v1/schema/swagger-ui` (no
+        # trailing slash); using reverse_lazy avoids hard-coding it.
+        {
+            "icon": "schema",
+            "title": _("API Swagger"),
+            "link": reverse_lazy("swagger-ui"),
+            "attrs": {"target": "_blank", "rel": "noopener"},
+        },
+        # Ops links — only render when the env var is explicitly set.
+        # In dev, set ADMIN_FLOWER_URL=http://localhost:5556 etc. in
+        # `.env`. In production these surfaces are usually NOT exposed
+        # publicly, so the default is to hide the link entirely
+        # rather than show a broken localhost shortcut.
+        *[
+            {
+                "icon": entry["icon"],
+                "title": entry["title"],
+                "link": entry["link"],
+                "attrs": {"target": "_blank", "rel": "noopener"},
+            }
+            for entry in [
+                {
+                    "icon": "monitoring",
+                    "title": _("Flower (Celery)"),
+                    "link": getenv("ADMIN_FLOWER_URL", "").strip(),
+                },
+                {
+                    "icon": "mark_email_unread",
+                    "title": _("Mailpit"),
+                    "link": getenv("ADMIN_MAILPIT_URL", "").strip(),
+                },
+                {
+                    "icon": "search",
+                    "title": _("Meilisearch"),
+                    "link": getenv("ADMIN_MEILISEARCH_URL", "").strip(),
+                },
+                {
+                    "icon": "router",
+                    "title": _("RabbitMQ"),
+                    "link": getenv("ADMIN_RABBITMQ_URL", "").strip(),
+                },
+            ]
+            if entry["link"]
+            if entry["link"]
+        ],
     ],
 }
 
 SESSION_CACHE_ALIAS = "default"
 SESSION_COOKIE_NAME = "sessionid"
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7 * 2
-SESSION_COOKIE_DOMAIN = getenv("SESSION_COOKIE_DOMAIN") or None
+_session_cookie_domain = getenv("SESSION_COOKIE_DOMAIN", "") or None
+if SYSTEM_ENV == "production" and not _session_cookie_domain:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "SESSION_COOKIE_DOMAIN must be set in production (e.g. .webside.gr)."
+    )
+SESSION_COOKIE_DOMAIN = _session_cookie_domain
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_PATH = "/"
 SESSION_COOKIE_HTTPONLY = True
@@ -1923,6 +2654,20 @@ SPECTACULAR_SETTINGS = {
         # generated frontend types on every regeneration.
         "OrderDocumentType": "order.enum.document_type.OrderDocumentTypeEnum",
         "OrderCreateDocumentType": "order.enum.document_type.OrderCreateDocumentTypeEnum",
+        # ``BoxNowShipment.parcel_state`` and ``BoxNowParcelEvent.event_type``
+        # both use ``BoxNowParcelState.choices``. Without this override,
+        # drf-spectacular emits ``ParcelStateEnum`` and ``EventTypeEnum``
+        # for the same choice set — a single canonical name is cleaner
+        # for the generated frontend types.
+        "BoxNowParcelState": "shipping_boxnow.enum.parcel_state.BoxNowParcelState",
+        # ``Order.shipping_kind`` and ``AcsShipment.delivery_kind`` both
+        # reuse ``ShippingKind.choices``; same fix as BoxNow above to
+        # keep the generated TS type single-named.
+        "ShippingKind": "shipping.enum.shipping_kind.ShippingKind",
+        # ``AcsShipment.charge_type`` and the inline choices on
+        # ``OrderCreateFromCartSerializer.acs_charge_type`` share the
+        # same choice set; consolidate naming.
+        "AcsChargeType": "shipping_acs.enum.charge_type.AcsChargeType",
     },
 }
 
@@ -2008,7 +2753,34 @@ TINYMCE_DEFAULT_CONFIG = {
     "backcolor casechange permanentpen formatpainter removeformat | pagebreak | charmap emoticons | "
     "fullscreen  preview save print | insertfile image media pageembed template link anchor codesample | "
     "a11ycheck ltr rtl | showcomments addcomment code",
-    "images_upload_url": "/upload_image",
+    # Custom upload handler instead of `images_upload_url`. The built-in
+    # uploader sends FormData with cookies (via `images_upload_credentials`)
+    # but never attaches an `X-CSRFToken` header, so Django's
+    # CsrfViewMiddleware rejects the request with 403 before reaching
+    # `core.views.upload_image`. The handler below reads the csrftoken
+    # cookie (CSRF_COOKIE_HTTPONLY = False) and forwards it as the
+    # `X-CSRFToken` header. `init_tinymce.js` evals the string when it
+    # contains a `(`, so we inline a function literal here.
+    "images_upload_handler": (
+        "function(blobInfo, progress) {"
+        " return new Promise(function(resolve, reject) {"
+        "  var formData = new FormData();"
+        "  formData.append('file', blobInfo.blob(), blobInfo.filename());"
+        "  var csrf = (document.cookie.match(/(?:^|;\\s*)csrftoken=([^;]+)/) || [])[1] || '';"
+        "  fetch('/upload_image', {"
+        "   method: 'POST', credentials: 'include',"
+        "   headers: {'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest'},"
+        "   body: formData"
+        "  }).then(function(r) {"
+        "   if (!r.ok) { return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t); }); }"
+        "   return r.json();"
+        "  }).then(function(d) {"
+        "   if (d && d.location) { resolve(d.location); }"
+        "   else { reject({message: (d && d['Error Message']) || 'Upload failed', remove: true}); }"
+        "  }).catch(function(e) { reject({message: e.message || 'Upload failed', remove: true}); });"
+        " });"
+        "}"
+    ),
     "relative_urls": False,
     "remove_script_host": False,
     "entity_encoding": "raw",
@@ -2063,6 +2835,9 @@ if IS_KUBERNETES:
             "add_correlation_id": {
                 "()": "core.logging.CorrelationIdFilter",
             },
+            "drop_asyncio_cancelled": {
+                "()": "core.logging.DropAsyncioCancelledError",
+            },
         },
         "handlers": {
             "console": {
@@ -2085,6 +2860,13 @@ if IS_KUBERNETES:
             },
             "celery": {
                 "level": logging_level,
+                "propagate": True,
+            },
+            # Suppress asyncio's CancelledError tracebacks emitted when an
+            # ASGI client disconnects mid-request. See DropAsyncioCancelledError.
+            "asyncio": {
+                "level": logging_level,
+                "filters": ["drop_asyncio_cancelled"],
                 "propagate": True,
             },
         },
@@ -2116,6 +2898,9 @@ elif IS_DOCKER or IS_DEVELOPMENT:
             "add_correlation_id": {
                 "()": "core.logging.CorrelationIdFilter",
             },
+            "drop_asyncio_cancelled": {
+                "()": "core.logging.DropAsyncioCancelledError",
+            },
         },
         "handlers": {
             "console": {
@@ -2146,6 +2931,12 @@ elif IS_DOCKER or IS_DEVELOPMENT:
                 "level": logging_level,
                 "propagate": True,
             },
+            # See DropAsyncioCancelledError — silences ASGI client-disconnect noise.
+            "asyncio": {
+                "level": logging_level,
+                "filters": ["drop_asyncio_cancelled"],
+                "propagate": True,
+            },
         },
     }
 
@@ -2173,8 +2964,8 @@ else:
 
 # PAYMENT SETTINGS
 # Stripe Configuration (dj-stripe format)
-STRIPE_LIVE_SECRET_KEY = getenv("STRIPE_LIVE_SECRET_KEY", "sk_live_...")
-STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "sk_test_...")
+STRIPE_LIVE_SECRET_KEY = getenv("STRIPE_LIVE_SECRET_KEY", "")
+STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "")
 STRIPE_LIVE_MODE = not DEBUG
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
 DJSTRIPE_WEBHOOK_VALIDATION = "verify_signature"
@@ -2219,3 +3010,84 @@ FEDEX_API_KEY = getenv("FEDEX_API_KEY", "")
 FEDEX_ACCOUNT_NUMBER = getenv("FEDEX_ACCOUNT_NUMBER", "")
 UPS_API_KEY = getenv("UPS_API_KEY", "")
 UPS_ACCOUNT_NUMBER = getenv("UPS_ACCOUNT_NUMBER", "")
+
+# ---------- BoxNow Shipping ----------
+BOXNOW_CLIENT_ID = getenv("BOXNOW_CLIENT_ID", "")
+BOXNOW_CLIENT_SECRET = getenv("BOXNOW_CLIENT_SECRET", "")
+BOXNOW_PARTNER_ID = getenv("BOXNOW_PARTNER_ID", "")
+BOXNOW_WAREHOUSE_ID = getenv("BOXNOW_WAREHOUSE_ID", "2")
+BOXNOW_WEBHOOK_SECRET = getenv("BOXNOW_WEBHOOK_SECRET", "")
+BOXNOW_API_BASE_URL = getenv(
+    "BOXNOW_API_BASE_URL", "https://api-stage.boxnow.gr"
+)
+BOXNOW_LOCATION_API_BASE_URL = getenv(
+    "BOXNOW_LOCATION_API_BASE_URL",
+    "https://locationapi-stage.boxnow.gr",
+)
+BOXNOW_LIVE_MODE = getenv("BOXNOW_LIVE_MODE", "False").lower() == "true"
+BOXNOW_DEFAULT_COMPARTMENT_SIZE = int(
+    getenv("BOXNOW_DEFAULT_COMPARTMENT_SIZE", "1")
+)
+# Shipping price + free-shipping threshold are NOT mirrored as Django
+# settings: they live in `extra_settings.Setting` rows (BOXNOW_SHIPPING_PRICE
+# / BOXNOW_FREE_SHIPPING_THRESHOLD). Both Django (calculate_shipping_cost)
+# and Nuxt (`/api/settings/get`) read from there so an admin can retune the
+# rate without a redeploy.
+BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
+# Operations phone BoxNow calls about pickup issues at the origin warehouse.
+# Per BoxNow API §3.4 must be a real number in full international format
+# (P405 rejects malformed phones). Stage placeholder by default.
+BOXNOW_NOTIFY_PHONE = getenv("BOXNOW_NOTIFY_PHONE", "+302100000000")
+
+# ---------- ACS Shipping ----------
+# Single static API key in the AcsApiKey header + per-call body
+# credentials (Company_*, User_*) plus the partner Billing_Code.  See
+# docs/acs-web-services.pdf.  Note: ACS_BILLING_CODE may contain Greek
+# characters (e.g. "2ΑΚ89587"); the env file must be UTF-8.
+ACS_API_KEY = getenv("ACS_API_KEY", "")
+ACS_COMPANY_ID = getenv("ACS_COMPANY_ID", "")
+ACS_COMPANY_PASSWORD = getenv("ACS_COMPANY_PASSWORD", "")
+ACS_USER_ID = getenv("ACS_USER_ID", "")
+ACS_USER_PASSWORD = getenv("ACS_USER_PASSWORD", "")
+ACS_BILLING_CODE = getenv("ACS_BILLING_CODE", "")
+ACS_API_BASE_URL = getenv(
+    "ACS_API_BASE_URL",
+    "https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest",
+)
+ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
+ACS_LIVE_MODE = getenv("ACS_LIVE_MODE", "False").lower() == "true"
+ACS_PICKUP_LIST_TIMEZONE = getenv("ACS_PICKUP_LIST_TIMEZONE", "Europe/Athens")
+ACS_SUPPORTED_COUNTRIES = [
+    code.strip().upper()
+    for code in getenv("ACS_SUPPORTED_COUNTRIES", "GR").split(",")
+    if code.strip()
+]
+# Pricing lives in extra_settings.Setting rows
+# (ACS_SHIPPING_PRICE / ACS_FREE_SHIPPING_THRESHOLD) so admins can
+# retune without a redeploy. The master on/off switch is the
+# ShippingProvider.is_active flag, NOT a setting — see Phase 0
+# (shipping/migrations/0002_seed_providers.py).
+
+# ---------- Meta Conversions API ----------
+# Pixel ID is public (rendered in the browser pixel tag) but kept in
+# settings here so the Django side can stamp it on every server-side
+# event. The access token is a server-only secret; never echo it back
+# to the frontend or include it in error responses. ``META_CAPI_ENABLED``
+# in extra_settings.Setting is the master kill switch — flipping it
+# False stops the Celery dispatcher from posting to Meta without any
+# code changes (lets ops shut traffic off during an incident).
+META_PIXEL_ID = getenv("META_PIXEL_ID", "")
+META_CAPI_ACCESS_TOKEN = getenv("META_CAPI_ACCESS_TOKEN", "")
+META_CAPI_API_VERSION = getenv("META_CAPI_API_VERSION", "v22.0")
+# Optional Meta-issued code that flags every event as a test event.
+# Set during integration testing so events surface under "Test Events"
+# in Events Manager instead of polluting prod attribution. Empty in
+# production.
+META_CAPI_TEST_EVENT_CODE = getenv("META_CAPI_TEST_EVENT_CODE", "")
+# Identifier sent on every CAPI request via ``partner_agent`` so Meta
+# can attribute support requests to this integration.
+META_CAPI_PARTNER_AGENT = getenv(
+    "META_CAPI_PARTNER_AGENT", "grooveshop-django-capi-1.0"
+)
+# Per-request timeout for the facebook_business SDK's HTTP client.
+META_CAPI_HTTP_TIMEOUT = int(getenv("META_CAPI_HTTP_TIMEOUT", "10"))

@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
@@ -13,6 +14,50 @@ logger = logging.getLogger(__name__)
 
 
 class PayWayService:
+    @staticmethod
+    def filter_by_carrier(
+        queryset: QuerySet,
+        *,
+        provider_code: str | None,
+        shipping_kind: str | None,
+    ) -> QuerySet:
+        """Filter PayWays compatible with the chosen carrier + kind.
+
+        Each carrier owns its own pay-way compatibility rules. Today
+        all registered carriers (BoxNow via PAY ON THE GO, ACS) accept
+        every active pay-way and pass through unchanged. The dispatch
+        still goes through the registry so a future carrier with hard
+        constraints (e.g. an integration that genuinely cannot collect
+        COD) can override ``filter_pay_ways`` without editing this
+        method or any caller.
+
+        Args:
+            queryset: Base PayWay queryset.
+            provider_code: ``ShippingProvider.code`` value, or None.
+            shipping_kind: ``ShippingKind`` value, or None.
+
+        Returns:
+            Filtered queryset.
+        """
+        if not provider_code or not shipping_kind:
+            return queryset
+
+        from shipping.enum import ShippingKind
+        from shipping.interfaces import get_provider, is_registered
+
+        if not is_registered(provider_code):
+            return queryset
+
+        try:
+            kind_enum = ShippingKind(shipping_kind)
+        except ValueError:
+            return queryset
+
+        adapter = get_provider(provider_code)
+        # Default carriers don't constrain pay-ways; BoxNow's adapter
+        # overrides this hook to block COD on PICKUP_POINT.
+        return adapter.filter_pay_ways(queryset, kind=kind_enum)
+
     @staticmethod
     def get_provider_for_pay_way(pay_way: PayWay):
         if not pay_way.provider_code:

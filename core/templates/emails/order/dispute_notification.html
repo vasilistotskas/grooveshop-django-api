@@ -1,0 +1,35 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}Stripe Dispute - Order #{{ order.id }} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>Stripe dispute opened — Order #{{ order.id }}</h1>
+
+<p>A Stripe dispute has been opened against this order. The order
+status has NOT been changed automatically — please review the dispute
+in the Stripe dashboard and decide whether to accept or contest it.</p>
+
+<div class="email-card" style="border-left: 4px solid #dc2626;">
+    <h2>Dispute</h2>
+    <p><strong>Dispute ID:</strong> <code>{{ dispute_id }}</code></p>
+    <p><strong>Reason:</strong> {{ reason|default:"unknown" }}</p>
+    <p><strong>Order:</strong> #{{ order.id }}</p>
+    <p><strong>Customer:</strong> {{ order.first_name }} {{ order.last_name }} &lt;{{ order.email }}&gt;</p>
+    {% if order.payment_id %}
+    <p><strong>Stripe payment intent:</strong> <code>{{ order.payment_id }}</code></p>
+    {% endif %}
+    <p><strong>Order placed:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    <p><strong>Order total:</strong> {{ order.total_price }}</p>
+</div>
+
+<p class="mt-3">Next steps:</p>
+<ul>
+    <li>Open the Stripe dashboard, find dispute <code>{{ dispute_id }}</code>.</li>
+    <li>Decide whether to submit evidence (contest) or accept the dispute.</li>
+    <li>Respond before Stripe's deadline — defaults to 7 calendar days for chargebacks.</li>
+    <li>Update order metadata or status manually if you accept the dispute.</li>
+</ul>
+
+<p class="mt-3">This email is operational; staff only.</p>
+{% endblock %}

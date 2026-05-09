@@ -80,6 +80,23 @@ class PayWayFilter(
             "Filter payment methods that have/don't have configuration"
         ),
     )
+    shipping_provider_code = filters.CharFilter(
+        method="filter_carrier_compat",
+        help_text=_(
+            "Filter pay ways compatible with the given shipping carrier. "
+            "Each carrier owns its own compatibility rules — BoxNow "
+            "(``boxnow``) supports COD on lockers via PAY ON THE GO "
+            "and so passes through; ACS passes through unchanged. "
+            "Pair with ``shippingKind``."
+        ),
+    )
+    shipping_kind = filters.CharFilter(
+        method="filter_carrier_compat",
+        help_text=_(
+            "Pair with ``shippingProviderCode`` to filter pay ways by "
+            "the carrier's compatibility rules for that kind."
+        ),
+    )
 
     class Meta:
         model = PayWay
@@ -112,3 +129,23 @@ class PayWayFilter(
         elif value is False:
             return queryset.filter(configuration__isnull=True)
         return queryset
+
+    def filter_carrier_compat(self, queryset, name, value):
+        """Both ``shippingProviderCode`` and ``shippingKind`` route to
+        this method; we only filter when BOTH are provided so the API
+        stays predictable. ``self.data`` lets us read the sibling
+        param without binding the methods together at the field level.
+        """
+        from pay_way.services import PayWayService
+
+        # ``self.data`` is already camel-decoded by CamelCaseFilterMixin
+        # so we read snake_case keys.
+        provider_code = self.data.get("shipping_provider_code")
+        shipping_kind = self.data.get("shipping_kind")
+        if not provider_code or not shipping_kind:
+            return queryset
+        return PayWayService.filter_by_carrier(
+            queryset,
+            provider_code=provider_code,
+            shipping_kind=shipping_kind,
+        )

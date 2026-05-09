@@ -80,11 +80,81 @@ class CartModelTestCase(TestCase):
     def test_total_items_unique(self):
         self.assertEqual(self.cart.total_items_unique, 2)
 
+    def test_total_weight_grams_sums_per_item_weight_times_quantity(self):
+        """Cart property must mirror the carrier's
+        ``compute_total_weight_grams`` so the live ACS quote at
+        checkout matches what the voucher mint will charge — same
+        helper, single source of truth.
+        """
+        from measurement.measures import Mass
+
+        self.cart_item_1.product.weight = Mass(g=250)
+        self.cart_item_1.product.save(update_fields=["weight"])
+        self.cart_item_2.product.weight = Mass(kg=1.2)
+        self.cart_item_2.product.save(update_fields=["weight"])
+
+        # 250g × 2 (item_1) + 1200g × 3 (item_2) = 4100g
+        self.assertEqual(self.cart.total_weight_grams, 4100)
+
+    def test_total_weight_grams_zero_when_weights_are_zero(self):
+        """Products with zero weight contribute 0; the property never
+        raises so a missing/zero weight can't block checkout."""
+        from measurement.measures import Mass
+
+        self.cart_item_1.product.weight = Mass(g=0)
+        self.cart_item_1.product.save(update_fields=["weight"])
+        self.cart_item_2.product.weight = Mass(g=0)
+        self.cart_item_2.product.save(update_fields=["weight"])
+
+        self.assertEqual(self.cart.total_weight_grams, 0)
+
     def test_refresh_last_activity(self):
-        last_activity_before_refresh = self.cart.last_activity
+        # Verify the DB row gets written and the in-memory value is updated.
+        # Compare UTC timestamps — auto_now=True fields are stored in UTC
+        # but our in-memory now() may carry a local ZoneInfo offset.
+        import datetime
+
         self.cart.refresh_last_activity()
-        self.assertNotEqual(
-            self.cart.last_activity, last_activity_before_refresh
+        in_memory_utc = self.cart.last_activity.utctimetuple()
+        self.cart.refresh_from_db(fields=["last_activity"])
+        db_utc = self.cart.last_activity.utctimetuple()
+        # Both must represent the same UTC second.
+        self.assertEqual(
+            datetime.datetime(*in_memory_utc[:6]).replace(microsecond=0),
+            datetime.datetime(*db_utc[:6]).replace(microsecond=0),
+        )
+
+    def test_refresh_last_activity_does_not_fire_save_signals(self):
+        """refresh_last_activity must use UPDATE, not .save(), so that
+        pre_save / post_save signals are NOT triggered."""
+        from django.db.models import signals
+
+        pre_save_fired = []
+        post_save_fired = []
+
+        def on_pre_save(sender, instance, **kwargs):
+            pre_save_fired.append(instance.pk)
+
+        def on_post_save(sender, instance, created, **kwargs):
+            post_save_fired.append(instance.pk)
+
+        signals.pre_save.connect(on_pre_save, sender=type(self.cart))
+        signals.post_save.connect(on_post_save, sender=type(self.cart))
+        try:
+            self.cart.refresh_last_activity()
+        finally:
+            signals.pre_save.disconnect(on_pre_save, sender=type(self.cart))
+            signals.post_save.disconnect(on_post_save, sender=type(self.cart))
+
+        self.assertEqual(
+            pre_save_fired,
+            [],
+            "pre_save must not fire during refresh_last_activity",
+        )
+        self.assertEqual(
+            post_save_fired,
+            [],
+            "post_save must not fire during refresh_last_activity",
         )
 
 

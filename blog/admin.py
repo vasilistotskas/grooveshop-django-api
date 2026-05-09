@@ -1,8 +1,8 @@
 from django.contrib import admin
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count
 from django.utils import timezone
-from django.utils.html import conditional_escape
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from mptt.admin import DraggableMPTTAdmin
@@ -18,6 +18,8 @@ from unfold.contrib.filters.admin import (
 from unfold.contrib.forms.widgets import WysiwygWidget
 from unfold.decorators import action
 from unfold.enums import ActionVariant
+
+from core.admin import ExportActionMixin
 
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
@@ -239,16 +241,21 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("User"))
     def user_display(self, obj):
-        safe_name = conditional_escape(obj.user.full_name or obj.user.username)
-        safe_email = conditional_escape(obj.user.email)
-
-        html = (
+        return format_html(
             '<div class="flex items-center gap-2">'
-            f'<strong class="text-base-900 dark:text-base-100">{safe_name}</strong>'
-            f'<span class="text-base-600 dark:text-base-300">({safe_email}</span>'
-            "</div>"
+            '<strong class="text-base-900 dark:text-base-100">{name}</strong>'
+            '<span class="text-base-600 dark:text-base-300">({email}</span>'
+            "</div>",
+            name=obj.user.full_name or obj.user.username,
+            email=obj.user.email,
         )
-        return mark_safe(html)
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(posts_count_ann=Count("blog_posts", distinct=True))
+        )
 
     @admin.display(description=_("Bio"))
     def bio_preview(self, obj):
@@ -259,42 +266,36 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Posts"))
     def posts_count(self, obj):
-        count = obj.blog_posts.count()
-        safe_count = conditional_escape(str(count))
-
-        html = (
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            f"{safe_count}"
-            "</span>"
+        count = getattr(obj, "posts_count_ann", obj.blog_posts.count())
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            "{count}"
+            "</span>",
+            count=count,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Total Likes"))
     def total_likes_display(self, obj):
-        total = obj.total_likes_received
-        safe_total = conditional_escape(str(total))
-
-        html = (
+        return format_html(
             '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
             'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
             "<span>❤️</span>"
-            f"<span>{safe_total}</span>"
-            "</span>"
+            "<span>{total}</span>"
+            "</span>",
+            total=obj.total_likes_received,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Website"))
     def website_link(self, obj):
         if obj.website:
-            safe_url = conditional_escape(obj.website)
-            html = (
-                f'<a href="{safe_url}" target="_blank" '
+            return format_html(
+                '<a href="{url}" target="_blank" '
                 'class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">'
                 "<span>🔗</span><span>Website</span>"
-                "</a>"
+                "</a>",
+                url=obj.website,
             )
-            return mark_safe(html)
         return "-"
 
 
@@ -338,49 +339,51 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(posts_count_ann=Count("blog_posts", distinct=True))
+        )
+
     @admin.display(description=_("Name"))
     def name_display(self, obj):
-        name = (
-            obj.safe_translation_getter("name", any_language=True)
-            or "Unnamed Tag"
+        return format_html(
+            '<strong class="text-base-900 dark:text-base-100">{name}</strong>',
+            name=(
+                obj.safe_translation_getter("name", any_language=True)
+                or "Unnamed Tag"
+            ),
         )
-        safe_name = conditional_escape(name)
-
-        html = f'<strong class="text-base-900 dark:text-base-100">{safe_name}</strong>'
-        return mark_safe(html)
 
     @admin.display(description=_("Status"))
     def active_badge(self, obj):
         if obj.active:
-            html = (
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                 "<span>✓</span>"
                 "<span>Active</span>"
                 "</span>"
             )
-        else:
-            html = (
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-                "<span>✗</span>"
-                "<span>Inactive</span>"
-                "</span>"
-            )
-        return mark_safe(html)
+        return mark_safe(
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
+            "<span>✗</span>"
+            "<span>Inactive</span>"
+            "</span>"
+        )
 
     @admin.display(description=_("Posts"))
     def posts_count_badge(self, obj):
-        count = obj.blog_posts.count()
-        safe_count = conditional_escape(str(count))
-
-        html = (
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            f"{safe_count}"
-            "</span>"
+        count = getattr(obj, "posts_count_ann", obj.blog_posts.count())
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            "{count}"
+            "</span>",
+            count=count,
         )
-        return mark_safe(html)
 
 
 @admin.register(BlogCategory)
@@ -465,12 +468,11 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     @admin.display(description=_("Image"))
     def category_image(self, obj):
         if obj.image:
-            safe_url = conditional_escape(obj.image.url)
-            html = (
-                f'<img src="{safe_url}" '
-                'style="max-height: 40px; max-width: 80px; border-radius: 4px;" />'
+            return format_html(
+                '<img src="{url}" '
+                'style="max-height: 40px; max-width: 80px; border-radius: 4px;" />',
+                url=obj.image.url,
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No image</span>'
         )
@@ -478,32 +480,28 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     @admin.display(description=_("Direct Posts"))
     def posts_count_display(self, instance):
         count = getattr(instance, "posts_count", 0)
-        safe_count = conditional_escape(str(count))
-
-        html = (
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-semibold '
-            f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            f"{safe_count}"
-            "</span>"
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-semibold '
+            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
+            "{count}"
+            "</span>",
+            count=count,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Total Posts (Tree)"))
     def recursive_posts_display(self, instance):
         count = getattr(instance, "posts_cumulative_count", 0)
-        safe_count = conditional_escape(str(count))
-
-        html = (
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            f'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">'
-            f"{safe_count}"
-            "</span>"
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">'
+            "{count}"
+            "</span>",
+            count=count,
         )
-        return mark_safe(html)
 
 
 @admin.register(BlogPost)
-class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
+class BlogPostAdmin(ExportActionMixin, ModelAdmin, TranslatableAdmin):
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True
@@ -554,6 +552,9 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         "author__user__email",
         "author__user__username",
     )
+    search_help_text = _(
+        "Search by title, subtitle, slug, body, or author email/username."
+    )
     autocomplete_fields = ["category", "author", "tags"]
     readonly_fields = [
         "id",
@@ -571,6 +572,8 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         "unpublish_posts",
         "increment_view_count",
         "reset_view_count",
+        "export_csv",
+        "export_xml",
     ]
     date_hierarchy = "published_at"
     save_on_top = True
@@ -656,10 +659,10 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             obj.safe_translation_getter("title", any_language=True)
             or "Untitled"
         )
-        safe_title = conditional_escape(title[:50])
-
-        html = f'<strong class="text-base-900 dark:text-base-100">{safe_title}</strong>'
-        return mark_safe(html)
+        return format_html(
+            '<strong class="text-base-900 dark:text-base-100">{title}</strong>',
+            title=title[:50],
+        )
 
     @admin.display(description=_("Category"))
     def category_badge(self, obj):
@@ -668,15 +671,13 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
                 obj.category.safe_translation_getter("name", any_language=True)
                 or "Unnamed"
             )
-            safe_name = conditional_escape(category_name)
-
-            html = (
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f'bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full">'
-                f"{safe_name}"
-                "</span>"
+            return format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full">'
+                "{name}"
+                "</span>",
+                name=category_name,
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No category</span>'
         )
@@ -685,10 +686,10 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     def author_display(self, obj):
         if obj.author:
             author_name = obj.author.user.full_name or obj.author.user.username
-            safe_name = conditional_escape(author_name)
-
-            html = f'<span class="font-medium text-base-700 dark:text-base-300">{safe_name}</span>'
-            return mark_safe(html)
+            return format_html(
+                '<span class="font-medium text-base-700 dark:text-base-300">{name}</span>',
+                name=author_name,
+            )
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No author</span>'
         )
@@ -696,69 +697,59 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
     @admin.display(description=_("Featured"))
     def featured_badge(self, obj):
         if obj.featured:
-            html = (
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full gap-1">'
                 "<span>⭐</span>"
                 "<span>Featured</span>"
                 "</span>"
             )
-            return mark_safe(html)
         return ""
 
     @admin.display(description=_("Status"))
     def publish_status_badge(self, obj):
         if obj.is_published and obj.published_at:
             if obj.published_at <= timezone.now():
-                html = (
+                return mark_safe(
                     '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                     'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                     "<span>✓</span>"
                     "<span>Published</span>"
                     "</span>"
                 )
-            else:
-                html = (
-                    '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                    'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1">'
-                    "<span>📅</span>"
-                    "<span>Scheduled</span>"
-                    "</span>"
-                )
-        else:
-            html = (
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full gap-1">'
-                "<span>📝</span>"
-                "<span>Draft</span>"
+                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1">'
+                "<span>📅</span>"
+                "<span>Scheduled</span>"
                 "</span>"
             )
-        return mark_safe(html)
+        return mark_safe(
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full gap-1">'
+            "<span>📝</span>"
+            "<span>Draft</span>"
+            "</span>"
+        )
 
     @admin.display(description=_("Engagement"))
     def engagement_metrics(self, obj):
-        likes = obj.likes_count
-        comments = obj.comments_count
-        views = obj.view_count
-
-        safe_likes = conditional_escape(str(likes))
-        safe_comments = conditional_escape(str(comments))
-        safe_views = conditional_escape(str(views))
-
-        html = (
+        return format_html(
             '<div class="text-sm text-base-700 dark:text-base-300 flex items-center gap-3">'
             '<span class="flex items-center gap-1 text-red-600 dark:text-red-400">'
-            f"<span>❤️</span><span>{safe_likes}</span>"
+            "<span>❤️</span><span>{likes}</span>"
             "</span>"
             '<span class="flex items-center gap-1 text-blue-600 dark:text-blue-400">'
-            f"<span>💬</span><span>{safe_comments}</span>"
+            "<span>💬</span><span>{comments}</span>"
             "</span>"
             '<span class="flex items-center gap-1 text-green-600 dark:text-green-400">'
-            f"<span>👀</span><span>{safe_views}</span>"
+            "<span>👀</span><span>{views}</span>"
             "</span>"
-            "</div>"
+            "</div>",
+            likes=obj.likes_count,
+            comments=obj.comments_count,
+            views=obj.view_count,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("SEO Score"))
     def seo_score(self, obj):
@@ -787,25 +778,24 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
             bg_class = "bg-red-50 dark:bg-red-900"
             text_class = "text-red-700 dark:text-red-300"
 
-        safe_score = conditional_escape(str(score))
-
-        html = (
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            f'{bg_class} {text_class} rounded-full">'
-            f"{safe_score}%"
-            "</span>"
+        return format_html(
+            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+            '{bg_class} {text_class} rounded-full">'
+            "{score}%"
+            "</span>",
+            bg_class=bg_class,
+            text_class=text_class,
+            score=score,
         )
-        return mark_safe(html)
 
     @admin.display(description="")
     def image_preview(self, obj):
         if obj.image:
-            safe_url = conditional_escape(obj.image.url)
-            html = (
-                f'<img src="{safe_url}" '
-                'style="max-height: 100px; max-width: 80px; border-radius: 4px; object-fit: cover;" />'
+            return format_html(
+                '<img src="{url}" '
+                'style="max-height: 100px; max-width: 80px; border-radius: 4px; object-fit: cover;" />',
+                url=obj.image.url,
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No image</span>'
         )
@@ -820,6 +810,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         variant=ActionVariant.PRIMARY,
         icon="star",
     )
+    @transaction.atomic
     def mark_as_featured(self, request, queryset):
         updated = queryset.update(featured=True)
         self.message_user(
@@ -833,6 +824,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         variant=ActionVariant.WARNING,
         icon="star_border",
     )
+    @transaction.atomic
     def unmark_as_featured(self, request, queryset):
         updated = queryset.update(featured=False)
         self.message_user(
@@ -846,6 +838,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         variant=ActionVariant.SUCCESS,
         icon="publish",
     )
+    @transaction.atomic
     def publish_posts(self, request, queryset):
         updated = queryset.update(
             is_published=True, published_at=timezone.now()
@@ -861,6 +854,7 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         variant=ActionVariant.WARNING,
         icon="unpublished",
     )
+    @transaction.atomic
     def unpublish_posts(self, request, queryset):
         updated = queryset.update(is_published=False)
         self.message_user(
@@ -987,21 +981,15 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     @admin.display(description=_("User"))
     def user_display(self, obj):
         if obj.user:
-            full_name = obj.user.full_name
-            username = obj.user.username
-            email = obj.user.email
-
-            display_name = full_name if full_name else username
-            safe_name = conditional_escape(display_name)
-            safe_email = conditional_escape(email)
-
-            html = (
+            display_name = obj.user.full_name or obj.user.username
+            return format_html(
                 '<div class="text-sm">'
-                f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-                f'<div class="text-base-600 dark:text-base-300">{safe_email}</div>'
-                "</div>"
+                '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
+                '<div class="text-base-600 dark:text-base-300">{email}</div>'
+                "</div>",
+                name=display_name,
+                email=obj.user.email,
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300 italic">Anonymous</span>'
         )
@@ -1014,18 +1002,14 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
                 or f"Post {obj.post.id}"
             )
             title_display = title[:30] + "..." if len(title) > 30 else title
-            safe_title = conditional_escape(title_display)
-            safe_url = conditional_escape(
-                f"/admin/blog/blogpost/{obj.post.id}/change/"
-            )
-
-            html = (
-                f'<a href="{safe_url}" '
+            return format_html(
+                '<a href="{url}" '
                 'class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">'
-                f"{safe_title}"
-                "</a>"
+                "{title}"
+                "</a>",
+                url=f"/admin/blog/blogpost/{obj.post.id}/change/",
+                title=title_display,
             )
-            return mark_safe(html)
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No post</span>'
         )
@@ -1033,48 +1017,42 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     @admin.display(description=_("Status"))
     def approval_badge(self, obj):
         if obj.approved:
-            html = (
+            return mark_safe(
                 '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
                 'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
                 "<span>✓</span>"
                 "<span>Approved</span>"
                 "</span>"
             )
-        else:
-            html = (
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-                "<span>⏳</span>"
-                "<span>Pending</span>"
-                "</span>"
-            )
-        return mark_safe(html)
+        return mark_safe(
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
+            "<span>⏳</span>"
+            "<span>Pending</span>"
+            "</span>"
+        )
 
     @admin.display(description=_("Engagement"))
     def engagement_display(self, obj):
-        likes = obj.likes_count
-        replies = obj.replies_count
-
-        safe_likes = conditional_escape(str(likes))
-        safe_replies = conditional_escape(str(replies))
-
-        html = (
+        return format_html(
             '<div class="text-sm text-base-700 dark:text-base-300 flex items-center gap-3">'
             '<span class="flex items-center gap-1 text-red-600 dark:text-red-400">'
-            f"<span>❤️</span><span>{safe_likes}</span>"
+            "<span>❤️</span><span>{likes}</span>"
             "</span>"
             '<span class="flex items-center gap-1 text-blue-600 dark:text-blue-400">'
-            f"<span>💬</span><span>{safe_replies}</span>"
+            "<span>💬</span><span>{replies}</span>"
             "</span>"
-            "</div>"
+            "</div>",
+            likes=obj.likes_count,
+            replies=obj.replies_count,
         )
-        return mark_safe(html)
 
     @action(
         description=str(_("Approve selected comments")),
         variant=ActionVariant.SUCCESS,
         icon="check_circle",
     )
+    @transaction.atomic
     def approve_comments(self, request, queryset):
         updated = queryset.update(approved=True)
         self.message_user(
@@ -1088,6 +1066,7 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         variant=ActionVariant.WARNING,
         icon="cancel",
     )
+    @transaction.atomic
     def unapprove_comments(self, request, queryset):
         updated = queryset.update(approved=False)
         self.message_user(

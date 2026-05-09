@@ -6,6 +6,7 @@ This module provides models for:
 - SearchClick: Records user clicks on search results for CTR analysis
 """
 
+from django.core.validators import MaxLengthValidator
 from django.db import models
 
 from search.managers import SearchClickManager, SearchQueryManager
@@ -82,7 +83,10 @@ class SearchQuery(models.Model):
         null=True, blank=True, help_text="IP address of the user"
     )
     user_agent = models.TextField(
-        null=True, blank=True, help_text="User agent string from the request"
+        null=True,
+        blank=True,
+        help_text="User agent string from the request",
+        validators=[MaxLengthValidator(512)],
     )
 
     timestamp = models.DateTimeField(

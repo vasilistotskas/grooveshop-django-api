@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from allauth.account.adapter import DefaultAccountAdapter
@@ -16,6 +17,8 @@ from core.utils.tenant_urls import get_tenant_frontend_url
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialAccount
+
+logger = logging.getLogger(__name__)
 
 
 class UserAccountAdapter(DefaultAccountAdapter):
@@ -56,6 +59,25 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
     #   SOCIALACCOUNT_EMAIL_AUTHENTICATION = True
     #   SOCIALACCOUNT_EMAIL_AUTHENTICATION_AUTO_CONNECT = True
 
+    # ``pre_social_login`` is intentionally NOT overridden.
+    #
+    # Earlier versions issued an ``ImmediateHttpResponse(HttpResponseRedirect)``
+    # to a frontend URL when the matched local account had TOTP/WebAuthn
+    # enrolled.  That short-circuited allauth's stage pipeline, which means
+    # the headless contract was never produced and the Nuxt callback page
+    # had no actionable state to resume.
+    #
+    # The headless ``AuthenticateStage`` (``allauth.mfa.stages``) already
+    # intercepts *every* completed login — password and social — and emits a
+    # 401 ``{"flows": [{"id": "mfa_authenticate", "is_pending": true}]}``
+    # envelope that the Nuxt ``useAuth`` composable + ``handleAllAuthError``
+    # know how to route to the TOTP challenge screen.  Verified against the
+    # storefront's ``app/utils/error.ts`` flow handler and
+    # ``shared/constants/index.ts`` ``MFA_AUTHENTICATE`` mapping.
+    #
+    # Removing the override therefore restores the canonical headless
+    # behaviour without weakening MFA enforcement.
+
     def save_user(self, request, sociallogin, form=None):
         user = super().save_user(request, sociallogin, form=form)
         if (
@@ -66,7 +88,7 @@ class SocialAccountAdapter(DefaultSocialAccountAdapter):
             user.save(update_fields=["language_code"])
         return user
 
-    def get_connect_redirect_url(self, request, social_account: SocialAccount):
+    def get_connect_redirect_url(self, request, socialaccount: SocialAccount):
         url = request.POST.get("next") or request.GET.get("next")
         allowed_hosts = {
             settings.APP_MAIN_HOST_NAME,

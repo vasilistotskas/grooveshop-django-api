@@ -4,7 +4,7 @@ import datetime
 from django.contrib import admin
 from django.db.models.functions import Length
 from django.utils import timezone
-from django.utils.html import conditional_escape
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
@@ -157,40 +157,34 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         )
         email_display = obj.email or "(no email)"
 
-        safe_name = conditional_escape(name)
-        safe_email = conditional_escape(email_display)
-        safe_email_class = conditional_escape(
-            "text-red-600 dark:text-red-400"
-            if is_suspicious
-            else "text-base-600 dark:text-base-400"
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
+            '<div class="{email_class}">{email}</div>'
+            '<div class="text-xs text-base-600 dark:text-base-300">ID: {id}</div>'
+            "</div>",
+            name=name,
+            email_class=(
+                "text-red-600 dark:text-red-400"
+                if is_suspicious
+                else "text-base-600 dark:text-base-400"
+            ),
+            email=email_display,
+            id=str(obj.id),
         )
-        safe_id = conditional_escape(str(obj.id))
-
-        html = (
-            f'<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_name}</div>'
-            f'<div class="{safe_email_class}">{safe_email}</div>'
-            f'<div class="text-xs text-base-600 dark:text-base-300">ID: {safe_id}</div>'
-            f"</div>"
-        )
-        return mark_safe(html)
 
     @admin.display(description=_("Message"))
     def message_preview(self, obj):
         full = obj.message or ""
         preview = full[:100] + ("..." if len(full) > 100 else "")
         preview = preview.replace("\n", " ").replace("\r", " ")
-        title_attr = full.replace('"', "&quot;")
-
-        safe_title = conditional_escape(title_attr)
-        safe_preview = conditional_escape(preview)
-
-        html = (
-            f'<div class="text-sm">'
-            f'<div class="text-base-900 dark:text-base-100" title="{safe_title}">{safe_preview}</div>'
-            f"</div>"
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="text-base-900 dark:text-base-100" title="{title}">{preview}</div>'
+            "</div>",
+            title=full,
+            preview=preview,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Message Stats"))
     def message_stats(self, obj):
@@ -222,19 +216,18 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
                 "</span>"
             )
 
-        safe_chars = conditional_escape(str(char_count))
-        safe_words = conditional_escape(str(word_count))
-        safe_lines = conditional_escape(str(line_count))
-
-        html = (
-            f'<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_chars} chars</div>'
-            f'<div class="text-base-600 dark:text-base-400">{safe_words} words</div>'
-            f'<div class="text-base-600 dark:text-base-300">{safe_lines} lines</div>'
-            f'<div class="mt-1">{length_badge}</div>'
-            f"</div>"
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="font-medium text-base-900 dark:text-base-100">{chars} chars</div>'
+            '<div class="text-base-600 dark:text-base-400">{words} words</div>'
+            '<div class="text-base-600 dark:text-base-300">{lines} lines</div>'
+            '<div class="mt-1">{badge}</div>'
+            "</div>",
+            chars=char_count,
+            words=word_count,
+            lines=line_count,
+            badge=length_badge,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Timing"))
     def contact_timing(self, obj):
@@ -250,22 +243,20 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
                 "</span>"
             )
         elif diff < timedelta(days=1):
-            hours_ago = str(int(diff.total_seconds() // 3600))
-            safe_hours = conditional_escape(hours_ago)
-            time_badge = mark_safe(
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-full">'
-                f"🕒 {safe_hours}h ago"
-                f"</span>"
+            time_badge = format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-200 rounded-full">'
+                "🕒 {h}h ago"
+                "</span>",
+                h=int(diff.total_seconds() // 3600),
             )
         elif diff < timedelta(days=7):
-            days_ago = str(diff.days)
-            safe_days = conditional_escape(days_ago)
-            time_badge = mark_safe(
-                f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                f'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded-full">'
-                f"📅 {safe_days}d ago"
-                f"</span>"
+            time_badge = format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
+                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 rounded-full">'
+                "📅 {d}d ago"
+                "</span>",
+                d=diff.days,
             )
         else:
             time_badge = mark_safe(
@@ -275,14 +266,14 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
                 "</span>"
             )
 
-        safe_date = conditional_escape(date_str)
-        html = (
-            f'<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_date}</div>'
-            f'<div class="mt-1">{time_badge}</div>'
-            f"</div>"
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="font-medium text-base-900 dark:text-base-100">{date}</div>'
+            '<div class="mt-1">{badge}</div>'
+            "</div>",
+            date=date_str,
+            badge=time_badge,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Priority"))
     def priority_badge(self, obj):
@@ -326,18 +317,16 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
             },
         }[key]
 
-        safe_bg = conditional_escape(cfg["bg"])
-        safe_text = conditional_escape(cfg["text"])
-        safe_icon = conditional_escape(cfg["icon"])
-        safe_label = conditional_escape(cfg["label"])
-
-        html = (
-            f'<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            f'{safe_bg} {safe_text} rounded-full gap-1">'
-            f"<span>{safe_icon}</span><span>{safe_label}</span>"
-            f"</span>"
+        return format_html(
+            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
+            '{bg} {text_class} rounded-full gap-1">'
+            "<span>{icon}</span><span>{label}</span>"
+            "</span>",
+            bg=cfg["bg"],
+            text_class=cfg["text"],
+            icon=cfg["icon"],
+            label=cfg["label"],
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Contact Analytics"))
     def contact_analytics(self, obj):
@@ -361,31 +350,25 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         prio_score = score_map[prio]
         reading_time = max(1, words // 200)
 
-        safe_days = conditional_escape(str(age.days))
-        safe_hours = conditional_escape(str(age.seconds // 3600))
-        safe_status = conditional_escape(
-            "Pending" if age < timedelta(days=1) else "Delayed"
+        return format_html(
+            '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
+            "<div><strong>Contact Age:</strong></div><div>{days}d {hours}h</div>"
+            "<div><strong>Response Time:</strong></div><div>{status}</div>"
+            "<div><strong>Email Domain:</strong></div><div>{domain}</div>"
+            "<div><strong>Contact Day:</strong></div><div>{dayname}</div>"
+            "<div><strong>Contact Time:</strong></div><div>{time}</div>"
+            "<div><strong>Reading Time:</strong></div><div>{reading}min</div>"
+            '<div><strong>Priority Score:</strong></div><div class="font-medium">{score}</div>'
+            "</div></div>",
+            days=age.days,
+            hours=age.seconds // 3600,
+            status="Pending" if age < timedelta(days=1) else "Delayed",
+            domain=obj.email.split("@")[-1] if "@" in obj.email else "Invalid",
+            dayname=obj.created_at.strftime("%A"),
+            time=obj.created_at.strftime("%H:%M"),
+            reading=reading_time,
+            score=prio_score,
         )
-        safe_domain = conditional_escape(
-            obj.email.split("@")[-1] if "@" in obj.email else "Invalid"
-        )
-        safe_dayname = conditional_escape(obj.created_at.strftime("%A"))
-        safe_time = conditional_escape(obj.created_at.strftime("%H:%M"))
-        safe_reading = conditional_escape(str(reading_time))
-        safe_score = conditional_escape(str(prio_score))
-
-        html = (
-            f'<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Contact Age:</strong></div><div>{safe_days}d {safe_hours}h</div>"
-            f"<div><strong>Response Time:</strong></div><div>{safe_status}</div>"
-            f"<div><strong>Email Domain:</strong></div><div>{safe_domain}</div>"
-            f"<div><strong>Contact Day:</strong></div><div>{safe_dayname}</div>"
-            f"<div><strong>Contact Time:</strong></div><div>{safe_time}</div>"
-            f"<div><strong>Reading Time:</strong></div><div>{safe_reading}min</div>"
-            f'<div><strong>Priority Score:</strong></div><div class="font-medium">{safe_score}</div>'
-            f"</div></div>"
-        )
-        return mark_safe(html)
 
     @admin.display(description=_("Message Analytics"))
     def message_analytics(self, obj):
@@ -411,32 +394,30 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         complexity = "Complex" if avg_len_val > 5 else "Simple"
         language = "English"
 
-        safe_chars = conditional_escape(str(chars))
-        safe_words = conditional_escape(str(words))
-        safe_sentences = conditional_escape(str(sentences))
-        safe_paras = conditional_escape(str(paras))
-        safe_urgency = conditional_escape(str(urgency))
-        safe_avg_len = conditional_escape(f"{avg_len_val:.1f}")
-        safe_read_sec = conditional_escape(str(read_sec))
-        safe_sentiment = conditional_escape(sentiment)
-        safe_complexity = conditional_escape(complexity)
-        safe_language = conditional_escape(language)
-
-        html = (
-            f'<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Characters:</strong></div><div>{safe_chars}</div>"
-            f"<div><strong>Words:</strong></div><div>{safe_words}</div>"
-            f"<div><strong>Sentences:</strong></div><div>{safe_sentences}</div>"
-            f"<div><strong>Paragraphs:</strong></div><div>{safe_paras}</div>"
-            f"<div><strong>Urgency Score:</strong></div><div>{safe_urgency}/10</div>"
-            f"<div><strong>Avg Word Length:</strong></div><div>{safe_avg_len}</div>"
-            f"<div><strong>Reading Time:</strong></div><div>{safe_read_sec} seconds</div>"
-            f"<div><strong>Sentiment:</strong></div><div>{safe_sentiment}</div>"
-            f"<div><strong>Complexity:</strong></div><div>{safe_complexity}</div>"
-            f"<div><strong>Language:</strong></div><div>{safe_language}</div>"
-            f"</div></div>"
+        return format_html(
+            '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
+            "<div><strong>Characters:</strong></div><div>{chars}</div>"
+            "<div><strong>Words:</strong></div><div>{words}</div>"
+            "<div><strong>Sentences:</strong></div><div>{sentences}</div>"
+            "<div><strong>Paragraphs:</strong></div><div>{paras}</div>"
+            "<div><strong>Urgency Score:</strong></div><div>{urgency}/10</div>"
+            "<div><strong>Avg Word Length:</strong></div><div>{avg_len}</div>"
+            "<div><strong>Reading Time:</strong></div><div>{read_sec} seconds</div>"
+            "<div><strong>Sentiment:</strong></div><div>{sentiment}</div>"
+            "<div><strong>Complexity:</strong></div><div>{complexity}</div>"
+            "<div><strong>Language:</strong></div><div>{language}</div>"
+            "</div></div>",
+            chars=chars,
+            words=words,
+            sentences=sentences,
+            paras=paras,
+            urgency=urgency,
+            avg_len=f"{avg_len_val:.1f}",
+            read_sec=read_sec,
+            sentiment=sentiment,
+            complexity=complexity,
+            language=language,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Timing Information"))
     def timing_info(self, obj):
@@ -447,31 +428,25 @@ class ContactAdmin(ExportModelAdmin, ModelAdmin):
         is_weekend = obj.created_at.weekday() >= 5
         season = self._get_season(obj.created_at.month)
 
-        safe_created_dt = conditional_escape(
-            obj.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        return format_html(
+            '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
+            "<div><strong>Created:</strong></div><div>{created_dt}</div>"
+            "<div><strong>Updated:</strong></div><div>{updated_dt}</div>"
+            "<div><strong>Age:</strong></div><div>{cdays}d {chours}h</div>"
+            "<div><strong>Last Modified:</strong></div><div>{udays}d ago</div>"
+            "<div><strong>Business Hours:</strong></div><div>{bhours}</div>"
+            "<div><strong>Weekend Contact:</strong></div><div>{weekend}</div>"
+            "<div><strong>Season:</strong></div><div>{season}</div>"
+            "</div></div>",
+            created_dt=obj.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            updated_dt=obj.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
+            cdays=created_age.days,
+            chours=created_age.seconds // 3600,
+            udays=updated_age.days,
+            bhours="Yes" if is_business else "No",
+            weekend="Yes" if is_weekend else "No",
+            season=season,
         )
-        safe_updated_dt = conditional_escape(
-            obj.updated_at.strftime("%Y-%m-%d %H:%M:%S")
-        )
-        safe_cdays = conditional_escape(str(created_age.days))
-        safe_chours = conditional_escape(str(created_age.seconds // 3600))
-        safe_udays = conditional_escape(str(updated_age.days))
-        safe_bhours = conditional_escape("Yes" if is_business else "No")
-        safe_weekend = conditional_escape("Yes" if is_weekend else "No")
-        safe_season = conditional_escape(season)
-
-        html = (
-            f'<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Created:</strong></div><div>{safe_created_dt}</div>"
-            f"<div><strong>Updated:</strong></div><div>{safe_updated_dt}</div>"
-            f"<div><strong>Age:</strong></div><div>{safe_cdays}d {safe_chours}h</div>"
-            f"<div><strong>Last Modified:</strong></div><div>{safe_udays}d ago</div>"
-            f"<div><strong>Business Hours:</strong></div><div>{safe_bhours}</div>"
-            f"<div><strong>Weekend Contact:</strong></div><div>{safe_weekend}</div>"
-            f"<div><strong>Season:</strong></div><div>{safe_season}</div>"
-            f"</div></div>"
-        )
-        return mark_safe(html)
 
     def _get_season(self, month_or_date):
         if isinstance(month_or_date, (datetime.date, datetime.datetime)):

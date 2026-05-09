@@ -8,11 +8,25 @@ from rest_framework.test import APITestCase
 
 from pay_way.factories import PayWayFactory
 from pay_way.models import PayWay
+from user.factories.account import UserAccountFactory
 
 
 class PayWayFilterTest(APITestCase):
     def setUp(self):
         PayWay.objects.all().delete()
+
+        # Authenticate as staff so the queryset isn't filtered to
+        # active=True. The view hides disabled PayWays from anonymous +
+        # non-staff users (checkout customers shouldn't see methods the
+        # admin has disabled), but these tests exercise the full filter
+        # surface and need to see inactive rows like `cash_payment`.
+        self.admin_user = UserAccountFactory(
+            email="admin@example.com",
+            is_staff=True,
+            is_superuser=True,
+            num_addresses=0,
+        )
+        self.client.force_authenticate(user=self.admin_user)
 
         self.now = timezone.now()
 

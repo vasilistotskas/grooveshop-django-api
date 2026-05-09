@@ -78,7 +78,10 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         """
         Optimized queryset for detail views.
 
-        Includes everything from for_list() plus full item details.
+        Includes everything from for_list() plus full item details and
+        an eager-load of the linked shipping_provider row + provider
+        shipment objects so the Order detail serializer never N+1s on
+        ``boxnow_shipment`` / ``acs_shipment``.
         """
         from order.models.history import OrderHistory
 
@@ -88,13 +91,19 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
             .with_payment_info()
             .with_items()
             .with_counts()
+            .select_related("shipping_provider")
             .prefetch_related(
                 Prefetch(
                     "history",
                     queryset=OrderHistory.objects.select_related(
                         "user"
                     ).order_by("created_at"),
-                )
+                ),
+                "boxnow_shipment",
+                "acs_shipment",
+                "acs_shipment__events",
+                "acs_shipment__station_destination",
+                "invoice",
             )
         )
 

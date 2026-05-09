@@ -6,6 +6,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
+from django.utils.translation import gettext
 from unfold.contrib.filters.admin import RangeDateTimeFilter
 from zoneinfo import ZoneInfo
 
@@ -46,7 +47,7 @@ class TestMessageLengthFilter(TestCase):
         filter_instance = MessageLengthFilter(
             self.request, {}, Contact, self.model_admin
         )
-        self.assertEqual(filter_instance.title, "Message Length")
+        self.assertEqual(str(filter_instance.title), gettext("Message Length"))
         self.assertEqual(filter_instance.parameter_name, "message_length")
 
     def test_lookups(self):
@@ -183,7 +184,7 @@ class TestRecentContactFilter(TestCase):
         filter_instance = RecentContactFilter(
             self.request, {}, Contact, self.model_admin
         )
-        self.assertEqual(filter_instance.title, "Contact Period")
+        self.assertEqual(str(filter_instance.title), gettext("Contact Period"))
         self.assertEqual(filter_instance.parameter_name, "contact_period")
 
     def test_lookups(self):
@@ -637,25 +638,35 @@ class TestContactAdmin(TestCase):
         self.assertEqual(season, "Autumn")
 
     def test_method_short_descriptions(self):
-        self.assertEqual(self.admin.contact_info.short_description, "Contact")
         self.assertEqual(
-            self.admin.message_preview.short_description, "Message"
+            str(self.admin.contact_info.short_description), gettext("Contact")
         )
         self.assertEqual(
-            self.admin.message_stats.short_description, "Message Stats"
-        )
-        self.assertEqual(self.admin.contact_timing.short_description, "Timing")
-        self.assertEqual(
-            self.admin.priority_badge.short_description, "Priority"
+            str(self.admin.message_preview.short_description),
+            gettext("Message"),
         )
         self.assertEqual(
-            self.admin.contact_analytics.short_description, "Contact Analytics"
+            str(self.admin.message_stats.short_description),
+            gettext("Message Stats"),
         )
         self.assertEqual(
-            self.admin.message_analytics.short_description, "Message Analytics"
+            str(self.admin.contact_timing.short_description), gettext("Timing")
         )
         self.assertEqual(
-            self.admin.timing_info.short_description, "Timing Information"
+            str(self.admin.priority_badge.short_description),
+            gettext("Priority"),
+        )
+        self.assertEqual(
+            str(self.admin.contact_analytics.short_description),
+            gettext("Contact Analytics"),
+        )
+        self.assertEqual(
+            str(self.admin.message_analytics.short_description),
+            gettext("Message Analytics"),
+        )
+        self.assertEqual(
+            str(self.admin.timing_info.short_description),
+            gettext("Timing Information"),
         )
 
 
@@ -675,14 +686,14 @@ class TestContactAdminIntegration(TestCase):
         self.assertGreater(len(fieldsets), 1)
 
         basic_fieldset = fieldsets[0]
-        self.assertEqual(basic_fieldset[0], "Contact Information")
+        self.assertEqual(str(basic_fieldset[0]), gettext("Contact Information"))
 
         basic_fields = basic_fieldset[1]["fields"]
         self.assertIn("name", basic_fields)
         self.assertIn("email", basic_fields)
 
         message_fieldset = fieldsets[1]
-        self.assertEqual(message_fieldset[0], "Message")
+        self.assertEqual(str(message_fieldset[0]), gettext("Message"))
         message_fields = message_fieldset[1]["fields"]
         self.assertIn("message", message_fields)
 

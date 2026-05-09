@@ -1,3 +1,4 @@
+import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from datetime import timedelta
@@ -18,7 +19,18 @@ from pay_way.factories import PayWayFactory
 User = get_user_model()
 
 
+@pytest.mark.django_db(transaction=True)
 class OrderItemFilterTest(APITestCase):
+    """
+    Use ``transaction=True`` so each test method runs in a real transaction
+    that's flushed at teardown — defends against leftover rows from a
+    sibling ``TransactionTestCase`` whose own flush was interrupted under
+    parallel xdist load. Earlier the class used the default ``TestCase``
+    rollback, which left the DB in an unknown state when this class ran
+    after `test_concurrent_stock*.py` and intermittently inflated row
+    counts on `test_camel_case_filters` / `test_filter_with_ordering`.
+    """
+
     def setUp(self):
         OrderItem.objects.all().delete()
 

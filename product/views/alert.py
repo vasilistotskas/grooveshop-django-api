@@ -14,7 +14,8 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
-from product.models.alert import ProductAlert
+from product.models.alert import ProductAlert, ProductAlertKind
+from product.models.product import Product
 from product.serializers.alert import ProductAlertSerializer
 
 serializers_config: SerializersConfig = {
@@ -77,6 +78,36 @@ class ProductAlertViewSet(BaseModelViewSet):
 
         user = request.user if request.user.is_authenticated else None
         validated = dict(serializer.validated_data)
+
+        # Guard: price-drop alerts require the feature to be enabled on the
+        # product.  Reject new subscriptions with 403 when the flag is off.
+        # Existing subscriptions (created before the flag was cleared) are
+        # unaffected — only creation is blocked.
+        if validated.get("kind") == ProductAlertKind.PRICE_DROP:
+            product_id = (
+                validated["product"].pk
+                if hasattr(validated.get("product"), "pk")
+                else validated.get("product")
+            )
+            try:
+                product = Product.objects.only("price_drop_alerts_enabled").get(
+                    pk=product_id
+                )
+            except Product.DoesNotExist:
+                return Response(
+                    {"detail": _("Product not found.")},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if not product.price_drop_alerts_enabled:
+                return Response(
+                    {
+                        "detail": _(
+                            "Price-drop alerts are not enabled for this product."
+                        )
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
         if user is not None:
             validated["user"] = user
             validated["email"] = ""

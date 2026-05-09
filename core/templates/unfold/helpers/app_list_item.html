@@ -1,0 +1,68 @@
+{% comment %}
+Recursive renderer for sidebar items (used by our overridden
+`app_list.html`).
+
+Leaf item (no `items` list) renders as a plain `<a>`, matching the
+upstream markup so styling stays consistent. Branch item (with a
+non-empty `items` list) renders as an Alpine.js-driven collapsible
+header with a chevron, then a nested `<ol>` of children rendered via
+the same partial — unlimited depth works because unfold's Python
+layer recurses too.
+
+`item.items` falls through to Python dict's `.items()` method when
+the key is absent, which returns a dict_items view of (key, value)
+tuples and breaks downstream consumers that expect a list of dicts.
+Guard with unfold's `is_list` filter so leaf items skip the branch
+path cleanly. `item.has_permission` is set server-side by unfold's
+`_get_navigation_items` and honoured at every depth.
+{% endcomment %}
+{% load unfold %}
+
+{% if item.has_permission %}
+    {% if item.items|is_list and item.items %}
+        {% has_nav_item_active item.items as has_active_child %}
+
+        <li {% if depth > 0 %}class="border-l border-base-200 dark:border-base-800 ml-2 pl-2"{% endif %}
+            x-data="{subtreeOpen: {% if has_active_child %}true{% else %}false{% endif %}}">
+            <button type="button"
+                    x-on:click="subtreeOpen = !subtreeOpen"
+                    class="group flex h-[38px] w-full items-center -mx-3 px-3 rounded-default text-left hover:text-primary-600 dark:hover:text-primary-500 select-none cursor-pointer">
+                {% if item.icon %}
+                    <span class="material-symbols-outlined md-18 mr-3 w-[18px]">
+                        {{ item.icon }}
+                    </span>
+                {% endif %}
+
+                <span class="flex-1 truncate">{{ item.title|safe }}</span>
+
+                {% include "unfold/helpers/app_list_badge.html" with item=item %}
+
+                <span class="material-symbols-outlined ml-2 transition-transform text-base-500 group-hover:text-primary-600 dark:group-hover:text-primary-500"
+                      x-bind:class="{'rotate-90': subtreeOpen}">
+                    chevron_right
+                </span>
+            </button>
+
+            <ol class="flex flex-col gap-0.5 mt-0.5 mb-1" x-show="subtreeOpen" x-cloak>
+                {% for child in item.items %}
+                    {% include "unfold/helpers/app_list_item.html" with item=child depth=depth|add:1 %}
+                {% endfor %}
+            </ol>
+        </li>
+    {% else %}
+        <li {% if depth > 0 %}class="border-l border-base-200 dark:border-base-800 ml-2 pl-2"{% endif %}>
+            <a href="{% if item.link_callback %}{{ item.link_callback }}{% else %}{{ item.link }}{% endif %}"
+               class="flex h-[38px] items-center -mx-3 px-3 rounded-default hover:text-primary-600 dark:hover:text-primary-500 {% if item.active %}bg-base-100 font-semibold text-primary-600 dark:bg-white/[.06] dark:text-primary-500 active{% endif %}">
+                {% if item.icon %}
+                    <span class="material-symbols-outlined md-18 mr-3 w-[18px]">
+                        {{ item.icon }}
+                    </span>
+                {% endif %}
+
+                <span class="truncate">{{ item.title|safe }}</span>
+
+                {% include "unfold/helpers/app_list_badge.html" with item=item %}
+            </a>
+        </li>
+    {% endif %}
+{% endif %}

@@ -307,6 +307,53 @@ class PaymentVerificationError(PaymentError):
         )
 
 
+class PaymentAmountMismatchError(PaymentError):
+    """
+    Raised when the provider's payment amount does not match the
+    server-calculated order total.
+
+    This prevents a class of attack where a tampered client submits a
+    payment intent created for a lower amount than the actual cart total.
+
+    Attributes:
+        provider_amount_cents (int): Amount reported by the payment provider
+            (in EUR cents).
+        calculated_amount_cents (int): Amount calculated server-side
+            (in EUR cents).
+    """
+
+    def __init__(
+        self, provider_amount_cents: int, calculated_amount_cents: int
+    ):
+        self.provider_amount_cents = provider_amount_cents
+        self.calculated_amount_cents = calculated_amount_cents
+        super().__init__(
+            f"Provider amount {provider_amount_cents} cents != "
+            f"calculated {calculated_amount_cents} cents"
+        )
+
+
+class PaymentCurrencyMismatchError(PaymentError):
+    """
+    Raised when the provider's payment currency does not match the
+    project's configured default currency (EUR).
+
+    Attributes:
+        provider_currency (str): Currency code reported by the payment
+            provider (lower-case ISO 4217).
+        expected_currency (str): The project's configured default currency
+            (lower-case ISO 4217).
+    """
+
+    def __init__(self, provider_currency: str, expected_currency: str):
+        self.provider_currency = provider_currency
+        self.expected_currency = expected_currency
+        super().__init__(
+            f"Provider currency '{provider_currency}' != "
+            f"expected '{expected_currency}'"
+        )
+
+
 class WebhookVerificationError(PaymentError):
     """
     Raised when webhook signature verification fails.

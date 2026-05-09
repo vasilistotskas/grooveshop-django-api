@@ -35,7 +35,7 @@ class BlogCommentSerializer(
         help_text=_("Whether this comment is a reply to another comment")
     )
     has_replies = serializers.SerializerMethodField(
-        help_text=_("Whether this comment has approved replies")
+        help_text=_("Whether this comment has approved replies"),
     )
     is_edited = serializers.SerializerMethodField(
         help_text=_("Whether this comment has been edited")
@@ -56,7 +56,15 @@ class BlogCommentSerializer(
     def get_is_reply(self, obj: BlogComment) -> bool:
         return obj.parent is not None
 
+    @extend_schema_field(serializers.BooleanField())
     def get_has_replies(self, obj: BlogComment) -> bool:
+        # List/detail views annotate `has_replies` via an Exists() subquery in
+        # the viewset's get_queryset() for O(1) per row. Create/update paths
+        # return the raw model instance without the annotation, so fall back
+        # to a direct EXISTS check there (one query, only on write).
+        annotated = getattr(obj, "has_replies", None)
+        if isinstance(annotated, bool):
+            return annotated
         return obj.get_children().filter(approved=True).exists()
 
     def get_is_edited(self, obj: BlogComment) -> bool:

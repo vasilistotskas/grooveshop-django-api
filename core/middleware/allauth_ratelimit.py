@@ -7,7 +7,6 @@ Uses Django's Redis cache for counters (already configured in settings).
 """
 
 import hashlib
-import ipaddress
 import logging
 from typing import Callable
 
@@ -31,36 +30,20 @@ _ALLAUTH_RATE_LIMITS: list[tuple[str, int | None, int | None]] = [
 ]
 
 
-def _is_private_ip(ip: str) -> bool:
-    """Return True if the IP is a loopback or private/link-local address."""
-    try:
-        addr = ipaddress.ip_address(ip)
-        return addr.is_loopback or addr.is_private or addr.is_link_local
-    except ValueError:
-        return False
-
-
 def _client_key(request: HttpRequest) -> str:
     """Return a stable, non-reversible identifier for the requesting client.
 
-    The app runs behind a single trusted reverse proxy (Traefik in K8s).
-    REMOTE_ADDR is always the proxy's address (a private/loopback IP), so we
-    use the *rightmost* (last) entry in X-Forwarded-For — the one appended by
-    our trusted proxy — rather than the leftmost, which an attacker can spoof.
-    If REMOTE_ADDR is not a private IP, we trust it directly and ignore the
-    X-Forwarded-For header entirely.
+    Mirrors the precedence in ``UserAccountAdapter.get_client_ip`` exactly:
+    1. ``X-Real-IP`` — set by the Nuxt proxy via h3 ``getRequestIP``.
+    2. ``REMOTE_ADDR`` — direct-to-Django connections (health probes, tests).
+    3. Empty string — fail-open if neither header is present.
+
+    The XFF fallback has been deliberately dropped: when X-Real-IP is absent
+    and REMOTE_ADDR is a private address, trusting the rightmost XFF entry
+    would be trivially spoofable by an attacker who controls the request body.
     """
-    remote_addr = request.META.get("REMOTE_ADDR", "")
-
-    if _is_private_ip(remote_addr):
-        # We're behind a trusted proxy — use the last XFF entry set by the proxy.
-        xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
-        entries = [e.strip() for e in xff.split(",") if e.strip()]
-        ip = entries[-1] if entries else remote_addr
-    else:
-        # Direct connection (or proxy is not on a private range) — trust as-is.
-        ip = remote_addr
-
+    real_ip = request.META.get("HTTP_X_REAL_IP", "").strip()
+    ip = real_ip or request.META.get("REMOTE_ADDR", "")
     return hashlib.sha256(ip.encode()).hexdigest()[:32]
 
 
@@ -74,12 +57,21 @@ def _is_rate_limited(cache_key: str, limit: int, window_seconds: int) -> bool:
     - cache.incr() is atomic: increments without race conditions.
     - On first hit, add() succeeds and incr() brings the value to 1.
     - On subsequent hits, add() is a no-op and incr() atomically increments.
+
+    Fails open on any cache error so a Redis outage never 500s users.
     """
-    # Try to initialise the key with TTL atomically. If the key already
-    # exists, add() is a no-op (returns False) and expiry is unchanged.
-    cache.add(cache_key, 0, window_seconds)
-    current = cache.incr(cache_key)
-    return current > limit
+    try:
+        # Try to initialise the key with TTL atomically. If the key already
+        # exists, add() is a no-op (returns False) and expiry is unchanged.
+        cache.add(cache_key, 0, window_seconds)
+        current = cache.incr(cache_key)
+        return current > limit
+    except Exception as exc:
+        logger.warning(
+            "AllAuthRateLimit: cache error, failing open",
+            exc_info=exc,
+        )
+        return False
 
 
 class AllAuthRateLimitMiddleware:

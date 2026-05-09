@@ -60,9 +60,9 @@ class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
     region = PrimaryKeyRelatedField(queryset=Region.objects.all())
     phone = PhoneNumberField()
 
-    def validate(self, data):
-        if data.get("is_main"):
-            user = data.get("user") or (
+    def validate(self, attrs):
+        if attrs.get("is_main"):
+            user = attrs.get("user") or (
                 self.instance.user if self.instance else None
             )
             if user:
@@ -77,7 +77,7 @@ class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
                         _("A main address already exists for this user")
                     )
 
-        return data
+        return attrs
 
     class Meta:
         model = UserAddress

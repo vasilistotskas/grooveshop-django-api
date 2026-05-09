@@ -24,12 +24,18 @@ class TestPaymentConfirmationConvertsReservations:
 
     @pytest.fixture
     def mock_payment_validation(self):
-        """Mock payment provider validation to avoid external API calls."""
+        """Mock payment provider validation to avoid external API calls.
+
+        Omits ``amount``/``currency`` from the payload so OrderService's
+        amount-vs-total cross-check is skipped — these tests exercise the
+        reservation → stock-decrement conversion, not payment amount
+        validation (covered elsewhere).
+        """
         with patch("order.payment.get_payment_provider") as mock_provider:
             mock_instance = Mock()
             mock_instance.get_payment_status.return_value = (
                 PaymentStatus.COMPLETED,
-                {"status": "succeeded", "amount": 10000, "currency": "usd"},
+                {"status": "succeeded"},
             )
             mock_provider.return_value = mock_instance
             yield mock_provider
@@ -91,7 +97,8 @@ class TestPaymentConfirmationConvertsReservations:
         """
         # Setup: Create products with specified stock levels
         products = [
-            ProductFactory(stock=initial_stocks[i]) for i in range(num_products)
+            ProductFactory(stock=initial_stocks[i], active=True)
+            for i in range(num_products)
         ]
 
         # Create a cart with items
@@ -239,8 +246,8 @@ class TestPaymentConfirmationConvertsReservations:
         order creation is rolled back and no reservations are consumed.
         """
         # Setup: Create two products with sufficient stock
-        product1 = ProductFactory(stock=50)
-        product2 = ProductFactory(stock=50)
+        product1 = ProductFactory(stock=50, active=True)
+        product2 = ProductFactory(stock=50, active=True)
 
         # Create cart with items
         user = UserAccountFactory()
@@ -341,7 +348,7 @@ class TestPaymentConfirmationConvertsReservations:
         Test that reservation conversion creates correct StockLog audit entries.
         """
         # Setup: Create product
-        product = ProductFactory(stock=100)
+        product = ProductFactory(stock=100, active=True)
 
         # Create cart and reservation
         user = UserAccountFactory()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import uuid
 from contextvars import ContextVar, Token
 
@@ -38,7 +39,9 @@ class CorrelationIdMiddleware:
 
     def __call__(self, request):
         incoming = request.META.get("HTTP_X_CORRELATION_ID")
-        correlation_id = (incoming or uuid.uuid4().hex)[:64]
+        if incoming:
+            incoming = re.sub(r"[\x00-\x1f\x7f]", "", incoming)[:64]
+        correlation_id = incoming or uuid.uuid4().hex
         request.correlation_id = correlation_id
         token = set_correlation_id(correlation_id)
         try:

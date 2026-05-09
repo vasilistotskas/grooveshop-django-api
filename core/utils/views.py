@@ -1,9 +1,26 @@
+"""
+Utility view helpers.
+
+cache_methods
+-------------
+A class decorator that applies Django's ``cache_page`` to named methods.
+``cache_page`` alone is not safe for authenticated APIs because it caches
+by URL only: two users with different auth tokens hitting the same URL get
+each other's responses.  ``vary_on_headers("Authorization", "Cookie")`` is
+chained so Django includes those headers in the cache key, ensuring per-user
+(and per-session) segregation.
+
+In test mode or when ``settings.DISABLE_CACHE`` is True the decorator is
+a no-op so tests are never affected by cache residue.
+"""
+
 import sys
 
 from django.conf import settings
 from django.http import QueryDict
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from django.views.decorators.vary import vary_on_headers
 from rest_framework.request import Request
 
 
@@ -67,7 +84,12 @@ def cache_methods(timeout, methods, *, cache=None):
             cache_decorator = cache_page(
                 timeout, cache=cache, key_prefix=key_prefix
             )
-            decorated_func = method_decorator(cache_decorator)(func)
+            vary_decorator = vary_on_headers("Authorization", "Cookie")
+            # vary_on_headers must wrap cache_page so the Vary header is set
+            # before the cache layer reads it for key derivation.
+            decorated_func = method_decorator(vary_decorator)(
+                method_decorator(cache_decorator)(func)
+            )
             setattr(cls, method_name, decorated_func)
         return cls
 

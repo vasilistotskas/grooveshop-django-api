@@ -120,10 +120,7 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
             self.get_order_item_list_url(), payload, format="json"
         )
 
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST],
-        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_uses_correct_serializer(self):
         self.client.force_authenticate(user=self.admin_user)
@@ -139,12 +136,10 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
             self.get_order_item_list_url(), payload, format="json"
         )
 
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST],
-        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_update_valid(self):
+        # self.user owns self.order, so owns self.order_item — expect 200
         self.client.force_authenticate(user=self.user)
 
         payload = {
@@ -160,17 +155,35 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
             format="json",
         )
 
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_200_OK, status.HTTP_403_FORBIDDEN],
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order_item.refresh_from_db()
+        self.assertEqual(self.order_item.quantity, 4)
+        self.assertEqual(self.order_item.notes, "Updated notes")
+
+    def test_update_forbidden_for_non_owner(self):
+        # other_user does not own self.order_item — expect 403/404
+        self.client.force_authenticate(user=self.other_user)
+
+        payload = {
+            "order": self.order.id,
+            "product": self.product.id,
+            "quantity": 4,
+            "notes": "Should not update",
+        }
+
+        response = self.client.put(
+            self.get_order_item_detail_url(self.order_item.id),
+            payload,
+            format="json",
         )
 
-        if response.status_code == status.HTTP_200_OK:
-            self.order_item.refresh_from_db()
-            self.assertEqual(self.order_item.quantity, 4)
-            self.assertEqual(self.order_item.notes, "Updated notes")
+        self.assertIn(
+            response.status_code,
+            [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND],
+        )
 
     def test_partial_update_valid(self):
+        # self.user owns self.order_item — expect 200
         self.client.force_authenticate(user=self.user)
 
         payload = {"notes": "Partially updated notes"}
@@ -181,22 +194,34 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
             format="json",
         )
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_partial_update_forbidden_for_non_owner(self):
+        # other_user does not own self.order_item — expect 403/404
+        self.client.force_authenticate(user=self.other_user)
+
+        payload = {"notes": "Should not update"}
+
+        response = self.client.patch(
+            self.get_order_item_detail_url(self.order_item.id),
+            payload,
+            format="json",
+        )
+
         self.assertIn(
             response.status_code,
-            [status.HTTP_200_OK, status.HTTP_403_FORBIDDEN],
+            [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND],
         )
 
     def test_delete_valid(self):
+        # admin_user can delete any order item — expect 204
         self.client.force_authenticate(user=self.admin_user)
 
         response = self.client.delete(
-            self.get_order_item_detail_url(self.order_item.id)
+            self.get_order_item_detail_url(self.other_order_item.id)
         )
 
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_204_NO_CONTENT, status.HTTP_403_FORBIDDEN],
-        )
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_user_can_only_access_own_order_items(self):
         self.client.force_authenticate(user=self.user)
@@ -289,56 +314,6 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
 
-    def test_refund_action_valid(self):
-        self.client.force_authenticate(user=self.user)
-
-        self.order.status = OrderStatus.DELIVERED.value
-        self.order.save()
-
-        refund_url = reverse(
-            "order-item-refund", kwargs={"pk": self.order_item.id}
-        )
-        payload = {"quantity": 1, "reason": "Product defective"}
-
-        response = self.client.post(refund_url, payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("detail", response.data)
-        self.assertIn("refunded_amount", response.data)
-
-    def test_refund_action_invalid_order_status(self):
-        self.client.force_authenticate(user=self.user)
-
-        self.order.status = OrderStatus.PENDING.value
-        self.order.save()
-
-        refund_url = reverse(
-            "order-item-refund", kwargs={"pk": self.order_item.id}
-        )
-        payload = {"quantity": 1, "reason": "Test refund"}
-
-        response = self.client.post(refund_url, payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_refund_action_excessive_quantity(self):
-        self.client.force_authenticate(user=self.user)
-
-        self.order.status = OrderStatus.DELIVERED.value
-        self.order.save()
-
-        refund_url = reverse(
-            "order-item-refund", kwargs={"pk": self.order_item.id}
-        )
-        payload = {
-            "quantity": 10,
-            "reason": "Test excessive refund",
-        }
-
-        response = self.client.post(refund_url, payload, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
     def test_validation_errors(self):
         self.client.force_authenticate(user=self.admin_user)
 
@@ -365,6 +340,79 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         response = self.client.post(
             self.get_order_item_list_url(), payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class RefundActionTests(TestURLFixerMixin, APITestCase):
+    """
+    Tests for the refund action on OrderItemViewSet.
+
+    Uses per-test setUp (not setUpTestData) because each test must set
+    a specific order status before calling the refund endpoint — mutating
+    shared class-level state in setUpTestData causes test-order coupling.
+    """
+
+    def setUp(self):
+        self.user = UserAccountFactory()
+        self.pay_way = PayWayFactory()
+        self.product = ProductFactory(
+            active=True, num_images=0, num_reviews=0, stock=20
+        )
+        self.order = OrderFactory(user=self.user, pay_way=self.pay_way)
+        self.order_item = self.order.items.create(
+            product=self.product,
+            price=Money("50.00", "EUR"),
+            quantity=2,
+        )
+
+    def get_refund_url(self, pk):
+        return reverse("order-item-refund", kwargs={"pk": pk})
+
+    def test_refund_action_valid(self):
+        self.client.force_authenticate(user=self.user)
+
+        self.order.status = OrderStatus.DELIVERED.value
+        self.order.save()
+
+        payload = {"quantity": 1, "reason": "Product defective"}
+        response = self.client.post(
+            self.get_refund_url(self.order_item.id),
+            payload,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("detail", response.data)
+        self.assertIn("refunded_amount", response.data)
+
+    def test_refund_action_invalid_order_status(self):
+        self.client.force_authenticate(user=self.user)
+
+        self.order.status = OrderStatus.PENDING.value
+        self.order.save()
+
+        payload = {"quantity": 1, "reason": "Test refund"}
+        response = self.client.post(
+            self.get_refund_url(self.order_item.id),
+            payload,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_refund_action_excessive_quantity(self):
+        self.client.force_authenticate(user=self.user)
+
+        self.order.status = OrderStatus.DELIVERED.value
+        self.order.save()
+
+        payload = {"quantity": 10, "reason": "Test excessive refund"}
+        response = self.client.post(
+            self.get_refund_url(self.order_item.id),
+            payload,
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

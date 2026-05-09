@@ -5,6 +5,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
+from django.utils.translation import gettext
 
 from pay_way.admin import (
     ConfigurationStatusFilter,
@@ -43,7 +44,7 @@ class CostRangeFilterTestCase(TestCase):
         filter_instance = CostRangeFilter(
             self.request, {}, PayWay, self.model_admin
         )
-        self.assertEqual(filter_instance.title, "Cost Range")
+        self.assertEqual(str(filter_instance.title), gettext("Cost Range"))
 
     def test_filter_parameter_name(self):
         filter_instance = CostRangeFilter(
@@ -120,7 +121,9 @@ class FreeThresholdFilterTestCase(TestCase):
         filter_instance = FreeThresholdFilter(
             self.request, {}, PayWay, self.model_admin
         )
-        self.assertEqual(filter_instance.title, "Free Threshold Range")
+        self.assertEqual(
+            str(filter_instance.title), gettext("Free Threshold Range")
+        )
 
     def test_filter_parameter_name(self):
         filter_instance = FreeThresholdFilter(
@@ -161,7 +164,7 @@ class PaymentTypeFilterTestCase(TestCase):
         filter_instance = PaymentTypeFilter(
             self.request, {}, PayWay, self.model_admin
         )
-        self.assertEqual(filter_instance.title, "Payment Type")
+        self.assertEqual(str(filter_instance.title), gettext("Payment Type"))
 
     def test_filter_parameter_name(self):
         filter_instance = PaymentTypeFilter(
@@ -234,7 +237,9 @@ class ConfigurationStatusFilterTestCase(TestCase):
         filter_instance = ConfigurationStatusFilter(
             self.request, {}, PayWay, self.model_admin
         )
-        self.assertEqual(filter_instance.title, "Configuration Status")
+        self.assertEqual(
+            str(filter_instance.title), gettext("Configuration Status")
+        )
 
     def test_filter_parameter_name(self):
         filter_instance = ConfigurationStatusFilter(
@@ -355,10 +360,14 @@ class PayWayAdminTestCase(TestCase):
         self.assertEqual(self.admin.search_fields, expected_fields)
 
     def test_readonly_fields(self):
+        # `configuration` is in the base readonly_fields because it holds
+        # payment-provider secrets; get_readonly_fields() removes it for
+        # superusers (see test_get_readonly_fields_*).
         expected_fields = [
             "id",
             "created_at",
             "updated_at",
+            "configuration",
             "configuration_preview",
             "effective_cost_display",
             "is_configured_status",

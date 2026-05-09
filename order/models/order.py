@@ -23,6 +23,7 @@ from core.models import (
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager
+from shipping.enum import ShippingKind
 
 
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
@@ -80,7 +81,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     user = models.ForeignKey(
         "user.UserAccount",
         related_name="orders",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
@@ -214,6 +215,26 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     shipping_carrier = models.CharField(
         _("Shipping Carrier"), max_length=255, blank=True, default=""
     )
+    shipping_provider = models.ForeignKey(
+        "shipping.ShippingProvider",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="orders",
+        verbose_name=_("Shipping Provider"),
+        help_text=_(
+            "Carrier handling this order. Null for legacy rows where "
+            "fulfilment is handled outside any registered provider."
+        ),
+    )
+    shipping_kind = models.CharField(
+        _("Shipping Kind"),
+        max_length=32,
+        choices=ShippingKind.choices,
+        default=ShippingKind.HOME_DELIVERY,
+        db_index=True,
+        help_text=_("Generic fulfilment kind, independent of provider."),
+    )
     stock_reservation_ids = models.JSONField(
         _("Stock Reservation IDs"),
         default=list,
@@ -275,6 +296,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             BTreeIndex(
                 fields=["payment_status", "-created_at"],
                 name="order_paystatus_created_ix",
+            ),
+            BTreeIndex(
+                fields=["status", "-created_at"],
+                name="order_status_created_ix",
             ),
             BTreeIndex(
                 fields=["tracking_number"], name="order_tracking_num_ix"

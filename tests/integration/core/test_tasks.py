@@ -56,8 +56,15 @@ class TestMonitoredTask:
             exc=exception, task_id="12345", args=(), kwargs={}, einfo=None
         )
 
+        # MonitoredTask.on_failure logs args/kwargs for debuggability; mask
+        # is applied per-key by _safe_repr.
         mock_logger.error.assert_called_once_with(
-            "Task test_task failed. Task ID: 12345, Error: Test error"
+            "Task %s failed. Task ID: %s, Error: %s, args=%s, kwargs=%s",
+            "test_task",
+            "12345",
+            exception,
+            [],
+            {},
         )
 
 
@@ -491,26 +498,36 @@ class TestSendInactiveUserNotificationsTask:
     def test_send_inactive_user_notifications_success(
         self, mock_logger, mock_render, mock_email_cls, db
     ):
+        # Pin English locale on the inactive recipients — the task
+        # renders the subject under ``translation.override(get_user_
+        # language(user))``, and ``UserAccountFactory.language_code``
+        # defaults to ``settings.LANGUAGE_CODE`` ("el") so an unpinned
+        # account would render the Greek translation and break the
+        # English subject assertion below.
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=30),
             is_active=True,
             email="active@example.com",
+            language_code="en",
         )
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=70),
             is_active=True,
             email="inactive@example.com",
             first_name="John",
+            language_code="en",
         )
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=100),
             is_active=True,
             email="old@example.com",
+            language_code="en",
         )
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=70),
             is_active=True,
             email="",
+            language_code="en",
         )
 
         mock_render.return_value = "<html>Test email</html>"
@@ -680,10 +697,14 @@ class TestMonitorSystemHealthTask:
         mock_cache.set.return_value = None
         mock_cache.get.return_value = "ok"
 
-        mock_open_obj = mock_open()
-        mock_open_obj.side_effect = OSError("Storage error")
-
-        with patch("core.tasks.open", mock_open_obj):
+        # The storage probe uses ``default_storage`` (django.core.files.storage)
+        # rather than raw ``open(MEDIA_ROOT/...)`` so it exercises the same
+        # backend the app writes to (S3 in prod).  Patch ``save`` to surface
+        # an OSError matching the ``except Exception`` branch in the task.
+        with patch(
+            "django.core.files.storage.default_storage.save",
+            side_effect=OSError("Storage error"),
+        ):
             result = monitor_system_health()
 
         assert result["status"] == "degraded"

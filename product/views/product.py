@@ -13,6 +13,7 @@ from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import ViewCountThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,
@@ -209,6 +210,7 @@ class ProductViewSet(BaseModelViewSet):
     @action(
         detail=True,
         methods=["POST"],
+        throttle_classes=[ViewCountThrottle],
     )
     def update_view_count(self, request, pk=None):
         from django.db.models import F
@@ -231,7 +233,15 @@ class ProductViewSet(BaseModelViewSet):
     )
     def reviews(self, request, pk=None):
         product = get_object_or_404(Product, pk=pk)
-        reviews = product.reviews.all()
+        # select_related("user") avoids N+1 for UserDetailsSerializer.
+        # prefetch_related("translations") avoids N+1 for the parler
+        # TranslatableModelSerializer (one extra query per review
+        # otherwise, as parler fetches the translation row lazily).
+        reviews = (
+            product.reviews.select_related("user")
+            .prefetch_related("translations")
+            .all()
+        )
 
         response_serializer_class = self.get_response_serializer()
         return self.paginate_and_serialize(

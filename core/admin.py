@@ -35,6 +35,8 @@ from parler.models import TranslatableModel
 from unfold.admin import ModelAdmin
 from unfold.widgets import UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
+from admin.mixins import IsSuperuserOnlyModelAdmin
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,6 +96,15 @@ class ExportActionMixin:
         ]
 
     def export_csv(self, request: HttpRequest, queryset: QuerySet):
+        MAX_EXPORT_ROWS = 10_000
+        if queryset.count() > MAX_EXPORT_ROWS:
+            self.message_user(
+                request,
+                _("Export capped — refine filter to ≤ %(max)d rows")
+                % {"max": MAX_EXPORT_ROWS},
+                level=messages.ERROR,
+            )
+            return
         opts = self.model._meta
         model_verbose_name_str = str(opts.verbose_name)
         response = HttpResponse(content_type="text/csv; charset=utf-8")
@@ -269,6 +280,15 @@ class ExportActionMixin:
         return response
 
     def export_xml(self, request: HttpRequest, queryset: QuerySet):
+        MAX_EXPORT_ROWS = 10_000
+        if queryset.count() > MAX_EXPORT_ROWS:
+            self.message_user(
+                request,
+                _("Export capped — refine filter to ≤ %(max)d rows")
+                % {"max": MAX_EXPORT_ROWS},
+                level=messages.ERROR,
+            )
+            return
         try:
             opts = self.model._meta
             model_verbose_name_str = str(opts.verbose_name)
@@ -421,52 +441,54 @@ class SettingAdmin(ModelAdmin):
 
     @admin.display(description=_("Name"))
     def name_display(self, obj):
-        from django.utils.html import conditional_escape
-        from django.utils.safestring import mark_safe
+        from django.utils.html import format_html  # noqa: PLC0415
 
-        safe_name = conditional_escape(obj.name)
-        html = f'<strong style="font-weight: 600;">{safe_name}</strong>'
-        return mark_safe(html)
+        return format_html(
+            '<strong style="font-weight: 600;">{}</strong>', obj.name
+        )
 
     @admin.display(description=_("Type"))
     def value_type_badge(self, obj):
-        from django.utils.html import conditional_escape
-        from django.utils.safestring import mark_safe
+        from django.utils.html import format_html  # noqa: PLC0415
 
-        safe_type = conditional_escape(obj.value_type)
-        html = f'<span class="setting-type-badge" data-type="{safe_type}">{safe_type}</span>'
-        return mark_safe(html)
+        return format_html(
+            '<span class="setting-type-badge" data-type="{type}">{type}</span>',
+            type=obj.value_type,
+        )
 
     @admin.display(description=_("Current Value"))
     def value_preview(self, obj):
-        from django.utils.html import conditional_escape
-        from django.utils.safestring import mark_safe
+        from django.utils.html import format_html  # noqa: PLC0415
 
         try:
             value = str(obj.value)
             if len(value) > 50:
                 value = value[:50] + "..."
-            safe_value = conditional_escape(value)
-
-            html = f'<code style="font-size: 0.875rem; padding: 0.125rem 0.25rem; background-color: rgba(0,0,0,0.05); border-radius: 0.25rem;">{safe_value}</code>'
-            return mark_safe(html)
+            return format_html(
+                '<code style="font-size: 0.875rem; padding: 0.125rem 0.25rem;'
+                " background-color: rgba(0,0,0,0.05); border-radius:"
+                ' 0.25rem;">{}</code>',
+                value,
+            )
         except Exception:
+            from django.utils.safestring import mark_safe  # noqa: PLC0415
+
             return mark_safe(
                 '<span style="font-style: italic; opacity: 0.6;">-</span>'
             )
 
     @admin.display(description=_("Description"))
     def description_preview(self, obj):
-        from django.utils.html import conditional_escape
-        from django.utils.safestring import mark_safe
+        from django.utils.html import format_html  # noqa: PLC0415
+        from django.utils.safestring import mark_safe  # noqa: PLC0415
 
         if obj.description:
             desc = obj.description
             if len(desc) > 60:
                 desc = desc[:60] + "..."
-            safe_desc = conditional_escape(desc)
-            return mark_safe(
-                f'<span style="font-size: 0.875rem; opacity: 0.8;">{safe_desc}</span>'
+            return format_html(
+                '<span style="font-size: 0.875rem; opacity: 0.8;">{}</span>',
+                desc,
             )
         return mark_safe(
             '<span style="font-style: italic; opacity: 0.6;">-</span>'
@@ -491,3 +513,42 @@ class SolarScheduleAdmin(ModelAdmin):
 
 class ClockedScheduleAdmin(BaseClockedScheduleAdmin, ModelAdmin):
     pass
+
+
+from core.cache.models import CachePurgeLog  # noqa: E402
+
+
+@admin.register(CachePurgeLog)
+class CachePurgeLogAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+    list_display = (
+        "created_at",
+        "actor",
+        "surface_summary",
+        "total_django",
+        "total_nuxt",
+        "total_blocked",
+        "dry_run",
+    )
+    list_filter = ("dry_run", "created_at")
+    search_fields = ("actor__email", "actor__username")
+    readonly_fields = (
+        "actor",
+        "created_at",
+        "surfaces",
+        "dry_run",
+        "total_django",
+        "total_nuxt",
+        "total_blocked",
+        "detail",
+    )
+
+    @admin.display(description="Surfaces")
+    def surface_summary(self, obj):
+        codes = obj.surfaces or []
+        return ", ".join(codes) if codes else "—"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

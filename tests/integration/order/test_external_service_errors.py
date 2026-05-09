@@ -1,7 +1,6 @@
 import pytest
 import logging
 from unittest.mock import patch
-from decimal import Decimal
 
 from djmoney.money import Money
 import stripe
@@ -13,15 +12,15 @@ from order.payment import (
     StripePaymentProvider,
     PayPalPaymentProvider,
 )
-from order.shipping import FedExCarrier, UPSCarrier
 
 
 @pytest.mark.django_db
 class TestExternalServiceErrorsAreLogged:
     """
-    This test suite validates that all external service failures (Stripe, PayPal,
-    FedEx, UPS) are properly logged with exc_info=True and return structured
-    error responses.
+    This test suite validates that all external payment service failures
+    (Stripe, PayPal) are properly logged with exc_info=True and return
+    structured error responses. Carrier-specific error tests live alongside
+    each carrier in ``tests/{unit,integration}/shipping_*/``.
     """
 
     @pytest.mark.parametrize(
@@ -276,136 +275,6 @@ class TestExternalServiceErrorsAreLogged:
             ]
             assert len(logs_with_exc_info) > 0, (
                 "PayPal error logs should include exc_info=True"
-            )
-
-    @pytest.mark.skip(
-        reason="FedEx carrier is mock implementation without error logging. "
-        "Needs real implementation with exc_info=True logging."
-    )
-    @pytest.mark.parametrize(
-        "method_name,method_args",
-        [
-            (
-                "get_shipping_options",
-                {
-                    "origin_country": "US",
-                    "destination_country": "CA",
-                    "weight": Decimal("5.0"),
-                    "dimensions": {"length": 10, "width": 8, "height": 6},
-                },
-            ),
-            (
-                "create_shipment",
-                {
-                    "order_id": "order_fedex_1",
-                    "shipping_option_id": "fedex_ground",
-                    "origin_address": {},
-                    "destination_address": {},
-                },
-            ),
-        ],
-    )
-    def test_fedex_errors_are_logged_with_exc_info(
-        self,
-        method_name,
-        method_args,
-        caplog,
-    ):
-        """
-        Test that FedEx service failures are logged with exc_info=True.
-
-        **EXPECTED TO FAIL**: FedEx carrier is currently a mock implementation
-        that doesn't log errors. This test documents the expected behavior.
-
-        **TO FIX**: Implement real FedEx integration with error logging that
-        includes exc_info=True in all logger.error() calls.
-        """
-        carrier = FedExCarrier()
-        caplog.set_level(logging.ERROR)
-
-        with patch.object(
-            FedExCarrier, method_name, side_effect=Exception("FedEx error")
-        ):
-            try:
-                method = getattr(carrier, method_name)
-                method(**method_args)
-            except Exception:
-                pass  # Exception is acceptable if logged
-
-            # Verify: Error was logged with exc_info
-            error_logs = [r for r in caplog.records if r.levelname == "ERROR"]
-            assert len(error_logs) > 0, "FedEx errors should be logged"
-
-            logs_with_exc_info = [
-                r for r in error_logs if r.exc_info is not None
-            ]
-            assert len(logs_with_exc_info) > 0, (
-                "FedEx error logs should include exc_info=True"
-            )
-
-    @pytest.mark.skip(
-        reason="UPS carrier is mock implementation without error logging. "
-        "Needs real implementation with exc_info=True logging."
-    )
-    @pytest.mark.parametrize(
-        "method_name,method_args",
-        [
-            (
-                "get_shipping_options",
-                {
-                    "origin_country": "US",
-                    "destination_country": "MX",
-                    "weight": Decimal("3.0"),
-                    "dimensions": {"length": 12, "width": 10, "height": 8},
-                },
-            ),
-            (
-                "create_shipment",
-                {
-                    "order_id": "order_ups_1",
-                    "shipping_option_id": "ups_worldwide",
-                    "origin_address": {},
-                    "destination_address": {},
-                },
-            ),
-        ],
-    )
-    def test_ups_errors_are_logged_with_exc_info(
-        self,
-        method_name,
-        method_args,
-        caplog,
-    ):
-        """
-        Test that UPS service failures are logged with exc_info=True.
-
-        **EXPECTED TO FAIL**: UPS carrier is currently a mock implementation
-        that doesn't log errors. This test documents the expected behavior.
-
-        **TO FIX**: Implement real UPS integration with error logging that
-        includes exc_info=True in all logger.error() calls.
-        """
-        carrier = UPSCarrier()
-        caplog.set_level(logging.ERROR)
-
-        with patch.object(
-            UPSCarrier, method_name, side_effect=Exception("UPS error")
-        ):
-            try:
-                method = getattr(carrier, method_name)
-                method(**method_args)
-            except Exception:
-                pass  # Exception is acceptable if logged
-
-            # Verify: Error was logged with exc_info
-            error_logs = [r for r in caplog.records if r.levelname == "ERROR"]
-            assert len(error_logs) > 0, "UPS errors should be logged"
-
-            logs_with_exc_info = [
-                r for r in error_logs if r.exc_info is not None
-            ]
-            assert len(logs_with_exc_info) > 0, (
-                "UPS error logs should include exc_info=True"
             )
 
     def test_stripe_errors_return_structured_response(self, caplog):

@@ -257,3 +257,137 @@ def test_allowed_csp_sources_mixed_valid_invalid_raises():
     with pytest.raises(ValidationError) as exc_info:
         t.clean()
     assert "allowed_csp_sources" in exc_info.value.message_dict
+
+
+# ---------------------------------------------------------------------------
+# Tenant.clean() — meta_pixel_id validation
+# ---------------------------------------------------------------------------
+
+
+def test_meta_pixel_id_empty_is_valid():
+    t = _unsaved_tenant(meta_pixel_id="")
+    t.clean()  # must not raise
+
+
+def test_meta_pixel_id_digits_only_is_valid():
+    t = _unsaved_tenant(meta_pixel_id="123456789012345")
+    t.clean()  # must not raise
+
+
+def test_meta_pixel_id_non_digits_raises():
+    t = _unsaved_tenant(meta_pixel_id="abc123")
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "meta_pixel_id" in exc_info.value.message_dict
+
+
+def test_meta_pixel_id_with_spaces_raises():
+    t = _unsaved_tenant(meta_pixel_id="123 456")
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "meta_pixel_id" in exc_info.value.message_dict
+
+
+# ---------------------------------------------------------------------------
+# Tenant.clean() — ga_tracking_id validation
+# ---------------------------------------------------------------------------
+
+
+def test_ga_tracking_id_empty_is_valid():
+    t = _unsaved_tenant(ga_tracking_id="")
+    t.clean()  # must not raise
+
+
+def test_ga_tracking_id_ga4_prefix_is_valid():
+    t = _unsaved_tenant(ga_tracking_id="G-ABCDE12345")
+    t.clean()  # must not raise
+
+
+def test_ga_tracking_id_ua_prefix_is_valid():
+    t = _unsaved_tenant(ga_tracking_id="UA-123456-1")
+    t.clean()  # must not raise
+
+
+def test_ga_tracking_id_invalid_prefix_raises():
+    t = _unsaved_tenant(ga_tracking_id="AW-1234567890")
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "ga_tracking_id" in exc_info.value.message_dict
+
+
+def test_ga_tracking_id_bare_string_raises():
+    t = _unsaved_tenant(ga_tracking_id="not-a-ga-id")
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "ga_tracking_id" in exc_info.value.message_dict
+
+
+# ---------------------------------------------------------------------------
+# Tenant.clean() — social URL validation (https-only)
+# ---------------------------------------------------------------------------
+
+
+def test_socials_facebook_https_is_valid():
+    t = _unsaved_tenant(socials_facebook="https://facebook.com/myshop")
+    t.clean()  # must not raise
+
+
+def test_socials_facebook_empty_is_valid():
+    t = _unsaved_tenant(socials_facebook="")
+    t.clean()  # must not raise
+
+
+def test_socials_facebook_http_raises():
+    t = _unsaved_tenant(socials_facebook="http://facebook.com/myshop")
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "socials_facebook" in exc_info.value.message_dict
+
+
+def test_all_social_fields_https_are_valid():
+    t = _unsaved_tenant(
+        socials_discord="https://discord.gg/abc",
+        socials_facebook="https://facebook.com/x",
+        socials_instagram="https://instagram.com/x",
+        socials_pinterest="https://pinterest.com/x",
+        socials_reddit="https://reddit.com/r/x",
+        socials_tiktok="https://tiktok.com/@x",
+        socials_twitter="https://twitter.com/x",
+        socials_youtube="https://youtube.com/c/x",
+    )
+    t.clean()  # must not raise
+
+
+def test_multiple_social_http_raises_combined_error():
+    """All bad social fields appear in message_dict."""
+    t = _unsaved_tenant(
+        socials_instagram="http://instagram.com/x",
+        socials_twitter="http://twitter.com/x",
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    errors = exc_info.value.message_dict
+    assert "socials_instagram" in errors
+    assert "socials_twitter" in errors
+
+
+# ---------------------------------------------------------------------------
+# Tenant.clean() — box_now_partner_id validation
+# ---------------------------------------------------------------------------
+
+
+def test_box_now_partner_id_empty_is_valid():
+    t = _unsaved_tenant(box_now_partner_id="")
+    t.clean()  # must not raise
+
+
+def test_box_now_partner_id_digits_only_is_valid():
+    t = _unsaved_tenant(box_now_partner_id="12345")
+    t.clean()  # must not raise
+
+
+def test_box_now_partner_id_non_digits_raises():
+    t = _unsaved_tenant(box_now_partner_id="BN-12345")
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "box_now_partner_id" in exc_info.value.message_dict

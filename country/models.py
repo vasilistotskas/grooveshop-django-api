@@ -1,4 +1,3 @@
-
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.validators import RegexValidator
 from django.db import models

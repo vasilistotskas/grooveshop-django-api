@@ -189,8 +189,15 @@ jobs:
       - name: Check for missing migrations
         run: uv run python manage.py makemigrations --check --dry-run
 
-      - name: Run migrations
-        run: uv run python manage.py migrate
+      - name: Run migrations (django-tenants)
+        # Using ``migrate_schemas --shared`` for SHARED_APPS first, then
+        # exercising the TENANT_APPS migration path against the seeded
+        # webside schema (created by ``tenant.0002_seed_webside_tenant``
+        # which runs as part of ``--shared``). This validates both shared
+        # and tenant migration paths on a clean DB.
+        run: |
+          uv run python manage.py migrate_schemas --shared
+          uv run python manage.py migrate_schemas --schema=webside
 
       - name: Run Tests
         # ``--dist loadfile`` is mandatory for stability per

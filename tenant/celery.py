@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 class TenantTask(Task):
     """Base Celery task that propagates tenant schema context."""
 
-    def apply_async(self, args=None, kwargs=None, **options):
+    def apply_async(self, *args: Any, **options: Any) -> Any:
         headers = options.pop("headers", {}) or {}
         headers["_schema_name"] = getattr(connection, "schema_name", "public")
         options["headers"] = headers
-        return super().apply_async(args=args, kwargs=kwargs, **options)
+        return super().apply_async(*args, **options)
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         schema_name = (

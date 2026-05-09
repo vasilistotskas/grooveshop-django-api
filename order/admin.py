@@ -587,12 +587,22 @@ class OrderAdmin(ModelAdmin):
         "mark_as_completed",
         "mark_as_canceled",
     ]
+    # Detail header had 5 long English buttons that overflowed the
+    # title bar. Group invoice + myDATA ops under one dropdown, keep
+    # the shipping-voucher button top-level (it's the most-used
+    # one-click op and reads cleaner with a short label).
     actions_detail = [
-        "generate_invoice_now",
-        "regenerate_invoice",
-        "send_invoice_to_mydata_now",
-        "cancel_mydata_invoice_now",
         "download_shipping_voucher",
+        {
+            "title": _("Invoicing & myDATA"),
+            "icon": "receipt_long",
+            "items": [
+                "generate_invoice_now",
+                "regenerate_invoice",
+                "send_invoice_to_mydata_now",
+                "cancel_mydata_invoice_now",
+            ],
+        },
     ]
     # Per-row quick actions: avoid the detail-page round-trip for the
     # two ops the support team does most (download voucher PDF, jump

@@ -2486,9 +2486,22 @@ UNFOLD = {
             "title": _("Email Templates"),
             "link": reverse_lazy("email_templates:management"),
         },
-        # Ops links — open in new tab; URLs are env-driven so they
-        # work in both local docker (localhost) and production
-        # (subdomains/internal hosts). Empty env var hides the link.
+        # API Swagger always works — same Django process serves both
+        # the admin and the schema, so reverse_lazy gives the right
+        # URL in dev and prod regardless of host. The route name is
+        # `swagger-ui` and matches `/api/v1/schema/swagger-ui` (no
+        # trailing slash); using reverse_lazy avoids hard-coding it.
+        {
+            "icon": "schema",
+            "title": _("API Swagger"),
+            "link": reverse_lazy("swagger-ui"),
+            "attrs": {"target": "_blank", "rel": "noopener"},
+        },
+        # Ops links — only render when the env var is explicitly set.
+        # In dev, set ADMIN_FLOWER_URL=http://localhost:5556 etc. in
+        # `.env`. In production these surfaces are usually NOT exposed
+        # publicly, so the default is to hide the link entirely
+        # rather than show a broken localhost shortcut.
         *[
             {
                 "icon": entry["icon"],
@@ -2500,38 +2513,25 @@ UNFOLD = {
                 {
                     "icon": "monitoring",
                     "title": _("Flower (Celery)"),
-                    "link": getenv("ADMIN_FLOWER_URL", "http://localhost:5556"),
+                    "link": getenv("ADMIN_FLOWER_URL", "").strip(),
                 },
                 {
                     "icon": "mark_email_unread",
                     "title": _("Mailpit"),
-                    "link": getenv(
-                        "ADMIN_MAILPIT_URL", "http://localhost:8025"
-                    ),
-                },
-                {
-                    "icon": "schema",
-                    "title": _("API Swagger"),
-                    "link": getenv(
-                        "ADMIN_SWAGGER_URL",
-                        "/api/v1/schema/swagger-ui/",
-                    ),
+                    "link": getenv("ADMIN_MAILPIT_URL", "").strip(),
                 },
                 {
                     "icon": "search",
                     "title": _("Meilisearch"),
-                    "link": getenv(
-                        "ADMIN_MEILISEARCH_URL", "http://localhost:7700"
-                    ),
+                    "link": getenv("ADMIN_MEILISEARCH_URL", "").strip(),
                 },
                 {
                     "icon": "router",
                     "title": _("RabbitMQ"),
-                    "link": getenv(
-                        "ADMIN_RABBITMQ_URL", "http://localhost:15672"
-                    ),
+                    "link": getenv("ADMIN_RABBITMQ_URL", "").strip(),
                 },
             ]
+            if entry["link"]
             if entry["link"]
         ],
     ],

@@ -6037,7 +6037,7 @@ msgstr ""
 
 #: order/admin.py:1451
 msgid "Generate invoice"
-msgstr ""
+msgstr "Έκδοση τιμολογίου"
 
 #: order/admin.py:1466 order/admin.py:1527 order/admin.py:1567
 #: order/admin.py:1622 order/admin.py:1674 order/admin.py:1742
@@ -6072,7 +6072,7 @@ msgstr ""
 
 #: order/admin.py:1511
 msgid "Regenerate invoice (same number)"
-msgstr ""
+msgstr "Επανέκδοση τιμολογίου (ίδιος αριθμός)"
 
 #: order/admin.py:1538
 #, python-format
@@ -6088,7 +6088,7 @@ msgstr ""
 
 #: order/admin.py:1553
 msgid "Send invoice to myDATA"
-msgstr ""
+msgstr "Αποστολή στο myDATA"
 
 #: order/admin.py:1575
 #, python-format
@@ -6112,7 +6112,7 @@ msgstr ""
 
 #: order/admin.py:1608
 msgid "Cancel invoice in myDATA"
-msgstr ""
+msgstr "Ακύρωση στο myDATA"
 
 #: order/admin.py:1630
 #, python-format
@@ -6126,7 +6126,7 @@ msgstr ""
 
 #: order/admin.py:1651
 msgid "Download shipping voucher (PDF)"
-msgstr ""
+msgstr "Λήψη voucher αποστολής (PDF)"
 
 #: order/admin.py:1682
 #, python-format
@@ -12895,3 +12895,6 @@ msgstr ""
 #: vat/models.py:40
 msgid "Vats"
 msgstr ""
+
+msgid "Invoicing & myDATA"
+msgstr "Τιμολόγηση & myDATA"

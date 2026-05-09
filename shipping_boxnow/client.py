@@ -55,13 +55,12 @@ class BoxNowClient:
         timeout: int | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        self.client_id = client_id or getattr(settings, "BOXNOW_CLIENT_ID", "")
-        self.client_secret = client_secret or getattr(
-            settings, "BOXNOW_CLIENT_SECRET", ""
-        )
-        self.partner_id = str(
-            partner_id or getattr(settings, "BOXNOW_PARTNER_ID", "")
-        )
+        from tenant.credentials import box_now_credentials  # noqa: PLC0415
+
+        creds = box_now_credentials()
+        self.client_id = client_id or creds["client_id"]
+        self.client_secret = client_secret or creds["client_secret"]
+        self.partner_id = str(partner_id or creds["partner_id"])
         self.api_base_url = (
             api_base_url
             or getattr(

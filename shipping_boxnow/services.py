@@ -255,18 +255,24 @@ class BoxNowService:
             shipment.save(update_fields=update_fields)
 
         # ---- Phase 2: API call (no transaction, no lock) -----------------
-        notify_phone = getattr(settings, "BOXNOW_NOTIFY_PHONE", "+302100000000")
+        from tenant.credentials import box_now_credentials  # noqa: PLC0415
+
+        bn_creds = box_now_credentials()
+        notify_phone = bn_creds["notify_phone"] or "+302100000000"
         site_name = getattr(settings, "SITE_NAME", "GrooveShop")
-        warehouse_id = str(getattr(settings, "BOXNOW_WAREHOUSE_ID", "2"))
+        warehouse_id = str(bn_creds["warehouse_id"] or "2")
         paid_amount = getattr(order, "paid_amount", None)
         invoice_value = str(paid_amount.amount) if paid_amount else "0.00"
         # ``notifyOnAccepted`` is the PARTNER (operations) email per
         # BoxNow API §3.4 — BoxNow sends us the success-notification +
         # PDF label here. The customer gets BoxNow's own customer-facing
         # notifications via ``destination.contactEmail`` / ``contactNumber``.
-        partner_notify_email = getattr(settings, "INFO_EMAIL", None) or getattr(
-            settings, "DEFAULT_FROM_EMAIL", ""
+        from tenant.credentials import (  # noqa: PLC0415
+            tenant_contact_email,
+            tenant_from_email,
         )
+
+        partner_notify_email = tenant_contact_email() or tenant_from_email()
 
         payload: dict[str, Any] = {
             "orderNumber": str(order.id),

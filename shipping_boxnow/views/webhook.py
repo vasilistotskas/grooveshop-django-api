@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import logging
 
-from django.conf import settings
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.permissions import AllowAny
@@ -137,7 +136,9 @@ class BoxNowWebhookView(APIView):
         # ------------------------------------------------------------------ #
         # 5. Guard: secret must be configured.                                #
         # ------------------------------------------------------------------ #
-        secret: str = getattr(settings, "BOXNOW_WEBHOOK_SECRET", "")
+        from tenant.credentials import box_now_credentials  # noqa: PLC0415
+
+        secret: str = box_now_credentials()["webhook_secret"]
         if not secret:
             logger.error(
                 "BoxNow webhook: BOXNOW_WEBHOOK_SECRET is not configured"

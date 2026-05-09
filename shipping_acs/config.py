@@ -173,10 +173,12 @@ def station_origin() -> str | None:
 
     1. ``ShippingProvider.metadata['station_origin']`` — operator
        override via Django admin.
-    2. Parsed from ``settings.ACS_BILLING_CODE`` positions 1-2 — the
+    2. ``Tenant.acs_station_origin`` / ``settings.ACS_STATION_ORIGIN``
+       — per-tenant explicit station code via the credentials helper.
+    3. Parsed from the resolved ACS billing code (positions 1-2) — the
        standard ACS billing code format is ``<category><station>
        <customer_id>``, e.g. ``"2ΑΚ89587"`` → ``"ΑΚ"``.
-    3. ``None`` — the live-quote path treats this as "can't quote" and
+    4. ``None`` — the live-quote path treats this as "can't quote" and
        falls back to the flat-rate Setting.
 
     Returns the station code as ACS expects it (Greek 2-letter codes
@@ -187,7 +189,14 @@ def station_origin() -> str | None:
     if explicit:
         return str(explicit).strip().upper() or None
 
-    billing_code = getattr(django_settings, "ACS_BILLING_CODE", "") or ""
+    from tenant.credentials import acs_credentials  # noqa: PLC0415
+
+    creds = acs_credentials()
+    tenant_station = (creds.get("station_origin") or "").strip().upper()
+    if tenant_station:
+        return tenant_station
+
+    billing_code = creds.get("billing_code") or ""
     if len(billing_code) >= 3:
         candidate = billing_code[1:3].strip().upper()
         if candidate:

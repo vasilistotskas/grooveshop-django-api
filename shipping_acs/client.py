@@ -75,18 +75,15 @@ class AcsClient:
         timeout: int | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        self.api_key = api_key or getattr(settings, "ACS_API_KEY", "")
-        self.company_id = company_id or getattr(settings, "ACS_COMPANY_ID", "")
-        self.company_password = company_password or getattr(
-            settings, "ACS_COMPANY_PASSWORD", ""
-        )
-        self.user_id = user_id or getattr(settings, "ACS_USER_ID", "")
-        self.user_password = user_password or getattr(
-            settings, "ACS_USER_PASSWORD", ""
-        )
-        self.billing_code = billing_code or getattr(
-            settings, "ACS_BILLING_CODE", ""
-        )
+        from tenant.credentials import acs_credentials  # noqa: PLC0415
+
+        creds = acs_credentials()
+        self.api_key = api_key or creds["api_key"]
+        self.company_id = company_id or creds["company_id"]
+        self.company_password = company_password or creds["company_password"]
+        self.user_id = user_id or creds["user_id"]
+        self.user_password = user_password or creds["user_password"]
+        self.billing_code = billing_code or creds["billing_code"]
         self.api_base_url = (
             api_base_url
             or getattr(

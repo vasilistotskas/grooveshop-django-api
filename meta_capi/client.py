@@ -24,6 +24,10 @@ from meta_capi.exceptions import (
     MetaCapiError,
     MetaCapiTransientError,
 )
+from tenant.credentials import (
+    tenant_meta_capi_access_token,
+    tenant_meta_pixel_id,
+)
 
 if TYPE_CHECKING:
     from facebook_business.adobjects.serverside.event import Event
@@ -77,8 +81,11 @@ class MetaCapiClient:
         test_event_code: str | None = None,
         partner_agent: str | None = None,
     ) -> None:
-        self.pixel_id = pixel_id or settings.META_PIXEL_ID
-        self.access_token = access_token or settings.META_CAPI_ACCESS_TOKEN
+        # Per-tenant credentials take priority over global settings.
+        # Explicit constructor args (used in tests and admin actions) win
+        # over both.
+        self.pixel_id = pixel_id or tenant_meta_pixel_id()
+        self.access_token = access_token or tenant_meta_capi_access_token()
         self.api_version = api_version or settings.META_CAPI_API_VERSION
         # Empty string means "no test code" — production posture.
         self.test_event_code = (

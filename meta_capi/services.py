@@ -25,6 +25,10 @@ from django.conf import settings
 from extra_settings.models import Setting
 
 from meta_capi.events import META_EVENT_ID_KEYS, ContentType, StandardEvent
+from tenant.credentials import (
+    tenant_meta_capi_access_token,
+    tenant_meta_pixel_id,
+)
 
 if TYPE_CHECKING:
     from facebook_business.adobjects.serverside.event import Event
@@ -105,7 +109,8 @@ def is_capi_enabled() -> bool:
     """
     if not bool(Setting.get("META_CAPI_ENABLED", default=False)):
         return False
-    if not (settings.META_PIXEL_ID and settings.META_CAPI_ACCESS_TOKEN):
+    # Check per-tenant credentials (falls back to global settings).
+    if not (tenant_meta_pixel_id() and tenant_meta_capi_access_token()):
         return False
     return True
 

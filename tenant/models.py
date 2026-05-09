@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -187,6 +189,382 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         ),
     )
 
+    # === Analytics ===
+
+    meta_pixel_id = models.CharField(
+        _("Meta Pixel ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Meta (Facebook) Pixel ID for the storefront. "
+            "Digits only (e.g. '123456789012345'). "
+            "Empty → browser pixel is disabled for this tenant."
+        ),
+    )
+    ga_tracking_id = models.CharField(
+        _("Google Analytics Tracking ID"),
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=_(
+            "Google Analytics 4 measurement ID (G-XXXXXXXXXX) or "
+            "Universal Analytics property (UA-XXXXXXXX-X). "
+            "Empty → GA is disabled for this tenant."
+        ),
+    )
+
+    # === Authentication ===
+
+    totp_issuer = models.CharField(
+        _("TOTP Issuer"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Issuer name shown in authenticator apps when the user "
+            "scans the TOTP QR code (e.g. 'MyShop'). "
+            "Empty falls back to settings.MFA_TOTP_ISSUER."
+        ),
+    )
+
+    # === Bot Protection ===
+
+    turnstile_site_key = models.CharField(
+        _("Turnstile Site Key"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Cloudflare Turnstile site key (public). "
+            "Shown to browsers for the CAPTCHA widget. "
+            "Empty → Turnstile widget is disabled for this tenant."
+        ),
+    )
+
+    # === Social Links ===
+
+    socials_discord = models.URLField(
+        _("Discord URL"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Discord server invite URL. Must use https://. "
+            "Empty → link hidden in storefront footer."
+        ),
+    )
+    socials_facebook = models.URLField(
+        _("Facebook URL"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Facebook page URL. Must use https://. "
+            "Empty → link hidden in storefront footer."
+        ),
+    )
+    socials_instagram = models.URLField(
+        _("Instagram URL"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Instagram profile URL. Must use https://. "
+            "Empty → link hidden in storefront footer."
+        ),
+    )
+    socials_pinterest = models.URLField(
+        _("Pinterest URL"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Pinterest profile URL. Must use https://. "
+            "Empty → link hidden in storefront footer."
+        ),
+    )
+    socials_reddit = models.URLField(
+        _("Reddit URL"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Reddit community/profile URL. Must use https://. "
+            "Empty → link hidden in storefront footer."
+        ),
+    )
+    socials_tiktok = models.URLField(
+        _("TikTok URL"),
+        blank=True,
+        default="",
+        help_text=_(
+            "TikTok profile URL. Must use https://. "
+            "Empty → link hidden in storefront footer."
+        ),
+    )
+    socials_twitter = models.URLField(
+        _("Twitter / X URL"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Twitter/X profile URL. Must use https://. "
+            "Empty → link hidden in storefront footer."
+        ),
+    )
+    socials_youtube = models.URLField(
+        _("YouTube URL"),
+        blank=True,
+        default="",
+        help_text=_(
+            "YouTube channel URL. Must use https://. "
+            "Empty → link hidden in storefront footer."
+        ),
+    )
+
+    # === Shipping — BoxNow (public field) ===
+
+    box_now_partner_id = models.CharField(
+        _("BoxNow Partner ID"),
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=_(
+            "BoxNow partner identifier (digits only). "
+            "Used by the storefront BoxNow widget. "
+            "Empty falls back to settings.BOXNOW_PARTNER_ID."
+        ),
+    )
+
+    # -----------------------------------------------------------------------
+    # Admin-only / server-only fields — NOT exposed via TenantConfigSerializer
+    # -----------------------------------------------------------------------
+
+    # === Email ===
+
+    from_email = models.EmailField(
+        _("From Email"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Sender address for outbound email from this tenant "
+            "(e.g. 'no-reply@myshop.com'). "
+            "Empty falls back to settings.DEFAULT_FROM_EMAIL."
+        ),
+    )
+    contact_email = models.EmailField(
+        _("Contact Email"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Public contact email shown in storefront footer and "
+            "contact page. "
+            "Empty falls back to settings.INFO_EMAIL."
+        ),
+    )
+
+    # === Analytics (server-side) ===
+
+    meta_capi_access_token = models.CharField(
+        _("Meta CAPI Access Token"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "Meta Conversions API system user access token. "
+            "Secret — never expose to the browser. "
+            "Empty falls back to settings.META_CAPI_ACCESS_TOKEN."
+        ),
+    )
+    meta_capi_dataset_id = models.CharField(
+        _("Meta CAPI Dataset ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Meta Conversions API dataset (pixel) ID used for "
+            "server-side event deduplication. "
+            "Empty falls back to settings.META_PIXEL_ID."
+        ),
+    )
+
+    # === Payments — Viva Wallet ===
+
+    viva_wallet_merchant_id = models.CharField(
+        _("Viva Wallet Merchant ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Viva Wallet merchant ID. "
+            "Empty falls back to settings.VIVA_WALLET_MERCHANT_ID."
+        ),
+    )
+    viva_wallet_api_key = models.CharField(
+        _("Viva Wallet API Key"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "Viva Wallet API key (classic auth). "
+            "Empty falls back to settings.VIVA_WALLET_API_KEY."
+        ),
+    )
+    viva_wallet_client_id = models.CharField(
+        _("Viva Wallet Client ID"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "Viva Wallet OAuth2 client ID. "
+            "Empty falls back to settings.VIVA_WALLET_CLIENT_ID."
+        ),
+    )
+    viva_wallet_client_secret = models.CharField(
+        _("Viva Wallet Client Secret"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "Viva Wallet OAuth2 client secret. "
+            "Empty falls back to settings.VIVA_WALLET_CLIENT_SECRET."
+        ),
+    )
+    viva_wallet_webhook_verification_key = models.CharField(
+        _("Viva Wallet Webhook Verification Key"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "Viva Wallet webhook verification key for HMAC validation. "
+            "Empty falls back to "
+            "settings.VIVA_WALLET_WEBHOOK_VERIFICATION_KEY."
+        ),
+    )
+
+    # === Shipping — ACS ===
+
+    acs_api_key = models.CharField(
+        _("ACS API Key"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "ACS courier API key. Empty falls back to settings.ACS_API_KEY."
+        ),
+    )
+    acs_company_id = models.CharField(
+        _("ACS Company ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "ACS company identifier. "
+            "Empty falls back to settings.ACS_COMPANY_ID."
+        ),
+    )
+    acs_company_password = models.CharField(
+        _("ACS Company Password"),
+        max_length=128,
+        blank=True,
+        default="",
+        help_text=_(
+            "ACS company password. "
+            "Empty falls back to settings.ACS_COMPANY_PASSWORD."
+        ),
+    )
+    acs_user_id = models.CharField(
+        _("ACS User ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "ACS API user identifier. Empty falls back to settings.ACS_USER_ID."
+        ),
+    )
+    acs_user_password = models.CharField(
+        _("ACS User Password"),
+        max_length=128,
+        blank=True,
+        default="",
+        help_text=_(
+            "ACS API user password. "
+            "Empty falls back to settings.ACS_USER_PASSWORD."
+        ),
+    )
+    acs_billing_code = models.CharField(
+        _("ACS Billing Code"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "ACS billing code (e.g. 'ΑΚ12345678'). "
+            "Empty falls back to settings.ACS_BILLING_CODE."
+        ),
+    )
+    acs_station_origin = models.CharField(
+        _("ACS Station Origin"),
+        max_length=8,
+        blank=True,
+        default="",
+        help_text=_(
+            "ACS origin station code (up to 8 chars). "
+            "Empty falls back to settings.ACS_STATION_ORIGIN."
+        ),
+    )
+
+    # === Shipping — BoxNow (secrets) ===
+
+    box_now_client_id = models.CharField(
+        _("BoxNow Client ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "BoxNow OAuth2 client ID. "
+            "Empty falls back to settings.BOXNOW_CLIENT_ID."
+        ),
+    )
+    box_now_client_secret = models.CharField(
+        _("BoxNow Client Secret"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "BoxNow OAuth2 client secret. "
+            "Empty falls back to settings.BOXNOW_CLIENT_SECRET."
+        ),
+    )
+    box_now_warehouse_id = models.CharField(
+        _("BoxNow Warehouse ID"),
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=_(
+            "BoxNow warehouse identifier. "
+            "Empty falls back to settings.BOXNOW_WAREHOUSE_ID."
+        ),
+    )
+    box_now_notify_phone = models.CharField(
+        _("BoxNow Notify Phone"),
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=_(
+            "Phone number for BoxNow shipment notifications. "
+            "Empty falls back to settings.BOXNOW_NOTIFY_PHONE."
+        ),
+    )
+
+    # === Bot Protection (secret) ===
+
+    turnstile_secret_key = models.CharField(
+        _("Turnstile Secret Key"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "Cloudflare Turnstile secret key (server-side validation). "
+            "Never expose to the browser. "
+            "Empty falls back to settings.TURNSTILE_SECRET_KEY."
+        ),
+    )
+
     auto_create_schema = True
 
     class Meta:
@@ -200,6 +578,10 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         super().clean()
         self._validate_stripe_publishable_key()
         self._validate_allowed_csp_sources()
+        self._validate_meta_pixel_id()
+        self._validate_ga_tracking_id()
+        self._validate_social_urls()
+        self._validate_box_now_partner_id()
 
     def _validate_stripe_publishable_key(self) -> None:
         key = self.stripe_publishable_key
@@ -248,6 +630,74 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                         "Invalid entries: %(bad)s"
                     )
                     % {"bad": ", ".join(str(b) for b in bad)}
+                }
+            )
+
+    def _validate_meta_pixel_id(self) -> None:
+        """Meta Pixel IDs are numeric strings only."""
+        value = self.meta_pixel_id
+        if not value:
+            return
+        if not re.fullmatch(r"\d+", value):
+            raise ValidationError(
+                {
+                    "meta_pixel_id": _(
+                        "Meta Pixel ID must contain digits only "
+                        "(e.g. '123456789012345')."
+                    )
+                }
+            )
+
+    def _validate_ga_tracking_id(self) -> None:
+        """GA tracking IDs must start with G- (GA4) or UA- (Universal)."""
+        value = self.ga_tracking_id
+        if not value:
+            return
+        if not (value.startswith("G-") or value.startswith("UA-")):
+            raise ValidationError(
+                {
+                    "ga_tracking_id": _(
+                        "Google Analytics tracking ID must start with "
+                        "'G-' (GA4) or 'UA-' (Universal Analytics)."
+                    )
+                }
+            )
+
+    _SOCIAL_URL_FIELDS = (
+        "socials_discord",
+        "socials_facebook",
+        "socials_instagram",
+        "socials_pinterest",
+        "socials_reddit",
+        "socials_tiktok",
+        "socials_twitter",
+        "socials_youtube",
+    )
+
+    def _validate_social_urls(self) -> None:
+        """All social URL fields must use https:// when non-empty."""
+        errors: dict[str, list[str]] = {}
+        for field_name in self._SOCIAL_URL_FIELDS:
+            value = getattr(self, field_name, "")
+            if value and not value.startswith("https://"):
+                errors[field_name] = [
+                    _("Social URL must use https://. Got: %(value)s")
+                    % {"value": value}
+                ]
+        if errors:
+            raise ValidationError(errors)
+
+    def _validate_box_now_partner_id(self) -> None:
+        """BoxNow partner ID must be digits only when set."""
+        value = self.box_now_partner_id
+        if not value:
+            return
+        if not re.fullmatch(r"\d+", value):
+            raise ValidationError(
+                {
+                    "box_now_partner_id": _(
+                        "BoxNow Partner ID must contain digits only."
+                    )
                 }
             )
 

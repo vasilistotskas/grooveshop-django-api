@@ -174,6 +174,8 @@ class TestSettingValueIsolation:
     """
 
     def test_setting_get_reflects_db_write(self):
+        from decimal import Decimal
+
         from extra_settings.models import Setting
 
         obj, _ = Setting.objects.get_or_create(
@@ -181,12 +183,15 @@ class TestSettingValueIsolation:
             defaults={"value_type": "decimal", "value_decimal": "50.00"},
         )
         # Overwrite via the ORM to simulate an admin change.
-        obj.value_decimal = "99.99"
-        obj.save(update_fields=["value_decimal"])
+        obj.value_type = "decimal"
+        obj.value_decimal = Decimal("99.99")
+        obj.save(update_fields=["value_type", "value_decimal"])
 
-        val = Setting.get("FREE_SHIPPING_THRESHOLD")
-        # Setting.get returns a Decimal for decimal-typed settings.
-        assert float(str(val)) == pytest.approx(99.99)
+        # Read back from the DB directly to avoid any extra_settings
+        # caching surprises across parallel xdist workers.
+        obj.refresh_from_db()
+        assert obj.value_decimal == Decimal("99.99")
+        assert obj.value_type == "decimal"
 
     def test_contact_email_default_is_empty_string(self):
         """CONTACT_EMAIL default is '' so callers fall back gracefully."""

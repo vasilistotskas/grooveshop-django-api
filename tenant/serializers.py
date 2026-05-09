@@ -27,7 +27,9 @@ class TenantConfigSerializer(serializers.Serializer):
     primary_domain = serializers.SerializerMethodField()
     loyalty_enabled = serializers.BooleanField(read_only=True)
     blog_enabled = serializers.BooleanField(read_only=True)
-    plan = serializers.CharField(read_only=True)
+    # NOTE: ``plan`` is intentionally excluded — it is billing-sensitive
+    # and must not be exposed to unauthenticated callers via tenant/resolve.
+    # Platform admins can read it via TenantAdminSerializer.
 
     def get_primary_domain(self, obj: Tenant) -> str:
         domain = obj.domains.filter(is_primary=True).first()

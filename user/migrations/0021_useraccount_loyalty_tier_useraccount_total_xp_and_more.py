@@ -6,28 +6,47 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('auth', '0012_alter_user_first_name_max_length'),
-        ('country', '0006_remove_country_country_cou_alpha_2_398383_idx_and_more'),
-        ('loyalty', '0001_initial'),
-        ('region', '0006_rename_region_created_at_idx_region_created_at_ix_and_more'),
-        ('user', '0020_remove_mobile_phone_field'),
+        ("auth", "0012_alter_user_first_name_max_length"),
+        (
+            "country",
+            "0006_remove_country_country_cou_alpha_2_398383_idx_and_more",
+        ),
+        (
+            "region",
+            "0006_rename_region_created_at_idx_region_created_at_ix_and_more",
+        ),
+        ("user", "0020_remove_mobile_phone_field"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='useraccount',
-            name='loyalty_tier',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='users', to='loyalty.loyaltytier'),
+            model_name="useraccount",
+            name="loyalty_tier",
+            # db_constraint=False because UserAccount lives in SHARED schema
+            # while LoyaltyTier is per-tenant — PostgreSQL cannot enforce
+            # FKs across schemas. ORM-only relation; tier lookup happens
+            # inside the active tenant's schema_context.
+            field=models.ForeignKey(
+                blank=True,
+                db_constraint=False,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="users",
+                to="loyalty.loyaltytier",
+            ),
         ),
         migrations.AddField(
-            model_name='useraccount',
-            name='total_xp',
-            field=models.PositiveBigIntegerField(default=0, verbose_name='Total XP'),
+            model_name="useraccount",
+            name="total_xp",
+            field=models.PositiveBigIntegerField(
+                default=0, verbose_name="Total XP"
+            ),
         ),
         migrations.AddIndex(
-            model_name='useraccount',
-            index=django.contrib.postgres.indexes.BTreeIndex(fields=['total_xp'], name='user_account_total_xp_ix'),
+            model_name="useraccount",
+            index=django.contrib.postgres.indexes.BTreeIndex(
+                fields=["total_xp"], name="user_account_total_xp_ix"
+            ),
         ),
     ]

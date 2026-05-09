@@ -107,6 +107,11 @@ class UserAccount(
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+        # UserAccount lives in SHARED schema; LoyaltyTier lives in
+        # TENANT schemas. PostgreSQL cannot enforce FKs across schemas,
+        # so this is an ORM-only relation. Tier resolution happens
+        # inside the active tenant's schema_context.
+        db_constraint=False,
     )
     language_code = models.CharField(
         _("Language"),

@@ -168,9 +168,14 @@ class TestRevokeKnoxTokensOnPasswordChange:
 
         # Tokens revoked.
         assert AuthToken.objects.filter(user=user).count() == 0
-        # WS broadcast called with the user's personal group.
-        assert any(group == f"user_{user.pk}" for group, _ in group_sends), (
-            f"Expected group_send to target user_{user.pk}, got {group_sends}"
+        # WS broadcast called with the user's tenant-scoped personal group.
+        # Tests run in the public schema (DATABASE_ROUTERS disabled in
+        # conftest), so the group prefix is "tenant_public".
+        from notification.groups import user_group
+
+        expected_group = user_group("public", user.pk)
+        assert any(group == expected_group for group, _ in group_sends), (
+            f"Expected group_send to target {expected_group}, got {group_sends}"
         )
 
 

@@ -6,7 +6,7 @@ from django.db.models import Count, Q
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import conditional_escape
+from django.utils.html import conditional_escape, format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
@@ -503,16 +503,22 @@ class UserAdmin(ModelAdmin):
         )
         return mark_safe(html)
 
-    @admin.display(description=_("Last Activity"))
+    @admin.display(description=_("Last Activity"), ordering="updated_at")
     def last_activity(self, obj):
-        ts = (
-            obj.updated_at.strftime("%Y-%m-%d %H:%M")
-            if obj.updated_at
-            else "Never"
+        # The column header already says "Last Activity"; the
+        # "Updated:" prefix was redundant and made the timestamp
+        # twice as wide as the actual data.
+        if not obj.updated_at:
+            return format_html(
+                '<span class="text-base-500 dark:text-base-400 italic">'
+                "{}</span>",
+                _("Never"),
+            )
+        return format_html(
+            '<span class="text-sm text-base-700 dark:text-base-300 '
+            'tabular-nums">{}</span>',
+            obj.updated_at.strftime("%Y-%m-%d %H:%M"),
         )
-        esc_ts = conditional_escape(ts)
-        html = f'<div class="text-sm text-base-600 dark:text-base-400"><div>Updated: {esc_ts}</div></div>'
-        return mark_safe(html)
 
     @admin.display(description=_("Social Links Summary"))
     def social_links_summary(self, obj):

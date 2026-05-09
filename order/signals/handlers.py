@@ -7,6 +7,8 @@ from django.dispatch import receiver
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
+from order.signals._tenant import with_tenant_schema_from_event
+
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory, OrderItemHistory
@@ -632,6 +634,7 @@ def handle_order_returned(
 
 
 @djstripe_receiver("payment_intent.succeeded")
+@with_tenant_schema_from_event
 def handle_stripe_payment_succeeded(sender, **kwargs):
     """Handle Stripe payment success webhook."""
     logger.debug("Processing payment_intent.succeeded webhook")
@@ -708,6 +711,7 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
 
 
 @djstripe_receiver("payment_intent.payment_failed")
+@with_tenant_schema_from_event
 def handle_stripe_payment_failed(sender, **kwargs):
     """Handle Stripe payment failure webhook."""
     logger.debug("Processing payment_intent.payment_failed webhook")
@@ -785,6 +789,7 @@ def handle_stripe_payment_failed(sender, **kwargs):
 
 
 @djstripe_receiver("payment_intent.requires_action")
+@with_tenant_schema_from_event
 def handle_stripe_payment_requires_action(sender, **kwargs):
     """Handle Stripe payment requiring action webhook."""
     logger.debug("Processing payment_intent.requires_action webhook")
@@ -820,6 +825,7 @@ def handle_stripe_payment_requires_action(sender, **kwargs):
 
 
 @djstripe_receiver("charge.refunded")
+@with_tenant_schema_from_event
 def handle_stripe_charge_refunded(sender, **kwargs):
     """Handle Stripe ``charge.refunded`` webhook (full + partial).
 
@@ -933,6 +939,7 @@ def handle_stripe_charge_refunded(sender, **kwargs):
 
 
 @djstripe_receiver("charge.dispute.created")
+@with_tenant_schema_from_event
 def handle_stripe_dispute_created(sender, **kwargs):
     """Handle Stripe dispute creation webhook.
 
@@ -1016,6 +1023,7 @@ def handle_stripe_dispute_created(sender, **kwargs):
 
 
 @djstripe_receiver("checkout.session.completed")
+@with_tenant_schema_from_event
 def handle_stripe_checkout_completed(sender, **kwargs):
     """Handle Stripe checkout session completion webhook."""
     logger.debug("Processing checkout.session.completed webhook")
@@ -1125,6 +1133,7 @@ def handle_stripe_checkout_completed(sender, **kwargs):
 
 
 @djstripe_receiver("checkout.session.expired")
+@with_tenant_schema_from_event
 def handle_stripe_checkout_expired(sender, **kwargs):
     """Handle Stripe checkout session expiration webhook."""
     logger.debug("Processing checkout.session.expired webhook")

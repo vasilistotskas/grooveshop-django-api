@@ -147,3 +147,6 @@ NOTES.MD
 /docs/
 .claude/settings.local.json
 /mediafiles_private/
+
+# Per-user Claude agent memory (not shared)
+.claude/agent-memory/

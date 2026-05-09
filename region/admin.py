@@ -2,8 +2,7 @@ from datetime import timedelta
 from django.contrib import admin, messages
 from django.db import models
 from django.utils import timezone
-from django.utils.html import conditional_escape
-from django.utils.safestring import mark_safe
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin, TranslatableTabularInline
 from unfold.admin import ModelAdmin
@@ -420,23 +419,21 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
             else "text-orange-600 dark:text-orange-400"
         )
 
-        safe_name = conditional_escape(name)
-        safe_alpha = conditional_escape(alpha)
-        safe_sort = conditional_escape(str(sort))
-        safe_icon = conditional_escape(status_icon)
-        safe_color = conditional_escape(status_color)
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
-            f'<span class="{safe_color}">{safe_icon}</span>'
-            f"<span>{safe_name}</span>"
+            '<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
+            '<span class="{color}">{icon}</span>'
+            "<span>{name}</span>"
             "</div>"
-            f'<div class="text-base-600 dark:text-base-400">Code: {safe_alpha}</div>'
-            f'<div class="text-xs text-base-600 dark:text-base-300">Sort: {safe_sort}</div>'
-            "</div>"
+            '<div class="text-base-600 dark:text-base-400">Code: {alpha}</div>'
+            '<div class="text-xs text-base-600 dark:text-base-300">Sort: {sort}</div>'
+            "</div>",
+            color=status_color,
+            icon=status_icon,
+            name=name,
+            alpha=alpha,
+            sort=str(sort),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Country"))
     def country_display(self, obj):
@@ -447,40 +444,37 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         )
 
         if country.image_flag:
-            safe_url = conditional_escape(country.image_flag.url)
-            flag_html = (
-                f'<img src="{safe_url}" '
+            flag_html = format_html(
+                '<img src="{url}" '
                 'style="width:24px;height:16px;object-fit:cover;border-radius:2px;'
-                'border:1px solid #e5e7eb;margin-right:8px;" />'
+                'border:1px solid #e5e7eb;margin-right:8px;" />',
+                url=country.image_flag.url,
             )
         else:
-            flag_html = (
+            flag_html = format_html(
                 '<div style="width:24px;height:16px;background:#f3f4f6;border-radius:2px;'
                 "border:1px solid #e5e7eb;margin-right:8px;display:flex;align-items:center;"
                 'justify-content:center;font-size:8px;">🏳️</div>'
             )
 
-        safe_country = conditional_escape(country_name)
-        safe_code = conditional_escape(country.alpha_2)
-        codes_badge = (
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            f'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded border">'
-            f"{safe_code}"
-            "</span>"
-        )
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
             '<div class="flex items-center">'
-            f"{flag_html}"
+            "{flag}"
             "<div>"
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_country}</div>'
-            f'<div class="flex gap-1 mt-1">{codes_badge}</div>'
+            '<div class="font-medium text-base-900 dark:text-base-100">{country}</div>'
+            '<div class="flex gap-1 mt-1">'
+            '<span class="inline-flex items-center px-2 py-1 text-xs'
+            " font-medium bg-blue-50 dark:bg-blue-900 text-blue-700"
+            ' dark:text-blue-200 rounded border">{code}</span>'
             "</div>"
             "</div>"
             "</div>"
+            "</div>",
+            flag=flag_html,
+            country=country_name,
+            code=country.alpha_2,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Stats"))
     def region_stats(self, obj):
@@ -492,23 +486,28 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         is_alpha = obj.alpha.isalpha()
 
         if is_num:
-            badge = '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">🔢 Numeric</span>'
+            badge = format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 rounded">🔢 Numeric</span>'
+            )
         elif is_alpha:
-            badge = '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">🔤 Alpha</span>'
+            badge = format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded">🔤 Alpha</span>'
+            )
         else:
-            badge = '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded">🔀 Mixed</span>'
+            badge = format_html(
+                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded">🔀 Mixed</span>'
+            )
 
-        safe_name_len = conditional_escape(str(name_len))
-        safe_code_len = conditional_escape(str(code_len))
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_code_len} chars</div>'
-            f'<div class="text-base-600 dark:text-base-400">{safe_name_len} name</div>'
-            f'<div class="mt-1">{badge}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{code_len} chars</div>'
+            '<div class="text-base-600 dark:text-base-400">{name_len} name</div>'
+            '<div class="mt-1">{badge}</div>'
+            "</div>",
+            code_len=code_len,
+            name_len=name_len,
+            badge=badge,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Sort Order"))
     def sort_display(self, obj):
@@ -528,22 +527,19 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
             icon = "✅"
             label = f"#{sort}"
 
-        safe_sort = conditional_escape(
-            str(sort if sort is not None else "None")
-        )
-        safe_badge = conditional_escape(badge_class)
-        safe_icon = conditional_escape(icon)
-        safe_label = conditional_escape(label)
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_sort}</div>'
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium {safe_badge} rounded gap-1">'
-            f"<span>{safe_icon}</span><span>{safe_label}</span>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{sort}</div>'
+            '<span class="inline-flex items-center px-2 py-1 text-xs'
+            ' font-medium {badge_class} rounded gap-1">'
+            "<span>{icon}</span><span>{label}</span>"
             "</span>"
-            "</div>"
+            "</div>",
+            sort=str(sort if sort is not None else "None"),
+            badge_class=badge_class,
+            icon=icon,
+            label=label,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Completeness"))
     def completeness_badge(self, obj):
@@ -574,35 +570,30 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
             icon = "❌"
             lbl = "Poor"
 
-        safe_pct = conditional_escape(str(pct))
-        safe_cls = conditional_escape(cls)
-        safe_icon = conditional_escape(icon)
-        safe_lbl = conditional_escape(lbl)
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_pct}%</div>'
-            f'<span class="inline-flex items-center px-2 py-1 text-xs font-medium {safe_cls} rounded border gap-1">'
-            f"<span>{safe_icon}</span><span>{safe_lbl}</span>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{pct}%</div>'
+            '<span class="inline-flex items-center px-2 py-1 text-xs'
+            ' font-medium {cls} rounded border gap-1">'
+            "<span>{icon}</span><span>{lbl}</span>"
             "</span>"
-            "</div>"
+            "</div>",
+            pct=pct,
+            cls=cls,
+            icon=icon,
+            lbl=lbl,
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Created"))
     def created_display(self, obj):
-        date_str = obj.created_at.strftime("%Y-%m-%d")
-        time_str = obj.created_at.strftime("%H:%M")
-        safe_date = conditional_escape(date_str)
-        safe_time = conditional_escape(time_str)
-
-        html = (
+        return format_html(
             '<div class="text-sm">'
-            f'<div class="font-medium text-base-900 dark:text-base-100">{safe_date}</div>'
-            f'<div class="text-base-600 dark:text-base-400">{safe_time}</div>'
-            "</div>"
+            '<div class="font-medium text-base-900 dark:text-base-100">{date}</div>'
+            '<div class="text-base-600 dark:text-base-400">{time}</div>'
+            "</div>",
+            date=obj.created_at.strftime("%Y-%m-%d"),
+            time=obj.created_at.strftime("%H:%M"),
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Region Analytics"))
     def region_analytics(self, obj):
@@ -617,26 +608,24 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         pattern = "Numeric" if is_num else "Alpha" if is_alpha else "Mixed"
         case = "Mixed" if has_up and has_lo else "Upper" if has_up else "Lower"
 
-        safe_name_len = conditional_escape(str(name_len))
-        safe_code_len = conditional_escape(str(code_len))
-        safe_pattern = conditional_escape(pattern)
-        safe_case = conditional_escape(case)
-        safe_has_name = conditional_escape("Yes" if name else "No")
-        safe_sort = conditional_escape(
-            str(obj.sort_order) if obj.sort_order is not None else "Not Set"
-        )
-
-        html = (
+        return format_html(
             '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Name Length:</strong></div><div>{safe_name_len} chars</div>"
-            f"<div><strong>Code Length:</strong></div><div>{safe_code_len} chars</div>"
-            f"<div><strong>Code Pattern:</strong></div><div>{safe_pattern}</div>"
-            f"<div><strong>Case Pattern:</strong></div><div>{safe_case}</div>"
-            f"<div><strong>Has Name:</strong></div><div>{safe_has_name}</div>"
-            f"<div><strong>Sort Position:</strong></div><div>{safe_sort}</div>"
-            "</div></div>"
+            "<div><strong>Name Length:</strong></div><div>{name_len} chars</div>"
+            "<div><strong>Code Length:</strong></div><div>{code_len} chars</div>"
+            "<div><strong>Code Pattern:</strong></div><div>{pattern}</div>"
+            "<div><strong>Case Pattern:</strong></div><div>{case}</div>"
+            "<div><strong>Has Name:</strong></div><div>{has_name}</div>"
+            "<div><strong>Sort Position:</strong></div><div>{sort}</div>"
+            "</div></div>",
+            name_len=name_len,
+            code_len=code_len,
+            pattern=pattern,
+            case=case,
+            has_name="Yes" if name else "No",
+            sort=str(obj.sort_order)
+            if obj.sort_order is not None
+            else "Not Set",
         )
-        return mark_safe(html)
 
     @admin.display(description=_("Country Analytics"))
     def country_analytics(self, obj):
@@ -653,24 +642,22 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
             + 1
         )
 
-        safe_cname = conditional_escape(cname)
-        safe_code = conditional_escape(country.alpha_2)
-        safe_total = conditional_escape(str(total_regions))
-        safe_pos = conditional_escape(str(position))
-        safe_flag = conditional_escape("Yes" if country.image_flag else "No")
-        safe_iso = conditional_escape("Yes" if country.iso_cc else "No")
-
-        html = (
+        return format_html(
             '<div class="text-sm"><div class="grid grid-cols-2 gap-2">'
-            f"<div><strong>Country:</strong></div><div>{safe_cname}</div>"
-            f"<div><strong>Country Code:</strong></div><div>{safe_code}</div>"
-            f"<div><strong>Total Regions:</strong></div><div>{safe_total}</div>"
-            f"<div><strong>Position:</strong></div><div>{safe_pos} of {safe_total}</div>"
-            f"<div><strong>Has Flag:</strong></div><div>{safe_flag}</div>"
-            f"<div><strong>Has ISO:</strong></div><div>{safe_iso}</div>"
-            "</div></div>"
+            "<div><strong>Country:</strong></div><div>{cname}</div>"
+            "<div><strong>Country Code:</strong></div><div>{code}</div>"
+            "<div><strong>Total Regions:</strong></div><div>{total}</div>"
+            "<div><strong>Position:</strong></div><div>{pos} of {total}</div>"
+            "<div><strong>Has Flag:</strong></div><div>{has_flag}</div>"
+            "<div><strong>Has ISO:</strong></div><div>{has_iso}</div>"
+            "</div></div>",
+            cname=cname,
+            code=country.alpha_2,
+            total=total_regions,
+            pos=position,
+            has_flag="Yes" if country.image_flag else "No",
+            has_iso="Yes" if country.iso_cc else "No",
         )
-        return mark_safe(html)
 
     @action(
         description=str(_("Update sort order")),

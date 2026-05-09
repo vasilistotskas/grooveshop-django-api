@@ -9,6 +9,7 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
 )
 
+from core.admin import ExportActionMixin
 from loyalty.models.tier import LoyaltyTier
 from loyalty.models.transaction import PointsTransaction
 
@@ -44,7 +45,8 @@ class LoyaltyTierAdmin(ModelAdmin, TranslatableAdmin):
 
 
 @admin.register(PointsTransaction)
-class PointsTransactionAdmin(ModelAdmin):
+class PointsTransactionAdmin(ExportActionMixin, ModelAdmin):
+    actions = ["export_csv", "export_xml"]
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True

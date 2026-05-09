@@ -19,6 +19,8 @@ from unfold.contrib.forms.widgets import WysiwygWidget
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
+from core.admin import ExportActionMixin
+
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
@@ -517,7 +519,7 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
 
 
 @admin.register(BlogPost)
-class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
+class BlogPostAdmin(ExportActionMixin, ModelAdmin, TranslatableAdmin):
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True
@@ -588,6 +590,8 @@ class BlogPostAdmin(ModelAdmin, TranslatableAdmin):
         "unpublish_posts",
         "increment_view_count",
         "reset_view_count",
+        "export_csv",
+        "export_xml",
     ]
     date_hierarchy = "published_at"
     save_on_top = True

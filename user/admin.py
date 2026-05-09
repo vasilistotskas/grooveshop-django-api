@@ -13,6 +13,7 @@ from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin, TabularInline
 
 from admin.base import BaseModelAdmin
+from core.admin import ExportActionMixin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateFilter,
@@ -197,7 +198,8 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
 
 
 @admin.register(UserAccount)
-class UserAdmin(BaseModelAdmin):
+class UserAdmin(ExportActionMixin, BaseModelAdmin):
+    actions = ["export_csv", "export_xml"]
 
     form = UserChangeForm
     add_form = UserCreationForm

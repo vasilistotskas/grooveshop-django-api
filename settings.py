@@ -295,7 +295,13 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
+        # IsTenantMemberOrReadOnly is a drop-in for IsAuthenticatedOrReadOnly
+        # that additionally validates tenant membership for authenticated
+        # requests.  Anonymous GET/HEAD/OPTIONS are still allowed so public
+        # catalog endpoints keep working without explicit overrides.
+        # ViewSets that need anonymous write access (guest checkout, contact)
+        # must set permission_classes = [AllowAny] explicitly.
+        "tenant.membership.IsTenantMemberOrReadOnly",
     ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
@@ -2695,10 +2701,10 @@ if USE_AWS:
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
     # s3 private media settings
     PRIVATE_MEDIA_LOCATION = "private"
-    PRIVATE_FILE_STORAGE = "core.storages.PrivateMediaStorage"
+    PRIVATE_FILE_STORAGE = "core.storages.TenantPrivateMediaStorage"
     STORAGES = {
         "default": {
-            "BACKEND": "core.storages.PublicMediaStorage",
+            "BACKEND": "core.storages.TenantPublicMediaStorage",
         },
         "staticfiles": {
             "BACKEND": "core.storages.StaticStorage",

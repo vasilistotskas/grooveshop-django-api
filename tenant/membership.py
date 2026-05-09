@@ -74,3 +74,43 @@ class HasTenantAccess(permissions.BasePermission):
 
     def has_permission(self, request, view):
         return user_has_tenant_access(request.user)
+
+
+class IsTenantMemberOrReadOnly(permissions.BasePermission):
+    """Drop-in replacement for ``IsAuthenticatedOrReadOnly`` that also
+    validates tenant membership for authenticated requests.
+
+    Rules:
+    - Anonymous requests on SAFE_METHODS (GET, HEAD, OPTIONS): allowed.
+    - Authenticated requests: user must have an active ``UserTenantMembership``
+      for the current ``connection.tenant``.  If the connection is in the
+      public schema (no tenant attached) the membership check is skipped
+      and the request is allowed — this preserves correct behaviour for
+      platform-admin and health-check paths that run in the public schema.
+
+    This permission is used as the global default in ``DEFAULT_PERMISSION_CLASSES``
+    so that every new ViewSet inherits secure-by-default behaviour without
+    requiring explicit per-viewset annotations.  ViewSets that need fully
+    anonymous write access (e.g. guest checkout, contact form) must override
+    ``permission_classes = [AllowAny]`` explicitly.
+    """
+
+    message = "You do not have access to this store."
+
+    def has_permission(self, request, view):
+        # Allow all safe (read-only) requests from anonymous users.
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        # Unauthenticated write attempt — deny.
+        if not getattr(request.user, "is_authenticated", False):
+            return False
+
+        # Authenticated request — require tenant membership when a tenant
+        # is active on this connection.
+        tenant = get_current_tenant()
+        if tenant is None:
+            # Public-schema path (admin, health, platform routines).
+            return True
+
+        return user_has_tenant_access(request.user, tenant)

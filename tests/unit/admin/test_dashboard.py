@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 
 from admin.dashboard import (
     DASHBOARD_CACHE_KEY,
@@ -25,6 +25,19 @@ from admin.dashboard import (
 User = get_user_model()
 
 
+# Force LocMem cache for these tests so pickle of patched MagicMock objects
+# never hits a Redis backend (which surfaces as a "not the same object as
+# unittest.mock.MagicMock" error in some environments — Redis stores the
+# pickle bytes alongside the class qualified name, and parallel xdist
+# workers can race on conftest-level CACHES overrides).
+@override_settings(
+    CACHES={
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "dashboard-test-cache",
+        }
+    }
+)
 class DashboardCallbackCachingTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()

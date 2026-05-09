@@ -511,10 +511,13 @@ class VivaWalletPaymentProvider(PaymentProvider):
     LIVE_TRANSACTIONS_URL = "https://www.vivapayments.com"
 
     def __init__(self):
-        self.merchant_id = getattr(settings, "VIVA_WALLET_MERCHANT_ID", "")
-        self.api_key = getattr(settings, "VIVA_WALLET_API_KEY", "")
-        self.client_id = getattr(settings, "VIVA_WALLET_CLIENT_ID", "")
-        self.client_secret = getattr(settings, "VIVA_WALLET_CLIENT_SECRET", "")
+        from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+
+        creds = viva_wallet_credentials()
+        self.merchant_id = creds["merchant_id"]
+        self.api_key = creds["api_key"]
+        self.client_id = creds["client_id"]
+        self.client_secret = creds["client_secret"]
         self.source_code = getattr(
             settings, "VIVA_WALLET_SOURCE_CODE", "Default"
         )

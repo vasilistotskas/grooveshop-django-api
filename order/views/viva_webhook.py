@@ -171,17 +171,18 @@ def _handle_verification(request):
         request.META.get("REMOTE_ADDR", ""),
         request.META.get("HTTP_X_FORWARDED_FOR", ""),
     )
-    verification_key = getattr(
-        settings, "VIVA_WALLET_WEBHOOK_VERIFICATION_KEY", ""
-    )
+    from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+
+    creds = viva_wallet_credentials()
+    verification_key = creds["webhook_verification_key"]
 
     if verification_key:
-        logger.info("Using configured VIVA_WALLET_WEBHOOK_VERIFICATION_KEY")
+        logger.info("Using configured Viva Wallet webhook verification key")
     else:
         logger.info(
-            "VIVA_WALLET_WEBHOOK_VERIFICATION_KEY not set — fetching from Viva"
+            "Viva Wallet webhook verification key not set — fetching from Viva"
         )
-        verification_key = _fetch_verification_key()
+        verification_key = _fetch_verification_key(creds)
 
     if not verification_key:
         logger.error(
@@ -200,14 +201,17 @@ def _handle_verification(request):
     )
 
 
-def _fetch_verification_key():
-    merchant_id = getattr(settings, "VIVA_WALLET_MERCHANT_ID", "")
-    api_key = getattr(settings, "VIVA_WALLET_API_KEY", "")
+def _fetch_verification_key(creds: dict | None = None):
+    if creds is None:
+        from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+
+        creds = viva_wallet_credentials()
+
+    merchant_id = creds["merchant_id"]
+    api_key = creds["api_key"]
 
     if not merchant_id or not api_key:
-        logger.error(
-            "VIVA_WALLET_MERCHANT_ID or VIVA_WALLET_API_KEY not configured"
-        )
+        logger.error("Viva Wallet merchant_id or api_key not configured")
         return ""
 
     live_mode = getattr(settings, "VIVA_WALLET_LIVE_MODE", False)

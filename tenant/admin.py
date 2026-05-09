@@ -77,8 +77,121 @@ class TenantAdmin(admin.ModelAdmin):
             {"fields": ["loyalty_enabled", "blog_enabled"]},
         ),
         (
+            "Analytics",
+            {
+                "fields": [
+                    "meta_pixel_id",
+                    "ga_tracking_id",
+                    "meta_capi_access_token",
+                    "meta_capi_dataset_id",
+                ],
+                "classes": ["collapse"],
+            },
+        ),
+        (
+            "Social Links",
+            {
+                "fields": [
+                    "socials_discord",
+                    "socials_facebook",
+                    "socials_instagram",
+                    "socials_pinterest",
+                    "socials_reddit",
+                    "socials_tiktok",
+                    "socials_twitter",
+                    "socials_youtube",
+                ],
+                "classes": ["collapse"],
+            },
+        ),
+        (
+            "Email",
+            {
+                "fields": [
+                    "from_email",
+                    "contact_email",
+                ],
+                "classes": ["collapse"],
+            },
+        ),
+        (
+            "Authentication",
+            {
+                "fields": ["totp_issuer"],
+                "classes": ["collapse"],
+            },
+        ),
+        (
+            "Bot Protection",
+            {
+                "fields": [
+                    "turnstile_site_key",
+                    "turnstile_secret_key",
+                ],
+                "classes": ["collapse"],
+            },
+        ),
+        (
+            "Security",
+            {
+                "fields": ["allowed_csp_sources"],
+                "classes": ["collapse"],
+            },
+        ),
+        (
+            "Payments — Viva Wallet",
+            {
+                "fields": [
+                    "viva_wallet_merchant_id",
+                    "viva_wallet_api_key",
+                    "viva_wallet_client_id",
+                    "viva_wallet_client_secret",
+                    "viva_wallet_webhook_verification_key",
+                ],
+                "classes": ["collapse"],
+            },
+        ),
+        (
+            "Shipping — ACS",
+            {
+                "fields": [
+                    "acs_api_key",
+                    "acs_company_id",
+                    "acs_company_password",
+                    "acs_user_id",
+                    "acs_user_password",
+                    "acs_billing_code",
+                    "acs_station_origin",
+                ],
+                "classes": ["collapse"],
+            },
+        ),
+        (
+            "Shipping — BoxNow",
+            {
+                "fields": [
+                    "box_now_partner_id",
+                    "box_now_client_id",
+                    "box_now_client_secret",
+                    "box_now_warehouse_id",
+                    "box_now_notify_phone",
+                ],
+                "classes": ["collapse"],
+            },
+        ),
+        (
+            "Stripe",
+            {
+                "fields": ["stripe_publishable_key"],
+                "classes": ["collapse"],
+            },
+        ),
+        (
             "Timestamps",
-            {"fields": ["created_at", "updated_at"]},
+            {
+                "fields": ["created_at", "updated_at"],
+                "classes": ["collapse"],
+            },
         ),
     ]
 

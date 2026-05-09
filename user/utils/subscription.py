@@ -57,7 +57,25 @@ def send_subscription_confirmation(
         return False
 
     try:
-        confirmation_url = Setting.get("SUBSCRIPTION_CONFIRMATION_URL")
+        # SUBSCRIPTION_CONFIRMATION_URL is a relative path template
+        # (e.g. "/api/v1/user/subscription/confirm/{token}").  We
+        # prepend the current tenant's API base URL at send time so the
+        # link is always correct for the tenant that owns the request,
+        # rather than relying on API_BASE_URL baked into the setting at
+        # startup.
+        url_path_template = Setting.get("SUBSCRIPTION_CONFIRMATION_URL")
+        api_base = settings.API_BASE_URL.rstrip("/")
+        # If the stored value already looks like an absolute URL (legacy
+        # rows from before this fix), respect it as-is so existing tenants
+        # aren't broken until they run backfill_extra_settings_defaults.
+        if url_path_template and url_path_template.startswith("http"):
+            raw_confirmation_url = url_path_template
+        else:
+            raw_confirmation_url = f"{api_base}{url_path_template}"
+        confirmation_url = raw_confirmation_url.format(
+            token=subscription.confirmation_token
+        )
+
         user = subscription.user
         language = get_user_language(user)
 
@@ -65,9 +83,7 @@ def send_subscription_confirmation(
             "user": user,
             "topic": subscription.topic,
             "subscription": subscription,
-            "confirmation_url": confirmation_url.format(
-                token=subscription.confirmation_token
-            ),
+            "confirmation_url": confirmation_url,
             "SITE_NAME": settings.SITE_NAME,
             "SITE_URL": get_tenant_base_url(),
             "INFO_EMAIL": settings.INFO_EMAIL,

@@ -1159,7 +1159,21 @@ EXTRA_SETTINGS_DEFAULTS = [
     {
         "name": "SUBSCRIPTION_CONFIRMATION_URL",
         "type": "string",
-        "value": f"{API_BASE_URL}/api/v1/user/subscription/confirm/{{token}}",
+        # Relative path template — the {token} placeholder is filled at
+        # send time.  The full URL is built dynamically by
+        # send_subscription_confirmation() via get_tenant_base_url() so
+        # that the link points to the correct tenant's API domain rather
+        # than the platform-wide API_BASE_URL baked at startup.
+        "value": "/api/v1/user/subscription/confirm/{token}",
+        "description": (
+            "URL path template for subscription confirmation emails. "
+            "The {token} placeholder is substituted at send time. "
+            "The API host prefix is prepended dynamically using the "
+            "current tenant's primary domain (falls back to "
+            "settings.API_BASE_URL). "
+            "Example resolved value: "
+            "https://myshop.com/api/v1/user/subscription/confirm/abc123"
+        ),
     },
     {
         "name": "STOCK_RESERVATION_TTL_MINUTES",
@@ -1190,6 +1204,17 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "CHECKOUT_ABANDONMENT_HOURS",
         "type": "int",
         "value": 2,
+    },
+    # Contact / email
+    {
+        "name": "CONTACT_EMAIL",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Public contact email for the storefront footer and contact "
+            "page. Empty → falls back to Tenant.contact_email (if set) "
+            "or settings.INFO_EMAIL."
+        ),
     },
     # Meta Conversions API
     {

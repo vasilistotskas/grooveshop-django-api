@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
+
 from django import forms
 from django.db import connection
 from django.utils.translation import gettext_lazy as _
 
 from tenant.membership import user_has_tenant_access
 from user.adapter import SocialAccountAdapter, UserAccountAdapter
+
+logger = logging.getLogger(__name__)
 
 
 def _ensure_member_membership(user) -> None:
@@ -129,7 +133,71 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
     hit ``pre_login`` (which runs for both flows) and get rejected with
     "You do not have access to this store" — even though the signup
     just succeeded on the same tenant.
+
+    Additionally overrides ``get_app`` to look for a per-tenant
+    ``SocialApp`` row (linked to the tenant's primary domain via the Sites
+    framework) before falling back to the global ``SOCIALACCOUNT_PROVIDERS``
+    settings config.  This enables tenants to use their own OAuth app
+    credentials — e.g. so each tenant's OAuth consent screen shows their
+    own brand name.
+
+    Design rationale — Sites vs new FK:
+    allauth's ``SocialApp`` already has a M2M to ``django.contrib.sites.Site``.
+    Each tenant's primary domain corresponds to a ``Site`` row whose domain
+    matches.  Using the existing Sites relationship avoids a new DB migration
+    and keeps allauth's own tooling (admin, shell) usable for managing apps.
     """
+
+    def get_app(self, request, provider, client_id=None):
+        """Return the ``SocialApp`` for ``provider`` on the current tenant.
+
+        Lookup order:
+        1. ``SocialApp`` rows linked via Sites to the tenant's primary domain.
+        2. Super (settings-based APP config or unfiltered DB lookup).
+
+        Falls back gracefully when:
+        - The Sites framework has no row for the tenant domain.
+        - No per-tenant ``SocialApp`` is configured (single-tenant deployments).
+        """
+        tenant = getattr(connection, "tenant", None)
+        if (
+            tenant is not None
+            and getattr(tenant, "schema_name", "public") != "public"
+        ):
+            try:
+                from allauth.socialaccount.models import (  # noqa: PLC0415
+                    SocialApp,
+                )
+                from django.contrib.sites.models import Site  # noqa: PLC0415
+
+                # Find the Site row whose domain matches this tenant's
+                # primary domain.  Uses select_related to avoid N+1.
+                primary_domain_obj = tenant.domains.filter(
+                    is_primary=True
+                ).first()
+                if primary_domain_obj:
+                    site = Site.objects.filter(
+                        domain=primary_domain_obj.domain
+                    ).first()
+                    if site:
+                        qs = SocialApp.objects.filter(
+                            provider=provider, sites=site
+                        )
+                        if client_id:
+                            qs = qs.filter(client_id=client_id)
+                        app = qs.first()
+                        if app is not None:
+                            return app
+            except Exception:
+                logger.warning(
+                    "TenantSocialAccountAdapter.get_app: error during "
+                    "per-tenant lookup for provider %r on tenant %r",
+                    provider,
+                    getattr(tenant, "schema_name", "?"),
+                    exc_info=True,
+                )
+
+        return super().get_app(request, provider, client_id=client_id)
 
     def save_user(self, request, sociallogin, form=None):
         user = super().save_user(request, sociallogin, form=form)

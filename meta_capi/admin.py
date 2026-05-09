@@ -18,6 +18,8 @@ class MetaCapiEventLogAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
     )
     list_filter = ("status", "event_name", "created_at")
     search_fields = ("event_id", "fbtrace_id", "order__id", "user__email")
+    date_hierarchy = "created_at"
+    list_per_page = 50
     readonly_fields = (
         "event_name",
         "event_id",

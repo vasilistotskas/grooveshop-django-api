@@ -14,6 +14,7 @@ from unfold.decorators import action
 from unfold.enums import ActionVariant
 
 from country.models import Country
+from region.admin import RegionInline
 
 
 class CountryStatusFilter(DropdownFilter):
@@ -85,6 +86,7 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
     )
     list_per_page = 50
     ordering = ["sort_order", "alpha_2"]
+    inlines = [RegionInline]
     actions = [
         "update_sort_order",
     ]

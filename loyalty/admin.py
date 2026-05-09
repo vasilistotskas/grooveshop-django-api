@@ -68,6 +68,8 @@ class PointsTransactionAdmin(ModelAdmin):
     )
     list_select_related = ("user", "reference_order")
     ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+    list_per_page = 50
 
     def has_add_permission(self, request):
         return False

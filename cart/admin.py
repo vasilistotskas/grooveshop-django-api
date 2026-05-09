@@ -424,6 +424,7 @@ class CartItemAdmin(ModelAdmin):
     list_fullwidth = True
     list_filter_submit = True
     list_filter_sheet = True
+    date_hierarchy = "created_at"
 
     list_display = (
         "cart_info",

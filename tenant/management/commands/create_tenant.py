@@ -51,6 +51,7 @@ class Command(BaseCommand):
             plan=options["plan"],
             store_name=options["store_name"] or options["name"],
             is_active=True,
+            suspended_at=None,
         )
 
         TenantDomain.objects.create(

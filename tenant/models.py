@@ -63,6 +63,17 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     slug = models.SlugField(_("Slug"), max_length=100, unique=True)
     owner_email = models.EmailField(_("Owner Email"))
     is_active = models.BooleanField(_("Active"), default=True)
+    suspended_at = models.DateTimeField(
+        _("Suspended At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Timestamp when this tenant was last suspended. "
+            "Set automatically by the suspend admin action. "
+            "Required to be at least 24 hours in the past before "
+            "the tenant can be permanently destroyed."
+        ),
+    )
 
     # Plan / billing
     plan = models.CharField(
@@ -566,6 +577,36 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     )
 
     auto_create_schema = True
+
+    # Schema names that may never be deleted through normal paths.
+    # Deletion of these tenants would destroy the platform itself.
+    _PROTECTED_SCHEMAS = frozenset({"public", "webside"})
+
+    def delete(self, *args, force_drop: bool = False, **kwargs):
+        """Block deletion of protected tenants.
+
+        Raises ``ValidationError`` when called on a tenant whose
+        ``schema_name`` is in ``_PROTECTED_SCHEMAS``. All other tenants
+        pass through to the django-tenants ``TenantMixin.delete()``
+        which respects the ``force_drop`` kwarg to optionally drop the
+        Postgres schema.
+
+        Parameters
+        ----------
+        force_drop:
+            When True the underlying Postgres schema is dropped before
+            the row is removed. Defaults to False so that accidental
+            row deletion does not silently destroy tenant data.
+        """
+        if self.schema_name in self._PROTECTED_SCHEMAS:
+            raise ValidationError(
+                _(
+                    "Tenant '%(schema)s' is a protected system tenant "
+                    "and cannot be deleted."
+                )
+                % {"schema": self.schema_name}
+            )
+        return super().delete(*args, force_drop=force_drop, **kwargs)
 
     class Meta:
         verbose_name = _("Tenant")

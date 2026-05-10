@@ -301,25 +301,45 @@ def _reset_payment_events_redis_client():
 
 @pytest.fixture(autouse=True)
 def _reseed_extra_settings(request):
-    """Ensure ``EXTRA_SETTINGS_DEFAULTS`` rows exist before every DB test.
+    """Ensure ``EXTRA_SETTINGS_DEFAULTS`` rows exist + drop any cached
+    Setting values before every DB test.
 
-    ``django-extra-settings`` seeds its rows via a ``post_migrate`` signal
-    that only fires at DB creation. Tests marked
-    ``@pytest.mark.django_db(transaction=True)`` (e.g. concurrent stock
-    tests) flush every table on teardown, wiping the ``Setting`` rows.
-    A subsequent test calling ``Setting.get("STOCK_RESERVATION_TTL_MINUTES")``
-    would hit an empty DB and fall back to the code-level default
-    (``StockManager.RESERVATION_TTL_MINUTES_DEFAULT = 15``) instead of
-    the configured 30, producing intermittent assertion failures in
-    ``tests/integration/order/test_stock_reservation_ttl.py``.
+    Two failure modes that this guards:
 
-    ``set_defaults_from_settings`` calls ``get_or_create`` per entry —
-    cheap no-op when rows are intact, restorative when they are not.
+    1. ``django-extra-settings`` seeds its rows via a ``post_migrate``
+       signal that only fires at DB creation. Tests marked
+       ``@pytest.mark.django_db(transaction=True)`` flush every table on
+       teardown, wiping ``Setting`` rows. A subsequent test calling
+       ``Setting.get(...)`` would hit an empty DB and fall back to the
+       code-level default. ``set_defaults_from_settings`` (uses
+       ``get_or_create``) is cheap when rows are intact, restorative
+       when they are not.
+
+    2. **Stale cache across xdist workers (CI repro)**. Although the
+       conftest patches ``extra_settings.cache._get_cache`` to a
+       DummyCache, the package's ``post_save`` signal can still write
+       through the cache helpers if any consumer imported the
+       ``set_cached_setting`` function before the patch landed. Calling
+       ``Setting.objects.update_or_create(name="MYDATA_ENABLED", ...)``
+       in test A would emit ``post_save`` → cache write to whichever
+       backend is live at signal time. Test B reading the same key
+       would then short-circuit on the stale cache value and never hit
+       the DB. Forcing every read to a freshly cleared cache eliminates
+       the entire class of "Setting set but read returns stale" CI
+       flakes (``test_routes_to_mydata_when_enabled``,
+       ``test_pickup_point_enabled_when_setting_on``, BoxNow availability
+       checks, etc.). Cost is one ``cache.clear`` per DB test, which is
+       a no-op for DummyCache and ~1ms for LocMem/Redis.
     """
     if request.node.get_closest_marker("django_db"):
         try:
+            from extra_settings.cache import _get_cache as _es_get_cache
             from extra_settings.models import Setting
 
+            try:
+                _es_get_cache().clear()
+            except Exception:
+                pass
             Setting.set_defaults_from_settings()
         except Exception:
             pass

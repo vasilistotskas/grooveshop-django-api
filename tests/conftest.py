@@ -333,11 +333,30 @@ def _reseed_extra_settings(request):
     """
     if request.node.get_closest_marker("django_db"):
         try:
-            from extra_settings.cache import _get_cache as _es_get_cache
+            from extra_settings.cache import (
+                _get_cache as _es_get_cache,
+                _get_cache_key,
+            )
             from extra_settings.models import Setting
 
+            # Clear via every possible cache route so a stale post_save
+            # write under any cache backend doesn't survive into the
+            # next test. The two ``cache.clear()`` calls are independent:
+            # one drops keys via the patched _get_cache (DummyCache no-op),
+            # the other drops keys via Django's default ``cache`` proxy
+            # (the real backend, possibly Redis in CI).
             try:
                 _es_get_cache().clear()
+            except Exception:
+                pass
+            try:
+                cache.delete_many(
+                    [
+                        _get_cache_key(item["name"])
+                        for item in settings.EXTRA_SETTINGS_DEFAULTS
+                        if isinstance(item, dict) and "name" in item
+                    ]
+                )
             except Exception:
                 pass
             Setting.set_defaults_from_settings()

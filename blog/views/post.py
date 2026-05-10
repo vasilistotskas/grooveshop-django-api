@@ -33,6 +33,7 @@ from blog.strategies.weighted_related_posts_strategy import (
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from tenant.permissions import IsBlogEnabled
 
 from core.utils.serializers import (
     ActionConfig,
@@ -188,8 +189,8 @@ class BlogPostViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsAdminUser()]
-        return [AllowAny()]
+            return [IsBlogEnabled(), IsAdminUser()]
+        return [IsBlogEnabled(), AllowAny()]
 
     search_fields = [
         "translations__title",

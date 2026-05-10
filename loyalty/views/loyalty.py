@@ -32,6 +32,7 @@ from loyalty.serializers.loyalty import (
 from loyalty.serializers.tier import LoyaltyTierSerializer
 from loyalty.services import LoyaltyService
 from product.models.product import Product
+from tenant.permissions import IsLoyaltyEnabled
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,11 @@ class LoyaltyViewSet(BaseModelViewSet):
     """
 
     queryset = PointsTransaction.objects.none()
-    permission_classes = [IsAuthenticated]
+    # IsLoyaltyEnabled fires first and raises 404 when the tenant's
+    # loyalty_enabled flag is False.  IsAuthenticated then enforces that
+    # all loyalty actions require a logged-in user. Both conditions must
+    # hold — the feature gate does NOT bypass auth.
+    permission_classes = [IsLoyaltyEnabled, IsAuthenticated]
     serializers_config = serializers_config
 
     @action(detail=False, methods=["GET"])

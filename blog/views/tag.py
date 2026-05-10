@@ -13,6 +13,7 @@ from blog.serializers.tag import (
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from tenant.permissions import IsBlogEnabled
 
 from core.utils.serializers import (
     SerializersConfig,
@@ -48,8 +49,8 @@ class BlogTagViewSet(BaseModelViewSet):
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):
-            return [IsAdminUser()]
-        return [AllowAny()]
+            return [IsBlogEnabled(), IsAdminUser()]
+        return [IsBlogEnabled(), AllowAny()]
 
     ordering_fields = [
         "id",

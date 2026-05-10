@@ -17,6 +17,7 @@ from blog.serializers.author import (
 from blog.serializers.post import BlogPostSerializer
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from tenant.permissions import IsBlogEnabled
 
 from core.utils.serializers import (
     ActionConfig,
@@ -69,8 +70,8 @@ class BlogAuthorViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsAdminUser()]
-        return [AllowAny()]
+            return [IsBlogEnabled(), IsAdminUser()]
+        return [IsBlogEnabled(), AllowAny()]
 
     def get_filterset_class(self):
         if self.action == "posts":

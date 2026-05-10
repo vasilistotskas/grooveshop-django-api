@@ -22,6 +22,7 @@ from blog.serializers.post import (
 from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from tenant.permissions import IsBlogEnabled
 
 from core.utils.serializers import (
     ActionConfig,
@@ -141,7 +142,8 @@ class BlogCommentViewSet(BaseModelViewSet):
         )
 
     def get_permissions(self):
-        permission_classes = []
+        # Feature gate always fires first (raises 404 when disabled).
+        base = [IsBlogEnabled()]
         if self.action in [
             "create",
             "update",
@@ -151,8 +153,8 @@ class BlogCommentViewSet(BaseModelViewSet):
             "liked_comments",
             "my_comments",
         ]:
-            permission_classes.append(IsOwnerOrAdmin)
-        return [permission() for permission in permission_classes]
+            base.append(IsOwnerOrAdmin())
+        return base
 
     @action(detail=True, methods=["GET"])
     def replies(self, request, pk=None):

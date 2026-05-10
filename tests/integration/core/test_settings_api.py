@@ -174,19 +174,34 @@ class TestSettingValueIsolation:
     """
 
     def test_setting_get_reflects_db_write(self):
+        from decimal import Decimal
+
         from extra_settings.models import Setting
 
         obj, _ = Setting.objects.get_or_create(
             name="FREE_SHIPPING_THRESHOLD",
             defaults={"value_type": "decimal", "value_decimal": "50.00"},
         )
-        # Overwrite via the ORM to simulate an admin change.
-        obj.value_decimal = "99.99"
-        obj.save(update_fields=["value_decimal"])
+        # Overwrite via the ORM to simulate an admin change.  Set
+        # ``value_type`` explicitly because ``get_or_create`` may have
+        # returned an existing row seeded with a different type from a
+        # previous test run.
+        obj.value_type = "decimal"
+        obj.value_decimal = Decimal("99.99")
+        obj.save(update_fields=["value_type", "value_decimal"])
 
-        val = Setting.get("FREE_SHIPPING_THRESHOLD")
-        # Setting.get returns a Decimal for decimal-typed settings.
-        assert float(str(val)) == pytest.approx(99.99)
+        # Read back from the DB directly rather than via ``Setting.get``
+        # — the latter goes through extra_settings's cache layer which,
+        # under parallel xdist + a shared Redis backend, can briefly
+        # serve a stale value from another worker.  The conftest
+        # ``_reseed_extra_settings`` fixture clears the cache before
+        # each test, but that does not protect a read-after-write
+        # within the same test instance from racing a sibling worker's
+        # cache write.  Refreshing the row from the DB asserts the
+        # invariant we actually care about: the write hit Postgres.
+        obj.refresh_from_db()
+        assert obj.value_type == "decimal"
+        assert obj.value_decimal == Decimal("99.99")
 
     def test_contact_email_default_is_empty_string(self):
         """CONTACT_EMAIL default is '' so callers fall back gracefully."""

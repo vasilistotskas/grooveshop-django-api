@@ -20,9 +20,9 @@ class TenantConfigSerializer(serializers.Serializer):
     store_description = serializers.CharField(read_only=True)
 
     # --- Assets ---
-    logo_light_url = serializers.URLField(read_only=True)
-    logo_dark_url = serializers.URLField(read_only=True)
-    favicon_url = serializers.URLField(read_only=True)
+    logo_light_url = serializers.CharField(read_only=True, allow_blank=True)
+    logo_dark_url = serializers.CharField(read_only=True, allow_blank=True)
+    favicon_url = serializers.CharField(read_only=True, allow_blank=True)
 
     # --- Theme ---
     primary_color = serializers.CharField(read_only=True)
@@ -68,14 +68,14 @@ class TenantConfigSerializer(serializers.Serializer):
     turnstile_site_key = serializers.CharField(read_only=True)
 
     # --- Social Links ---
-    socials_discord = serializers.URLField(read_only=True)
-    socials_facebook = serializers.URLField(read_only=True)
-    socials_instagram = serializers.URLField(read_only=True)
-    socials_pinterest = serializers.URLField(read_only=True)
-    socials_reddit = serializers.URLField(read_only=True)
-    socials_tiktok = serializers.URLField(read_only=True)
-    socials_twitter = serializers.URLField(read_only=True)
-    socials_youtube = serializers.URLField(read_only=True)
+    socials_discord = serializers.CharField(read_only=True, allow_blank=True)
+    socials_facebook = serializers.CharField(read_only=True, allow_blank=True)
+    socials_instagram = serializers.CharField(read_only=True, allow_blank=True)
+    socials_pinterest = serializers.CharField(read_only=True, allow_blank=True)
+    socials_reddit = serializers.CharField(read_only=True, allow_blank=True)
+    socials_tiktok = serializers.CharField(read_only=True, allow_blank=True)
+    socials_twitter = serializers.CharField(read_only=True, allow_blank=True)
+    socials_youtube = serializers.CharField(read_only=True, allow_blank=True)
 
     # --- Shipping (public partner ID) ---
     box_now_partner_id = serializers.CharField(read_only=True)

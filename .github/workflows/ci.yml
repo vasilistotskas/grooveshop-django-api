@@ -121,7 +121,7 @@ jobs:
   testing:
     name: Testing
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       db:
         image: postgres:17
@@ -210,11 +210,13 @@ jobs:
         # in ``pyproject.toml::addopts`` — keeping them explicit here
         # so a careless edit can't silently flip the project off the
         # supported configuration.
-        # The 15-min timeout absorbs coverage overhead (~2-3× the no-cov
-        # runtime) on the 2-vCPU GitHub runner; the previous 10-min cap
-        # ran out at ~99% of the suite.
+        # The 25-min timeout absorbs coverage overhead (~2-3× the no-cov
+        # runtime) on the 2-vCPU GitHub runner. Previous 15-min cap
+        # timed out at ~85% of the suite once tenant-scoping work
+        # extended a few teardown hot paths (transaction.on_commit
+        # immediate fixture + extra_settings cache.delete_many per test).
         run: uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml -n auto --dist loadfile
-        timeout-minutes: 15
+        timeout-minutes: 25
         env:
           HYPOTHESIS_PROFILE: ci
 

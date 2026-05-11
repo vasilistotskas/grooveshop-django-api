@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
+from django.utils import translation
 from django.utils.html import conditional_escape
 
 from product.admin import (
@@ -541,7 +542,8 @@ class TestReviewAdmin:
     def test_status_badge_approved(self, review_admin):
         review = ProductReviewFactory(status="TRUE")
 
-        result = review_admin.status_badge(review)
+        with translation.override("en"):
+            result = review_admin.status_badge(review)
 
         assert "✅" in result
         assert "True" in result
@@ -549,7 +551,8 @@ class TestReviewAdmin:
     def test_status_badge_pending(self, review_admin):
         review = ProductReviewFactory(status="NEW")
 
-        result = review_admin.status_badge(review)
+        with translation.override("en"):
+            result = review_admin.status_badge(review)
 
         assert "🆕" in result
         assert "New" in result

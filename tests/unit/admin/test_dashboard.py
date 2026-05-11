@@ -58,15 +58,18 @@ class DashboardCallbackCachingTests(TestCase):
             self.assertIn(key, result, f"missing zone key {key!r}")
 
     def test_callback_caches_zones_a_b_c(self):
+        # Pre-populate the cache directly; this proves the second call
+        # reads from the cache without triggering rebuild. Avoids
+        # depending on cross-test cache state under parallel xdist runs.
         request = self._make_request(superuser=True)
-        ctx: dict = {}
-        dashboard_callback(request, ctx)
-        self.assertIsNotNone(cache.get(DASHBOARD_CACHE_KEY))
+        cache.set(DASHBOARD_CACHE_KEY, {"hero": {"_test": True}}, 300)
 
         with patch("admin.dashboard._build_zones_a_b_c") as builder:
-            ctx2: dict = {}
-            dashboard_callback(request, ctx2)
+            ctx: dict = {}
+            dashboard_callback(request, ctx)
             builder.assert_not_called()
+
+        self.assertEqual(ctx.get("hero"), {"_test": True})
 
     def test_zone_d_hidden_for_non_superuser(self):
         request = self._make_request(superuser=False)

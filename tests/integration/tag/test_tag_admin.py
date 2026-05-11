@@ -5,6 +5,7 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory
+from django.utils import translation
 
 from tag.admin import (
     TagAdmin,
@@ -374,8 +375,9 @@ class TestTagInLine:
     def test_tag_inline_fields(self, tag_inline):
         assert tag_inline.fields == ("tag",)
         assert tag_inline.extra == 0
-        assert tag_inline.verbose_name == "Tag"
-        assert tag_inline.verbose_name_plural == "Tags"
+        with translation.override("en"):
+            assert str(tag_inline.verbose_name) == "Tag"
+            assert str(tag_inline.verbose_name_plural) == "Tags"
 
     def test_tag_inline_model(self, tag_inline):
         assert tag_inline.model == TaggedItem

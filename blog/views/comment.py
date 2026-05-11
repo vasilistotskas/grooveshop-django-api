@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.db.models import Count, Exists, OuterRef
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
-from rest_framework import status
+from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -143,7 +143,7 @@ class BlogCommentViewSet(BaseModelViewSet):
 
     def get_permissions(self):
         # Feature gate always fires first (raises 404 when disabled).
-        base = [IsBlogEnabled()]
+        base: list[permissions.BasePermission] = [IsBlogEnabled()]
         if self.action in [
             "create",
             "update",

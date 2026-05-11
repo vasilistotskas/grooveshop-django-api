@@ -582,7 +582,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # Deletion of these tenants would destroy the platform itself.
     _PROTECTED_SCHEMAS = frozenset({"public", "webside"})
 
-    def delete(self, *args, force_drop: bool = False, **kwargs):
+    def delete(
+        self, using=None, keep_parents=False, *, force_drop: bool = False
+    ):
         """Block deletion of protected tenants.
 
         Raises ``ValidationError`` when called on a tenant whose
@@ -606,7 +608,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                 )
                 % {"schema": self.schema_name}
             )
-        return super().delete(*args, force_drop=force_drop, **kwargs)
+        return super().delete(
+            using=using, keep_parents=keep_parents, force_drop=force_drop
+        )
 
     class Meta:
         verbose_name = _("Tenant")

@@ -14,7 +14,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django.contrib import messages
+from django.contrib.messages import storage as messages_storage
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -52,7 +52,7 @@ def _make_tenant(slug: str, **kwargs) -> Tenant:
 def _admin_request():
     """Minimal mock of an HttpRequest sufficient for admin action calls."""
     req = MagicMock()
-    req._messages = messages.storage.default_storage(req)
+    req._messages = messages_storage.default_storage(req)
     return req
 
 

@@ -86,8 +86,42 @@ def _dummy_extra_settings_cache():
 
 
 import extra_settings.cache as _extra_settings_cache  # noqa: E402
+import extra_settings.models as _extra_settings_models  # noqa: E402
 
 _extra_settings_cache._get_cache = _dummy_extra_settings_cache
+
+
+# Belt-and-braces: also patch the public cache API functions themselves
+# so that ANY consumer that captured a reference to them at import time
+# still sees a cache miss for get / a no-op for set. The ``_get_cache``
+# patch above is the canonical path, but in CI under shared Redis +
+# parallel xdist, isolated workers have intermittently observed stale
+# cache reads — bypassing the cache helpers entirely at the public-API
+# level eliminates that race surface and forces every ``Setting.get``
+# to consult Postgres (which IS rolled back per test).
+def _noop_get_cached_setting(_key):
+    return None
+
+
+def _noop_set_cached_setting(_key, _value):
+    return None
+
+
+def _noop_del_cached_setting(_key):
+    return None
+
+
+_extra_settings_cache.get_cached_setting = _noop_get_cached_setting
+_extra_settings_cache.set_cached_setting = _noop_set_cached_setting
+_extra_settings_cache.del_cached_setting = _noop_del_cached_setting
+
+# These were already imported into ``extra_settings.models`` at module
+# load (``from extra_settings.cache import get_cached_setting,
+# set_cached_setting``), so patching ``extra_settings.cache.*`` after
+# the fact does not affect the captured references. Re-bind on the
+# models module too.
+_extra_settings_models.get_cached_setting = _noop_get_cached_setting
+_extra_settings_models.set_cached_setting = _noop_set_cached_setting
 
 settings.DATABASES["default"]["ATOMIC_REQUESTS"] = False
 settings.DATABASES["default"]["AUTOCOMMIT"] = True

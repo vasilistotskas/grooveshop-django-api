@@ -3,6 +3,38 @@
 
 
 
+## v1.128.1 (2026-05-11)
+
+### Bug fixes
+
+* fix(meta_capi): use ActionSource.WEBSITE enum instead of raw string (#6)
+
+facebook_business 25.0.1 tightened type validation on
+Event.action_source — passing the literal string "website" raises
+TypeError on value: website at dispatch time. The error is wrapped
+as a transient retry by the dispatch task, so on the surface it
+looked like a flaky network blip; in reality every CAPI event was
+silently torpedoed before reaching Meta.
+
+Verified via a manual CompleteRegistration dispatch on prod
+(MetaCapiEventLog id=6, status=failed, error_message=
+"action_source must be an ActionSource. TypeError on value: website").
+The audit row showing FAILED proves the rest of the pipeline (signal
+→ on_commit → Celery task → audit write) is healthy; the issue is
+isolated to the Event constructor argument.
+
+Switching to the ActionSource enum via a tiny lazy-import helper
+keeps the import graph clean (services stays importable in test
+environments that stub the SDK) and adds a regression unit test
+that hits the SDK's runtime check directly so any future revert
+to a raw string is caught at pytest time, not on a paid order.
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`56c2c2f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/56c2c2f623eea9aabec15f25b46d8ab92b33e444))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.128.0 [skip ci] ([`0b6ad0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0b6ad0db9b17e8cac347e9515af2ee0e0a9a6426))
+
 ## v1.128.0 (2026-05-11)
 
 ### Bug fixes

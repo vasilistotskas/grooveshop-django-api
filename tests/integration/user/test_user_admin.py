@@ -399,7 +399,18 @@ class TestUserAdmin:
 
         result = admin.last_activity(user)
 
-        assert "Updated:" in result
+        assert user.updated_at.strftime("%Y-%m-%d %H:%M") in result
+        assert "tabular-nums" in result
+
+    def test_last_activity_never(self, admin_request):
+        admin = UserAdmin(UserAccount, AdminSite())
+        user = UserAccountFactory()
+        user.updated_at = None
+
+        result = admin.last_activity(user)
+
+        assert "Never" in result
+        assert "italic" in result
 
     def test_social_links_summary(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())

@@ -3,6 +3,30 @@
 
 
 
+## v1.128.2 (2026-05-11)
+
+### Bug fixes
+
+* fix(admin): hide sidebar badge when count is 0
+
+Unfold's stock app_list_badge.html always renders the badge <span>
+when the config-time ``item.badge`` string is set, and uses the
+Django lazy proxy's ``__str__`` for the value. When our
+``_cached_count`` badge callbacks return ``None`` for empty counts
+(0 rows to flag), the proxy renders as the literal string ``None``,
+which the badge's ``uppercase`` CSS class then displays as
+``NONE`` in the sidebar — surfacing for any nav item with a
+zero count (e.g. Products when nothing is in the low-stock band).
+
+Override the template so the span is only emitted when the resolved
+callback value is non-empty / non-zero, matching the intended
+"hide when nothing to flag" semantics of the badge callbacks in
+``admin/badges.py``. ([`c9b92fa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c9b92fa32438dd5ad52c7947ffd3dc32b47b8b55))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.128.1 [skip ci] ([`70471a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70471a513f61b34ef1f90f36f79f7a580e3ed7c3))
+
 ## v1.128.1 (2026-05-11)
 
 ### Bug fixes

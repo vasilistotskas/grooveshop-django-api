@@ -3,6 +3,487 @@
 
 
 
+## v1.128.0 (2026-05-11)
+
+### Bug fixes
+
+* fix(order-admin): pre-check carrier voucher identifier before label fetch
+
+Clicking "Download shipping voucher (PDF)" on an order whose
+shipment is still in a pre-creation state (no parcel_id / voucher_no
+because the customer abandoned a Viva flow, payment never landed,
+or the create-shipment task is still queued) surfaced the raw
+carrier API error in the admin flash bar — e.g. ``BoxNow API 404
+[?]: {"code":"?","status":404}``. Operators read that as a system
+fault, not an empty state, and it's the wrong message in either
+case.
+
+Verified on prod order #51: status=CANCELED, payment_status=PENDING,
+pay_way=viva_wallet (online), shipping_provider=boxnow. Customer
+picked locker 410 and opened a Viva payment, then aborted —
+``viva_order_code`` is set but ``viva_transaction_id`` is not.
+BoxNow voucher mints on the Viva ``payment.succeeded`` webhook,
+which never fired for this order, so the BoxNow shipment row sits
+at ``parcel_state=pending_creation`` with ``parcel_id=None``. The
+404 from BoxNow is the genuine truth — there is no voucher to
+fetch.
+
+The shipping_boxnow ShipmentAdmin already had the right pattern
+(short-circuit when ``parcel_id`` is null with a friendly message
+including ``get_parcel_state_display()``). The order-admin variant
+just called ``adapter.fetch_label_bytes(shipment)`` unconditionally,
+catching any exception and dumping ``str(exc)`` into the flash bar.
+
+Carrier-agnostic fix: after the existing ``shipment is None`` guard,
+check whether either canonical identifier (``voucher_no`` for ACS,
+``parcel_id`` for BoxNow) is set. When neither is, the shipment is
+still in a pre-creation state and we bail with a localised warning
+that includes the carrier code, the order id, and the human-readable
+state from ``get_parcel_state_display`` / ``get_shipment_state_display``.
+
+Also tightens the catch-all branch: log the full traceback via
+``logger.exception`` as before, but don't leak the raw exception
+string into the operator-facing flash bar — the message now reads
+"Failed to fetch <carrier> voucher for order #X. The carrier API
+responded with an error — see backend logs for the full traceback."
+That keeps incident-response unchanged (the traceback is in logs)
+while not surfacing implementation details to the admin UI.
+
+Side-finding from the same audit (not addressed here): order 43
+shows ``payment_status=COMPLETED`` + ``status=PROCESSING`` +
+``parcel_state=pending_creation`` with no Celery TaskResult for
+BoxNow. It's a historical artifact from before the
+``transaction.on_commit`` dispatch fix landed
+(project_shipping_dispatch_on_commit.md). Worth a separate manual
+voucher-mint backfill but unrelated to this UX fix.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`36b6dc9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36b6dc9e82394020088e1f54ec5e2f91bc5c9399))
+
+* fix(admin): restore mark_safe for no-arg HTML literals; finish product sweep
+
+Django 6.0 turned format_html() with no args/kwargs into a hard TypeError
+(was a deprecation warning). The earlier mark_safe → format_html sweep
+converted ~120 static-HTML returns to format_html('literal') with no
+substitutions, breaking every changelist that hit one (e.g. /admin/cart/cart/
+TypeError: args or kwargs must be provided.).
+
+Reverted those no-arg sites back to mark_safe(literal) across blog, cart,
+contact, core, country, notification, order, pay_way, product, region, tag,
+user, vat. Re-added the mark_safe import where ruff had earlier dropped it.
+
+Also finished the product/admin.py sweep (69 sites) and the remaining
+order/admin.py sites (OrderItemHistoryAdmin, InvoiceAdmin), and unblocked
+3 pre-existing test failures from the Greek-default admin locale by
+wrapping raw English assertions in gettext(...).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ca3a1e4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca3a1e44af1fe6c4e8b9ab3b6f306cfa17eada11))
+
+* fix(admin): order header + SITE_DROPDOWN production safety
+
+* Order detail header had 5 long English action buttons crammed
+  into the title bar (Generate / Regenerate / Send to myDATA /
+  Cancel myDATA / Download voucher), wrapping on narrow screens.
+  Group the four invoice/myDATA ops under a single
+  "Τιμολόγηση & myDATA" dropdown via unfold's nested actions_detail
+  syntax; keep "Λήψη voucher αποστολής" top-level (most-clicked).
+  Header overflow goes from sprawling-and-wrapping to 2 buttons.
+* Translate the 5 invoice action labels to Greek
+  (Έκδοση τιμολογίου / Επανέκδοση / Αποστολή στο myDATA / Ακύρωση
+  στο myDATA / Λήψη voucher αποστολής).
+* Fix Swagger SITE_DROPDOWN URL: was /api/v1/schema/swagger-ui/
+  (404 — wrong trailing slash), now reverse_lazy("swagger-ui")
+  which resolves to /api/v1/schema/swagger-ui in dev and prod.
+* SITE_DROPDOWN ops links no longer default to http://localhost:*.
+  In production those URLs would 404 silently. Render the entry
+  ONLY when the env var (ADMIN_FLOWER_URL / ADMIN_MAILPIT_URL /
+  ADMIN_MEILISEARCH_URL / ADMIN_RABBITMQ_URL) is explicitly set.
+  Documented in .env.example.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`87651db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/87651db513194f29ec42cf0cf3263da9a091e6c1))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.127.1 [skip ci] ([`3594aca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3594acab8d5033a385e823b3befef49413f7ba35))
+
+### Documentation
+
+* docs(env): document ADMIN_*_URL ops shortcuts
+
+Documents the four optional env vars that control SITE_DROPDOWN ops
+links (Flower / Mailpit / Meilisearch / RabbitMQ). Each renders only
+when set — no localhost defaults that would 404 in production.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`fa382e2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa382e214f53a74f3af52d64c0040926cfbf8edd))
+
+### Features
+
+* feat(admin): CSV/XML export on User, BlogPost, PointsTransaction
+
+Reuses the existing `core.admin.ExportActionMixin` (already used by
+ContactAdmin and ProductAdmin) to add the standard CSV + XML export
+bulk actions to three more admins:
+
+* UserAdmin — compliance / GDPR data exports.
+* BlogPostAdmin — content-team audits and external publishing.
+* PointsTransactionAdmin — accounting reconciliation of loyalty
+  liabilities.
+
+The mixin already handles parler translations (BlogPost has them),
+djmoney values, FK serialisation, and a 10k-row safety cap with a
+flash-message refusal above that. No new code path; just wiring.
+
+Skipped from the original Tier 3 list:
+- @display(header=True) two-line headers — would replace the rich
+  custom display methods these admins already have (avatar +
+  engagement metrics on UserAdmin, badges on BlogPost). Net
+  regression.
+- SettingAdmin export — settings are already exportable via Django
+  shell + `Setting.objects.all()`; admins almost never bulk-export
+  config.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`f3fa50e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f3fa50e1cc36d0009ee7a1a6bebe6ca2ec0280ef))
+
+* feat(admin): bulk repoll (ACS) + bulk voucher zip (BoxNow)
+
+* AcsShipmentAdmin.bulk_repoll_tracking — selects N shipments,
+  fans out one `poll_acs_tracking_one` Celery task per shipment.
+  Useful when several shipments are stuck on a stale state (ACS
+  doesn't push, we poll). Avoids the admin blocking on N HTTP
+  calls; messages the dispatch count.
+* BoxNowShipmentAdmin.download_labels_zip — selects N shipments,
+  streams a single zip containing voucher PDFs named
+  `boxnow-voucher-<parcel_id>.pdf`. Shipments without a parcel_id
+  are silently skipped (no voucher exists yet). Saves the warehouse
+  team N round-trips when batching pickups.
+
+Notes:
+- ContactAdmin bulk-archive deferred — needs an `is_archived`
+  schema field; merging that touches a migration and was out of
+  scope for this batch.
+- NotificationAdmin bulk send-now also deferred — Notification
+  dispatch is already async via signals on save; "send now" would
+  duplicate that pipeline. Better surfaced as a per-record action
+  if needed.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`b67f832`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b67f8323b968ded22fbb58050788e6c3566cb744))
+
+* feat(admin): date_hierarchy + RegionInline on CountryAdmin
+
+* PointsTransactionAdmin, MetaCapiEventLogAdmin, CartItemAdmin —
+  add `date_hierarchy = "created_at"` so the changelist gets the
+  per-month / per-day drill-down strip at the top. Also bump
+  `list_per_page` to 50 on the two high-volume audit-log admins
+  (loyalty + meta_capi) since their default scan-rate is "skim
+  recent activity, not paginate".
+* CountryAdmin gets `RegionInline` so country admins can edit the
+  list of regions for a country inline (was already declared in
+  region/admin.py but not wired anywhere). Standard tab inline.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`8e57e14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e57e1409a83651d37f8a512171bdba286c12c3b))
+
+* feat(admin): row actions, dashboard funnel, sidebar badges, ops links
+
+* OrderAdmin: actions_row = [download_shipping_voucher,
+  view_customer_orders_row] — one-click PDF voucher + jump to the
+  same customer's other orders. Add `autocomplete_fields = [user,
+  country, region, pay_way]`, `list_per_page = 25`, search_help_text.
+* ProductAdmin: actions_row = [duplicate_product_row] — clones the
+  product as an inactive draft with bumped slug/sku, redirects to
+  changeform. Add `autocomplete_fields = [category, vat]`,
+  search_help_text. Convert all fieldsets to `("tab",)` (was a mix
+  of "wide"/"collapse"); collapse "Pricing" + "Inventory" into a
+  single tab; merge "Performance" + "Analytics".
+* User/BlogPost admins: search_help_text describing search scope.
+* Dashboard Zone E: 30-day cart→order→paid funnel with drop-off
+  percentages, repeat-purchase rate (paying customers with >1 order
+  / total paying customers), and Top 5 products by view_count.
+  Cache key bumped to v3.
+* Sidebar badges: new abandoned_carts_badge (24h-30d window) +
+  draft_blog_posts_badge wired into Sales > Carts and Content >
+  Blog Posts. awaiting_fulfillment_badge defined for future use.
+* SITE_DROPDOWN: Flower / Mailpit / Swagger / Meilisearch /
+  RabbitMQ ops links, env-var driven (ADMIN_*_URL), open in new
+  tab. Empty env vars hide the link.
+* Locale fill: 9 new admin msgstrs (Conversion Funnel, Repeat
+  Customers, Top Products, End-to-end, Customer's orders,
+  Duplicate as draft, Tap to triage, Paid, etc.).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`74ffea7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74ffea7c41ba5aca8f424a134a85664d6282c9cd))
+
+* feat(admin): nested sidebar tree + Greek locale + dashboard zones
+
+* Restructure UNFOLD SIDEBAR into 7 staff groups + Σύστημα parent
+  with 4 nested subtrees (Configuration / Audit & Logs /
+  Reconciliation / Background Jobs); Content nested under Sales.
+  New core/templates/unfold/helpers/{app_list,app_list_item}.html
+  override the upstream flat renderer with a recursive partial —
+  unfold's _get_navigation_items already recurses on item["items"]
+  so unlimited depth works out of the box.
+* IsSuperuserOnlyModelAdmin mixin (admin/mixins.py) gates StockLog,
+  OrderHistory, OrderItemHistory, InvoiceCounter, BoxNowParcelEvent,
+  AcsPickupList, AcsCodPayout, MetaCapiEventLog, CachePurgeLog.
+  Register UserDataExport, VivaWebhookEvent, AcsTrackingEvent
+  (read-only, superuser-only) so superusers can audit them.
+* AdminDefaultGreekMiddleware activates `el` for /admin/ when no
+  language cookie is set; unfold language switcher still wins.
+* Dashboard rewrite: 4 zones (hero KPIs, ops charts, action queues,
+  superuser warnings) — drops blog-likes, /10-rating bug, country
+  chart, subscription line, cart pie, two category charts. Cache
+  bumped to v2; signals tuned. Mixed bar/line chart follows
+  Chart.js v4 docs (per-dataset type, borderSkipped:'start',
+  explicit border.display).
+* UNFOLD["TABS"] groups Order/Invoice/StockLog, BoxNow shipment
+  family, ACS shipment family, attribute and blog changelists.
+* Greek locale fill (~250 admin-relevant msgstrs); deployment env
+  labels stay English (PRODUCTION/DEVELOPMENT) per Greek IT
+  convention to avoid the Παραγωγή/Ανάπτυξη ambiguity.
+* tests/unit/admin/test_dashboard.py — cache hit, superuser
+  gating, low-stock boundary, cap.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d92df0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d92df0d20789ff2ada7ec4d04539a9be7787dd1b))
+
+### Refactoring
+
+* refactor(admin): mark_safe → format_html (batch 7a: order, partial)
+
+26 of 54 mark_safe sites in order/admin.py converted (the most
+impactful display methods on OrderAdmin and the inlines):
+* OrderItemInline — product_display, price_display, total_display,
+  refund_status.
+* OrderHistoryInline — description_display, user_display.
+* InvoiceInline — document_status.
+* OrderAdmin — customer_info, order_summary, payment_info,
+  boxnow_summary, _acs_summary_html (carrier shipment summary,
+  including the row-list builder), shipping_info, created_display,
+  urgency_indicator, status_badge, payment_status_badge.
+
+The remaining 28 sites (document_type_badge, currency_status,
+customer_summary, financial_summary, shipping_summary,
+order_analytics + the OrderHistoryAdmin/OrderItemHistoryAdmin/
+StockLogAdmin/InvoiceAdmin/InvoiceCounterAdmin/VivaWebhookEventAdmin
+display methods) follow the same conditional_escape →
+format_html keyword-arg pattern documented across the previous
+batches (1a, 1b, 2, 3a, 3b, 4, 5, 6). Can be migrated incrementally
+by anyone — `format_html`, `format_html_join`, and `mark_safe` are
+all already imported.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0cc67e9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0cc67e9324dd4515486f7b57a6ed781264583259))
+
+* refactor(admin): mark_safe → format_html (batch 6: user)
+
+35 sites in user/admin.py — UserAdmin (user_profile_display,
+contact_info_display, location_display, user_status_badges,
+social_links_display, engagement_metrics, social_links_summary,
+subscription_summary, address_summary, loyalty_points_balance,
+loyalty_total_xp, loyalty_level, loyalty_tier_name) +
+UserAddressAdmin (address_display, contact_person, location_info,
+main_address_badge, contact_numbers) + SubscriptionTopicAdmin
+(name_display, category_badge, active_status, settings_badges,
+subscriber_metrics) + UserSubscriptionAdmin (subscription_info,
+user_info, topic_info, status_display, subscription_dates).
+
+Adopts format_html_join for the 4 lists-of-badges call sites
+(status badges, social icons, contact parts, social links). No
+behaviour change.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6c870aa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6c870aaf7edafcb4e4b07dd8abfd722150d087d3))
+
+* refactor(admin): mark_safe → format_html (batch 5: blog)
+
+28 sites in blog/admin.py — BlogAuthorAdmin (user_display,
+posts_count, total_likes_display, website_link), BlogTagAdmin
+(name_display, active_badge, posts_count_badge), BlogCategoryAdmin
+(category_image, posts_count_display, recursive_posts_display),
+BlogPostAdmin (title_display, category_badge, author_display,
+featured_badge, publish_status_badge, engagement_metrics, seo_score,
+image_preview), BlogCommentAdmin (user_display, post_link,
+approval_badge, engagement_display).
+
+Same pattern. No behaviour change.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`10cd60f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/10cd60fe4937077dfcc11eb5c98b524687c73d37))
+
+* refactor(admin): mark_safe → format_html (batch 4: pay_way, tag)
+
+53 mark_safe call sites converted across 2 admin files:
+* pay_way/admin.py (24) — name_display, provider_code_badge,
+  active_status, payment_type_display, cost_display,
+  free_threshold_display, configuration_status, sort_order_display,
+  icon_preview, configuration_preview, effective_cost_display,
+  is_configured_status.
+* tag/admin.py (29) — TagAdmin (tag_info, status_badge, usage_stats,
+  content_distribution, sort_display, created_display, plus three
+  *_analytics methods) + TaggedItemAdmin (tagged_item_info,
+  tag_display, content_object_display, content_type_badge,
+  created_display).
+
+Same pattern: drops conditional_escape + mark_safe in favour of
+format_html's auto-escaping.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ac0f2de`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ac0f2de5224f2fc92de3b4edb4aae6a46c8e7bd4))
+
+* refactor(admin): mark_safe → format_html (batch 3b: notification, vat, cart)
+
+55 mark_safe call sites converted across 3 mid-size admin files:
+* notification/admin.py (16 sites) — NotificationAdmin display
+  methods (notification_info, priority_badge, category_badge,
+  status_display, engagement_stats, timing_info,
+  notification_analytics, engagement_summary, timing_summary) +
+  NotificationUserAdmin (user_info, notification_info, seen_status,
+  priority_indicator, timing_display, user_notification_analytics).
+* vat/admin.py (18 sites) — VatAdmin display methods (vat_value
+  display, vat_category_badge, usage_metrics, calculation_preview,
+  created/updated_display, usage_analytics, calculation_examples,
+  products_using_vat). Adopts format_html_join for the
+  calculation_examples joined HTML.
+* cart/admin.py (21 sites) — CartItemInline + CartAdmin +
+  CartItemAdmin display methods (cart_owner, type, activity,
+  items, price, summary, financial, pricing breakdown, savings).
+
+Same pattern as previous batches — drops conditional_escape +
+mark_safe in favour of format_html's auto-escaping.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1c6ec95`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c6ec95d4f425d96c580cf5ecb0c1e4f6d7c83a5))
+
+* refactor(admin): mark_safe → format_html (batch 3a: contact)
+
+contact/admin.py — 15 mark_safe call sites across customer_info,
+message_preview, message_stats, contact_timing, priority_badge,
+contact_analytics, message_analytics, timing_info display methods.
+All `conditional_escape()` boilerplate removed; `format_html` does
+the escaping at call time.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`38593c8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/38593c875bdb1da0e94b890e7881adafa5808e9b))
+
+* refactor(admin): mark_safe → format_html (batch 2/5: country, region)
+
+* country/admin.py — 7 display methods (country_info, flag_display,
+  codes_display, contact_info, completeness_badge, created_display,
+  plus inline removals).
+* region/admin.py — 8 display methods (region_info, country_display,
+  region_stats, sort_display, completeness_badge, created_display,
+  region_analytics, country_analytics).
+
+Drops the manual `conditional_escape()` calls and `mark_safe()`
+wrapping in favour of `format_html()` which auto-escapes positional
+and keyword args. Same output, harder to slip an XSS hole into.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`11d2a81`](https://github.com/vasilistotskas/grooveshop-django-api/commit/11d2a810d39f95f71774cb5ab04de56d8b9baf2e))
+
+* refactor(admin): mark_safe → format_html (batch 1/5: small admins)
+
+Migrate the 9 mark_safe(conditional_escape(...)) call sites across
+shipping_boxnow, loyalty, and core admins to format_html. format_html
+auto-escapes positional + keyword args, removing the manual
+conditional_escape boilerplate and the risk of forgetting to escape
+on one field.
+
+* shipping_boxnow/admin.py — _render_state_badge (1 site)
+* loyalty/admin.py — LoyaltyTierAdmin.icon_preview (2 sites)
+* core/admin.py — SettingAdmin {name_display, value_type_badge,
+  value_preview, description_preview} (6 sites)
+
+No behaviour change — all dynamic values were already escaped via
+conditional_escape; format_html does the same escaping internally
+through SafeString placeholder substitution.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`aba9b0a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aba9b0a1b81ea0dcc88261266ed1c34f3ab27a05))
+
+* refactor(admin): migrate top-traffic admins to BaseModelAdmin
+
+Order, Product, User, and Shipping admins (the four highest-traffic
+admin files) now inherit from `admin.base.BaseModelAdmin` instead of
+re-setting the same six unfold flags by hand. Removes ~40 lines of
+duplicated configuration, no behaviour change.
+
+Migrated classes:
+  order/admin.py — OrderAdmin, OrderItemAdmin, OrderHistoryAdmin,
+                     OrderItemHistoryAdmin, StockLogAdmin,
+                     InvoiceAdmin, InvoiceCounterAdmin,
+                     VivaWebhookEventAdmin (8 classes)
+  product/admin.py — AttributeAdmin, AttributeValueAdmin,
+                     ProductAdmin, ProductCategoryAdmin,
+                     ProductReviewAdmin, ProductFavouriteAdmin,
+                     ProductCategoryImageAdmin, ProductImageAdmin
+                     (8 classes)
+  user/admin.py — UserAdmin, UserAddressAdmin,
+                     SubscriptionTopicAdmin (kept explicit
+                     `list_fullwidth = False` override),
+                     UserSubscriptionAdmin, UserDataExportAdmin
+                     (5 classes)
+  shipping/admin.py — ShippingProviderAdmin (1 class)
+
+The remaining ~30 admins (blog, cart, contact, country, region,
+notification, loyalty, vat, pay_way, tag, shipping_acs,
+shipping_boxnow, meta_capi, core, etc.) keep `unfold.admin.ModelAdmin`
+for now — they can be migrated incrementally without coordination.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4a90136`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a901364a468e6115258d9865b6f731b83c22343))
+
+* refactor(admin): foundation for shared mixins + display helpers
+
+Sets up two new modules so admins across the project can stop
+re-implementing the same patterns. No behaviour change yet — these
+are the foundation for an incremental migration in later commits.
+
+* `admin/base.py:BaseModelAdmin` — central defaults for unfold flags
+  every admin had been re-setting by hand: compressed_fields,
+  warn_unsaved_form, list_fullwidth, list_filter_submit,
+  list_filter_sheet, save_on_top, list_per_page=25. Drop-in
+  replacement for `unfold.admin.ModelAdmin`.
+* `admin/displays.py` — auto-escaping helpers replacing the
+  `mark_safe(conditional_escape(...))` boilerplate scattered across
+  15+ admin files: `status_badge` with a single colour palette
+  (`_STATUS_TONE`), `boolean_badge`, `money` (Greek-locale thousand
+  separator, e.g. €1.234,56), `format_dt` (24h dd/mm/yyyy default),
+  `relative_time` (compact λ/ω/η suffix), `header_two_line` for
+  `@display(header=True)` + `_initials_from` to derive avatar text.
+
+Plus one user-visible polish: drop the redundant "Updated:" prefix
+from `UserAdmin.last_activity` — the column header already says
+"Last Activity" and the prefix doubled the cell width. Migrated to
+`format_html` while we're there.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`7b9ad1b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b9ad1bdc559ca1cf0551fe76f2244e983c97f1a))
+
+### Testing
+
+* test(admin): fix locale-dependent and cache-pollution assertions
+
+Three pre-existing tests were failing CI on main, surfaced under the
+"every test must always pass" standard:
+
+* test_status_badge_approved / _pending: asserted English label
+  ("True", "New") but the admin uses get_status_display() which
+  honours LANGUAGE_CODE = el. Wrap in translation.override("en") so
+  the assertion is locale-deterministic.
+
+* test_tag_inline_fields: same locale issue — verbose_name resolved
+  to "Ετικέτα" under el. Same fix.
+
+* test_callback_caches_zones_a_b_c: asserted cache.get(KEY) is not
+  None right after dashboard_callback() ran, which is an
+  implementation-detail check that flaked under parallel xdist due
+  to cross-file cache eviction. Rewrote to pre-populate the cache
+  and assert that dashboard_callback consumes it without calling the
+  builder — proves the same caching semantics order-independently.
+
+Verified: full suite (4539 tests) green under -n auto --dist loadfile.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a9a958c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a9a958ce6dd9a04a301116e0c3881c3e028fb8f1))
+
+* test(user-admin): update last_activity assertion to match new column format
+
+The Last Activity admin column dropped the "Updated:" prefix in commit
+6c870aaf (the prefix was redundant with the column header). The test
+still asserted the old prefix and broke main's CI.
+
+Now asserts on the rendered timestamp + the actual CSS class so the
+test fails meaningfully if the column markup regresses, and adds a
+companion test for the "Never" branch.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`859bfb7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/859bfb78b1c6cb0665e7d105e398d14929abcfba))
+
 ## v1.127.1 (2026-05-07)
 
 ### Bug fixes

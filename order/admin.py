@@ -1676,24 +1676,58 @@ class OrderAdmin(BaseModelAdmin):
             )
             return self._redirect_to_order_change(object_id)
 
+        # Carrier-agnostic "voucher minted" check. ACS exposes
+        # ``voucher_no`` once ``ACS_Create_Voucher`` returns, BoxNow
+        # exposes ``parcel_id`` once the delivery-request task lands.
+        # When neither is set the shipment is still in a pre-creation
+        # state (``pending_creation``, ``failed_creation``, etc.) and
+        # hitting the carrier's label endpoint would 404 with an
+        # opaque "code: ?" payload — surfacing the raw API error in
+        # the admin flash bar reads as a regression. Bail early with
+        # a friendly message instead.
+        identifier = getattr(shipment, "voucher_no", None) or getattr(
+            shipment, "parcel_id", None
+        )
+        if not identifier:
+            state_label = getattr(
+                shipment, "get_parcel_state_display", None
+            ) or getattr(shipment, "get_shipment_state_display", None)
+            state = state_label() if callable(state_label) else "pending"
+            messages.warning(
+                request,
+                _(
+                    "No voucher available for order #%(order_id)s — "
+                    "the %(carrier)s shipment is in state "
+                    "'%(state)s'. The carrier has not yet assigned a "
+                    "voucher number."
+                )
+                % {
+                    "order_id": order.id,
+                    "carrier": adapter.code,
+                    "state": state,
+                },
+            )
+            return self._redirect_to_order_change(object_id)
+
         try:
             pdf_bytes = adapter.fetch_label_bytes(shipment)
-        except Exception as exc:  # noqa: BLE001
+        except Exception:  # noqa: BLE001
             logger.exception(
                 "Admin download_shipping_voucher failed for order %s",
                 order.id,
             )
             messages.error(
                 request,
-                _("Failed to fetch voucher: %(err)s") % {"err": str(exc)},
+                _(
+                    "Failed to fetch %(carrier)s voucher for order"
+                    " #%(order_id)s. The carrier API responded with"
+                    " an error — see backend logs for the full"
+                    " traceback."
+                )
+                % {"carrier": adapter.code, "order_id": order.id},
             )
             return self._redirect_to_order_change(object_id)
 
-        identifier = (
-            getattr(shipment, "voucher_no", None)
-            or getattr(shipment, "parcel_id", None)
-            or order.id
-        )
         filename = f"{adapter.code}-voucher-{identifier}.pdf"
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'

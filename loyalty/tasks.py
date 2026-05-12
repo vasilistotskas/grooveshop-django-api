@@ -99,34 +99,6 @@ def process_points_expiration() -> dict:
     retry_backoff=True,
     retry_jitter=True,
 )
-def recalculate_user_tier(self, user_id: int) -> dict:
-    """Recalculate user tier after XP change."""
-    from loyalty.services import LoyaltyService
-    from user.models.account import UserAccount
-
-    try:
-        user = UserAccount.objects.get(id=user_id)
-    except UserAccount.DoesNotExist:
-        logger.error("User %s not found for tier recalculation", user_id)
-        return {"status": "error", "reason": "user_not_found"}
-
-    LoyaltyService.recalculate_tier(user)
-
-    return {
-        "status": "success",
-        "user_id": user_id,
-        "new_tier": str(user.loyalty_tier) if user.loyalty_tier else None,
-    }
-
-
-@celery_app.task(
-    base=MonitoredTask,
-    bind=True,
-    max_retries=3,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_jitter=True,
-)
 def notify_loyalty_tier_up_live(self, user_id: int) -> dict:
     """Fire a celebratory live notification on a real tier promotion.
 

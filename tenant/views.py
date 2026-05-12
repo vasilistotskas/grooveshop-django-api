@@ -4,6 +4,7 @@ import logging
 
 from django.core.cache import cache
 from django.db import connection
+from django.db.models import Prefetch
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import status, viewsets
 from rest_framework.decorators import (
@@ -102,17 +103,27 @@ def my_memberships(request: Request) -> Response:
     Always queried from the public schema — memberships are platform-
     wide data.
     """
+    # Prefetch ONLY the primary domain so the inline loop doesn't
+    # re-query — ``.filter(is_primary=True).first()`` on a prefetched
+    # related manager triggers a fresh query and discards the prefetch.
     memberships = (
         UserTenantMembership.objects.filter(
             user=request.user, is_active=True, tenant__is_active=True
         )
         .select_related("tenant")
-        .prefetch_related("tenant__domains")
+        .prefetch_related(
+            Prefetch(
+                "tenant__domains",
+                queryset=TenantDomain.objects.filter(is_primary=True),
+                to_attr="_primary_domains",
+            )
+        )
     )
 
     out = []
     for m in memberships:
-        primary = m.tenant.domains.filter(is_primary=True).first()
+        primary_domains = getattr(m.tenant, "_primary_domains", [])
+        primary = primary_domains[0] if primary_domains else None
         out.append(
             {
                 "schemaName": m.tenant.schema_name,

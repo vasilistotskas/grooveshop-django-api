@@ -53,10 +53,12 @@ def _resolve_tenant_for_parcel(parcel_id: str) -> str | None:
     from shipping_boxnow.models import BoxNowShipment  # noqa: PLC0415
     from tenant.models import Tenant  # noqa: PLC0415
 
+    # Skip suspended tenants — mirrors the Viva webhook resolver;
+    # BoxNow retries will resolve once the operator reactivates.
     public = get_public_schema_name()
-    for tenant in Tenant.objects.filter(is_active=True).exclude(
-        schema_name=public
-    ):
+    for tenant in Tenant.objects.filter(
+        is_active=True, suspended_at__isnull=True
+    ).exclude(schema_name=public):
         with schema_context(tenant.schema_name):
             if BoxNowShipment.objects.filter(parcel_id=parcel_id).exists():
                 return tenant.schema_name

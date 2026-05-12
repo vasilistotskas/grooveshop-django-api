@@ -43,10 +43,14 @@ def _resolve_tenant_for_order_code(order_code: str) -> str | None:
 
     from tenant.models import Tenant  # noqa: PLC0415
 
+    # Skip suspended tenants — a Viva re-delivery for an order on a
+    # tenant that's been suspended mid-flight should NOT mutate the
+    # tenant's data; let Viva keep retrying and resolve once the
+    # operator either reactivates or destroys the tenant.
     public = get_public_schema_name()
-    for tenant in Tenant.objects.filter(is_active=True).exclude(
-        schema_name=public
-    ):
+    for tenant in Tenant.objects.filter(
+        is_active=True, suspended_at__isnull=True
+    ).exclude(schema_name=public):
         with schema_context(tenant.schema_name):
             if Order.objects.filter(
                 metadata__viva_order_code=str(order_code)

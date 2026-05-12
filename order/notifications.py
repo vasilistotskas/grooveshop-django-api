@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 
 from django.conf import settings
-from django.db.utils import DatabaseError, OperationalError
+from django.db.utils import OperationalError
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_noop
 from django.utils.translation import override as translation_override
@@ -57,10 +57,6 @@ TASK_DEFAULTS = {
     "retry_backoff": True,
     "retry_jitter": True,
 }
-
-
-# Re-export DatabaseError for tests that want to assert on the exclusion.
-__all__ = ("RETRYABLE_DB_ERRORS", "TASK_DEFAULTS", "DatabaseError")
 
 
 # Status → (category, kind, notification_type, i18n (title_msgid, message_msgid))

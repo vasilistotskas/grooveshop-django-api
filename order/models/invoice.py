@@ -65,27 +65,33 @@ class MyDataStatus(models.TextChoices):
 
 
 def _private_invoice_storage() -> Any:
-    """Resolve the private storage backend for invoice files.
+    """Resolve the per-tenant private storage backend for invoice files.
 
-    On AWS-backed deployments this is the ``PrivateMediaStorage``
-    subclass (``default_acl='private'`` + ``custom_domain=False`` so
-    downloads require a signed URL). In DEBUG / self-hosted static
-    setups it falls back to a filesystem directory — still separate
-    from the public ``media/`` tree so a misconfigured webserver won't
-    accidentally serve invoices.
+    On AWS-backed deployments this is ``TenantPrivateMediaStorage``
+    (``location='media/{schema}/private'`` resolved lazily from
+    ``connection.schema_name`` at every read, plus
+    ``default_acl='private'`` + ``custom_domain=False`` so downloads
+    require a signed URL). In DEBUG / self-hosted setups the private
+    tree is partitioned by schema too — ``{MEDIA_ROOT}_private/{schema}/``
+    — so a misconfigured webserver cannot serve another tenant's
+    invoices.
     """
     if getattr(settings, "USE_AWS", False):
-        from core.storages import PrivateMediaStorage
+        from core.storages import TenantPrivateMediaStorage
 
-        return PrivateMediaStorage()
-    location = getattr(
+        return TenantPrivateMediaStorage()
+
+    from django.db import connection
+
+    base_location = getattr(
         settings,
         "PRIVATE_MEDIA_ROOT",
         settings.MEDIA_ROOT + "_private"
         if getattr(settings, "MEDIA_ROOT", None)
         else "private_media",
     )
-    return FileSystemStorage(location=location)
+    schema = getattr(connection, "schema_name", "public") or "public"
+    return FileSystemStorage(location=f"{base_location}/{schema}")
 
 
 def _invoice_upload_to(instance: Invoice, filename: str) -> str:

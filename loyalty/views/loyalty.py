@@ -14,6 +14,7 @@ from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
+from tenant.membership import HasTenantAccess
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -93,10 +94,12 @@ class LoyaltyViewSet(BaseModelViewSet):
 
     queryset = PointsTransaction.objects.none()
     # IsLoyaltyEnabled fires first and raises 404 when the tenant's
-    # loyalty_enabled flag is False.  IsAuthenticated then enforces that
-    # all loyalty actions require a logged-in user. Both conditions must
-    # hold — the feature gate does NOT bypass auth.
-    permission_classes = [IsLoyaltyEnabled, IsAuthenticated]
+    # loyalty_enabled flag is False. IsAuthenticated then enforces that
+    # all loyalty actions require a logged-in user. HasTenantAccess
+    # pins the request to the current tenant — without it the global
+    # IsTenantMemberOrReadOnly default would not apply to a viewset
+    # that overrides permission_classes.
+    permission_classes = [IsLoyaltyEnabled, IsAuthenticated, HasTenantAccess]
     serializers_config = serializers_config
 
     @action(detail=False, methods=["GET"])

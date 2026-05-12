@@ -805,7 +805,12 @@ def get_celery_beat_schedule():
         # cap. Distributed mutex inside the task body prevents two
         # workers from each running the full fan-out concurrently.
         "poll-acs-tracking": {
-            "task": "shipping_acs.tasks.poll_acs_tracking_batch",
+            # Beat fires in the public schema. Without the fanout wrapper
+            # the worker would query `AcsShipment` in public — where no
+            # tenant shipment rows exist — and silently process zero
+            # parcels per tick. The fanout iterates active tenants and
+            # dispatches per-schema.
+            "task": "tenant.tasks.fanout_poll_acs_tracking_batch",
             "schedule": crontab(minute="*/15"),
             "options": {"queue": "celery", "expires": 300},
         },
@@ -815,7 +820,11 @@ def get_celery_beat_schedule():
         # (voucher_no, cod_payment_date) so an early run or a re-run
         # is harmless.
         "reconcile-acs-cod-payouts": {
-            "task": "shipping_acs.tasks.reconcile_acs_cod_payouts",
+            # Same fanout requirement as poll-acs-tracking — AcsShipment
+            # and AcsCodPayout are tenant-scoped tables, so beat must
+            # dispatch per-schema or the reconciliation runs against the
+            # empty public schema.
+            "task": "tenant.tasks.fanout_reconcile_acs_cod_payouts",
             "schedule": crontab(hour="2", minute="30")
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],

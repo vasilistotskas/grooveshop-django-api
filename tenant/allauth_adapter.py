@@ -196,8 +196,15 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
         Falls back gracefully when:
         - The Sites framework has no row for the tenant domain.
         - No per-tenant ``SocialApp`` is configured (single-tenant deployments).
+
+        Resolves the tenant from ``request.get_host()`` rather than
+        ``connection.tenant``. Under Daphne/Channels with
+        ``database_sync_to_async`` thread pooling, ``connection.tenant``
+        can be stale and would return a different tenant's OAuth app
+        config (H7 in MULTI_TENANT_AUDIT.md — same fix pattern as
+        ``pre_login``).
         """
-        tenant = getattr(connection, "tenant", None)
+        tenant = _resolve_tenant_from_request(request)
         if (
             tenant is not None
             and getattr(tenant, "schema_name", "public") != "public"

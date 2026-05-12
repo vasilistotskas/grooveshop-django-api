@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -194,8 +193,10 @@ class UserAccount(
 
     @property
     def main_image_path(self) -> str:
-        if self.image and hasattr(self.image, "name"):
-            return (
-                f"media/uploads/users/{os.path.basename(str(self.image.name))}"
-            )
-        return ""
+        # Delegate to the shared helper so the path is tenant-aware
+        # (``media/{schema}/uploads/users/…``). The hardcoded
+        # ``media/uploads/users/…`` literal always returned the legacy
+        # pre-multi-tenant flat path and 404'd on every tenant.
+        from core.utils.image_paths import image_to_media_path
+
+        return image_to_media_path(self.image)

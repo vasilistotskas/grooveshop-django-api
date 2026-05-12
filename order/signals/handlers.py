@@ -574,12 +574,26 @@ def handle_order_refunded(
             },
         )
 
+        # Capture the active tenant schema BEFORE the on_commit lambdas.
+        # The Stripe charge.refunded handler dispatches order_refunded.send
+        # synchronously inside @with_tenant_schema_from_event's
+        # schema_context; by the time these lambdas fire post-COMMIT, the
+        # schema_context has exited and connection.schema_name is back
+        # to public. Without explicit capture, TenantTask.apply_async
+        # would stamp _schema_name=public on the email + live-notification
+        # tasks (same bug class as C1 in MULTI_TENANT_AUDIT.md).
+        _schema = connection.schema_name
+
         # Live notification so the shopper learns about the refund without
         # having to check email. ``notify_order_refunded_live`` silently
         # drops guest orders.
         if order.user_id:
             transaction.on_commit(
-                lambda oid=order.id: notify_order_refunded_live.delay(oid)
+                lambda oid=order.id, s=_schema: (
+                    notify_order_refunded_live.apply_async(
+                        args=[oid], headers={"_schema_name": s}
+                    )
+                )
             )
 
         # Email confirmation. Idempotent via the
@@ -591,7 +605,11 @@ def handle_order_refunded(
         # the live notification which is account-bound, the email
         # uses ``order.email`` as the recipient.
         transaction.on_commit(
-            lambda oid=order.id: send_refund_confirmation_email.delay(oid)
+            lambda oid=order.id, s=_schema: (
+                send_refund_confirmation_email.apply_async(
+                    args=[oid], headers={"_schema_name": s}
+                )
+            )
         )
 
         logger.info("Order %s refunded", order.id)
@@ -1025,9 +1043,17 @@ def handle_stripe_dispute_created(sender, **kwargs):
             },
         )
 
+        # Capture the active tenant schema BEFORE the lambda is queued.
+        # ``transaction.on_commit`` fires after the surrounding
+        # @with_tenant_schema_from_event schema_context has exited, so
+        # without capture the dispatcher would stamp _schema_name=public
+        # — matching C1 in MULTI_TENANT_AUDIT.md.
+        _schema = connection.schema_name
         transaction.on_commit(
-            lambda oid=order.id, did=dispute_id: (
-                send_dispute_notification_email.delay(oid, did)
+            lambda oid=order.id, did=dispute_id, s=_schema: (
+                send_dispute_notification_email.apply_async(
+                    args=[oid, did], headers={"_schema_name": s}
+                )
             )
         )
 

@@ -793,7 +793,16 @@ class BoxNowService:
                         boxnow_send_arrival_notification,
                     )
 
-                    boxnow_send_arrival_notification.delay(event.id)
+                    # Defer to on_commit — we're inside ``transaction.atomic``
+                    # (line 704) and Celery dispatched mid-transaction can
+                    # deliver to a worker that races the COMMIT, causing
+                    # ``BoxNowParcelEvent.DoesNotExist``. Mirrors the
+                    # ShippingService.dispatch_create_shipment_task pattern.
+                    transaction.on_commit(
+                        lambda evt_id=event.id: (
+                            boxnow_send_arrival_notification.delay(evt_id)
+                        )
+                    )
                 except ImportError:
                     logger.warning(
                         "apply_webhook_event: "

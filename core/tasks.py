@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 from django.core import management
 from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured
-from django.core.mail import EmailMultiAlternatives, send_mail
+from django.core.mail import EmailMultiAlternatives, mail_admins
 from django.db import connections, transaction
 from django.db.models import F
 from django.template.loader import render_to_string
@@ -642,12 +642,10 @@ def monitor_system_health():
 
     if not critical_passed:
         try:
-            send_mail(
+            mail_admins(
                 subject="CRITICAL: System Health Check Failed",
                 message="Critical system components have failed health checks:\n\n"
                 + "\n".join(errors),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.ADMIN_EMAIL],
                 fail_silently=False,
             )
         except Exception as e:
@@ -815,12 +813,10 @@ def scheduled_database_backup():
         logger.error(f"Scheduled backup failed: {e}")
 
         try:
-            send_mail(
+            mail_admins(
                 subject="ALERT: Scheduled Database Backup Failed",
                 message=f"The scheduled database backup failed with error: {e!s}\n\n"
                 f"Please check the system logs and ensure the backup system is working properly.",
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.ADMIN_EMAIL],
                 fail_silently=True,
             )
         except Exception as mail_error:
@@ -916,7 +912,7 @@ def cleanup_old_backups(days=30, backup_dir="backups"):
 def validate_task_configuration():
     required_settings = [
         "DEFAULT_FROM_EMAIL",
-        "ADMIN_EMAIL",
+        "ADMINS",
         "MEDIA_ROOT",
         "BASE_DIR",
     ]

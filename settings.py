@@ -328,10 +328,7 @@ LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 
 ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
 
-ADMINS = [
-    ("Admin", getenv("ADMIN_EMAIL", "")),
-    ("Info", getenv("INFO_EMAIL", "")),
-]
+ADMINS = [email for email in [getenv("ADMIN_EMAIL", "")] if email]
 
 if DEBUG:
     MIDDLEWARE += [
@@ -1432,8 +1429,15 @@ if EMAIL_HOST_PASSWORD == "changeme" and SYSTEM_ENV == "production":
     )
 EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "True") == "True"
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
-ADMIN_EMAIL = getenv("ADMIN_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
+# Used by mail_admins() as the From: header for operational alerts
+# (system health, low stock, new-order notifications). Aliased to
+# DEFAULT_FROM_EMAIL so all outbound mail uses one verified sender.
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
+# Site administrator email is sourced via the ADMINS setting + mail_admins()
+# — there is no separate ADMIN_EMAIL Django setting. The ADMIN_EMAIL env
+# var is read once at module import time into ADMINS (see top of file).
 
 REST_KNOX = {
     "TOKEN_TTL": datetime.timedelta(days=7),

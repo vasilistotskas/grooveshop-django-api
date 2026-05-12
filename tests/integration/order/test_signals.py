@@ -37,8 +37,11 @@ class OrderSignalsTestCase(TestCase):
         self.product.refresh_from_db()
         self.initial_stock = self.product.stock
 
+    @patch("order.signals.handlers.send_admin_new_order_email.delay")
     @patch("order.signals.handlers.send_order_confirmation_email.delay")
-    def test_order_created_offline_payment_sends_email(self, mock_email_task):
+    def test_order_created_offline_payment_sends_email(
+        self, mock_email_task, mock_admin_task
+    ):
         # Offline payment methods (COD, bank transfer) need the
         # confirmation email immediately so the customer has the order
         # details before paying manually.
@@ -48,6 +51,7 @@ class OrderSignalsTestCase(TestCase):
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_called_once_with(self.order.id)
+        mock_admin_task.assert_called_once_with(self.order.id)
 
         self.assertTrue(
             OrderHistory.objects.filter(
@@ -57,11 +61,15 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
+    @patch("order.signals.handlers.send_admin_new_order_email.delay")
     @patch("order.signals.handlers.send_order_confirmation_email.delay")
-    def test_order_created_online_payment_defers_email(self, mock_email_task):
+    def test_order_created_online_payment_defers_email(
+        self, mock_email_task, mock_admin_task
+    ):
         # Online payments (Stripe, Viva) must defer the confirmation
         # email to the payment-success webhook — the customer should
-        # only get the email once the payment actually clears.
+        # only get the email once the payment actually clears. The
+        # admin notification still fires on creation regardless.
         self.order.pay_way = PayWayFactory.create_online_payment(
             provider_code="stripe"
         )
@@ -71,6 +79,7 @@ class OrderSignalsTestCase(TestCase):
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_not_called()
+        mock_admin_task.assert_called_once_with(self.order.id)
 
         self.assertTrue(
             OrderHistory.objects.filter(
@@ -80,9 +89,10 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
+    @patch("order.signals.handlers.send_admin_new_order_email.delay")
     @patch("order.signals.handlers.send_order_confirmation_email.delay")
     def test_order_created_online_payment_already_paid_sends_email(
-        self, mock_email_task
+        self, mock_email_task, mock_admin_task
     ):
         # Safety net: if an online-payment order is somehow already
         # paid at creation time, we still send the email immediately.
@@ -95,6 +105,7 @@ class OrderSignalsTestCase(TestCase):
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_called_once_with(self.order.id)
+        mock_admin_task.assert_called_once_with(self.order.id)
 
     @patch("order.tasks.send_order_status_update_email.delay")
     def test_order_status_changed_signal(self, mock_email_task):

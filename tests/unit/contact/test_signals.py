@@ -17,7 +17,7 @@ class TestContactSignals(TestCase):
         }
 
     @override_settings(
-        ADMINS=[("Admin", "admin@example.com")],
+        ADMINS=["admin@example.com"],
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     def test_email_sent_on_contact_creation(self):
@@ -38,10 +38,7 @@ class TestContactSignals(TestCase):
         assert "admin@example.com" in email.to
 
     @override_settings(
-        ADMINS=[
-            ("Admin1", "admin1@example.com"),
-            ("Admin2", "admin2@example.com"),
-        ],
+        ADMINS=["admin1@example.com", "admin2@example.com"],
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     def test_email_sent_to_multiple_admins(self):
@@ -92,7 +89,7 @@ class TestContactSignals(TestCase):
         assert len(mail.outbox) == 0
 
     @override_settings(
-        ADMINS=[("Admin", "admin@example.com")],
+        ADMINS=["admin@example.com"],
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     @patch("contact.tasks.send_mail")
@@ -114,7 +111,7 @@ class TestContactSignals(TestCase):
         assert mock_send_mail.called
 
     @override_settings(
-        ADMINS=[("Admin", "admin@example.com")],
+        ADMINS=["admin@example.com"],
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     def test_email_content_format(self):
@@ -136,7 +133,7 @@ class TestContactSignals(TestCase):
         assert "Message: I have a question about your services." in email.body
 
     @override_settings(
-        ADMINS=[("Admin", "admin@example.com")],
+        ADMINS=["admin@example.com"],
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     def test_email_with_special_characters(self):
@@ -155,7 +152,7 @@ class TestContactSignals(TestCase):
         assert "¡Hola!" in email.body
 
     @override_settings(
-        ADMINS=[("Admin", "admin@example.com")],
+        ADMINS=["admin@example.com"],
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     def test_email_with_long_message(self):
@@ -181,7 +178,7 @@ class TestContactSignals(TestCase):
                 "contact.tasks.send_contact_notification_email_task.delay"
             ) as mock_delay,
             override_settings(
-                ADMINS=[("Admin", "admin@example.com")],
+                ADMINS=["admin@example.com"],
                 DEFAULT_FROM_EMAIL="noreply@example.com",
             ),
         ):
@@ -204,7 +201,7 @@ class TestContactSignals(TestCase):
             mock_delay.assert_not_called()
 
     @override_settings(
-        ADMINS=[("Admin", "admin@example.com")],
+        ADMINS=["admin@example.com"],
         DEFAULT_FROM_EMAIL="",
     )
     def test_email_with_empty_from_email(self):
@@ -217,7 +214,7 @@ class TestContactSignals(TestCase):
         assert email.from_email == ""
 
     @override_settings(
-        ADMINS=[("Admin", "admin@example.com")],
+        ADMINS=["admin@example.com"],
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     @patch("contact.tasks.send_mail")
@@ -235,10 +232,10 @@ class TestContactSignals(TestCase):
         )
 
     @override_settings(
-        ADMINS=[("", "admin@example.com")],
+        ADMINS=["admin@example.com"],
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
-    def test_email_with_empty_admin_name(self):
+    def test_email_delivered_to_admin(self):
         mail.outbox = []
 
         Contact.objects.create(**self.contact_data)
@@ -248,7 +245,7 @@ class TestContactSignals(TestCase):
         assert "admin@example.com" in email.to
 
     @override_settings(
-        ADMINS=[("Admin", "admin@example.com")],
+        ADMINS=["admin@example.com"],
         DEFAULT_FROM_EMAIL="noreply@example.com",
     )
     def test_email_content_escaping(self):

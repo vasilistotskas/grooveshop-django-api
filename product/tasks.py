@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from celery import shared_task
 from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
+from django.core.mail import EmailMultiAlternatives, mail_admins
 from django.db import models
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -249,18 +249,15 @@ def check_low_stock_products() -> dict:
             low_stock_alert_sent=True
         )
 
-    admin_email = getattr(settings, "ADMIN_EMAIL", None) or getattr(
-        settings, "INFO_EMAIL", None
-    )
-    if not admin_email:
+    if not settings.ADMINS:
         logger.warning(
-            "check_low_stock_products: no ADMIN_EMAIL/INFO_EMAIL configured — rolling back claim"
+            "check_low_stock_products: no ADMINS configured — rolling back claim"
         )
-        # Release the claim so a future run with email configured can send.
+        # Release the claim so a future run with admins configured can send.
         Product.objects.filter(id__in=product_ids).update(
             low_stock_alert_sent=False
         )
-        return {"alerted": 0, "reason": "no_admin_email"}
+        return {"alerted": 0, "reason": "no_admins"}
 
     products_to_alert = list(
         Product.objects.filter(id__in=product_ids).prefetch_related(
@@ -286,9 +283,7 @@ def check_low_stock_products() -> dict:
         "SITE_URL": settings.NUXT_BASE_URL,
         "STATIC_BASE_URL": settings.STATIC_BASE_URL,
     }
-    subject = _("[{site}] Low stock alert — {n} product(s)").format(
-        site=settings.SITE_NAME, n=len(rows)
-    )
+    subject = _("Low stock alert — {n} product(s)").format(n=len(rows))
     try:
         text_content = render_to_string(
             "emails/product/low_stock_alert.txt", context
@@ -296,14 +291,11 @@ def check_low_stock_products() -> dict:
         html_content = render_to_string(
             "emails/product/low_stock_alert.html", context
         )
-        msg = EmailMultiAlternatives(
-            subject,
-            text_content,
-            settings.DEFAULT_FROM_EMAIL,
-            [admin_email],
+        mail_admins(
+            subject=subject,
+            message=text_content,
+            html_message=html_content,
         )
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
     except Exception as e:
         logger.error(
             "check_low_stock_products: failed to send alert email: %s",

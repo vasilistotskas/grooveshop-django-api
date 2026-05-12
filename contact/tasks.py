@@ -56,7 +56,7 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
         )
         return False
 
-    recipient_list = [admin[1] for admin in getattr(settings, "ADMINS", [])]
+    recipient_list = list(getattr(settings, "ADMINS", []))
     if not recipient_list:
         logger.warning(
             "send_contact_notification_email_task: no ADMINS configured — skipping",

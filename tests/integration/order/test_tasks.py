@@ -17,6 +17,7 @@ from order.tasks import (
     _release_confirmation_email,
     check_pending_orders,
     generate_order_invoice,
+    send_admin_new_order_email,
     send_invoice_email,
     send_order_confirmation_email,
     send_order_status_update_email,
@@ -564,3 +565,56 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         # Invoice generation must not mutate the order's status.
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, original_status)
+
+
+@pytest.mark.django_db
+class SendAdminNewOrderEmailTestCase(DjangoTestCase):
+    def setUp(self):
+        self.order = OrderFactory.create(
+            email="customer@example.com",
+            first_name="John",
+            last_name="Doe",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+
+    @patch("order.tasks.mail_admins")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        ADMINS=["admin@example.com"],
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_send_admin_new_order_email_sends_to_admins(
+        self, mock_render, mock_mail_admins
+    ):
+        mock_render.side_effect = ["Text body", "<p>HTML body</p>"]
+
+        result = send_admin_new_order_email(self.order.id)
+
+        self.assertTrue(result)
+        mock_mail_admins.assert_called_once()
+        call_kwargs = mock_mail_admins.call_args[1]
+        self.assertIn(f"New order — #{self.order.id}", call_kwargs["subject"])
+        self.assertEqual(call_kwargs["message"], "Text body")
+        self.assertEqual(call_kwargs["html_message"], "<p>HTML body</p>")
+
+    @override_settings(ADMINS=[])
+    @patch("order.tasks.mail_admins")
+    def test_send_admin_new_order_email_skips_when_unconfigured(
+        self, mock_mail_admins
+    ):
+        result = send_admin_new_order_email(self.order.id)
+
+        self.assertFalse(result)
+        mock_mail_admins.assert_not_called()
+
+    @patch("order.tasks.logger.error")
+    def test_send_admin_new_order_email_order_not_found(self, mock_logger):
+        result = send_admin_new_order_email(999999)
+
+        self.assertFalse(result)
+        mock_logger.assert_called_once()

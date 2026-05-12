@@ -30,9 +30,12 @@ def _resolve_tenant_from_request(request):
         host = request.get_host()
     except Exception:
         return None
-    # Strip the port so ``store.com:443`` matches a row with
-    # ``domain='store.com'``.
-    host = host.split(":", 1)[0]
+    # Strip the port and the trailing dot. ``domain__iexact`` handles
+    # case insensitivity at the DB layer, but a fully-qualified host
+    # like ``store.com.`` is semantically identical to ``store.com``
+    # and would otherwise silently miss the lookup → fall through to
+    # the public-schema branch, granting access to a different tenant.
+    host = host.split(":", 1)[0].rstrip(".")
     if not host:
         return None
     from tenant.models import TenantDomain  # noqa: PLC0415

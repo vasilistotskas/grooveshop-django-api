@@ -212,8 +212,8 @@ TEMPLATES = [
 
 LOGIN_URL = "/admin/"
 AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 WSGI_APPLICATION = "wsgi.application"
@@ -406,6 +406,7 @@ SOCIALACCOUNT_PROVIDERS = {
         "GRAPH_API_URL": "https://graph.facebook.com/v20.0",
         "FIELDS": [
             "id",
+            "email",
             "first_name",
             "last_name",
             "middle_name",
@@ -457,6 +458,7 @@ USERSESSIONS_TRACK_ACTIVITY = True
 # latter hard-requires the header — direct-to-Django paths (health probes,
 # Celery-triggered HTTP calls, tests) would otherwise 403 on every hit.
 
+HEADLESS_CLIENTS = ("app",)
 HEADLESS_TOKEN_STRATEGY = "core.api.tokens.SessionTokenStrategy"
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": f"{NUXT_BASE_URL}/account/verify-email/{{key}}",

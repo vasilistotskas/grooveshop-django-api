@@ -55,6 +55,18 @@ urlpatterns = [
     ),
 ]
 
+urlpatterns += [
+    # allauth headless endpoints must be at the root (not inside i18n_patterns)
+    # so non-default locales don't get a /{lang}/_allauth/ prefix that
+    # the Nuxt proxy never sends.
+    path("_allauth/", include("allauth.headless.urls")),
+    path(
+        "_allauth/app/v1/account/authenticators/totp/svg",
+        ManageTOTPSvgView.as_api_view(client="app"),
+        name="manage_totp_svg",
+    ),
+]
+
 urlpatterns += i18n_patterns(
     path("", HomeView.as_view(), name="home"),
     path(
@@ -64,12 +76,6 @@ urlpatterns += i18n_patterns(
     path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
-    path("_allauth/", include("allauth.headless.urls")),
-    path(
-        "_allauth/app/v1/account/authenticators/totp/svg",
-        ManageTOTPSvgView.as_api_view(client="app"),
-        name="manage_totp_svg",
-    ),
     # Our DBBackedTranslationFormView overrides the same URL that rosetta.urls
     # registers for the translation form; Django resolves the first match
     # so this override takes priority over the default `TranslationFormView`.

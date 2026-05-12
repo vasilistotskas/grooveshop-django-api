@@ -245,8 +245,17 @@ class AcsService:
             metadata["mint_started_at"] = timezone.now().isoformat()
             shipment.metadata = metadata
 
+            # The contract is COD-only, so the carrier sets
+            # ``charge_type=COD`` for every voucher regardless of how the
+            # order was paid. Sync ``cod_amount`` to the order total
+            # ONLY for true COD pay-ways — online-paid orders (Viva,
+            # Stripe) must keep ``cod_amount=0`` or the courier will
+            # collect at the door a second time.
+            pay_way = getattr(order, "pay_way", None)
+            is_cod_payway = bool(pay_way and pay_way.is_cash_on_delivery)
             cod_synced = (
-                shipment.charge_type == AcsChargeType.COD
+                is_cod_payway
+                and shipment.charge_type == AcsChargeType.COD
                 and (not shipment.cod_amount or shipment.cod_amount.amount == 0)
                 and order.paid_amount
                 and order.paid_amount.amount > 0
@@ -404,6 +413,8 @@ class AcsService:
     ) -> dict[str, Any]:
         """Translate Order + AcsShipment fields to the ACS payload."""
         from shipping_acs import config as acs_config
+        from shipping_acs.enum.charge_type import AcsChargeType
+        from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
 
         sender = getattr(settings, "SITE_NAME", "GrooveShop")
         fallback_country = acs_config.default_country()
@@ -446,14 +457,25 @@ class AcsService:
                 shipment.station_branch_destination or ""
             )
 
-        if shipment.cod_amount and shipment.cod_amount.amount > 0:
+        if shipment.charge_type == AcsChargeType.COD:
             # ACS parses Cod_Ammount with the Greek locale: dot is the
             # thousands separator, comma is the decimal separator. So
             # "47.01" reads as 4701, which trips the 1500€ cash cap. Send
-            # it as a comma-decimal string.
-            cod_decimal = shipment.cod_amount.amount.quantize(Decimal("0.01"))
+            # it as a comma-decimal string — always, even at 0,00. The
+            # contract is COD-only so every voucher carries a
+            # Cod_Ammount; online-paid orders ship at 0,00 so the
+            # courier collects nothing on delivery.
+            cod_decimal = (
+                shipment.cod_amount.amount
+                if shipment.cod_amount
+                else Decimal("0")
+            ).quantize(Decimal("0.01"))
             params["Cod_Ammount"] = format(cod_decimal, "f").replace(".", ",")
-            params["Cod_Payment_Way"] = shipment.cod_payment_way or 0
+            params["Cod_Payment_Way"] = (
+                shipment.cod_payment_way
+                if shipment.cod_payment_way is not None
+                else AcsCodPaymentWay.CASH
+            )
 
         if shipment.delivery_products:
             params["Acs_Delivery_Products"] = shipment.delivery_products

@@ -129,11 +129,18 @@ class AcsCarrier(ShippingCarrierInterface):
         charge type out of the checkout payload and computes the
         item quantity / weight from the cart line items.
 
-        ``charge_type`` defaults to PREPAID but is overridden to COD
-        when the order's pay_way is an offline (cash-on-delivery)
-        provider — that way ACS collects the parcel total from the
-        recipient at the door instead of expecting the partner to
-        pre-fund the shipment.
+        ``Charge_Type`` is **always** COD on the ACS voucher because our
+        commercial contract does not enable PREPAID (Charge_Type=1) —
+        ACS rejects PREPAID calls with "Μη αποδεκτή τιμή χρέωσης
+        μεταφορικών". What the courier collects at the door depends on
+        the pay-way: COD pay-ways sync ``cod_amount`` to the order
+        total at mint time (see ``AcsService.create_voucher_for_order``);
+        online pay-ways (Viva, Stripe) leave it at 0 so the voucher
+        mints but nothing is collected on delivery.
+
+        The explicit ``acs_charge_type`` payload key still wins so an
+        admin can force a per-order override if the contract ever gets
+        PREPAID enabled.
 
         Idempotent — re-runs are no-ops because the order already has
         a row at that point.
@@ -159,21 +166,18 @@ class AcsCarrier(ShippingCarrierInterface):
         branch_code = payload.get("acs_station_branch", "") or ""
         delivery_kind = order.shipping_kind or kind.value
 
-        # COD detection uses ``PayWay.is_cash_on_delivery`` (offline
-        # AND not requires_confirmation) so bank-transfer-style pay-ways
-        # — which are settled off-platform — ship as PREPAID instead of
-        # being double-billed at the door. The explicit ``acs_charge_type``
-        # payload key still wins so an admin override can force either
-        # direction (e.g. flip a COD order to PREPAID for B2B invoice
-        # settlement).
         pay_way = getattr(order, "pay_way", None)
         is_cod = bool(pay_way and pay_way.is_cash_on_delivery)
-        default_charge = AcsChargeType.COD if is_cod else AcsChargeType.PREPAID
-        charge_type = int(payload.get("acs_charge_type") or default_charge)
+        # Default to COD because the contract is COD-only; admins can
+        # still override per order via the ``acs_charge_type`` payload
+        # key. ``Acs_Delivery_Products="COD"`` only goes on the voucher
+        # for real COD pay-ways — online-paid orders get a COD voucher
+        # with Cod_Ammount=0 but should not carry the COD product flag.
+        charge_type = int(payload.get("acs_charge_type") or AcsChargeType.COD)
         cod_payment_way = (
             AcsCodPaymentWay.CASH if charge_type == AcsChargeType.COD else None
         )
-        delivery_products = "COD" if charge_type == AcsChargeType.COD else ""
+        delivery_products = "COD" if is_cod else ""
 
         weight_grams = 0
         item_quantity = 1

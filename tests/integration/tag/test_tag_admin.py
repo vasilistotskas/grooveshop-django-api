@@ -373,7 +373,6 @@ class TestTaggedItemAdmin:
 @pytest.mark.django_db
 class TestTagInLine:
     def test_tag_inline_fields(self, tag_inline):
-        from django.utils import translation
 
         assert tag_inline.fields == ("tag",)
         assert tag_inline.extra == 0

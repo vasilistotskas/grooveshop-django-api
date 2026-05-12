@@ -3,6 +3,71 @@
 
 
 
+## v1.131.0 (2026-05-12)
+
+### Bug fixes
+
+* fix(auth): close audit gaps across signals, headless config, urls, CORS
+
+- user/signals.py: revoke Knox tokens on password_reset signal (forgot-password
+  flow). password_changed only covers in-session changes; without this, an
+  account taken over via reset email kept the victim's Knox tokens valid for
+  the full 7-day TTL.
+- settings.py: HEADLESS_CLIENTS=("app",) — disables browser-mode allauth
+  endpoints that bypassed our SessionTokenStrategy Knox token issuance.
+- settings.py: swap AUTHENTICATION_BACKENDS so allauth precedes ModelBackend;
+  ModelBackend-first lets is_active=False users authenticate via the legacy
+  path.
+- settings.py: add "email" to Facebook FIELDS — the custom override dropped
+  the default, so Graph API never returned an email and signup/auto-connect
+  silently failed for Facebook.
+- core/urls.py: move _allauth/ and TOTP SVG include out of i18n_patterns so
+  non-default locales don't get a /{lang}/_allauth/ prefix the Nuxt proxy
+  never sends.
+- asgi/cors_handler.py: add GET/PUT/PATCH/DELETE to the allowed-methods
+  preflight response and expand allowed-headers to include X-Session-Token,
+  X-Cart-Id, X-Forwarded-Host, X-Real-IP, X-CSRFToken, X-Requested-With,
+  Idempotency-Key, Location. The previous POST-only list silently broke
+  every cross-origin browser request that wasn't a POST.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0c22cb5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c22cb5fe43efde67f2abb7802fa46560e82ee73))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.130.0 [skip ci] ([`c85679b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c85679b14b1ffd8bfa08437733d55f6d60b97d44))
+
+### Features
+
+* feat(order): add Viva Wallet return-URL lookup endpoint
+
+Viva's hosted checkout (``POST /checkout/v2/orders``) only accepts a
+per-order ``urlFail`` — the success URL is configured once in the
+merchant portal source settings and points at a static string with
+no per-order substitution. The storefront needs a way to translate
+the ``?t=<transaction_id>`` query param Viva appends to the
+success-callback URL into the order's UUID so it can forward the
+customer to the canonical ``/checkout/success/{uuid}`` route.
+
+Adds ``GET /api/v1/order/viva_return?t=<transaction_id>`` with
+``AllowAny`` permission. The transaction_id is a Viva-generated UUID
+(unguessable) and the response is intentionally minimal — id, uuid,
+status, paymentStatus — so the endpoint can't be used to enumerate
+PII.
+
+Companion change in the storefront (see next commit on the Nuxt
+side) adds ``/checkout/viva-return`` that hits this endpoint and
+``navigateTo`` the success page; operator then sets the Viva
+merchant portal source success URL to
+``https://webside.gr/el/checkout/viva-return``.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`8746c3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8746c3a34ef5e2a0fd66a6454b1a062fb43aace0))
+
+### Testing
+
+* test(asgi): sync CORS preflight assertions with handler
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`24fca55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/24fca55ed2163275303f3fede38a3b39782d7657))
+
 ## v1.130.0 (2026-05-12)
 
 ### Bug fixes

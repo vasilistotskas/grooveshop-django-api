@@ -223,6 +223,11 @@ class BoxNowCarrier(ShippingCarrierInterface):
             )
             return
 
+        logger.info(
+            "BoxNow dispatch: queued create-shipment for order=%s",
+            order.id,
+            extra={"order_id": order.id, "carrier": "boxnow"},
+        )
         create_boxnow_shipment_for_order.delay(order.id)
 
     # ------------------------------------------------------------------

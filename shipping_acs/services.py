@@ -471,11 +471,18 @@ class AcsService:
                 else Decimal("0")
             ).quantize(Decimal("0.01"))
             params["Cod_Ammount"] = format(cod_decimal, "f").replace(".", ",")
-            params["Cod_Payment_Way"] = (
-                shipment.cod_payment_way
-                if shipment.cod_payment_way is not None
-                else AcsCodPaymentWay.CASH
-            )
+            # Per ACS PDF p.6: ``Cod_Payment_Way`` should be ``null``
+            # when no cash is actually collected. For online-paid
+            # orders our voucher is COD-with-zero (contract limitation);
+            # sending ``0`` (cash) here tells the driver to collect €0
+            # which they sometimes log as a confused PoD entry. Omit
+            # the field entirely when the amount is zero.
+            if cod_decimal > 0:
+                params["Cod_Payment_Way"] = (
+                    shipment.cod_payment_way
+                    if shipment.cod_payment_way is not None
+                    else AcsCodPaymentWay.CASH
+                )
 
         if shipment.delivery_products:
             params["Acs_Delivery_Products"] = shipment.delivery_products

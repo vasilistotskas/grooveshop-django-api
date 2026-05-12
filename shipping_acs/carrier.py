@@ -186,6 +186,26 @@ class AcsCarrier(ShippingCarrierInterface):
             weight_grams = compute_total_weight_grams(items_list)
             item_quantity = max(sum(int(q or 0) for _, q in items_list) or 1, 1)
 
+        # ACS PDF p.8: Smartpoint locker deliveries are constrained to
+        # ``Item_Quantity == 1`` — multi-piece vouchers are only
+        # accepted for physical-shop / home-delivery destinations. A
+        # 2-line cart routed to a locker would mint a voucher that
+        # ACS rejects at locker-load. Clamp before persistence so the
+        # rest of the pipeline sees the actual shippable quantity.
+        if delivery_kind == ShippingKind.PICKUP_POINT and item_quantity > 1:
+            logger.warning(
+                "ACS Smartpoint clamps Item_Quantity %d → 1 for order=%s",
+                item_quantity,
+                order.id,
+                extra={
+                    "order_id": order.id,
+                    "carrier": "acs",
+                    "original_quantity": item_quantity,
+                    "delivery_kind": delivery_kind,
+                },
+            )
+            item_quantity = 1
+
         station = None
         if external_id:
             station = AcsStation.objects.filter(external_id=external_id).first()
@@ -215,6 +235,11 @@ class AcsCarrier(ShippingCarrierInterface):
             )
             return
 
+        logger.info(
+            "ACS dispatch: queued voucher mint for order=%s",
+            order.id,
+            extra={"order_id": order.id, "carrier": "acs"},
+        )
         create_acs_voucher_for_order.delay(order.id)
 
     # ------------------------------------------------------------------

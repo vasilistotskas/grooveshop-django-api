@@ -268,11 +268,23 @@ class BoxNowService:
             settings, "DEFAULT_FROM_EMAIL", ""
         )
 
+        # BoxNow P408 rejects ``amountToBeCollected`` outside (0, 5000).
+        # For PREPAID parcels the courier shouldn't collect anything;
+        # force ``"0.00"`` so a prepaid cart over €5000 still mints.
+        # COD parcels carry the real amount and are pre-validated at
+        # row creation time (carrier.create_shipment_row).
+        from shipping_boxnow.enum import BoxNowPaymentMode
+
+        if shipment.payment_mode == BoxNowPaymentMode.PREPAID:
+            amount_to_collect_str = "0.00"
+        else:
+            amount_to_collect_str = str(shipment.amount_to_be_collected.amount)
+
         payload: dict[str, Any] = {
             "orderNumber": str(order.id),
             "invoiceValue": invoice_value,
             "paymentMode": shipment.payment_mode,
-            "amountToBeCollected": str(shipment.amount_to_be_collected.amount),
+            "amountToBeCollected": amount_to_collect_str,
             "notifyOnAccepted": partner_notify_email,
             "origin": {
                 "contactNumber": notify_phone,
@@ -781,13 +793,23 @@ class BoxNowService:
             cls._apply_order_status_transition(order, mapped_state)
 
             # --- Enqueue arrival notification for final-destination -------
+            # Wrap ``.delay`` in ``transaction.on_commit`` so the Celery
+            # worker only sees the BoxNowParcelEvent row AFTER this
+            # atomic block commits. Without the wrapper the worker can
+            # dequeue before commit and crash on ``DoesNotExist`` (same
+            # class of bug as ACS order 47 — see project memory
+            # ``project_shipping_dispatch_on_commit``).
             if mapped_state == BoxNowParcelState.FINAL_DESTINATION:
                 try:
                     from shipping_boxnow.tasks import (  # noqa: PLC0415
                         boxnow_send_arrival_notification,
                     )
 
-                    boxnow_send_arrival_notification.delay(event.id)
+                    transaction.on_commit(
+                        lambda eid=event.id: (
+                            boxnow_send_arrival_notification.delay(eid)
+                        )
+                    )
                 except ImportError:
                     logger.warning(
                         "apply_webhook_event: "
@@ -1137,8 +1159,13 @@ class BoxNowService:
         except ValueError:
             locker_type = BoxNowLockerType.APM
 
-        address: dict = dest.get("address", {})
-
+        # BoxNow returns the address fields at the **top level** of the
+        # destination object (``addressLine1`` / ``postalCode`` /
+        # ``country``), not nested under an ``address`` sub-object. The
+        # previous version of this method walked a non-existent
+        # ``dest["address"]`` dict, so every synced locker landed in
+        # the DB with empty address fields — silently breaking
+        # postal-code filtering and the admin display.
         return {
             "type": locker_type,
             "image_url": dest.get("imageUrl") or None,
@@ -1146,10 +1173,10 @@ class BoxNowService:
             "lng": dest.get("lng", 0),
             "title": dest.get("title", ""),
             "name": dest.get("name", ""),
-            "address_line_1": address.get("addressLine1", ""),
-            "address_line_2": address.get("addressLine2", ""),
-            "postal_code": address.get("postalCode", ""),
-            "country_code": address.get("countryCode", "GR"),
+            "address_line_1": dest.get("addressLine1", ""),
+            "address_line_2": dest.get("addressLine2", ""),
+            "postal_code": dest.get("postalCode", ""),
+            "country_code": dest.get("country") or "GR",
             "note": dest.get("note", ""),
             "is_active": True,
             "last_synced_at": timezone.now(),

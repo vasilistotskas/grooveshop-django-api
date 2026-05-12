@@ -5,9 +5,10 @@ from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import PaymentStatus
 from order.models import Order
 from order.payment import get_payment_provider
+from order.signals import order_refunded
 from pay_way.models import PayWay
 
 logger = logging.getLogger(__name__)
@@ -202,9 +203,15 @@ class PayWayService:
                     "note": _("Manual refund process required"),
                 }
 
+            # Flip ``payment_status`` only; ``order.status`` is a
+            # business decision (the canonical transition table only
+            # allows RETURNED → REFUNDED). Mirrors the policy in
+            # ``handle_stripe_charge_refunded``; admin drives the
+            # RETURNED→REFUNDED transition manually from the order
+            # page when the goods are actually returned.
             order.payment_status = PaymentStatus.REFUNDED
-            order.status = OrderStatus.REFUNDED
-            order.save(update_fields=["payment_status", "status"])
+            order.save(update_fields=["payment_status"])
+            order_refunded.send(sender=Order, order=order)
 
             return True, refund_info
 
@@ -216,7 +223,7 @@ class PayWayService:
 
         if success:
             order.payment_status = PaymentStatus.REFUNDED
-            order.status = OrderStatus.REFUNDED
-            order.save(update_fields=["payment_status", "status"])
+            order.save(update_fields=["payment_status"])
+            order_refunded.send(sender=Order, order=order)
 
         return success, refund_data

@@ -191,6 +191,7 @@ class PayWayServiceTestCase(TestCase):
             payment_id="TEST_PAYMENT_123", payment_method="Stripe"
         )
         self.order.save()
+        status_before_refund = self.order.status
 
         mock_provider = mock.MagicMock()
         mock_provider.refund_payment.return_value = (
@@ -214,7 +215,12 @@ class PayWayServiceTestCase(TestCase):
         self.order.refresh_from_db()
 
         self.assertEqual(self.order.payment_status, PaymentStatus.REFUNDED)
-        self.assertEqual(self.order.status, "REFUNDED")
+        # ``order.status`` is intentionally NOT changed by the refund
+        # path — the canonical transition table only allows
+        # RETURNED → REFUNDED, and deciding whether a refund implies
+        # the goods were returned is a business decision (mirrors the
+        # Stripe ``charge.refunded`` handler).
+        self.assertEqual(self.order.status, status_before_refund)
 
     def test_refund_payment_offline(self):
         self.order.payment_id = f"OFFLINE_{self.order.id}"
@@ -224,6 +230,7 @@ class PayWayServiceTestCase(TestCase):
             payment_method="Bank Transfer",
         )
         self.order.save()
+        status_before_refund = self.order.status
 
         success, data = PayWayService.refund_payment(
             pay_way=self.offline_pay_way_with_confirmation, order=self.order
@@ -237,4 +244,7 @@ class PayWayServiceTestCase(TestCase):
         self.order.refresh_from_db()
 
         self.assertEqual(self.order.payment_status, PaymentStatus.REFUNDED)
-        self.assertEqual(self.order.status, "REFUNDED")
+        # See note in ``test_refund_payment_online``: ``order.status``
+        # is preserved across a refund; the staff drives the
+        # RETURNED → REFUNDED transition manually.
+        self.assertEqual(self.order.status, status_before_refund)

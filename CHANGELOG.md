@@ -3,6 +3,16 @@
 
 
 
+## v1.129.0 (2026-05-12)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.128.2 [skip ci] ([`eadccc3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eadccc381a2d35c0b48264c649f2256bd76d5269))
+
+### Features
+
+* feat: Bump Versions ([`b5126f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5126f94f97c5b7ac1c36afc515f5832aa0f098f))
+
 ## v1.128.2 (2026-05-11)
 
 ### Bug fixes

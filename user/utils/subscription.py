@@ -65,7 +65,15 @@ def send_subscription_confirmation(
         # rather than relying on API_BASE_URL baked into the setting at
         # startup.
         url_path_template = Setting.get("SUBSCRIPTION_CONFIRMATION_URL")
-        api_base = get_tenant_base_url().rstrip("/")
+        # The confirmation URL points at a Django API endpoint
+        # (``/api/v1/user/subscription/confirm/<token>``), NOT the
+        # storefront. There is no Nuxt proxy for that path, so we must
+        # build against the API origin. In single-tenant deployments
+        # this is the tenant's only API URL; for multi-tenant the
+        # follow-up is either a per-tenant ``get_tenant_api_base_url``
+        # helper (api.<tenant-domain>) or a Nuxt proxy route that
+        # forwards to Django — see H1 in MULTI_TENANT_AUDIT.md.
+        api_base = settings.API_BASE_URL.rstrip("/")
         # If the stored value already looks like an absolute URL (legacy
         # rows from before this fix), respect it as-is so existing tenants
         # aren't broken until they run backfill_extra_settings_defaults.
@@ -137,7 +145,11 @@ def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
     token = default_token_generator.make_token(user)
     uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-    base_url = get_tenant_base_url().rstrip("/")
+    # See note in ``send_subscription_confirmation`` — the unsubscribe
+    # URL targets a Django API endpoint that has no Nuxt proxy, so the
+    # API origin is the correct base. Multi-tenant follow-up tracked
+    # against H1 in MULTI_TENANT_AUDIT.md.
+    base_url = settings.API_BASE_URL.rstrip("/")
     unsubscribe_url = (
         f"{base_url}/api/v1/user/unsubscribe/{uid}/{token}/{topic.slug}"
     )
@@ -165,7 +177,8 @@ def generate_blanket_unsubscribe_link(
     token = default_token_generator.make_token(user)
     uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-    base_url = get_tenant_base_url().rstrip("/")
+    # Django API endpoint — see note above. H1 in MULTI_TENANT_AUDIT.md.
+    base_url = settings.API_BASE_URL.rstrip("/")
     return f"{base_url}/api/v1/user/unsubscribe/{uid}/{token}"
 
 

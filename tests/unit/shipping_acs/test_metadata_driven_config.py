@@ -199,7 +199,7 @@ class TestPrintType:
         # metadata invalidates only the layout that changed —
         # otherwise admins flipping thermal→laser would still get
         # the cached thermal PDF for an hour.
-        from unittest.mock import patch
+        from unittest.mock import MagicMock, patch
         from django.core.cache import cache
         from shipping_acs.factories import AcsShipmentFactory
         from shipping_acs.services import AcsService
@@ -208,16 +208,24 @@ class TestPrintType:
         cache.delete("acs:label:TEST_9999999999:pt1")
         cache.delete("acs:label:TEST_9999999999:pt2")
 
-        with patch("shipping_acs.client.AcsClient.print_voucher") as mock_print:
-            mock_print.return_value = b"%PDF-1.7 thermal"
+        # Patch ``AcsClient`` at the import site in services so the
+        # real constructor (which requires ACS_API_KEY / etc.) is
+        # bypassed — those env vars aren't set in CI's test environment.
+        with patch("shipping_acs.services.AcsClient") as MockClient:
+            instance = MagicMock()
+            MockClient.return_value = instance
+            instance.print_voucher.return_value = b"%PDF-1.7 thermal"
+
             # Default thermal call.
             assert AcsService.fetch_label_bytes(shipment) == b"%PDF-1.7 thermal"
-            mock_print.assert_called_once_with("TEST_9999999999", print_type=1)
+            instance.print_voucher.assert_called_once_with(
+                "TEST_9999999999", print_type=1
+            )
 
             # Flip provider metadata to laser; cache miss → fresh call
             # with print_type=2.
-            mock_print.reset_mock()
-            mock_print.return_value = b"%PDF-1.7 laser"
+            instance.print_voucher.reset_mock()
+            instance.print_voucher.return_value = b"%PDF-1.7 laser"
             acs_provider.metadata = {
                 **acs_provider.metadata,
                 "print_type": 2,
@@ -225,4 +233,6 @@ class TestPrintType:
             acs_provider.save(update_fields=["metadata"])
 
             assert AcsService.fetch_label_bytes(shipment) == b"%PDF-1.7 laser"
-            mock_print.assert_called_once_with("TEST_9999999999", print_type=2)
+            instance.print_voucher.assert_called_once_with(
+                "TEST_9999999999", print_type=2
+            )

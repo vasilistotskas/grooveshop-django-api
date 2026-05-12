@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from tenant.membership import HasTenantAccess
+from tenant.membership import IsTenantMemberOrReadOnly
 
 from core.utils.serializers import (
     ActionConfig,
@@ -62,13 +62,14 @@ serializers_config: SerializersConfig = {
 class OrderItemViewSet(BaseModelViewSet):
     queryset = OrderItem.objects.none()
     serializers_config = serializers_config
-    # ``IsAuthenticated`` alone would let a token from tenant A read
-    # order items on tenant B (Knox token tables are per-schema, so the
-    # token would fail authentication on B — but if it ever passed via
-    # a code-path that bypasses BoundedTokenAuthentication's tenant
-    # binding check, OrderItemViewSet would silently serve cross-tenant
-    # data). Add ``HasTenantAccess`` for defence in depth.
-    permission_classes = [IsAuthenticated, HasTenantAccess]
+    # Match the global ``IsTenantMemberOrReadOnly`` default that
+    # ``permission_classes = [IsAuthenticated]`` would otherwise drop.
+    # ``IsTenantMemberOrReadOnly`` lets authenticated users issue safe
+    # reads (the queryset itself is user-scoped + schema-isolated, so
+    # cross-tenant data can't leak via GETs) while requiring an active
+    # membership for writes. Switching to ``HasTenantAccess`` blanket
+    # was over-strict — own-order reads were never a tenancy concern.
+    permission_classes = [IsAuthenticated, IsTenantMemberOrReadOnly]
     filterset_class = OrderItemFilter
     ordering_fields = [
         "id",

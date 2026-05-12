@@ -2,6 +2,16 @@
 
 Tests the full request path through Django + DRF: URL routing,
 signature verification, and service dispatch.
+
+Multi-tenant note: production resolves the owning tenant by iterating
+``Tenant.objects.filter(...).exclude(schema_name=public)`` and entering
+each schema via ``schema_context`` to look up the parcel. Tests can't
+spin up real Postgres schemas cheaply, so the autouse fixture below
+creates a ``Tenant`` row (``auto_create_schema=False``) and patches
+``schema_context`` in the webhook view to a no-op — same pattern as
+``tests/integration/tenant/test_multi_tenant_invariants.py``. The
+shipment then lives in the test's public schema and the resolver
+"finds" it under the patched no-op context.
 """
 
 from __future__ import annotations
@@ -9,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import pytest
@@ -17,6 +28,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from shipping_boxnow.factories import BoxNowShipmentFactory
+from tenant.models import Tenant
 
 
 # ---------------------------------------------------------------------------
@@ -80,8 +92,71 @@ def _webhook_url():
 # ---------------------------------------------------------------------------
 
 
+@contextmanager
+def _noop_schema(_schema):
+    """Drop-in replacement for ``schema_context`` that does nothing.
+
+    Used by ``_tenant_setup`` so the webhook resolver's iteration over
+    non-public tenants doesn't try to SET search_path to a schema that
+    doesn't exist in the test Postgres database.
+    """
+    yield
+
+
+@pytest.fixture
+def _tenant_setup(db):
+    """Provision a single non-public tenant + no-op ``schema_context``.
+
+    The webhook resolver requires at least one ``Tenant`` row with a
+    non-public ``schema_name`` to iterate. Production hits the real
+    tenant's schema via ``schema_context`` and looks up the parcel
+    there; tests keep the parcel in the public schema and patch
+    ``schema_context`` to a no-op so the same lookup runs against
+    public. The downstream Celery task (``process_boxnow_webhook_event``)
+    inherits ``TenantTask`` and would also enter the schema — we patch
+    its ``schema_context`` too so the eager-mode execution doesn't trip
+    on the missing schema.
+    """
+    # ``auto_create_schema`` is a django-tenants class attribute, not a
+    # model field — set after __init__, before save(), so the row lands
+    # without trying to ``CREATE SCHEMA`` against the test database.
+    t = Tenant(
+        schema_name="boxnow_webhook_test",
+        name="boxnow-webhook-test",
+        slug="boxnow-webhook-test",
+        owner_email="owner-boxnow-webhook-test@example.com",
+        is_active=True,
+        suspended_at=None,
+    )
+    t.auto_create_schema = False
+    t.save()
+    # The webhook view imports ``schema_context`` at module scope, so
+    # patch its bound reference. ``TenantTask.__call__`` (the Celery
+    # base class used by ``process_boxnow_webhook_event``) imports
+    # ``schema_context`` lazily inside the call, so patch the canonical
+    # ``django_tenants.utils`` reference too — that catches the lazy
+    # import on first execution under ``CELERY_TASK_ALWAYS_EAGER``.
+    with (
+        patch(
+            "shipping_boxnow.views.webhook.schema_context",
+            _noop_schema,
+        ),
+        patch(
+            "django_tenants.utils.schema_context",
+            _noop_schema,
+        ),
+    ):
+        yield
+
+
 @pytest.mark.django_db
 class TestWebhookEndpoint:
+    @pytest.fixture(autouse=True)
+    def _setup(self, _tenant_setup):
+        """Autouse fixture so every test in this class gets the
+        tenant + no-op ``schema_context`` patch without an explicit
+        argument."""
+
     def setup_method(self):
         self.client = APIClient()
 
@@ -176,10 +251,20 @@ class TestWebhookEndpoint:
         )
 
     def test_missing_secret_returns_503(self, settings):
-        """When BOXNOW_WEBHOOK_SECRET is not configured → 503."""
+        """When BOXNOW_WEBHOOK_SECRET is not configured → 503.
+
+        Post-multi-tenant: the secret check runs INSIDE the resolved
+        tenant's schema_context, so the parcel must first be findable
+        in the DB before the secret-missing branch can fire. Without
+        a matching shipment, the resolver returns ``None`` and the
+        webhook short-circuits with 200 (orphan parcel) before ever
+        reaching the secret lookup. Seed a shipment so the test
+        actually exercises the 503 path it claims to.
+        """
         settings.BOXNOW_WEBHOOK_SECRET = ""
 
-        raw = _build_raw_body(parcel_id="9219709201", event="new")
+        shipment = BoxNowShipmentFactory(with_parcel=True)
+        raw = _build_raw_body(parcel_id=shipment.parcel_id, event="new")
 
         response = self.client.post(
             _webhook_url(),

@@ -1,8 +1,14 @@
+from django.db import connection
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
 from page_config.models import ComponentType, PageLayout, PageSection
+from tenant.models import (
+    Tenant,
+    TenantMembershipRole,
+    UserTenantMembership,
+)
 from user.factories.account import UserAccountFactory
 
 
@@ -65,6 +71,39 @@ class TestPageLayoutAdminViewSet(TestCase):
         self.client = APIClient()
         self.admin = UserAccountFactory(is_staff=True)
         self.client.force_authenticate(user=self.admin)
+
+        # Page-layout admin now requires both ``IsAdminUser`` AND
+        # ``HasTenantAccess`` (H22 in MULTI_TENANT_AUDIT.md). The test
+        # client hits the API under the public schema, so we attach a
+        # tenant + membership for the duration of each test rather than
+        # routing requests through a real tenant domain.
+        self.tenant = Tenant(
+            schema_name="page_admin_test",
+            name="Page Admin Test",
+            slug="page-admin-test",
+            owner_email="owner-page-admin@example.com",
+        )
+        self.tenant.auto_create_schema = False
+        self.tenant.save()
+        UserTenantMembership.objects.create(
+            user=self.admin,
+            tenant=self.tenant,
+            role=TenantMembershipRole.ADMIN,
+            is_active=True,
+        )
+
+        # Bind the tenant to the active connection so
+        # ``HasTenantAccess`` sees it via ``get_current_tenant``. We
+        # restore the previous value in ``tearDown`` so other tests
+        # in the same module aren't affected.
+        self._previous_tenant = getattr(connection, "tenant", None)
+        connection.tenant = self.tenant
+
+    def tearDown(self):
+        try:
+            connection.tenant = self._previous_tenant
+        except AttributeError:
+            pass
 
     def test_list(self):
         PageLayout.objects.create(page_type="home", title="Homepage")

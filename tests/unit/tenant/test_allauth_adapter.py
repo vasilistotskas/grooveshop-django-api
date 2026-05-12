@@ -42,10 +42,26 @@ def user(db):
 
 
 class TestPreLoginMembershipGate:
+    """``pre_login`` now resolves the active tenant from
+    ``request.get_host()`` rather than ``connection.tenant`` (H7 in
+    MULTI_TENANT_AUDIT.md — thread-local reuse under
+    ``database_sync_to_async`` could serve a stale tenant). The tests
+    patch ``_resolve_tenant_from_request`` so the per-test fixture
+    tenant is returned regardless of the mocked request host.
+    """
+
+    @staticmethod
+    def _stub_resolver(tenant):
+        """Patch the tenant resolver to return ``tenant`` for any request."""
+        from unittest.mock import patch as _patch
+
+        return _patch(
+            "tenant.allauth_adapter._resolve_tenant_from_request",
+            return_value=tenant,
+        )
+
     @pytest.mark.django_db
-    def test_allows_login_with_active_membership(
-        self, tenant_factory, user, bind_tenant
-    ):
+    def test_allows_login_with_active_membership(self, tenant_factory, user):
         tenant = tenant_factory("prelogin-allow")
         UserTenantMembership.objects.create(
             user=user,
@@ -53,36 +69,12 @@ class TestPreLoginMembershipGate:
             role=TenantMembershipRole.MEMBER,
             is_active=True,
         )
-        bind_tenant(tenant)
 
         adapter = TenantAccountAdapter()
-        # pre_login calls super().pre_login with extra kwargs; patch the
-        # super chain so we isolate the membership check.
-        adapter.pre_login = adapter.__class__.pre_login.__get__(adapter)
-
         request = MagicMock()
+
         # Should not raise
-        adapter.pre_login(
-            request,
-            user,
-            email_verification=None,
-            signal_kwargs=None,
-            email="bob-adapter@example.com",
-            signup=False,
-            redirect_url=None,
-        )
-
-    @pytest.mark.django_db
-    def test_rejects_login_without_membership(
-        self, tenant_factory, user, bind_tenant
-    ):
-        tenant = tenant_factory("prelogin-reject")
-        bind_tenant(tenant)
-
-        adapter = TenantAccountAdapter()
-        request = MagicMock()
-
-        with pytest.raises(forms.ValidationError) as exc:
+        with self._stub_resolver(tenant):
             adapter.pre_login(
                 request,
                 user,
@@ -92,13 +84,30 @@ class TestPreLoginMembershipGate:
                 signup=False,
                 redirect_url=None,
             )
+
+    @pytest.mark.django_db
+    def test_rejects_login_without_membership(self, tenant_factory, user):
+        tenant = tenant_factory("prelogin-reject")
+
+        adapter = TenantAccountAdapter()
+        request = MagicMock()
+
+        with self._stub_resolver(tenant):
+            with pytest.raises(forms.ValidationError) as exc:
+                adapter.pre_login(
+                    request,
+                    user,
+                    email_verification=None,
+                    signal_kwargs=None,
+                    email="bob-adapter@example.com",
+                    signup=False,
+                    redirect_url=None,
+                )
         # The code is what the storefront i18n pack keys on — preserve it
         assert exc.value.code == "no_tenant_membership"
 
     @pytest.mark.django_db
-    def test_rejects_login_with_inactive_membership(
-        self, tenant_factory, user, bind_tenant
-    ):
+    def test_rejects_login_with_inactive_membership(self, tenant_factory, user):
         tenant = tenant_factory("prelogin-inactive")
         UserTenantMembership.objects.create(
             user=user,
@@ -106,71 +115,77 @@ class TestPreLoginMembershipGate:
             role=TenantMembershipRole.MEMBER,
             is_active=False,
         )
-        bind_tenant(tenant)
 
         adapter = TenantAccountAdapter()
         request = MagicMock()
 
-        with pytest.raises(forms.ValidationError):
-            adapter.pre_login(
-                request,
-                user,
-                email_verification=None,
-                signal_kwargs=None,
-                email="bob-adapter@example.com",
-                signup=False,
-                redirect_url=None,
-            )
+        with self._stub_resolver(tenant):
+            with pytest.raises(forms.ValidationError):
+                adapter.pre_login(
+                    request,
+                    user,
+                    email_verification=None,
+                    signal_kwargs=None,
+                    email="bob-adapter@example.com",
+                    signup=False,
+                    redirect_url=None,
+                )
 
     @pytest.mark.django_db
-    def test_skips_check_on_public_schema(self, user, bind_tenant):
+    def test_skips_check_on_public_schema(self, user):
         # Platform admin paths (/admin/login/ on the public schema) must
         # still work. The gate short-circuits when schema_name == "public".
-        bind_tenant(SimpleNamespace(schema_name="public"))
+        public_marker = SimpleNamespace(schema_name="public")
 
         adapter = TenantAccountAdapter()
         request = MagicMock()
 
         # Will call super().pre_login which expects more context; just
         # verify we don't raise ValidationError for missing membership.
-        try:
-            adapter.pre_login(
-                request,
-                user,
-                email_verification=None,
-                signal_kwargs=None,
-                email="bob-adapter@example.com",
-                signup=False,
-                redirect_url=None,
-            )
-        except forms.ValidationError:
-            pytest.fail("public schema should skip the tenant membership gate")
-        except Exception:
-            # Super's pre_login may raise for unrelated reasons given
-            # our mock request; that's not what this test covers.
-            pass
+        with self._stub_resolver(public_marker):
+            try:
+                adapter.pre_login(
+                    request,
+                    user,
+                    email_verification=None,
+                    signal_kwargs=None,
+                    email="bob-adapter@example.com",
+                    signup=False,
+                    redirect_url=None,
+                )
+            except forms.ValidationError:
+                pytest.fail(
+                    "public schema should skip the tenant membership gate"
+                )
+            except Exception:
+                # Super's pre_login may raise for unrelated reasons given
+                # our mock request; that's not what this test covers.
+                pass
 
     @pytest.mark.django_db
-    def test_skips_check_when_no_tenant(self, user, bind_tenant):
-        bind_tenant(None)
-
+    def test_skips_check_when_no_tenant(self, user):
+        """When the resolver returns None (request host did not match
+        any TenantDomain row) the gate is skipped — platform paths
+        like /admin/login/ on the public hostname still work.
+        """
         adapter = TenantAccountAdapter()
         request = MagicMock()
 
-        try:
-            adapter.pre_login(
-                request,
-                user,
-                email_verification=None,
-                signal_kwargs=None,
-                email="bob-adapter@example.com",
-                signup=False,
-                redirect_url=None,
-            )
-        except forms.ValidationError:
-            pytest.fail("no tenant should skip the membership gate")
-        except Exception:
-            pass
+        with self._stub_resolver(None):
+            try:
+                adapter.pre_login(
+                    request,
+                    user,
+                    email_verification=None,
+                    signal_kwargs=None,
+                    email="bob-adapter@example.com",
+                    signup=False,
+                    redirect_url=None,
+                )
+            except forms.ValidationError:
+                pytest.fail("no tenant should skip the membership gate")
+            except Exception:
+                pass
 
 
 class TestSaveUserCreatesMembership:

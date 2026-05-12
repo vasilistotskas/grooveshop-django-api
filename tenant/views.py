@@ -132,11 +132,13 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
 
     def _require_public_schema(self):
         if connection.schema_name != "public":
-            from rest_framework.exceptions import PermissionDenied
+            # Returning 404 instead of 403 hides the endpoint's existence
+            # from tenants that have no business knowing it's there
+            # (H6 in MULTI_TENANT_AUDIT.md). A 403 leaks the URL surface
+            # to anyone hitting the API on a tenant domain.
+            from django.http import Http404
 
-            raise PermissionDenied(
-                "This endpoint is only available on the public schema."
-            )
+            raise Http404
 
     def get_queryset(self):
         if connection.schema_name != "public":

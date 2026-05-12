@@ -114,6 +114,11 @@ urlpatterns = [
         name="order-my-orders",
     ),
     path(
+        "order/viva_return",
+        OrderViewSet.as_view({"get": "viva_return"}),
+        name="order-viva-return",
+    ),
+    path(
         "order-items",
         OrderItemViewSet.as_view({"get": "list", "post": "create"}),
         name="order-item-list",

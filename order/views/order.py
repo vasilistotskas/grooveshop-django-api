@@ -9,7 +9,11 @@ from django.http import FileResponse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
-from drf_spectacular.utils import extend_schema, extend_schema_view
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import (
@@ -18,7 +22,7 @@ from rest_framework.exceptions import (
     PermissionDenied,
     ValidationError,
 )
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
@@ -1302,6 +1306,73 @@ class OrderViewSet(BaseModelViewSet):
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    @extend_schema(
+        operation_id="vivaReturnLookup",
+        tags=["Orders"],
+        summary=_(
+            "Look up an order by Viva Wallet transaction id (post-payment redirect)"
+        ),
+        description=_(
+            "Viva's hosted checkout redirects to a static success URL "
+            "configured in the merchant portal — Viva does not support "
+            "per-order success URLs (only ``urlFail``). This endpoint "
+            "translates the ``t`` (transaction_id) query param that "
+            "Viva appends to the redirect into the order's UUID so the "
+            "Nuxt return page can forward the customer to the canonical "
+            "``/checkout/success/{uuid}`` route. Permission is open "
+            "because the transaction_id is a Viva-generated UUID "
+            "(unguessable) and the response carries no PII — just the "
+            "order's UUID, public id, status, and payment_status."
+        ),
+        parameters=[
+            OpenApiParameter(
+                name="t",
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="Viva transaction_id (UUID).",
+                type=str,
+            ),
+        ],
+        responses={200: None, 400: None, 404: None},
+    )
+    @action(
+        detail=False,
+        methods=["GET"],
+        permission_classes=[AllowAny],
+        url_path="viva_return",
+    )
+    def viva_return(self, request, *args, **kwargs):
+        """Return the order UUID for a Viva transaction id."""
+        transaction_id = request.query_params.get("t", "").strip()
+        if not transaction_id:
+            return Response(
+                {"detail": _("Missing transaction id (t query param).")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = (
+            Order.objects.only(
+                "id", "uuid", "status", "payment_status", "payment_id"
+            )
+            .filter(payment_id=transaction_id, payment_method="viva_wallet")
+            .first()
+        )
+        if order is None:
+            raise NotFound(
+                _("No order found for transaction id {t}").format(
+                    t=transaction_id
+                )
+            )
+
+        return Response(
+            {
+                "id": order.id,
+                "uuid": str(order.uuid),
+                "status": str(order.status),
+                "paymentStatus": str(order.payment_status),
+            }
+        )
 
     @action(detail=False, methods=["GET"])
     def my_orders(self, request, *args, **kwargs):

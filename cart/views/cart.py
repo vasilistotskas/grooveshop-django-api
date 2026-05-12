@@ -50,9 +50,14 @@ logger = logging.getLogger(__name__)
 GUEST_CART_HEADERS = [
     OpenApiParameter(
         name="X-Cart-Id",
-        type=OpenApiTypes.INT,
+        type=OpenApiTypes.UUID,
         location=OpenApiParameter.HEADER,
-        description="Cart ID for guest users. Used to identify and maintain guest cart sessions.",
+        description=(
+            "Cart UUID for guest users. Used to identify and maintain "
+            "guest cart sessions. Sequential integer IDs were enumerable "
+            "metadata, so the public identifier is the UUID inherited "
+            "from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md)."
+        ),
         required=False,
     ),
 ]

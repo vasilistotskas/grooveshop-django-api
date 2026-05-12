@@ -242,7 +242,7 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.client.force_authenticate(user=None)
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
-        headers = self._add_cart_headers(cart_id=anonymous_cart.id)
+        headers = self._add_cart_headers(cart_id=anonymous_cart.uuid)
 
         response = self.client.get(self.detail_url, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -261,7 +261,7 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.client.force_authenticate(user=None)
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
-        headers = self._add_cart_headers(cart_id=anonymous_cart.id)
+        headers = self._add_cart_headers(cart_id=anonymous_cart.uuid)
 
         update_data = {}
         response = self.client.patch(
@@ -274,7 +274,7 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.client.force_authenticate(user=None)
 
         anonymous_cart = CartFactory(user=None, num_cart_items=0)
-        headers = self._add_cart_headers(cart_id=anonymous_cart.id)
+        headers = self._add_cart_headers(cart_id=anonymous_cart.uuid)
 
         response = self.client.delete(self.detail_url, **headers)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
@@ -293,7 +293,7 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
 
     def test_authenticated_user_with_guest_cart_headers_merges(self):
         guest_cart = CartFactory(user=None, num_cart_items=0)
-        headers = self._add_cart_headers(cart_id=guest_cart.id)
+        headers = self._add_cart_headers(cart_id=guest_cart.uuid)
 
         response = self.client.get(self.detail_url, **headers)
         self.assertEqual(response.status_code, status.HTTP_200_OK)

@@ -39,9 +39,12 @@ from core.utils.serializers import (
 GUEST_CART_HEADERS = [
     OpenApiParameter(
         name="X-Cart-Id",
-        type=OpenApiTypes.INT,
+        type=OpenApiTypes.UUID,
         location=OpenApiParameter.HEADER,
-        description="Cart ID for guest users. Used to identify and maintain guest cart sessions.",
+        description=(
+            "Cart UUID for guest users. Used to identify and maintain "
+            "guest cart sessions (M18 in MULTI_TENANT_AUDIT.md)."
+        ),
         required=False,
     ),
 ]

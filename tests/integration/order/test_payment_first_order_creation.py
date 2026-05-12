@@ -126,7 +126,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         # Assertions
@@ -152,7 +152,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -174,7 +174,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -190,7 +190,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -205,7 +205,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -220,7 +220,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -236,7 +236,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -269,7 +269,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -308,7 +308,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -344,7 +344,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -383,7 +383,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.guest_cart.id),
+            HTTP_X_CART_ID=str(self.guest_cart.uuid),
         )
 
         # Assertions
@@ -426,7 +426,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         # Assertions

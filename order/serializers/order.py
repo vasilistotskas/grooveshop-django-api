@@ -1009,21 +1009,26 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
 
         validated_data["shipping_price"] = shipping_price
 
-        # Store cart_id in order metadata for guest cart clearing
+        # Store the guest cart's UUID in order metadata so the post-save
+        # signal can clear the cart. Header value is the cart UUID
+        # (M18 in MULTI_TENANT_AUDIT.md); store the normalised string
+        # form so JSONField round-tripping is identity.
         request = self.context.get("request")
         if request and not validated_data.get("user"):
-            cart_id = None
+            cart_id_raw = None
             if hasattr(request, "META"):
-                cart_id = request.META.get("HTTP_X_CART_ID")
+                cart_id_raw = request.META.get("HTTP_X_CART_ID")
             elif hasattr(request, "headers"):
-                cart_id = request.headers.get("X-Cart-Id")
+                cart_id_raw = request.headers.get("X-Cart-Id")
 
-            if cart_id:
+            if cart_id_raw:
                 try:
-                    cart_id = int(cart_id)
+                    import uuid as _uuid  # noqa: PLC0415
+
+                    cart_uuid = _uuid.UUID(str(cart_id_raw))
                     if "metadata" not in validated_data:
                         validated_data["metadata"] = {}
-                    validated_data["metadata"]["cart_id"] = cart_id
+                    validated_data["metadata"]["cart_id"] = str(cart_uuid)
                 except (ValueError, TypeError):
                     pass
 

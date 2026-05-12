@@ -189,19 +189,21 @@ def handle_order_created(
                         order.id,
                     )
             else:
-                # For guest orders, try to get cart_id from order metadata
-                cart_id = (
+                # For guest orders, look up the cart via the UUID
+                # stored in metadata (M18 in MULTI_TENANT_AUDIT.md —
+                # the integer PK is internal only).
+                cart_uuid = (
                     order.metadata.get("cart_id") if order.metadata else None
                 )
-                if cart_id:
+                if cart_uuid:
                     cart = Cart.objects.filter(
-                        id=cart_id, user__isnull=True
+                        uuid=cart_uuid, user__isnull=True
                     ).first()
                     if cart:
                         cart.delete()  # Delete entire cart
                         logger.info(
                             "Cleared guest cart %s after order %s creation",
-                            cart_id,
+                            cart_uuid,
                             order.id,
                         )
                 else:

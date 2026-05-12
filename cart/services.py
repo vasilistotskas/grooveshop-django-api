@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid as uuid_module
 from enum import Enum, unique
 from typing import TYPE_CHECKING
 
@@ -52,16 +53,28 @@ class CartService:
             raise
 
     def _extract_cart_info(self):
-        if hasattr(self.request, "META"):
-            self.cart_id = self.request.META.get("HTTP_X_CART_ID")
-        else:
-            self.cart_id = self.request.headers.get("X-Cart-Id")
+        """Parse the X-Cart-Id header as a UUID.
 
-        if self.cart_id:
+        Cart has both an integer PK (``id``) for internal joins and a
+        UUID (``uuid``) inherited from ``UUIDModel``. The header carries
+        the UUID — the integer PK was enumerable and a metadata leak
+        (M18 in MULTI_TENANT_AUDIT.md). Any non-UUID value is rejected
+        as a malformed header rather than silently casting.
+        """
+        if hasattr(self.request, "META"):
+            raw = self.request.META.get("HTTP_X_CART_ID")
+        else:
+            raw = self.request.headers.get("X-Cart-Id")
+
+        if raw:
             try:
-                self.cart_id = int(self.cart_id)
-            except (ValueError, TypeError):
+                self.cart_id: uuid_module.UUID | None = uuid_module.UUID(
+                    str(raw)
+                )
+            except (ValueError, AttributeError, TypeError):
                 self.cart_id = None
+        else:
+            self.cart_id = None
 
     def __str__(self):
         return f"Cart {self.cart.user if self.cart and self.cart.user else 'Anonymous'}"
@@ -76,7 +89,7 @@ class CartService:
     def _initialize_cart(self):
         if self.request.user.is_authenticated and self.cart_id:
             guest_cart = (
-                Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
             )
             if guest_cart:
                 self.cart = self.get_or_create_cart()
@@ -97,7 +110,7 @@ class CartService:
 
             if cart and self.cart_id:
                 guest_cart = (
-                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                    Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
 
                 if guest_cart:
@@ -107,7 +120,7 @@ class CartService:
         else:
             if self.cart_id:
                 return (
-                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                    Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
 
             return None
@@ -120,7 +133,7 @@ class CartService:
 
             if self.cart_id:
                 guest_cart = (
-                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                    Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
 
                 if guest_cart:
@@ -130,7 +143,7 @@ class CartService:
         else:
             if self.cart_id:
                 cart = (
-                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                    Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
                 if cart:
                     return cart
@@ -177,25 +190,34 @@ class CartService:
             self.cart.items.all().delete()
             self.cart_items = []
 
-    def get_cart_by_id(self, cart_id: int):
-        """Return ``cart_id`` only when the caller owns it.
+    def get_cart_by_id(self, cart_uuid: str | uuid_module.UUID):
+        """Return the cart identified by ``cart_uuid`` if the caller owns it.
 
         Authenticated users may only fetch their own cart. Anonymous
         callers may only fetch the guest cart bound to the X-Cart-Id
-        header captured during ``_extract_cart_info`` — random integer
-        scans are a 1-line IDOR otherwise (see C11 in
-        MULTI_TENANT_AUDIT.md).
+        header captured during ``_extract_cart_info`` (see C11 + M18
+        in MULTI_TENANT_AUDIT.md). The lookup uses the public UUID
+        rather than the integer PK so the namespace is not enumerable.
         """
+        try:
+            normalized = (
+                cart_uuid
+                if isinstance(cart_uuid, uuid_module.UUID)
+                else uuid_module.UUID(str(cart_uuid))
+            )
+        except (ValueError, TypeError):
+            return None
+
         if self.request.user.is_authenticated:
             return (
                 Cart.objects.for_detail()
-                .filter(id=cart_id, user=self.request.user)
+                .filter(uuid=normalized, user=self.request.user)
                 .first()
             )
-        if self.cart_id == cart_id:
+        if self.cart_id == normalized:
             return (
                 Cart.objects.for_detail()
-                .filter(id=cart_id, user__isnull=True)
+                .filter(uuid=normalized, user__isnull=True)
                 .first()
             )
         return None

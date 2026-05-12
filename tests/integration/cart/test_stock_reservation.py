@@ -180,7 +180,7 @@ class CartStockReservationTest(TestURLFixerMixin, APITestCase):
 
         # Add cart ID header for guest
         response = self.client.post(
-            self.reserve_url, HTTP_X_CART_ID=str(guest_cart.id)
+            self.reserve_url, HTTP_X_CART_ID=str(guest_cart.uuid)
         )
 
         # Verify response

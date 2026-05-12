@@ -30,8 +30,11 @@ class CartItemSerializer(serializers.ModelSerializer[CartItem]):
         max_digits=11, decimal_places=2, read_only=True
     )
 
-    def get_cart_id(self, obj: CartItem) -> int:
-        return obj.cart.id
+    def get_cart_id(self, obj: CartItem) -> str:
+        # Returns the cart's UUID — the public identifier the storefront
+        # echoes back in X-Cart-Id (M18 in MULTI_TENANT_AUDIT.md). The
+        # integer PK stays internal.
+        return str(obj.cart.uuid)
 
     @extend_schema_field(
         {

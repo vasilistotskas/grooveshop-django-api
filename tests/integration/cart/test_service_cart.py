@@ -25,7 +25,7 @@ class CartServiceTest(TestCase):
 
         self.request = self._create_request_with_headers(
             user=self.user,
-            cart_id=self.cart.id,
+            cart_id=self.cart.uuid,
         )
 
     def _create_request_with_headers(self, user=None, cart_id=None):
@@ -71,7 +71,7 @@ class CartServiceTest(TestCase):
 
         request = self._create_request_with_headers(
             user=self.user,
-            cart_id=guest_cart.id,
+            cart_id=guest_cart.uuid,
         )
 
         CartService(request=request)
@@ -84,17 +84,16 @@ class CartServiceTest(TestCase):
 
     def test_get_cart_by_id_valid(self):
         cart_service = CartService(request=self.request)
-        cart_id = self.cart.id
-
-        cart = cart_service.get_cart_by_id(cart_id)
+        cart = cart_service.get_cart_by_id(self.cart.uuid)
 
         self.assertEqual(cart, self.cart)
 
     def test_get_cart_by_id_invalid(self):
-        cart_service = CartService(request=self.request)
-        cart_id = self.cart.id + 1000
+        import uuid as _uuid
 
-        cart = cart_service.get_cart_by_id(cart_id)
+        cart_service = CartService(request=self.request)
+        # An unrelated UUID — never minted as a real cart row.
+        cart = cart_service.get_cart_by_id(_uuid.uuid4())
 
         self.assertIsNone(cart)
 
@@ -181,7 +180,7 @@ class GuestCartServiceTest(TestCase):
     def test_get_or_create_cart_for_guest_with_existing_cart(self):
         guest_cart = CartFactory(user=None)
 
-        request = self._create_guest_request(cart_id=guest_cart.id)
+        request = self._create_guest_request(cart_id=guest_cart.uuid)
 
         cart_service = CartService(request=request)
         cart = cart_service.get_or_create_cart()
@@ -191,7 +190,7 @@ class GuestCartServiceTest(TestCase):
 
     def test_create_cart_item_for_guest(self):
         guest_cart = CartFactory(user=None)
-        request = self._create_guest_request(cart_id=guest_cart.id)
+        request = self._create_guest_request(cart_id=guest_cart.uuid)
 
         cart_service = CartService(request=request)
         cart_item = cart_service.create_cart_item(self.product, 3)
@@ -209,14 +208,13 @@ class GuestCartServiceTest(TestCase):
 
     def test_guest_cart_with_specific_cart_id(self):
         guest_cart = CartFactory(user=None)
-        cart_id = guest_cart.id
 
-        request = self._create_guest_request(cart_id=cart_id)
+        request = self._create_guest_request(cart_id=guest_cart.uuid)
 
         cart_service = CartService(request=request)
         cart = cart_service.get_or_create_cart()
 
-        self.assertEqual(cart.id, cart_id)
+        self.assertEqual(cart.uuid, guest_cart.uuid)
         self.assertIsNone(cart.user)
 
     def test_guest_cart_no_headers_creates_new(self):
@@ -235,12 +233,12 @@ class GuestCartServiceTest(TestCase):
 
         user = UserAccountFactory(num_addresses=0)
 
-        guest_request = self._create_guest_request(cart_id=guest_cart.id)
+        guest_request = self._create_guest_request(cart_id=guest_cart.uuid)
         guest_service = CartService(request=guest_request)
         self.assertEqual(guest_service.cart.items.count(), 1)
 
         user_request = self._create_request_with_headers(
-            user=user, cart_id=guest_cart.id
+            user=user, cart_id=guest_cart.uuid
         )
 
         user_service = CartService(request=user_request)

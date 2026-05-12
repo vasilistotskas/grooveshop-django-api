@@ -245,7 +245,7 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
         )
 
         headers = {
-            "HTTP_X_CART_ID": str(guest_cart.id),
+            "HTTP_X_CART_ID": str(guest_cart.uuid),
         }
 
         create_data = {
@@ -270,7 +270,7 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
         guest_cart = CartFactory(user=None, num_cart_items=1)
 
         headers = {
-            "HTTP_X_CART_ID": str(guest_cart.id),
+            "HTTP_X_CART_ID": str(guest_cart.uuid),
         }
 
         response = self.client.get(self.list_url, **headers)

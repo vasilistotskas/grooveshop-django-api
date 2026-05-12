@@ -12,6 +12,7 @@ from typing import Callable
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import connection
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
 logger = logging.getLogger(__name__)
@@ -103,7 +104,15 @@ class AllAuthRateLimitMiddleware:
                 continue
 
             client = _client_key(request)
-            cache_prefix = f"allauth_rl:{path_prefix.replace('/', '_')}"
+            # Explicit schema prefix on the cache key gives defence in
+            # depth — tenant scoping must NOT depend on KEY_FUNCTION
+            # alone (H11 in MULTI_TENANT_AUDIT.md). Two tenants behind
+            # a NAT will share an IP, but with the schema in the key
+            # they cannot exhaust each other's quota.
+            schema = getattr(connection, "schema_name", "public") or "public"
+            cache_prefix = (
+                f"allauth_rl:{schema}:{path_prefix.replace('/', '_')}"
+            )
 
             if per_minute and _is_rate_limited(
                 f"{cache_prefix}:min:{client}", per_minute, 60

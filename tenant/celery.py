@@ -10,11 +10,23 @@ logger = logging.getLogger(__name__)
 
 
 class TenantTask(Task):
-    """Base Celery task that propagates tenant schema context."""
+    """Base Celery task that propagates tenant schema context.
+
+    Schema resolution at enqueue time prefers an explicit
+    ``_schema_name`` header from the caller (so cross-schema
+    on_commit and fanout paths can pin the value) and falls back to
+    the thread-local ``connection.schema_name`` (H8 in
+    MULTI_TENANT_AUDIT.md). Without the explicit hand-off, dispatchers
+    fired from worker callbacks or management commands stamp
+    ``'public'`` and the worker runs against the wrong schema.
+    """
 
     def apply_async(self, *args: Any, **options: Any) -> Any:
         headers = options.pop("headers", {}) or {}
-        headers["_schema_name"] = getattr(connection, "schema_name", "public")
+        if not headers.get("_schema_name"):
+            headers["_schema_name"] = getattr(
+                connection, "schema_name", "public"
+            )
         options["headers"] = headers
         return super().apply_async(*args, **options)
 

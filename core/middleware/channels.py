@@ -80,6 +80,14 @@ def authenticate_ticket(ticket: str):
     return user
 
 
+@database_sync_to_async
+def _user_has_tenant_access_async(user, tenant) -> bool:
+    """Sync membership check wrapped for the ASGI middleware."""
+    from tenant.membership import user_has_tenant_access  # noqa: PLC0415
+
+    return user_has_tenant_access(user, tenant)
+
+
 class TokenAuthMiddleware(BaseMiddleware):
     async def __call__(self, scope, receive, send):
         query_string = scope.get("query_string", b"").decode()
@@ -88,9 +96,31 @@ class TokenAuthMiddleware(BaseMiddleware):
         ticket = query_params.get("ticket", [None])[0]
 
         if ticket:
-            scope["user"] = await authenticate_ticket(ticket)
+            user = await authenticate_ticket(ticket)
         else:
-            scope["user"] = AnonymousUser()
+            user = AnonymousUser()
+
+        # Tenant binding (H3 in MULTI_TENANT_AUDIT.md): a Knox ticket
+        # minted on tenant A must not authenticate a WebSocket on
+        # tenant B. ``TenantWebsocketMiddleware`` runs outside this one
+        # and has already set ``scope["tenant"]``; we drop the user
+        # back to AnonymousUser when membership is missing so the
+        # consumer enforces its anonymous policy (deny + close).
+        tenant = scope.get("tenant")
+        if (
+            user.is_authenticated
+            and tenant is not None
+            and getattr(tenant, "schema_name", "public") != "public"
+            and not await _user_has_tenant_access_async(user, tenant)
+        ):
+            logger.warning(
+                "WS auth: rejecting user %s on tenant %s — no membership",
+                getattr(user, "pk", "?"),
+                getattr(tenant, "schema_name", "?"),
+            )
+            user = AnonymousUser()
+
+        scope["user"] = user
 
         return await super().__call__(scope, receive, send)
 

@@ -68,7 +68,16 @@ class TinymceS3Storage(S3Boto3Storage):
 #   fallback once the S3 mv is complete.
 # ---------------------------------------------------------------------------
 
-_LEGACY_FALLBACK = os.getenv("STORAGE_LEGACY_FALLBACK", "False") == "True"
+
+def _legacy_fallback_enabled() -> bool:
+    """Resolve ``STORAGE_LEGACY_FALLBACK`` at call time, not import time.
+
+    Storage classes are imported very early (before late env injection
+    from Celery workers, test patches, kubectl-edit settings, etc.).
+    Reading the env var inside the call ensures a later flip of the
+    flag actually takes effect (H12 in MULTI_TENANT_AUDIT.md).
+    """
+    return os.getenv("STORAGE_LEGACY_FALLBACK", "False") == "True"
 
 
 class _TenantLocationMixin:
@@ -95,7 +104,7 @@ class _TenantLocationMixin:
         try:
             return super()._open(name, mode)  # type: ignore[misc]
         except Exception:
-            if not _LEGACY_FALLBACK:
+            if not _legacy_fallback_enabled():
                 raise
             # Attempt to read from legacy location (no tenant prefix).
             # We temporarily swap location to the legacy root, open the

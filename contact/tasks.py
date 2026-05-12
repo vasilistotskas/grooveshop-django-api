@@ -8,12 +8,11 @@ failures are automatically retried.
 
 import logging
 
-from django.conf import settings
 from django.core.mail import send_mail
 
 from core import celery_app
 from core.tasks import MonitoredTask
-from tenant.credentials import tenant_from_email
+from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +56,20 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
         )
         return False
 
-    recipient_list = [admin[1] for admin in getattr(settings, "ADMINS", [])]
-    if not recipient_list:
+    # Route to the tenant's public contact inbox, not the platform
+    # ADMINS list (H23 in MULTI_TENANT_AUDIT.md). On a single-tenant
+    # deployment this resolves to the same address operators use
+    # already; on multi-tenant it puts each tenant's submissions in
+    # their own inbox.
+    recipient = tenant_contact_email()
+    if not recipient:
         logger.warning(
-            "send_contact_notification_email_task: no ADMINS configured — skipping",
+            "send_contact_notification_email_task: no contact email "
+            "configured for the active tenant — skipping",
             extra={"contact_id": contact_id},
         )
         return False
+    recipient_list = [recipient]
 
     safe_name = _sanitize(contact.name)
     subject = f"New Contact Form Submission from {safe_name}"

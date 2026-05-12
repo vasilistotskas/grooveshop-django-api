@@ -14,6 +14,7 @@ from page_config.serializers import (
     PageLayoutAdminSerializer,
     PageLayoutSerializer,
 )
+from tenant.membership import HasTenantAccess
 
 
 @extend_schema(
@@ -40,7 +41,12 @@ def public_page_config(request, page_type):
 
 class PageLayoutAdminViewSet(BaseModelViewSet):
     queryset = PageLayout.objects.prefetch_related("sections")
-    permission_classes = [IsAdminUser]
+    # ``IsAdminUser`` alone lets any platform-staff user mutate any
+    # tenant's page layout (H22 in MULTI_TENANT_AUDIT.md). Pair it
+    # with ``HasTenantAccess`` so the requester must also be a member
+    # of the current tenant — platform owners onboarding a new tenant
+    # get a membership provisioned through the standard flow.
+    permission_classes = [IsAdminUser, HasTenantAccess]
     serializers_config = {
         "list": ActionConfig(response=PageLayoutSerializer),
         "retrieve": ActionConfig(response=PageLayoutSerializer),

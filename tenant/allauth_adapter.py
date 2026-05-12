@@ -12,6 +12,39 @@ from user.adapter import SocialAccountAdapter, UserAccountAdapter
 logger = logging.getLogger(__name__)
 
 
+def _resolve_tenant_from_request(request):
+    """Return the Tenant for ``request.get_host()`` or ``None``.
+
+    The login gate in ``pre_login`` previously read
+    ``connection.tenant`` from a thread-local. Under Daphne/Channels
+    ``database_sync_to_async`` reuses threads across requests — a
+    pooled worker thread can hold a stale ``connection.tenant`` from
+    an earlier request and grant access to the wrong tenant (H7 in
+    MULTI_TENANT_AUDIT.md). Resolving from the request host bypasses
+    the thread-local entirely so the gate is correct regardless of
+    pool state.
+    """
+    if request is None:
+        return None
+    try:
+        host = request.get_host()
+    except Exception:
+        return None
+    # Strip the port so ``store.com:443`` matches a row with
+    # ``domain='store.com'``.
+    host = host.split(":", 1)[0]
+    if not host:
+        return None
+    from tenant.models import TenantDomain  # noqa: PLC0415
+
+    domain = (
+        TenantDomain.objects.select_related("tenant")
+        .filter(domain__iexact=host)
+        .first()
+    )
+    return getattr(domain, "tenant", None) if domain else None
+
+
 def _ensure_member_membership(user) -> None:
     """Grant a MEMBER membership in the active tenant, if any.
 
@@ -93,8 +126,13 @@ class TenantAccountAdapter(UserAccountAdapter):
         ``forms.ValidationError`` surfaces as a 400 with a localizable
         message the storefront can show the user ("You don't have
         access to this store — contact support or register here.").
+
+        Resolves the tenant from the request host (NOT
+        ``connection.tenant``) so a stale thread-local cannot let a
+        user authenticated on tenant A pass the gate on tenant B's
+        domain.
         """
-        tenant = getattr(connection, "tenant", None)
+        tenant = _resolve_tenant_from_request(request)
         # No tenant attached (public schema, admin login, health probes)
         # — nothing to gate on, fall through to the default.
         if (

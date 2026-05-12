@@ -9,7 +9,6 @@ import logging
 from collections.abc import Callable, Iterable
 from typing import Any, TypedDict
 
-from django.conf import settings
 from django.db import models
 from django.db.models.fields import Field
 from meilisearch.models.task import Task, TaskInfo
@@ -235,23 +234,13 @@ class IndexMixin(models.Model):
             tasks=[],
         )
 
-        # Skip index creation in offline mode
-        if settings.MEILISEARCH.get("OFFLINE", False):
-            return
-
-        # Create index and apply settings
-        try:
-            _client.create_index(index_name, primary_key).with_settings(
-                index_name=index_name,
-                index_settings=index_settings,
-            )
-
-            # Store tasks for reference
-            cls._meilisearch["tasks"] = list(_client.tasks)
-            _client.flush_tasks()
-
-        except Exception as e:
-            logger.warning(f"Failed to initialize index {index_name}: {e}")
+        # Index creation is deferred to ``meilisearch_sync_all_indexes``,
+        # which runs per-tenant and uses ``get_meili_index_name()`` to
+        # produce a ``{schema}__{base_name}`` index. Auto-creating here at
+        # Django class-load time fires in the public schema and would
+        # produce a bare ``ProductTranslation`` index that no tenant ever
+        # reads (see C6 in MULTI_TENANT_AUDIT.md).
+        return
 
     class _MeilisearchDescriptor:
         """Descriptor that returns a fresh IndexQuerySet instance on each access."""

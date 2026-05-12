@@ -7,10 +7,11 @@ from base64 import b64encode
 import requests
 from django.conf import settings
 from django.core.cache import cache
-from django.db import transaction
+from django.db import connection, transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django_tenants.utils import get_public_schema_name, schema_context
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
@@ -25,6 +26,33 @@ from order.tasks import (
     send_order_confirmation_email,
     send_payment_failed_email,
 )
+
+
+def _resolve_tenant_for_order_code(order_code: str) -> str | None:
+    """Return the schema name of the tenant that owns ``order_code``.
+
+    Viva webhooks land in the public schema (no tenant routing exists
+    at the HTTP layer for machine-to-machine callers). We iterate
+    active tenants and look up the order via its
+    ``metadata.viva_order_code`` field; first match wins. Returns
+    ``None`` for an orphan order code (deleted order, wrong tenant,
+    test webhook).
+    """
+    if not order_code:
+        return None
+
+    from tenant.models import Tenant  # noqa: PLC0415
+
+    public = get_public_schema_name()
+    for tenant in Tenant.objects.filter(is_active=True).exclude(
+        schema_name=public
+    ):
+        with schema_context(tenant.schema_name):
+            if Order.objects.filter(
+                metadata__viva_order_code=str(order_code)
+            ).exists():
+                return tenant.schema_name
+    return None
 
 
 class ResolveVivaOrderCodeResponseSerializer(serializers.Serializer):
@@ -316,7 +344,6 @@ def _verify_transaction(transaction_id):
 
 
 def _handle_webhook_event(request):
-    from django.db import transaction
 
     # === DEBUG: log all request details ===
     logger.info(
@@ -396,25 +423,68 @@ def _handle_webhook_event(request):
         logger.warning("No OrderCode in Viva Wallet webhook")
         return JsonResponse({"status": "ok"})
 
+    # Resolve the owning tenant up-front. Every ORM call below must run
+    # inside that tenant's schema_context — otherwise we'd query the
+    # public schema (where Order rows do not live) and silently drop
+    # the webhook on the floor.
+    tenant_schema = _resolve_tenant_for_order_code(order_code)
+    if not tenant_schema:
+        logger.error(
+            "Order not found for Viva Wallet order code: %s | "
+            "(no tenant owns metadata.viva_order_code='%s')",
+            order_code,
+            str(order_code),
+        )
+        return JsonResponse({"status": "ok"})
+
+    # The rest of the handler runs inside the tenant's schema_context so
+    # SELECT FOR UPDATE, VivaWebhookEvent inserts, and downstream task
+    # dispatches all land in the correct schema.
+    with schema_context(tenant_schema):
+        return _process_event_in_tenant(
+            order_code=order_code,
+            event_type_id=event_type_id,
+            event_data=event_data,
+            transaction_id=transaction_id,
+            status_id=status_id,
+            txn_hash=txn_hash,
+        )
+
+
+def _process_event_in_tenant(
+    *,
+    order_code: str,
+    event_type_id,
+    event_data: dict,
+    transaction_id: str,
+    status_id: str,
+    txn_hash: str,
+) -> JsonResponse:
+    """Run the Viva webhook state-machine inside an active tenant schema.
+
+    Caller must already be inside ``schema_context(tenant_schema)``.
+    """
     order = Order.objects.filter(
         metadata__viva_order_code=str(order_code)
     ).first()
 
     if not order:
         logger.error(
-            "Order not found for Viva Wallet order code: %s | "
-            "(was searching for metadata.viva_order_code = '%s')",
+            "Viva webhook: tenant schema=%s resolved but Order vanished "
+            "(order_code=%s)",
+            connection.schema_name,
             order_code,
-            str(order_code),
         )
         return JsonResponse({"status": "ok"})
 
     logger.info(
-        "Viva webhook matched order #%s (uuid=%s, status=%s, payment_status=%s)",
+        "Viva webhook matched order #%s (uuid=%s, status=%s, "
+        "payment_status=%s) in tenant=%s",
         order.id,
         order.uuid,
         order.status,
         order.payment_status,
+        connection.schema_name,
     )
 
     # Idempotency: ``VivaWebhookEvent`` table is the single source of
@@ -680,8 +750,15 @@ def _handle_payment_created(order, event_data, transaction_id):
     # duplicate webhook delivery or a retry will not resend.
     # Wrapped in on_commit so the Celery worker always sees the committed
     # payment_status / order.status rather than an in-flight row.
+    # ``_schema`` captured at lambda-build time; on_commit fires after the
+    # tenant ``schema_context`` exits (see C1/C2 in MULTI_TENANT_AUDIT.md).
+    _schema = connection.schema_name
     transaction.on_commit(
-        lambda oid=order.id: send_order_confirmation_email.delay(oid)
+        lambda oid=order.id, s=_schema: (
+            send_order_confirmation_email.apply_async(
+                args=[oid], headers={"_schema_name": s}
+            )
+        )
     )
 
     # Enqueue the carrier's delivery-request creation. Provider-agnostic
@@ -722,8 +799,11 @@ def _handle_payment_failed(order, event_data, transaction_id):
     # Notify the customer so they can retry instead of silently sitting
     # on a broken order.
     # Wrapped in on_commit so the worker sees the committed payment_status.
+    _schema = connection.schema_name
     transaction.on_commit(
-        lambda oid=order.id: send_payment_failed_email.delay(oid)
+        lambda oid=order.id, s=_schema: send_payment_failed_email.apply_async(
+            args=[oid], headers={"_schema_name": s}
+        )
     )
 
 

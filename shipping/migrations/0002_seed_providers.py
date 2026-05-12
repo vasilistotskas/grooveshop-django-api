@@ -18,8 +18,9 @@ from django.db import migrations
 
 def seed_providers(apps, schema_editor):
     ShippingProvider = apps.get_model("shipping", "ShippingProvider")
+    db_alias = schema_editor.connection.alias
 
-    ShippingProvider.objects.update_or_create(
+    ShippingProvider.objects.using(db_alias).update_or_create(
         code="boxnow",
         defaults={
             "name": "BOX NOW",
@@ -38,17 +39,12 @@ def seed_providers(apps, schema_editor):
         },
     )
 
-    ShippingProvider.objects.update_or_create(
+    ShippingProvider.objects.using(db_alias).update_or_create(
         code="acs",
         defaults={
             "name": "ACS Courier",
             "is_active": False,
             "supports_home_delivery": True,
-            # Smartpoint pickup ships in Phase 2; the follow-up
-            # migration 0003_acs_supports_pickup_point.py flips this
-            # to True without disturbing existing rows. Default here
-            # is False so the row at first seed reflects what the
-            # 0001/0002 contract advertised.
             "supports_pickup_point": False,
             "live_mode": False,
             "priority": 10,
@@ -63,7 +59,9 @@ def seed_providers(apps, schema_editor):
 
 def unseed_providers(apps, schema_editor):
     ShippingProvider = apps.get_model("shipping", "ShippingProvider")
-    ShippingProvider.objects.filter(code__in=["boxnow", "acs"]).delete()
+    ShippingProvider.objects.using(schema_editor.connection.alias).filter(
+        code__in=["boxnow", "acs"]
+    ).delete()
 
 
 class Migration(migrations.Migration):

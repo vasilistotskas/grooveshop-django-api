@@ -401,11 +401,41 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Ownership gate (see C11 in MULTI_TENANT_AUDIT.md): a reservation
+        # belongs to the requester if it was made by their user account
+        # OR its session_id matches the current cart's UUID. Without this
+        # filter, any caller could pass an arbitrary integer reservation
+        # ID and release another customer's hold mid-checkout.
+        from django.db.models import Q
+        from order.models.stock_reservation import StockReservation
+
+        cart = self.cart_service.cart
+        cart_uuid = str(cart.uuid) if cart else ""
+        ownership = Q(pk__in=[])  # default: nothing
+        if request.user.is_authenticated:
+            ownership |= Q(reserved_by=request.user)
+        if cart_uuid:
+            ownership |= Q(session_id=cart_uuid)
+
+        owned_ids = set(
+            StockReservation.objects.filter(
+                ownership, pk__in=reservation_ids
+            ).values_list("pk", flat=True)
+        )
+
         # Release each reservation
         released_count = 0
         failed_releases = []
 
         for reservation_id in reservation_ids:
+            if reservation_id not in owned_ids:
+                failed_releases.append(
+                    {
+                        "reservation_id": reservation_id,
+                        "error": "not_owner",
+                    }
+                )
+                continue
             try:
                 StockManager.release_reservation(reservation_id)
                 released_count += 1

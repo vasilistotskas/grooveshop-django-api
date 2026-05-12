@@ -65,7 +65,7 @@ def send_subscription_confirmation(
         # rather than relying on API_BASE_URL baked into the setting at
         # startup.
         url_path_template = Setting.get("SUBSCRIPTION_CONFIRMATION_URL")
-        api_base = settings.API_BASE_URL.rstrip("/")
+        api_base = get_tenant_base_url().rstrip("/")
         # If the stored value already looks like an absolute URL (legacy
         # rows from before this fix), respect it as-is so existing tenants
         # aren't broken until they run backfill_extra_settings_defaults.
@@ -137,7 +137,7 @@ def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
     token = default_token_generator.make_token(user)
     uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-    base_url = settings.API_BASE_URL.rstrip("/")
+    base_url = get_tenant_base_url().rstrip("/")
     unsubscribe_url = (
         f"{base_url}/api/v1/user/unsubscribe/{uid}/{token}/{topic.slug}"
     )
@@ -165,7 +165,7 @@ def generate_blanket_unsubscribe_link(
     token = default_token_generator.make_token(user)
     uid = urlsafe_base64_encode(force_bytes(user.pk))
 
-    base_url = settings.API_BASE_URL.rstrip("/")
+    base_url = get_tenant_base_url().rstrip("/")
     return f"{base_url}/api/v1/user/unsubscribe/{uid}/{token}"
 
 

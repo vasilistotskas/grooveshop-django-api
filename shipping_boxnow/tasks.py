@@ -8,6 +8,7 @@ from django.conf import settings
 from django.utils import translation
 
 from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowRetryableError
+from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(BoxNowRetryableError, ConnectionError),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -105,6 +107,7 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(BoxNowRetryableError,),
     retry_backoff=True,
     retry_backoff_max=3600,
@@ -134,6 +137,7 @@ def sync_boxnow_lockers(self) -> dict[str, int]:
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(BoxNowRetryableError,),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -179,6 +183,7 @@ def process_boxnow_webhook_event(
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(Exception,),
     retry_backoff=True,
     retry_backoff_max=600,

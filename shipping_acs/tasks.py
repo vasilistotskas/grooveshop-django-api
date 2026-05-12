@@ -27,6 +27,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from shipping_acs.exceptions import AcsAPIError, AcsRetryableError
+from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(AcsRetryableError, ConnectionError),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -100,6 +102,7 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(AcsRetryableError,),
     retry_backoff=True,
     retry_backoff_max=3600,
@@ -121,6 +124,7 @@ def sync_acs_stations(self) -> dict[str, int]:
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(AcsRetryableError,),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -157,6 +161,7 @@ _POLL_BATCH_LOCK_TTL = 13 * 60  # 13 minutes
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(AcsRetryableError,),
     retry_backoff=True,
     retry_backoff_max=300,
@@ -230,6 +235,7 @@ def models_or_null(cutoff):
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(AcsRetryableError, ConnectionError),
     retry_backoff=True,
     retry_backoff_max=600,
@@ -271,6 +277,7 @@ def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(AcsRetryableError,),
     retry_backoff=True,
     retry_backoff_max=3600,
@@ -309,6 +316,7 @@ def reconcile_acs_cod_payouts(self) -> dict[str, int]:
 
 @shared_task(
     bind=True,
+    base=TenantTask,
     autoretry_for=(Exception,),
     retry_backoff=True,
     retry_backoff_max=600,

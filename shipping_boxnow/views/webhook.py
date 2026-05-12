@@ -4,8 +4,11 @@ Public URL given to BoxNow for parcel-event notifications.
 Authentication is done exclusively via HMAC-SHA256 datasignature
 (no Knox/session auth — BoxNow is a machine-to-machine caller).
 
-Wire-up is deferred to a later wave; this file is intentionally not
-yet listed in urls.py.
+Multi-tenant: the webhook hits the platform's public schema (BoxNow
+doesn't know about our tenant boundary). We resolve the owning tenant
+by looking up ``data.parcelId`` across all active tenant schemas, then
+verify the signature with that tenant's secret and dispatch the task
+with the matching schema header. See C5 in MULTI_TENANT_AUDIT.md.
 """
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ import logging
 
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from django_tenants.utils import get_public_schema_name, schema_context
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -34,6 +38,29 @@ from shipping_boxnow.webhook import (
 )
 
 logger = logging.getLogger("shipping_boxnow.webhook")
+
+
+def _resolve_tenant_for_parcel(parcel_id: str) -> str | None:
+    """Return the schema name of the tenant that owns ``parcel_id``.
+
+    Iterates active tenants and searches each schema's
+    ``BoxNowShipment`` table for the parcel. First match wins.
+    Returns ``None`` if no tenant owns the parcel (orphan webhook).
+    """
+    if not parcel_id:
+        return None
+
+    from shipping_boxnow.models import BoxNowShipment  # noqa: PLC0415
+    from tenant.models import Tenant  # noqa: PLC0415
+
+    public = get_public_schema_name()
+    for tenant in Tenant.objects.filter(is_active=True).exclude(
+        schema_name=public
+    ):
+        with schema_context(tenant.schema_name):
+            if BoxNowShipment.objects.filter(parcel_id=parcel_id).exists():
+                return tenant.schema_name
+    return None
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -134,52 +161,68 @@ class BoxNowWebhookView(APIView):
             return Response(status=400)
 
         # ------------------------------------------------------------------ #
-        # 5. Guard: secret must be configured.                                #
+        # 5. Resolve the owning tenant from the parcel.                       #
+        # ------------------------------------------------------------------ #
+        parcel_id = (envelope.get("data") or {}).get("parcelId") or ""
+        tenant_schema = _resolve_tenant_for_parcel(parcel_id)
+        if not tenant_schema:
+            logger.warning(
+                "BoxNow webhook: cannot resolve tenant for parcelId=%s id=%s",
+                parcel_id,
+                message_id,
+            )
+            # Acknowledge with 200 so BoxNow stops retrying an orphan parcel.
+            return Response(status=200)
+
+        # ------------------------------------------------------------------ #
+        # 6. Verify signature inside the tenant schema (per-tenant secret).   #
         # ------------------------------------------------------------------ #
         from tenant.credentials import box_now_credentials  # noqa: PLC0415
 
-        secret: str = box_now_credentials()["webhook_secret"]
+        with schema_context(tenant_schema):
+            secret: str = box_now_credentials()["webhook_secret"]
+
         if not secret:
             logger.error(
                 "BoxNow webhook: BOXNOW_WEBHOOK_SECRET is not configured"
-                " — cannot verify signature | id=%s",
+                " for tenant=%s — cannot verify signature | id=%s",
+                tenant_schema,
                 message_id,
             )
             return Response(status=503)
 
-        # ------------------------------------------------------------------ #
-        # 6. Verify HMAC-SHA256 signature (constant-time compare).            #
-        # ------------------------------------------------------------------ #
         if not verify_signature(raw_data, datasignature, secret):
             logger.warning(
-                "BoxNow webhook: signature mismatch | id=%s"
+                "BoxNow webhook: signature mismatch | tenant=%s | id=%s"
                 " | datasignature_prefix=%s",
+                tenant_schema,
                 message_id,
                 datasignature[:8] if datasignature else "<empty>",
             )
             return Response(status=401)
 
-        logger.info("BoxNow webhook: signature verified | id=%s", message_id)
+        logger.info(
+            "BoxNow webhook: signature verified | tenant=%s | id=%s",
+            tenant_schema,
+            message_id,
+        )
 
         # ------------------------------------------------------------------ #
-        # 7. Dispatch to Celery and acknowledge.                               #
+        # 7. Dispatch to Celery with the resolved tenant schema header.       #
         # ------------------------------------------------------------------ #
-        # Signature verification is sync (it has to be — we can't queue
-        # an unauthenticated payload), but the apply flow runs in a
-        # worker so Daphne is never blocked by BoxNow retry storms.
-        # Celery handles transient infra errors via ``autoretry_for``.
         try:
             from shipping_boxnow.tasks import process_boxnow_webhook_event
 
-            process_boxnow_webhook_event.delay(envelope)
+            process_boxnow_webhook_event.apply_async(
+                args=[envelope],
+                headers={"_schema_name": tenant_schema},
+            )
         except Exception:
             logger.exception(
-                "BoxNow webhook dispatch failed for message %s",
+                "BoxNow webhook dispatch failed for message %s tenant=%s",
                 envelope.get("id", "<unknown>"),
+                tenant_schema,
             )
-            # If we can't even enqueue the task (broker outage) return
-            # 500 so BoxNow retries the delivery rather than dropping
-            # the event into the void.
             return Response(status=500)
 
         return Response(status=200)

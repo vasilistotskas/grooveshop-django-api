@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from djstripe.event_handlers import djstripe_receiver
@@ -770,8 +770,17 @@ def handle_stripe_payment_failed(sender, **kwargs):
             # sitting on a broken order.
             # Wrapped in on_commit: handle_payment_failed runs inside
             # @transaction.atomic; the worker must see the committed row.
+            # ``_schema`` is captured at lambda-build time so the task is
+            # enqueued against the tenant schema this handler entered via
+            # @with_tenant_schema_from_event — by the time on_commit fires,
+            # connection.schema_name has reverted to public.
+            _schema = connection.schema_name
             transaction.on_commit(
-                lambda oid=order.id: send_payment_failed_email.delay(oid)
+                lambda oid=order.id, s=_schema: (
+                    send_payment_failed_email.apply_async(
+                        args=[oid], headers={"_schema_name": s}
+                    )
+                )
             )
 
             # Parallel live notification — same idempotency story as
@@ -779,7 +788,11 @@ def handle_stripe_payment_failed(sender, **kwargs):
             # metadata flag).
             if order.user_id:
                 transaction.on_commit(
-                    lambda oid=order.id: notify_payment_failed_live.delay(oid)
+                    lambda oid=order.id, s=_schema: (
+                        notify_payment_failed_live.apply_async(
+                            args=[oid], headers={"_schema_name": s}
+                        )
+                    )
                 )
 
     except Exception as e:
@@ -1106,9 +1119,14 @@ def handle_stripe_checkout_completed(sender, **kwargs):
 
                 # Payment confirmed via Stripe Checkout — send the
                 # confirmation email now (idempotent).
+                # ``_schema`` captured at lambda-build time; see C1 in
+                # MULTI_TENANT_AUDIT.md.
+                _schema = connection.schema_name
                 transaction.on_commit(
-                    lambda oid=order.id: send_order_confirmation_email.delay(
-                        oid
+                    lambda oid=order.id, s=_schema: (
+                        send_order_confirmation_email.apply_async(
+                            args=[oid], headers={"_schema_name": s}
+                        )
                     )
                 )
 

@@ -178,7 +178,27 @@ class CartService:
             self.cart_items = []
 
     def get_cart_by_id(self, cart_id: int):
-        return Cart.objects.for_detail().filter(id=cart_id).first()
+        """Return ``cart_id`` only when the caller owns it.
+
+        Authenticated users may only fetch their own cart. Anonymous
+        callers may only fetch the guest cart bound to the X-Cart-Id
+        header captured during ``_extract_cart_info`` — random integer
+        scans are a 1-line IDOR otherwise (see C11 in
+        MULTI_TENANT_AUDIT.md).
+        """
+        if self.request.user.is_authenticated:
+            return (
+                Cart.objects.for_detail()
+                .filter(id=cart_id, user=self.request.user)
+                .first()
+            )
+        if self.cart_id == cart_id:
+            return (
+                Cart.objects.for_detail()
+                .filter(id=cart_id, user__isnull=True)
+                .first()
+            )
+        return None
 
     def get_cart_item(self, product_id: int | None):
         if self.cart:

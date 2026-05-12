@@ -3,6 +3,173 @@
 
 
 
+## v1.130.0 (2026-05-12)
+
+### Bug fixes
+
+* fix(shipping): tighten BoxNow + ACS API contract handling
+
+BoxNow:
+* ``_locker_defaults_from_dest`` was reading ``dest["address"]["..."]``
+  but BoxNow's ``/destinations`` response has those fields at the top
+  level. Every synced locker was silently saved with empty
+  ``address_line_1`` / ``postal_code`` and a hardcoded ``"GR"`` country
+  — postal-code filtering and admin display were both broken.
+* ``boxnow_send_arrival_notification.delay()`` now fires through
+  ``transaction.on_commit`` so the worker sees the committed
+  ``BoxNowParcelEvent`` row. Without the wrapper the dequeue could
+  race past the commit and crash on ``DoesNotExist`` — the same class
+  of bug as ACS order 47 (see memory
+  ``project_shipping_dispatch_on_commit``).
+* ``amountToBeCollected`` is forced to ``"0.00"`` for PREPAID parcels
+  per BoxNow API §3.4. Previously the full order total was sent
+  regardless of payment mode, which combined with the P408 ``(0,
+  5000)`` cap to silently reject prepaid carts above €5000.
+
+ACS:
+* ``_build_create_voucher_params`` no longer sends ``Cod_Payment_Way``
+  when ``Cod_Ammount`` is ``0,00`` (online-paid orders that ship as
+  COD-with-zero because the contract doesn't enable PREPAID). Per
+  ACS PDF p.6 the field should be ``null`` when no cash is collected;
+  sending ``0`` (cash) tells the driver to ``collect €0`` which has
+  been observed to produce confused PoD entries.
+* ``create_shipment_row`` clamps ``Item_Quantity`` to ``1`` when the
+  destination is a Smartpoint locker. Per ACS PDF p.8 Smartpoint
+  pickups are restricted to single-piece vouchers; a 2-line cart
+  routed to a locker would otherwise mint a voucher that ACS rejects
+  at locker-load time.
+
+Plus a dispatch-enqueue log entry on both carriers so an order's
+shipment lifecycle can be reconstructed from grep alone.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`299bc17`](https://github.com/vasilistotskas/grooveshop-django-api/commit/299bc1744e76ddf8021de4580ea3c9195bc51de6))
+
+* fix(order): tighten Stripe webhook race + idempotency + refund state
+
+Three related fixes surfaced by the order/payment audit:
+
+* ``handle_stripe_payment_requires_action`` now wraps in
+  ``transaction.atomic`` + ``select_for_update`` and (a) idempotency-
+  checks the event_id, (b) refuses to walk back a terminal
+  ``payment_status`` (COMPLETED/FAILED/REFUNDED). Stripe redelivery
+  ordering is not guaranteed; a late ``requires_action`` could
+  previously overwrite ``COMPLETED`` back to ``PENDING`` and leave
+  the order paid-but-not-paid with no signal.
+* ``handle_stripe_dispute_created`` now locks the order row and
+  honours ``webhook_processed_{event_id}`` so a redelivered dispute
+  event no longer fires duplicate staff notification emails or
+  re-overwrites later dispute fields.
+* ``handle_stripe_checkout_expired`` gets the same lock + idempotency
+  treatment to stop a redelivered expiry from appending duplicate
+  history rows.
+* ``PayWayService.refund_payment`` no longer writes
+  ``order.status = REFUNDED`` directly — that bypassed the canonical
+  state-machine table (which only allows RETURNED→REFUNDED) and the
+  ``order_refunded`` signal. ``payment_status`` is still flipped to
+  ``REFUNDED`` and the ``order_refunded`` signal now fires
+  consistently from both online and offline refund paths, matching
+  the policy in ``handle_stripe_charge_refunded``. Admin drives the
+  RETURNED→REFUNDED status transition manually when the goods are
+  actually returned.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`8bf22d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8bf22d29dec76924b7ef032240fbdd7bf1fdf042))
+
+* fix(shipping_acs): switch ACS voucher print layout to thermal by default
+
+The PDF returned by ACS_Print_Voucher was always rendered as laser
+(Print_Type=2 — 4 vouchers per A4) because the client default was
+hardcoded and never overridden. Ops uses thermal/roll printers
+(Print_Type=1 — single voucher per page), so every printed sheet
+arrived with one voucher in the top-left and three blank slots.
+
+Surface the value as ``ShippingProvider.metadata["print_type"]`` via
+a new ``acs_config.print_type()`` accessor (mirroring the existing
+metadata-driven config pattern for shop kinds, weight bounds, etc.).
+``AcsService.fetch_label_bytes`` reads the accessor and passes it
+through to ``AcsClient.print_voucher`` — and the PDF cache key now
+includes the print type so flipping the metadata invalidates only
+the layout that changed instead of waiting an hour for the cached
+laser PDF to expire.
+
+Migration ``shipping/0005`` seeds ``print_type=1`` on fresh deploys;
+the live ACS row in production was updated out-of-band so the next
+voucher download (manual fix for order 53's voucher 9770584611
+applied alongside this change) returns thermal.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c7f2bbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7f2bbc838fe84804e26a0c8bee13b69a443a2e5))
+
+* fix(shipping_acs): default Charge_Type to COD on contract that disallows PREPAID
+
+ACS rejects Charge_Type=1 (PREPAID) on our billing code with "Μη
+αποδεκτή τιμή χρέωσης μεταφορικών" — discovered after Viva-paid order
+53 minted no voucher (0/2 prepaid attempts ever succeeded in prod;
+2/2 COD ones did). The carrier now defaults to COD for every order
+regardless of pay-way and ``_build_create_voucher_params`` always
+emits ``Cod_Ammount`` (comma-decimal, e.g. ``"0,00"``) plus
+``Cod_Payment_Way`` when Charge_Type=COD. ``cod_synced`` is gated on
+``pay_way.is_cash_on_delivery`` so online-paid orders keep
+``cod_amount=0`` and the courier collects nothing on delivery
+instead of double-charging the recipient. The ``acs_charge_type``
+payload override hatch is preserved so admins can force PREPAID per
+order if ACS ever enables it on the contract.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`00d3d65`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00d3d65415c92d6a929d7852db922c0c18cdc6d2))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.129.0 [skip ci] ([`91f4c20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/91f4c209387be39015e58cd934264b397e0c728f))
+
+### Features
+
+* feat(order): notify admin on new order via mail_admins()
+
+Add `send_admin_new_order_email` Celery task that fires on the
+`order_created` signal and notifies every recipient in `settings.ADMINS`.
+The task renders `emails/order/admin_new_order.{html,txt}` with the
+order summary, customer, shipping address, and items.
+
+Migrate the codebase to Django 6.0's canonical admin-email pattern:
+- Drop the custom `settings.ADMIN_EMAIL` setting. The `ADMIN_EMAIL`
+  env var still exists, but it is now read once into `ADMINS`.
+- Switch `ADMINS` to the Django 6.0+ list-of-strings form; the old
+  `[(name, email)]` tuple form raises `RemovedInDjango70Warning`.
+- Remove `("Info", INFO_EMAIL)` from `ADMINS`. INFO_EMAIL is the
+  public support inbox, not a site administrator — Django routes
+  500-error reports and AdminEmailHandler logs to ADMINS, which
+  must never leak stack traces to a customer-facing address.
+- Add `SERVER_EMAIL = DEFAULT_FROM_EMAIL` and
+  `EMAIL_SUBJECT_PREFIX = "[Webside] "` so `mail_admins()` produces
+  a well-formed From: and subject (defaults are `root@localhost`
+  and `[Django] `).
+- Migrate four call sites to `mail_admins()`: new-order admin
+  notification, system health critical alert, scheduled backup
+  failure alert, low-stock alert.
+- Drop the bogus `INFO_EMAIL` fallback in
+  `check_low_stock_products` — INFO_EMAIL is not an admin recipient.
+- Update `contact/tasks.py` for the new ADMINS shape (strings,
+  not tuples).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a1f6d54`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a1f6d549e292c8b07ade496fc68efc3da8827d18))
+
+### Testing
+
+* test(shipping_acs): mock AcsClient at the import site so CI can run
+
+Follow-up to c7f2bbc8 (Print_Type metadata-driven config). The new
+``test_fetch_label_bytes_passes_print_type_and_keys_cache_by_it``
+patched ``shipping_acs.client.AcsClient.print_voucher`` (the method)
+but ``AcsService.fetch_label_bytes`` instantiates a fresh
+``AcsClient()`` first, and the constructor validates every
+``ACS_*`` env var. CI doesn't set those vars, so the test failed
+with ``AcsConfigError: Missing required ACS settings``.
+
+Patch the ``AcsClient`` class at the services import site instead so
+the constructor is bypassed entirely; this is the same pattern the
+other shipping_acs tests use when they cross the service↔client
+boundary.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0ef3d59`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ef3d59de2e11d6a2bbb54ccfab5f9ea68028699))
+
 ## v1.129.0 (2026-05-12)
 
 ### Chores

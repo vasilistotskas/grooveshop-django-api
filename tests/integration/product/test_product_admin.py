@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
+from django.utils import translation
 from django.utils.html import conditional_escape
 
 from product.admin import (

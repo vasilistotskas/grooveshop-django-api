@@ -376,6 +376,7 @@ def _reseed_shipping_providers(request):
                         "min_weight_kg": "0.5",
                         "max_weight_kg": "999",
                         "default_voucher_language": "GR",
+                        "print_type": 1,
                         "default_map_center": [37.9838, 23.7275],
                         "default_map_zoom": 11,
                         "tile_provider": {

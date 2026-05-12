@@ -168,3 +168,61 @@ class TestVoucherLanguage:
         }
         acs_provider.save(update_fields=["metadata"])
         assert acs_config.default_voucher_language() == "EN"
+
+
+@pytest.mark.django_db
+class TestPrintType:
+    def test_default_is_thermal(self, acs_provider):
+        # Per ACS PDF: 1 = thermal/roll printer (single voucher per
+        # page); 2 = laser (4 vouchers per A4). Ops uses thermal so
+        # 1 is our default — fail loud if anyone reverts it.
+        assert acs_config.print_type() == 1
+
+    def test_metadata_can_flip_to_laser(self, acs_provider):
+        acs_provider.metadata = {**acs_provider.metadata, "print_type": 2}
+        acs_provider.save(update_fields=["metadata"])
+        assert acs_config.print_type() == 2
+
+    def test_invalid_value_falls_back_to_default(self, acs_provider):
+        for bad in ("garbage", None, 0, 3, 99):
+            acs_provider.metadata = {**acs_provider.metadata, "print_type": bad}
+            acs_provider.save(update_fields=["metadata"])
+            assert acs_config.print_type() == 1, (
+                f"print_type={bad!r} should clamp to default; got "
+                f"{acs_config.print_type()}"
+            )
+
+    def test_fetch_label_bytes_passes_print_type_and_keys_cache_by_it(
+        self, acs_provider
+    ):
+        # Cache key must include the print type so flipping the
+        # metadata invalidates only the layout that changed —
+        # otherwise admins flipping thermal→laser would still get
+        # the cached thermal PDF for an hour.
+        from unittest.mock import patch
+        from django.core.cache import cache
+        from shipping_acs.factories import AcsShipmentFactory
+        from shipping_acs.services import AcsService
+
+        shipment = AcsShipmentFactory(voucher_no="TEST_9999999999")
+        cache.delete("acs:label:TEST_9999999999:pt1")
+        cache.delete("acs:label:TEST_9999999999:pt2")
+
+        with patch("shipping_acs.client.AcsClient.print_voucher") as mock_print:
+            mock_print.return_value = b"%PDF-1.7 thermal"
+            # Default thermal call.
+            assert AcsService.fetch_label_bytes(shipment) == b"%PDF-1.7 thermal"
+            mock_print.assert_called_once_with("TEST_9999999999", print_type=1)
+
+            # Flip provider metadata to laser; cache miss → fresh call
+            # with print_type=2.
+            mock_print.reset_mock()
+            mock_print.return_value = b"%PDF-1.7 laser"
+            acs_provider.metadata = {
+                **acs_provider.metadata,
+                "print_type": 2,
+            }
+            acs_provider.save(update_fields=["metadata"])
+
+            assert AcsService.fetch_label_bytes(shipment) == b"%PDF-1.7 laser"
+            mock_print.assert_called_once_with("TEST_9999999999", print_type=2)

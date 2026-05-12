@@ -945,7 +945,16 @@ class AcsService:
 
     @classmethod
     def fetch_label_bytes(cls, shipment: AcsShipment) -> bytes:
-        """Return the PDF label bytes for ``shipment``, cached for 1h."""
+        """Return the PDF label bytes for ``shipment``, cached for 1h.
+
+        The print layout (thermal vs. laser) comes from the ACS
+        provider metadata via :func:`acs_config.print_type` so ops
+        can switch without a redeploy. The cache key includes the
+        print type so flipping the metadata invalidates only the
+        layout that changed.
+        """
+        from shipping_acs import config as acs_config
+
         if not shipment.voucher_no:
             raise AcsAPIError(
                 alias="ACS_Print_Voucher",
@@ -953,12 +962,13 @@ class AcsService:
                     "Cannot fetch a label before the voucher is created."
                 ),
             )
-        cache_key = f"acs:label:{shipment.voucher_no}"
+        pt = acs_config.print_type()
+        cache_key = f"acs:label:{shipment.voucher_no}:pt{pt}"
         cached = cache.get(cache_key)
         if cached:
             return cached
 
-        pdf = AcsClient().print_voucher(shipment.voucher_no)
+        pdf = AcsClient().print_voucher(shipment.voucher_no, print_type=pt)
         cache.set(cache_key, pdf, timeout=_LABEL_CACHE_TTL)
         return pdf
 

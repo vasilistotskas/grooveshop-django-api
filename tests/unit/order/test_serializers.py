@@ -61,6 +61,77 @@ class OrderDetailSerializerTestCase(TestCase):
             all(field in data for field in expected_additional_fields)
         )
 
+    def test_timeline_unwraps_note_text_from_new_value(self):
+        """The storefront timeline was rendering generic
+        ``"Note added to order"`` for every NOTE entry because
+        ``get_order_timeline`` returned ``OrderHistory.description``
+        (a stored sentinel string) instead of the real text on
+        ``OrderHistory.new_value['note']``.
+
+        Lock the behaviour: NOTE entries surface the actual note
+        text; STATUS entries surface the from→to transition;
+        PAYMENT entries surface the status transition with the
+        provider.
+        """
+        from order.models.history import OrderHistory
+
+        OrderHistory.log_note(
+            order=self.order,
+            note="Shipping confirmation email sent via boxnow",
+        )
+        OrderHistory.log_status_change(
+            order=self.order,
+            previous_status="PENDING",
+            new_status="PROCESSING",
+        )
+        OrderHistory.log_payment_update(
+            order=self.order,
+            previous_value={"payment_status": "PENDING"},
+            new_value={
+                "payment_status": "COMPLETED",
+                "provider": "viva_wallet",
+                "payment_id": "internal-token-do-not-expose",
+            },
+        )
+
+        # Re-build the serializer so it sees the new history rows.
+        serializer = OrderDetailSerializer(instance=self.order)
+        timeline = serializer.data["order_timeline"]
+
+        descriptions = [entry["description"] for entry in timeline]
+        change_types = [entry["change_type"] for entry in timeline]
+
+        self.assertIn("NOTE", change_types)
+        self.assertIn(
+            "Shipping confirmation email sent via boxnow",
+            descriptions,
+            "NOTE timeline entry must surface new_value['note'] text",
+        )
+
+        self.assertIn("STATUS", change_types)
+        self.assertIn(
+            "PENDING → PROCESSING",
+            descriptions,
+            "STATUS entry must show the from→to transition",
+        )
+
+        # PAYMENT must show the transition + provider, but MUST NOT
+        # leak the internal payment_id token.
+        payment_descs = [
+            entry["description"]
+            for entry in timeline
+            if entry["change_type"] == "PAYMENT"
+        ]
+        self.assertTrue(payment_descs, "PAYMENT entry missing")
+        payment_desc = payment_descs[-1]
+        self.assertIn("PENDING → COMPLETED", payment_desc)
+        self.assertIn("viva_wallet", payment_desc)
+        self.assertNotIn(
+            "internal-token-do-not-expose",
+            payment_desc,
+            "PAYMENT description must not surface the payment_id token",
+        )
+
 
 class OrderCreateUpdateSerializerTestCase(TestCase):
     def setUp(self):

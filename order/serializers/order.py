@@ -25,7 +25,15 @@ from shipping_boxnow.serializers.shipment import (
 
 CARRIER_TRACKING_URLS: dict[str, str] = {
     "elta": "https://www.elta.gr/en/tracking?code={number}",
-    "acs": "https://www.acscourier.net/el/track-and-trace/?p={number}",
+    # ACS deliberately omitted: their public tracking site
+    # (``/el/track-and-trace/`` and ``/el/myacs/anafores-apostolwn/
+    # anazitisi-apostolwn/``) is a JS-only search form — query
+    # parameters are not honoured, so a deep-link to a specific
+    # voucher number is impossible. The frontend renders the
+    # voucher number prominently and the operator/customer copies
+    # it into ACS's search manually. Re-add this entry only when
+    # ACS publishes a working URL pattern.
+    "boxnow": "https://boxnow.gr/en?track={number}",
     "speedex": "https://www.speedex.gr/en/track-and-trace/?p_code={number}",
     "dhl": "https://www.dhl.com/en/express/tracking.html?AWB={number}",
     "fedex": "https://www.fedex.com/fedextrack/?trknbr={number}",
@@ -424,7 +432,7 @@ class OrderDetailSerializer(OrderSerializer):
                 {
                     "change_type": history.change_type,
                     "timestamp": history.created_at,
-                    "description": history.description,
+                    "description": self._describe_history_entry(history),
                     "user": history.user.full_name if history.user else None,
                     "previous_value": history.previous_value,
                     "new_value": history.new_value,
@@ -432,6 +440,78 @@ class OrderDetailSerializer(OrderSerializer):
             )
 
         return timeline
+
+    @staticmethod
+    def _describe_history_entry(history) -> str:
+        """Render a customer-readable description for an OrderHistory row.
+
+        ``OrderHistory.log_*`` helpers always store a short generic
+        ``description`` ("Note added to order", "Payment information
+        updated") and put the actual content in ``new_value`` /
+        ``previous_value``. The storefront timeline rendered those
+        generic strings, producing a wall of identical
+        ``"NOTE — Note added to order"`` rows. This helper unwraps
+        the JSON payload so the customer sees what actually
+        happened.
+        """
+        change_type = history.change_type
+        new_value = history.new_value or {}
+        previous_value = history.previous_value or {}
+
+        if change_type == "NOTE":
+            # Notes carry the actual text in ``new_value['note']``;
+            # fall back to the stored description only if missing.
+            note = (
+                new_value.get("note") if isinstance(new_value, dict) else None
+            )
+            return note or history.description
+
+        if change_type == "STATUS":
+            prev = (
+                previous_value.get("status")
+                if isinstance(previous_value, dict)
+                else None
+            )
+            new = (
+                new_value.get("status") if isinstance(new_value, dict) else None
+            )
+            if prev and new:
+                return f"{prev} → {new}"
+            return history.description
+
+        if change_type == "PAYMENT":
+            # ``previous_value`` may carry ``payment_status``; new
+            # may carry ``payment_status`` + ``provider`` +
+            # ``payment_id``. Surface the status transition + the
+            # provider (no payment_id — that's an internal token).
+            if isinstance(new_value, dict):
+                new_status = new_value.get("payment_status")
+                provider = new_value.get("provider")
+                prev_status = (
+                    previous_value.get("payment_status")
+                    if isinstance(previous_value, dict)
+                    else None
+                )
+                parts = []
+                if prev_status and new_status:
+                    parts.append(f"{prev_status} → {new_status}")
+                elif new_status:
+                    parts.append(str(new_status))
+                if provider:
+                    parts.append(f"({provider})")
+                if parts:
+                    return " ".join(parts)
+            return history.description
+
+        if change_type == "REFUND":
+            # ``log_refund`` already builds a useful description
+            # from ``refund_data``; keep it but trim noise.
+            return history.description
+
+        # SHIPPING / CUSTOMER / ITEMS / ADDRESS / OTHER — fall back
+        # to the generic stored description until we have a richer
+        # log helper for them.
+        return history.description
 
     @extend_schema_field(
         {

@@ -738,6 +738,20 @@ def get_celery_beat_schedule():
             else SCHEDULE_PRESETS["every_hour"],
             "options": {"queue": "celery", "expires": 300},
         },
+        # Poll BoxNow's REST API every 15 min for non-terminal
+        # shipments. Defence-in-depth against a missed webhook
+        # delivery: BoxNow's webhook URL is partner-managed by
+        # BoxNow support (one URL per partner, no self-serve
+        # registration), so a single misconfiguration would freeze
+        # parcel state at our last observed value. The poll
+        # converges state independent of webhook health.
+        # ``expires=300`` keeps a beat-pod restart from re-firing
+        # stale enqueues.
+        "poll-boxnow-tracking": {
+            "task": "shipping_boxnow.tasks.poll_boxnow_tracking_batch",
+            "schedule": crontab(minute="*/15"),
+            "options": {"queue": "celery", "expires": 300},
+        },
         # ACS — daily station sync at 03:00 Athens (Phase 2 only fires
         # when the AcsStation cache is in use; harmless to schedule now
         # since the task no-ops when ACS provider is inactive).

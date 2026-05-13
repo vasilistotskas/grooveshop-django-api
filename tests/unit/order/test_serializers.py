@@ -61,23 +61,26 @@ class OrderDetailSerializerTestCase(TestCase):
             all(field in data for field in expected_additional_fields)
         )
 
-    def test_timeline_unwraps_note_text_from_new_value(self):
-        """The storefront timeline was rendering generic
-        ``"Note added to order"`` for every NOTE entry because
-        ``get_order_timeline`` returned ``OrderHistory.description``
-        (a stored sentinel string) instead of the real text on
-        ``OrderHistory.new_value['note']``.
+    def test_timeline_is_curated_for_customer(self):
+        """The customer-facing timeline is a curated subset of
+        ``OrderHistory`` — only state transitions that matter to
+        the buyer (STATUS, PAYMENT, SHIPPING, REFUND) plus the
+        synthetic CREATED entry. Operational NOTE rows (item-added,
+        order-created sentinel, confirmation-email-sent) belong
+        in the admin audit log only; surfacing them duplicates
+        information already visible on the order page and leaks
+        internal recipient addresses.
 
-        Lock the behaviour: NOTE entries surface the actual note
-        text; STATUS entries surface the from→to transition;
-        PAYMENT entries surface the status transition with the
-        provider.
+        Lock the behaviour: NOTE is filtered out; STATUS/PAYMENT
+        are rendered with from→to transitions; the synthetic
+        CREATED entry carries no description (frontend renders
+        the localised title on its own).
         """
         from order.models.history import OrderHistory
 
         OrderHistory.log_note(
             order=self.order,
-            note="Shipping confirmation email sent via boxnow",
+            note="Shipping confirmation email sent to ops@example.com",
         )
         OrderHistory.log_status_change(
             order=self.order,
@@ -94,29 +97,33 @@ class OrderDetailSerializerTestCase(TestCase):
             },
         )
 
-        # Re-build the serializer so it sees the new history rows.
         serializer = OrderDetailSerializer(instance=self.order)
         timeline = serializer.data["order_timeline"]
-
-        descriptions = [entry["description"] for entry in timeline]
         change_types = [entry["change_type"] for entry in timeline]
+        descriptions = [entry["description"] for entry in timeline]
 
-        self.assertIn("NOTE", change_types)
-        self.assertIn(
-            "Shipping confirmation email sent via boxnow",
+        self.assertNotIn(
+            "NOTE",
+            change_types,
+            "NOTE rows must be filtered from the customer timeline",
+        )
+        self.assertNotIn(
+            "Shipping confirmation email sent to ops@example.com",
             descriptions,
-            "NOTE timeline entry must surface new_value['note'] text",
+            "NOTE note text must not leak into the customer timeline",
+        )
+
+        created = next(e for e in timeline if e["change_type"] == "CREATED")
+        self.assertEqual(
+            created["description"],
+            "",
+            "Synthetic CREATED entry must have empty description "
+            "(frontend renders the localised title alone)",
         )
 
         self.assertIn("STATUS", change_types)
-        self.assertIn(
-            "PENDING → PROCESSING",
-            descriptions,
-            "STATUS entry must show the from→to transition",
-        )
+        self.assertIn("PENDING → PROCESSING", descriptions)
 
-        # PAYMENT must show the transition + provider, but MUST NOT
-        # leak the internal payment_id token.
         payment_descs = [
             entry["description"]
             for entry in timeline

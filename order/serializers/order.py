@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
@@ -394,6 +396,18 @@ class OrderDetailSerializer(OrderSerializer):
             }
         return out or None
 
+    # OrderHistory is the full audit trail (visible in Django admin);
+    # the customer-facing timeline is a curated subset of state
+    # transitions that actually matter to the buyer. Operational
+    # NOTE rows ("email sent", "item added", "Order created")
+    # belong in the admin log only — surfacing them as customer
+    # timeline entries duplicates information already in the order
+    # body and leaks internal addresses (e.g. confirmation email
+    # recipients).
+    CUSTOMER_VISIBLE_HISTORY_TYPES: ClassVar[frozenset[str]] = frozenset(
+        {"STATUS", "PAYMENT", "SHIPPING", "REFUND"}
+    )
+
     @extend_schema_field(
         {
             "type": "array",
@@ -411,23 +425,24 @@ class OrderDetailSerializer(OrderSerializer):
         }
     )
     def get_order_timeline(self, obj):
-        timeline = []
-
-        timeline.append(
+        # The synthetic CREATED entry carries no description: the
+        # storefront localises the title via ``timeline.title.created``
+        # and the row reads cleanly as just the title + timestamp.
+        timeline = [
             {
                 "change_type": "CREATED",
                 "timestamp": obj.created_at,
-                "description": _("Order was created"),
+                "description": "",
                 "user": None,
                 "previous_value": None,
                 "new_value": None,
             }
-        )
+        ]
 
         # Uses prefetched data from for_detail() — no extra query
-        history_records = obj.history.all()
-
-        for history in history_records:
+        for history in obj.history.all():
+            if history.change_type not in self.CUSTOMER_VISIBLE_HISTORY_TYPES:
+                continue
             timeline.append(
                 {
                     "change_type": history.change_type,
@@ -445,26 +460,15 @@ class OrderDetailSerializer(OrderSerializer):
     def _describe_history_entry(history) -> str:
         """Render a customer-readable description for an OrderHistory row.
 
-        ``OrderHistory.log_*`` helpers always store a short generic
-        ``description`` ("Note added to order", "Payment information
-        updated") and put the actual content in ``new_value`` /
-        ``previous_value``. The storefront timeline rendered those
-        generic strings, producing a wall of identical
-        ``"NOTE — Note added to order"`` rows. This helper unwraps
-        the JSON payload so the customer sees what actually
-        happened.
+        ``OrderHistory.log_*`` helpers store a short generic
+        ``description`` ("Payment information updated") and put the
+        real content in ``new_value`` / ``previous_value``. This
+        helper unwraps the JSON payload so the customer sees the
+        actual transition instead of the generic sentinel.
         """
         change_type = history.change_type
         new_value = history.new_value or {}
         previous_value = history.previous_value or {}
-
-        if change_type == "NOTE":
-            # Notes carry the actual text in ``new_value['note']``;
-            # fall back to the stored description only if missing.
-            note = (
-                new_value.get("note") if isinstance(new_value, dict) else None
-            )
-            return note or history.description
 
         if change_type == "STATUS":
             prev = (

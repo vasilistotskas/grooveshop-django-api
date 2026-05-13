@@ -139,6 +139,23 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
         null=True,
         blank=True,
     )
+    # Cursor for the poll-based defence-in-depth sync (see
+    # ``BoxNowService.sync_shipment_state``). BoxNow's webhook
+    # delivery is partner-managed on their side (per
+    # Webhook-Based Parcel Tracking Guide v1.4 §"Hook Management":
+    # _"BOX NOW will assist partners in configuring their webhook"_),
+    # so we periodically reconcile state from ``GET /api/v1/parcels``
+    # to converge even if a webhook is lost / not yet registered /
+    # delivered out of band.
+    last_polled_at = models.DateTimeField(
+        _("Last Polled At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Last time we reconciled this shipment via the BoxNow REST "
+            "API (defence-in-depth against missed webhooks)."
+        ),
+    )
     cancel_requested_at = models.DateTimeField(
         _("Cancel Requested At"),
         null=True,
@@ -159,7 +176,12 @@ class BoxNowShipment(UUIDModel, TimeStampMixinModel):
     # ``last_event_at``/``updated_at`` excluded so the history rows
     # focus on state-machine transitions, not high-frequency churn.
     history = HistoricalRecords(
-        excluded_fields=["metadata", "last_event_at", "updated_at"],
+        excluded_fields=[
+            "metadata",
+            "last_event_at",
+            "last_polled_at",
+            "updated_at",
+        ],
     )
 
     class Meta(TypedModelMeta):

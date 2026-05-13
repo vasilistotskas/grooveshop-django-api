@@ -884,6 +884,243 @@ class BoxNowService:
             )
 
     # ------------------------------------------------------------------
+    # sync_shipment_state — REST poll fallback (defence-in-depth)
+    # ------------------------------------------------------------------
+
+    # Synthetic message-id prefix for events recorded via the REST poll
+    # path instead of a CloudEvents webhook delivery. Stays compatible
+    # with the unique-key idempotency contract on
+    # ``BoxNowParcelEvent.webhook_message_id`` while making the source
+    # of each row traceable in audits.
+    _POLL_MESSAGE_ID_PREFIX = "poll"
+
+    @classmethod
+    def sync_shipment_state(cls, shipment: BoxNowShipment) -> dict[str, Any]:
+        """Reconcile one shipment with the BoxNow REST API.
+
+        Why this exists
+        ---------------
+        BoxNow's webhook URL is **partner-managed on BoxNow's side**
+        (per Webhook-Based Parcel Tracking Guide v1.4 §"Hook
+        Management": _"BOX NOW will assist partners in configuring
+        their webhook to the appropriate URL"_). There is no
+        self-serve registration. If their support hasn't wired our
+        URL yet — or a single delivery is silently dropped — the
+        webhook path goes dark and parcel state freezes at whatever
+        we last observed (e.g. ``new`` after creation). A 15-minute
+        poll converges state independent of webhook health.
+
+        How it stays consistent with the webhook path
+        ---------------------------------------------
+        * Each event row inserted carries a deterministic synthetic
+          ``webhook_message_id`` of the form
+          ``poll:{parcel_id}:{event_type}:{event_time_iso}``. The
+          unique constraint on the column means a re-poll of the
+          same parcel is idempotent — duplicates collapse silently.
+        * Before inserting we also check for an event matching
+          ``(shipment, event_type, event_time)`` so that a real
+          webhook event that landed first (with BoxNow's own message
+          id) is never duplicated by the poll.
+        * State updates honour the same out-of-order protection as
+          ``apply_webhook_event``: ``shipment.parcel_state`` only
+          moves forward when the new event's ``event_time`` is
+          strictly greater than ``shipment.last_event_at``.
+        * Downstream side-effects mirror the webhook path: order
+          status cascades via ``_apply_order_status_transition``,
+          locker-arrival notification on
+          ``final-destination``, delivered notification on
+          ``delivered``.
+
+        Returns:
+            ``{"parcel_id", "events_synced", "state", "last_event_at"}``
+        """
+        if not shipment.parcel_id:
+            logger.warning(
+                "sync_shipment_state: shipment %s has no parcel_id — "
+                "cannot poll",
+                shipment.pk,
+            )
+            return {
+                "parcel_id": None,
+                "events_synced": 0,
+                "state": shipment.parcel_state,
+                "last_event_at": shipment.last_event_at,
+            }
+
+        parcel_id = shipment.parcel_id
+        logger.info(
+            "sync_shipment_state: polling BoxNow for parcel_id=%s",
+            parcel_id,
+        )
+
+        response = BoxNowClient().get_parcel_info(parcel_id=parcel_id)
+        data_rows: list[dict] = (response or {}).get("data") or []
+        if not data_rows:
+            logger.warning(
+                "sync_shipment_state: BoxNow returned no data for "
+                "parcel_id=%s — likely not yet visible or wrong id",
+                parcel_id,
+            )
+            # Still bump last_polled_at so the batch task can move on
+            # to next candidates rather than spinning on this one.
+            BoxNowShipment.objects.filter(pk=shipment.pk).update(
+                last_polled_at=timezone.now()
+            )
+            return {
+                "parcel_id": parcel_id,
+                "events_synced": 0,
+                "state": shipment.parcel_state,
+                "last_event_at": shipment.last_event_at,
+            }
+
+        parcel = data_rows[0]
+        events: list[dict] = parcel.get("events") or []
+        events_synced = 0
+
+        # Apply events in chronological order so the state machine
+        # observes transitions the same way the webhook stream would
+        # have delivered them (oldest first).
+        for event in sorted(events, key=lambda e: e.get("createTime") or ""):
+            applied = cls._apply_poll_event(shipment, parcel, event)
+            if applied is not None:
+                events_synced += 1
+
+        BoxNowShipment.objects.filter(pk=shipment.pk).update(
+            last_polled_at=timezone.now()
+        )
+        shipment.refresh_from_db(
+            fields=["parcel_state", "last_event_at", "last_polled_at"]
+        )
+
+        logger.info(
+            "sync_shipment_state: parcel_id=%s events_synced=%d state=%s",
+            parcel_id,
+            events_synced,
+            shipment.parcel_state,
+        )
+
+        return {
+            "parcel_id": parcel_id,
+            "events_synced": events_synced,
+            "state": shipment.parcel_state,
+            "last_event_at": shipment.last_event_at,
+        }
+
+    @classmethod
+    def _apply_poll_event(
+        cls,
+        shipment: BoxNowShipment,
+        parcel: dict,
+        event: dict,
+    ) -> BoxNowParcelEvent | None:
+        """Idempotently insert one poll-derived event and cascade state.
+
+        Returns the new ``BoxNowParcelEvent`` row, or ``None`` if the
+        event was already recorded (via webhook or a prior poll).
+        """
+        raw_event = event.get("type") or ""
+        event_time_raw = event.get("createTime")
+        if not raw_event or not event_time_raw:
+            logger.warning(
+                "_apply_poll_event: malformed event for parcel_id=%s — %r",
+                shipment.parcel_id,
+                event,
+            )
+            return None
+
+        try:
+            mapped_state = BoxNowParcelState.from_webhook_event(raw_event)
+        except ValueError:
+            logger.warning(
+                "_apply_poll_event: unknown BoxNow event %r for "
+                "parcel_id=%s — recording as-is",
+                raw_event,
+                shipment.parcel_id,
+            )
+            mapped_state = raw_event
+
+        event_time = parse_datetime(event_time_raw)
+
+        with transaction.atomic():
+            locked = (
+                BoxNowShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
+            )
+
+            # Two-stage dedup so the poll never duplicates a webhook
+            # row that arrived with BoxNow's own CloudEvents id.
+            already_recorded = BoxNowParcelEvent.objects.filter(
+                shipment=locked,
+                event_type=mapped_state,
+                event_time=event_time,
+            ).exists()
+            if already_recorded:
+                return None
+
+            synthetic_id = (
+                f"{cls._POLL_MESSAGE_ID_PREFIX}:{locked.parcel_id}:"
+                f"{mapped_state}:{event_time_raw}"
+            )
+
+            new_event, created = BoxNowParcelEvent.objects.get_or_create(
+                webhook_message_id=synthetic_id,
+                defaults={
+                    "shipment": locked,
+                    "event_type": mapped_state,
+                    "parcel_state": parcel.get("state", ""),
+                    "event_time": event_time,
+                    "display_name": event.get("locationDisplayName", "") or "",
+                    "postal_code": event.get("postalCode", "") or "",
+                    "additional_information": "",
+                    "raw_payload": {
+                        "source": "poll",
+                        "event": event,
+                        "parcel_summary": {
+                            "id": parcel.get("id"),
+                            "state": parcel.get("state"),
+                            "updateTime": parcel.get("updateTime"),
+                        },
+                    },
+                },
+            )
+
+            if not created:
+                # Lost a race with a concurrent poll that won the
+                # unique-key insert microseconds earlier.
+                return None
+
+            if locked.last_event_at is None or (
+                event_time is not None and event_time > locked.last_event_at
+            ):
+                locked.parcel_state = mapped_state
+                locked.last_event_at = event_time
+                locked.save(
+                    update_fields=[
+                        "parcel_state",
+                        "last_event_at",
+                        "updated_at",
+                    ]
+                )
+
+            cls._apply_order_status_transition(locked.order, mapped_state)
+
+            if mapped_state == BoxNowParcelState.FINAL_DESTINATION:
+                from shipping_boxnow.tasks import (  # noqa: PLC0415
+                    boxnow_send_arrival_notification,
+                )
+
+                transaction.on_commit(
+                    lambda eid=new_event.id: (
+                        boxnow_send_arrival_notification.delay(eid)
+                    )
+                )
+            elif mapped_state == BoxNowParcelState.DELIVERED:
+                cls._dispatch_delivered_notification(locked)
+
+        return new_event
+
+    # ------------------------------------------------------------------
     # sync_lockers
     # ------------------------------------------------------------------
 

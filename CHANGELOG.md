@@ -3,6 +3,63 @@
 
 
 
+## v1.132.2 (2026-05-13)
+
+### Bug fixes
+
+* fix(order): meaningful timeline + correct carrier tracking URLs
+
+Two storefront-visible fixes packaged together because both flow
+through ``OrderDetailSerializer``:
+
+**Timeline descriptions**: ``get_order_timeline`` returned
+``OrderHistory.description``, which is the generic stored sentinel
+(``"Note added to order"``, ``"Payment information updated"``,
+``"Status changed from X to Y"``). The actual content the log
+helpers write lives in ``new_value`` JSON. Result on the
+storefront's ``Ιστορικό Παραγγελίας`` card: a wall of identical
+``NOTE / Note added to order`` rows that told the customer nothing.
+
+New ``_describe_history_entry`` helper unwraps the JSON payload:
+
+* NOTE → ``new_value['note']`` (the real email/event text)
+* STATUS → ``"PENDING → PROCESSING"`` style transition
+* PAYMENT → ``"PENDING → COMPLETED (viva_wallet)"`` — surfaces the
+  provider but NOT the ``payment_id`` token (which is an internal
+  reference, not customer-facing)
+* SHIPPING/CUSTOMER/etc. fall back to the stored description (no
+  richer log helper to unwrap from yet)
+
+**Carrier tracking URLs**:
+
+* BoxNow ``CARRIER_TRACKING_URLS`` entry was missing entirely —
+  ``tracking_details.tracking_url`` returned None for every BoxNow
+  order. Added ``https://boxnow.gr/en?track={number}`` which is
+  the public-facing tracking page (the internal subdomain
+  ``tracking.boxnow.gr/track/...`` previously hard-coded in
+  ``BoxNowTracking.vue`` is not reachable for customers).
+* ACS removed from the dict with a comment explaining why: the
+  public tracking page (``/el/track-and-trace/`` and the
+  ``anazitisi-apostolwn`` admin page) is a JS-only search form
+  that ignores ``?p=``/``?id=`` and any other query parameter. A
+  deep-link is impossible until ACS publishes a proper URL.
+  The frontend now hides the broken external-tracking button on
+  ACS cards and displays the voucher number prominently for
+  copy-paste.
+
+OpenAPI schema regenerated (schema.yml + schema.json) — no shape
+change, only doc-string updates for the timeline help_text.
+
+Regression test pins all three contracts: NOTE surfaces note text,
+STATUS shows from→to, PAYMENT shows transition + provider AND
+does NOT leak the ``payment_id`` token.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`15b072a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15b072adb2f57cb2d5b08ed01eaf66e46686c847))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.132.1 [skip ci] ([`6bca710`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6bca71091b8829cbd6b8c5167623ace55a5d486a))
+
 ## v1.132.1 (2026-05-13)
 
 ### Bug fixes

@@ -234,12 +234,8 @@ class PayWayShippingExclusion(TimeStampMixinModel):
         # name limit. We still want the timestamp indexes; just give
         # them tighter names.
         indexes = [
-            BTreeIndex(
-                fields=["created_at"], name="payway_excl_created_at_ix"
-            ),
-            BTreeIndex(
-                fields=["updated_at"], name="payway_excl_updated_at_ix"
-            ),
+            BTreeIndex(fields=["created_at"], name="payway_excl_created_at_ix"),
+            BTreeIndex(fields=["updated_at"], name="payway_excl_updated_at_ix"),
             BTreeIndex(
                 fields=["shipping_provider", "shipping_kind"],
                 name="payway_excl_provider_kind_ix",

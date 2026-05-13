@@ -3,6 +3,27 @@
 
 
 
+## v1.133.0 (2026-05-13)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.132.3 [skip ci] ([`83ad48f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/83ad48f24a9f1bd65066dcbf81b28dc888c406ac))
+
+### Features
+
+* feat(admin): expose Shipping Providers in Unfold sidebar
+
+The provider rows are the on/off switch and capability declaration for
+every carrier (BoxNow, ACS), and since 1436161e they also host the
+``PayWayShippingExclusion`` inline that toggles COD-on-lockers without
+a redeploy. Ops were navigating to it via raw URL because the only
+shipping entries in the sidebar were the per-carrier shipment and
+locker changelists. Adds a "Shipping Providers" item at the top of
+the Shipping group linking to the standard
+``admin:shipping_shippingprovider_changelist`` route.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2cca385`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2cca385b1815e9c946c5b99539720f0451f8a983))
+
 ## v1.132.3 (2026-05-13)
 
 ### Bug fixes

@@ -3,6 +3,229 @@
 
 
 
+## v1.132.0 (2026-05-13)
+
+### Bug fixes
+
+* fix(tests): drop dead defensive import from conftest fixture
+
+``ty`` correctly flagged ``from django.conf import django_settings_module``
+in ``_reseed_extra_settings`` as ``unresolved-import`` — there is no
+such symbol on ``django.conf`` (the actual one is the
+``DJANGO_SETTINGS_MODULE`` *env var*, not an attribute). The
+try/except was a stray hangover from an earlier draft; the
+``from django.conf import settings as _dj_settings`` line right
+below it is what the fixture actually needs.
+
+Pure dead-code removal. Fixture body and behaviour unchanged.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`69b77ac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/69b77ac421b7e1d392de1f3ddfd929465b6c2ac4))
+
+* fix(shipping_acs): align AcsShipment.charge_type model default to COD
+
+Defence-in-depth alongside ``00d3d654`` (carrier default) and
+``c20af461`` (serializer default removed). The model field default
+was still ``AcsChargeType.PREPAID``, which is the deepest layer of
+the stack: if any future code path constructs an ``AcsShipment``
+row without explicitly passing ``charge_type`` (e.g. a new admin
+form, a data migration, or a test helper), the model default kicks
+in and we'd be back to ACS rejecting every voucher.
+
+Today there's only one creation site — ``AcsCarrier.create_shipment_row``
+— and it explicitly passes ``charge_type=charge_type``. The model
+default is academic for the current call graph. But aligning it
+with COD makes the "what's the safe default if you forget to pass
+it?" answer consistent across all four layers (model field,
+serializer field, view payload builder, carrier method) — so the
+class of bug that caused orders 53/55/56 truly can't recur via any
+combination of upstream regressions.
+
+Migration is a state-only ``AlterField`` — no SQL changes the
+on-disk values of existing rows, no rewrite, safe under the Argo CD
+PreSync hook.
+
+A new test (``test_acs_shipment_model_default_is_cod``) pins the
+field's default explicitly so a future "let's be conservative,
+revert to PREPAID" change fails the suite loudly.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`96de158`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96de15850e65b7e4655c1a4f5177c4c9dd993728))
+
+* fix(order): drop OrderCreateFromCartSerializer.acs_charge_type default
+
+This is the upstream half of the PREPAID-leak fix from commit
+``00d3d654``. That commit set the carrier's ``create_shipment_row``
+default to ``AcsChargeType.COD`` because our ACS contract is
+COD-only — every PREPAID voucher request is rejected with
+"Μη αποδεκτή τιμή χρέωσης μεταφορικών". The carrier-level fix
+shipped, but order 56 was placed today and rejected by ACS with the
+same error.
+
+Root cause: ``order/serializers/order.py:747-751`` has
+``serializers.ChoiceField(..., required=False, default=1)``. DRF
+injects ``default=1`` into ``validated_data`` even when the request
+body doesn't supply ``acsChargeType``. The view passes that ``1``
+through to the carrier's payload. In the carrier,
+``int(payload.get("acs_charge_type") or AcsChargeType.COD)``
+short-circuits because ``1`` is truthy — so the COD fallback never
+fires and the new AcsShipment is created with ``charge_type=1``
+(PREPAID), which ACS then rejects.
+
+Fix: remove ``default=1`` from the serializer field. The field
+stays as an optional per-order admin override (an admin can still
+flip an individual order back to PREPAID if the contract ever gets
+that enabled), but the platform-wide default lives in one place
+only — the carrier code. Three regression tests pin both halves of
+the contract: serializer omits the default; carrier defaults to COD
+when payload doesn't override; explicit overrides still work.
+
+Affects orders 53, 55, 56 going forward (all three had to be
+minted manually with charge_type=COD via shell — see commit
+messages on the original ``00d3d654`` and live fixes recorded in
+memory ``project_acs_contract_cod_only``).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c20af46`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c20af461a92247006a2579e1c3808fe6fb975d05))
+
+* fix(pay_way): shorten PayWayShippingExclusion index names to satisfy E034
+
+The inherited ``TimeStampMixinModel.Meta.indexes`` use a
+``%(class)s_..._ix`` template; resolved for this model it produced
+``paywayshippingexclusion_created_at_ix`` (37 chars), tripping
+Django's ``models.E034`` 30-char index-name limit and crashing
+``manage.py migrate`` in CI with a ``SystemCheckError`` before any
+SQL ran.
+
+Two changes:
+
+* Override the inherited indexes in the model's ``Meta`` with
+  explicit short names (``payway_excl_*``) so the system check
+  passes.
+* Amend the just-pushed migration ``0013`` in place to write those
+  short names from the start. ``0013`` had not been applied to any
+  environment yet (CI failed before deploy), so there is no
+  rename-migration churn — a single migration creates the table
+  with the final index names.
+
+No model field changes, no constraint changes, no filter-logic
+changes — index-name fix only.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`78d7d80`](https://github.com/vasilistotskas/grooveshop-django-api/commit/78d7d805cd1f8e604f08dbd39275645a710b2d73))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.131.0 [skip ci] ([`c5020e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5020e09eca8859c1ef5ee4507a6a33c419afeb3))
+
+### Code style
+
+* style(pay_way): apply ruff format to PayWayShippingExclusion
+
+CI's ``ruff format --check`` ran with the project's pinned 0.15.12
+and flagged a minor formatting diff in ``pay_way/models.py`` left
+over from the previous index-name fix. Local ``uv run ruff format``
+applies the canonical layout. Format-only — no semantic changes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0b22a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0b22a7485a78bc425aa373b5bc26e831f5ec6e17))
+
+### Features
+
+* feat(pay_way): admin-configurable pay-way exclusions per (provider, kind)
+
+Adds runtime-toggleable rules for "this pay-way is unavailable when
+the customer picks this shipping (provider, kind) combination."
+Previously the only escape valve was either a code-level
+``ShippingCarrierInterface.filter_pay_ways`` override (which
+required a redeploy and couldn't differentiate kinds for the same
+provider) or globally deactivating the pay-way (too coarse).
+
+A real motivating case: BoxNow's PAY ON THE GO product collects
+cash/card at the locker on delivery and our partner contract honours
+COD on lockers, but partners without PAY ON THE GO active need to
+hide ``Αντικαταβολή`` from the BoxNow checkout step without
+disabling the pay-way for ACS Smartpoint or home delivery. The
+previous design forced an all-or-nothing toggle; this PR lets ops
+flip the specific (provider, kind, pay_way) row from Django admin.
+
+Design — two-layer filter in
+``PayWayService.filter_by_carrier``:
+
+1. **Layer 1 — admin-configured exclusions** (this PR):
+   ``PayWayShippingExclusion`` rows index by (provider, kind, pay_way).
+   Empty table = default-permissive (current behaviour preserved
+   without any data migration).
+2. **Layer 2 — carrier hard constraints**: the existing
+   ``ShippingCarrierInterface.filter_pay_ways`` hook is reserved for
+   code-level vetoes where the courier API itself rejects a combo
+   regardless of operator preference. Default base implementation
+   stays pass-through.
+
+Layer 1 runs first so an operator-blocked combo short-circuits
+without consulting the carrier adapter at all.
+
+Changes:
+
+* New ``PayWayShippingExclusion`` model with a unique constraint on
+  (pay_way, shipping_provider, shipping_kind), composite BTree
+  index on (provider, kind) sized for the read-heavy filter query,
+  and an optional ``note`` text field for ops to document why a row
+  was added (visible to admins only, never reaches customers).
+* Reusable Unfold ``TabularInline`` registered on both
+  ``PayWayAdmin`` and ``ShippingProviderAdmin`` — ops can manage
+  rules from whichever side they land on.
+* ``BoxNowCarrier.filter_pay_ways`` no-op override removed (its
+  whole purpose — operator-configurable per-combo toggle — now
+  lives in the DB).
+* ``PayWayShippingExclusionFactory`` mirrors the existing factory
+  conventions; ``django_get_or_create`` keys the unique triple so
+  the fixture is safe under ``-n auto``.
+
+Migration is purely additive — new table, no FK changes elsewhere,
+old code ignores the new model. Safe under the Argo CD PreSync hook
+deploy model (schema lands before new code).
+
+No frontend changes: the storefront already calls
+``/api/v1/pay_way?shippingProviderCode=…&shippingKind=…`` and
+results respect the new exclusions transparently.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1436161`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1436161e5b64eee00a2792abade5db970a0ab604))
+
+### Testing
+
+* test(conftest): reset extra_settings to declared baseline per test
+
+CI under -n auto intermittently fails ~10 tests across mydata,
+smartpoint-gating, boxnow-order-creation, and b2b-invoicing, all
+gated on a feature flag in ``EXTRA_SETTINGS_DEFAULTS`` (BOXNOW_ENABLED,
+ACS_SMARTPOINT_ENABLED, MYDATA_ENABLED, B2B_INVOICING_ENABLED, etc).
+Local reruns with -n0 always pass — the failure is non-deterministic
+and worker-count-sensitive.
+
+Root cause: the previous ``_reseed_extra_settings`` autouse fixture
+called ``Setting.set_defaults_from_settings()`` which uses
+``get_or_create`` — it restored MISSING rows after a
+``django_db(transaction=True)`` flush but did NOT undo VALUE
+mutations from prior tests. A test like
+``Setting.objects.update_or_create(name="BOXNOW_ENABLED", ...,
+defaults={..., "value_bool": True})`` would commit the change to
+the shared test DB; the next test on a different worker would read
+the mutated True instead of the declared False default and the
+assertion flaked.
+
+Fix: replace ``set_defaults_from_settings`` with ``update_or_create``
+keyed on ``name`` that rewrites ``value_<type>`` to the declared
+default every time the fixture runs (i.e. before every test). Each
+test now starts from the same baseline regardless of what any prior
+test did. Cost is one tiny UPDATE per declared setting (~30 rows)
+per test — dwarfed by the EAGER signal cascades the same tests
+already trigger.
+
+Verified locally with two consecutive runs of the originally-failing
+tests under -n auto (22/22 each), and a 1636-test broad sweep
+across order + shipping + pay_way under -n auto (1636/1636).
+
+Reruns are no longer required — tests are now deterministic across
+any worker count.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`fbb402e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fbb402e93174091a0b030b1fa86c4260c27bf314))
+
 ## v1.131.0 (2026-05-12)
 
 ### Bug fixes

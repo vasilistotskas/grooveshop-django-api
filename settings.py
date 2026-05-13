@@ -2000,6 +2000,13 @@ UNFOLD = {
                 "collapsible": True,
                 "items": [
                     {
+                        "title": _("Shipping Providers"),
+                        "icon": "local_shipping",
+                        "link": reverse_lazy(
+                            "admin:shipping_shippingprovider_changelist"
+                        ),
+                    },
+                    {
                         "title": _("BoxNow Shipments"),
                         "icon": "package_2",
                         "link": reverse_lazy(

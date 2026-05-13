@@ -55,3 +55,89 @@ def test_calculate_shipping_cost_uses_settings_threshold():
         kind=ShippingKind.HOME_DELIVERY,
     )
     assert free == (0.0, "EUR")
+
+
+@pytest.mark.django_db
+def test_create_shipment_row_defaults_to_cod_charge_type():
+    """Regression test for orders 53, 55, 56.
+
+    Our ACS commercial contract rejects ``Charge_Type=PREPAID`` with
+    "Μη αποδεκτή τιμή χρέωσης μεταφορικών" — the carrier MUST
+    default to COD when the order payload doesn't supply an explicit
+    override. Pre-fix, the serializer's ``default=1`` injected
+    PREPAID into ``validated_data`` and the carrier's
+    ``or AcsChargeType.COD`` fallback never fired because ``1`` is
+    truthy. Three customers paid before this was caught — pin the
+    contract here so the regression can't sneak back in via a stray
+    serializer default.
+    """
+    from order.factories.order import OrderFactory
+    from shipping_acs.enum.charge_type import AcsChargeType
+    from shipping_acs.models import AcsShipment
+
+    order = OrderFactory(shipping_kind=ShippingKind.HOME_DELIVERY.value)
+    adapter = get_provider("acs")
+
+    # Empty payload — no ``acs_charge_type`` override. Carrier
+    # default MUST be COD.
+    adapter.create_shipment_row(
+        order, kind=ShippingKind.HOME_DELIVERY, payload={}
+    )
+    shipment = AcsShipment.objects.get(order=order)
+    assert shipment.charge_type == AcsChargeType.COD, (
+        "Empty payload must default to COD; got "
+        f"{shipment.charge_type} ({AcsChargeType(shipment.charge_type).label})"
+    )
+
+
+@pytest.mark.django_db
+def test_create_shipment_row_explicit_acs_charge_type_overrides():
+    """The ``acs_charge_type`` admin override is still wired up.
+
+    If the contract ever supports PREPAID (or any per-order
+    deviation), an admin can pass an explicit value and the carrier
+    must honor it. Asserts the override hook in
+    ``create_shipment_row`` still respects the payload's explicit
+    value even though COD is the platform default.
+    """
+    from order.factories.order import OrderFactory
+    from shipping_acs.enum.charge_type import AcsChargeType
+    from shipping_acs.models import AcsShipment
+
+    order = OrderFactory(shipping_kind=ShippingKind.HOME_DELIVERY.value)
+    adapter = get_provider("acs")
+
+    adapter.create_shipment_row(
+        order,
+        kind=ShippingKind.HOME_DELIVERY,
+        payload={"acs_charge_type": AcsChargeType.PREPAID},
+    )
+    shipment = AcsShipment.objects.get(order=order)
+    assert shipment.charge_type == AcsChargeType.PREPAID
+
+
+@pytest.mark.django_db
+def test_order_create_serializer_omits_acs_charge_type_by_default():
+    """The serializer must NOT inject a default for ``acs_charge_type``.
+
+    Hard-pinning the upstream half of the regression that caused
+    orders 53/55/56 to fail. If a future change adds ``default=X``
+    back to the field, this test fails loud — without it, the
+    serializer's default would leak past the carrier-level COD
+    default again and ACS would silently reject every voucher.
+    """
+    from order.serializers.order import OrderCreateFromCartSerializer
+
+    serializer = OrderCreateFromCartSerializer(data={})
+    # We're not validating the whole order body here — just asserting
+    # the field's contract. Inspect the field instance directly.
+    field = serializer.fields["acs_charge_type"]
+    assert field.required is False
+    # ``serializers.empty`` is DRF's sentinel for "no default set".
+    from rest_framework.fields import empty
+
+    assert field.default is empty, (
+        "OrderCreateFromCartSerializer.acs_charge_type must not have "
+        "a default — DRF inserts it into validated_data, which would "
+        "leak past the carrier-level COD default. See orders 53/55/56."
+    )

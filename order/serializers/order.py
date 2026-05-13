@@ -747,7 +747,24 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
     acs_charge_type = serializers.ChoiceField(
         choices=[(1, _("Prepaid")), (2, _("Cash on delivery"))],
         required=False,
-        default=1,
+        # No ``default=`` — when the field is absent, DRF omits it
+        # from ``validated_data`` so the carrier's own default
+        # (``AcsChargeType.COD`` in ``shipping_acs.carrier``) wins.
+        # Our ACS contract is COD-only; PREPAID is rejected at the
+        # API. Setting ``default=1`` here used to leak that PREPAID
+        # past the carrier fix (orders 53, 55, 56). The field stays
+        # as an *optional* admin override so an admin can flip an
+        # individual order back to PREPAID if the contract ever
+        # gets it enabled — but the platform-wide default lives in
+        # the carrier code, not here.
+        help_text=_(
+            "Optional per-order ACS Charge_Type override. Leave "
+            "unset to use the carrier-level default (COD on a "
+            "COD-only contract). Setting this here only makes "
+            "sense if the ACS commercial contract permits the "
+            "chosen value — invalid combinations are rejected by "
+            "ACS_Create_Voucher."
+        ),
     )
 
     # ---------- Meta Conversions API context ----------

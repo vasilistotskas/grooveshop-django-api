@@ -3,6 +3,33 @@
 
 
 
+## v1.134.0 (2026-05-13)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.133.0 [skip ci] ([`f62f2c3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f62f2c37d9d69a87d613d3a85f4bbae0a84c960e))
+
+### Features
+
+* feat(boxnow): poll fallback + curate customer order timeline
+
+BoxNow webhook delivery has been silent across 6 shipments — their
+partner-managed registration is the only knob (doc §Hook Management:
+"BOX NOW will assist partners in configuring their webhook"), so a
+single misconfiguration freezes parcel state on our side. Add
+``BoxNowService.sync_shipment_state`` and a 15-min ``poll-boxnow-tracking``
+beat task that reconciles state from ``GET /api/v1/parcels``,
+idempotent with the webhook path via ``(shipment, event_type,
+event_time)`` dedup and synthetic ``poll:`` message ids.
+
+Also strip operational NOTE rows ("Order created", "Item X added",
+confirmation-email-sent — leaking ``admin@admin.gr``) from the
+customer order timeline; they stay in ``OrderHistory`` for the
+admin audit log. Synthetic CREATED entry drops its English
+description so the storefront renders the i18n title alone.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`b32aea3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b32aea39e3f7a22f8db08424f34b61e3cb84d424))
+
 ## v1.133.0 (2026-05-13)
 
 ### Chores

@@ -3,6 +3,44 @@
 
 
 
+## v1.132.3 (2026-05-13)
+
+### Bug fixes
+
+* fix(order): restore ACS deep-link tracking URL (webapp SPA path-based)
+
+Revert the previous commit's decision to drop ACS from
+``CARRIER_TRACKING_URLS``. ACS does publish a working customer-
+facing deep-link — it just isn't where the earlier audit looked.
+
+The legacy ``/el/track-and-trace/?p={number}`` URL on the main
+marketing site is indeed a static search page that ignores query
+parameters. Same for ``/el/myacs/anafores-apostolwn/anazitisi-
+apostolwn/``. Concluding "no deep-link exists" from that was
+wrong — the actual customer-facing tracker is the Vue SPA at:
+
+https://webapp.acscourier.net/track-shipment/{voucher_no}
+
+Path-based, not query-string. The SPA reads the voucher off the
+URL path and auto-runs the search on load. Verified end-to-end via
+Chrome MCP with voucher 9770932931 — page rendered route
+``ΜΑΡΟΥΣΙ → ΣΤΑΥΡΟΥΠΟΛΗ`` with the voucher pre-populated.
+
+Why the previous miss: WebFetch can't render JS — the SPA returns
+only the bare ``"ACS"`` shell to a non-JS client, so the earlier
+check looked indistinguishable from a static "search not found"
+page. The lesson is documented in memory
+``project_acs_tracking_url`` so it doesn't recur.
+
+Schema regenerated (no shape change — same ``tracking_url`` field
+on ``tracking_details``).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0475048`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0475048e63ecdd783ae1c4d6c2d73f62c9e70db4))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.132.2 [skip ci] ([`aff869c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aff869c83ed4e9f75775a39f7051b1a5d1523a50))
+
 ## v1.132.2 (2026-05-13)
 
 ### Bug fixes

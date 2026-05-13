@@ -144,6 +144,90 @@ def test_order_create_serializer_omits_acs_charge_type_by_default():
 
 
 @pytest.mark.django_db
+def test_create_shipment_row_item_quantity_defaults_to_one():
+    """Regression test for order 56 (cart with 3 items → 3 ACS vouchers).
+
+    ACS ``Item_Quantity`` is the number of **physical parcels**, not
+    cart line items. When the carrier sent
+    ``Item_Quantity = sum(cart quantities)``, ACS treated the
+    shipment as multi-parcel and ``get_multipart_vouchers`` auto-
+    minted one child voucher per "piece" (parent + N-1 children).
+    The shop physically bundles every order into one box, so the
+    correct default is always ``1`` — the merchant only needs to
+    print one label.
+
+    Asserts: regardless of how many cart line items the order has
+    (here we pass a fake 5-line ``items`` iterable), the resulting
+    AcsShipment row carries ``item_quantity=1``.
+    """
+    from order.factories.order import OrderFactory
+    from shipping_acs.models import AcsShipment
+
+    order = OrderFactory(shipping_kind=ShippingKind.HOME_DELIVERY.value)
+    adapter = get_provider("acs")
+
+    # Five fake cart lines, each with quantity 2 — pre-fix this
+    # would have produced ``item_quantity = 10``.
+    fake_items = [(None, 2) for _ in range(5)]
+
+    adapter.create_shipment_row(
+        order,
+        kind=ShippingKind.HOME_DELIVERY,
+        payload={},
+        items=fake_items,
+    )
+    shipment = AcsShipment.objects.get(order=order)
+    assert shipment.item_quantity == 1, (
+        f"Cart with multiple items must NOT produce multipart "
+        f"vouchers — Item_Quantity must be 1; got "
+        f"{shipment.item_quantity}. This is the order-56 regression."
+    )
+
+
+@pytest.mark.django_db
+def test_create_shipment_row_item_quantity_admin_override():
+    """Admin override hatch — ``acs_item_quantity`` payload key
+    forces multi-parcel for merchants that genuinely ship one
+    order in multiple boxes. The default stays 1 (see above);
+    explicit override must still win.
+    """
+    from order.factories.order import OrderFactory
+    from shipping_acs.models import AcsShipment
+
+    order = OrderFactory(shipping_kind=ShippingKind.HOME_DELIVERY.value)
+    adapter = get_provider("acs")
+    adapter.create_shipment_row(
+        order,
+        kind=ShippingKind.HOME_DELIVERY,
+        payload={"acs_item_quantity": 3},
+    )
+    shipment = AcsShipment.objects.get(order=order)
+    assert shipment.item_quantity == 3
+
+
+@pytest.mark.django_db
+def test_order_create_serializer_omits_acs_item_quantity_by_default():
+    """Same pin as ``acs_charge_type`` — the serializer field for
+    ``acsItemQuantity`` MUST NOT carry a DRF ``default=``. Any value
+    here would be injected into ``validated_data`` and short-circuit
+    the carrier's "default to 1" logic via the truthy ``or 1``
+    fallback. Tested explicitly so the PREPAID-leak pattern (commit
+    ``c20af461``) can't recur for this field either.
+    """
+    from rest_framework.fields import empty
+
+    from order.serializers.order import OrderCreateFromCartSerializer
+
+    field = OrderCreateFromCartSerializer().fields["acs_item_quantity"]
+    assert field.required is False
+    assert field.default is empty, (
+        "OrderCreateFromCartSerializer.acs_item_quantity must not "
+        "have a default — see comment in the field declaration and "
+        "the PREPAID-leak postmortem on acs_charge_type."
+    )
+
+
+@pytest.mark.django_db
 def test_acs_shipment_model_default_is_cod():
     """Deepest defence-in-depth layer.
 

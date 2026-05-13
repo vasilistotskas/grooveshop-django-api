@@ -766,6 +766,24 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             "ACS_Create_Voucher."
         ),
     )
+    acs_item_quantity = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        max_value=20,
+        # No ``default=`` — same lesson as ``acs_charge_type`` above.
+        # Carrier-level default is 1 (single physical parcel per
+        # order). Override here only when the merchant ships a
+        # single order in multiple physical boxes; ACS will mint a
+        # parent voucher + N-1 child vouchers. The shop's
+        # operational reality is one box per order, so leaving this
+        # unset is correct for every normal order.
+        help_text=_(
+            "Optional per-order override for ACS Item_Quantity (number "
+            "of physical parcels in the shipment). Defaults to 1. "
+            "Must NOT be set for Smartpoint pickup — ACS rejects "
+            "multipart vouchers on lockers."
+        ),
+    )
 
     # ---------- Meta Conversions API context ----------
     # Forwarded by the Nuxt ``server/api/orders/index.post.ts`` proxy

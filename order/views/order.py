@@ -908,6 +908,7 @@ class OrderViewSet(BaseModelViewSet):
             ),
             "acs_station_branch": validated_data.get("acs_station_branch", ""),
             "acs_charge_type": validated_data.get("acs_charge_type"),
+            "acs_item_quantity": validated_data.get("acs_item_quantity"),
         }
 
     # Payment endpoints are expensive and abuse-prone (Stripe PaymentIntent

@@ -27,6 +27,7 @@ class AcsCarrier(ShippingCarrierInterface):
         "acs_station_external_id",
         "acs_station_branch",
         "acs_charge_type",
+        "acs_item_quantity",
     )
 
     def create_shipment(
@@ -180,30 +181,36 @@ class AcsCarrier(ShippingCarrierInterface):
         delivery_products = "COD" if is_cod else ""
 
         weight_grams = 0
-        item_quantity = 1
         if items is not None:
-            items_list = list(items)
-            weight_grams = compute_total_weight_grams(items_list)
-            item_quantity = max(sum(int(q or 0) for _, q in items_list) or 1, 1)
+            weight_grams = compute_total_weight_grams(list(items))
 
-        # ACS PDF p.8: Smartpoint locker deliveries are constrained to
-        # ``Item_Quantity == 1`` — multi-piece vouchers are only
-        # accepted for physical-shop / home-delivery destinations. A
-        # 2-line cart routed to a locker would mint a voucher that
-        # ACS rejects at locker-load. Clamp before persistence so the
-        # rest of the pipeline sees the actual shippable quantity.
-        if delivery_kind == ShippingKind.PICKUP_POINT and item_quantity > 1:
-            logger.warning(
-                "ACS Smartpoint clamps Item_Quantity %d → 1 for order=%s",
-                item_quantity,
-                order.id,
-                extra={
-                    "order_id": order.id,
-                    "carrier": "acs",
-                    "original_quantity": item_quantity,
-                    "delivery_kind": delivery_kind,
-                },
-            )
+        # ACS ``Item_Quantity`` is the number of **physical parcels**
+        # in the shipment — NOT the number of cart line items. For a
+        # shop that bundles every order into one box (the default
+        # ours operates under), this is always ``1``. When we sent
+        # ``sum(cart quantities)`` instead, ACS interpreted it as a
+        # multi-parcel shipment and ``get_multipart_vouchers`` minted
+        # one child voucher per "piece" (parent + N-1 children) —
+        # see order #56, which produced 3 vouchers for a 3-item cart.
+        #
+        # ACS PDF p.8 also explicitly forbids ``Item_Quantity > 1``
+        # for Smartpoint pickup, so a single hard default of 1 is
+        # safe everywhere; the Smartpoint clamp the previous version
+        # carried is now redundant.
+        #
+        # Admins who genuinely ship in multiple parcels can pass
+        # ``acs_item_quantity`` in the order payload to override
+        # per-order — same admin-override hatch we use for
+        # ``acs_charge_type``. Lesson from the PREPAID-leak incident:
+        # the serializer field for that override MUST NOT carry a
+        # default (any default leaks past this fallback because
+        # truthy values short-circuit ``or``).
+        raw_qty = payload.get("acs_item_quantity")
+        try:
+            item_quantity = int(raw_qty) if raw_qty is not None else 1
+        except (TypeError, ValueError):
+            item_quantity = 1
+        if item_quantity < 1:
             item_quantity = 1
 
         station = None

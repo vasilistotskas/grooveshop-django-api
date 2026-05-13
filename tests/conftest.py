@@ -319,10 +319,6 @@ def _reseed_extra_settings(request):
     """
     if not request.node.get_closest_marker("django_db"):
         return
-    try:
-        from django.conf import django_settings_module  # noqa: F401
-    except ImportError:
-        pass
     from django.conf import settings as _dj_settings
 
     try:

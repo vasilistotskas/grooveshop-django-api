@@ -3,6 +3,69 @@
 
 
 
+## v1.132.1 (2026-05-13)
+
+### Bug fixes
+
+* fix(shipping_acs): always send Item_Quantity=1 — one parcel per order
+
+Reported by the shop admin on order #56: a 3-item cart produced 3
+ACS vouchers. Root cause: ``AcsCarrier.create_shipment_row``
+computed ``item_quantity = sum(cart quantities)`` from the items
+iterable, conflating "cart line items" with ACS's ``Item_Quantity``
+field — which actually means "number of **physical parcels** in
+the shipment" (ACS PDF p.9). When ``Item_Quantity > 1`` ACS
+auto-mints child vouchers via ``ACS_Get_Multipart_Vouchers``
+(handled by ``shipping_acs.services.create_voucher_for_order`` at
+line 319), producing one extra voucher per "piece."
+
+The shop physically bundles every order into one box, so
+``Item_Quantity`` should always be 1. Future merchants that
+genuinely ship one order in multiple boxes can pass
+``acsItemQuantity`` in the order body — added as an optional
+admin-override hatch with the same "no DRF default" treatment we
+applied to ``acsChargeType`` after the PREPAID-leak incident.
+
+Changes:
+
+* ``AcsCarrier.payload_keys`` declares ``acs_item_quantity`` so the
+  view forwards it to the carrier payload.
+* ``AcsCarrier.create_shipment_row`` reads ``acs_item_quantity``
+  from the payload with a hard fallback to ``1`` (rejects invalid
+  inputs, clamps to a positive integer).
+* The Smartpoint clamp (``if kind == PICKUP_POINT and qty > 1``)
+  is gone — subsumed by the single hard default of 1, which is
+  also what ACS PDF p.8 requires for Smartpoint anyway.
+* ``OrderCreateFromCartSerializer.acs_item_quantity`` field added
+  with ``required=False``, ``min_value=1``, ``max_value=20``, and
+  EXPLICITLY no ``default=`` so DRF omits it from
+  ``validated_data`` when the storefront doesn't send it — the
+  carrier-level default of 1 then fires cleanly.
+* ``_build_shipping_address_from_validated`` forwards the new key.
+
+Three new regression tests pin all three layers:
+
+* ``test_create_shipment_row_item_quantity_defaults_to_one`` —
+  5-line fake cart (would have been Item_Quantity=10 pre-fix) now
+  produces 1.
+* ``test_create_shipment_row_item_quantity_admin_override`` —
+  explicit override still wins.
+* ``test_order_create_serializer_omits_acs_item_quantity_by_default``
+  — asserts ``field.default is empty`` (DRF sentinel) so the
+  PREPAID-leak pattern can't recur for this field either.
+
+Note: this fix is forward-looking — order #56's three minted
+vouchers exist on ACS's side. Admin can simply use one and discard
+the other two physical labels, or we can cancel them via
+``ACS_Delete_Voucher`` and re-mint as a single-parcel voucher.
+Discussed separately.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6369a72`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6369a7295392a2abd98c6bedd9beaa6e45879d30))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.132.0 [skip ci] ([`5305442`](https://github.com/vasilistotskas/grooveshop-django-api/commit/53054429552ed3d1195bf5c4cad496411a36b7ad))
+
 ## v1.132.0 (2026-05-13)
 
 ### Bug fixes

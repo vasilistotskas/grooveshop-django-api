@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
                 'verbose_name': 'PayWay shipping exclusion',
                 'verbose_name_plural': 'PayWay shipping exclusions',
                 'ordering': ['shipping_provider', 'shipping_kind', 'pay_way'],
-                'indexes': [django.contrib.postgres.indexes.BTreeIndex(fields=['created_at'], name='paywayshippingexclusion_created_at_ix'), django.contrib.postgres.indexes.BTreeIndex(fields=['updated_at'], name='paywayshippingexclusion_updated_at_ix'), django.contrib.postgres.indexes.BTreeIndex(fields=['shipping_provider', 'shipping_kind'], name='payway_excl_provider_kind_ix')],
+                'indexes': [django.contrib.postgres.indexes.BTreeIndex(fields=['created_at'], name='payway_excl_created_at_ix'), django.contrib.postgres.indexes.BTreeIndex(fields=['updated_at'], name='payway_excl_updated_at_ix'), django.contrib.postgres.indexes.BTreeIndex(fields=['shipping_provider', 'shipping_kind'], name='payway_excl_provider_kind_ix')],
                 'constraints': [models.UniqueConstraint(fields=('pay_way', 'shipping_provider', 'shipping_kind'), name='payway_shipping_exclusion_unique')],
             },
         ),

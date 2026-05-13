@@ -227,8 +227,19 @@ class PayWayShippingExclusion(TimeStampMixinModel):
                 name="payway_shipping_exclusion_unique",
             ),
         ]
+        # Override the inherited TimeStampMixinModel indexes with
+        # shorter explicit names: the mixin uses ``%(class)s`` which
+        # would resolve to ``paywayshippingexclusion_created_at_ix``
+        # (37 chars) and trip Django's ``models.E034`` 30-char index-
+        # name limit. We still want the timestamp indexes; just give
+        # them tighter names.
         indexes = [
-            *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(
+                fields=["created_at"], name="payway_excl_created_at_ix"
+            ),
+            BTreeIndex(
+                fields=["updated_at"], name="payway_excl_updated_at_ix"
+            ),
             BTreeIndex(
                 fields=["shipping_provider", "shipping_kind"],
                 name="payway_excl_provider_kind_ix",

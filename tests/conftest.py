@@ -285,28 +285,70 @@ def _reset_payment_events_redis_client():
 
 @pytest.fixture(autouse=True)
 def _reseed_extra_settings(request):
-    """Ensure ``EXTRA_SETTINGS_DEFAULTS`` rows exist before every DB test.
+    """Reset every ``EXTRA_SETTINGS_DEFAULTS`` row to its declared
+    baseline before each DB test.
 
-    ``django-extra-settings`` seeds its rows via a ``post_migrate`` signal
-    that only fires at DB creation. Tests marked
-    ``@pytest.mark.django_db(transaction=True)`` (e.g. concurrent stock
-    tests) flush every table on teardown, wiping the ``Setting`` rows.
-    A subsequent test calling ``Setting.get("STOCK_RESERVATION_TTL_MINUTES")``
-    would hit an empty DB and fall back to the code-level default
-    (``StockManager.RESERVATION_TTL_MINUTES_DEFAULT = 15``) instead of
-    the configured 30, producing intermittent assertion failures in
-    ``tests/integration/order/test_stock_reservation_ttl.py``.
+    Why **reset** and not just **re-seed**: tests that mutate a
+    setting (e.g. ``Setting.objects.update_or_create(name="BOXNOW_ENABLED",
+    ...)``) and run with ``@pytest.mark.django_db(transaction=True)``
+    commit the change to the shared test database. Under ``-n auto``
+    a subsequent test on a different worker reads the mutated value
+    and the assertion flakes. The previous version called
+    ``Setting.set_defaults_from_settings()`` which uses
+    ``get_or_create`` and only writes on creation — it restored
+    missing rows after a ``flush`` but didn't undo value mutations.
 
-    ``set_defaults_from_settings`` calls ``get_or_create`` per entry —
-    cheap no-op when rows are intact, restorative when they are not.
+    This version uses ``update_or_create`` keyed on ``name`` and
+    rewrites ``value_<type>`` to the declared default every time, so
+    each test starts from the same baseline regardless of what any
+    prior test did. The cost is one tiny UPDATE per declared setting
+    (~30 rows) per test — dwarfed by the EAGER signal cascades the
+    same tests trigger.
+
+    Notes:
+
+    * ``value_type`` is normalised the same way ``extra_settings``
+      does in its own ``set_defaults`` — strips the ``Setting.TYPE_``
+      prefix if present and lowercases — so both the long and short
+      forms in ``EXTRA_SETTINGS_DEFAULTS`` are accepted.
+    * Settings not declared in ``EXTRA_SETTINGS_DEFAULTS`` (rare —
+      ad-hoc admin-created rows) are left alone.
+    * The DummyCache patch above neutralises ``extra_settings``'s
+      caching; combined with this reset, every ``Setting.get`` is a
+      direct, current-test DB read with no cross-worker leakage.
     """
-    if request.node.get_closest_marker("django_db"):
-        try:
-            from extra_settings.models import Setting
+    if not request.node.get_closest_marker("django_db"):
+        return
+    try:
+        from django.conf import django_settings_module  # noqa: F401
+    except ImportError:
+        pass
+    from django.conf import settings as _dj_settings
 
-            Setting.set_defaults_from_settings()
-        except Exception:
-            pass
+    try:
+        from extra_settings.models import Setting
+
+        for default in getattr(_dj_settings, "EXTRA_SETTINGS_DEFAULTS", ()):
+            name = default.get("name")
+            value_type = (
+                default.get("type", "string")
+                .replace("Setting.TYPE_", "")
+                .lower()
+            )
+            value = default.get("value")
+            if not name or value is None:
+                continue
+            Setting.objects.update_or_create(
+                name=name,
+                defaults={
+                    "value_type": value_type,
+                    f"value_{value_type}": value,
+                },
+            )
+    except Exception:
+        # Fixture is best-effort — a transient DB connection error
+        # must not mask the real failure of the test itself.
+        pass
 
 
 @pytest.fixture(autouse=True)

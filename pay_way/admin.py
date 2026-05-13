@@ -5,7 +5,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from parler.admin import TranslatableAdmin
-from unfold.admin import ModelAdmin
+from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
@@ -15,7 +15,32 @@ from unfold.contrib.forms.widgets import WysiwygWidget
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
-from pay_way.models import PayWay
+from pay_way.models import PayWay, PayWayShippingExclusion
+
+
+class PayWayShippingExclusionInline(TabularInline):
+    """Reusable inline for ``PayWayShippingExclusion``.
+
+    Registered on both ``PayWayAdmin`` (rows where ``pay_way=this``)
+    and ``ShippingProviderAdmin`` (rows where
+    ``shipping_provider=this``). Both edit the same table — pick
+    whichever side you're already on in the admin.
+
+    Why we don't constrain ``shipping_kind`` at form-render time to
+    only the kinds the parent provider supports: the inline is also
+    used from the PayWay side where there's no single parent
+    provider, so a uniform full-choice dropdown keeps the UX
+    consistent. The ``unique_together`` constraint + the carrier's
+    ``ShippingProvider.supports`` check at runtime already prevent
+    misconfigured combinations from doing damage.
+    """
+
+    model = PayWayShippingExclusion
+    extra = 0
+    fields = ("shipping_provider", "shipping_kind", "pay_way", "note")
+    autocomplete_fields = ("pay_way", "shipping_provider")
+    verbose_name = _("Payment-method exclusion")
+    verbose_name_plural = _("Payment-method exclusions")
 
 
 class CostRangeFilter(RangeNumericListFilter):
@@ -183,6 +208,8 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         "move_down_in_order",
         "reset_sort_order",
     ]
+
+    inlines = [PayWayShippingExclusionInline]
 
     fieldsets = (
         (

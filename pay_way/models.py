@@ -11,6 +11,7 @@ from parler.models import TranslatableModel, TranslatedFields
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from pay_way.enum.pay_way import PayWayEnum
 from pay_way.managers import PayWayManager
+from shipping.enum import ShippingKind
 
 
 class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
@@ -164,3 +165,78 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         if not self.configuration:
             self.configuration = {}
         self.configuration[key] = value
+
+
+class PayWayShippingExclusion(TimeStampMixinModel):
+    """Per-(shipping provider, kind, pay-way) availability override.
+
+    A row's presence means the pay-way is **disabled** for that
+    (provider, kind) combination. An empty table = every active
+    pay-way is offered on every supported (provider, kind), which
+    matches the pre-existing behaviour without any seed data.
+
+    Two-layer model with :func:`pay_way.services.PayWayService.filter_by_carrier`:
+
+    * **Layer 1 (this table)** — admin-configurable soft rules. Toggle
+      from Django admin without a redeploy.
+    * **Layer 2** — ``ShippingCarrierInterface.filter_pay_ways`` hard
+      vetos in code for cases where the courier API itself genuinely
+      rejects a combination regardless of operator preference.
+
+    The two layers compose: exclusions here run BEFORE the carrier
+    hook, so an operator-blocked combination short-circuits without
+    even consulting the carrier adapter.
+    """
+
+    pay_way = models.ForeignKey(
+        "pay_way.PayWay",
+        on_delete=models.CASCADE,
+        related_name="shipping_exclusions",
+        verbose_name=_("Pay way"),
+    )
+    shipping_provider = models.ForeignKey(
+        "shipping.ShippingProvider",
+        on_delete=models.CASCADE,
+        related_name="pay_way_exclusions",
+        verbose_name=_("Shipping provider"),
+    )
+    shipping_kind = models.CharField(
+        _("Shipping kind"),
+        max_length=32,
+        choices=ShippingKind.choices,
+    )
+    note = models.TextField(
+        _("Note"),
+        blank=True,
+        default="",
+        help_text=_(
+            "Optional explanation for why this combination is "
+            "blocked (e.g. 'PAY ON THE GO not yet active on the "
+            "BoxNow partner account — re-enable when ops confirms'). "
+            "Visible to admins only — never shown to customers."
+        ),
+    )
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("PayWay shipping exclusion")
+        verbose_name_plural = _("PayWay shipping exclusions")
+        ordering = ["shipping_provider", "shipping_kind", "pay_way"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("pay_way", "shipping_provider", "shipping_kind"),
+                name="payway_shipping_exclusion_unique",
+            ),
+        ]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            BTreeIndex(
+                fields=["shipping_provider", "shipping_kind"],
+                name="payway_excl_provider_kind_ix",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return (
+            f"{self.pay_way} blocked on "
+            f"{self.shipping_provider.code}/{self.shipping_kind}"
+        )

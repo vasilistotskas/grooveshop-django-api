@@ -77,26 +77,13 @@ class BoxNowCarrier(ShippingCarrierInterface):
     # Validation (called by order/services._validate_address_data)
     # ------------------------------------------------------------------
 
-    def filter_pay_ways(self, queryset, *, kind: ShippingKind):
-        """BoxNow supports prepaid AND COD on lockers.
-
-        The legacy "BoxNow rejects COD on locker pickup" rule was
-        true before BoxNow shipped their PAY ON THE GO product
-        (2025-Q3), which collects cash / card at the locker on
-        delivery. Once BoxNow activates PAY ON THE GO on the
-        partner account, an offline pay-way (Αντικαταβολή) maps to
-        ``paymentMode='cod'`` + ``amountToBeCollected=<total>`` in
-        the create-shipment payload (handled in
-        ``create_shipment_row`` below) and BoxNow honours it.
-
-        We therefore expose ALL active pay-ways for both
-        ``HOME_DELIVERY`` and ``PICKUP_POINT``. Partners that don't
-        have PAY ON THE GO active should remove the offline pay-way
-        from their PayWay catalogue (or mark it inactive) so it
-        doesn't appear in the picker; that's a deployment-config
-        decision, not a courier-rule one.
-        """
-        return queryset
+    # ``filter_pay_ways`` is intentionally NOT overridden — the base
+    # implementation (pass-through) is correct now that admin-level
+    # exclusions live in ``PayWayShippingExclusion``. Partners that
+    # don't yet have PAY ON THE GO active should add a
+    # ``PayWayShippingExclusion`` row for (boxnow, pickup_point,
+    # <cod-pay-way>) from the Django admin — runtime-toggleable, no
+    # redeploy required.
 
     def validate_order_payload(
         self,

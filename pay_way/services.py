@@ -24,13 +24,18 @@ class PayWayService:
     ) -> QuerySet:
         """Filter PayWays compatible with the chosen carrier + kind.
 
-        Each carrier owns its own pay-way compatibility rules. Today
-        all registered carriers (BoxNow via PAY ON THE GO, ACS) accept
-        every active pay-way and pass through unchanged. The dispatch
-        still goes through the registry so a future carrier with hard
-        constraints (e.g. an integration that genuinely cannot collect
-        COD) can override ``filter_pay_ways`` without editing this
-        method or any caller.
+        Two layers of rules apply, in order:
+
+        1. **Admin-configured exclusions** — rows in
+           ``PayWayShippingExclusion`` indexed by ``(provider, kind)``
+           identify pay-ways that the operator has switched off for
+           that combination from the Django admin. Soft rules,
+           runtime-toggleable with no redeploy.
+        2. **Carrier hard constraints** — the registered adapter's
+           ``filter_pay_ways(kind)`` hook applies any code-level
+           vetoes for combinations the courier API genuinely rejects
+           regardless of operator preference. Default base
+           implementation is pass-through.
 
         Args:
             queryset: Base PayWay queryset.
@@ -38,7 +43,9 @@ class PayWayService:
             shipping_kind: ``ShippingKind`` value, or None.
 
         Returns:
-            Filtered queryset.
+            Filtered queryset. Empty/unknown inputs short-circuit to
+            the input queryset unchanged (caller's choice to widen
+            the search).
         """
         if not provider_code or not shipping_kind:
             return queryset
@@ -54,9 +61,20 @@ class PayWayService:
         except ValueError:
             return queryset
 
+        # Layer 1: admin-configured exclusions. Subquery so callers
+        # composing paginated queries don't pay an extra round trip.
+        from pay_way.models import PayWayShippingExclusion
+
+        excluded_ids = PayWayShippingExclusion.objects.filter(
+            shipping_provider__code=provider_code,
+            shipping_kind=kind_enum.value,
+        ).values("pay_way_id")
+        queryset = queryset.exclude(id__in=excluded_ids)
+
+        # Layer 2: carrier-specific hard constraints. Default
+        # implementation is pass-through; specific carriers override
+        # the hook for combinations the courier API itself rejects.
         adapter = get_provider(provider_code)
-        # Default carriers don't constrain pay-ways; BoxNow's adapter
-        # overrides this hook to block COD on PICKUP_POINT.
         return adapter.filter_pay_ways(queryset, kind=kind_enum)
 
     @staticmethod

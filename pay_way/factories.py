@@ -7,7 +7,8 @@ from factory.fuzzy import FuzzyDecimal
 from faker import Faker
 
 from pay_way.enum.pay_way import PayWayEnum
-from pay_way.models import PayWay
+from pay_way.models import PayWay, PayWayShippingExclusion
+from shipping.enum import ShippingKind
 
 fake = Faker()
 available_languages = [
@@ -165,4 +166,23 @@ class PayWayFactory(factory.django.DjangoModelFactory):
             requires_confirmation=requires_confirmation,
             configuration=config,
             **kwargs,
+        )
+
+
+class PayWayShippingExclusionFactory(factory.django.DjangoModelFactory):
+    pay_way = factory.SubFactory(PayWayFactory)
+    shipping_provider = factory.SubFactory(
+        "shipping.factories.ShippingProviderFactory"
+    )
+    shipping_kind = factory.Iterator([kind.value for kind in ShippingKind])
+    note = ""
+
+    class Meta:
+        model = PayWayShippingExclusion
+        # Match the unique constraint so re-using the same triple
+        # under -n auto reuses the existing row instead of crashing.
+        django_get_or_create = (
+            "pay_way",
+            "shipping_provider",
+            "shipping_kind",
         )

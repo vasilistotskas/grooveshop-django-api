@@ -141,3 +141,86 @@ def test_order_create_serializer_omits_acs_charge_type_by_default():
         "a default — DRF inserts it into validated_data, which would "
         "leak past the carrier-level COD default. See orders 53/55/56."
     )
+
+
+@pytest.mark.django_db
+def test_acs_shipment_model_default_is_cod():
+    """Deepest defence-in-depth layer.
+
+    If ALL upstream defaults fail (serializer regression + carrier
+    regression + view regression), the Django model-level default
+    is the last line. It must be COD so that even a code path that
+    creates an ``AcsShipment`` row without explicitly passing
+    ``charge_type`` (e.g. a hypothetical future admin form, a data
+    migration, or an integration test) still yields a row whose
+    voucher mint ACS will accept.
+    """
+    from shipping_acs.enum.charge_type import AcsChargeType
+    from shipping_acs.models import AcsShipment
+
+    field = AcsShipment._meta.get_field("charge_type")
+    assert field.default == AcsChargeType.COD, (
+        f"AcsShipment.charge_type model default must be COD; got "
+        f"{field.default} ({AcsChargeType(field.default).label})."
+    )
+
+
+@pytest.mark.django_db
+def test_validated_data_omits_acs_charge_type_when_absent_from_body():
+    """End-to-end proof the regression is closed.
+
+    Run the serializer's actual ``is_valid()`` against a realistic
+    order-create body that does NOT include ``acsChargeType`` and
+    assert the resulting ``validated_data`` dict OMITS the key
+    entirely. This is the value the view passes to
+    ``_build_shipping_address_from_validated`` → carrier payload —
+    if it's absent, the carrier's COD default fires.
+
+    Pre-fix (``default=1``): ``validated_data["acs_charge_type"] == 1``.
+    Post-fix (``default=empty``): key absent, ``.get`` returns None,
+    carrier picks ``AcsChargeType.COD``.
+
+    Pairs with the model-level + override tests above. If those
+    pass but this one fails, someone reintroduced a default upstream
+    of the carrier without touching the serializer field itself
+    (e.g. via ``DEFAULT_FIELD_DEFAULTS`` overrides or a parent
+    serializer mixin).
+    """
+    from order.serializers.order import OrderCreateFromCartSerializer
+
+    # Minimal-but-realistic body for the offline-payment create-from-
+    # cart endpoint. ``acsChargeType`` deliberately absent — this is
+    # what the storefront sends on every order.
+    body = {
+        "first_name": "Test",
+        "last_name": "Customer",
+        "email": "test@example.com",
+        "phone": "+306900000000",
+        "street": "Test Street",
+        "street_number": "1",
+        "city": "Athens",
+        "zipcode": "11141",
+        "country_id": "GR",
+        "shipping_provider_code": "acs",
+        "shipping_kind": "home_delivery",
+        "document_type": "RECEIPT",
+        "pay_way": 1,
+    }
+
+    serializer = OrderCreateFromCartSerializer(data=body)
+    # ``raise_exception=False`` — other required fields might error
+    # depending on which factories are seeded; we only care about
+    # this one field's contract.
+    serializer.is_valid(raise_exception=False)
+
+    # The contract: when ``acsChargeType`` is absent from the body,
+    # the key must NOT appear in ``validated_data``. If it does, the
+    # default leaked.
+    assert "acs_charge_type" not in serializer.validated_data, (
+        "Regression: ``acs_charge_type`` should be absent from "
+        "validated_data when the request body omits it. Got "
+        f"{serializer.validated_data.get('acs_charge_type')!r}. "
+        "This means the serializer is injecting a default that will "
+        "leak past the carrier-level COD default and ACS will reject "
+        "every PREPAID voucher. See orders 53/55/56."
+    )

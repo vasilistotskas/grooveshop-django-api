@@ -67,6 +67,9 @@ _ALLOWED_PRODUCT_FACETS: frozenset[str] = frozenset(
         "price_range",
         "final_price",
         "language_code",
+        "likes_count",
+        "view_count",
+        "attribute_values",
     }
 )
 

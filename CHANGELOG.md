@@ -3,6 +3,26 @@
 
 
 
+## v1.134.1 (2026-05-14)
+
+### Bug fixes
+
+* fix(search): allow attribute_values, likes_count, view_count facets
+
+These three Meilisearch facets were silently dropped by the product
+search facet allowlist, even though all three are configured as
+filterable fields in ProductTranslation.MeiliMeta. The frontend's
+AttributeFilter, PopularityFilter, and ViewCountFilter all requested
+these facets and fell back to defaults — the most visible symptom was
+every Χαρακτηριστικά option (e.g. "80*38.5*26 mm") rendering with a
+"0 products" badge and disabled state on /products.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`23d2c2a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23d2c2a3dd716c7547a541d06e44b1824cf1ec79))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.0 [skip ci] ([`19f76d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19f76d88cd5325d0965634f30272459b9edf20b3))
+
 ## v1.134.0 (2026-05-13)
 
 ### Chores

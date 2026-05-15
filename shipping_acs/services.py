@@ -445,10 +445,15 @@ class AcsService:
         """
         try:
             with transaction.atomic():
-                fresh = (
-                    AcsShipment.objects.select_for_update()
-                    .only("metadata")
-                    .get(pk=shipment.pk)
+                # Full row fetch (no ``.only("metadata")``): django-money's
+                # ``cod_amount`` descriptor reads from ``__dict__`` directly,
+                # and the ``simple_history`` post-save hook snapshots every
+                # field even when ``metadata`` is excluded — together they
+                # raise ``KeyError: 'cod_amount'`` on a deferred-field
+                # save. Verified against the v1.134.x CI run after the
+                # initial ``.only("metadata")`` version of this method.
+                fresh = AcsShipment.objects.select_for_update().get(
+                    pk=shipment.pk
                 )
                 metadata = fresh.metadata or {}
                 metadata["last_error"] = {
@@ -475,10 +480,15 @@ class AcsService:
         """
         try:
             with transaction.atomic():
-                fresh = (
-                    AcsShipment.objects.select_for_update()
-                    .only("metadata")
-                    .get(pk=shipment.pk)
+                # Full row fetch (no ``.only("metadata")``): see
+                # ``_record_last_error`` for the rationale — the
+                # deferred-field path raises ``KeyError: 'cod_amount'``
+                # on save via django-money's descriptor + simple-history
+                # snapshot. Latent bug verified against prod order 57
+                # on 2026-05-15 where ``mint_started_at`` remained set
+                # after a Phase 2 failure.
+                fresh = AcsShipment.objects.select_for_update().get(
+                    pk=shipment.pk
                 )
                 metadata = fresh.metadata or {}
                 if metadata.pop("mint_started_at", None) is not None:

@@ -13,7 +13,12 @@ from shipping_acs.factories import (
     AcsShipmentFactory,
 )
 from shipping_acs.models import AcsShipment, AcsTrackingEvent
-from shipping_acs.services import AcsService, _kg_from_grams
+from shipping_acs.services import (
+    AcsService,
+    _kg_from_grams,
+    _normalize_phone_for_acs,
+    _normalize_zipcode_for_acs,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -481,3 +486,163 @@ class TestIssueDailyPickupList:
             voucher_no__in=["7227891111", "7227891222"]
         ):
             assert shipment.pickup_list_id == result.id
+
+
+# ---------------------------------------------------------------------------
+# Field normalizers — locked after order 57 (2026-05-15) was rejected by ACS
+# with "Error fill data error" because the customer's zipcode "848 00"
+# (Greek convention) and PhoneNumberField's E.164 "+306989424342" were
+# passed verbatim. ACS sample payload uses digits-only zipcode + bare
+# 10-digit local phone.
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeZipcodeForAcs:
+    def test_strips_internal_whitespace(self):
+        assert _normalize_zipcode_for_acs("848 00") == "84800"
+
+    def test_strips_punctuation_and_keeps_first_five(self):
+        assert _normalize_zipcode_for_acs("12345-6") == "12345"
+
+    def test_blank_returns_empty(self):
+        assert _normalize_zipcode_for_acs("") == ""
+        assert _normalize_zipcode_for_acs(None) == ""
+
+    def test_truncates_to_five_digits(self):
+        assert _normalize_zipcode_for_acs("123456789") == "12345"
+
+    def test_handles_integer_input(self):
+        assert _normalize_zipcode_for_acs(17778) == "17778"
+
+
+class TestNormalizePhoneForAcs:
+    def test_strips_e164_country_code(self):
+        assert _normalize_phone_for_acs("+306989424342") == "6989424342"
+
+    def test_strips_double_zero_country_code(self):
+        assert _normalize_phone_for_acs("00306989424342") == "6989424342"
+
+    def test_local_format_unchanged(self):
+        assert _normalize_phone_for_acs("6989424342") == "6989424342"
+
+    def test_blank_returns_empty(self):
+        assert _normalize_phone_for_acs("") == ""
+        assert _normalize_phone_for_acs(None) == ""
+
+    def test_phonenumber_object_uses_national_number(self):
+        # PhoneNumberField returns a phonenumbers.PhoneNumber whose
+        # ``national_number`` is the canonical local-format integer.
+        # We can't easily import phonenumbers here without adding a
+        # dependency to the test setup, so simulate with a stub object.
+        class _PhoneStub:
+            national_number = 6989424342
+
+        assert _normalize_phone_for_acs(_PhoneStub()) == "6989424342"
+
+    def test_ambiguous_length_left_untouched(self):
+        # 30 prefix + 9 digits doesn't match the 10-digit local rule —
+        # leave it so ACS rejects loudly instead of silently truncating.
+        assert _normalize_phone_for_acs("30123456789") == "30123456789"
+
+
+# ---------------------------------------------------------------------------
+# last_error persistence
+# ---------------------------------------------------------------------------
+
+
+class TestLastErrorPersisted:
+    """``_record_last_error`` must capture the failing payload so admins
+    can diagnose ACS rejections without re-running the request builder."""
+
+    def test_writes_request_and_error_to_metadata_when_voucher_no_empty(
+        self, monkeypatch
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+        from shipping_acs import services
+
+        class _BadClient:
+            billing_code = "X"
+
+            def create_voucher(self, params):
+                return {
+                    "Voucher_No": "",
+                    "Error_Message": "ACS:Error fill data error",
+                }
+
+        monkeypatch.setattr(services, "AcsClient", _BadClient)
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        shipment = AcsShipmentFactory(order=order)
+
+        with pytest.raises(AcsAPIError):
+            AcsService.create_voucher_for_order(order)
+
+        shipment.refresh_from_db()
+        last_error = shipment.metadata.get("last_error")
+        assert last_error is not None
+        assert "Error fill data error" in last_error["error"]
+        assert "Recipient_Zipcode" in last_error["request_params"]
+        assert last_error["occurred_at"]
+        # mint_started_at must be released so the next retry isn't
+        # stuck waiting for the 300s TTL.
+        assert "mint_started_at" not in shipment.metadata
+
+    def test_writes_request_and_error_to_metadata_when_client_raises(
+        self, monkeypatch
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+        from shipping_acs import services
+
+        class _ExplodingClient:
+            billing_code = "X"
+
+            def create_voucher(self, params):
+                raise ConnectionError("ACS host unreachable")
+
+        monkeypatch.setattr(services, "AcsClient", _ExplodingClient)
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        shipment = AcsShipmentFactory(order=order)
+
+        with pytest.raises(ConnectionError):
+            AcsService.create_voucher_for_order(order)
+
+        shipment.refresh_from_db()
+        last_error = shipment.metadata.get("last_error")
+        assert last_error is not None
+        assert "ACS host unreachable" in last_error["error"]
+        assert last_error["request_params"]["Billing_Code"] == "X"
+        assert "mint_started_at" not in shipment.metadata
+
+
+# ---------------------------------------------------------------------------
+# Payload builder — zipcode/phone flow from order → ACS
+# ---------------------------------------------------------------------------
+
+
+class TestBuildCreateVoucherParamsNormalizes:
+    """End-to-end check that the normalizers are wired into the
+    outbound ACS payload — guards against a future edit dropping
+    them silently."""
+
+    def test_normalizes_zipcode_and_phone_in_outgoing_payload(
+        self, acs_client_mock
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            zipcode="848 00",
+            phone="+306989424342",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        sent = acs_client_mock.last_create_payload
+        assert sent["Recipient_Zipcode"] == "84800"
+        assert sent["Recipient_Phone"] == "6989424342"
+        assert sent["Recipient_Cell_Phone"] == "6989424342"

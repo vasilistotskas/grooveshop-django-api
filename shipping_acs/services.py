@@ -104,6 +104,49 @@ def _kg_from_grams(weight_grams: int | None) -> str:
     return text.replace(".", ",")
 
 
+def _normalize_zipcode_for_acs(value: object) -> str:
+    """Strip whitespace/hyphens/etc; return up to 5 leading digits.
+
+    ACS rejects any non-digit characters in ``Recipient_Zipcode``
+    (verified against order 57 on 2026-05-15 — the customer typed the
+    Greek convention ``"848 00"`` with a space and ACS returned the
+    generic ``"Error fill data error"`` rejection). The sample payload
+    in the ACS REST API guide §3 shows the field as a bare integer
+    (``17778``), so digits-only is the safe canonical form.
+    """
+    if not value:
+        return ""
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    return digits[:5]
+
+
+def _normalize_phone_for_acs(value: object) -> str:
+    """Return the 10-digit local Greek phone format ACS expects.
+
+    The ACS payload sample treats ``Recipient_Phone`` /
+    ``Recipient_Cell_Phone`` as bare integers (``2115005000``,
+    ``699999999``) with no country prefix. ``order.phone`` is a
+    ``phonenumber_field.PhoneNumber`` whose ``str()`` is E.164
+    (``+306989424342``), which ACS rejects.
+
+    ``PhoneNumber.national_number`` is the cleanest extractor. As a
+    fallback for plain-string inputs we strip non-digit characters and
+    drop a leading ``30`` / ``0030`` country code — but only when the
+    remaining length is exactly 10, so an ambiguous mistyped value is
+    left unchanged for ACS to flag rather than silently truncated.
+    """
+    if value is None or value == "":
+        return ""
+    national = getattr(value, "national_number", None)
+    if national:
+        return str(national)
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    for prefix in ("0030", "30"):
+        if digits.startswith(prefix) and len(digits) - len(prefix) == 10:
+            return digits[len(prefix) :]
+    return digits
+
+
 def _event_fingerprint(
     *,
     shipment_id: int,
@@ -284,8 +327,11 @@ class AcsService:
         try:
             result = client.create_voucher(params)
         except Exception as exc:
-            # API call failed — release the claim so a future retry
-            # can proceed without waiting out the TTL.
+            # API call failed — persist the failing payload + error to
+            # metadata['last_error'] for post-mortem, then release the
+            # claim so a future retry can proceed without waiting out
+            # the TTL.
+            cls._record_last_error(shipment, params, exc)
             cls._release_mint_claim(shipment)
             logger.warning(
                 "create_voucher_for_order: API call failed for order=%s "
@@ -304,16 +350,18 @@ class AcsService:
 
         voucher_no = (result.get("Voucher_No") or "").strip()
         if not voucher_no:
-            cls._release_mint_claim(shipment)
             error_message = (
                 result.get("Error_Message")
                 or "ACS_Create_Voucher succeeded but returned no Voucher_No."
             )
-            raise AcsAPIError(
+            api_error = AcsAPIError(
                 alias="ACS_Create_Voucher",
                 error_message=error_message,
                 raw=result,
             )
+            cls._record_last_error(shipment, params, api_error)
+            cls._release_mint_claim(shipment)
+            raise api_error
 
         children: list[str] = []
         if shipment.item_quantity > 1:
@@ -378,6 +426,47 @@ class AcsService:
         return shipment
 
     @classmethod
+    def _record_last_error(
+        cls,
+        shipment: AcsShipment,
+        request_params: dict[str, Any],
+        exc: Exception,
+    ) -> None:
+        """Persist the failed request + ACS error to ``metadata['last_error']``.
+
+        Without this, an ACS rejection like ``"Error fill data error"``
+        is unactionable — the celery log carries only the message
+        string, not the offending payload, so reproducing the bug
+        requires re-running the offline payload-builder by hand
+        (verified against order 57 on 2026-05-15: metadata had only
+        ``mint_started_at``, the failing params were lost). Storing
+        the params plus the raw ACS response on the shipment row gives
+        admins everything needed for a post-mortem.
+        """
+        try:
+            with transaction.atomic():
+                fresh = (
+                    AcsShipment.objects.select_for_update()
+                    .only("metadata")
+                    .get(pk=shipment.pk)
+                )
+                metadata = fresh.metadata or {}
+                metadata["last_error"] = {
+                    "occurred_at": timezone.now().isoformat(),
+                    "error": str(exc),
+                    "request_params": request_params,
+                    "response": getattr(exc, "raw", None),
+                }
+                fresh.metadata = metadata
+                fresh.save(update_fields=["metadata"])
+        except Exception:
+            logger.warning(
+                "Failed to persist last_error for shipment=%s",
+                shipment.pk,
+                exc_info=True,
+            )
+
+    @classmethod
     def _release_mint_claim(cls, shipment: AcsShipment) -> None:
         """Drop the ``mint_started_at`` flag so a retry can proceed.
 
@@ -435,10 +524,10 @@ class AcsService:
             ),
             "Recipient_Address": order.street,
             "Recipient_Address_Number": order.street_number,
-            "Recipient_Zipcode": order.zipcode,
+            "Recipient_Zipcode": _normalize_zipcode_for_acs(order.zipcode),
             "Recipient_Region": order.city,
-            "Recipient_Phone": str(order.phone) if order.phone else "",
-            "Recipient_Cell_Phone": str(order.phone) if order.phone else "",
+            "Recipient_Phone": _normalize_phone_for_acs(order.phone),
+            "Recipient_Cell_Phone": _normalize_phone_for_acs(order.phone),
             "Recipient_Country": country_code or fallback_country,
             "Recipient_Email": order.email or "",
             "Charge_Type": shipment.charge_type,

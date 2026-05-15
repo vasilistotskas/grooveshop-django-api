@@ -3,6 +3,34 @@
 
 
 
+## v1.134.3 (2026-05-15)
+
+### Bug fixes
+
+* fix(shipping): pipe Order.customer_notes to ACS Delivery_Notes + BoxNow description
+
+Site owner flagged 2026-05-16 that the customer's checkout
+παρατηρήσεις / σημειώσεις never appeared on the courier voucher.
+Root cause: ``Order.customer_notes`` is captured at checkout,
+persisted to the DB, and shown in admin, but neither carrier
+payload builder includes it.
+
+* ACS_Create_Voucher carries notes in ``Delivery_Notes`` (printed on
+  the voucher's "Παρατηρήσεις" line — per ACS REST API guide §3).
+* BoxNow ``deliveryRequest`` carries them in ``description``
+  (BoxNow API Manual §6.3.1).
+
+Add ``shipping.services.sanitize_delivery_notes`` as the single
+trim/cap helper (collapses CR/LF/tab runs to a space, caps at 500
+chars so ACS's voucher cell + BoxNow's portal box stay readable),
+and wire it into both payload builders.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9323275`](https://github.com/vasilistotskas/grooveshop-django-api/commit/932327550f59ed5b919ebb7b5cdcfdc66bc11f8c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.2 [skip ci] ([`8d44430`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d44430c355c9dc7082f1f7e15620a7e01dd950b))
+
 ## v1.134.2 (2026-05-15)
 
 ### Bug fixes

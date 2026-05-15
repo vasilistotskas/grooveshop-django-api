@@ -22,6 +22,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from shipping.enum import ShippingKind
+from shipping.services import sanitize_delivery_notes
 from shipping_acs.client import AcsClient
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import AcsAPIError
@@ -546,6 +547,14 @@ class AcsService:
             "Reference_Key1": str(order.id),
             "Reference_Key2": str(order.uuid),
             "Language": acs_config.default_voucher_language(),
+            # ACS prints ``Delivery_Notes`` on the voucher's
+            # "Παρατηρήσεις" line — the customer's free-text checkout
+            # note (e.g. "ring twice", "leave at the porter"). Captured
+            # on ``Order.customer_notes`` at checkout and previously
+            # dropped on the floor between Django and the carrier
+            # (reported by the site owner 2026-05-16). Empty string
+            # is fine — ACS renders nothing.
+            "Delivery_Notes": sanitize_delivery_notes(order.customer_notes),
         }
 
         if shipment.delivery_kind == ShippingKind.PICKUP_POINT:

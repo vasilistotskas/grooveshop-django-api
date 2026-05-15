@@ -157,6 +157,53 @@ class TestCreateShipmentForOrder:
 
         assert exc_info.value.code == "P402"
 
+    def test_customer_notes_flow_to_boxnow_description(self):
+        """``Order.customer_notes`` must land on
+        ``deliveryRequest.description`` so the partner portal /
+        downstream BoxNow tooling sees the customer's note.
+
+        Site owner reported on 2026-05-16 that checkout
+        παρατηρήσεις/σημειώσεις never made it to the courier; this
+        locks the wiring."""
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            customer_notes="Αφήστε το στη θυρωρό  παρακαλώ.\nΕυχαριστώ!",
+        )
+        BoxNowShipmentFactory(
+            order=order,
+            locker_external_id="4",
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        mock_cls = _mock_client_create_ok()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_cls):
+            BoxNowService.create_shipment_for_order(order)
+
+        sent = mock_cls.return_value.create_delivery_request.call_args[0][0]
+        assert (
+            sent["description"] == "Αφήστε το στη θυρωρό παρακαλώ. Ευχαριστώ!"
+        )
+
+    def test_empty_customer_notes_sends_empty_description(self):
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            customer_notes="",
+        )
+        BoxNowShipmentFactory(
+            order=order,
+            locker_external_id="4",
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        mock_cls = _mock_client_create_ok()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_cls):
+            BoxNowService.create_shipment_for_order(order)
+
+        sent = mock_cls.return_value.create_delivery_request.call_args[0][0]
+        assert sent["description"] == ""
+
 
 # ---------------------------------------------------------------------------
 # apply_webhook_event

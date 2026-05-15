@@ -646,3 +646,69 @@ class TestBuildCreateVoucherParamsNormalizes:
         assert sent["Recipient_Zipcode"] == "84800"
         assert sent["Recipient_Phone"] == "6989424342"
         assert sent["Recipient_Cell_Phone"] == "6989424342"
+
+
+# ---------------------------------------------------------------------------
+# Delivery_Notes — site owner reported on 2026-05-16 that the checkout
+# "παρατηρήσεις/σημειώσεις" field was not appearing on the courier
+# voucher. The helper lives in shipping.services so BoxNow can reuse
+# it; these tests lock both the normalisation and the wiring into
+# the ACS payload.
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeDeliveryNotes:
+    def test_collapses_whitespace_runs(self):
+        from shipping.services import sanitize_delivery_notes
+
+        assert (
+            sanitize_delivery_notes("Ring   twice.\n\n  Leave\twith porter.")
+            == "Ring twice. Leave with porter."
+        )
+
+    def test_blank_returns_empty(self):
+        from shipping.services import sanitize_delivery_notes
+
+        assert sanitize_delivery_notes("") == ""
+        assert sanitize_delivery_notes(None) == ""
+
+    def test_truncates_to_500_chars(self):
+        from shipping.services import (
+            DELIVERY_NOTES_MAX_LEN,
+            sanitize_delivery_notes,
+        )
+
+        long_note = "α" * 800
+        assert len(sanitize_delivery_notes(long_note)) == DELIVERY_NOTES_MAX_LEN
+
+
+class TestDeliveryNotesInPayload:
+    def test_customer_notes_lands_in_Delivery_Notes(self, acs_client_mock):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            customer_notes="Χτυπήστε το κουδούνι 2  φορές.\nΘυρωρός.",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        sent = acs_client_mock.last_create_payload
+        assert (
+            sent["Delivery_Notes"] == "Χτυπήστε το κουδούνι 2 φορές. Θυρωρός."
+        )
+
+    def test_empty_customer_notes_sends_empty_string(self, acs_client_mock):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            customer_notes="",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+        assert acs_client_mock.last_create_payload["Delivery_Notes"] == ""

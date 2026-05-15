@@ -23,6 +23,34 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Defensive cap on free-text notes that ride along to the courier
+# voucher. Neither ACS_Create_Voucher nor BoxNow ``deliveryRequest``
+# documents a hard limit on the notes/description field, but the
+# printed ACS voucher's "Παρατηρήσεις" cell is only a few lines
+# wide and BoxNow's partner portal renders the description in a
+# fixed-height box; sending 2-3 sentences is helpful, sending a
+# novel just truncates ugly. 500 chars is comfortable for either
+# side.
+DELIVERY_NOTES_MAX_LEN = 500
+
+
+def sanitize_delivery_notes(value: object) -> str:
+    """Return courier-safe free-text notes — trimmed, single-spaced, capped.
+
+    Couriers render this field verbatim on the voucher / partner
+    portal. Embedded CRs and tabs make the layout shift
+    unpredictably (and a stray ``\\r`` can be interpreted as a
+    record separator on ACS's side), so we collapse whitespace runs
+    to a single space and trim to ``DELIVERY_NOTES_MAX_LEN``.
+    Lives here so both ``shipping_acs`` and ``shipping_boxnow``
+    payload builders can pull it without cross-app imports.
+    """
+    if not value:
+        return ""
+    text = " ".join(str(value).split())
+    return text[:DELIVERY_NOTES_MAX_LEN]
+
+
 class ShippingService:
     """Provider-agnostic dispatcher used by the rest of the codebase."""
 

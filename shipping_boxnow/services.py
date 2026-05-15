@@ -280,8 +280,18 @@ class BoxNowService:
         else:
             amount_to_collect_str = str(shipment.amount_to_be_collected.amount)
 
+        # BoxNow's ``description`` field carries free-text per-delivery
+        # context (per API Manual §6.3.1 example). For us that's the
+        # customer's checkout note ("ring twice", "leave with porter")
+        # — captured on ``Order.customer_notes`` and previously dropped
+        # on the floor between Django and the carrier (reported by the
+        # site owner 2026-05-16). Shared helper trims + caps to keep
+        # the partner-portal box readable.
+        from shipping.services import sanitize_delivery_notes
+
         payload: dict[str, Any] = {
             "orderNumber": str(order.id),
+            "description": sanitize_delivery_notes(order.customer_notes),
             "invoiceValue": invoice_value,
             "paymentMode": shipment.payment_mode,
             "amountToBeCollected": amount_to_collect_str,

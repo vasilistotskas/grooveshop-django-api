@@ -3,6 +3,60 @@
 
 
 
+## v1.134.2 (2026-05-15)
+
+### Bug fixes
+
+* fix(shipping_acs): drop .only("metadata") in mint-claim helpers
+
+``simple_history`` snapshots every non-excluded field on save, and
+django-money's ``cod_amount`` descriptor reads ``__dict__['cod_amount']``
+directly — together they raise ``KeyError: 'cod_amount'`` when the
+shipment row was fetched with ``.only("metadata")``. The exception
+was swallowed by the broad ``except`` so ``last_error`` was never
+persisted AND ``mint_started_at`` lingered (verified against prod
+order 57 on 2026-05-15, whose ``metadata`` still showed
+``mint_started_at`` after a Phase 2 failure that supposedly
+"released mint claim").
+
+Fetch the full row in both ``_record_last_error`` and
+``_release_mint_claim``; the row is small and lives for the
+duration of a brief ``transaction.atomic`` block.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`844b3c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/844b3c68e8f6457686e951e4e5191ce98204974d))
+
+* fix(shipping_acs): strip whitespace + country code from voucher fields
+
+Order 57 was rejected by ACS_Create_Voucher with the generic
+"ACS:Error fill data error" because two outbound fields had the
+wrong format:
+
+- ``Recipient_Zipcode`` = ``"848 00"`` — customer typed the Greek
+  postal convention (3+2 with a space). ACS's sample payload uses
+  a digits-only integer (``17778``).
+- ``Recipient_Phone`` = ``"+306989424342"`` — ``PhoneNumberField``'s
+  ``str()`` is E.164. ACS's sample is the bare 10-digit local form
+  (``2115005000``).
+
+Add ``_normalize_zipcode_for_acs`` (digits only, 5 chars) and
+``_normalize_phone_for_acs`` (prefer ``PhoneNumber.national_number``;
+strip ``+30`` / ``0030`` only when the remainder is exactly 10
+digits so ambiguous mistypes still surface to ACS) and wire both
+into ``_build_create_voucher_params``.
+
+Also persist the failing payload + ACS error to
+``shipment.metadata['last_error']`` on both API exception and
+empty-``Voucher_No`` paths. Without this, prod debugging needed
+re-running the offline builder by hand — verified against order 57
+where ``metadata`` carried only ``mint_started_at`` and the failing
+params were lost.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3a66fba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a66fba8d9d8240913de71a0ab3769fe09b3a980))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.1 [skip ci] ([`e3c9971`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3c99716aa4ca409bc9fead4c1ff74c9e1c8b78f))
+
 ## v1.134.1 (2026-05-14)
 
 ### Bug fixes

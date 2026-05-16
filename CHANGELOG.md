@@ -3,6 +3,123 @@
 
 
 
+## v1.134.4 (2026-05-16)
+
+### Bug fixes
+
+* fix(order): cancel cascade idempotent + non-recursive
+
+Two follow-up fixes after the cancel cascade move:
+
+1. ``cancel_attached_shipment`` now short-circuits when the
+   ``shipment_cancel`` breadcrumb is already on the metadata. The
+   signal-side cascade fires from inside ``Order.save()``'s
+   post_save chain (under the test ``on_commit``-immediate
+   fixture), then ``cancel_order``'s explicit call ran the same
+   cascade again before the idempotency check caught it. Moving
+   the check into the cascade method itself covers both entry
+   points symmetrically.
+
+2. The cascade's metadata save switched from
+   ``order.save(update_fields=["metadata"])`` to
+   ``Order.objects.filter(pk=...).update(metadata=...)``. The
+   nested ``order.save()`` was firing ``post_save`` with a stale
+   ``_original_status`` (Django sends post_save inside
+   ``super().save()``, but ``Order.save()`` refreshes
+   ``_original_status`` only AFTER ``super().save()`` returns) —
+   the handler then re-fired ``order_status_changed`` and tests
+   in ``test_property_17_status_changes_trigger_signals`` saw
+   the signal called twice for a single transition.
+   ``.update()`` bypasses model save entirely; metadata-only
+   writes don't need the lifecycle signals anyway.
+
+3. ``handle_order_canceled`` now reads the cancellation reason
+   from ``metadata['cancellation']['reason']`` when the
+   ``order_canceled`` signal kwarg is missing (which happens
+   because ``handle_order_status_changed`` doesn't forward it).
+   Preserves the programmatic reason all the way through to
+   the carrier API while keeping the admin-form-save default.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`5f5abf4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f5abf4bc680bc6e5de2cdb2cb381c1406549c8e))
+
+* fix(order/admin): handle OrderCancellationError + per-order isolation in bulk cancel
+
+The ``Cancel selected orders and restore stock`` admin action only
+caught ``ValueError``, but ``OrderService.cancel_order`` raises
+``OrderCancellationError`` (subclass of ``OrderServiceError``) when
+an order is in a terminal state (COMPLETED / DELIVERED / already
+CANCELED). With the prior code that unhandled exception bubbled
+into the response and the whole change-list view returned a 500.
+Verified against prod admin action on 2026-05-16: order 43
+cancelled cleanly, then order 41 in COMPLETED state raised and
+took down the response.
+
+The action was also wrapped in a single ``transaction.atomic()``
+around the entire batch loop, so the raise also rolled back the
+successful cancel(s) earlier in the batch. ``cancel_order`` is
+already wrapped in its own atomic — the outer block was redundant
+and dangerous.
+
+Drop the outer atomic, catch ``OrderCancellationError`` as a
+warning-level skip (one selected row in a terminal state is normal
+operator behaviour, not an error), and catch ``Exception`` as a
+last-ditch error-level message with a logger.exception so the
+trace is preserved for ops review without breaking the batch.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1b47092`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b4709264cd4e1b24d6a4416576ae36ad9b23afc))
+
+* fix(order): keep cancel cascade in both entry points, idempotent in signal
+
+The previous commit moved the carrier cascade out of
+``OrderService.cancel_order`` and into ``handle_order_canceled``,
+which broke the programmatic-cancel test contract because
+``@pytest.mark.django_db`` does not fire ``transaction.on_commit``
+hooks — pre-existing tests that drove ``cancel_order`` directly
+expected the cascade to have run synchronously by the time the
+method returned.
+
+Restore the explicit ``cancel_attached_shipment`` call inside
+``OrderService.cancel_order`` (synchronous, as before) and keep
+the signal-side cascade as a safety net for paths that bypass
+``cancel_order`` (admin form save). The signal-side cascade
+short-circuits when ``metadata.cancellation.shipment_cancel`` is
+already set, so the programmatic path's on-commit signal fan-out
+does not re-fire the carrier API.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`667993f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/667993f960e3e53f1b9b7b91fa9df54fb381ddf7))
+
+* fix(order): cascade courier-voucher cancel from order_canceled signal
+
+The cascade lived inside ``OrderService.cancel_order``, so any
+entry point that flips ``order.status`` to CANCELED through
+``Order.save()`` instead of going through the service — Django
+admin's change-form Save button is the canonical example —
+bypassed the cascade and left the courier voucher alive at ACS /
+BoxNow. Verified on prod order 60 (2026-05-16): the admin
+dropdown was set to CANCELED, ``status`` flipped, but voucher
+9771614856 stayed active because the cascade never ran and
+``metadata.cancellation`` was ``null``.
+
+Move the cascade into ``handle_order_canceled`` (the single
+``order_canceled`` signal receiver). The handler also seeds
+``metadata['cancellation']`` (reason / previous_status /
+canceled_at) when missing — so the admin-form path gets the same
+breadcrumb the programmatic path already produces.
+``OrderService.cancel_order`` no longer invokes the cascade
+explicitly; doing so would be a redundant second round-trip since
+the signal already fires synchronously off the ``Order.save()``
+inside that method.
+
+Rename ``_cancel_attached_shipment`` → ``cancel_attached_shipment``
+(public) since it's now called across modules. Add an info log
+line on cascade start so the next prod incident is easy to trace.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`5fcd314`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5fcd314ff2de41c475a4747ab63f934bf5e3e180))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.3 [skip ci] ([`d36cc99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d36cc998748e63d642742911ad3b0e048a3800ad))
+
 ## v1.134.3 (2026-05-15)
 
 ### Bug fixes

@@ -516,7 +516,19 @@ def handle_order_canceled(
     alive at ACS.
     """
     previous_status = kwargs.get("previous_status")
-    cancellation_reason = kwargs.get("reason") or "admin status change"
+    # ``order_canceled`` is dispatched by ``handle_order_status_changed``
+    # without forwarding the ``reason`` kwarg, so the programmatic path
+    # (``OrderService.cancel_order`` with a meaningful reason) needs us
+    # to recover it from the metadata that ``cancel_order`` writes
+    # BEFORE the save that triggers this signal chain. Falls back to
+    # "admin status change" for the admin-form-save path where neither
+    # the kwarg nor the metadata is populated.
+    metadata_reason = (
+        (order.metadata or {}).get("cancellation", {}).get("reason")
+    )
+    cancellation_reason = (
+        kwargs.get("reason") or metadata_reason or "admin status change"
+    )
 
     try:
         # Defensive: ``OrderService.cancel_order`` writes a rich

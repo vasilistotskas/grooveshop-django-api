@@ -2236,6 +2236,18 @@ class OrderService:
         """
         from shipping.services import ShippingService
 
+        # Idempotency: short-circuit when the cascade has already run for
+        # this order. The two entry points (programmatic ``cancel_order``
+        # explicit call AND the ``order_canceled`` signal-side safety
+        # net) can otherwise double-fire — with the test
+        # ``on_commit``-immediate fixture, the signal cascade lands
+        # synchronously during the first ``order.save()`` inside
+        # ``cancel_order``, then the explicit call inside the same
+        # method would run again.
+        existing_cancellation = (order.metadata or {}).get("cancellation") or {}
+        if "shipment_cancel" in existing_cancellation:
+            return
+
         logger.info(
             "Cascading order cancel to carrier voucher | order=%s reason=%r",
             order.id,
@@ -2266,7 +2278,17 @@ class OrderService:
             order.metadata = {}
         cancellation = order.metadata.setdefault("cancellation", {})
         cancellation["shipment_cancel"] = info
-        order.save(update_fields=["metadata"])
+
+        # ``.update(...)`` bypasses ``Order.save()`` and its post_save
+        # signal cascade — important because this method runs INSIDE
+        # the ``order_canceled`` signal handler, which itself fires
+        # from inside ``Order.save()``'s post_save chain. A nested
+        # ``order.save()`` would see a stale ``_original_status``
+        # (refreshed only AFTER the outer ``super().save()`` returns)
+        # and re-fire ``order_status_changed``, causing infinite
+        # recursion or duplicate-signal failures (verified in CI on
+        # 2026-05-16).
+        Order.objects.filter(pk=order.pk).update(metadata=order.metadata)
 
     @classmethod
     def _dispatch_shipment_creation_task(cls, order: Order) -> None:

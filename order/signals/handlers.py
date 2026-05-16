@@ -540,11 +540,17 @@ def handle_order_canceled(
         # Email is sent by handle_order_status_changed via
         # send_order_status_update_email (uses the canceled template)
 
-        # Cascade to the courier voucher. Lives here (not inside
-        # OrderService.cancel_order alone) so every path that flips
-        # ``order.status`` to CANCELED — including admin form saves
-        # that go straight to Order.save() — reaches the carrier.
-        OrderService.cancel_attached_shipment(order, cancellation_reason)
+        # Cascade to the courier voucher. Lives here as a safety net
+        # so every path that flips ``order.status`` to CANCELED —
+        # including admin form saves that go straight to Order.save()
+        # — reaches the carrier. ``OrderService.cancel_order`` runs
+        # the cascade synchronously itself; we detect that via the
+        # ``shipment_cancel`` outcome breadcrumb and skip, so the
+        # programmatic path doesn't double-fire and pre-existing
+        # tests that rely on synchronous cascade behaviour keep
+        # working.
+        if "shipment_cancel" not in cancellation:
+            OrderService.cancel_attached_shipment(order, cancellation_reason)
 
         logger.info(
             "Order %s canceled (previous status: %s)",

@@ -1820,15 +1820,15 @@ class OrderService:
                 old_status,
             )
 
-            # The courier cascade fires from
-            # ``order.signals.handlers.handle_order_canceled`` — the
-            # ``order_canceled`` signal we emit via ``order.save()``
-            # above already triggered the cascade synchronously. Doing
-            # it again here would be a second redundant API round-trip.
-            # Verified against prod order 60 (2026-05-16) where the
-            # admin-form-save path bypassed this method entirely, so
-            # the cascade now needs to live in the signal handler to
-            # cover every entry point.
+            # Cascade to the courier voucher synchronously here so the
+            # existing programmatic API contract (cancel-order callers
+            # see ``metadata.cancellation.shipment_cancel`` populated
+            # before this method returns) is preserved. The signal-side
+            # cascade in ``handle_order_canceled`` covers paths that
+            # bypass this method (admin form save) — it short-circuits
+            # when ``shipment_cancel`` is already on the metadata, so
+            # we don't double-fire from this entry point.
+            cls.cancel_attached_shipment(order, reason)
 
             refund_info = None
             if (

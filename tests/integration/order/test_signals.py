@@ -300,11 +300,14 @@ class OrderSignalsTestCase(TestCase):
         )
 
     @patch("order.services.OrderService.cancel_attached_shipment")
-    def test_handle_order_canceled_cascades_to_carrier(self, mock_cascade):
-        """Locks the contract: every ``order_canceled`` dispatch runs
-        the courier-voucher cascade. Verified necessary on 2026-05-16
-        after prod order 60 was cancelled via the admin form and the
-        ACS voucher stayed alive."""
+    def test_handle_order_canceled_cascades_when_not_yet_run(
+        self, mock_cascade
+    ):
+        """When ``OrderService.cancel_order`` hasn't already run the
+        cascade (admin-form-save path), the signal handler must do
+        it. Verified necessary on 2026-05-16 after prod order 60 was
+        cancelled via the admin form and the ACS voucher stayed
+        alive."""
         order_canceled.send(
             sender=Order, order=self.order, reason="Customer request"
         )
@@ -312,13 +315,36 @@ class OrderSignalsTestCase(TestCase):
         mock_cascade.assert_called_once_with(self.order, "Customer request")
 
     @patch("order.services.OrderService.cancel_attached_shipment")
-    def test_handle_order_canceled_admin_form_path_cascades(self, mock_cascade):
+    def test_handle_order_canceled_admin_form_path_uses_default_reason(
+        self, mock_cascade
+    ):
         """When the admin form save flips ``order.status`` to CANCELED
         directly (no kwargs/reason), the cascade still runs with a
-        sensible default reason. This is the prod-order-60 path."""
+        sensible default reason."""
         order_canceled.send(sender=Order, order=self.order)
 
         mock_cascade.assert_called_once_with(self.order, "admin status change")
+
+    @patch("order.services.OrderService.cancel_attached_shipment")
+    def test_handle_order_canceled_skips_cascade_when_already_run(
+        self, mock_cascade
+    ):
+        """``OrderService.cancel_order`` runs the cascade synchronously
+        and leaves a ``shipment_cancel`` breadcrumb on the metadata.
+        The signal handler must detect that and skip — otherwise the
+        programmatic cancel path would double-fire the carrier API."""
+        self.order.metadata = {
+            "cancellation": {
+                "shipment_cancel": {"attempted": True, "dispatched": True}
+            }
+        }
+        self.order.save(update_fields=["metadata"])
+
+        order_canceled.send(
+            sender=Order, order=self.order, reason="programmatic"
+        )
+
+        mock_cascade.assert_not_called()
 
     def test_handle_order_canceled_initialises_metadata_cancellation(self):
         """The admin-form-save path leaves ``metadata.cancellation``

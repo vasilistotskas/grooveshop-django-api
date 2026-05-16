@@ -1374,17 +1374,48 @@ class OrderAdmin(BaseModelAdmin):
         icon="cancel",
     )
     def mark_as_canceled(self, request, queryset):
-        with transaction.atomic():
-            for order in queryset:
-                try:
-                    OrderService.cancel_order(order)
-                    self.message_user(
-                        request,
-                        _("Order %(order_id)s marked as canceled")
-                        % {"order_id": order.id},
+        # No outer ``transaction.atomic`` here: ``OrderService.cancel_order``
+        # is already wrapped in its own atomic, and a batch-wide
+        # rollback would undo successful cancels just because one
+        # selected row is in a terminal state. Verified by prod admin
+        # action on 2026-05-16 — selecting a mix of cancellable and
+        # COMPLETED orders raised ``OrderCancellationError`` for the
+        # COMPLETED row, bubbled up to a 500, and rolled back the
+        # earlier successful cancel.
+        from order.exceptions import OrderCancellationError
+
+        for order in queryset:
+            try:
+                OrderService.cancel_order(order)
+                self.message_user(
+                    request,
+                    _("Order %(order_id)s marked as canceled")
+                    % {"order_id": order.id},
+                )
+            except OrderCancellationError as e:
+                # Order not eligible (already shipped, delivered,
+                # cancelled, etc.). Skip and report — not a server
+                # error.
+                self.message_user(
+                    request,
+                    _("Order %(order_id)s skipped: %(reason)s")
+                    % {"order_id": order.id, "reason": e.reason},
+                    level="warning",
+                )
+            except Exception as e:  # pragma: no cover — defensive
+                logger.exception(
+                    "Bulk cancel failed for order %s",
+                    order.id,
+                )
+                self.message_user(
+                    request,
+                    _(
+                        "Order %(order_id)s: unexpected error "
+                        "(%(error)s) — check logs"
                     )
-                except ValueError as e:
-                    self.message_user(request, f"Error: {e!s}", level="error")
+                    % {"order_id": order.id, "error": e.__class__.__name__},
+                    level="error",
+                )
 
     # --- Invoice detail actions ---------------------------------------
     # Unfold detail-action signature is ``(self, request, object_id)`` —

@@ -299,6 +299,56 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
+    @patch("order.services.OrderService.cancel_attached_shipment")
+    def test_handle_order_canceled_cascades_to_carrier(self, mock_cascade):
+        """Locks the contract: every ``order_canceled`` dispatch runs
+        the courier-voucher cascade. Verified necessary on 2026-05-16
+        after prod order 60 was cancelled via the admin form and the
+        ACS voucher stayed alive."""
+        order_canceled.send(
+            sender=Order, order=self.order, reason="Customer request"
+        )
+
+        mock_cascade.assert_called_once_with(self.order, "Customer request")
+
+    @patch("order.services.OrderService.cancel_attached_shipment")
+    def test_handle_order_canceled_admin_form_path_cascades(self, mock_cascade):
+        """When the admin form save flips ``order.status`` to CANCELED
+        directly (no kwargs/reason), the cascade still runs with a
+        sensible default reason. This is the prod-order-60 path."""
+        order_canceled.send(sender=Order, order=self.order)
+
+        mock_cascade.assert_called_once_with(self.order, "admin status change")
+
+    def test_handle_order_canceled_initialises_metadata_cancellation(self):
+        """The admin-form-save path leaves ``metadata.cancellation``
+        absent. The signal handler must seed it so the cascade has a
+        parent dict to write its ``shipment_cancel`` outcome into.
+
+        Uses the real cascade — the test order has no shipping
+        provider attached, so ``ShippingService.cancel_shipment``
+        short-circuits to ``False``, but the metadata save still runs
+        end of cascade. That's what persists the seeded fields."""
+        # Baseline: ensure the test order has no cancellation dict.
+        self.order.metadata = {}
+        self.order.save(update_fields=["metadata"])
+
+        order_canceled.send(
+            sender=Order, order=self.order, previous_status="PROCESSING"
+        )
+
+        self.order.refresh_from_db()
+        cancellation = (self.order.metadata or {}).get("cancellation") or {}
+        assert cancellation.get("previous_status") == "PROCESSING"
+        assert cancellation.get("reason") == "admin status change"
+        assert cancellation.get("canceled_at")  # truthy ISO timestamp
+        # The cascade ran and wrote its outcome (no shipment attached
+        # → dispatched=False).
+        assert cancellation.get("shipment_cancel", {}).get("attempted") is True
+        assert (
+            cancellation.get("shipment_cancel", {}).get("dispatched") is False
+        )
+
     def test_handle_order_refunded(self):
         order_refunded.send(
             sender=Order,

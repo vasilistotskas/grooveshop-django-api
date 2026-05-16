@@ -1820,13 +1820,15 @@ class OrderService:
                 old_status,
             )
 
-            # Cascade to the courier voucher when one is attached. ACS
-            # rejects cancellation once the voucher is in a daily
-            # pickup list (the parcel is already with the courier);
-            # we log + record on the order and continue, so admins
-            # can still cancel the order at our end while the courier
-            # handles the in-transit return out of band.
-            cls._cancel_attached_shipment(order, reason)
+            # The courier cascade fires from
+            # ``order.signals.handlers.handle_order_canceled`` — the
+            # ``order_canceled`` signal we emit via ``order.save()``
+            # above already triggered the cascade synchronously. Doing
+            # it again here would be a second redundant API round-trip.
+            # Verified against prod order 60 (2026-05-16) where the
+            # admin-form-save path bypassed this method entirely, so
+            # the cascade now needs to live in the signal handler to
+            # cover every entry point.
 
             refund_info = None
             if (
@@ -2209,8 +2211,17 @@ class OrderService:
         return out
 
     @classmethod
-    def _cancel_attached_shipment(cls, order: Order, reason: str) -> None:
+    def cancel_attached_shipment(cls, order: Order, reason: str) -> None:
         """Best-effort: cancel the courier voucher when the order is canceled.
+
+        Called from ``handle_order_canceled`` so the cascade fires for
+        every code path that produces ``order.status = CANCELED`` —
+        including admin form saves that go straight to ``Order.save()``
+        without touching :meth:`OrderService.cancel_order`. Verified
+        against prod order 60 on 2026-05-16: the admin status dropdown
+        was set to CANCELED via the change form, leaving voucher
+        9771614856 alive at ACS because the cascade lived only inside
+        ``cancel_order``.
 
         Routed through ``ShippingService.cancel_shipment`` so each
         carrier enforces its own cancellability rules. Common
@@ -2224,6 +2235,12 @@ class OrderService:
         even when the courier-side cancel fails.
         """
         from shipping.services import ShippingService
+
+        logger.info(
+            "Cascading order cancel to carrier voucher | order=%s reason=%r",
+            order.id,
+            reason,
+        )
 
         info: dict[str, Any] = {}
         try:

@@ -4,6 +4,7 @@ from typing import Any
 from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
@@ -503,18 +504,47 @@ def handle_order_delivered(
 def handle_order_canceled(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Handle order canceled signal."""
+    """Handle order canceled signal.
+
+    Single source of truth for cancellation side-effects beyond the
+    status flip itself: history note, courier-voucher cascade, and
+    backfilling ``metadata['cancellation']`` for entry points (like
+    Django admin's form save) that bypass
+    :meth:`OrderService.cancel_order`. Verified necessary on
+    2026-05-16 after prod order 60 had ``status=CANCELED`` but
+    ``metadata.cancellation = null`` and voucher 9771614856 still
+    alive at ACS.
+    """
     previous_status = kwargs.get("previous_status")
+    cancellation_reason = kwargs.get("reason") or "admin status change"
 
     try:
-        cancellation_reason = kwargs.get("reason")
-        if cancellation_reason:
+        # Defensive: ``OrderService.cancel_order`` writes a rich
+        # ``metadata['cancellation']`` dict (reason / canceled_by /
+        # canceled_at / previous_status) BEFORE saving the row, so
+        # this block is a no-op on that path. For the admin form
+        # path we initialise it here so the carrier cascade has a
+        # parent dict to write its ``shipment_cancel`` outcome into.
+        if not order.metadata:
+            order.metadata = {}
+        cancellation = order.metadata.setdefault("cancellation", {})
+        cancellation.setdefault("canceled_at", timezone.now().isoformat())
+        cancellation.setdefault("previous_status", previous_status)
+        cancellation.setdefault("reason", cancellation_reason)
+
+        if kwargs.get("reason"):
             OrderHistory.log_note(
                 order=order,
-                note=f"Order canceled. Reason: {cancellation_reason}",
+                note=f"Order canceled. Reason: {kwargs['reason']}",
             )
         # Email is sent by handle_order_status_changed via
         # send_order_status_update_email (uses the canceled template)
+
+        # Cascade to the courier voucher. Lives here (not inside
+        # OrderService.cancel_order alone) so every path that flips
+        # ``order.status`` to CANCELED — including admin form saves
+        # that go straight to Order.save() — reaches the carrier.
+        OrderService.cancel_attached_shipment(order, cancellation_reason)
 
         logger.info(
             "Order %s canceled (previous status: %s)",

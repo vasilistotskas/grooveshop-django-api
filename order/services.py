@@ -62,11 +62,15 @@ def _log_price_drift_if_needed(cart_item, current_price) -> None:
     except (AttributeError, TypeError):
         return
     logger.warning(
-        "Cart price drift at checkout: cart_item=%s product=%s price_at_add=%s charged=%s",
+        "Cart price drift at checkout: cart_item=%s product=%s "
+        "price_at_add=%s charged=%s (raw price_at_add=%r charged=%r delta=%s)",
         getattr(cart_item, "id", "?"),
         getattr(getattr(cart_item, "product", None), "id", "?"),
         frozen,
         current_price,
+        frozen.amount,
+        current_price.amount,
+        current_price.amount - frozen.amount,
     )
 
 

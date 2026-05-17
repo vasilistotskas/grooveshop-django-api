@@ -1218,13 +1218,19 @@ class AcsService:
         Mirrors what ``Order.mark_as_paid`` does for online payments,
         but adapted for the COD path where the customer pays the
         courier in cash on delivery and ACS later remits the amount.
-        Fires ``order_paid`` and queues the confirmation email exactly
-        once via the standard signal chain. After the flip, attempts
-        the DELIVERED → COMPLETED auto-advance so accounting matches
-        the lifecycle.
+        Fires ``order_paid`` so the standard signal chain (Meta CAPI
+        Purchase dispatch) runs — ``mark_as_paid`` only persists
+        ``payment_status``; the post_save handler in
+        ``order/signals/handlers.py`` only emits ``order_paid`` on a
+        PENDING → PROCESSING status transition with ``is_paid=True``,
+        and COD orders are already at PROCESSING by the time we reach
+        here (status was advanced at voucher-mint time). After the
+        flip, attempts the DELIVERED → COMPLETED auto-advance so
+        accounting matches the lifecycle.
         """
         from order.enum.status import PaymentStatus
         from order.services import OrderService
+        from order.signals import order_paid
 
         order = getattr(shipment, "order", None)
         if order is None:
@@ -1238,6 +1244,13 @@ class AcsService:
             order.id,
             shipment.voucher_no,
         )
+        # Idempotent on the dispatch side: every Purchase reuses the
+        # event_id stored on order.metadata at checkout submit, the
+        # MetaCapiEventLog row is unique on event_id, and _dispatch
+        # short-circuits when an existing row is already SENT. So a
+        # double-fire (e.g. a payout being upserted twice) results in
+        # one Meta event, not two.
+        order_paid.send(sender=type(order), order=order)
         OrderService.maybe_advance_to_completed(order)
 
     # ------------------------------------------------------------------

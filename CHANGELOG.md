@@ -3,6 +3,40 @@
 
 
 
+## v1.134.5 (2026-05-17)
+
+### Bug fixes
+
+* fix(meta_capi): fire order_paid on COD reconcile so Purchase dispatches
+
+The post_save chain only emits order_paid on a PENDING -> PROCESSING
+status transition with is_paid=True. COD orders are already at
+PROCESSING by the time payment confirms (status advanced at ACS
+voucher mint), so _mark_cod_order_paid_if_pending was silently
+dropping every COD Purchase event — Meta saw zero attribution for
+COD revenue, which is the dominant payment method in Greece.
+
+mark_as_paid only persists payment_status; it does not fire any
+signal. The existing docstring on _mark_cod_order_paid_if_pending
+claimed otherwise. Fix is one explicit order_paid.send right after
+mark_as_paid, gated by the existing payment_status==PENDING check so
+re-running a payout upsert never re-fires.
+
+Dedup is safe at three layers: storefront mints a stable purchase
+event_id per checkout submit and persists it on order.metadata, the
+MetaCapiEventLog.event_id column is unique, and _dispatch
+short-circuits when the row is already SENT.
+
+Also enriches the cart-price-drift warning to log raw Decimal +
+delta — current format shows both sides as "19,99 EUR" when they
+differ by a sub-cent fraction, making the warning unactionable.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a4bd03e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a4bd03ec27f5d99dead00aa8746f19f1405d5c99))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.4 [skip ci] ([`e84b216`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e84b216587eeb24dabc29f541f8e1489cd2d612e))
+
 ## v1.134.4 (2026-05-16)
 
 ### Bug fixes

@@ -12,7 +12,6 @@ Idempotent: rerunning won't overwrite existing translations.
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -633,7 +632,7 @@ TRANSLATIONS: dict[str, str] = {
     "Super Users": "Διαχειριστές",
     "Staff": "Προσωπικό",
     # ----- Misc admin -----
-    "Card": "Κάρτα",
+    # ``"Card"`` already defined at line ~410 with the same value.
     "Cart Owner": "Ιδιοκτήτης καλαθιού",
     "Cart Items": "Αντικείμενα καλαθιού",
     "Cart is empty": "Το καλάθι είναι άδειο",
@@ -844,8 +843,7 @@ TRANSLATIONS: dict[str, str] = {
     "Delta": "Διαφορά",
     "Values": "Τιμές",
     "Usage": "Χρήση",
-    "Active": "Ενεργό",
-    "Inactive": "Ανενεργό",
+    # ``"Active"`` / ``"Inactive"`` already defined at line ~41/42.
     # ----- VAT -----
     "Vat": "ΦΠΑ",
     "Vats": "ΦΠΑ",
@@ -994,8 +992,8 @@ TRANSLATIONS: dict[str, str] = {
     "Increment post view count": "Αύξηση προβολών άρθρου",
     "Increment product view count": "Αύξηση προβολών προϊόντος",
     # ----- Validation messages -----
-    "Slug is required.": "Το slug είναι υποχρεωτικό.",
-    "Email is required.": "Το email είναι υποχρεωτικό.",
+    # ``"Slug is required."`` / ``"Email is required."`` already defined
+    # at line ~750/751 with the same values.
     "Setting key is required": "Το κλειδί ρύθμισης είναι υποχρεωτικό",
     "UUID parameter is required": "Η παράμετρος UUID είναι υποχρεωτική",
     "User is not authenticated.": "Ο χρήστης δεν είναι πιστοποιημένος.",
@@ -1040,7 +1038,7 @@ TRANSLATIONS: dict[str, str] = {
     "Failed to create payment intent.": "Αποτυχία δημιουργίας payment intent.",
     "Failed to fetch voucher: %(err)s": "Αποτυχία ανάκτησης voucher: %(err)s",
     "Cart validation failed: {errors}": "Αποτυχία επαλήθευσης καλαθιού: {errors}",
-    "Cart is empty": "Το καλάθι είναι άδειο",
+    # ``"Cart is empty"`` already defined at line ~638 with the same value.
     "Product in cart no longer exists": "Το προϊόν στο καλάθι δεν υπάρχει πλέον",
     "Order with UUID {uuid} not found": "Δεν βρέθηκε παραγγελία με UUID {uuid}",
     "This order has no payment ID.": "Αυτή η παραγγελία δεν έχει ID πληρωμής.",
@@ -1175,12 +1173,12 @@ TRANSLATIONS: dict[str, str] = {
     "Users with Subscriptions": "Χρήστες με συνδρομές",
     "Users without Subscriptions": "Χρήστες χωρίς συνδρομές",
     "Subscriptions & Engagement": "Συνδρομές & Αλληλεπίδραση",
-    "Bonus": "Bonus",
-    "Recently Created": "Πρόσφατα δημιουργήθηκε",
-    "Recently Added": "Πρόσφατα προστέθηκε",
+    # ``"Bonus"`` already defined at line ~533 with the same value.
+    # ``"Recently Created"`` already defined at line ~619 with the same value.
+    # ``"Recently Added"`` already defined at line ~621 with the same value.
     # ----- A few remaining short admin terms -----
     "From %(start)s to %(end)s": "Από %(start)s έως %(end)s",
-    "Hi %(first_name)s,": "Γεια σου %(first_name)s,",
+    # ``"Hi %(first_name)s,"`` already defined at line ~774 with the same value.
     "Link expires on %(expires)s.": "Ο σύνδεσμος λήγει στις %(expires)s.",
     "Thanks,\nThe %(site_name)s team": "Ευχαριστούμε,\nΗ ομάδα %(site_name)s",
     "Your data export is ready": "Το export σας είναι έτοιμο",

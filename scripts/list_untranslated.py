@@ -1,6 +1,5 @@
 """List remaining untranslated msgids — both simple and multi-line."""
 
-import re
 import sys
 from pathlib import Path
 

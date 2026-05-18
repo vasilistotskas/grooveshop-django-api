@@ -291,7 +291,14 @@ class NotificationAdminTestCase(TestCase):
         queryset = self.admin.get_queryset(request)
 
         self.assertTrue(hasattr(queryset, "_prefetch_related_lookups"))
-        self.assertIn("user__user", queryset._prefetch_related_lookups)
+        # ``Notification`` has no ``user`` FK (it's a broadcast model;
+        # per-user delivery lives on ``UserNotification`` via the
+        # ``notification_users`` reverse manager). The historical
+        # ``prefetch_related("user__user")`` raised a 500 on every
+        # changelist load — replaced with the translations prefetch
+        # that's actually used by the per-row title/message display.
+        self.assertIn("translations", queryset._prefetch_related_lookups)
+        self.assertNotIn("user__user", queryset._prefetch_related_lookups)
 
     def test_notification_info(self):
         result = self.admin.notification_info(self.notification)

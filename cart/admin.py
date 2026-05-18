@@ -243,7 +243,16 @@ class CartAdmin(ModelAdmin):
     inlines = [CartItemInline]
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("items__product")
+        # ``price_summary`` reads ``cart.total_price`` → ``item.final_price``
+        # → ``product.final_price`` → ``product.vat_value`` → ``product.vat``.
+        # Without ``items__product__vat`` in the prefetch chain, every
+        # cart-item product fetched its own VAT row, costing 89 queries
+        # on a 12-cart page.
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("items__product__vat")
+        )
 
     @admin.display(description=_("Cart Owner"))
     def cart_owner_display(self, obj):

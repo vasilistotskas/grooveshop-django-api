@@ -345,8 +345,18 @@ if ENABLE_DEBUG_TOOLBAR:
         "debug_toolbar.panels.timer.TimerPanel",
         "debug_toolbar.panels.settings.SettingsPanel",
         "debug_toolbar.panels.headers.HeadersPanel",
+        # Request panel surfaces the resolved view + GET/POST/cookies.
+        "debug_toolbar.panels.request.RequestPanel",
+        # SQL panel is the load-bearing diagnostic for N+1 hunting.
+        # Without it the toolbar can show wall-clock time but not
+        # WHERE that time goes — which is the only useful question.
+        "debug_toolbar.panels.sql.SQLPanel",
         "debug_toolbar.panels.staticfiles.StaticFilesPanel",
         "debug_toolbar.panels.templates.TemplatesPanel",
+        # Cache panel reveals get/set/hit/miss on Redis — critical for
+        # validating that the admin dashboard cache (5 min TTL on
+        # ``admin:dashboard:data:v3``) is actually warm under load.
+        "debug_toolbar.panels.cache.CachePanel",
         "debug_toolbar.panels.signals.SignalsPanel",
         "debug_toolbar.panels.redirects.RedirectsPanel",
         "debug_toolbar.panels.profiling.ProfilingPanel",

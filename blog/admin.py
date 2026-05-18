@@ -33,19 +33,24 @@ class LikesCountFilter(RangeNumericListFilter):
     parameter_name = "likes_count"
 
     def queryset(self, request, queryset):
-        filters = {}
+        # Short-circuit when the filter is unused. Django admin
+        # invokes every ``list_filter``'s ``queryset()`` on every
+        # page load — without this guard ``with_likes_count()``
+        # added a ``LEFT JOIN blog_blogpost_likes`` + GROUP BY to
+        # the main fetch, exploding the BlogPost changelist from
+        # ~80 to >1000 queries.
+        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
+        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
+        if not value_from and not value_to:
+            return queryset
 
         queryset = queryset.with_likes_count()
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
+        filters = {}
+        if value_from:
             filters["likes_count__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
+        if value_to:
             filters["likes_count__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
+        return queryset.filter(**filters)
 
     def expected_parameters(self):
         return [
@@ -59,19 +64,19 @@ class CommentsCountFilter(RangeNumericListFilter):
     parameter_name = "comments_count"
 
     def queryset(self, request, queryset):
-        filters = {}
+        # Short-circuit — same rationale as ``LikesCountFilter`` above.
+        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
+        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
+        if not value_from and not value_to:
+            return queryset
 
         queryset = queryset.with_comments_count(approved_only=True)
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
+        filters = {}
+        if value_from:
             filters["comments_count__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
+        if value_to:
             filters["comments_count__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
+        return queryset.filter(**filters)
 
     def expected_parameters(self):
         return [
@@ -85,19 +90,19 @@ class TagsCountFilter(RangeNumericListFilter):
     parameter_name = "tags_count"
 
     def queryset(self, request, queryset):
-        filters = {}
+        # Short-circuit — same rationale as ``LikesCountFilter`` above.
+        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
+        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
+        if not value_from and not value_to:
+            return queryset
 
         queryset = queryset.with_tags_count(active_only=True)
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
+        filters = {}
+        if value_from:
             filters["tags_count__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
+        if value_to:
             filters["tags_count__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
+        return queryset.filter(**filters)
 
     def expected_parameters(self):
         return [
@@ -111,7 +116,11 @@ class PostsCountFilter(RangeNumericListFilter):
     parameter_name = "posts_count"
 
     def queryset(self, request, queryset):
-        filters = {}
+        # Short-circuit — same rationale as ``LikesCountFilter`` above.
+        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
+        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
+        if not value_from and not value_to:
+            return queryset
 
         if hasattr(queryset.model, "blog_posts"):
             queryset = queryset.annotate(
@@ -121,16 +130,12 @@ class PostsCountFilter(RangeNumericListFilter):
             queryset = queryset.annotate(
                 posts_count_annotation=Count("posts", distinct=True)
             )
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
+        filters = {}
+        if value_from:
             filters["posts_count_annotation__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
+        if value_to:
             filters["posts_count_annotation__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
+        return queryset.filter(**filters)
 
     def expected_parameters(self):
         return [
@@ -972,6 +977,17 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     readonly_fields = ["engagement_display"]
 
     def get_queryset(self, request):
+        # NOTE: I tried annotating ``likes_count`` and ``replies_count``
+        # to short-circuit the per-row property fallback (35 extra
+        # queries on a 30-comment page), but the resulting JOIN +
+        # GROUP BY on the main fetch was empirically more expensive
+        # than the 35 single-row COUNTs (~1ms each). Left here as a
+        # paper trail for the next person who's tempted. If we ever
+        # add a real ``BlogCommentQuerySet.with_likes_count()`` using
+        # ``Subquery`` (cheaper than JOIN explosion), wire it in here.
+        # The model properties already check ``__dict__`` first
+        # (see ``blog/models/comment.py``) so an annotation by name
+        # will short-circuit them.
         return (
             super()
             .get_queryset(request)

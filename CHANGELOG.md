@@ -3,6 +3,77 @@
 
 
 
+## v1.136.1 (2026-05-18)
+
+### Bug fixes
+
+* fix(shipping_acs): only map status=5 → ATTEMPTED when ACS provides a reason
+
+ACS's ``shipment_status=5`` is overloaded: paired with
+``delivery_flag=1`` it means "delivered" (handled separately), but
+paired with ``delivery_flag=0`` it can be either a failed delivery
+attempt (when ``non_delivery_reason_code`` is populated, e.g. "1"
+= recipient absent) OR an in-transit parcel that has only just
+left the origin warehouse.
+
+Verified 2026-05-18 against live tracking summaries for vouchers
+9771670285, 9771670576, 9771662342 — all freshly minted, all
+freshly departed Marousi ("ΑΝΑΧΩΡΗΣΗ ΚΟΜΟΤΗΝΗ" / "ΤΟΥΜΠΑ"),
+``delivery_info="Η αποστολή βρίσκεται στην διαδρομή προς το
+κατάστημα παράδοσης"``, ``non_delivery_reason_code=""`` —
+incorrectly painted as "Delivery attempted" in admin.
+
+Tighten the mapping: status=5 + delivery_flag=0 maps to ATTEMPTED
+only when ``non_delivery_reason_code`` is non-empty. Otherwise
+preserve ``current`` and let a subsequent poll lift the state via
+a clearer signal (``delivery_flag=1``, an explicit reason code,
+or ``shipment_status=4``).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`5833a62`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5833a625315659a2706553b21cf6c4da1de75e6f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.136.0 [skip ci] ([`d790173`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d7901738a77747f3d3896ca474d3922c9327903f))
+
+### Performance improvements
+
+* perf(admin): follow-up prefetches for CartItem + OrderItemHistory
+
+Prod sweep of v1.136.0 (the bundled performance pass) flagged
+two remaining N+1 changelists that weren't in the original scope:
+
+cart.cartitem 441q / 766ms SQL / 2976ms wall
+order.orderitemhistory 115q / 191ms / 853ms
+
+Both have the same root cause as the CartAdmin / blog admin
+fixes already shipped — display methods read parler-translated
+fields and the property chain ``item.final_price →
+product.final_price → product.vat_value → product.vat`` per row,
+with no prefetch backing them up.
+
+CartItemAdmin
+  ``product_display`` calls ``safe_translation_getter``;
+  ``pricing_info`` reads the property chain ending at
+  ``product.vat``. Adds an explicit ``get_queryset`` that
+  ``select_related("cart", "cart__user", "product", "product__vat")``
+  (FK chain — single join on the main query is cheaper than
+  prefetch) plus ``prefetch_related("product__translations")``
+  (reverse relation, prefetch is the only option).
+
+OrderItemHistoryAdmin
+  ``description_display`` calls ``safe_translation_getter`` per
+  row. Adds ``prefetch_related("translations")``.
+
+OrderHistoryAdmin has the same pattern but the prod sweep
+showed 19q / 35ms / 534ms — within budget, so left alone to
+avoid scope creep. Same fix would apply if it ever grows.
+
+Expected impact on prod once rolled:
+  cart.cartitem: 441q → ~15q (~30× fewer)
+  order.orderitemhistory: 115q → ~15q (~8× fewer)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`58bfcbf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58bfcbf01a1061e85a8e84e2ffd983aa07998d60))
+
 ## v1.136.0 (2026-05-18)
 
 ### Chores

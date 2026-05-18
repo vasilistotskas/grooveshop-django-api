@@ -979,12 +979,16 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             and attrs.get("shipping_kind") == "pickup_point"
         )
         if is_boxnow_pickup:
-            # Master switch — admin can hide BoxNow without redeploy.
-            # Production starts disabled (BOXNOW_ENABLED defaults to
-            # False); we only allow BoxNow locker orders once an admin
-            # has flipped the Setting row to True. Defends against a
-            # stale frontend cache surfacing the option.
-            if not Setting.get("BOXNOW_ENABLED", default=False):
+            # Defence-in-depth — ``/api/v1/shipping/options`` already
+            # filters by ``ShippingProvider.is_active``, but a stale
+            # frontend cache could still POST an order with a hidden
+            # provider. Re-check the registry row before accepting.
+            from shipping.models import ShippingProvider
+
+            boxnow_active = ShippingProvider.objects.filter(
+                code="boxnow", is_active=True
+            ).exists()
+            if not boxnow_active:
                 raise serializers.ValidationError(
                     {
                         "shipping_provider_code": _(

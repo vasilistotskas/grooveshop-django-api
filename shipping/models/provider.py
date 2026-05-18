@@ -9,9 +9,9 @@ from core.models import TimeStampMixinModel
 class ShippingProvider(TimeStampMixinModel):
     """DB-backed registry row, one per courier integration.
 
-    Acts as the on/off switch for a provider in checkout — replaces the
-    per-app ``BOXNOW_ENABLED``-style ``extra_settings`` flag — and tells
-    the abstraction which fulfilment kinds the provider can handle.
+    Acts as the single on/off switch for a provider in checkout (via
+    ``is_active``) and tells the abstraction which fulfilment kinds the
+    provider can handle.
 
     The matching adapter class is looked up in the in-memory
     ``shipping.interfaces._REGISTRY`` by ``code``; the adapter is

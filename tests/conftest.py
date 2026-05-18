@@ -289,7 +289,7 @@ def _reseed_extra_settings(request):
     baseline before each DB test.
 
     Why **reset** and not just **re-seed**: tests that mutate a
-    setting (e.g. ``Setting.objects.update_or_create(name="BOXNOW_ENABLED",
+    setting (e.g. ``Setting.objects.update_or_create(name="ACS_SMARTPOINT_ENABLED",
     ...)``) and run with ``@pytest.mark.django_db(transaction=True)``
     commit the change to the shared test database. Under ``-n auto``
     a subsequent test on a different worker reads the mutated value

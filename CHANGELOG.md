@@ -3,6 +3,109 @@
 
 
 
+## v1.136.0 (2026-05-18)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.135.0 [skip ci] ([`7acfdf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7acfdf20a224e6c0e0c0fa3f3e8e3d1c8db606e7))
+
+### Features
+
+* feat(order): show carrier shipment state and status age in admin changelist
+
+Replace the Currency and Document Type columns on the Order changelist
+with two columns that are actually used by ops: a carrier-aware shipment
+state badge (BoxNow parcel_state / ACS shipment_state) and the elapsed
+time since the order last transitioned status. select_related now pulls
+shipping_provider, boxnow_shipment, and acs_shipment so the new columns
+don't N+1 the list view.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`76021d7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76021d791443d21833ea5aaae3b29d6c70a0056a))
+
+### Performance improvements
+
+* perf(admin): bundled admin changelist performance pass
+
+End-to-end pass to fix a 500 in NotificationAdmin and dial back
+several N+1s / JOIN-explosions across the most-trafficked admin
+changelists. All findings were captured by profiling every
+registered ModelAdmin via ``Client.force_login`` +
+``connection.queries`` against the local DB, then mapped back to
+source.
+
+NotificationAdmin (FIXES a 500)
+  Removed ``prefetch_related("user__user")`` — ``Notification``
+  has no ``user`` FK (it's a broadcast model; per-user delivery
+  lives on ``UserNotification`` via ``notification_users``).
+  Every changelist load was raising ``AttributeError: Cannot
+  find 'user' on Notification object``. Replaced with
+  ``prefetch_related("translations")`` which is what the per-row
+  title/message display actually needs. Test updated to lock the
+  new shape.
+
+OrderAdmin (already pushed in 76021d79 with carrier changelist columns)
+  Adds ``.with_total_amounts()`` so ``Order.total_price_items``
+  reads its ``items_total`` annotation from ``__dict__`` instead
+  of falling back to per-row ``SUM(price*qty)`` aggregation.
+  Cut order changelist from 156 → 50 queries (3.1×).
+
+CartAdmin
+  Extended ``prefetch_related("items__product")`` to
+  ``"items__product__vat"`` — ``cart.total_price`` walks
+  ``item.final_price → product.final_price → product.vat_value
+  → product.vat``, costing 89 VAT lookups on a 12-cart page.
+  Cut cart changelist from 103 → 15 queries (6.9×).
+
+ProductAdmin (the big one)
+  * Two ``RangeNumericListFilter``s (LikesCountFilter,
+    ReviewAverageFilter) called ``with_likes_count()`` /
+    ``with_review_average()`` UNCONDITIONALLY in ``queryset()``.
+    Django admin invokes every filter's ``queryset()`` on every
+    page load, so the JOINs fired even when no filter value was
+    set — exploding the main fetch + the date-hierarchy
+    DATE_TRUNC + the COUNT query. Now short-circuits when both
+    range values are empty.
+  * ``get_queryset`` previously annotated likes/reviews by
+    default "to avoid attribute errors". The model's properties
+    already fall back to per-row queries via ``__dict__`` check,
+    so removing the default annotation shifts the cost from
+    "2.4s JOIN once" to "~25ms per-row counts" on the rare path
+    where filters aren't engaged.
+  Result: product changelist SQL 4.6s → 1.0s (4.6×), wall 5.5s
+  → 2.4s (2.3×).
+
+BlogAdmin (audit found the same filter pattern as Product)
+  Same unconditional-annotation bug across four
+  ``RangeNumericListFilter``s — LikesCountFilter,
+  CommentsCountFilter, TagsCountFilter, PostsCountFilter. All
+  now short-circuit when both range values are empty, so the
+  JOIN to blog_blogpost_likes / blog_blogcomment / blog_blogtag
+  doesn't fire on every blog admin page load.
+
+BlogCommentAdmin / BlogComment model
+  Added the ``__dict__`` + setter pattern to
+  ``BlogComment.likes_count`` / ``replies_count`` properties
+  (mirrors ``Product.likes_count``) so a future caller that
+  pre-aggregates via ``Subquery``-based manager method can
+  short-circuit the per-row count. Admin's ``get_queryset``
+  documents WHY the obvious-looking ``Count(... distinct=True)``
+  annotation isn't applied: empirically the JOIN+GROUP BY on
+  the main fetch was MORE expensive than the per-row counts it
+  saved. The paper trail is left for the next person tempted.
+
+Debug toolbar config
+  Added ``SQLPanel`` + ``CachePanel`` + ``RequestPanel`` to
+  ``DEBUG_TOOLBAR_PANELS`` — the toolbar previously couldn't
+  show the load-bearing diagnostic for N+1 hunting (SQL panel).
+
+Net measured impact (cold hits, single run per page):
+  notification.notification: 500 ERROR → 200 (62q / 11ms / 530ms)
+  order.order: 156q → 50q (3.1× fewer queries)
+  product.product: 5.5s → 2.4s wall, 4.6s → 1.0s SQL
+  cart.cart: 103q → 15q (6.9× fewer queries)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c18d45b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c18d45b93744834054cbfe0b10944f93850f81ff))
+
 ## v1.135.0 (2026-05-18)
 
 ### Chores

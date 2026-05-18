@@ -3,6 +3,72 @@
 
 
 
+## v1.136.2 (2026-05-18)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.136.1 [skip ci] ([`f79ec7b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f79ec7bf7d2a764221e76dacd04673c9eb9bcaf5))
+
+### Performance improvements
+
+* perf(admin): swap RelatedDropdownFilter → AutocompleteSelectFilter on high-cardinality FKs
+
+Prod sweep of v1.136.1 (the previous follow-up) showed CartItem and
+OrderItemHistory changelists still slow despite the get_queryset
+prefetches — drill-down revealed the remaining N+1 lives in the
+filter dropdowns, not the main queryset:
+
+cart.cartitem (368q / 1262ms / 3794ms):
+  ×197 cart_cartitem ← Cart dropdown rendering str(cart) per
+                        option, triggering cart.items.all()
+  ×151 product_product_translation ← Product dropdown rendering
+                        str(product) per option
+
+order.orderitemhistory (115q / 346ms / 1085ms):
+  ×52 product_product ← order_item dropdown rendering
+                        OrderItem.__str__ → self.product
+  ×52 order_order ← same, → self.order
+
+Root cause: ``RelatedDropdownFilter`` (from
+``unfold.contrib.filters``) populates its dropdown by calling
+``RelatedFieldListFilter.field_choices()``, which does
+``RelatedModel.objects.all()`` and then renders ``str(obj)`` for
+each option — when ``__str__`` reaches into other related models,
+this fans out into a per-option query chain on every changelist
+page load.
+
+Fix: swap to ``AutocompleteSelectFilter`` for the high-cardinality
+FK filters. Source confirms ``AutocompleteMixin.field_choices()``
+in ``unfold/contrib/filters/admin/mixins.py`` returns just
+``[("", BLANK_CHOICE_DASH)]`` — the dropdown is populated lazily
+via the standard ``/admin/autocomplete/`` XHR endpoint only when
+the admin user types in the search box.
+
+cart.cartitem:
+  ("cart", RelatedDropdownFilter) → ("cart", AutocompleteSelectFilter)
+  ("product", RelatedDropdownFilter) → ("product", AutocompleteSelectFilter)
+
+order.orderitemhistory:
+  ("order_item", RelatedDropdownFilter) → ("order_item", AutocompleteSelectFilter)
+  ("user", RelatedDropdownFilter) → ("user", AutocompleteSelectFilter)
+
+Prerequisites verified:
+- ``unfold.contrib.filters`` already in INSTALLED_APPS
+- CartAdmin / ProductAdmin / OrderItemAdmin / UserAdmin all have
+  ``search_fields`` (required by the autocomplete endpoint)
+
+Bounded-cardinality dropdowns (Country, Region, PayWay,
+ShippingProvider, VAT, Attribute, etc.) keep ``RelatedDropdownFilter``
+on purpose — those tables are small (< 200 rows), the dropdown UX
+is more discoverable than autocomplete, and the per-option
+``__str__`` chains there don't N+1 in measurable ways.
+
+Expected impact on prod once rolled:
+  cart.cartitem: 368q → ~20q (~18× fewer)
+  order.orderitemhistory: 115q → ~15q (~8× fewer)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c3f634f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c3f634fb91c0d573674b49385f8c5c0d1dfb943f))
+
 ## v1.136.1 (2026-05-18)
 
 ### Bug fixes

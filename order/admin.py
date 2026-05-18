@@ -2284,6 +2284,14 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     ]
     list_select_related = ["order_item", "order_item__order", "user"]
 
+    def get_queryset(self, request):
+        # ``description_display`` calls ``safe_translation_getter``,
+        # which fires one ``OrderItemHistoryTranslation`` query per
+        # row without prefetch. With 25 rows on a changelist that's
+        # 25 extra queries — visible as the 115q / 191ms SQL on
+        # ``/admin/order/orderitemhistory/`` in the prod sweep.
+        return super().get_queryset(request).prefetch_related("translations")
+
     @admin.display(description=_("Order Item"))
     def order_item_link(self, obj):
         return format_html(

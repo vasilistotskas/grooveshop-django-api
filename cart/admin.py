@@ -479,6 +479,23 @@ class CartItemAdmin(ModelAdmin):
         "remove_from_cart",
     ]
 
+    def get_queryset(self, request):
+        # ``product_display`` calls ``safe_translation_getter`` and
+        # ``pricing_info`` reads ``obj.final_price`` → which walks
+        # ``product.final_price → product.vat_value → product.vat``.
+        # Without these, every row fires two extra queries — costing
+        # 441 queries (766ms SQL, ~3s wall) on a typical changelist
+        # page. ``product__vat`` is a FK chain so ``select_related``
+        # (single join on the main query) is cheaper than prefetch.
+        # Translations are a reverse relation, so prefetch is the
+        # only option. Mirrors the ``CartAdmin`` fix in ``c18d45b9``.
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("cart", "cart__user", "product", "product__vat")
+            .prefetch_related("product__translations")
+        )
+
     @admin.display(description=_("Cart"))
     def cart_info(self, obj):
         owner = (

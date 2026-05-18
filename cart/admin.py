@@ -9,6 +9,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericListFilter,
@@ -429,8 +430,18 @@ class CartItemAdmin(ModelAdmin):
         "created_at",
     )
     list_filter = (
-        ("cart", RelatedDropdownFilter),
-        ("product", RelatedDropdownFilter),
+        # AutocompleteSelectFilter populates the dropdown lazily via
+        # /admin/autocomplete/ XHR only when the admin user types — it
+        # does NOT pre-fetch every Cart / Product row on changelist
+        # load. RelatedDropdownFilter previously fetched all rows and
+        # rendered ``str(obj)`` for each, triggering ``Cart.__str__`` →
+        # ``cart.items.all()`` (×197) and ``Product`` →
+        # ``product.translations`` (×151) per-option chains — the
+        # bulk of the 368-query / 3s wall cost on /admin/cart/cartitem/.
+        # Requires search_fields on CartAdmin + ProductAdmin (both
+        # already defined).
+        ("cart", AutocompleteSelectFilter),
+        ("product", AutocompleteSelectFilter),
         ("quantity", SliderNumericFilter),
         ("created_at", RangeDateTimeFilter),
     )

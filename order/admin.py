@@ -15,6 +15,7 @@ from unfold.admin import TabularInline
 
 from admin.base import BaseModelAdmin
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
@@ -2263,8 +2264,16 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     ]
     list_filter = [
         "change_type",
-        ("order_item", RelatedDropdownFilter),
-        ("user", RelatedDropdownFilter),
+        # AutocompleteSelectFilter — lazy XHR dropdown, no pre-fetch
+        # of every OrderItem / UserAccount on changelist load.
+        # ``RelatedDropdownFilter`` previously rendered
+        # ``OrderItem.__str__`` per option, which reads
+        # ``self.product`` + ``self.order`` per row → ×52 product +
+        # ×52 order queries on every page load. Requires
+        # search_fields on OrderItemAdmin + UserAdmin (both already
+        # defined).
+        ("order_item", AutocompleteSelectFilter),
+        ("user", AutocompleteSelectFilter),
         ("created_at", RangeDateTimeFilter),
     ]
     search_fields = [

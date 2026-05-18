@@ -412,8 +412,8 @@ class OrderAdmin(BaseModelAdmin):
         "customer_info",
         "order_summary",
         "payment_info",
-        "currency_status",
-        "document_type_badge",
+        "shipment_status_badge",
+        "order_status_age",
         "shipping_info",
         "created_display",
         "urgency_indicator",
@@ -639,14 +639,29 @@ class OrderAdmin(BaseModelAdmin):
         return inlines
 
     def get_queryset(self, request):
+        # ``with_total_amounts()`` annotates ``items_total`` which
+        # ``Order.total_price_items`` reads from ``self.__dict__``
+        # to short-circuit a per-row Sum aggregation. Without this
+        # annotation, every row in ``order_summary`` fired one
+        # ``SUM(price*qty)`` query + one ``price_currency`` query
+        # — 106 queries for 53 orders on the changelist.
         return (
             super()
             .get_queryset(request)
+            .with_total_amounts()
             .annotate(
                 item_count=Count("items"),
                 total_items_quantity=Sum("items__quantity"),
             )
-            .select_related("user", "country", "region", "pay_way")
+            .select_related(
+                "user",
+                "country",
+                "region",
+                "pay_way",
+                "shipping_provider",
+                "boxnow_shipment",
+                "acs_shipment",
+            )
         )
 
     @admin.display(description=_("Customer"))
@@ -1076,48 +1091,143 @@ class OrderAdmin(BaseModelAdmin):
             label=obj.get_payment_status_display(),
         )
 
-    @admin.display(description=_("Document Type"))
-    def document_type_badge(self, obj):
-        document_config = {
-            OrderDocumentTypeEnum.RECEIPT: {
-                "bg": "bg-blue-50 dark:bg-blue-900",
-                "text": "text-blue-700 dark:text-blue-300",
-                "icon": "🧾",
-            },
-            OrderDocumentTypeEnum.INVOICE: {
-                "bg": "bg-green-50 dark:bg-green-900",
-                "text": "text-green-700 dark:text-green-300",
-                "icon": "📄",
-            },
-            OrderDocumentTypeEnum.PROFORMA: {
-                "bg": "bg-orange-50 dark:bg-orange-900",
-                "text": "text-orange-700 dark:text-orange-300",
-                "icon": "📋",
-            },
-            OrderDocumentTypeEnum.SHIPPING_LABEL: {
-                "bg": "bg-purple-50 dark:bg-purple-900",
-                "text": "text-purple-700 dark:text-purple-300",
-                "icon": "🏷️",
-            },
-            OrderDocumentTypeEnum.RETURN_LABEL: {
-                "bg": "bg-red-50 dark:bg-red-900",
-                "text": "text-red-700 dark:text-red-300",
-                "icon": "↩️",
-            },
-            OrderDocumentTypeEnum.CREDIT_NOTE: {
-                "bg": "bg-yellow-50 dark:bg-yellow-900",
-                "text": "text-yellow-700 dark:text-yellow-300",
-                "icon": "💳",
-            },
-        }
+    _SHIPMENT_STATE_CONFIG = {
+        "acs": {
+            "pending_creation": (
+                "bg-base-50 dark:bg-base-900",
+                "text-base-700 dark:text-base-300",
+                "🕓",
+            ),
+            "new": (
+                "bg-blue-50 dark:bg-blue-900",
+                "text-blue-700 dark:text-blue-300",
+                "🆕",
+            ),
+            "in_transit": (
+                "bg-cyan-50 dark:bg-cyan-900",
+                "text-cyan-700 dark:text-cyan-300",
+                "🚚",
+            ),
+            "at_destination": (
+                "bg-amber-50 dark:bg-amber-900",
+                "text-amber-700 dark:text-amber-300",
+                "🏬",
+            ),
+            "out_for_delivery": (
+                "bg-amber-50 dark:bg-amber-900",
+                "text-amber-700 dark:text-amber-300",
+                "🛵",
+            ),
+            "delivered": (
+                "bg-green-50 dark:bg-green-900",
+                "text-green-700 dark:text-green-300",
+                "📦",
+            ),
+            "attempted": (
+                "bg-orange-50 dark:bg-orange-900",
+                "text-orange-700 dark:text-orange-300",
+                "⚠️",
+            ),
+            "returned": (
+                "bg-red-50 dark:bg-red-900",
+                "text-red-700 dark:text-red-300",
+                "↩️",
+            ),
+            "canceled": (
+                "bg-gray-50 dark:bg-gray-900",
+                "text-base-700 dark:text-base-300",
+                "🚫",
+            ),
+            "lost": (
+                "bg-red-50 dark:bg-red-900",
+                "text-red-700 dark:text-red-300",
+                "❓",
+            ),
+        },
+        "boxnow": {
+            "pending_creation": (
+                "bg-base-50 dark:bg-base-900",
+                "text-base-700 dark:text-base-300",
+                "🕓",
+            ),
+            "new": (
+                "bg-blue-50 dark:bg-blue-900",
+                "text-blue-700 dark:text-blue-300",
+                "🆕",
+            ),
+            "in_depot": (
+                "bg-cyan-50 dark:bg-cyan-900",
+                "text-cyan-700 dark:text-cyan-300",
+                "🏢",
+            ),
+            "final_destination": (
+                "bg-amber-50 dark:bg-amber-900",
+                "text-amber-700 dark:text-amber-300",
+                "🏪",
+            ),
+            "delivered": (
+                "bg-green-50 dark:bg-green-900",
+                "text-green-700 dark:text-green-300",
+                "📦",
+            ),
+            "returned": (
+                "bg-red-50 dark:bg-red-900",
+                "text-red-700 dark:text-red-300",
+                "↩️",
+            ),
+            "expired": (
+                "bg-red-50 dark:bg-red-900",
+                "text-red-700 dark:text-red-300",
+                "⌛",
+            ),
+            "canceled": (
+                "bg-gray-50 dark:bg-gray-900",
+                "text-base-700 dark:text-base-300",
+                "🚫",
+            ),
+            "missing": (
+                "bg-red-50 dark:bg-red-900",
+                "text-red-700 dark:text-red-300",
+                "❓",
+            ),
+            "lost": (
+                "bg-red-50 dark:bg-red-900",
+                "text-red-700 dark:text-red-300",
+                "❓",
+            ),
+        },
+    }
 
-        config = document_config.get(
-            obj.document_type,
-            {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-700",
-                "icon": "📄",
-            },
+    @admin.display(description=_("Shipment"))
+    def shipment_status_badge(self, obj):
+        provider_code = (
+            obj.shipping_provider.code if obj.shipping_provider_id else None
+        )
+
+        if provider_code == "acs":
+            shipment = getattr(obj, "acs_shipment", None)
+            state = getattr(shipment, "shipment_state", None)
+            label = shipment.get_shipment_state_display() if shipment else None
+        elif provider_code == "boxnow":
+            shipment = getattr(obj, "boxnow_shipment", None)
+            state = getattr(shipment, "parcel_state", None)
+            label = shipment.get_parcel_state_display() if shipment else None
+        else:
+            return mark_safe('<span class="text-xs text-base-500">—</span>')
+
+        if shipment is None or state is None:
+            return format_html(
+                '<span class="text-xs text-orange-600 dark:text-orange-400">{}</span>',
+                _("No shipment"),
+            )
+
+        bg, text_class, icon = self._SHIPMENT_STATE_CONFIG[provider_code].get(
+            state,
+            (
+                "bg-gray-50 dark:bg-gray-900",
+                "text-base-700 dark:text-base-300",
+                "❓",
+            ),
         )
 
         return format_html(
@@ -1126,39 +1236,41 @@ class OrderAdmin(BaseModelAdmin):
             "<span>{icon}</span>"
             "<span>{label}</span>"
             "</span>",
-            bg=config["bg"],
-            text_class=config["text"],
-            icon=config["icon"],
-            label=obj.get_document_type_display(),
+            bg=bg,
+            text_class=text_class,
+            icon=icon,
+            label=label,
         )
 
-    @admin.display(description=_("Currency"))
-    def currency_status(self, obj):
-        try:
-            items_currency = obj.total_price_items.currency
-            shipping_currency = obj.shipping_price.currency
+    @admin.display(description=_("Status Age"), ordering="status_updated_at")
+    def order_status_age(self, obj):
+        if not obj.status_updated_at:
+            return mark_safe('<span class="text-xs text-base-500">—</span>')
 
-            if items_currency == shipping_currency:
-                return format_html(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                    'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                    "✅ {currency}"
-                    "</span>",
-                    currency=str(items_currency),
-                )
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "⚠️ Mixed"
-                "</span>"
-            )
-        except ValueError:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "❌ Mismatch"
-                "</span>"
-            )
+        diff = timezone.now() - obj.status_updated_at
+
+        if diff < timedelta(hours=1):
+            age = f"{max(diff.seconds // 60, 1)}m"
+            color = "text-green-600 dark:text-green-400"
+        elif diff < timedelta(days=1):
+            age = f"{diff.seconds // 3600}h"
+            color = "text-blue-600 dark:text-blue-400"
+        elif diff < timedelta(days=7):
+            age = f"{diff.days}d"
+            color = "text-blue-600 dark:text-blue-400"
+        else:
+            age = f"{diff.days}d"
+            color = "text-orange-600 dark:text-orange-400"
+
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="{color} font-medium">{age}</div>'
+            '<div class="text-base-500 dark:text-base-400 text-xs">{ts}</div>'
+            "</div>",
+            color=color,
+            age=age,
+            ts=obj.status_updated_at.strftime("%Y-%m-%d %H:%M"),
+        )
 
     @admin.display(description=_("Customer Summary"))
     def customer_summary(self, obj):

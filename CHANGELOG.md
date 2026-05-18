@@ -3,6 +3,74 @@
 
 
 
+## v1.135.0 (2026-05-18)
+
+### Chores
+
+* chore(migrations): regenerate translation unique constraints for django-parler 2.4
+
+django-parler 2.4 (bumped in 650a91845) declares the per-language
+uniqueness on translation models with a named ``UniqueConstraint``
+instead of the legacy ``unique_together``. The model state changed
+but no migrations were generated, so CI's ``makemigrations --check``
+fails on every commit.
+
+Adds the 9 missing migrations (blog, country, notification, order,
+pay_way, product, region, tag, user). Each one:
+
+1. Sets ``unique_together`` to ``set()`` on every TranslatableModel
+2. Adds ``UniqueConstraint(fields=('language_code', 'master'), name='<app>_<model>_translation_uniq_lang')``
+
+Same fields, same uniqueness — just renamed from auto-generated
+``_unique_together`` indexes to explicit named constraints.
+
+Safe under Argo PreSync (schema lands before code rolls): the
+DB-level uniqueness is preserved at all times during the swap,
+so old pods still serving traffic don't see any divergence.
+Verified by ``migrate`` against a fresh DB and re-running the
+shipping unit suite under the new schema.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2d41688`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2d416888989d1d90f24f590241b2412527536404))
+
+* chore(deps): sync uv.lock to 1.134.5 [skip ci] ([`f315991`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f315991d3256a54be5c1949c07c613ea6698e653))
+
+### Features
+
+* feat: Bump Versions ([`650a918`](https://github.com/vasilistotskas/grooveshop-django-api/commit/650a91845d3ec98c42950d926608dbf8c426990b))
+
+* feat(shipping): persist audit envelope + structured mint log
+
+The fix for piping Order.customer_notes to ACS Delivery_Notes and
+BoxNow description landed in commit 93232755 (v1.134.4), but
+existing prod orders with notes still showed empty vouchers — and
+we couldn't verify the fix worked because shipment.metadata only
+stored the carrier RESPONSE, not the request payload we sent.
+
+Adds metadata["create_request"] to both ACS and BoxNow success
+paths via a per-carrier _audit_envelope() helper that emits an
+operational subset of the request (delivery notes, COD amount,
+locker/station id, weights, charge type, country for ACS, items
+for BoxNow, etc.) — intentionally PII-free so the row doesn't
+become a GDPR-scrub gap (gdpr.py only clears Order columns, not
+shipment JSON).
+
+Also emits a structured logger.info("voucher/parcel minted",
+extra={...}) with notes_chars_raw, notes_chars_sent,
+notes_truncated, voucher/parcel id, carrier, phase — single grep
+target for future "did notes leave us?" investigations. The
+notes_truncated flag derives from the post-sanitize length to
+avoid a false-positive when sanitize_delivery_notes collapses
+whitespace runs (a 600-char all-whitespace note sanitises to "").
+
+Side fix: ACS success path now also clears stale last_error from a
+prior failed mint attempt, mirroring BoxNow's existing behaviour
+so ops don't see ghost errors after a retry succeeds.
+
+Tests lock the envelope shape, the PII exclusion (specific
+forbidden Recipient_* keys), and the stale-last_error wipe.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2e767c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2e767c78bb4323ddd31b1385fc71ea96bad1006e))
+
 ## v1.134.5 (2026-05-17)
 
 ### Bug fixes

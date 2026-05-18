@@ -22,7 +22,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from shipping.enum import ShippingKind
-from shipping.services import sanitize_delivery_notes
+from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
 from shipping_acs.client import AcsClient
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import AcsAPIError
@@ -58,6 +58,39 @@ _TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
 )
 
 _LABEL_CACHE_TTL = 3600  # 1 hour, mirrors BoxNow
+
+# Subset of ACS_Create_Voucher params we mirror onto ``shipment.metadata
+# ['create_request']`` so a future "did X actually leave us?" question
+# (notes, COD amount, locker id, weight, …) can be answered from the
+# DB without re-running the payload builder. Strictly operational —
+# recipient PII (name/address/phone/email) is intentionally excluded
+# because shipment.metadata is not cleared by GDPR anonymisation
+# (see user/services/gdpr.py) and we don't want a shadow PII copy.
+_AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
+    "Pickup_Date",
+    "Sender",
+    # ISO-2 country code (e.g. "GR") — drives cross-border routing,
+    # NOT PII. Included so a future "wrong country" report can be
+    # answered from metadata without re-running the builder.
+    "Recipient_Country",
+    "Charge_Type",
+    "Item_Quantity",
+    "Weight",
+    "Cod_Ammount",
+    "Cod_Payment_Way",
+    "Acs_Delivery_Products",
+    "Acs_Station_Destination",
+    "Acs_Station_Branch_Destination",
+    "Reference_Key1",
+    "Reference_Key2",
+    "Language",
+    "Delivery_Notes",
+)
+
+
+def _audit_envelope(params: dict[str, Any]) -> dict[str, Any]:
+    """Return a PII-scrubbed copy of the create-voucher params."""
+    return {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
 
 
 def _kg_from_grams(weight_grams: int | None) -> str:
@@ -412,7 +445,14 @@ class AcsService:
 
             metadata = shipment.metadata or {}
             metadata.pop("mint_started_at", None)
+            # Clear any stale ``last_error`` from a prior failed
+            # attempt so ops looking at the row don't mistake an old
+            # error for the current state. Mirrors BoxNow's success
+            # path which already nulls ``last_error`` (see
+            # shipping_boxnow/services.py).
+            metadata.pop("last_error", None)
             metadata["create_response"] = result
+            metadata["create_request"] = _audit_envelope(params)
             metadata["multipart_vouchers"] = children
 
             shipment.voucher_no = voucher_no
@@ -421,6 +461,34 @@ class AcsService:
             shipment.save(
                 update_fields=["voucher_no", "shipment_state", "metadata"]
             )
+
+        sent_notes = params.get("Delivery_Notes", "") or ""
+        raw_notes_len = len(order.customer_notes or "")
+        # ``notes_truncated`` derives from the post-sanitize length —
+        # ``sanitize_delivery_notes`` collapses whitespace runs before
+        # truncating, so a raw note of 600 spaces sanitises to "" and
+        # was NOT truncated even though raw_len > MAX. The sanitiser
+        # caps at exactly MAX, so sent_len == MAX is the truncation
+        # signal (a 500-char all-content note will be a benign
+        # false-positive, but that's better than the false-negative
+        # the raw comparison produced).
+        logger.info(
+            "create_voucher_for_order: voucher minted for order=%s "
+            "shipment=%s voucher_no=%s",
+            order.id,
+            shipment.pk,
+            voucher_no,
+            extra={
+                "order_id": order.id,
+                "shipment_pk": shipment.pk,
+                "carrier": "acs",
+                "phase": "phase3_minted",
+                "voucher_no": voucher_no,
+                "notes_chars_raw": raw_notes_len,
+                "notes_chars_sent": len(sent_notes),
+                "notes_truncated": len(sent_notes) >= DELIVERY_NOTES_MAX_LEN,
+            },
+        )
 
         order.add_tracking_info(voucher_no, "acs")
         cls._advance_pending_order_to_processing(order)

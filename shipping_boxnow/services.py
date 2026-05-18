@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum import BoxNowParcelState
 from shipping_boxnow.exceptions import BoxNowAPIError
@@ -49,6 +50,42 @@ _TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
 
 # Label cache TTL in seconds (1 hour).
 _LABEL_CACHE_TTL = 3600
+
+# Subset of the deliveryRequest payload we mirror onto ``shipment.metadata
+# ['create_request']`` so a future "did X actually leave us?" question
+# (description/notes, COD amount, locker id, weight, …) can be answered
+# from the DB without re-running the payload builder. Strictly
+# operational — destination/origin contact details are intentionally
+# excluded because shipment.metadata is not cleared by GDPR
+# anonymisation (see user/services/gdpr.py).
+_AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
+    "orderNumber",
+    "description",
+    "invoiceValue",
+    "paymentMode",
+    "amountToBeCollected",
+)
+
+
+def _audit_envelope(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return a PII-scrubbed copy of the BoxNow deliveryRequest payload.
+
+    Includes the operational subset plus ``destination.locationId``
+    (locker id — not PII) and the ``items`` array (weights /
+    compartment size / value — not PII). Keys mirror the BoxNow
+    payload shape (camelCase) so a reader who knows the API can
+    grep this envelope by the same field names.
+    """
+    envelope: dict[str, Any] = {
+        k: payload[k] for k in _AUDIT_REQUEST_FIELDS if k in payload
+    }
+    dest = payload.get("destination") or {}
+    if "locationId" in dest:
+        envelope["destination"] = {"locationId": dest["locationId"]}
+    if payload.get("items"):
+        envelope["items"] = payload["items"]
+    return envelope
+
 
 # BoxNow's voucher template prints ``items[].weight`` directly with a
 # ``kg`` label and 2-decimal formatting — empirically verified by
@@ -412,6 +449,7 @@ class BoxNowService:
             shipment.metadata = {
                 **shipment.metadata,
                 "create_response": response,
+                "create_request": _audit_envelope(payload),
                 "last_error": None,
                 "mint_started_at": None,
             }
@@ -433,12 +471,27 @@ class BoxNowService:
             )
             cls._advance_pending_order_to_processing(order)
 
+        sent_notes = payload.get("description", "") or ""
+        raw_notes_len = len(order.customer_notes or "")
+        # ``notes_truncated`` derives from the post-sanitize length —
+        # mirrors AcsService for the same reason.
         logger.info(
-            "create_shipment_for_order: order=%s → "
+            "create_shipment_for_order: parcel minted for order=%s "
             "delivery_request_id=%s parcel_id=%s",
             order.id,
             delivery_request_id,
             parcel_id,
+            extra={
+                "order_id": order.id,
+                "shipment_pk": shipment.pk,
+                "carrier": "boxnow",
+                "phase": "phase3_minted",
+                "delivery_request_id": delivery_request_id,
+                "parcel_id": parcel_id,
+                "notes_chars_raw": raw_notes_len,
+                "notes_chars_sent": len(sent_notes),
+                "notes_truncated": len(sent_notes) >= DELIVERY_NOTES_MAX_LEN,
+            },
         )
         return shipment
 

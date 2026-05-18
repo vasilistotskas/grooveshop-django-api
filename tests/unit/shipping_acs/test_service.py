@@ -712,3 +712,76 @@ class TestDeliveryNotesInPayload:
 
         AcsService.create_voucher_for_order(order)
         assert acs_client_mock.last_create_payload["Delivery_Notes"] == ""
+
+    def test_create_request_envelope_persisted_on_success(
+        self, acs_client_mock
+    ):
+        """``metadata['create_request']`` mirrors the operational subset
+        of the ACS payload so future "did we send X?" audits don't
+        need to re-run the builder. Also locks the PII exclusion —
+        recipient name/address/phone/email MUST NOT be on the row."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            customer_notes="Χτυπήστε το κουδούνι 2 φορές.",
+        )
+        AcsShipmentFactory(order=order)
+
+        result = AcsService.create_voucher_for_order(order)
+        # Verify against the DB row, not the in-memory mutation, so a
+        # JSONField round-trip regression would be caught.
+        result.refresh_from_db()
+
+        envelope = result.metadata["create_request"]
+        assert envelope["Delivery_Notes"] == "Χτυπήστε το κουδούνι 2 φορές."
+        # Operational routing fields are present (these drove the
+        # owner's "wrong COD / wrong locker / wrong country" class
+        # of audit too).
+        assert "Charge_Type" in envelope
+        assert "Weight" in envelope
+        assert "Recipient_Country" in envelope
+        # PII MUST NOT leak into shipment.metadata — gdpr.py only
+        # scrubs Order columns, not shipment JSON.
+        for forbidden in (
+            "Recipient_Name",
+            "Recipient_Address",
+            "Recipient_Address_Number",
+            "Recipient_Region",
+            "Recipient_Phone",
+            "Recipient_Cell_Phone",
+            "Recipient_Email",
+            "Recipient_Zipcode",
+        ):
+            assert forbidden not in envelope, (
+                f"PII leak in create_request envelope: {forbidden}"
+            )
+
+    def test_success_clears_stale_last_error(self, acs_client_mock):
+        """A retry after a prior failed mint must wipe ``last_error`` so
+        ops looking at the row don't mistake a stale error for the
+        current state. Mirrors the BoxNow success path."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = AcsShipmentFactory(order=order)
+        # Seed a stale error from a "prior failed attempt".
+        shipment.metadata = {
+            "last_error": {
+                "occurred_at": "2026-05-17T00:00:00+00:00",
+                "error": "Error fill data error",
+                "request_params": {"Delivery_Notes": "stale"},
+                "response": None,
+            }
+        }
+        shipment.save(update_fields=["metadata"])
+
+        result = AcsService.create_voucher_for_order(order)
+        result.refresh_from_db()
+
+        assert "last_error" not in result.metadata
+        assert "create_request" in result.metadata

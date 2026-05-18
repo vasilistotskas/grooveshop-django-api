@@ -204,6 +204,43 @@ class TestCreateShipmentForOrder:
         sent = mock_cls.return_value.create_delivery_request.call_args[0][0]
         assert sent["description"] == ""
 
+    def test_create_request_envelope_persisted_on_success(self):
+        """``metadata['create_request']`` mirrors the operational subset
+        of the BoxNow deliveryRequest so future "did we send X?"
+        audits don't need to re-run the builder. Also locks the PII
+        exclusion — destination contact fields MUST NOT leak."""
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            customer_notes="Αφήστε στον θυρωρό.",
+        )
+        BoxNowShipmentFactory(
+            order=order,
+            locker_external_id="4",
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        mock_cls = _mock_client_create_ok()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_cls):
+            result = BoxNowService.create_shipment_for_order(order)
+        # Verify against the DB row, not the in-memory mutation, so a
+        # JSONField round-trip regression would be caught.
+        result.refresh_from_db()
+
+        envelope = result.metadata["create_request"]
+        assert envelope["description"] == "Αφήστε στον θυρωρό."
+        # Operational routing fields are present.
+        assert envelope["paymentMode"]
+        assert envelope["items"]
+        # ``destination`` is nested — same camelCase shape as the
+        # outgoing BoxNow payload, but stripped of contact PII.
+        assert envelope["destination"] == {"locationId": "4"}
+        # PII MUST NOT leak — the inner destination dict in the
+        # actual payload carries contactName / contactNumber /
+        # contactEmail. The envelope must mirror ONLY the locationId.
+        assert set(envelope["destination"].keys()) == {"locationId"}
+        assert "origin" not in envelope
+
 
 # ---------------------------------------------------------------------------
 # apply_webhook_event

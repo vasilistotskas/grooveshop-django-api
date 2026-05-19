@@ -3,6 +3,373 @@
 
 
 
+## v1.137.1 (2026-05-19)
+
+### Bug fixes
+
+* fix(tests): patch admin.dashboard.cache to dodge Redis PicklingError flake
+
+CI run 26105645872 (test-only commit at 587db078) failed on:
+
+tests/unit/admin/test_dashboard.py::DashboardCallbackCachingTests::
+test_callback_caches_zones_a_b_c
+_pickle.PicklingError: Can't pickle <class 'unittest.mock.MagicMock'>:
+it's not the same object as unittest.mock.MagicMock
+
+Traceback: the test seeded ``DASHBOARD_CACHE_KEY`` via ``cache.set``,
+patched ``_build_zones_a_b_c`` with a ``MagicMock``, and called
+``dashboard_callback``. ``cache.get_or_set`` saw a cache miss (the
+``post_save`` signal in ``admin/signals.py`` invalidates the key on
+every ``UserAccount`` save — and ``_make_request`` creates one), so
+it called the patched builder and tried to persist the ``MagicMock``
+return value back into the cache.
+
+The ``cache`` proxy resolves to the production ``RedisCache``
+backend even in tests: conftest's ``settings.CACHES =
+{LocMemCache}`` patch sets the dict, but Django's ``CacheHandler``
+materialises ``settings`` (a ``cached_property``) and ``_connections``
+during app/setting startup — anything that touched ``cache.*`` before
+conftest ran has already bound the default alias to Redis, and the
+patch is a no-op. Tried resetting the CacheHandler registry instead
+and that breaks the Channels middleware tests, which patch
+``cache._cache.get_client`` and depend on the default alias staying
+Redis-bound.
+
+Fix: patch ``admin.dashboard.cache`` directly in the test, supplying
+a ``MagicMock`` whose ``.get_or_set(...)`` returns the test payload.
+That bypasses the real cache + Redis serialization entirely and
+lets the assertion stay focused on its actual contract ("the
+callback uses ``cache.get_or_set`` with the documented key/TTL and
+doesn't invoke the builder when the cache says it has a value").
+The new ``assert_called_once_with(DASHBOARD_CACHE_KEY, builder, 300)``
+pins both the key and the 300s TTL, which the original assertion
+didn't cover.
+
+Also extends the conftest's ``CACHES`` comment so the next reader
+knows why we *don't* reset the CacheHandler registry and what the
+downstream consequence is for tests that need pickle-unsafe
+fixtures in cache (patch ``cache`` at the module under test).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`7915e7a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7915e7a79e8e82237ecf62443fce1cb67a1d514b))
+
+* fix(release): cut patch release after test-stability + legacy-cleanup sweep
+
+Patch release marker after a series of test-only and refactor commits
+since 1.137.0 that don't carry an individual fix/feat/perf prefix but
+together justify cutting a deployable version:
+
+- 7822e900 + frontend companion: drop legacy ``BOXNOW_ENABLED``
+  ``Setting`` (single-source-of-truth now is
+  ``ShippingProvider.is_active``); admin no longer shows the
+  duplicate toggle that could disagree with the FK.
+- dcf9dcb0 / 938bf61a / 069713d5 / 0a11000e: rename / drop
+  misnamed-as-``legacy`` code paths now that the actual legacy
+  ``Order.shipping_method`` enum was removed in 0038. Includes
+  ``boxnow_summary`` → ``carrier_shipment_summary`` (now serves both
+  ACS + BoxNow), ``resolve_viva_order_code`` → ``ResolveVivaOrderCodeView``
+  (function-style class fixed), dropped ``additional_responses``
+  kwarg from ``create_schema_view_config`` (no callers), removed
+  ``optimized_for_list()`` back-compat alias.
+- f877a08f: ``_legacy_prefix_clear`` → ``_raw_prefix_clear`` — the
+  helper is an actively-used disaster-recovery escape hatch, not
+  legacy code.
+- a318420a: test-suite stability — mock myDATA / B2B / ACS Smartpoint
+  integration at the boundary (``load_config`` + ``_resolve_issuer_vat``
+  + ``Setting.get``) instead of round-tripping ``Setting.update_or_create``
+  → ``Setting.get``, which flaked under parallel xdist on commit
+  0a11000e (9 unrelated tests failed; same code path passed on
+  e9e3f0db). Cancels the misdiagnosis in
+  ``project_test_suite_remaining_failures.md`` (premise was
+  ``.delay`` → ``.apply_async`` mock targets; actual cause was
+  ``extra_settings`` round-trip).
+- 0236836e: pin gettext active language to English for tests that
+  assert on English substrings (validator messages, admin filter
+  labels, ``CategoryImageTypeEnum.BANNER`` display value). New
+  ``pytest.mark.assert_english`` marker + autouse fixture in
+  ``conftest.py`` keeps the opt-in narrow so parler / i18n tests
+  are untouched.
+
+No production-code behaviour change since 1.137.0 — only legacy /
+back-compat removals + test infrastructure. Cut as patch (not
+minor) because the user-visible removal of ``BOXNOW_ENABLED`` is the
+only thing closer to a feature, and even that is a cleanup of a
+duplicate flag rather than a new capability. ([`587db07`](https://github.com/vasilistotskas/grooveshop-django-api/commit/587db078d19ba57521dd3c427a10f2280e6582a6))
+
+### Chores
+
+* chore(invoicing): clarify _pay_way_display fallback comment
+
+Last "legacy" mention in the backend source. ``Order.payment_method``
+is an actively-written field (the payment-confirmation handlers
+populate it with the gateway code that processed the charge — see
+``order/services.py`` Stripe path and ``order/views/viva_webhook.py``
+Viva path), not legacy code awaiting removal. The comment's "legacy
+free-text" framing was misleading.
+
+Reframed to describe the field's actual semantics (raw gateway
+code, written by payment-confirmation handlers) without invoking
+the "legacy" label.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0a11000`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a11000ee1687fcc66515442aa407246b8b6e23a))
+
+* chore(tests): drop last 'legacy shipping_method' comment in BoxNow test
+
+Caught during a validation sweep after ``ba6ad203``. The BoxNow
+integration test had one more inline comment describing the
+``(provider, kind)`` payload pair as "the only supported routing"
+and contrasting it with the "legacy ``shipping_method`` enum" —
+same misframing as the production-code comments cleaned up in
+``ba6ad203``. The enum is gone (migration 0038); future readers
+of the test shouldn't be told it still exists.
+
+Reframed to describe what the payload triggers without the
+gone-field reference.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`069713d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/069713d53286c161401a81d720a02852463c15b2))
+
+* chore(clear_cache): rename _legacy_prefix_clear to _raw_prefix_clear
+
+The ``--prefixes`` mode was labelled "Legacy" in the command help,
+the private method (``_legacy_prefix_clear``), the warning text,
+and the test name — implying it was a transitional code path
+queued for removal. But the method is actually a current,
+deliberately-kept escape hatch with a different semantic from
+``CacheService.purge_all()``: it bypasses the cache-surface
+registry and clears raw key prefixes directly, for disaster
+recovery when registry coverage is suspect or keys were written
+outside the surface system.
+
+"Legacy" mischaracterised the code. Renamed end-to-end to
+``_raw_prefix_clear`` + "Raw prefix mode (disaster recovery)"
+labels + clearer help text describing when to use it.
+
+  * ``Command.help`` — drops "legacy" framing
+  * ``--prefixes`` argument help — explains the escape-hatch
+    semantic instead of calling it "legacy mode"
+  * method renamed ``_legacy_prefix_clear`` → ``_raw_prefix_clear``
+  * warning string ``"Legacy mode: ..."`` → ``"Raw prefix mode
+    (disaster recovery): ..."``
+test renamed + assertion updated to match new warning
+
+No behaviour change.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`f877a08`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f877a08f81af920af5778013b41d3d71c6bcdc65))
+
+* chore(deps): sync uv.lock to 1.137.0 [skip ci] ([`20a5bb4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/20a5bb43f6300d877f4138379b8d656d5931be69))
+
+### Refactoring
+
+* refactor(product/managers): drop optimized_for_list backward-compat alias
+
+``ProductImageQuerySet.optimized_for_list()`` was a one-line alias
+that returned ``self.for_list()`` — comment said "for backward
+compatibility". Grep confirmed zero production callers: only three
+tests inside ``test_image.py`` exercised the alias, and they were
+literally testing that the alias works.
+
+Removed the alias + renamed/updated the three test callsites to
+use the canonical ``for_list()``:
+
+* ``test_optimized_for_list`` → ``test_for_list_eager_loads_product``
+* ``test_manager_delegates_to_queryset_optimized_for_list`` →
+  ``test_manager_delegates_to_queryset_for_list``
+* ``test_chained_filters`` — internal ``.optimized_for_list()``
+  call in the chain swapped to ``.for_list()``
+
+38/38 product manager tests pass.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3d246d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d246d2e133bdcd60402ed16404ae9840ecf86da))
+
+* refactor: drop remaining legacy/back-compat tails from the cleanup sweep
+
+A second pass through the codebase (triggered by a paranoid
+cross-repo verification of the earlier cleanup PRs) found five more
+legacy-flavoured items that slipped past the first sweep. Each one
+is either dead code, redundant dual-write, or a misleading "legacy"
+comment on current code.
+
+order/services.py:
+  Remove the ``from shipping.utils import compute_total_weight_grams
+  as _compute_total_weight_grams`` re-export + the matching ``__all__``
+  entry. Comment claimed it was kept "so existing tests keep passing
+  without churn", but a grep confirmed the test imports the function
+  directly from ``shipping.utils`` — zero callers of the re-export
+  alias.
+
+order/tasks.py + order/views/order.py + tests:
+  Stop dual-writing the legacy ``confirmation_email_sent`` boolean
+  alongside the modern ``confirmation_email_sent_at`` timestamp. New
+  writes use only the timestamp. The reader
+  (``_confirmation_already_sent``) still checks the boolean as a
+  fallback so pre-timestamp DB rows continue to dedupe correctly.
+  Comment updated to describe the fallback as data-shape protection,
+  not "legacy". Test assertion ``"legacy boolean flag must also be
+  set for backward compat"`` flipped to assert the boolean is now
+  absent. Earlier integration test updated to assert on the timestamp
+  key instead of the dropped boolean.
+
+order/signals/handlers.py:
+  Comment claiming "missing pay_way is treated as offline to preserve
+  the legacy fallback behavior" rewritten to describe what actually
+  happens — ``pay_way`` becomes None when its row is deleted
+  (``on_delete=SET_NULL``), not just for legacy orders, and treating
+  None as offline keeps the confirmation flow working in that case.
+
+search/views.py:
+  Drop the undocumented fallback that accepted the singular
+  ``attribute_value`` query parameter alongside the plural
+  ``attributeValues`` (which is the only form in the OpenAPI schema
+  and the only form the Nuxt frontend sends). Confirmed via grep:
+  zero Nuxt callers + schema.yml advertises only the plural form.
+
+order/serializers/order.py:
+  Comment in the CARRIER_TRACKING_URLS table called ACS's older
+  ``/el/track-and-trace/?p={number}`` URL "legacy" — it's just an
+  older URL on an external (ACS-owned) website. Reframed to
+  "older" so the rationale doesn't read like there's legacy code
+  here to remove.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`938bf61`](https://github.com/vasilistotskas/grooveshop-django-api/commit/938bf61a4ffe9add8f90f0cc00713f31f6912ab5))
+
+* refactor(order/core): drop 3 misnamed-as-legacy code paths
+
+Three small "backwards-compat" labels that didn't describe legacy
+code — they were either misnamed current code or genuinely unused
+dead parameters.
+
+OrderAdmin.carrier_shipment_summary (was boxnow_summary)
+  The display method handles BOTH ACS and BoxNow shipments — keying
+  on ``obj.shipping_provider.code``. The name was kept as
+  ``boxnow_summary`` "for backwards-compat" but no caller cares about
+  the field name; only the four references inside OrderAdmin itself
+  (readonly_fields + fieldsets + method def + helper docstring).
+  Renamed end-to-end to ``carrier_shipment_summary`` which actually
+  describes what it does. Stale inline comment about "BoxNow parcel
+  state" rewritten to mention both carriers.
+
+ResolveVivaOrderCodeView (was resolve_viva_order_code)
+  Class was function-style (``class resolve_viva_order_code(APIView):``
+  + ``noqa: N801``) with a comment claiming "URL conf compat". The
+  only two references are in ``core/urls.py`` (import + .as_view()) —
+  neither cares about the class name. Renamed to canonical Django/
+  DRF ``ResolveVivaOrderCodeView``, dropped the noqa, dropped the
+  misleading comment.
+
+create_schema_view_config: drop additional_responses parameter
+  The parameter was labelled "(backward compat)" — and rightly so:
+  ``ActionConfig.responses`` (the per-action override on the
+  serializers_config dict) covers every case it used to handle, and
+  zero production ViewSets in the codebase actually passed it. The
+  parameter was dead, the two branches inside the function were
+  dead, and the test ``test_config_with_additional_responses`` was
+  testing dead code. Removed all of it. Function signature stays
+  backwards-compatible-by-keyword for any external caller, since
+  the dropped param was the only positional change (still positional-
+  by-name, default ``None`` → simply removed).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`dcf9dcb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dcf9dcb01adf49f766d3467c7d0087f7cb2254cf))
+
+### Testing
+
+* test: pin gettext language to English for tests asserting English error text
+
+Tests across 14 files assert on English substrings of validator /
+admin filter / error messages (e.g. ``"quantity"``, ``"greater"``,
+``"insufficient stock"``, ``"Banner Image"``, admin filter labels).
+The project default is ``LANGUAGE_CODE='el'`` and those strings go
+through ``gettext_lazy``, so the tests pass in CI — which has no
+``compilemessages`` step and silently falls back to the English
+source — but fail on dev machines that have the compiled ``el``
+``.mo`` files present.
+
+Pin English at the **active-translation** layer (not via
+``LANGUAGE_CODE``) by opting modules in with
+``pytestmark = pytest.mark.assert_english``. A new autouse fixture in
+``tests/conftest.py`` activates ``translation.override("en")`` only
+when the marker is present, so parler / i18n tests that rely on the
+default Greek locale are untouched. Marker is registered in
+``pyproject.toml`` so pytest doesn't warn about unknown markers.
+
+Files marked:
+
+- ``tests/unit/order/test_address_validation.py``
+- ``tests/integration/order/test_stock_validation.py``
+- ``tests/integration/order/test_service_payment_flow.py``
+- ``tests/integration/order/test_order_service_payment_first.py``
+- ``tests/unit/contact/test_admin.py``
+- ``tests/unit/contact/test_utils.py``
+- ``tests/unit/country/test_country_admin.py``
+- ``tests/unit/notification/test_notification_admin.py``
+- ``tests/unit/region/test_region_admin.py``
+- ``tests/unit/test_loyalty/test_services.py``
+- ``tests/unit/vat/test_vat_admin.py``
+- ``tests/integration/product/favourite/test_view_product_favourite.py``
+- ``tests/integration/product/category_image/test_model_product_category_image.py``
+- ``tests/integration/user/test_view_user_subscription.py``
+
+A global pin in ``conftest.py`` was tried first and produced ~20
+collateral failures (parler queryset tests reading the wrong language,
+OpenAPI schema tests breaking on translated paths, smartpoint fixture
+ERRORs). The targeted opt-in marker leaves all of those alone.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0236836`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0236836e1edcb60d67391642e357280ae0592748))
+
+* test(extra_settings): mock integration boundary instead of round-tripping Setting
+
+The 9 tests that wrote ``Setting.objects.update_or_create(...)`` and
+then asserted behaviour reading ``Setting.get(...)`` flaked under CI's
+parallel xdist run on commit ``0a11000e`` (a 5-line comment-only diff,
+so the failures are infrastructure not regression). The conftest
+patches ``extra_settings.cache._get_cache`` to ``DummyCache`` and an
+autouse ``_reseed_extra_settings`` fixture rewrites the
+``EXTRA_SETTINGS_DEFAULTS`` rows before every test on every worker.
+The resulting savepoint-visibility interaction occasionally causes
+``Setting.get`` to return the seeded default instead of the just-
+written test value — symptom: ``Expected 'delay' to be called once.
+Called 0 times.`` / ``True is not false`` / ``'NOT_SENT' != CONFIRMED``.
+Same code paths on the very next commit (``e9e3f0db``) passed cleanly,
+so the failure mode is intermittent and not reproducible locally.
+
+The fix patches the integration boundary instead. For mydata,
+``_enable_mydata(self)`` patches ``load_config`` at both bound names
+(``order.mydata.config.load_config`` for the lazy-imported ``order.tasks``
+path AND ``order.mydata.service.load_config`` for the top-level
+``from order.mydata.config import load_config`` in ``service.py``)
+plus ``order.mydata.service._resolve_issuer_vat``. The service-level
+docstring on ``_resolve_issuer_vat`` already calls this out as the
+intended monkey-patch boundary: "Kept separate so tests can monkey-
+patch without spinning the whole config stack."
+
+For ``test_b2b_invoicing_gate`` and ``test_smartpoint_gating``, the
+read sites call ``Setting.get`` directly. Patch ``Setting.get`` with a
+stub that returns the chosen value for the test's specific key and
+falls through to the real classmethod for everything else — narrow
+enough to not affect unrelated Setting reads in the same test path.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a318420`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a318420a5377af476235d4eb745513ac5169686d))
+
+* test(order/tasks): add coverage for the _confirmation_already_sent fallback
+
+The cleanup pass that removed the
+``CONFIRMATION_EMAIL_SENT_FLAG`` dual-write left a load-bearing
+promise: the reader's boolean fallback would keep dedup correct
+for older DB rows that have only the boolean key (no timestamp).
+That promise had no regression test — if a future refactor drops
+the ``or meta.get(CONFIRMATION_EMAIL_SENT_FLAG)`` line, those
+older rows would re-fire the confirmation email and no test would
+catch it.
+
+New ``test_confirmation_already_sent_dedupes_via_either_key`` covers
+all three input shapes:
+  * timestamp only (current writer output) → True
+  * boolean only (older DB rows) → True
+  * neither (brand-new order) → False
+  * ``None`` metadata → False
+
+25/25 tests in ``test_tasks.py`` pass.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e9e3f0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e9e3f0db6a45496ec4dcacff9a9353cd75e9fbce))
+
 ## v1.137.0 (2026-05-19)
 
 ### Chores

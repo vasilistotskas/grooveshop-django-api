@@ -41,13 +41,21 @@ class B2BInvoicingGateTestCase(TestCase):
         return the seeded default of ``True`` instead of the just-written
         ``False``). Patching the read site bypasses the round-trip
         entirely.
+
+        The stub falls back to ``default`` for any non-B2B key so we
+        don't reach for ``Setting.get.__func__`` — which can crash
+        under pytest-xdist worker reuse if a prior test's MagicMock
+        on ``Setting.get`` hasn't been fully unwound by the time this
+        helper runs. The validator under test only consults
+        ``B2B_INVOICING_ENABLED`` during ``is_valid``, so returning
+        ``default`` for everything else is behaviourally equivalent to
+        a real cache miss.
         """
-        real_get = Setting.get.__func__
 
         def stub(cls, key, default=None):
             if key == "B2B_INVOICING_ENABLED":
                 return value
-            return real_get(cls, key, default)
+            return default
 
         p = patch.object(Setting, "get", classmethod(stub))
         p.start()

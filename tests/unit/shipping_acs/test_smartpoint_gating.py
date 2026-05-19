@@ -24,13 +24,20 @@ def _patch_setting_get(value: bool):
     visibility interaction occasionally caused ``Setting.get`` to
     return the seeded default of ``False`` instead of the just-written
     ``True``. Patching the read site bypasses the round-trip entirely.
+
+    The stub returns ``default`` for any non-ACS key so we don't reach
+    for ``Setting.get.__func__`` — which can crash under pytest-xdist
+    worker reuse if a prior test's MagicMock on ``Setting.get`` hasn't
+    been fully unwound by the time this fixture runs. The adapter
+    under test only consults ``ACS_SMARTPOINT_ENABLED`` in
+    ``is_kind_enabled(PICKUP_POINT)``, so the simpler stub is
+    behaviourally equivalent to a real cache miss for everything else.
     """
-    real_get = Setting.get.__func__
 
     def stub(cls, key, default=None):
         if key == "ACS_SMARTPOINT_ENABLED":
             return value
-        return real_get(cls, key, default)
+        return default
 
     return patch.object(Setting, "get", classmethod(stub))
 

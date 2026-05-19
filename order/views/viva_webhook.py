@@ -70,7 +70,7 @@ class _ResolveOrderThrottle(UserRateThrottle):
     rate = "60/hour"
 
 
-class resolve_viva_order_code(APIView):  # noqa: N801  (function-style name kept for URL conf compat)
+class ResolveVivaOrderCodeView(APIView):
     """Resolve a Viva Wallet order code to an order UUID.
 
     Used by the frontend to redirect from Viva's payment page to the

@@ -472,10 +472,12 @@ class OrderAdmin(BaseModelAdmin):
         "financial_summary",
         "customer_summary",
         "shipping_summary",
-        # ``boxnow_summary`` is a computed display that surfaces the
-        # BoxNow parcel state inline in the Shipping fieldset so admins
-        # don't have to scroll to the inline below.
-        "boxnow_summary",
+        # Carrier-aware shipment summary rendered inline in the
+        # Shipping fieldset so admins don't have to scroll to the
+        # per-carrier inline below. Branches on
+        # ``obj.shipping_provider.code`` to render either the ACS
+        # voucher state or the BoxNow parcel state.
+        "carrier_shipment_summary",
     )
 
     fieldsets = (
@@ -551,7 +553,7 @@ class OrderAdmin(BaseModelAdmin):
                     "shipping_price",
                     "tracking_number",
                     "shipping_carrier",
-                    "boxnow_summary",
+                    "carrier_shipment_summary",
                 ),
                 "classes": ("tab",),
                 "description": _(
@@ -719,14 +721,14 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     @admin.display(description=_("Shipment Summary"))
-    def boxnow_summary(self, obj):
+    def carrier_shipment_summary(self, obj):
         """Compact summary of the carrier shipment, shown inline in
         the Shipping & Tracking fieldset.
 
-        Field name kept as ``boxnow_summary`` for backwards-compat
-        with existing fieldsets/readonly references — display label
-        is generic. For ACS orders we render the ACS state + voucher;
-        for BoxNow we keep the original badge + locker rendering.
+        Branches on ``obj.shipping_provider.code`` — ACS orders get
+        the ACS state + voucher; BoxNow orders get the BoxNow badge
+        + locker rendering. Adding a new carrier means adding one
+        ``elif`` here that calls a per-carrier helper.
         """
         provider_code = (
             obj.shipping_provider.code if obj.shipping_provider_id else None
@@ -803,12 +805,13 @@ class OrderAdmin(BaseModelAdmin):
         )
 
     def _acs_summary_html(self, obj):
-        """ACS shipment summary helper used by ``boxnow_summary``.
+        """ACS shipment summary helper used by ``carrier_shipment_summary``.
 
         Kept as a private helper rather than its own admin display so
         the existing fieldset doesn't need a second column added — the
-        single ``boxnow_summary`` field renders whichever carrier is
-        attached. Mirrors the BoxNow rendering for visual consistency.
+        single ``carrier_shipment_summary`` field renders whichever
+        carrier is attached. Mirrors the BoxNow rendering for visual
+        consistency.
         """
         shipment = getattr(obj, "acs_shipment", None)
         if shipment is None:

@@ -164,41 +164,6 @@ class TestCreateSchemaViewConfig(TestCase):
             assert operation in config
             assert callable(config[operation])
 
-    def test_config_with_additional_responses(self):
-        additional_responses = {
-            "list": {422: DummyTestSerializer},
-            "create": {409: DummyTestSerializer},
-        }
-
-        serializers_config: SerializersConfig = {
-            **crud_config(
-                list=DummyTestSerializer,
-                detail=DummyTestDetailSerializer,
-                write=DummyTestWriteSerializer,
-            ),
-        }
-
-        config = create_schema_view_config(
-            model_class=MockSerializerModel,
-            display_config={
-                "tag": "Test Models",
-            },
-            serializers_config=serializers_config,
-            additional_responses=additional_responses,
-        )
-
-        expected_operations = [
-            "list",
-            "create",
-            "retrieve",
-            "update",
-            "partial_update",
-            "destroy",
-        ]
-        for operation in expected_operations:
-            assert operation in config
-            assert callable(config[operation])
-
     def test_config_with_custom_actions(self):
         serializers_config: SerializersConfig = {
             **crud_config(

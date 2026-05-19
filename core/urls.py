@@ -24,7 +24,7 @@ from core.views import (
     upload_image,
 )
 from order.views.viva_webhook import (
-    resolve_viva_order_code,
+    ResolveVivaOrderCodeView,
     viva_wallet_webhook,
 )
 from shipping_boxnow.views.webhook import BoxNowWebhookView
@@ -45,7 +45,7 @@ urlpatterns = [
     ),
     path(
         "viva-wallet/resolve-order",
-        resolve_viva_order_code.as_view(),
+        ResolveVivaOrderCodeView.as_view(),
         name="viva-wallet-resolve-order",
     ),
     path(

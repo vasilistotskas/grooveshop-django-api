@@ -217,30 +217,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.43.9"
+version = "1.43.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b4/cc/42d798fc5305e4636170b50cdfb305ff0a81f470e35131f4a0d2641976ae/boto3-1.43.9.tar.gz", hash = "sha256:37dac72f2921095378c0200caf07918d5e10a82b7c1f611abb70e44f69d0b962", size = 113135, upload-time = "2026-05-15T19:28:31.167Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/27/ae1a71e945ce7bde39b0677b252fe7d8a0ad7fa3d6b724d78b81469c08fe/boto3-1.43.10.tar.gz", hash = "sha256:27342e5d5f6170fcc8d1e21cdd939af2448d58ac56b08d494250eaad998e30c7", size = 113159, upload-time = "2026-05-18T20:42:34.454Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/dc/51286e9551f7852a79ce5d2a57468d9d905c30d32bcace55204551db202d/boto3-1.43.9-py3-none-any.whl", hash = "sha256:5e967292d361482793471bd80fad1e714515b7401f65a0d5b4aa6ef9d009c030", size = 140523, upload-time = "2026-05-15T19:28:28.948Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/1b/439234598449f846b17333e67ec63c3dd8f8880c13de9089383b4bab58c3/boto3-1.43.10-py3-none-any.whl", hash = "sha256:83918184d95967e4c6e9ed1e9a2f58250b291e6ea2cb847ab0825d52596b39e5", size = 140534, upload-time = "2026-05-18T20:42:32.009Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.43.9"
+version = "1.43.10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ca/e8/f696c80982685a4cdb3df5f0781919afa50262f40e1aac7066c9c2520deb/botocore-1.43.9.tar.gz", hash = "sha256:93e91c7160678182860f5902ee4cfe6d643cac0d9ee84d3eb65becc9f4c00228", size = 15357963, upload-time = "2026-05-15T19:28:19.342Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e2/4e/c127dd0628c551f10cb890e279a9c0e367523b880c4cd3e81a1e76886174/botocore-1.43.10.tar.gz", hash = "sha256:2f4af585b41dbccdfc9f49677d7bd72d713a12ef89a1dc9c8538a927649498bf", size = 15365344, upload-time = "2026-05-18T20:42:21.562Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/c9/a1b51a74d476f5cb2f555ce8274f0f6b9fb21d75cc3f57b87dd0632ee17a/botocore-1.43.9-py3-none-any.whl", hash = "sha256:b9bdcd9c87fc552aad30006f00167d9ebb3480e1b06f1902bac5b2c41014fdab", size = 15039827, upload-time = "2026-05-15T19:28:14.543Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/0e/41f64d6c267edf03f4fe8f461edc4c644243e77c8d5a1fef1e0166ac4ed0/botocore-1.43.10-py3-none-any.whl", hash = "sha256:8a0176d8c2f8bebe95d4f923a824a1ace04b02f360e220681c388e097f32c3b6", size = 15043571, upload-time = "2026-05-18T20:42:16.664Z" },
 ]
 
 [[package]]
@@ -710,11 +710,11 @@ wheels = [
 
 [[package]]
 name = "disposable-email-domains"
-version = "0.0.185"
+version = "0.0.186"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/02/04/27bd01f34e4b4981a7746afe735438154aa68b3bb99bc6a8934b7144d95b/disposable_email_domains-0.0.185.tar.gz", hash = "sha256:d725b3f395ecf9ec8f1499c25769038f40cf3c5c507fa46916f672bc8237c859", size = 64757, upload-time = "2026-05-15T11:48:52.375Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/95/de/3a9ea7bf6dc6c0ec5bd7774fa54afd3e869e53c5a579f37c069fdc3c6faf/disposable_email_domains-0.0.186.tar.gz", hash = "sha256:9cd2d99a79bbe8b18e3f0ddd1b52e0a8f00fc093e284104214b6a229045eb347", size = 64774, upload-time = "2026-05-18T12:34:47.049Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/f7/40e6377521e712ed75f60e76901089a1d49d6e78c891dd94804ed6c97f2d/disposable_email_domains-0.0.185-py3-none-any.whl", hash = "sha256:19a854d9a91812500877375a820efb552b61692614b2955aceb097bd8f5fe6d2", size = 33314, upload-time = "2026-05-15T11:48:50.7Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/41/64dfe27ed3bce715100aebe11015fcc26b7d9f6b26abffa1d415b5cdadf8/disposable_email_domains-0.0.186-py3-none-any.whl", hash = "sha256:607d7c3b520b82b532e509c8187cdbccf6a6dfcc27db82109a388070fd81dca9", size = 33325, upload-time = "2026-05-18T12:34:45.83Z" },
 ]
 
 [[package]]
@@ -1032,14 +1032,14 @@ wheels = [
 
 [[package]]
 name = "django-unfold"
-version = "0.93.0"
+version = "0.94.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/95/55/0649c4e7b540528f80078c300db7ae299502f3c2fccd4d6882193fa104d1/django_unfold-0.93.0.tar.gz", hash = "sha256:bce719989d199484c989e4042f338c287394c4562af05785f4fa511a8e3be859", size = 1124076, upload-time = "2026-05-11T10:13:07.855Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c5/26/d1e4f9ca3b23e020323c2b90ac57ac515acdfb6108fff47ad9354a47edd8/django_unfold-0.94.0.tar.gz", hash = "sha256:4c1f73b5371e8b45be548e520a9dc1b7b18e9de5bba65267784407776941f627", size = 1124721, upload-time = "2026-05-18T08:00:13.14Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/6c/c6c63af9eaabf85877005ba307a7af80088e9d28efd77c6431ec8c61c3c3/django_unfold-0.93.0-py3-none-any.whl", hash = "sha256:d0a09ebe906278fa994d6eb808880ba3f24c20d8c3a5ca37f82ee89969fd459c", size = 1249541, upload-time = "2026-05-11T10:13:09.185Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/fe/a064bb7195d0d50890c15562d7257646d1bce9240545af7c0e2a48fab408/django_unfold-0.94.0-py3-none-any.whl", hash = "sha256:89de4e1fe3be3477358afa92aa847940ca250e05e88724dd78f7e9499dccda0e", size = 1250343, upload-time = "2026-05-18T08:00:15.342Z" },
 ]
 
 [[package]]
@@ -1396,14 +1396,14 @@ dev = [
 requires-dist = [
     { name = "argon2-cffi", specifier = ">=25.1.0" },
     { name = "asgiref", specifier = "==3.11.1" },
-    { name = "boto3", specifier = "==1.43.9" },
+    { name = "boto3", specifier = "==1.43.10" },
     { name = "celery", extras = ["redis"], specifier = ">=5.6.3,<6.0.0" },
     { name = "channels", extras = ["daphne"], specifier = "==4.3.2" },
     { name = "channels-redis", specifier = "==4.3.0" },
     { name = "charset-normalizer", specifier = "==3.4.7" },
     { name = "cryptography", specifier = "==48.0.0" },
     { name = "defusedxml", specifier = ">=0.7.1" },
-    { name = "disposable-email-domains", specifier = "==0.0.185" },
+    { name = "disposable-email-domains", specifier = "==0.0.186" },
     { name = "dj-stripe", specifier = "==2.10.3" },
     { name = "django", specifier = "==6.0.5" },
     { name = "django-admin-thumbnails", specifier = "==1.0.0" },
@@ -1424,7 +1424,7 @@ requires-dist = [
     { name = "django-storages", specifier = "==1.14.6" },
     { name = "django-stubs-ext", specifier = "==6.0.4" },
     { name = "django-tinymce", specifier = "==5.0.0" },
-    { name = "django-unfold", specifier = "==0.93.0" },
+    { name = "django-unfold", specifier = "==0.94.0" },
     { name = "djangorestframework", specifier = "==3.17.1" },
     { name = "djangorestframework-camel-case", specifier = "==1.4.2" },
     { name = "drf-spectacular", specifier = "==0.29.0" },

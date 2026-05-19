@@ -14,7 +14,7 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.11.1",
-  "boto3==1.43.9",
+  "boto3==1.43.10",
   "charset_normalizer==3.4.7",
   "channels[daphne]==4.3.2",
   "channels-redis==4.3.0",
@@ -28,7 +28,7 @@ dependencies = [
   "django-cors-headers==4.9.0",
   "django-simple-history==3.11.0",
   "django-filter==25.2",
-  "django-unfold==0.93.0",
+  "django-unfold==0.94.0",
   "django-money==3.6.0",
   "django-mptt==0.18.0",
   "django-parler==2.4.0",
@@ -55,7 +55,7 @@ dependencies = [
   "urllib3==2.7.0",
   "uvicorn==0.47.0",
   "celery[redis] >=5.6.3,<6.0.0",
-  "disposable-email-domains==0.0.185",
+  "disposable-email-domains==0.0.186",
   "django-stubs-ext==6.0.4",
   "twisted[http2,tls]==26.4.0",
   "dj-stripe==2.10.3",

@@ -52,10 +52,6 @@ class ProductImageQuerySet(TranslatableOptimizedQuerySet):
         """
         return self.for_list().with_product_translations()
 
-    def optimized_for_list(self) -> Self:
-        """Alias for for_list() for backward compatibility."""
-        return self.for_list()
-
     def main_images(self):
         return self.filter(is_main=True)
 

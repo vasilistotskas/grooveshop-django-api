@@ -8716,7 +8716,6 @@ msgid "No Active Reservations"
 msgstr ""
 
 #: product/admin.py:239
-#, python-format
 msgid "High Reservations (>50% stock)"
 msgstr "Υψηλές δεσμεύσεις (>50% αποθέματος)"
 
@@ -9282,7 +9281,6 @@ msgid "Discount cannot exceed 100%."
 msgstr "Η έκπτωση δεν μπορεί να υπερβαίνει το 100%."
 
 #: product/forms.py:32
-#, python-format
 msgid "Enter a value between 0 and 100. For example, 25 for 25% discount."
 msgstr ""
 
@@ -12811,17 +12809,14 @@ msgid "Zero VAT (0%)"
 msgstr "Μηδενικός ΦΠΑ (0%)"
 
 #: vat/admin.py:24
-#, python-format
 msgid "Low VAT (0.1% - 10%)"
 msgstr ""
 
 #: vat/admin.py:25
-#, python-format
 msgid "Standard VAT (10% - 25%)"
 msgstr "Κανονικός ΦΠΑ (10% - 25%)"
 
 #: vat/admin.py:26
-#, python-format
 msgid "High VAT (25% - 50%)"
 msgstr ""
 
@@ -12854,7 +12849,6 @@ msgid "VAT Configuration"
 msgstr "Διαμόρφωση ΦΠΑ"
 
 #: vat/admin.py:119
-#, python-format
 msgid "Set the VAT percentage rate (0.0% - 100.0%)"
 msgstr ""
 

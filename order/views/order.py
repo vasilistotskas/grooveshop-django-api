@@ -371,7 +371,11 @@ class OrderViewSet(BaseModelViewSet):
             "acs_cancel",
             "shipment_cancel",
         }
-        public_actions = {"create"}
+        # ``viva_return`` is the Viva Wallet hosted-checkout callback
+        # — anonymous by design (lookup keys ``t`` and ``eventId`` are
+        # both unguessable UUIDs, and the response is intentionally
+        # minimal: id/uuid/status/paymentStatus, no PII).
+        public_actions = {"create", "viva_return"}
 
         if self.action in owner_or_admin_actions:
             self.permission_classes = [IsOwnerOrAdmin]
@@ -1181,6 +1185,7 @@ class OrderViewSet(BaseModelViewSet):
         success, checkout_response = provider.create_checkout_session(
             amount=amount,
             order_id=str(order.id),
+            order_uuid=str(order.uuid),
             **checkout_params,
         )
 
@@ -1345,34 +1350,96 @@ class OrderViewSet(BaseModelViewSet):
         url_path="viva_return",
     )
     def viva_return(self, request, *args, **kwargs):
-        """Return the order UUID for a Viva transaction id."""
+        """Resolve a Viva hosted-checkout return URL to the order UUID.
+
+        The customer's browser races the Viva webhook: Viva redirects
+        them back to ``/checkout/viva-return?t=<txn>&eventId=<uuid>&s=F``
+        immediately after they confirm payment, but the webhook (which
+        sets ``order.payment_id`` and ``order.payment_method``) may not
+        arrive for tens of seconds. To avoid leaving the customer on
+        an error page while the backend catches up, this endpoint
+        accepts two lookup keys and tries both:
+
+        1. ``t`` — Viva transaction id. ``payment_id`` is set to this
+           value by the webhook handler, so the lookup succeeds once
+           the webhook has fired (post-race path).
+        2. ``eventId`` — echoes ``merchantTrns`` which we set to
+           ``order.uuid`` at session-creation time, so it is always
+           populated before the redirect (pre-webhook path). The
+           ``viva_order_code`` metadata check confirms the row is
+           genuinely a Viva-paid order, so this fallback can't be
+           abused to dump arbitrary order UUIDs via guessed query
+           params (UUID itself is unguessable; the guard is defence
+           in depth in case Viva ever forwards a malformed eventId).
+        """
         transaction_id = request.query_params.get("t", "").strip()
-        if not transaction_id:
+        # ``CamelCaseMiddleWare`` rewrites query keys to snake_case on
+        # the way in, so ``?eventId=...`` from Viva surfaces here as
+        # ``event_id``. Accept both for defence in case the middleware
+        # is reconfigured upstream.
+        event_id = (
+            request.query_params.get("event_id", "")
+            or request.query_params.get("eventId", "")
+        ).strip()
+        if not transaction_id and not event_id:
             return Response(
-                {"detail": _("Missing transaction id (t query param).")},
+                {"detail": _("Missing transaction id (t or eventId).")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        order = (
-            Order.objects.only(
-                "id", "uuid", "status", "payment_status", "payment_id"
-            )
-            .filter(payment_id=transaction_id, payment_method="viva_wallet")
-            .first()
+        # Use ``.values(...)`` rather than ``.only(...)`` because the
+        # Order model's ``__init__`` lazy-loads ``_original_tracking_number``
+        # from any deferred attribute access and recurses indefinitely
+        # under DRF's serialization path (see project memory:
+        # ``project_order_state_machine_invariants.md``).
+        value_fields = (
+            "id",
+            "uuid",
+            "status",
+            "payment_status",
+            "metadata",
         )
-        if order is None:
+        row = None
+        if transaction_id:
+            row = (
+                Order.objects.filter(
+                    payment_id=transaction_id, payment_method="viva_wallet"
+                )
+                .values(*value_fields)
+                .first()
+            )
+
+        if row is None and event_id:
+            try:
+                event_uuid = uuid.UUID(event_id)
+            except (ValueError, TypeError):
+                event_uuid = None
+            if event_uuid is not None:
+                candidate = (
+                    Order.objects.filter(uuid=event_uuid)
+                    .values(*value_fields)
+                    .first()
+                )
+                if (
+                    candidate is not None
+                    and candidate.get("metadata")
+                    and candidate["metadata"].get("viva_order_code")
+                ):
+                    row = candidate
+
+        if row is None:
             raise NotFound(
                 _("No order found for transaction id {t}").format(
-                    t=transaction_id
+                    t=transaction_id or event_id
                 )
             )
 
         return Response(
             {
-                "id": order.id,
-                "uuid": str(order.uuid),
-                "status": str(order.status),
-                "paymentStatus": str(order.payment_status),
+                "id": row["id"],
+                "uuid": str(row["uuid"]),
+                "status": str(row["status"]),
+                "paymentStatus": str(row["payment_status"]),
             }
         )
 

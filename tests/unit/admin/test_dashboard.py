@@ -58,15 +58,29 @@ class DashboardCallbackCachingTests(TestCase):
             self.assertIn(key, result, f"missing zone key {key!r}")
 
     def test_callback_caches_zones_a_b_c(self):
-        # Pre-populate the cache directly; this proves the second call
-        # reads from the cache without triggering rebuild. Avoids
-        # depending on cross-test cache state under parallel xdist runs.
+        # Patch ``admin.dashboard.cache`` directly rather than seeding
+        # the real ``cache`` proxy. The proxy resolves through the
+        # production Redis backend on CI (conftest's ``settings.CACHES``
+        # patch can't reset the already-materialised ``CacheHandler``
+        # registry — Channels middleware tests depend on Redis staying
+        # bound there). Without this patch, ``cache.get_or_set`` was
+        # racing against the post-save signal handler in
+        # ``admin/signals.py`` that invalidates ``DASHBOARD_CACHE_KEY``
+        # whenever a ``UserAccount`` is created (``_make_request``
+        # creates one) and, on cache-miss, attempted to pickle the
+        # ``MagicMock`` builder's return value back into Redis —
+        # ``PicklingError`` flaked the test in parallel runs.
         request = self._make_request(superuser=True)
-        cache.set(DASHBOARD_CACHE_KEY, {"hero": {"_test": True}}, 300)
-
-        with patch("admin.dashboard._build_zones_a_b_c") as builder:
+        with (
+            patch("admin.dashboard.cache") as cache_mock,
+            patch("admin.dashboard._build_zones_a_b_c") as builder,
+        ):
+            cache_mock.get_or_set.return_value = {"hero": {"_test": True}}
             ctx: dict = {}
             dashboard_callback(request, ctx)
+            cache_mock.get_or_set.assert_called_once_with(
+                DASHBOARD_CACHE_KEY, builder, 300
+            )
             builder.assert_not_called()
 
         self.assertEqual(ctx.get("hero"), {"_test": True})

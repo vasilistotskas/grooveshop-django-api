@@ -60,6 +60,18 @@ settings.CACHES = {
     },
 }
 
+# Note: we intentionally do NOT reset ``django.core.cache.caches``
+# here, even though the ``settings.CACHES`` patch above is technically
+# inert against connections that materialised before this point. The
+# Channels middleware tests (``tests/unit/core/middleware/test_channels.py``)
+# patch ``cache._cache.get_client`` directly and assume the default
+# alias is the production Redis backend. Resetting the registry would
+# break those tests. The downstream consequence is that any test
+# caching a non-picklable value (e.g. a ``MagicMock``) via the real
+# ``cache.*`` proxy can crash with ``PicklingError`` — those tests
+# should patch ``cache`` at the module they're testing instead of
+# relying on the proxy (see ``test_dashboard.py``).
+
 
 # Route django-extra-settings through a DummyCache so every ``Setting.get``
 # falls through to the DB. The package's ``post_save`` hook updates the

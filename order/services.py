@@ -112,8 +112,9 @@ class OrderService:
                 for item in items_data
             ]
 
-            # One generic dispatch — provider's create_shipment_row
-            # handles its own filtering on shipping_method / kind.
+            # One generic dispatch — the resolved provider's
+            # ``create_shipment_row`` reads ``order.shipping_kind`` to
+            # branch on home delivery vs pickup point.
             from shipping.services import ShippingService
 
             ShippingService.create_shipment_row_for_order(

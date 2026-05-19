@@ -433,10 +433,9 @@ class OrderAdmin(BaseModelAdmin):
         ("pay_way", RelatedDropdownFilter),
         "payment_method",
         "document_type",
-        # Filter Orders by carrier — replaces the legacy
-        # ``shipping_method`` enum filter; FK lookup is denser
-        # (provider name) but supports the same support-ticket
-        # workflow.
+        # Filter Orders by carrier via the registry FK — denser than
+        # a flat enum (shows the provider name) and the same lookup
+        # support uses for ticket triage.
         ("shipping_provider", RelatedDropdownFilter),
         "shipping_kind",
         # Filter on the BoxNow parcel state via the OneToOne reverse
@@ -620,11 +619,11 @@ class OrderAdmin(BaseModelAdmin):
         provider_code = (
             obj.shipping_provider.code if obj.shipping_provider_id else None
         )
-        # Registry-driven inline routing — the legacy
-        # ``shipping_method`` enum no longer informs which inline to
-        # mount. Pre-Phase-0 rows (no ``shipping_provider`` set) get
-        # neither carrier inline; their data still lives on the order
-        # itself and can be reviewed from the change form fields.
+        # Registry-driven inline routing keyed on
+        # ``obj.shipping_provider.code``. Rows with no provider set
+        # (pre-registry data) get neither carrier inline; their data
+        # still lives on the order itself and can be reviewed from
+        # the change form fields.
         if provider_code == "boxnow":
             from shipping_boxnow.admin import (  # noqa: PLC0415
                 BoxNowShipmentOrderInline,

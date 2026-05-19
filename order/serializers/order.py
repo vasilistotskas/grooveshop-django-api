@@ -314,9 +314,8 @@ class OrderDetailSerializer(OrderSerializer):
     @extend_schema_field(BoxNowShipmentDetailSerializer(allow_null=True))
     def get_boxnow_shipment(self, obj: Order) -> dict | None:
         # Mirror ``get_acs_shipment`` — gate on the registry-backed
-        # ``shipping_provider`` FK rather than the denormalised
-        # ``shipping_method`` enum so the field stays consistent
-        # across carriers and the legacy column can be dropped.
+        # ``shipping_provider`` FK so a new carrier slots in via one
+        # more provider code check.
         provider = getattr(obj, "shipping_provider", None)
         if provider is None or provider.code != "boxnow":
             return None
@@ -972,8 +971,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
 
         # BoxNow cross-field validation. Trigger condition is the
         # registry-driven ``(shipping_provider_code, shipping_kind)``
-        # pair — the legacy ``shipping_method`` enum no longer drives
-        # carrier selection.
+        # pair.
         is_boxnow_pickup = (
             attrs.get("shipping_provider_code") == "boxnow"
             and attrs.get("shipping_kind") == "pickup_point"

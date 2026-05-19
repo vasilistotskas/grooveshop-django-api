@@ -3,6 +3,150 @@
 
 
 
+## v1.137.0 (2026-05-19)
+
+### Chores
+
+* chore(order): drop stale 'legacy shipping_method' comments
+
+The ``shipping_method`` CharField enum was dropped from the Order
+model in migration ``0038_drop_shipping_method`` (commit ``056f2c65``
+removed the last read; ``d521e066`` deleted the enum class). The
+column is gone, the dual-write transition is complete, but five
+inline comments still describe the gone field as "legacy" — as if
+the cleanup were pending. That framing is wrong now: the field is
+not legacy code awaiting removal, it's simply gone.
+
+Reframed each comment to describe what the code does *now* — the
+registry-driven ``(shipping_provider FK, shipping_kind CharField)``
+pair — without referencing the gone enum. Pure documentation
+cleanup, no behavior change.
+
+* ``order/serializers/order.py:get_boxnow_shipment`` (gate
+  rationale)
+* ``order/serializers/order.py:validate`` (BoxNow cross-field
+  validation header)
+* ``order/admin.py:list_filter`` (shipping_provider filter
+  rationale)
+* ``order/admin.py:get_inlines`` (registry-driven inline routing
+  rationale)
+* ``order/services.py:create_order_from_cart_offline`` (dispatch
+  comment)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ba6ad20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ba6ad20343b2c35c9a8c989c6c7e7d9a86629350))
+
+* chore(scripts): drop duplicate dict keys + unused import in i18n helpers
+
+CI Code Quality on commit ``131f3e19`` (i18n bulk translation add)
+failed ruff lint with 8 F601 (duplicate dict literal keys) + 1 F401
+(unused ``re`` import). All 8 duplicate keys in
+``scripts/fill_greek_translations.py`` had identical values to their
+earlier definitions, so removing the later occurrence is value-
+preserving:
+
+"Card" (line 635 → already at line 410)
+"Active" (line 846 → already at line 41)
+"Inactive" (line 847 → already at line 42)
+"Slug is required." (line 996 → already at line 750)
+"Email is required." (line 997 → already at line 751)
+"Cart is empty" (line 1042 → already at line 638)
+"Bonus" (line 1177 → already at line 533)
+"Recently Created" (line 1178 → already at line 619)
+"Recently Added" (line 1180 → already at line 621)
+"Hi %(first_name)s," (line 1183 → already at line 774)
+
+Each removal is replaced with a short ``# already defined at line ~N
+with the same value.`` comment as a paper trail. Plus dropped the
+unused ``re`` import in ``scripts/list_untranslated.py``.
+
+``ruff check .`` and ``ruff format`` clean on the full tree.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9d8168d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9d8168d4b3500321c2fc7c01ea8cd6309e64c661))
+
+* chore(deps): sync uv.lock to 1.136.2 [skip ci] ([`0451395`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0451395ebf7002ba64a8706baec6845be5a34c18))
+
+### Features
+
+* feat: Bump Versions ([`1fad684`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1fad684d72a978f2e39706c20791a4afa876c02d))
+
+### Refactoring
+
+* refactor(shipping): drop legacy BOXNOW_ENABLED setting
+
+``ShippingProvider(code='boxnow').is_active`` is now the single
+source of truth for whether BoxNow appears at checkout. The
+``BOXNOW_ENABLED`` ``extra_settings`` row predates the provider
+registry (introduced when each carrier had its own ``extra_settings``
+toggle) and was kept around as a secondary gate during the
+dual-write transition flagged in
+``shipping/migrations/0002_seed_providers.py``.
+
+The dual-flag setup confused the site owner: ``BOXNOW_ENABLED`` was
+True in Settings admin while ``ShippingProvider.is_active`` was
+False, and the API silently filtered BoxNow out. "We never keep
+legacy / backward compatibility code" per the project standard —
+removing all of it in one pass.
+
+Changes
+-------
+
+Order serializer (``order/serializers/order.py``):
+  Defence-in-depth gate against stale frontend caches now reads
+  ``ShippingProvider.objects.filter(code='boxnow', is_active=True)
+  .exists()`` instead of ``Setting.get("BOXNOW_ENABLED")``. Same
+  intent, single source of truth.
+
+Settings declarations:
+  * ``settings.py:EXTRA_SETTINGS_DEFAULTS`` — entry deleted.
+  * ``core/api/views.py:PUBLIC_SETTING_KEYS`` — key removed from
+    the anonymous-readable allowlist.
+
+Data migration (``shipping/migrations/0006_drop_legacy_boxnow_enabled_setting.py``):
+  ``Setting.objects.filter(name="BOXNOW_ENABLED").delete()`` so the
+  orphan row in prod stops cluttering the Settings admin list.
+  Idempotent + safe under Argo PreSync (no schema change, just a
+  row delete in extra_settings.Setting).
+
+Tests:
+  Integration tests in ``test_order_create_with_boxnow.py`` swap
+  ``Setting.objects.filter(name='BOXNOW_ENABLED').update(value_bool=...)``
+  for ``ShippingProvider.objects.filter(code='boxnow').update(is_active=...)``.
+  Stale docstring references updated.
+
+Docstrings:
+  * ``shipping/models/provider.py`` — drops the "replaces the per-app
+    BOXNOW_ENABLED-style" caveat.
+  * ``shipping/migrations/0002_seed_providers.py`` — updates the
+    transitional-state note to say the cleanup landed.
+  * ``tests/conftest.py`` — swaps the example.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`7822e90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7822e900111708c3d209a72c057e9abbdf78c9bb))
+
+### Unknown
+
+* i18n(admin): add ~870 Greek translations for admin-visible strings
+
+The Greek .po file was at 2,151 of 2,801 entries untranslated (77%).
+Bulk-fill the most user-visible admin terms: column headers, status
+labels, action button copy, fieldset titles, filter descriptions,
+validation messages, payment / shipping / order vocabulary, common
+filter labels (``Filter by …``), GET-endpoint descriptions, and
+notification/loyalty/subscription terms.
+
+Adds two one-shot helper scripts:
+- ``scripts/fill_greek_translations.py`` — curated dictionary +
+  in-place .po rewrite, idempotent on rerun.
+- ``scripts/list_untranslated.py`` — diagnostic listing of
+  remaining empty-msgstr entries for follow-up passes through
+  Rosetta.
+
+Remaining ~1,283 untranslated entries are mostly long-form copy
+(email templates, sentence-level admin help text, paragraph
+descriptions) better suited to Rosetta translation by an admin
+than to a curated dictionary.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`131f3e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/131f3e19ad1e6a0111050e75883fb8501f89bbbb))
+
 ## v1.136.2 (2026-05-18)
 
 ### Chores

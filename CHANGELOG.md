@@ -3,6 +3,94 @@
 
 
 
+## v1.137.3 (2026-05-19)
+
+### Bug fixes
+
+* fix(tests): drop Setting.get.__func__ fallthrough to survive worker reuse
+
+CI run 26116850104 failed at:
+
+tests/unit/order/test_b2b_invoicing_gate.py: AttributeError: __func__
+tests/unit/shipping_acs/test_smartpoint_gating.py: AttributeError: __func__
+
+at the ``real_get = Setting.get.__func__`` line of the test helper.
+Both files use the same pattern (captured during the earlier
+Setting-round-trip-flake refactor) to call the real classmethod for
+keys other than the one under test. The pattern breaks under pytest-
+xdist worker reuse when an earlier test on the same worker patches
+``Setting.get`` to a ``MagicMock`` and the cleanup hasn't fully
+unwound before this helper executes — ``MagicMock.__func__`` raises
+``AttributeError``.
+
+Drop the fallthrough. The stubs now return the call-site's
+``default`` for keys other than the one each file targets, which is
+behaviourally identical to a real cache miss / no-row state. Both
+test paths only consult their single feature flag during the
+exercised codepath, so removing the fallthrough doesn't lose
+coverage — and the helper no longer depends on whatever shape
+``Setting.get`` happens to be in when the helper is first called.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ad412c1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad412c12c5768ea0df058162e5ada1e81dbcb28f))
+
+* fix(viva): resolve viva_return via order UUID to dodge the webhook race
+
+Order #71 paid via Viva Wallet but the customer never landed on the
+``/checkout/success`` page. The DB shows the order completed cleanly
+at 12:37:43 EEST (payment_status → COMPLETED, voucher 9772350954
+minted, confirmation emails sent), but the storefront kept the
+customer on the ``checkout/viva-return`` page with the
+``error.lookup_failed`` toast.
+
+Root cause:
+
+- We sent ``merchantTrns = str(order.id)`` to Viva at hosted-checkout
+  session creation. Viva echoed it back as ``eventId`` in the return
+  URL (``?t=<txn>&eventId=71&s=F``).
+- ``/order/viva_return`` only looked up the order by
+  ``payment_id=t AND payment_method='viva_wallet'``. Both fields are
+  set inside ``viva_webhook.py`` AFTER Viva calls our webhook —
+  which can lag the customer's browser redirect by tens of seconds.
+- During that window the lookup returned 404; the Nuxt page showed
+  the error and offered "back to checkout"; the customer disengaged
+  even though the payment had already cleared.
+
+Fix:
+
+- Send ``merchantTrns = str(order.uuid)`` so the round-trip identifier
+  is set BEFORE the redirect (uuid is assigned at order creation).
+  Customer-facing label stays human readable via ``customerTrns``
+  (``"Order #{id}"``) so Viva's dashboard still shows the order
+  number — only the machine identifier moved to the unguessable UUID.
+- ``viva_return`` keeps the ``t`` lookup as the primary path (works
+  once the webhook has fired) and falls back to ``eventId`` (= the
+  UUID) when ``t`` doesn't resolve yet. The fallback gates on
+  ``metadata.viva_order_code`` so it cannot dump arbitrary order
+  UUIDs — only orders that have been through Viva session creation
+  match.
+- ``viva_return`` added to the viewset's ``public_actions`` set —
+  the action's own ``permission_classes=[AllowAny]`` was overridden
+  by the viewset's ``get_permissions`` fall-through to ``IsAdminUser``
+  (and so the fix wouldn't have worked end-to-end without this).
+- Uses ``.values(...)`` rather than ``.only(...)`` to avoid the
+  ``Order.__init__`` ``_original_tracking_number`` lazy-load
+  recursion documented in ``project_order_state_machine_invariants``.
+- ``CamelCaseMiddleWare`` rewrites incoming query keys to snake_case,
+  so the endpoint reads ``event_id`` (with ``eventId`` as a
+  defensive fallback if the middleware is ever reconfigured).
+- 6 new integration tests cover both lookup paths, the
+  ``viva_order_code`` guard, malformed/unknown UUIDs, and the
+  400-on-missing-params case.
+
+Nuxt-side change in a follow-up commit (forward ``eventId`` from the
+return URL through ``/api/checkout/viva-return``).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`efd001a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/efd001aca67ccdc210d0567d9dfac786aae6e8bf))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.137.2 [skip ci] ([`5e6a6c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e6a6c5b80f9ff9830024f1191740bffb8cdb7dd))
+
 ## v1.137.2 (2026-05-19)
 
 ### Bug fixes

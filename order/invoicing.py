@@ -194,8 +194,9 @@ def _pay_way_display(order: Order) -> str:
     """Human-readable payment method label for the invoice.
 
     Prefers the translated ``PayWay.name`` (structured choice), then
-    ``Order.payment_method`` (legacy free-text, often a provider code
-    like ``offline_...``), then an empty string.
+    ``Order.payment_method`` (raw gateway code like ``stripe`` /
+    ``viva_wallet`` / ``offline_...``, written by the payment-
+    confirmation handlers), then an empty string.
     """
     pay_way = getattr(order, "pay_way", None)
     if pay_way is not None:

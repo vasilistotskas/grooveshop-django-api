@@ -94,9 +94,9 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "region_id": self.region.alpha,
             "phone": "+302100000000",
             "shipping_price": "2.50",
-            # Registry-driven dispatch: explicit (provider, kind) is the
-            # only supported routing — the legacy ``shipping_method``
-            # enum no longer drives provider lookup.
+            # Registry-driven dispatch — the order serializer resolves
+            # the carrier adapter from this explicit ``(provider, kind)``
+            # pair (see ``order/services._resolve_shipping_provider``).
             "shipping_provider_code": "boxnow",
             "shipping_kind": "pickup_point",
             "boxnow_compartment_size": 1,

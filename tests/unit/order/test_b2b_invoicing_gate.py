@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from extra_settings.models import Setting
 
@@ -27,10 +29,29 @@ class B2BInvoicingGateTestCase(TestCase):
     """
 
     def _set_enabled(self, value: bool) -> None:
-        Setting.objects.update_or_create(
-            name="B2B_INVOICING_ENABLED",
-            defaults={"value_type": "bool", "value_bool": value},
-        )
+        """Stub ``Setting.get`` so the validator reads our chosen value
+        for ``B2B_INVOICING_ENABLED`` without touching the ``Setting``
+        table.
+
+        Earlier ``Setting.objects.update_or_create`` flaked under CI's
+        parallel xdist run (the autouse ``_reseed_extra_settings``
+        fixture in conftest.py rewrites the same ``EXTRA_SETTINGS_DEFAULTS``
+        rows for every test on every worker, and the resulting savepoint-
+        visibility interaction occasionally caused ``Setting.get`` to
+        return the seeded default of ``True`` instead of the just-written
+        ``False``). Patching the read site bypasses the round-trip
+        entirely.
+        """
+        real_get = Setting.get.__func__
+
+        def stub(cls, key, default=None):
+            if key == "B2B_INVOICING_ENABLED":
+                return value
+            return real_get(cls, key, default)
+
+        p = patch.object(Setting, "get", classmethod(stub))
+        p.start()
+        self.addCleanup(p.stop)
 
     def test_invoice_rejected_when_setting_disabled(self):
         self._set_enabled(False)

@@ -65,7 +65,12 @@ def _confirmation_lock_key(order_id: int) -> str:
 
 
 def _confirmation_already_sent(metadata: dict | None) -> bool:
-    """Return True if the permanent DB timestamp shows the email was sent."""
+    """Return True if the permanent DB timestamp shows the email was sent.
+
+    The boolean ``CONFIRMATION_EMAIL_SENT_FLAG`` is checked as a
+    fallback because pre-timestamp-key orders persisted in the DB
+    only have that key set. New writes use the timestamp only.
+    """
     meta = metadata or {}
     return bool(
         meta.get(CONFIRMATION_EMAIL_SENT_AT_KEY)
@@ -84,9 +89,6 @@ def _mark_confirmation_sent(order_id: int) -> None:
         order.metadata[CONFIRMATION_EMAIL_SENT_AT_KEY] = (
             timezone.now().isoformat()
         )
-        # Also set the legacy boolean so callers that check the old key
-        # (e.g. retry_payment view that clears the flag) keep working.
-        order.metadata[CONFIRMATION_EMAIL_SENT_FLAG] = True
         order.save(update_fields=["metadata"])
     # Release the execution lock immediately after the DB commit so the
     # next accidental duplicate call sees the DB flag instead of waiting

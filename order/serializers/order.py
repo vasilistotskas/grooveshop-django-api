@@ -29,11 +29,10 @@ CARRIER_TRACKING_URLS: dict[str, str] = {
     "elta": "https://www.elta.gr/en/tracking?code={number}",
     # ACS's public Vue SPA at ``webapp.acscourier.net`` reads the
     # voucher number from the URL path (NOT a query string) and
-    # auto-runs the search on page load. The legacy
+    # auto-runs the search on page load. The older
     # ``/el/track-and-trace/?p={number}`` URL on the main site is a
-    # generic search page that ignores query parameters — that's
-    # why an earlier audit pass concluded ACS didn't deep-link.
-    # The right URL is the SPA's path-based route.
+    # generic search page that ignores query parameters, which is
+    # why path-based deep-linking on the SPA is the right form.
     "acs": "https://webapp.acscourier.net/track-shipment/{number}",
     "boxnow": "https://boxnow.gr/en?track={number}",
     "speedex": "https://www.speedex.gr/en/track-and-trace/?p_code={number}",

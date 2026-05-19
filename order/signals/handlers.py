@@ -153,8 +153,9 @@ def handle_order_created(
     # Offline payments (COD, bank transfer) and already-paid orders get the
     # confirmation email immediately. Online payments (Stripe, Viva Wallet)
     # defer it to the payment-success webhook so the email only goes out
-    # once the payment actually succeeds. Missing pay_way is treated as
-    # offline to preserve the legacy fallback behavior.
+    # once the payment actually succeeds. Missing pay_way (the FK was
+    # ``SET_NULL`` because someone deleted the PayWay row) is treated as
+    # offline so the customer still receives a confirmation.
     pay_way = order.pay_way
     is_online_pending = (
         pay_way is not None

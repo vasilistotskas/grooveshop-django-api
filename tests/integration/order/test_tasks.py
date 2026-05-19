@@ -113,9 +113,9 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         mock_email_instance.send.assert_called_once()
 
         self.order.refresh_from_db()
-        self.assertTrue(
-            self.order.metadata.get("confirmation_email_sent"),
-            "metadata flag must be set after a successful send",
+        self.assertIsNotNone(
+            self.order.metadata.get(CONFIRMATION_EMAIL_SENT_AT_KEY),
+            "permanent sent_at timestamp must be set after a successful send",
         )
 
     @patch("order.tasks.EmailMultiAlternatives")
@@ -174,10 +174,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             self.order.metadata.get(CONFIRMATION_EMAIL_SENT_AT_KEY),
             "permanent sent_at timestamp must be set after successful send",
         )
-        self.assertTrue(
-            self.order.metadata.get(CONFIRMATION_EMAIL_SENT_FLAG),
-            "legacy boolean flag must also be set for backward compat",
-        )
+        # The legacy boolean key (``CONFIRMATION_EMAIL_SENT_FLAG``) is
+        # no longer dual-written — new writes use only the timestamp.
+        # The reader's fallback at ``_confirmation_already_sent`` still
+        # honours the boolean for pre-timestamp DB rows.
+        self.assertNotIn(CONFIRMATION_EMAIL_SENT_FLAG, self.order.metadata)
 
         # Third call: permanent DB flag present → skip without touching Redis.
         mock_email_instance.send.reset_mock()

@@ -29,16 +29,9 @@ from order.models.stock_reservation import StockReservation
 from order.signals import order_refunded
 from order.stock import StockManager
 
-# Re-export under the legacy private name so existing tests keep
-# passing without churn. The canonical home is ``shipping.utils``;
-# new call sites should import from there.
-from shipping.utils import (
-    compute_total_weight_grams as _compute_total_weight_grams,
-)
-
 logger = logging.getLogger(__name__)
 
-__all__ = ["OrderService", "_compute_total_weight_grams"]
+__all__ = ["OrderService"]
 
 
 def _log_price_drift_if_needed(cart_item, current_price) -> None:

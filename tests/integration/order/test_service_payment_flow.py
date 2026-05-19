@@ -21,6 +21,8 @@ from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
+pytestmark = pytest.mark.assert_english
+
 
 @pytest.mark.django_db
 class TestOrderServiceCreateOrderFromCart:

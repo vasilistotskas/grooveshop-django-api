@@ -1,10 +1,14 @@
 from unittest.mock import patch
 
+import pytest
+
 from contact.utils import (
     detect_spam_patterns,
     sanitize_message,
     validate_contact_content,
 )
+
+pytestmark = pytest.mark.assert_english
 
 
 class TestDetectSpamPatterns:

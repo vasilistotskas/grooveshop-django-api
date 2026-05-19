@@ -12,6 +12,8 @@ from order.exceptions import (
 )
 from order.enum.status import OrderStatus, PaymentStatus
 
+pytestmark = pytest.mark.assert_english
+
 
 @pytest.mark.django_db
 class TestCreateOrderFromCart:

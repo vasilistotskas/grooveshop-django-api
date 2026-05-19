@@ -7,6 +7,8 @@ from order.factories.order import OrderFactory
 from order.models.item import OrderItem
 from product.factories.product import ProductFactory
 
+pytestmark = pytest.mark.assert_english
+
 
 @pytest.fixture
 def test_order(db):

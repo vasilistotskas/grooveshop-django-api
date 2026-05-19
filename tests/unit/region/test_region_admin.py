@@ -1,5 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
+
+import pytest
 from django.test import override_settings
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
@@ -16,6 +18,8 @@ from region.admin import (
     RegionStatusFilter,
 )
 from region.models import Region
+
+pytestmark = pytest.mark.assert_english
 
 User = get_user_model()
 

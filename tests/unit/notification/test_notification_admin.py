@@ -1,6 +1,7 @@
 from datetime import timedelta
 from unittest.mock import Mock
 
+import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
@@ -15,6 +16,8 @@ from notification.admin import (
 )
 from notification.models.notification import Notification
 from notification.models.user import NotificationUser
+
+pytestmark = pytest.mark.assert_english
 
 User = get_user_model()
 

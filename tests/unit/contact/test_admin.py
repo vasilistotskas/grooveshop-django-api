@@ -1,6 +1,7 @@
 import datetime
 from unittest.mock import patch
 
+import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
 from django.db import models
@@ -12,6 +13,8 @@ from zoneinfo import ZoneInfo
 
 from contact.admin import ContactAdmin, MessageLengthFilter, RecentContactFilter
 from contact.models import Contact
+
+pytestmark = pytest.mark.assert_english
 
 
 class TestMessageLengthFilter(TestCase):

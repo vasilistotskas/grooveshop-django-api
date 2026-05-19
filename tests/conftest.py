@@ -157,6 +157,35 @@ def clear_caches():
 
 
 @pytest.fixture(autouse=True)
+def _assert_english_locale_if_marked(request):
+    """Pin the active gettext translation to English for any test (or
+    test class / test module) marked with ``@pytest.mark.assert_english``.
+
+    The project default is ``LANGUAGE_CODE='el'`` and most validators /
+    admin filter labels / error messages use ``gettext_lazy``. Tests
+    that assert on English substrings of those messages
+    (``"quantity"``, ``"greater"``, ``"insufficient stock"``, admin
+    filter labels in English, etc.) pass in CI — which has no
+    ``compilemessages`` step so falls back to the English source — but
+    fail on dev machines where the compiled ``el`` ``.mo`` files are
+    available and Django returns the translated Greek string.
+
+    Opting in per-module via ``pytestmark = pytest.mark.assert_english``
+    is the narrowest fix: it leaves parler / i18n tests alone (those
+    rely on ``LANGUAGE_CODE='el'`` to read translated content), and
+    keeps the override explicit so a future reader knows why the test
+    runs in English.
+    """
+    if request.node.get_closest_marker("assert_english"):
+        from django.utils import translation
+
+        with translation.override("en"):
+            yield
+    else:
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _run_transaction_on_commit_immediately(request, monkeypatch):
     """Execute ``transaction.on_commit`` callbacks synchronously in tests.
 

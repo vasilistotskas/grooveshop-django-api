@@ -1,11 +1,14 @@
 from unittest.mock import Mock, patch
 
+import pytest
 from django.contrib.admin.sites import AdminSite
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
 
 from country.admin import CountryAdmin, CountryStatusFilter
 from country.models import Country
+
+pytestmark = pytest.mark.assert_english
 
 
 class CountryStatusFilterTestCase(TestCase):

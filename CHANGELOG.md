@@ -3,6 +3,53 @@
 
 
 
+## v1.137.2 (2026-05-19)
+
+### Bug fixes
+
+* fix(i18n): drop bogus #, python-format flags on literal-% msgids
+
+``v1.137.1`` Docker publish (run 26109262745) failed at
+``compilemessages``:
+
+msgfmt failed: locale/el/LC_MESSAGES/django.po:8721:
+'msgstr' is not a valid Python format string, unlike 'msgid'.
+Reason: The character that terminates the directive number 1
+is not a valid conversion specifier.
+
+The Greek translation entries for 6 admin labels carry literal ``%``
+characters as the percent symbol (``"High Reservations (>50% stock)"``,
+``"Low VAT (0.1% - 10%)"``, etc.). The ``i18n(admin)`` commit at
+``131f3e19`` annotated them with ``#, python-format`` even though the
+source strings are plain ``_("...")`` calls with no ``%(name)s`` /
+``%s`` substitutions — ``%`` is just the percent symbol. ``msgfmt``
+then parses ``% stock`` / ``% - 10%`` and rejects it because a space
+or ``-`` is not a valid conversion specifier.
+
+Dropping the flag tells ``msgfmt`` to treat the string as opaque
+text. No source-code changes needed; ``django.po`` regeneration via
+``makemessages`` won't re-add the flag because ``xgettext`` only
+flags strings that match true format-spec patterns (``%s``, ``%d``,
+``%(name)s``).
+
+Affected entries:
+- ``product/admin.py:239`` — High Reservations (>50% stock)
+- ``product/forms.py:32`` — Enter a value between 0 and 100. For
+  example, 25 for 25% discount.
+- ``vat/admin.py:24`` — Low VAT (0.1% - 10%)
+- ``vat/admin.py:25`` — Standard VAT (10% - 25%)
+- ``vat/admin.py:26`` — High VAT (25% - 50%)
+- ``vat/admin.py:119`` — Set the VAT percentage rate (0.0% - 100.0%)
+
+Verified locally: ``uv run python manage.py compilemessages --ignore=.venv``
+now exits 0 across de / el / en.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`edfc0fa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/edfc0faea6ceab295773372153cadf6da567a13a))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.137.1 [skip ci] ([`982f7ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/982f7ba7a6ae9f35ed3e37e02a701935dde6ada2))
+
 ## v1.137.1 (2026-05-19)
 
 ### Bug fixes

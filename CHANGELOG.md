@@ -3,6 +3,52 @@
 
 
 
+## v1.138.3 (2026-05-20)
+
+### Bug fixes
+
+* fix(order): auto-resolve home_delivery carrier before shipping cost calc
+
+A ``home_delivery`` cart with no explicit ``shipping_provider_code``
+(the storefront sends ``null`` for home_delivery per
+``shared/shipping/index.ts::carrierForMethod``) was charged at the
+generic ``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD``
+rate, even though ``_resolve_shipping_provider`` would still set the
+order's FK to ACS. Result: at 35 € the cart sidebar showed 0 €
+shipping (ACS quoted directly via ``/api/v1/shipping/options``) but
+the order ended up charging 2,99 € (generic 50 € threshold not
+crossed) — silent disagreement between the carrier the customer was
+promised and the price they paid, and a wider gap between the
+"free above 30 €" marketing copy and the real charge.
+
+``OrderService.calculate_shipping_cost`` now auto-resolves
+``home_delivery`` to the active home-delivery carrier's code before
+dispatching to ``ShippingService.calculate_shipping_cost``, using
+the same priority-ordered query ``_resolve_shipping_provider``
+already uses. Both call sites now share a single helper
+(``_resolve_active_home_delivery_code``) so a future routing
+refactor (region-aware, dynamic priority, ...) cannot drift the
+pricing path from the FK-assignment path.
+
+Affects every caller of ``OrderService.calculate_shipping_cost``:
+* Stripe PI flow (``cart/views/cart.py::create_payment_intent``)
+* Order-create initial calc (``create_order_from_cart_offline`` etc.)
+* Order-create verification calc (``create_order_from_cart``)
+
+Three regression tests pin the contract:
+* ``test_home_delivery_without_explicit_code_uses_acs_threshold``
+* ``test_home_delivery_below_threshold_charges_carrier_rate``
+* ``test_home_delivery_falls_back_to_generic_when_no_active_provider``
+Plus the ``test_pi_and_order_create_calcs_agree_in_gap_range`` anchor
+now includes ``(None, "home_delivery", ...)`` cases that would have
+failed before the fix.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`c786cd5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c786cd574d4471d620485513ed0057bd25133289))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.2 [skip ci] ([`ea83ced`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ea83ced92668c99851c2cb90e47c7a1411483e39))
+
 ## v1.138.2 (2026-05-20)
 
 ### Bug fixes

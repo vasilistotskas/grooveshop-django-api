@@ -3,6 +3,33 @@
 
 
 
+## v1.138.1 (2026-05-20)
+
+### Bug fixes
+
+* fix(cart): pass shipping carrier to create-payment-intent to match order-create
+
+The Stripe PI flow was calling ``OrderService.calculate_shipping_cost``
+without ``shipping_provider_code`` / ``shipping_kind``, so the PI
+amount always used the generic ``FREE_SHIPPING_THRESHOLD`` /
+``CHECKOUT_SHIPPING_PRICE`` fallback. The order-create verification
+step DOES pass the per-carrier context, so the two calls silently
+disagreed whenever the carrier and generic thresholds differed — for
+the production tuning of ACS/BoxNow=30€ vs generic=50€, any cart in
+[30, 50) using Stripe was greeted with PaymentAmountMismatchError at
+order create time.
+
+Adds an explicit ``CartCreatePaymentIntentRequestSerializer`` that
+requires the shipping fields, computes weight from cart items, and
+threads everything into ``OrderService.calculate_shipping_cost`` so
+the PI amount matches what the order-create step will verify.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`ca03caf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca03cafdba5c4af272749974413d804edaf21d61))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.0 [skip ci] ([`628c779`](https://github.com/vasilistotskas/grooveshop-django-api/commit/628c779a4804b4fb70ff7e61dc047aed881ee975))
+
 ## v1.138.0 (2026-05-20)
 
 ### Chores

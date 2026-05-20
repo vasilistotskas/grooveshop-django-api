@@ -24,6 +24,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from shipping.exceptions import ShippingProviderNotFoundError
 
 if TYPE_CHECKING:
+    from decimal import Decimal
+
     from order.models.order import Order
 
     from shipping.enum import ShippingKind
@@ -122,6 +124,32 @@ class ShippingCarrierInterface(ABC):
         global ``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD``
         Setting rows.  Override when the provider should price its own
         kind (e.g. ACS flat ``ACS_SHIPPING_PRICE``).
+        """
+        return None
+
+    def free_shipping_threshold(
+        self,
+        kind: ShippingKind,
+    ) -> Decimal | None:
+        """Return the cart-subtotal above which the carrier ships free.
+
+        Customer-facing hook used by ``GET /api/v1/shipping/free-
+        shipping-info`` to advertise the "Δωρεάν μεταφορικά άνω των X €"
+        line on the PDP and the cart summary.  Co-located with the
+        ``calculate_shipping_cost`` rule so a carrier owns both ends of
+        its pricing — adding a new carrier means one new file declaring
+        both the live cost AND the marketing threshold; the rest of
+        the platform picks the row up automatically.
+
+        Return ``None`` when the carrier+kind combination has no
+        threshold (e.g. carriers that always charge for shipping, or
+        kinds the carrier doesn't price itself). The shipping-info view
+        skips ``None`` entries so they neither dilute the aggregate nor
+        produce a misleading "free above €0" line.
+
+        Currency is always the platform default (``settings.DEFAULT_
+        CURRENCY``) — the threshold is a marketing promise denominated
+        in store currency, not a per-locale FX figure.
         """
         return None
 

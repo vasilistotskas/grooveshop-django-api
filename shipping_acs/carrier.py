@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.enum import ShippingKind
@@ -287,6 +288,17 @@ class AcsCarrier(ShippingCarrierInterface):
 
         base = float(Setting.get("ACS_SHIPPING_PRICE", default=3.50))
         return (base, currency)
+
+    def free_shipping_threshold(
+        self,
+        kind: ShippingKind,
+    ) -> Decimal | None:
+        from extra_settings.models import Setting
+
+        # ACS applies the same threshold to both home delivery and
+        # Smartpoint pickup (see :meth:`calculate_shipping_cost`).
+        raw = Setting.get("ACS_FREE_SHIPPING_THRESHOLD", default=40.00)
+        return Decimal(str(raw))
 
     # ACS minimum chargeable weight per published tariff. Anything
     # below 500g is billed at 500g.

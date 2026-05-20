@@ -63,7 +63,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -73,7 +73,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -443,7 +443,7 @@ paths:
     get:
       operationId: getBlogAuthorPosts
       description: Retrieve all blog posts written by this author with proper pagination.
-      summary: Get author's blog posts
+      summary: Λήψη άρθρων συντάκτη
       parameters:
       - in: path
         name: id
@@ -583,7 +583,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -593,7 +593,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -1143,7 +1143,7 @@ paths:
     get:
       operationId: listBlogCategoryDescendants
       description: Get all descendants (children, grandchildren, etc.) of this category.
-      summary: Get category descendants
+      summary: Λήψη απογόνων κατηγορίας
       parameters:
       - in: path
         name: id
@@ -1234,7 +1234,7 @@ paths:
       operationId: listBlogCategoryPosts
       description: Retrieve all blog posts in this category and its subcategories.
         Use 'recursive=true' to include posts from all descendant categories.
-      summary: Get category's blog posts
+      summary: Λήψη άρθρων κατηγορίας
       parameters:
       - in: path
         name: id
@@ -1426,7 +1426,7 @@ paths:
     post:
       operationId: reorderBlogCategories
       description: Batch reorder categories by updating their sort_order values.
-      summary: Reorder categories
+      summary: Αναδιάταξη κατηγοριών
       tags:
       - Blog Categories
       requestBody:
@@ -1486,7 +1486,7 @@ paths:
       description: Get the complete category tree structure with nested relationships.
         This is more efficient than using list?tree=true for displaying navigation
         menus or category hierarchies.
-      summary: Get complete category tree
+      summary: Λήψη πλήρους δέντρου κατηγοριών
       parameters:
       - name: ordering
         in: query
@@ -1591,7 +1591,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by approval status
+        description: Φίλτρο ανά κατάσταση έγκρισης
       - in: query
         name: content
         schema:
@@ -1604,7 +1604,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by exact content length
+        description: Φίλτρο ανά ακριβές μήκος περιεχομένου
       - in: query
         name: createdAfter
         schema:
@@ -1896,7 +1896,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -1906,7 +1906,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: parent
         schema:
@@ -1914,7 +1914,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by parent comment ID
+        description: Φίλτρο ανά ID γονικού σχολίου
       - in: query
         name: parent_Isnull
         schema:
@@ -1942,7 +1942,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by blog post author ID
+        description: Φίλτρο ανά ID συντάκτη άρθρου
       - in: query
         name: post_Category
         schema:
@@ -1950,12 +1950,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by blog post category ID
+        description: Φίλτρο ανά ID κατηγορίας άρθρου
       - in: query
         name: post_Category_Slug
         schema:
           type: string
-        description: Filter by blog post category slug
+        description: Φίλτρο ανά slug κατηγορίας άρθρου
       - in: query
         name: post_IsPublished
         schema:
@@ -1972,12 +1972,12 @@ paths:
         name: post_Slug
         schema:
           type: string
-        description: Filter by blog post slug
+        description: Φίλτρο ανά slug άρθρου
       - in: query
         name: post_Title
         schema:
           type: string
-        description: Filter by blog post title
+        description: Φίλτρο ανά τίτλο άρθρου
       - in: query
         name: rght
         schema:
@@ -2048,12 +2048,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: user_Email
         schema:
           type: string
-        description: Filter by user email
+        description: Φίλτρο ανά email χρήστη
       - in: query
         name: user_IsActive
         schema:
@@ -2065,7 +2065,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments by active users
+        description: Φίλτρο σχολίων από ενεργούς χρήστες
       - in: query
         name: user_IsStaff
         schema:
@@ -2077,7 +2077,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments by staff users
+        description: Φίλτρο σχολίων από staff
       - in: query
         name: uuid
         schema:
@@ -2444,7 +2444,7 @@ paths:
     get:
       operationId: getBlogCommentPost
       description: Get the blog post that this comment belongs to.
-      summary: Get comment's blog post
+      summary: Λήψη άρθρου σχολίου
       parameters:
       - in: path
         name: id
@@ -2499,7 +2499,7 @@ paths:
     get:
       operationId: listBlogCommentReplies
       description: Get all replies (children) of this comment in threaded structure.
-      summary: Get comment replies
+      summary: Λήψη απαντήσεων σχολίου
       parameters:
       - in: query
         name: ancestorOf
@@ -2520,7 +2520,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by approval status
+        description: Φίλτρο ανά κατάσταση έγκρισης
       - in: query
         name: content
         schema:
@@ -2533,7 +2533,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by exact content length
+        description: Φίλτρο ανά ακριβές μήκος περιεχομένου
       - in: query
         name: createdAfter
         schema:
@@ -2818,7 +2818,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by parent comment ID
+        description: Φίλτρο ανά ID γονικού σχολίου
       - in: query
         name: parent_Isnull
         schema:
@@ -2846,7 +2846,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by blog post author ID
+        description: Φίλτρο ανά ID συντάκτη άρθρου
       - in: query
         name: post_Category
         schema:
@@ -2854,12 +2854,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by blog post category ID
+        description: Φίλτρο ανά ID κατηγορίας άρθρου
       - in: query
         name: post_Category_Slug
         schema:
           type: string
-        description: Filter by blog post category slug
+        description: Φίλτρο ανά slug κατηγορίας άρθρου
       - in: query
         name: post_IsPublished
         schema:
@@ -2876,12 +2876,12 @@ paths:
         name: post_Slug
         schema:
           type: string
-        description: Filter by blog post slug
+        description: Φίλτρο ανά slug άρθρου
       - in: query
         name: post_Title
         schema:
           type: string
-        description: Filter by blog post title
+        description: Φίλτρο ανά τίτλο άρθρου
       - in: query
         name: rght
         schema:
@@ -2952,12 +2952,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: user_Email
         schema:
           type: string
-        description: Filter by user email
+        description: Φίλτρο ανά email χρήστη
       - in: query
         name: user_IsActive
         schema:
@@ -2969,7 +2969,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments by active users
+        description: Φίλτρο σχολίων από ενεργούς χρήστες
       - in: query
         name: user_IsStaff
         schema:
@@ -2981,7 +2981,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments by staff users
+        description: Φίλτρο σχολίων από staff
       - in: query
         name: uuid
         schema:
@@ -3033,7 +3033,7 @@ paths:
       operationId: getBlogCommentThread
       description: Get the complete thread (all ancestors and descendants) of this
         comment.
-      summary: Get comment thread
+      summary: Λήψη νήματος σχολίων
       parameters:
       - in: query
         name: ancestorOf
@@ -3054,7 +3054,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by approval status
+        description: Φίλτρο ανά κατάσταση έγκρισης
       - in: query
         name: content
         schema:
@@ -3067,7 +3067,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by exact content length
+        description: Φίλτρο ανά ακριβές μήκος περιεχομένου
       - in: query
         name: createdAfter
         schema:
@@ -3352,7 +3352,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by parent comment ID
+        description: Φίλτρο ανά ID γονικού σχολίου
       - in: query
         name: parent_Isnull
         schema:
@@ -3380,7 +3380,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by blog post author ID
+        description: Φίλτρο ανά ID συντάκτη άρθρου
       - in: query
         name: post_Category
         schema:
@@ -3388,12 +3388,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by blog post category ID
+        description: Φίλτρο ανά ID κατηγορίας άρθρου
       - in: query
         name: post_Category_Slug
         schema:
           type: string
-        description: Filter by blog post category slug
+        description: Φίλτρο ανά slug κατηγορίας άρθρου
       - in: query
         name: post_IsPublished
         schema:
@@ -3410,12 +3410,12 @@ paths:
         name: post_Slug
         schema:
           type: string
-        description: Filter by blog post slug
+        description: Φίλτρο ανά slug άρθρου
       - in: query
         name: post_Title
         schema:
           type: string
-        description: Filter by blog post title
+        description: Φίλτρο ανά τίτλο άρθρου
       - in: query
         name: rght
         schema:
@@ -3486,12 +3486,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: user_Email
         schema:
           type: string
-        description: Filter by user email
+        description: Φίλτρο ανά email χρήστη
       - in: query
         name: user_IsActive
         schema:
@@ -3503,7 +3503,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments by active users
+        description: Φίλτρο σχολίων από ενεργούς χρήστες
       - in: query
         name: user_IsStaff
         schema:
@@ -3515,7 +3515,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments by staff users
+        description: Φίλτρο σχολίων από staff
       - in: query
         name: uuid
         schema:
@@ -3566,7 +3566,7 @@ paths:
     post:
       operationId: toggleBlogCommentLike
       description: Like or unlike a comment. Toggles the like status.
-      summary: Toggle comment like
+      summary: Εναλλαγή επισήμανσης σχολίου
       parameters:
       - in: path
         name: id
@@ -3679,7 +3679,7 @@ paths:
     get:
       operationId: listMyBlogComments
       description: Get all comments made by the currently authenticated user.
-      summary: Get current user's comments
+      summary: Λήψη σχολίων τρέχοντος χρήστη
       parameters:
       - in: query
         name: ancestorOf
@@ -3700,7 +3700,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by approval status
+        description: Φίλτρο ανά κατάσταση έγκρισης
       - in: query
         name: content
         schema:
@@ -3713,7 +3713,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by exact content length
+        description: Φίλτρο ανά ακριβές μήκος περιεχομένου
       - in: query
         name: createdAfter
         schema:
@@ -3990,7 +3990,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by parent comment ID
+        description: Φίλτρο ανά ID γονικού σχολίου
       - in: query
         name: parent_Isnull
         schema:
@@ -4018,7 +4018,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by blog post author ID
+        description: Φίλτρο ανά ID συντάκτη άρθρου
       - in: query
         name: post_Category
         schema:
@@ -4026,12 +4026,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by blog post category ID
+        description: Φίλτρο ανά ID κατηγορίας άρθρου
       - in: query
         name: post_Category_Slug
         schema:
           type: string
-        description: Filter by blog post category slug
+        description: Φίλτρο ανά slug κατηγορίας άρθρου
       - in: query
         name: post_IsPublished
         schema:
@@ -4048,12 +4048,12 @@ paths:
         name: post_Slug
         schema:
           type: string
-        description: Filter by blog post slug
+        description: Φίλτρο ανά slug άρθρου
       - in: query
         name: post_Title
         schema:
           type: string
-        description: Filter by blog post title
+        description: Φίλτρο ανά τίτλο άρθρου
       - in: query
         name: rght
         schema:
@@ -4124,12 +4124,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: user_Email
         schema:
           type: string
-        description: Filter by user email
+        description: Φίλτρο ανά email χρήστη
       - in: query
         name: user_IsActive
         schema:
@@ -4141,7 +4141,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments by active users
+        description: Φίλτρο σχολίων από ενεργούς χρήστες
       - in: query
         name: user_IsStaff
         schema:
@@ -4153,7 +4153,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter comments by staff users
+        description: Φίλτρο σχολίων από staff
       - in: query
         name: uuid
         schema:
@@ -4215,7 +4215,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by author ID
+        description: Φίλτρο ανά ID συντάκτη
       - in: query
         name: authorEmail
         schema:
@@ -4295,7 +4295,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by featured status
+        description: Φίλτρο ανά κατάσταση προτεινόμενου
       - in: query
         name: id
         schema:
@@ -4326,7 +4326,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by published status
+        description: Φίλτρο ανά κατάσταση δημοσίευσης
       - in: query
         name: languageCode
         schema:
@@ -4404,7 +4404,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -4414,7 +4414,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: publishedAfter
         schema:
@@ -4894,7 +4894,7 @@ paths:
     get:
       operationId: listBlogPostComments
       description: Get all comments for a blog post.
-      summary: Get post comments
+      summary: Λήψη σχολίων άρθρου
       parameters:
       - in: path
         name: id
@@ -5001,7 +5001,7 @@ paths:
     get:
       operationId: listBlogPostRelated
       description: Get related posts for a blog post.
-      summary: Get related posts
+      summary: Λήψη σχετικών άρθρων
       parameters:
       - in: query
         name: author
@@ -5010,7 +5010,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by author ID
+        description: Φίλτρο ανά ID συντάκτη
       - in: query
         name: authorEmail
         schema:
@@ -5085,7 +5085,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by featured status
+        description: Φίλτρο ανά κατάσταση προτεινόμενου
       - in: query
         name: id
         schema:
@@ -5125,7 +5125,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by published status
+        description: Φίλτρο ανά κατάσταση δημοσίευσης
       - in: query
         name: minComments
         schema:
@@ -5332,7 +5332,7 @@ paths:
     post:
       operationId: toggleBlogPostLike
       description: Like or unlike a blog post. Toggles the like status.
-      summary: Toggle post like
+      summary: Εναλλαγή επισήμανσης άρθρου
       parameters:
       - in: path
         name: id
@@ -5388,7 +5388,7 @@ paths:
     post:
       operationId: incrementBlogPostViews
       description: Increment the view count for a blog post.
-      summary: Increment post view count
+      summary: Αύξηση προβολών άρθρου
       parameters:
       - in: path
         name: id
@@ -5444,7 +5444,7 @@ paths:
     get:
       operationId: listFeaturedBlogPosts
       description: Get posts marked as featured, ordered by publication date.
-      summary: Get featured posts
+      summary: Λήψη προτεινόμενων άρθρων
       parameters:
       - in: query
         name: author
@@ -5453,7 +5453,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by author ID
+        description: Φίλτρο ανά ID συντάκτη
       - in: query
         name: authorEmail
         schema:
@@ -5528,7 +5528,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by featured status
+        description: Φίλτρο ανά κατάσταση προτεινόμενου
       - in: query
         name: id
         schema:
@@ -5559,7 +5559,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by published status
+        description: Φίλτρο ανά κατάσταση δημοσίευσης
       - in: query
         name: minComments
         schema:
@@ -5782,7 +5782,7 @@ paths:
     post:
       operationId: checkBlogPostLikes
       description: Get all posts that the authenticated user has liked.
-      summary: Get liked posts
+      summary: Λήψη άρθρων με επισήμανση
       tags:
       - Blog Posts
       requestBody:
@@ -5841,7 +5841,7 @@ paths:
     get:
       operationId: listPopularBlogPosts
       description: Get most popular blog posts based on all-time engagement metrics.
-      summary: Get popular posts
+      summary: Λήψη δημοφιλών άρθρων
       parameters:
       - in: query
         name: author
@@ -5850,7 +5850,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by author ID
+        description: Φίλτρο ανά ID συντάκτη
       - in: query
         name: authorEmail
         schema:
@@ -5925,7 +5925,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by featured status
+        description: Φίλτρο ανά κατάσταση προτεινόμενου
       - in: query
         name: id
         schema:
@@ -5956,7 +5956,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by published status
+        description: Φίλτρο ανά κατάσταση δημοσίευσης
       - in: query
         name: minComments
         schema:
@@ -6180,7 +6180,7 @@ paths:
       operationId: listTrendingBlogPosts
       description: Get trending blog posts based on recent engagement metrics. Combines
         views, likes, and comments from recent time period.
-      summary: Get trending posts
+      summary: Λήψη trending άρθρων
       parameters:
       - in: query
         name: author
@@ -6189,7 +6189,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by author ID
+        description: Φίλτρο ανά ID συντάκτη
       - in: query
         name: authorEmail
         schema:
@@ -6272,7 +6272,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by featured status
+        description: Φίλτρο ανά κατάσταση προτεινόμενου
       - in: query
         name: id
         schema:
@@ -6303,7 +6303,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by published status
+        description: Φίλτρο ανά κατάσταση δημοσίευσης
       - in: query
         name: minComments
         schema:
@@ -6646,7 +6646,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter tags with at most X posts
+        description: Φίλτρο ετικετών με έως X άρθρα
       - in: query
         name: minPosts
         schema:
@@ -6696,7 +6696,7 @@ paths:
         name: name_Exact
         schema:
           type: string
-        description: Filter by exact tag name
+        description: Φίλτρο ανά ακριβές όνομα ετικέτας
       - in: query
         name: name_Startswith
         schema:
@@ -6737,7 +6737,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -6747,7 +6747,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: post
         schema:
@@ -7231,7 +7231,7 @@ paths:
       operationId: retrieveCart
       description: Get a cart. For guest users, include X-Cart-Id header to maintain
         cart session.
-      summary: Get cart
+      summary: Λήψη καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -7282,7 +7282,7 @@ paths:
       operationId: updateCart
       description: Update a cart. For guest users, include X-Cart-Id header to maintain
         cart session.
-      summary: Update cart
+      summary: Ενημέρωση καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -7350,7 +7350,7 @@ paths:
       operationId: partialUpdateCart
       description: Update a cart. For guest users, include X-Cart-Id header to maintain
         cart session.
-      summary: Update cart
+      summary: Ενημέρωση καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -7418,7 +7418,7 @@ paths:
       operationId: destroyCart
       description: Delete a cart. For guest users, include X-Cart-Id header to maintain
         cart session.
-      summary: Delete cart
+      summary: Διαγραφή καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -7460,7 +7460,7 @@ paths:
         creation. This is required for online payment methods (Stripe) in the payment-first
         flow. Returns client_secret for frontend payment confirmation and payment_intent_id
         to be included in order creation request.
-      summary: Create payment intent from cart
+      summary: Δημιουργία payment intent από καλάθι
       parameters:
       - in: header
         name: X-Cart-Id
@@ -7518,7 +7518,7 @@ paths:
       operationId: listCartItem
       description: Retrieve a list of cart items with filtering and search capabilities.
         For guest users, include X-Cart-Id header to maintain cart session.
-      summary: List cart items
+      summary: Λίστα αντικειμένων καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -7536,7 +7536,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by cart ID
+        description: Φίλτρο ανά ID καλαθιού
       - in: query
         name: cart_IsGuest
         schema:
@@ -7548,7 +7548,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter items in guest carts
+        description: Φίλτρο αντικειμένων σε καλάθια επισκεπτών
       - in: query
         name: cart_User
         schema:
@@ -7572,7 +7572,7 @@ paths:
         schema:
           type: string
           format: uuid
-        description: Filter by cart UUID
+        description: Φίλτρο ανά UUID καλαθιού
       - in: query
         name: cartLastActivityAfter
         schema:
@@ -7685,7 +7685,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by maximum product price
+        description: Φίλτρο ανά μέγιστη τιμή προϊόντος
       - in: query
         name: maxQuantity
         schema:
@@ -7693,7 +7693,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by maximum quantity
+        description: Φίλτρο ανά μέγιστη ποσότητα
       - in: query
         name: maxTotalPrice
         schema:
@@ -7717,7 +7717,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum product price
+        description: Φίλτρο ανά ελάχιστη τιμή προϊόντος
       - in: query
         name: minQuantity
         schema:
@@ -7725,7 +7725,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by minimum quantity
+        description: Φίλτρο ανά ελάχιστη ποσότητα
       - in: query
         name: minTotalPrice
         schema:
@@ -7769,7 +7769,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -7779,7 +7779,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: product
         schema:
@@ -7787,7 +7787,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by product ID
+        description: Φίλτρο ανά ID προϊόντος
       - in: query
         name: product_Active
         schema:
@@ -7799,7 +7799,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by product active status
+        description: Φίλτρο ανά ενεργή κατάσταση προϊόντος
       - in: query
         name: product_Category
         schema:
@@ -7807,12 +7807,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by product category ID
+        description: Φίλτρο ανά ID κατηγορίας προϊόντος
       - in: query
         name: product_Category_Slug
         schema:
           type: string
-        description: Filter by product category slug
+        description: Φίλτρο ανά slug κατηγορίας προϊόντος
       - in: query
         name: product_Name
         schema:
@@ -7836,7 +7836,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by exact quantity
+        description: Φίλτρο ανά ακριβή ποσότητα
       - in: query
         name: quantity_Gte
         schema:
@@ -7947,7 +7947,7 @@ paths:
       operationId: createCartItem
       description: Create a new cart item. Requires authentication. For guest users,
         include X-Cart-Id header to maintain cart session.
-      summary: Create a cart item
+      summary: Δημιουργία αντικειμένου καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -8086,7 +8086,7 @@ paths:
       operationId: updateCartItem
       description: Update cart item information. Requires authentication. For guest
         users, include X-Cart-Id header to maintain cart session.
-      summary: Update a cart item
+      summary: Ενημέρωση αντικειμένου καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -8248,7 +8248,7 @@ paths:
       operationId: destroyCartItem
       description: Delete a cart item. Requires authentication. For guest users, include
         X-Cart-Id header to maintain cart session.
-      summary: Delete a cart item
+      summary: Διαγραφή αντικειμένου καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -8296,7 +8296,7 @@ paths:
       operationId: listCart
       description: Get a cart. For guest users, include X-Cart-Id header to maintain
         cart session.
-      summary: Get cart
+      summary: Λήψη καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -8316,7 +8316,7 @@ paths:
           - guest
           - user
         description: |-
-          Filter by cart type
+          Φίλτρο ανά τύπο καλαθιού
 
           * `user` - User Cart
           * `guest` - Guest Cart
@@ -8566,7 +8566,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -8576,7 +8576,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -8617,7 +8617,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: user_IsActive
         schema:
@@ -8641,7 +8641,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter carts with/without users
+        description: Φίλτρο καλαθιών με/χωρίς χρήστες
       - in: query
         name: userEmail
         schema:
@@ -8703,7 +8703,7 @@ paths:
       operationId: releaseCartReservations
       description: Release stock reservations when checkout is abandoned or payment
         fails. This makes the reserved stock available for other customers.
-      summary: Release stock reservations
+      summary: Αποδέσμευση δεσμεύσεων αποθέματος
       parameters:
       - in: header
         name: X-Cart-Id
@@ -8774,7 +8774,7 @@ paths:
       description: Reserve stock for all items in the cart during checkout. Creates
         temporary stock reservations with 15-minute TTL. Returns list of reservation
         IDs to be used during order creation.
-      summary: Reserve stock for cart items
+      summary: Δέσμευση αποθέματος για αντικείμενα καλαθιού
       parameters:
       - in: header
         name: X-Cart-Id
@@ -9047,7 +9047,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter EU member countries
+        description: Φίλτρο χωρών μελών ΕΕ
       - in: query
         name: isoCc
         schema:
@@ -9055,7 +9055,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by exact ISO country code
+        description: Φίλτρο ανά ακριβή ISO κωδικό χώρας
       - in: query
         name: isoCc_Gte
         schema:
@@ -9123,7 +9123,7 @@ paths:
         name: name_Exact
         schema:
           type: string
-        description: Filter by exact country name
+        description: Φίλτρο ανά ακριβές όνομα χώρας
       - in: query
         name: name_Startswith
         schema:
@@ -9165,7 +9165,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -9175,7 +9175,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: phoneCode
         schema:
@@ -9183,7 +9183,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by exact phone code
+        description: Φίλτρο ανά ακριβή κωδικό κλήσης
       - in: query
         name: phoneCode_Gte
         schema:
@@ -9773,8 +9773,8 @@ paths:
   /api/v1/loyalty/summary:
     get:
       operationId: getLoyaltySummary
-      description: Get loyalty summary
-      summary: Get loyalty summary
+      description: Λήψη σύνοψης πιστότητας
+      summary: Λήψη σύνοψης πιστότητας
       tags:
       - Loyalty
       security:
@@ -9890,8 +9890,8 @@ paths:
   /api/v1/loyalty/transactions:
     get:
       operationId: listLoyaltyTransactions
-      description: List loyalty transactions
-      summary: List loyalty transactions
+      description: Λίστα συναλλαγών πιστότητας
+      summary: Λίστα συναλλαγών πιστότητας
       parameters:
       - name: page
         required: false
@@ -10005,10 +10005,10 @@ paths:
   /api/v1/notification/user:
     get:
       operationId: listNotificationUser
-      description: 'Retrieve a list of Notification Users with filtering and search
+      description: 'Retrieve a list of Χρήστες ειδοποίησης with filtering and search
         capabilities. Supports multiple pagination strategies: pageNumber (default),
         cursor, and limitOffset.'
-      summary: List Notification Users
+      summary: List Χρήστες ειδοποίησης
       parameters:
       - in: query
         name: createdAfter
@@ -10102,12 +10102,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by notification ID
+        description: Φίλτρο ανά ID ειδοποίησης
       - in: query
         name: notification_Category
         schema:
           type: string
-        description: Filter by notification category
+        description: Φίλτρο ανά κατηγορία ειδοποίησης
       - in: query
         name: notification_ExpiresAfter
         schema:
@@ -10136,7 +10136,7 @@ paths:
         name: notification_Kind
         schema:
           type: string
-        description: Filter by notification kind
+        description: Φίλτρο ανά τύπο ειδοποίησης
       - in: query
         name: notification_Link
         schema:
@@ -10151,7 +10151,7 @@ paths:
         name: notification_Priority
         schema:
           type: string
-        description: Filter by notification priority
+        description: Φίλτρο ανά προτεραιότητα ειδοποίησης
       - in: query
         name: notification_Title
         schema:
@@ -10171,7 +10171,7 @@ paths:
         name: notificationKind
         schema:
           type: string
-        description: Filter by notification kind
+        description: Φίλτρο ανά τύπο ειδοποίησης
       - name: ordering
         in: query
         required: false
@@ -10210,7 +10210,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -10220,7 +10220,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: recentNotifications
         schema:
@@ -10289,7 +10289,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter only seen notifications
+        description: Φίλτρο μόνο ορατών ειδοποιήσεων
       - in: query
         name: unseenOnly
         schema:
@@ -10301,7 +10301,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter only unseen notifications
+        description: Φίλτρο μόνο μη ορατών ειδοποιήσεων
       - in: query
         name: updatedAfter
         schema:
@@ -10336,7 +10336,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: user_Email
         schema:
@@ -10358,7 +10358,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by user active status
+        description: Φίλτρο ανά ενεργή κατάσταση χρήστη
       - in: query
         name: user_IsStaff
         schema:
@@ -10370,7 +10370,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by user staff status
+        description: Φίλτρο ανά staff status χρήστη
       - in: query
         name: user_LastName
         schema:
@@ -10735,7 +10735,7 @@ paths:
     post:
       operationId: markAllNotificationUsersAsSeen
       description: Mark all of the authenticated user's notifications as seen.
-      summary: Mark all notifications as seen
+      summary: Σήμανση όλων ως ορατές
       tags:
       - Notification Users
       security:
@@ -10781,7 +10781,7 @@ paths:
     post:
       operationId: markAllNotificationUsersAsUnseen
       description: Mark all of the authenticated user's notifications as unseen.
-      summary: Mark all notifications as unseen
+      summary: Σήμανση όλων ως μη ορατές
       tags:
       - Notification Users
       security:
@@ -10943,7 +10943,7 @@ paths:
     get:
       operationId: getNotificationUserUnseenCount
       description: Get the count of unseen notifications for the authenticated user.
-      summary: Get unseen notifications count
+      summary: Λήψη πλήθους μη ορατών ειδοποιήσεων
       tags:
       - Notification Users
       security:
@@ -11021,7 +11021,7 @@ paths:
         name: city
         schema:
           type: string
-        description: Filter by city (case-insensitive)
+        description: Φίλτρο ανά πόλη (χωρίς πεζά/κεφαλαία)
       - in: query
         name: city_Icontains
         schema:
@@ -11035,7 +11035,7 @@ paths:
         name: country_Alpha2
         schema:
           type: string
-        description: Filter by country alpha-2 code
+        description: Φίλτρο ανά alpha-2 κωδικό χώρας
       - in: query
         name: country_Name
         schema:
@@ -11125,7 +11125,7 @@ paths:
         name: floor
         schema:
           type: string
-        description: Filter by floor
+        description: Φίλτρο ανά όροφο
       - in: query
         name: hasCustomerNotes
         schema:
@@ -11228,7 +11228,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter completed orders
+        description: Φίλτρο ολοκληρωμένων παραγγελιών
       - in: query
         name: isPaid
         schema:
@@ -11240,7 +11240,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter paid/unpaid orders
+        description: Φίλτρο πληρωμένων/μη πληρωμένων παραγγελιών
       - in: query
         name: languageCode
         schema:
@@ -11314,7 +11314,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -11324,7 +11324,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: paidAmount_Gte
         schema:
@@ -11346,7 +11346,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by maximum paid amount
+        description: Φίλτρο ανά μέγιστο πληρωμένο ποσό
       - in: query
         name: paidAmountMin
         schema:
@@ -11354,7 +11354,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum paid amount
+        description: Φίλτρο ανά ελάχιστο πληρωμένο ποσό
       - in: query
         name: payWay
         schema:
@@ -11362,7 +11362,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by payment method ID
+        description: Φίλτρο ανά ID μεθόδου πληρωμής
       - in: query
         name: payWay_IsOnlinePayment
         schema:
@@ -11374,7 +11374,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by online payment methods
+        description: Φίλτρο ανά online μεθόδους πληρωμής
       - in: query
         name: payWay_Name
         schema:
@@ -11384,7 +11384,7 @@ paths:
         name: paymentId
         schema:
           type: string
-        description: Filter by payment ID
+        description: Φίλτρο ανά ID πληρωμής
       - in: query
         name: paymentId_Icontains
         schema:
@@ -11393,7 +11393,7 @@ paths:
         name: paymentMethod
         schema:
           type: string
-        description: Filter by payment method
+        description: Φίλτρο ανά μέθοδο πληρωμής
       - in: query
         name: paymentMethod_Icontains
         schema:
@@ -11412,7 +11412,7 @@ paths:
           - PROCESSING
           - REFUNDED
         description: |-
-          Filter by payment status
+          Φίλτρο ανά κατάσταση πληρωμής
 
           * `PENDING` - Εκκρεμεί
           * `PROCESSING` - Σε επεξεργασία
@@ -11483,7 +11483,7 @@ paths:
         name: shippingCarrier
         schema:
           type: string
-        description: Filter by shipping carrier
+        description: Φίλτρο ανά εταιρεία μεταφοράς
       - in: query
         name: shippingCarrier_Icontains
         schema:
@@ -11509,7 +11509,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by maximum shipping price
+        description: Φίλτρο ανά μέγιστα έξοδα αποστολής
       - in: query
         name: shippingPriceMin
         schema:
@@ -11517,7 +11517,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum shipping price
+        description: Φίλτρο ανά ελάχιστα έξοδα αποστολής
       - in: query
         name: status
         schema:
@@ -11600,7 +11600,7 @@ paths:
         name: streetNumber
         schema:
           type: string
-        description: Filter by street number
+        description: Φίλτρο ανά αριθμό
       - in: query
         name: streetNumber_Icontains
         schema:
@@ -11609,7 +11609,7 @@ paths:
         name: trackingNumber
         schema:
           type: string
-        description: Filter by tracking number
+        description: Φίλτρο ανά αριθμό παρακολούθησης
       - in: query
         name: trackingNumber_Icontains
         schema:
@@ -11648,7 +11648,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: user_Email
         schema:
@@ -11670,7 +11670,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by user active status
+        description: Φίλτρο ανά ενεργή κατάσταση χρήστη
       - in: query
         name: user_LastName
         schema:
@@ -11690,7 +11690,7 @@ paths:
         name: zipcode
         schema:
           type: string
-        description: Filter by zipcode
+        description: Φίλτρο ανά Τ.Κ.
       tags:
       - Orders
       security:
@@ -11819,7 +11819,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter bulk items (quantity > 5)
+        description: Φίλτρο χονδρικής (ποσότητα > 5)
       - in: query
         name: createdAfter
         schema:
@@ -11918,7 +11918,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter fully refunded items
+        description: Φίλτρο πλήρως επιστραμμένων αντικειμένων
       - in: query
         name: isPartiallyRefunded
         schema:
@@ -11930,7 +11930,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter partially refunded items
+        description: Φίλτρο μερικώς επιστραμμένων αντικειμένων
       - in: query
         name: isRefunded
         schema:
@@ -11969,12 +11969,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by order ID
+        description: Φίλτρο ανά ID παραγγελίας
       - in: query
         name: order_Country
         schema:
           type: string
-        description: Filter by order country code
+        description: Φίλτρο ανά κωδικό χώρας παραγγελίας
       - in: query
         name: order_Email
         schema:
@@ -12004,7 +12004,7 @@ paths:
           - PROCESSING
           - REFUNDED
         description: |-
-          Filter by order payment status
+          Φίλτρο ανά κατάσταση πληρωμής παραγγελίας
 
           * `PENDING` - Εκκρεμεί
           * `PROCESSING` - Σε επεξεργασία
@@ -12017,7 +12017,7 @@ paths:
         name: order_Region
         schema:
           type: string
-        description: Filter by order region code
+        description: Φίλτρο ανά κωδικό περιφέρειας παραγγελίας
       - in: query
         name: order_Status
         schema:
@@ -12138,7 +12138,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -12148,7 +12148,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: price
         schema:
@@ -12201,7 +12201,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by product ID
+        description: Φίλτρο ανά ID προϊόντος
       - in: query
         name: product_Active
         schema:
@@ -12213,7 +12213,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by product active status
+        description: Φίλτρο ανά ενεργή κατάσταση προϊόντος
       - in: query
         name: product_Category
         schema:
@@ -12221,7 +12221,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by product category ID
+        description: Φίλτρο ανά ID κατηγορίας προϊόντος
       - in: query
         name: product_Category_Name
         schema:
@@ -12270,7 +12270,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by exact quantity
+        description: Φίλτρο ανά ακριβή ποσότητα
       - in: query
         name: quantityMax
         schema:
@@ -12278,7 +12278,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by maximum quantity
+        description: Φίλτρο ανά μέγιστη ποσότητα
       - in: query
         name: quantityMin
         schema:
@@ -12286,7 +12286,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by minimum quantity
+        description: Φίλτρο ανά ελάχιστη ποσότητα
       - in: query
         name: recentItems
         schema:
@@ -13602,7 +13602,7 @@ paths:
         has not been generated yet. Same ownership check as the metadata endpoint
         — returns a signed S3 stream on prod and a filesystem stream in dev without
         exposing the storage URL to the client.
-      summary: Download the invoice PDF
+      summary: Λήψη PDF τιμολογίου
       parameters:
       - in: path
         name: id
@@ -13626,7 +13626,7 @@ paths:
       operationId: getOrderPaymentStatus
       description: Retrieve the current payment status from the payment provider.
         This fetches the latest status directly from Stripe/PayPal.
-      summary: Get payment status for an order
+      summary: Λήψη κατάστασης πληρωμής παραγγελίας
       parameters:
       - in: path
         name: id
@@ -13922,7 +13922,7 @@ paths:
     post:
       operationId: updateOrderStatus
       description: Update the status of an existing order
-      summary: Update the status of an order
+      summary: Ενημέρωση κατάστασης παραγγελίας
       parameters:
       - in: path
         name: id
@@ -13989,7 +13989,7 @@ paths:
     get:
       operationId: listMyOrders
       description: Returns a list of the authenticated user's orders
-      summary: List current user's orders
+      summary: Λίστα παραγγελιών τρέχοντος χρήστη
       parameters:
       - in: query
         name: activeOrders
@@ -14019,7 +14019,7 @@ paths:
         name: city
         schema:
           type: string
-        description: Filter by city (case-insensitive)
+        description: Φίλτρο ανά πόλη (χωρίς πεζά/κεφαλαία)
       - in: query
         name: city_Icontains
         schema:
@@ -14033,7 +14033,7 @@ paths:
         name: country_Alpha2
         schema:
           type: string
-        description: Filter by country alpha-2 code
+        description: Φίλτρο ανά alpha-2 κωδικό χώρας
       - in: query
         name: country_Name
         schema:
@@ -14118,7 +14118,7 @@ paths:
         name: floor
         schema:
           type: string
-        description: Filter by floor
+        description: Φίλτρο ανά όροφο
       - in: query
         name: hasCustomerNotes
         schema:
@@ -14221,7 +14221,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter completed orders
+        description: Φίλτρο ολοκληρωμένων παραγγελιών
       - in: query
         name: isPaid
         schema:
@@ -14233,7 +14233,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter paid/unpaid orders
+        description: Φίλτρο πληρωμένων/μη πληρωμένων παραγγελιών
       - in: query
         name: lastName
         schema:
@@ -14311,7 +14311,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by maximum paid amount
+        description: Φίλτρο ανά μέγιστο πληρωμένο ποσό
       - in: query
         name: paidAmountMin
         schema:
@@ -14319,7 +14319,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum paid amount
+        description: Φίλτρο ανά ελάχιστο πληρωμένο ποσό
       - in: query
         name: payWay
         schema:
@@ -14327,7 +14327,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by payment method ID
+        description: Φίλτρο ανά ID μεθόδου πληρωμής
       - in: query
         name: payWay_IsOnlinePayment
         schema:
@@ -14339,7 +14339,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by online payment methods
+        description: Φίλτρο ανά online μεθόδους πληρωμής
       - in: query
         name: payWay_Name
         schema:
@@ -14349,7 +14349,7 @@ paths:
         name: paymentId
         schema:
           type: string
-        description: Filter by payment ID
+        description: Φίλτρο ανά ID πληρωμής
       - in: query
         name: paymentId_Icontains
         schema:
@@ -14358,7 +14358,7 @@ paths:
         name: paymentMethod
         schema:
           type: string
-        description: Filter by payment method
+        description: Φίλτρο ανά μέθοδο πληρωμής
       - in: query
         name: paymentMethod_Icontains
         schema:
@@ -14377,7 +14377,7 @@ paths:
           - PROCESSING
           - REFUNDED
         description: |-
-          Filter by payment status
+          Φίλτρο ανά κατάσταση πληρωμής
 
           * `PENDING` - Εκκρεμεί
           * `PROCESSING` - Σε επεξεργασία
@@ -14448,7 +14448,7 @@ paths:
         name: shippingCarrier
         schema:
           type: string
-        description: Filter by shipping carrier
+        description: Φίλτρο ανά εταιρεία μεταφοράς
       - in: query
         name: shippingCarrier_Icontains
         schema:
@@ -14474,7 +14474,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by maximum shipping price
+        description: Φίλτρο ανά μέγιστα έξοδα αποστολής
       - in: query
         name: shippingPriceMin
         schema:
@@ -14482,7 +14482,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum shipping price
+        description: Φίλτρο ανά ελάχιστα έξοδα αποστολής
       - in: query
         name: status
         schema:
@@ -14565,7 +14565,7 @@ paths:
         name: streetNumber
         schema:
           type: string
-        description: Filter by street number
+        description: Φίλτρο ανά αριθμό
       - in: query
         name: streetNumber_Icontains
         schema:
@@ -14574,7 +14574,7 @@ paths:
         name: trackingNumber
         schema:
           type: string
-        description: Filter by tracking number
+        description: Φίλτρο ανά αριθμό παρακολούθησης
       - in: query
         name: trackingNumber_Icontains
         schema:
@@ -14613,7 +14613,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: user_Email
         schema:
@@ -14635,7 +14635,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by user active status
+        description: Φίλτρο ανά ενεργή κατάσταση χρήστη
       - in: query
         name: user_LastName
         schema:
@@ -14655,7 +14655,7 @@ paths:
         name: zipcode
         schema:
           type: string
-        description: Filter by zipcode
+        description: Φίλτρο ανά Τ.Κ.
       tags:
       - Orders
       security:
@@ -14701,7 +14701,7 @@ paths:
     get:
       operationId: retrieveOrderByUuid
       description: Get detailed information about a specific order using its UUID
-      summary: Retrieve an order by UUID
+      summary: Ανάκτηση παραγγελίας με UUID
       parameters:
       - in: path
         name: uuid
@@ -14783,10 +14783,10 @@ paths:
   /api/v1/pay_way:
     get:
       operationId: listPayWay
-      description: 'Retrieve a list of Pay Ways with filtering and search capabilities.
+      description: 'Retrieve a list of Τρόποι πληρωμής with filtering and search capabilities.
         Supports multiple pagination strategies: pageNumber (default), cursor, and
         limitOffset.'
-      summary: List Pay Ways
+      summary: List Τρόποι πληρωμής
       parameters:
       - in: query
         name: active
@@ -14861,7 +14861,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by maximum free threshold
+        description: Φίλτρο ανά μέγιστο όριο δωρεάν
       - in: query
         name: freeThresholdMin
         schema:
@@ -14869,7 +14869,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by minimum free threshold
+        description: Φίλτρο ανά ελάχιστο όριο δωρεάν
       - in: query
         name: hasConfiguration
         schema:
@@ -14901,7 +14901,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by payment method ID
+        description: Φίλτρο ανά ID μεθόδου πληρωμής
       - in: query
         name: isOnlinePayment
         schema:
@@ -14913,7 +14913,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by online payment status
+        description: Φίλτρο ανά κατάσταση online πληρωμής
       - in: query
         name: languageCode
         schema:
@@ -14928,7 +14928,7 @@ paths:
         name: name
         schema:
           type: string
-        description: Filter by name (partial match)
+        description: Φίλτρο ανά όνομα (μερική αντιστοίχιση)
       - name: ordering
         in: query
         required: false
@@ -14965,7 +14965,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -14975,7 +14975,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: providerCode
         schema:
@@ -15761,7 +15761,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -15771,7 +15771,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: price
         schema:
@@ -16264,8 +16264,8 @@ paths:
   /api/v1/product/{id}/images:
     get:
       operationId: listProductImages
-      description: Get all images for a product.
-      summary: Get product images
+      description: Λήψη όλων των εικόνων προϊόντος.
+      summary: Λήψη εικόνων προϊόντος
       parameters:
       - in: path
         name: id
@@ -16350,7 +16350,7 @@ paths:
     get:
       operationId: listProductReviews
       description: Get all reviews for a product with pagination support.
-      summary: Get product reviews
+      summary: Λήψη κριτικών προϊόντος
       parameters:
       - in: path
         name: id
@@ -16396,7 +16396,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -16406,7 +16406,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -16459,7 +16459,7 @@ paths:
     get:
       operationId: listProductTags
       description: Get all tags associated with a product.
-      summary: Get product tags
+      summary: Λήψη ετικετών προϊόντος
       parameters:
       - in: path
         name: id
@@ -16534,7 +16534,7 @@ paths:
     post:
       operationId: incrementProductViews
       description: Increment the view count for a product.
-      summary: Increment product view count
+      summary: Αύξηση προβολών προϊόντος
       parameters:
       - in: path
         name: id
@@ -16614,11 +16614,12 @@ paths:
         name: kind
         schema:
           type: string
+          title: Είδος
           enum:
           - price_drop
           - restock
         description: |-
-          * `restock` - Restock
+          * `restock` - Αναπλήρωση
           * `price_drop` - Price drop
       - in: query
         name: languageCode
@@ -16664,7 +16665,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -16674,7 +16675,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: product
         schema:
@@ -17022,7 +17023,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -17032,7 +17033,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -17551,7 +17552,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -17561,7 +17562,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -17953,10 +17954,10 @@ paths:
   /api/v1/product/category:
     get:
       operationId: listProductCategory
-      description: 'Retrieve a list of Product Categories with filtering and search
+      description: 'Retrieve a list of Κατηγορίες προϊόντος with filtering and search
         capabilities. Supports multiple pagination strategies: pageNumber (default),
         cursor, and limitOffset.'
-      summary: List Product Categories
+      summary: List Κατηγορίες προϊόντος
       parameters:
       - in: query
         name: active
@@ -18183,7 +18184,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -18193,7 +18194,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: parent
         schema:
@@ -19013,6 +19014,7 @@ paths:
         name: imageType
         schema:
           type: string
+          title: Τύπος εικόνας
           enum:
           - BACKGROUND
           - BANNER
@@ -19025,16 +19027,16 @@ paths:
           - SEASONAL
           - THUMBNAIL
         description: |-
-          * `MAIN` - Main Image
-          * `BANNER` - Banner Image
-          * `ICON` - Icon Image
-          * `THUMBNAIL` - Thumbnail Image
-          * `GALLERY` - Gallery Image
-          * `BACKGROUND` - Background Image
-          * `HERO` - Hero Image
+          * `MAIN` - Κύρια εικόνα
+          * `BANNER` - Banner
+          * `ICON` - Εικονίδιο
+          * `THUMBNAIL` - Μικρογραφία
+          * `GALLERY` - Εικόνα συλλογής
+          * `BACKGROUND` - Εικόνα φόντου
+          * `HERO` - Κεντρική εικόνα
           * `FEATURE` - Κεντρική Εικόνα
-          * `PROMOTIONAL` - Promotional Image
-          * `SEASONAL` - Seasonal Image
+          * `PROMOTIONAL` - Προωθητική εικόνα
+          * `SEASONAL` - Εποχιακή εικόνα
       - in: query
         name: languageCode
         schema:
@@ -19079,7 +19081,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -19089,7 +19091,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -19461,7 +19463,7 @@ paths:
       operationId: bulkUpdateProductCategoryImages
       description: Update multiple category images at once. Can update active status
         and sort order.
-      summary: Bulk update category images
+      summary: Μαζική ενημέρωση εικόνων κατηγορίας
       tags:
       - Product Category Images
       requestBody:
@@ -19549,6 +19551,7 @@ paths:
         name: imageType
         schema:
           type: string
+          title: Τύπος εικόνας
           enum:
           - BACKGROUND
           - BANNER
@@ -19561,16 +19564,16 @@ paths:
           - SEASONAL
           - THUMBNAIL
         description: |-
-          * `MAIN` - Main Image
-          * `BANNER` - Banner Image
-          * `ICON` - Icon Image
-          * `THUMBNAIL` - Thumbnail Image
-          * `GALLERY` - Gallery Image
-          * `BACKGROUND` - Background Image
-          * `HERO` - Hero Image
+          * `MAIN` - Κύρια εικόνα
+          * `BANNER` - Banner
+          * `ICON` - Εικονίδιο
+          * `THUMBNAIL` - Μικρογραφία
+          * `GALLERY` - Εικόνα συλλογής
+          * `BACKGROUND` - Εικόνα φόντου
+          * `HERO` - Κεντρική εικόνα
           * `FEATURE` - Κεντρική Εικόνα
-          * `PROMOTIONAL` - Promotional Image
-          * `SEASONAL` - Seasonal Image
+          * `PROMOTIONAL` - Προωθητική εικόνα
+          * `SEASONAL` - Εποχιακή εικόνα
       - name: ordering
         in: query
         required: false
@@ -19634,7 +19637,7 @@ paths:
     get:
       operationId: getProductCategoryImagesByType
       description: Retrieve all images of a specific type (main, banner, icon, etc.).
-      summary: Get images by type
+      summary: Λήψη εικόνων ανά τύπο
       parameters:
       - in: query
         name: active
@@ -19665,6 +19668,7 @@ paths:
         name: imageType
         schema:
           type: string
+          title: Τύπος εικόνας
           enum:
           - BACKGROUND
           - BANNER
@@ -19677,16 +19681,16 @@ paths:
           - SEASONAL
           - THUMBNAIL
         description: |-
-          * `MAIN` - Main Image
-          * `BANNER` - Banner Image
-          * `ICON` - Icon Image
-          * `THUMBNAIL` - Thumbnail Image
-          * `GALLERY` - Gallery Image
-          * `BACKGROUND` - Background Image
-          * `HERO` - Hero Image
+          * `MAIN` - Κύρια εικόνα
+          * `BANNER` - Banner
+          * `ICON` - Εικονίδιο
+          * `THUMBNAIL` - Μικρογραφία
+          * `GALLERY` - Εικόνα συλλογής
+          * `BACKGROUND` - Εικόνα φόντου
+          * `HERO` - Κεντρική εικόνα
           * `FEATURE` - Κεντρική Εικόνα
-          * `PROMOTIONAL` - Promotional Image
-          * `SEASONAL` - Seasonal Image
+          * `PROMOTIONAL` - Προωθητική εικόνα
+          * `SEASONAL` - Εποχιακή εικόνα
       - name: ordering
         in: query
         required: false
@@ -19749,10 +19753,10 @@ paths:
   /api/v1/product/favourite:
     get:
       operationId: listProductFavourite
-      description: 'Retrieve a list of Product Favourites with filtering and search
+      description: 'Retrieve a list of Αγαπημένα προϊόντα with filtering and search
         capabilities. Supports multiple pagination strategies: pageNumber (default),
         cursor, and limitOffset.'
-      summary: List Product Favourites
+      summary: List Αγαπημένα προϊόντα
       parameters:
       - in: query
         name: createdAfter
@@ -19823,7 +19827,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -19833,7 +19837,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: product
         schema:
@@ -20234,7 +20238,7 @@ paths:
     get:
       operationId: getProductFavouriteProduct
       description: Get detailed information about the product in this favourite entry.
-      summary: Get favourite product details
+      summary: Λήψη λεπτομερειών αγαπημένου προϊόντος
       parameters:
       - in: path
         name: id
@@ -20286,7 +20290,7 @@ paths:
     post:
       operationId: getProductFavouritesByProducts
       description: Get favourite entries for the specified product IDs. Requires authentication.
-      summary: Get favourites by product IDs
+      summary: Λήψη αγαπημένων ανά IDs προϊόντων
       parameters:
       - in: query
         name: createdAfter
@@ -20426,10 +20430,10 @@ paths:
   /api/v1/product/image:
     get:
       operationId: listProductImage
-      description: 'Retrieve a list of Product Images with filtering and search capabilities.
-        Supports multiple pagination strategies: pageNumber (default), cursor, and
-        limitOffset.'
-      summary: List Product Images
+      description: 'Retrieve a list of Εικόνες προϊόντος with filtering and search
+        capabilities. Supports multiple pagination strategies: pageNumber (default),
+        cursor, and limitOffset.'
+      summary: List Εικόνες προϊόντος
       parameters:
       - in: query
         name: createdAt
@@ -20504,7 +20508,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -20514,7 +20518,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: product
         schema:
@@ -20902,10 +20906,10 @@ paths:
   /api/v1/product/review:
     get:
       operationId: listProductReview
-      description: 'Retrieve a list of Product Reviews with filtering and search capabilities.
-        Supports multiple pagination strategies: pageNumber (default), cursor, and
-        limitOffset.'
-      summary: List Product Reviews
+      description: 'Retrieve a list of Κριτικές προϊόντος with filtering and search
+        capabilities. Supports multiple pagination strategies: pageNumber (default),
+        cursor, and limitOffset.'
+      summary: List Κριτικές προϊόντος
       parameters:
       - in: query
         name: comment
@@ -20976,7 +20980,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by review ID
+        description: Φίλτρο ανά ID κριτικής
       - in: query
         name: isPublished
         schema:
@@ -20988,7 +20992,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by published status
+        description: Φίλτρο ανά κατάσταση δημοσίευσης
       - in: query
         name: languageCode
         schema:
@@ -21006,7 +21010,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by maximum rating (alias)
+        description: Φίλτρο ανά μέγιστη βαθμολογία (alias)
       - in: query
         name: minRate
         schema:
@@ -21014,7 +21018,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by minimum rating (alias)
+        description: Φίλτρο ανά ελάχιστη βαθμολογία (alias)
       - name: ordering
         in: query
         required: false
@@ -21051,7 +21055,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -21061,7 +21065,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: product
         schema:
@@ -21069,7 +21073,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by product ID
+        description: Φίλτρο ανά ID προϊόντος
       - in: query
         name: productActive
         schema:
@@ -21081,7 +21085,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by product active status
+        description: Φίλτρο ανά ενεργή κατάσταση προϊόντος
       - in: query
         name: productAvgRatingMax
         schema:
@@ -21105,7 +21109,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by product category ID
+        description: Φίλτρο ανά ID κατηγορίας προϊόντος
       - in: query
         name: productId
         schema:
@@ -21113,7 +21117,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by product ID
+        description: Φίλτρο ανά ID προϊόντος
       - in: query
         name: productName
         schema:
@@ -21164,16 +21168,16 @@ paths:
         description: |-
           Filter by exact rating
 
-          * `1` - One
-          * `2` - Two
-          * `3` - Three
-          * `4` - Four
-          * `5` - Five
-          * `6` - Six
-          * `7` - Seven
-          * `8` - Eight
-          * `9` - Nine
-          * `10` - Ten
+          * `1` - Ένα
+          * `2` - Δύο
+          * `3` - Τρία
+          * `4` - Τέσσερα
+          * `5` - Πέντε
+          * `6` - Έξι
+          * `7` - Επτά
+          * `8` - Οκτώ
+          * `9` - Εννέα
+          * `10` - Δέκα
       - in: query
         name: rate_Gte
         schema:
@@ -21195,7 +21199,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by maximum rating
+        description: Φίλτρο ανά μέγιστη βαθμολογία
       - in: query
         name: rateMin
         schema:
@@ -21203,7 +21207,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by minimum rating
+        description: Φίλτρο ανά ελάχιστη βαθμολογία
       - in: query
         name: recentDays
         schema:
@@ -21267,7 +21271,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: userEmail
         schema:
@@ -21285,7 +21289,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter by user ID
+        description: Φίλτρο ανά ID χρήστη
       - in: query
         name: userLastName
         schema:
@@ -21679,7 +21683,7 @@ paths:
     get:
       operationId: getProductReviewProduct
       description: Get detailed information about the product this review is for.
-      summary: Get reviewed product details
+      summary: Λήψη λεπτομερειών προϊόντος κριτικής
       parameters:
       - in: path
         name: id
@@ -21733,7 +21737,7 @@ paths:
       operationId: getUserProductReview
       description: Get the current user's review for a specific product. Requires
         authentication.
-      summary: Get user's review for a product
+      summary: Λήψη κριτικής χρήστη για προϊόν
       parameters:
       - in: path
         name: id
@@ -21807,7 +21811,7 @@ paths:
         name: country
         schema:
           type: string
-        description: Filter by country alpha-2 code
+        description: Φίλτρο ανά alpha-2 κωδικό χώρας
       - in: query
         name: countryName
         schema:
@@ -21879,7 +21883,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -21889,7 +21893,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -22054,7 +22058,7 @@ paths:
         name: alpha
         schema:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
         description: A unique value identifying this Περιοχή.
         required: true
       - in: query
@@ -22112,7 +22116,7 @@ paths:
         name: alpha
         schema:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
         description: A unique value identifying this Περιοχή.
         required: true
       - in: query
@@ -22187,7 +22191,7 @@ paths:
         name: alpha
         schema:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
         description: A unique value identifying this Περιοχή.
         required: true
       - in: query
@@ -22261,7 +22265,7 @@ paths:
         name: alpha
         schema:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
         description: A unique value identifying this Περιοχή.
         required: true
       tags:
@@ -22299,7 +22303,7 @@ paths:
         name: alpha
         schema:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
         description: A unique value identifying this Περιοχή.
         required: true
       - in: query
@@ -22320,7 +22324,7 @@ paths:
         name: country
         schema:
           type: string
-        description: Filter by country alpha-2 code
+        description: Φίλτρο ανά alpha-2 κωδικό χώρας
       - in: query
         name: countryName
         schema:
@@ -22463,7 +22467,7 @@ paths:
         queries, search volume by content type and language, average results count,
         average processing time, and click-through rate. Results can be filtered by
         date range and content type.
-      summary: Get search analytics metrics
+      summary: Λήψη μετρικών αναζήτησης
       parameters:
       - in: query
         name: contentType
@@ -22506,7 +22510,7 @@ paths:
       description: Search blog posts using MeiliSearch. Provides full-text search
         with highlighting, ranking, and faceting capabilities. Results can be filtered
         by language.
-      summary: Search blog posts
+      summary: Αναζήτηση άρθρων
       parameters:
       - in: query
         name: languageCode
@@ -22529,12 +22533,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Number of results to skip
+        description: Αριθμός αποτελεσμάτων προς παράλειψη
       - in: query
         name: query
         schema:
           type: string
-        description: Search query string
+        description: String αναζήτησης
         required: true
       tags:
       - Search
@@ -22583,12 +22587,12 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Number of results to skip
+        description: Αριθμός αποτελεσμάτων προς παράλειψη
       - in: query
         name: query
         schema:
           type: string
-        description: Search query string
+        description: String αναζήτησης
         required: true
       tags:
       - Search
@@ -22660,7 +22664,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Number of results to skip
+        description: Αριθμός αποτελεσμάτων προς παράλειψη
       - in: query
         name: priceMax
         schema:
@@ -22720,7 +22724,7 @@ paths:
       description: Return the most popular search queries from the last 24 hours,
         suitable for surfacing in the search modal empty state. Cached for 5 minutes
         per (language_code, content_type, limit).
-      summary: List trending search queries
+      summary: Λίστα trending αναζητήσεων
       parameters:
       - in: query
         name: contentType
@@ -22740,7 +22744,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Max results. Default 8, cap 20.
+        description: Μέγιστα αποτελέσματα. Προεπιλογή 8, ανώτατο 20.
       tags:
       - Search
       security:
@@ -22757,7 +22761,7 @@ paths:
     get:
       operationId: api_v1_settings_list
       description: Retrieve all settings with their names, values, and types
-      summary: List all available settings
+      summary: Λίστα όλων των ρυθμίσεων
       tags:
       - Settings
       security:
@@ -22781,7 +22785,7 @@ paths:
     get:
       operationId: api_v1_settings_get_retrieve
       description: Retrieve a specific setting value by its key name
-      summary: Get setting by key
+      summary: Λήψη ρύθμισης με κλειδί
       parameters:
       - in: query
         name: key
@@ -23149,7 +23153,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -23159,7 +23163,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -23380,6 +23384,38 @@ paths:
           description: No response body
         '404':
           description: No response body
+  /api/v1/shipping/free-shipping-info:
+    get:
+      operationId: getFreeShippingInfo
+      description: Returns per-(active provider × kind) free-shipping thresholds plus
+        aggregate min/max. The storefront uses ``min_threshold`` as the headline 'from
+        X €' number on the PDP and cart summary.
+      summary: Free-shipping thresholds for the storefront
+      parameters:
+      - in: query
+        name: countryCode
+        schema:
+          type: string
+        description: Optional ISO 3166-1 alpha-2 filter. Carriers with a ``metadata['supported_countries']``
+          list that excludes the code are dropped.
+      - in: query
+        name: currency
+        schema:
+          type: string
+        description: Currency the response should advertise. Defaults to settings.DEFAULT_CURRENCY
+          (EUR).
+      tags:
+      - Shipping
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FreeShippingInfo'
+          description: ''
   /api/v1/shipping/options:
     get:
       operationId: listShippingOptions
@@ -23539,7 +23575,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter tags that are/aren't used
+        description: Φίλτρο ετικετών χρησιμοποιούμενων/μη
       - in: query
         name: id
         schema:
@@ -23568,7 +23604,7 @@ paths:
         name: label_Exact
         schema:
           type: string
-        description: Filter by exact tag label
+        description: Φίλτρο ανά ακριβή ετικέτα
       - in: query
         name: label_Startswith
         schema:
@@ -23591,7 +23627,7 @@ paths:
           - type: string
             pattern: ^-?\d+(\.\d+)?$
           - type: number
-        description: Filter tags used at most X times
+        description: Φίλτρο ετικετών που χρησιμοποιούνται έως X φορές
       - in: query
         name: minUsageCount
         schema:
@@ -23655,7 +23691,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -23665,7 +23701,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -23716,7 +23752,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter tags not used anywhere
+        description: Φίλτρο ετικετών που δεν χρησιμοποιούνται
       - in: query
         name: updatedAfter
         schema:
@@ -24111,21 +24147,21 @@ paths:
   /api/v1/tagged-item:
     get:
       operationId: listTaggedItem
-      description: 'Retrieve a list of Tagged Items with filtering and search capabilities.
-        Supports multiple pagination strategies: pageNumber (default), cursor, and
-        limitOffset.'
-      summary: List Tagged Items
+      description: 'Retrieve a list of Αντικείμενα με ετικέτες with filtering and
+        search capabilities. Supports multiple pagination strategies: pageNumber (default),
+        cursor, and limitOffset.'
+      summary: List Αντικείμενα με ετικέτες
       parameters:
       - in: query
         name: contentType
         schema:
           type: string
-        description: Filter by content type model name
+        description: Φίλτρο ανά όνομα model τύπου περιεχομένου
       - in: query
         name: contentType_AppLabel
         schema:
           type: string
-        description: Filter by content type app label
+        description: Φίλτρο ανά app label τύπου περιεχομένου
       - in: query
         name: createdAfter
         schema:
@@ -24194,7 +24230,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by object ID
+        description: Φίλτρο ανά ID αντικειμένου
       - in: query
         name: objectId_In
         schema:
@@ -24244,7 +24280,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -24254,7 +24290,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -24268,7 +24304,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by specific tag ID
+        description: Φίλτρο ανά συγκεκριμένο ID ετικέτας
       - in: query
         name: tag_Active
         schema:
@@ -24280,7 +24316,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by tag active status
+        description: Φίλτρο ανά ενεργή κατάσταση ετικέτας
       - in: query
         name: tag_Label
         schema:
@@ -24735,7 +24771,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -24745,7 +24781,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -25113,7 +25149,7 @@ paths:
     get:
       operationId: getUserAccountAddresses
       description: Get all addresses for a specific user.
-      summary: Get user's addresses
+      summary: Λήψη διευθύνσεων χρήστη
       parameters:
       - in: path
         name: id
@@ -25202,7 +25238,7 @@ paths:
     get:
       operationId: getUserAccountBlogPostComments
       description: Get all blog post comments written by a specific user.
-      summary: Get user's blog comments
+      summary: Λήψη σχολίων blog χρήστη
       parameters:
       - in: path
         name: id
@@ -25291,7 +25327,7 @@ paths:
     post:
       operationId: changeUserAccountUsername
       description: Change the username for a specific user.
-      summary: Change username
+      summary: Αλλαγή ονόματος χρήστη
       parameters:
       - in: path
         name: id
@@ -25517,7 +25553,7 @@ paths:
     get:
       operationId: getUserAccountFavouriteProducts
       description: Get all favourite products for a specific user.
-      summary: Get user's favourite products
+      summary: Λήψη αγαπημένων προϊόντων χρήστη
       parameters:
       - in: path
         name: id
@@ -25606,7 +25642,7 @@ paths:
     get:
       operationId: getUserAccountLikedBlogPosts
       description: Get all blog posts liked by a specific user.
-      summary: Get user's liked blog posts
+      summary: Λήψη άρθρων με επισήμανση χρήστη
       parameters:
       - in: path
         name: id
@@ -25695,7 +25731,7 @@ paths:
     get:
       operationId: getUserAccountNotifications
       description: Get all notifications for a specific user.
-      summary: Get user's notifications
+      summary: Λήψη ειδοποιήσεων χρήστη
       parameters:
       - in: path
         name: id
@@ -25796,7 +25832,7 @@ paths:
     get:
       operationId: getUserAccountOrders
       description: Get all orders for a specific user.
-      summary: Get user's orders
+      summary: Λήψη παραγγελιών χρήστη
       parameters:
       - in: path
         name: id
@@ -25885,7 +25921,7 @@ paths:
     get:
       operationId: getUserAccountProductReviews
       description: Get all product reviews written by a specific user.
-      summary: Get user's product reviews
+      summary: Λήψη κριτικών προϊόντος χρήστη
       parameters:
       - in: path
         name: id
@@ -25975,7 +26011,7 @@ paths:
       operationId: requestUserAccountDataExport
       description: Queue a job that compiles the user's personal data and emails a
         one-off download link. Returns the new UserDataExport record.
-      summary: Request GDPR data export
+      summary: Αίτημα εξαγωγής δεδομένων GDPR
       parameters:
       - in: path
         name: id
@@ -26047,7 +26083,7 @@ paths:
         name: country
         schema:
           type: string
-        description: Filter by country alpha_2 code
+        description: Φίλτρο ανά alpha_2 κωδικό χώρας
       - in: query
         name: countryCode
         schema:
@@ -26103,6 +26139,7 @@ paths:
         name: floor
         schema:
           type: string
+          title: Όροφος
           enum:
           - ''
           - BASEMENT
@@ -26113,7 +26150,7 @@ paths:
           - SECOND_FLOOR
           - SIXTH_FLOOR_PLUS
           - THIRD_FLOOR
-        description: Filter by floor
+        description: Φίλτρο ανά όροφο
       - in: query
         name: fullName
         schema:
@@ -26130,7 +26167,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter addresses that have notes
+        description: Φίλτρο διευθύνσεων με σημειώσεις
       - in: query
         name: id
         schema:
@@ -26161,7 +26198,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by main address status
+        description: Φίλτρο ανά κύρια διεύθυνση
       - in: query
         name: languageCode
         schema:
@@ -26230,7 +26267,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -26240,7 +26277,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: phone
         schema:
@@ -26254,7 +26291,7 @@ paths:
         name: region
         schema:
           type: string
-        description: Filter by region alpha code
+        description: Φίλτρο ανά αλφαριθμητικό κωδικό περιφέρειας
       - in: query
         name: regionCode
         schema:
@@ -26284,7 +26321,7 @@ paths:
         name: streetNumber
         schema:
           type: string
-        description: Filter by street number
+        description: Φίλτρο ανά αριθμό
       - in: query
         name: streetNumber_Icontains
         schema:
@@ -26704,7 +26741,7 @@ paths:
     post:
       operationId: setMainUserAddress
       description: Set this address as the user's main address.
-      summary: Set address as main
+      summary: Ορισμός διεύθυνσης ως κύριας
       parameters:
       - in: path
         name: id
@@ -26861,7 +26898,7 @@ paths:
             - '1'
             - '0'
           - type: boolean
-        description: Filter by confirmation status
+        description: Φίλτρο ανά κατάσταση επιβεβαίωσης
       - in: query
         name: languageCode
         schema:
@@ -26907,7 +26944,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -26917,7 +26954,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -26935,12 +26972,12 @@ paths:
           - PENDING
           - UNSUBSCRIBED
         description: |-
-          Filter by subscription status
+          Φίλτρο ανά κατάσταση συνδρομής
 
           * `ACTIVE` - Ενεργή
           * `PENDING` - Pending Confirmation
-          * `UNSUBSCRIBED` - Unsubscribed
-          * `BOUNCED` - Bounced
+          * `UNSUBSCRIBED` - Διαγραφή
+          * `BOUNCED` - Επιστράφηκε
       - in: query
         name: subscribedAfter
         schema:
@@ -26975,7 +27012,7 @@ paths:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-        description: Filter by subscription topic
+        description: Φίλτρο ανά θέμα συνδρομής
       - in: query
         name: topicCategory
         schema:
@@ -26990,15 +27027,15 @@ paths:
           - PROMOTIONAL
           - SYSTEM
         description: |-
-          Filter by topic category
+          Φίλτρο ανά κατηγορία θέματος
 
-          * `MARKETING` - Marketing Campaigns
-          * `PRODUCT` - Product Updates
+          * `MARKETING` - Καμπάνιες marketing
+          * `PRODUCT` - Ενημερώσεις προϊόντων
           * `ACCOUNT` - Λογαριασμός Ανενεργός
           * `SYSTEM` - System Notifications
           * `NEWSLETTER` - Newsletter
-          * `PROMOTIONAL` - Promotional
-          * `OTHER` - Other
+          * `PROMOTIONAL` - Προωθητικό
+          * `OTHER` - Άλλο
       - in: query
         name: topicDescription
         schema:
@@ -27018,7 +27055,7 @@ paths:
         name: topicSlugExact
         schema:
           type: string
-        description: Filter by exact topic slug
+        description: Φίλτρο ανά ακριβές slug θέματος
       - in: query
         name: unsubscribedAfter
         schema:
@@ -27439,7 +27476,7 @@ paths:
     post:
       operationId: confirmUserSubscription
       description: Confirm a pending subscription using the confirmation token.
-      summary: Confirm a user subscription
+      summary: Επιβεβαίωση συνδρομής χρήστη
       parameters:
       - in: path
         name: id
@@ -27494,7 +27531,7 @@ paths:
     post:
       operationId: bulkUpdateUserSubscriptions
       description: Subscribe or unsubscribe from multiple topics at once.
-      summary: Bulk update user subscriptions
+      summary: Μαζική ενημέρωση συνδρομών χρήστη
       tags:
       - User Subscriptions
       requestBody:
@@ -27632,15 +27669,15 @@ paths:
           - PROMOTIONAL
           - SYSTEM
         description: |-
-          Filter by topic category
+          Φίλτρο ανά κατηγορία θέματος
 
-          * `MARKETING` - Marketing Campaigns
-          * `PRODUCT` - Product Updates
+          * `MARKETING` - Καμπάνιες marketing
+          * `PRODUCT` - Ενημερώσεις προϊόντων
           * `ACCOUNT` - Λογαριασμός Ανενεργός
           * `SYSTEM` - System Notifications
           * `NEWSLETTER` - Newsletter
-          * `PROMOTIONAL` - Promotional
-          * `OTHER` - Other
+          * `PROMOTIONAL` - Προωθητικό
+          * `OTHER` - Άλλο
       - in: query
         name: createdAfter
         schema:
@@ -27747,7 +27784,7 @@ paths:
         name: name
         schema:
           type: string
-        description: Filter by name (partial match)
+        description: Φίλτρο ανά όνομα (μερική αντιστοίχιση)
       - name: ordering
         in: query
         required: false
@@ -27783,7 +27820,7 @@ paths:
           - 'false'
           - 'true'
           default: 'true'
-        description: Enable or disable pagination
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
       - in: query
         name: paginationType
         schema:
@@ -27793,7 +27830,7 @@ paths:
           - limitOffset
           - pageNumber
           default: pageNumber
-        description: Pagination strategy type
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: requiresConfirmation
         schema:
@@ -27816,7 +27853,7 @@ paths:
         name: slug
         schema:
           type: string
-        description: Filter by slug (partial match)
+        description: Φίλτρο ανά slug (μερική αντιστοίχιση)
       - in: query
         name: slug_Icontains
         schema:
@@ -27825,7 +27862,7 @@ paths:
         name: slugExact
         schema:
           type: string
-        description: Filter by exact slug
+        description: Φίλτρο ανά ακριβές slug
       - in: query
         name: updatedAfter
         schema:
@@ -28280,7 +28317,7 @@ paths:
     post:
       operationId: unsubscribeFromTopic
       description: Unsubscribe the current user from a specific subscription topic.
-      summary: Unsubscribe from a topic
+      summary: Διαγραφή από θέμα
       parameters:
       - in: path
         name: id
@@ -28335,7 +28372,7 @@ paths:
     get:
       operationId: getMySubscriptionTopics
       description: Get the current user's subscribed and available subscription topics.
-      summary: Get my subscriptions
+      summary: Λήψη συνδρομών μου
       tags:
       - Subscription Topics
       security:
@@ -28665,7 +28702,7 @@ components:
       - 2
       type: integer
       description: |-
-        * `1` - Prepaid
+        * `1` - Προπληρωμένο
         * `2` - Cash on delivery
     AcsPickupList:
       type: object
@@ -28704,10 +28741,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - billingCode
       - createdAt
@@ -28760,6 +28799,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/AcsChargeType'
           readOnly: true
+          title: Τύπος χρέωσης
         deliveryProducts:
           type: string
           readOnly: true
@@ -28770,11 +28810,13 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Τελευταίο συμβάν
         lastPolledAt:
           type: string
           format: date-time
           readOnly: true
           nullable: true
+          title: Τελευταία ανάκτηση
           description: Used by poll_acs_tracking_batch to spread load and skip shipments
             polled within the last 15 minutes.
         deliveryDate:
@@ -28786,10 +28828,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         stationDestinationExternalId:
           type: string
           readOnly: true
@@ -28799,7 +28843,7 @@ components:
         stationBranchDestination:
           type: string
           readOnly: true
-          title: Destination branch
+          title: Υποκατάστημα προορισμού
           description: Acs_Station_Branch_Destination value.
         station:
           allOf:
@@ -28882,22 +28926,25 @@ components:
         externalId:
           type: string
           readOnly: true
+          title: Εξωτερικό ID
           description: ACS_SHOP_STATION_ID — used as Acs_Station_Destination.
         branchCode:
           type: string
           readOnly: true
+          title: Κωδικός υποκαταστήματος
           description: ACS_SHOP_BRANCH_ID — paired with external_id when creating
             vouchers (Acs_Station_Branch_Destination).
         shopKind:
           allOf:
           - $ref: '#/components/schemas/ShopKindEnum'
           readOnly: true
+          title: Είδος καταστήματος
           description: |-
             ACS_SHOP_KIND — 1 shop, 7/8 Smartpoint locker.
 
-            * `1` - Shop
-            * `2` - Partner shop (2)
-            * `3` - Partner shop (3)
+            * `1` - Κατάστημα
+            * `2` - Συνεργαζόμενο κατάστημα (2)
+            * `3` - Συνεργαζόμενο κατάστημα (3)
             * `4` - Xpress Point
             * `5` - Kiosk
             * `7` - Smartpoint (inbound)
@@ -28905,6 +28952,7 @@ components:
         name:
           type: string
           readOnly: true
+          title: Όνομα
         addressLine1:
           type: string
           readOnly: true
@@ -28918,7 +28966,7 @@ components:
         countryCode:
           type: string
           readOnly: true
-          description: ISO 3166-1 alpha-2 country code.
+          description: ISO 3166-1 alpha-2 κωδικός χώρας.
         lat:
           type: string
           nullable: true
@@ -28933,6 +28981,7 @@ components:
         workingHours:
           type: string
           readOnly: true
+          title: Ωράριο λειτουργίας
         isActive:
           type: boolean
           readOnly: true
@@ -28941,14 +28990,17 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Τελευταίος συγχρονισμός
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - addressLine1
       - branchCode
@@ -28986,22 +29038,25 @@ components:
         externalId:
           type: string
           readOnly: true
+          title: Εξωτερικό ID
           description: ACS_SHOP_STATION_ID — used as Acs_Station_Destination.
         branchCode:
           type: string
           readOnly: true
+          title: Κωδικός υποκαταστήματος
           description: ACS_SHOP_BRANCH_ID — paired with external_id when creating
             vouchers (Acs_Station_Branch_Destination).
         shopKind:
           allOf:
           - $ref: '#/components/schemas/ShopKindEnum'
           readOnly: true
+          title: Είδος καταστήματος
           description: |-
             ACS_SHOP_KIND — 1 shop, 7/8 Smartpoint locker.
 
-            * `1` - Shop
-            * `2` - Partner shop (2)
-            * `3` - Partner shop (3)
+            * `1` - Κατάστημα
+            * `2` - Συνεργαζόμενο κατάστημα (2)
+            * `3` - Συνεργαζόμενο κατάστημα (3)
             * `4` - Xpress Point
             * `5` - Kiosk
             * `7` - Smartpoint (inbound)
@@ -29009,6 +29064,7 @@ components:
         name:
           type: string
           readOnly: true
+          title: Όνομα
         addressLine1:
           type: string
           readOnly: true
@@ -29022,7 +29078,7 @@ components:
         countryCode:
           type: string
           readOnly: true
-          description: ISO 3166-1 alpha-2 country code.
+          description: ISO 3166-1 alpha-2 κωδικός χώρας.
         lat:
           type: string
           nullable: true
@@ -29037,6 +29093,7 @@ components:
         workingHours:
           type: string
           readOnly: true
+          title: Ωράριο λειτουργίας
         isActive:
           type: boolean
           readOnly: true
@@ -29045,14 +29102,17 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Τελευταίος συγχρονισμός
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         addressLine2:
           type: string
           readOnly: true
@@ -29096,6 +29156,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Ώρα συμβάντος
           description: Checkpoint_Date_Time from ACS_TrackingDetails.
         checkpointAction:
           type: string
@@ -29105,12 +29166,13 @@ components:
         checkpointLocation:
           type: string
           readOnly: true
+          title: Σημείο ελέγχου
           description: Checkpoint_Location_Description.
         notes:
           type: string
           readOnly: true
           title: Σημειώσεις
-          description: ACS Comments field.
+          description: Πεδίο σχολίων ACS.
         receivedAt:
           type: string
           format: date-time
@@ -29181,6 +29243,7 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         valuesCount:
           type: integer
           readOnly: true
@@ -29191,10 +29254,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - createdAt
       - id
@@ -29246,6 +29311,7 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         usageCount:
           type: integer
           readOnly: true
@@ -29253,10 +29319,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - attribute
       - attributeName
@@ -29312,10 +29380,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         numberOfPosts:
           type: integer
           readOnly: true
@@ -29379,10 +29449,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         numberOfPosts:
           type: integer
           readOnly: true
@@ -29442,6 +29514,7 @@ components:
         website:
           type: string
           format: uri
+          title: Ιστότοπος
           maxLength: 200
       required:
       - translations
@@ -29491,6 +29564,7 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         postCount:
           type: integer
           description: |-
@@ -29512,10 +29586,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - createdAt
       - hasChildren
@@ -29572,6 +29648,7 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         postCount:
           type: integer
           description: |-
@@ -29593,10 +29670,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         children:
           type: array
           items:
@@ -29650,7 +29729,7 @@ components:
       properties:
         id:
           type: integer
-          description: Category ID
+          description: ID κατηγορίας
         sortOrder:
           type: integer
           description: New sort order value
@@ -29672,7 +29751,7 @@ components:
       properties:
         updatedCount:
           type: integer
-          description: Number of categories updated
+          description: Αριθμός ενημερωμένων κατηγοριών
         message:
           type: string
           description: Success message
@@ -29791,10 +29870,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -29883,10 +29964,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -30091,6 +30174,7 @@ components:
         viewCount:
           type: integer
           readOnly: true
+          title: Προβολές
         likesCount:
           type: integer
           description: Return likes count from annotation or query database.
@@ -30110,14 +30194,17 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Δημοσιεύθηκε στις
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         mainImagePath:
           type: string
           readOnly: true
@@ -30215,6 +30302,7 @@ components:
         viewCount:
           type: integer
           readOnly: true
+          title: Προβολές
         likesCount:
           type: integer
           description: Return likes count from annotation or query database.
@@ -30234,14 +30322,17 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Δημοσιεύθηκε στις
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         mainImagePath:
           type: string
           readOnly: true
@@ -30459,6 +30550,7 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         postsCount:
           type: string
           readOnly: true
@@ -30467,10 +30559,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -30515,6 +30609,7 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         postsCount:
           type: string
           readOnly: true
@@ -30523,10 +30618,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -30603,6 +30700,7 @@ components:
         externalId:
           type: string
           readOnly: true
+          title: Εξωτερικό ID
           description: BoxNow APM identifier (string)
         type:
           allOf:
@@ -30622,7 +30720,7 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
-          title: Latitude
+          title: Γεωγραφικό πλάτος
         lng:
           type: number
           format: double
@@ -30631,7 +30729,7 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
-          title: Longitude
+          title: Γεωγραφικό μήκος
         title:
           type: string
           readOnly: true
@@ -30639,6 +30737,7 @@ components:
         name:
           type: string
           readOnly: true
+          title: Όνομα
         addressLine1:
           type: string
           readOnly: true
@@ -30652,7 +30751,7 @@ components:
         countryCode:
           type: string
           readOnly: true
-          description: ISO 3166-1 alpha-2 country code
+          description: ISO 3166-1 alpha-2 κωδικός χώρας
         note:
           type: string
           readOnly: true
@@ -30665,15 +30764,18 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Τελευταίος συγχρονισμός
           description: Timestamp of the most recent sync from BoxNow API
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -30711,6 +30813,7 @@ components:
         externalId:
           type: string
           readOnly: true
+          title: Εξωτερικό ID
           description: BoxNow APM identifier (string)
         type:
           allOf:
@@ -30730,7 +30833,7 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
-          title: Latitude
+          title: Γεωγραφικό πλάτος
         lng:
           type: number
           format: double
@@ -30739,7 +30842,7 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
-          title: Longitude
+          title: Γεωγραφικό μήκος
         title:
           type: string
           readOnly: true
@@ -30747,6 +30850,7 @@ components:
         name:
           type: string
           readOnly: true
+          title: Όνομα
         addressLine1:
           type: string
           readOnly: true
@@ -30760,7 +30864,7 @@ components:
         countryCode:
           type: string
           readOnly: true
-          description: ISO 3166-1 alpha-2 country code
+          description: ISO 3166-1 alpha-2 κωδικός χώρας
         note:
           type: string
           readOnly: true
@@ -30773,15 +30877,18 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Τελευταίος συγχρονισμός
           description: Timestamp of the most recent sync from BoxNow API
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -30865,7 +30972,7 @@ components:
         image:
           type: string
           readOnly: true
-          description: URL of locker image
+          description: URL εικόνας locker
         lat:
           type: string
           readOnly: true
@@ -30885,15 +30992,15 @@ components:
         postalCode:
           type: string
           readOnly: true
-          description: Postal code of the locker
+          description: Ταχ. κώδικας του locker
         country:
           type: string
           readOnly: true
-          description: ISO 3166-1 alpha-2 country code
+          description: ISO 3166-1 alpha-2 κωδικός χώρας
         note:
           type: string
           readOnly: true
-          description: Operational note from BoxNow
+          description: Λειτουργική σημείωση από BoxNow
         addressLine1:
           type: string
           readOnly: true
@@ -30940,6 +31047,7 @@ components:
         webhookMessageId:
           type: string
           readOnly: true
+          title: ID μηνύματος webhook
           description: CloudEvents 'id' field — idempotency key
         eventType:
           allOf:
@@ -30950,16 +31058,16 @@ components:
 
             * `pending_creation` - Pending creation
             * `new` - Νέο
-            * `in_depot` - In depot
+            * `in_depot` - Σε αποθήκη
             * `final_destination` - At locker
             * `delivered` - Παραδόθηκε
             * `returned` - Επιστράφηκε
             * `expired` - Έληξε
             * `canceled` - Ακυρώθηκε
-            * `accepted_for_return` - Accepted for return
-            * `accepted_to_locker` - Accepted to locker
-            * `missing` - Missing
-            * `lost` - Lost
+            * `accepted_for_return` - Αποδεκτό για επιστροφή
+            * `accepted_to_locker` - Αποδεκτό σε locker
+            * `missing` - Λείπει
+            * `lost` - Χάθηκε
         eventTypeDisplay:
           type: string
           readOnly: true
@@ -30972,6 +31080,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Ώρα συμβάντος
           description: Timestamp from 'data.time' in the webhook payload
         displayName:
           type: string
@@ -30995,6 +31104,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
       required:
       - additionalInformation
       - createdAt
@@ -31025,16 +31135,16 @@ components:
       description: |-
         * `pending_creation` - Pending creation
         * `new` - Νέο
-        * `in_depot` - In depot
+        * `in_depot` - Σε αποθήκη
         * `final_destination` - At locker
         * `delivered` - Παραδόθηκε
         * `returned` - Επιστράφηκε
         * `expired` - Έληξε
         * `canceled` - Ακυρώθηκε
-        * `accepted_for_return` - Accepted for return
-        * `accepted_to_locker` - Accepted to locker
-        * `missing` - Missing
-        * `lost` - Lost
+        * `accepted_for_return` - Αποδεκτό για επιστροφή
+        * `accepted_to_locker` - Αποδεκτό σε locker
+        * `missing` - Λείπει
+        * `lost` - Χάθηκε
     BoxNowShipmentDetail:
       type: object
       description: |-
@@ -31067,10 +31177,12 @@ components:
           type: string
           readOnly: true
           nullable: true
-          description: 10-digit BoxNow voucher number
+          title: ID δέματος
+          description: 10ψήφιος αριθμός BoxNow voucher
         lockerExternalId:
           type: string
           readOnly: true
+          title: Εξωτερικό ID locker
           description: Denormalised BoxNow APM ID — preserved even if the BoxNowLocker
             row is deleted
         parcelState:
@@ -31094,14 +31206,17 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Τελευταίο συμβάν
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         locker:
           allOf:
           - $ref: '#/components/schemas/BoxNowLocker'
@@ -31190,7 +31305,7 @@ components:
           description: Optional merchant reference number
         parcelName:
           type: string
-          description: Optional descriptive parcel name
+          description: Προαιρετικό όνομα δέματος
         orderNumber:
           type: string
           minLength: 1
@@ -31203,7 +31318,7 @@ components:
         eventLocation:
           allOf:
           - $ref: '#/components/schemas/BoxNowEventLocationRequest'
-          description: Location context for this event
+          description: Πλαίσιο τοποθεσίας συμβάντος
         customer:
           allOf:
           - $ref: '#/components/schemas/BoxNowCustomerRequest'
@@ -31243,7 +31358,7 @@ components:
           type: string
           format: uri
           minLength: 1
-          description: Origin URL of the event source
+          description: URL προέλευσης πηγής συμβάντος
         subject:
           type: string
           minLength: 1
@@ -31291,7 +31406,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ActionEnum'
           description: |-
-            Action to perform on the topics
+            Ενέργεια προς εκτέλεση σε θέματα
 
             * `subscribe` - subscribe
             * `unsubscribe` - unsubscribe
@@ -31386,14 +31501,17 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         lastActivity:
           type: string
           format: date-time
           readOnly: true
+          title: Τελευταία δραστηριότητα
       required:
       - createdAt
       - currency
@@ -31484,14 +31602,17 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         lastActivity:
           type: string
           format: date-time
           readOnly: true
+          title: Τελευταία δραστηριότητα
         recommendations:
           type: array
           items:
@@ -31610,10 +31731,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -31744,10 +31867,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -31855,6 +31980,7 @@ components:
           readOnly: true
         name:
           type: string
+          title: Όνομα
           maxLength: 100
         email:
           type: string
@@ -31867,10 +31993,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -31889,6 +32017,7 @@ components:
         name:
           type: string
           minLength: 1
+          title: Όνομα
           maxLength: 100
         email:
           type: string
@@ -31940,24 +32069,28 @@ components:
           maximum: 32767
           minimum: 0
           nullable: true
-          title: ISO Country Code
+          title: Κωδικός ISO χώρας
         phoneCode:
           type: integer
           maximum: 32767
           minimum: 0
           nullable: true
+          title: Κωδικός κλήσης
         sortOrder:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -32011,24 +32144,28 @@ components:
           maximum: 32767
           minimum: 0
           nullable: true
-          title: ISO Country Code
+          title: Κωδικός ISO χώρας
         phoneCode:
           type: integer
           maximum: 32767
           minimum: 0
           nullable: true
+          title: Κωδικός κλήσης
         sortOrder:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -32040,7 +32177,7 @@ components:
           type: array
           items:
             type: string
-            title: Region Code
+            title: Κωδικός περιφέρειας
           readOnly: true
       required:
       - alpha2
@@ -32091,12 +32228,13 @@ components:
           maximum: 32767
           minimum: 0
           nullable: true
-          title: ISO Country Code
+          title: Κωδικός ISO χώρας
         phoneCode:
           type: integer
           maximum: 32767
           minimum: 0
           nullable: true
+          title: Κωδικός κλήσης
       required:
       - alpha2
       - alpha3
@@ -32167,13 +32305,13 @@ components:
           description: Payment intent ID from the payment provider
         status:
           type: string
-          description: Payment status
+          description: Κατάσταση πληρωμής
         amount:
           type: string
-          description: Payment amount
+          description: Ποσό πληρωμής
         currency:
           type: string
-          description: Payment currency
+          description: Νόμισμα πληρωμής
         provider:
           type: string
           description: Payment provider name
@@ -32406,14 +32544,78 @@ components:
       - SIXTH_FLOOR_PLUS
       type: string
       description: |-
-        * `BASEMENT` - Basement
-        * `GROUND_FLOOR` - Ground Floor
-        * `FIRST_FLOOR` - First Floor
-        * `SECOND_FLOOR` - Second Floor
-        * `THIRD_FLOOR` - Third Floor
-        * `FOURTH_FLOOR` - Fourth Floor
-        * `FIFTH_FLOOR` - Fifth Floor
-        * `SIXTH_FLOOR_PLUS` - Sixth Floor Plus
+        * `BASEMENT` - Υπόγειο
+        * `GROUND_FLOOR` - Ισόγειο
+        * `FIRST_FLOOR` - 1ος όροφος
+        * `SECOND_FLOOR` - 2ος όροφος
+        * `THIRD_FLOOR` - 3ος όροφος
+        * `FOURTH_FLOOR` - 4ος όροφος
+        * `FIFTH_FLOOR` - 5ος όροφος
+        * `SIXTH_FLOOR_PLUS` - 6ος όροφος +
+    FreeShippingInfo:
+      type: object
+      description: Response payload for the free-shipping-info endpoint.
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/FreeShippingProviderEntry'
+        minThreshold:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: Lowest threshold across active providers — the headline 'free
+            shipping from X €' number. Null when no active provider advertises a threshold.
+        maxThreshold:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          nullable: true
+          description: Highest threshold across active providers — the subtotal at
+            which every carrier ships free. Null when no active provider advertises
+            a threshold.
+        currency:
+          type: string
+          maxLength: 3
+      required:
+      - currency
+      - maxThreshold
+      - minThreshold
+      - providers
+    FreeShippingProviderEntry:
+      type: object
+      description: One (provider, kind) row in the free-shipping-info response.
+      properties:
+        providerCode:
+          type: string
+        providerName:
+          type: string
+        kind:
+          $ref: '#/components/schemas/ShippingKind'
+        threshold:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          description: Cart subtotal in the response's currency above which this (provider,
+            kind) ships free.
+        priority:
+          type: integer
+      required:
+      - kind
+      - priority
+      - providerCode
+      - providerName
+      - threshold
     HealthCheckResponse:
       type: object
       properties:
@@ -32441,16 +32643,16 @@ components:
       - SEASONAL
       type: string
       description: |-
-        * `MAIN` - Main Image
-        * `BANNER` - Banner Image
-        * `ICON` - Icon Image
-        * `THUMBNAIL` - Thumbnail Image
-        * `GALLERY` - Gallery Image
-        * `BACKGROUND` - Background Image
-        * `HERO` - Hero Image
+        * `MAIN` - Κύρια εικόνα
+        * `BANNER` - Banner
+        * `ICON` - Εικονίδιο
+        * `THUMBNAIL` - Μικρογραφία
+        * `GALLERY` - Εικόνα συλλογής
+        * `BACKGROUND` - Εικόνα φόντου
+        * `HERO` - Κεντρική εικόνα
         * `FEATURE` - Κεντρική Εικόνα
-        * `PROMOTIONAL` - Promotional Image
-        * `SEASONAL` - Seasonal Image
+        * `PROMOTIONAL` - Προωθητική εικόνα
+        * `SEASONAL` - Εποχιακή εικόνα
     InvoiceDownloadResponse:
       type: object
       description: Invoice metadata plus an absolute URL to the streaming endpoint.
@@ -32516,9 +32718,9 @@ components:
       - OTHER
       type: string
       description: |-
-        * `HOME` - Αρχική
-        * `OFFICE` - Office
-        * `OTHER` - Other
+        * `HOME` - Σπίτι
+        * `OFFICE` - Γραφείο
+        * `OTHER` - Άλλο
     LoyaltySummary:
       type: object
       description: |-
@@ -32589,6 +32791,7 @@ components:
         requiredLevel:
           type: integer
           readOnly: true
+          title: Απαιτούμενο επίπεδο
           description: Minimum level to achieve this tier
         pointsMultiplier:
           type: number
@@ -32598,11 +32801,13 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
+          title: Πολλαπλασιαστής πόντων
           description: Multiplier applied to earned points for users in this tier
         icon:
           type: string
           format: uri
           nullable: true
+          title: Εικονίδιο
         mainImagePath:
           type: string
           readOnly: true
@@ -32654,7 +32859,9 @@ components:
           description: URL link or empty string
           readOnly: true
         kind:
-          $ref: '#/components/schemas/NotificationKindEnum'
+          allOf:
+          - $ref: '#/components/schemas/NotificationKindEnum'
+          title: Είδος
         category:
           allOf:
           - $ref: '#/components/schemas/NotificationCategory'
@@ -32664,6 +32871,7 @@ components:
           - $ref: '#/components/schemas/PriorityEnum'
           title: Προτεραιότητα
         notificationType:
+          title: Τύπος ειδοποίησης
           description: |-
             Fine-grained event identifier. See ``notification.enum.NotificationTypeEnum`` for the full catalogue. Left blank for ad-hoc admin broadcasts.
 
@@ -32674,16 +32882,16 @@ components:
             * `order_completed` - Order completed
             * `order_canceled` - Order canceled
             * `order_refunded` - Order refunded
-            * `shipment_dispatched` - Shipment dispatched
+            * `shipment_dispatched` - Αποστολή απεστάλη
             * `payment_confirmed` - Payment confirmed
             * `payment_failed` - Payment failed
-            * `price_drop_favourite` - Price drop (favourited product)
+            * `price_drop_favourite` - Πτώση τιμής (αγαπημένο προϊόν)
             * `restock_favourite` - Back in stock (favourited product)
             * `loyalty_tier_up` - Loyalty tier promotion
-            * `comment_liked` - Blog comment liked
+            * `comment_liked` - Επισήμανση σχολίου blog
             * `BOXNOW_PARCEL_AT_LOCKER` - BoxNow parcel arrived at locker
             * `BOXNOW_PARCEL_DELIVERED` - BoxNow parcel delivered
-            * `ACS_OUT_FOR_DELIVERY` - ACS parcel out for delivery
+            * `ACS_OUT_FOR_DELIVERY` - Δέμα ACS προς παράδοση
           oneOf:
           - $ref: '#/components/schemas/NotificationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -32696,10 +32904,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -32735,20 +32945,20 @@ components:
         * `CART` - Καλάθι
         * `PRODUCT` - Προϊόν
         * `ACCOUNT` - Λογαριασμός Ανενεργός
-        * `SECURITY` - Security
-        * `PROMOTION` - Promotion
+        * `SECURITY` - Ασφάλεια
+        * `PROMOTION` - Προσφορά
         * `SYSTEM` - Σύστημα
         * `REVIEW` - Εξέταση
-        * `WISHLIST` - Wishlist
-        * `SUPPORT` - Support
+        * `WISHLIST` - Λίστα επιθυμιών
+        * `SUPPORT` - Υποστήριξη
         * `NEWSLETTER` - Newsletter
-        * `RECOMMENDATION` - Recommendation
+        * `RECOMMENDATION` - Σύσταση
     NotificationCountResponse:
       type: object
       properties:
         count:
           type: integer
-          description: Number of unseen notifications
+          description: Αριθμός μη ορατών ειδοποιήσεων
       required:
       - count
     NotificationIdsRequest:
@@ -32770,10 +32980,10 @@ components:
       type: string
       description: |-
         * `ERROR` - Σφάλμα
-        * `SUCCESS` - Success
-        * `INFO` - Info
-        * `WARNING` - Warning
-        * `DANGER` - Danger
+        * `SUCCESS` - Επιτυχία
+        * `INFO` - Πληροφορία
+        * `WARNING` - Προειδοποίηση
+        * `DANGER` - Κίνδυνος
     NotificationSuccessResponse:
       type: object
       properties:
@@ -32808,16 +33018,16 @@ components:
         * `order_completed` - Order completed
         * `order_canceled` - Order canceled
         * `order_refunded` - Order refunded
-        * `shipment_dispatched` - Shipment dispatched
+        * `shipment_dispatched` - Αποστολή απεστάλη
         * `payment_confirmed` - Payment confirmed
         * `payment_failed` - Payment failed
-        * `price_drop_favourite` - Price drop (favourited product)
+        * `price_drop_favourite` - Πτώση τιμής (αγαπημένο προϊόν)
         * `restock_favourite` - Back in stock (favourited product)
         * `loyalty_tier_up` - Loyalty tier promotion
-        * `comment_liked` - Blog comment liked
+        * `comment_liked` - Επισήμανση σχολίου blog
         * `BOXNOW_PARCEL_AT_LOCKER` - BoxNow parcel arrived at locker
         * `BOXNOW_PARCEL_DELIVERED` - BoxNow parcel delivered
-        * `ACS_OUT_FOR_DELIVERY` - ACS parcel out for delivery
+        * `ACS_OUT_FOR_DELIVERY` - Δέμα ACS προς παράδοση
     NotificationUser:
       type: object
       properties:
@@ -32832,18 +33042,22 @@ components:
           readOnly: true
         seen:
           type: boolean
+          title: Ορατό
         seenAt:
           type: string
           format: date-time
           nullable: true
+          title: Ορατό στις
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -32881,18 +33095,22 @@ components:
           readOnly: true
         seen:
           type: boolean
+          title: Ορατό
         seenAt:
           type: string
           format: date-time
           nullable: true
+          title: Ορατό στις
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -32911,6 +33129,7 @@ components:
           type: integer
         seen:
           type: boolean
+          title: Ορατό
       required:
       - notification
     Order:
@@ -32928,21 +33147,25 @@ components:
           nullable: true
         region:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
           nullable: true
         floor:
+          title: Όροφος
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
           - $ref: '#/components/schemas/BlankEnum'
         locationType:
+          title: Τύπος τοποθεσίας
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
         street:
           type: string
+          title: Οδός
           maxLength: 255
         streetNumber:
           type: string
+          title: Αριθμός
           maxLength: 255
         payWay:
           type: integer
@@ -32959,6 +33182,7 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Κατάσταση ενημερώθηκε στις
         firstName:
           type: string
           title: Όνομα
@@ -32973,9 +33197,11 @@ components:
           maxLength: 255
         zipcode:
           type: string
+          title: Τ.Κ.
           maxLength: 255
         place:
           type: string
+          title: Τόπος
           maxLength: 255
         city:
           type: string
@@ -33022,10 +33248,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -33052,6 +33280,7 @@ components:
         paymentId:
           type: string
           nullable: true
+          title: ID πληρωμής
           maxLength: 255
         paymentStatus:
           title: Κατάσταση πληρωμής
@@ -33066,6 +33295,7 @@ components:
             locales all work without per-locale string maps in the UI.
         paymentMethod:
           type: string
+          title: Μέθοδος πληρωμής
           maxLength: 50
         isOnlinePayment:
           type: boolean
@@ -33115,7 +33345,7 @@ components:
       - INVOICE
       type: string
       description: |-
-        * `RECEIPT` - Receipt
+        * `RECEIPT` - Απόδειξη
         * `INVOICE` - Τιμολόγιο
     OrderCreateFromCartRequest:
       type: object
@@ -33131,7 +33361,7 @@ components:
       properties:
         payWayId:
           type: integer
-          description: Payment method ID
+          description: ID μεθόδου πληρωμής
         paymentIntentId:
           type: string
           nullable: true
@@ -33169,7 +33399,7 @@ components:
         zipcode:
           type: string
           minLength: 1
-          description: Postal/ZIP code
+          description: Ταχυδρομικός κώδικας
           maxLength: 20
         countryId:
           type: string
@@ -33178,7 +33408,7 @@ components:
         regionId:
           type: string
           nullable: true
-          description: Region alpha code
+          description: Αλφαριθμητικός κωδικός περιφέρειας
         phone:
           type: string
           minLength: 1
@@ -33193,7 +33423,7 @@ components:
           maxLength: 50
         place:
           type: string
-          description: Place or district (optional)
+          description: Τόπος ή περιοχή (προαιρετικό)
           maxLength: 255
         locationType:
           type: string
@@ -33216,7 +33446,7 @@ components:
           description: |-
             RECEIPT (Α.Λ.Π., Tier A — retail) or INVOICE (Τιμολόγιο Πώλησης, Tier B — B2B). Selecting INVOICE requires a valid ``billing_vat_id``.
 
-            * `RECEIPT` - Receipt
+            * `RECEIPT` - Απόδειξη
             * `INVOICE` - Τιμολόγιο
         loyaltyPointsToRedeem:
           type: integer
@@ -33260,7 +33490,7 @@ components:
           description: |-
             Optional per-order ACS Charge_Type override. Leave unset to use the carrier-level default (COD on a COD-only contract). Setting this here only makes sense if the ACS commercial contract permits the chosen value — invalid combinations are rejected by ACS_Create_Voucher.
 
-            * `1` - Prepaid
+            * `1` - Προπληρωμένο
             * `2` - Cash on delivery
         acsItemQuantity:
           type: integer
@@ -33304,21 +33534,25 @@ components:
           nullable: true
         region:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
           nullable: true
         floor:
+          title: Όροφος
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
           - $ref: '#/components/schemas/BlankEnum'
         locationType:
+          title: Τύπος τοποθεσίας
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
         street:
           type: string
+          title: Οδός
           maxLength: 255
         streetNumber:
           type: string
+          title: Αριθμός
           maxLength: 255
         payWay:
           type: integer
@@ -33335,6 +33569,7 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Κατάσταση ενημερώθηκε στις
         firstName:
           type: string
           title: Όνομα
@@ -33349,9 +33584,11 @@ components:
           maxLength: 255
         zipcode:
           type: string
+          title: Τ.Κ.
           maxLength: 255
         place:
           type: string
+          title: Τόπος
           maxLength: 255
         city:
           type: string
@@ -33399,10 +33636,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -33429,6 +33668,7 @@ components:
         paymentId:
           type: string
           nullable: true
+          title: ID πληρωμής
           maxLength: 255
         paymentStatus:
           title: Κατάσταση πληρωμής
@@ -33443,6 +33683,7 @@ components:
             locales all work without per-locale string maps in the UI.
         paymentMethod:
           type: string
+          title: Μέθοδος πληρωμής
           maxLength: 50
         isOnlinePayment:
           type: boolean
@@ -33590,6 +33831,7 @@ components:
           maxLength: 255
         shippingCarrier:
           type: string
+          title: Εταιρεία μεταφοράς
           maxLength: 255
         customerFullName:
           type: string
@@ -33673,12 +33915,12 @@ components:
       - CREDIT_NOTE
       type: string
       description: |-
-        * `RECEIPT` - Receipt
+        * `RECEIPT` - Απόδειξη
         * `INVOICE` - Τιμολόγιο
-        * `PROFORMA` - Proforma Invoice
-        * `SHIPPING_LABEL` - Shipping Label
-        * `RETURN_LABEL` - Return Label
-        * `CREDIT_NOTE` - Credit Note
+        * `PROFORMA` - Προτιμολόγιο
+        * `SHIPPING_LABEL` - Ετικέτα αποστολής
+        * `RETURN_LABEL` - Ετικέτα επιστροφής
+        * `CREDIT_NOTE` - Πιστωτικό
     OrderItem:
       type: object
       properties:
@@ -33709,9 +33951,11 @@ components:
         isRefunded:
           type: boolean
           readOnly: true
+          title: Έχει επιστραφεί
         refundedQuantity:
           type: integer
           readOnly: true
+          title: Επιστραφείσα ποσότητα
         netQuantity:
           type: integer
           readOnly: true
@@ -33727,10 +33971,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - createdAt
       - id
@@ -33790,9 +34036,11 @@ components:
         isRefunded:
           type: boolean
           readOnly: true
+          title: Έχει επιστραφεί
         refundedQuantity:
           type: integer
           readOnly: true
+          title: Επιστραφείσα ποσότητα
         netQuantity:
           type: integer
           readOnly: true
@@ -33808,14 +34056,17 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         originalQuantity:
           type: integer
           readOnly: true
           nullable: true
+          title: Αρχική ποσότητα
         refundedAmount:
           type: number
           format: double
@@ -33836,6 +34087,7 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         notes:
           type: string
           title: Σημειώσεις
@@ -33864,7 +34116,7 @@ components:
           description: Quantity to refund. If not provided, refunds all.
         reason:
           type: string
-          description: Optional reason for the refund
+          description: Προαιρετική αιτία επιστροφής
           maxLength: 255
     OrderItemRefundResponse:
       type: object
@@ -33937,23 +34189,27 @@ components:
         region:
           type: string
           minLength: 1
-          title: Region Code
+          title: Κωδικός περιφέρειας
           nullable: true
         floor:
+          title: Όροφος
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
           - $ref: '#/components/schemas/BlankEnum'
         locationType:
+          title: Τύπος τοποθεσίας
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
         street:
           type: string
           minLength: 1
+          title: Οδός
           maxLength: 255
         streetNumber:
           type: string
           minLength: 1
+          title: Αριθμός
           maxLength: 255
         payWay:
           type: integer
@@ -33976,9 +34232,11 @@ components:
         zipcode:
           type: string
           minLength: 1
+          title: Τ.Κ.
           maxLength: 255
         place:
           type: string
+          title: Τόπος
           maxLength: 255
         city:
           type: string
@@ -35328,6 +35586,7 @@ components:
         website:
           type: string
           format: uri
+          title: Ιστότοπος
           maxLength: 200
     PatchedBlogCategoryWriteRequest:
       type: object
@@ -35536,12 +35795,13 @@ components:
           maximum: 32767
           minimum: 0
           nullable: true
-          title: ISO Country Code
+          title: Κωδικός ISO χώρας
         phoneCode:
           type: integer
           maximum: 32767
           minimum: 0
           nullable: true
+          title: Κωδικός κλήσης
     PatchedNotificationUserWriteRequest:
       type: object
       properties:
@@ -35549,6 +35809,7 @@ components:
           type: integer
         seen:
           type: boolean
+          title: Ορατό
     PatchedOrderItemWriteRequest:
       type: object
       properties:
@@ -35579,23 +35840,27 @@ components:
         region:
           type: string
           minLength: 1
-          title: Region Code
+          title: Κωδικός περιφέρειας
           nullable: true
         floor:
+          title: Όροφος
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
           - $ref: '#/components/schemas/BlankEnum'
         locationType:
+          title: Τύπος τοποθεσίας
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
         street:
           type: string
           minLength: 1
+          title: Οδός
           maxLength: 255
         streetNumber:
           type: string
           minLength: 1
+          title: Αριθμός
           maxLength: 255
         payWay:
           type: integer
@@ -35618,9 +35883,11 @@ components:
         zipcode:
           type: string
           minLength: 1
+          title: Τ.Κ.
           maxLength: 255
         place:
           type: string
+          title: Τόπος
           maxLength: 255
         city:
           type: string
@@ -35696,13 +35963,16 @@ components:
           type: string
           format: binary
           nullable: true
+          title: Εικονίδιο
         providerCode:
           type: string
+          title: Κωδικός παρόχου
           description: Code used to identify the payment provider in the system (e.g.,
             'stripe', 'paypal')
           maxLength: 50
         isOnlinePayment:
           type: boolean
+          title: Είναι online πληρωμή
           description: Whether this payment method is processed online
         requiresConfirmation:
           type: boolean
@@ -35737,6 +36007,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ImageTypeEnum'
           default: MAIN
+          title: Τύπος εικόνας
         active:
           type: boolean
           title: Ενεργή
@@ -35829,6 +36100,7 @@ components:
           title: Εικόνα
         isMain:
           type: boolean
+          title: Κύριο
         translations:
           type: object
           properties:
@@ -35982,7 +36254,7 @@ components:
         alpha:
           type: string
           minLength: 1
-          title: Region Code
+          title: Κωδικός περιφέρειας
           maxLength: 10
         country:
           type: string
@@ -36029,20 +36301,20 @@ components:
           description: |-
             Category of the subscription topic
 
-            * `MARKETING` - Marketing Campaigns
-            * `PRODUCT` - Product Updates
+            * `MARKETING` - Καμπάνιες marketing
+            * `PRODUCT` - Ενημερώσεις προϊόντων
             * `ACCOUNT` - Λογαριασμός Ανενεργός
             * `SYSTEM` - System Notifications
             * `NEWSLETTER` - Newsletter
-            * `PROMOTIONAL` - Promotional
-            * `OTHER` - Other
+            * `PROMOTIONAL` - Προωθητικό
+            * `OTHER` - Άλλο
         isActive:
           type: boolean
           title: Ενεργή
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
-          title: Default Subscription
+          title: Προεπιλεγμένη συνδρομή
           description: Whether new users are automatically subscribed to this topic
         requiresConfirmation:
           type: boolean
@@ -36078,7 +36350,7 @@ components:
         tagId:
           type: integer
           writeOnly: true
-          description: ID of the tag to assign
+          description: ID ετικέτας προς ανάθεση
         contentType:
           type: integer
         objectId:
@@ -36106,10 +36378,12 @@ components:
         street:
           type: string
           minLength: 1
+          title: Οδός
           maxLength: 255
         streetNumber:
           type: string
           minLength: 1
+          title: Αριθμός
           maxLength: 255
         city:
           type: string
@@ -36122,10 +36396,12 @@ components:
           title: Ταχ. Κώδικας
           maxLength: 255
         floor:
+          title: Όροφος
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
           - $ref: '#/components/schemas/BlankEnum'
         locationType:
+          title: Τύπος τοποθεσίας
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -36139,6 +36415,7 @@ components:
         isMain:
           type: boolean
           default: false
+          title: Κύριο
         country:
           type: string
           minLength: 1
@@ -36146,7 +36423,7 @@ components:
         region:
           type: string
           minLength: 1
-          title: Region Code
+          title: Κωδικός περιφέρειας
     PatchedUserSubscriptionWriteRequest:
       type: object
       properties:
@@ -36202,6 +36479,7 @@ components:
           maxLength: 255
         place:
           type: string
+          title: Τόπος
           maxLength: 255
         country:
           type: string
@@ -36211,55 +36489,58 @@ components:
         region:
           type: string
           minLength: 1
-          title: Region Code
+          title: Κωδικός περιφέρειας
           nullable: true
         birthDate:
           type: string
           format: date
           nullable: true
+          title: Ημ/νία γέννησης
         twitter:
           type: string
           format: uri
           nullable: true
-          title: Twitter Profile
+          title: Προφίλ Twitter
           maxLength: 200
         linkedin:
           type: string
           format: uri
           nullable: true
-          title: LinkedIn Profile
+          title: Προφίλ LinkedIn
           maxLength: 200
         facebook:
           type: string
           format: uri
           nullable: true
-          title: Facebook Profile
+          title: Προφίλ Facebook
           maxLength: 200
         instagram:
           type: string
           format: uri
           nullable: true
-          title: Instagram Profile
+          title: Προφίλ Instagram
           maxLength: 200
         website:
           type: string
           format: uri
           nullable: true
+          title: Ιστότοπος
           maxLength: 200
         youtube:
           type: string
           format: uri
           nullable: true
-          title: Youtube Profile
+          title: Προφίλ Youtube
           maxLength: 200
         github:
           type: string
           format: uri
           nullable: true
-          title: Github Profile
+          title: Προφίλ Github
           maxLength: 200
         bio:
           type: string
+          title: Βιογραφικό
         languageCode:
           type: string
           minLength: 1
@@ -36324,10 +36605,12 @@ components:
           type: string
           format: uri
           nullable: true
+          title: Εικονίδιο
         sortOrder:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         mainImagePath:
           type: string
           readOnly: true
@@ -36335,10 +36618,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -36348,11 +36633,13 @@ components:
           readOnly: true
         providerCode:
           type: string
+          title: Κωδικός παρόχου
           description: Code used to identify the payment provider in the system (e.g.,
             'stripe', 'paypal')
           maxLength: 50
         isOnlinePayment:
           type: boolean
+          title: Είναι online πληρωμή
           description: Whether this payment method is processed online
         requiresConfirmation:
           type: boolean
@@ -36427,10 +36714,12 @@ components:
           type: string
           format: uri
           nullable: true
+          title: Εικονίδιο
         sortOrder:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         mainImagePath:
           type: string
           readOnly: true
@@ -36438,10 +36727,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -36451,11 +36742,13 @@ components:
           readOnly: true
         providerCode:
           type: string
+          title: Κωδικός παρόχου
           description: Code used to identify the payment provider in the system (e.g.,
             'stripe', 'paypal')
           maxLength: 50
         isOnlinePayment:
           type: boolean
+          title: Είναι online πληρωμή
           description: Whether this payment method is processed online
         requiresConfirmation:
           type: boolean
@@ -36530,13 +36823,16 @@ components:
           type: string
           format: binary
           nullable: true
+          title: Εικονίδιο
         providerCode:
           type: string
+          title: Κωδικός παρόχου
           description: Code used to identify the payment provider in the system (e.g.,
             'stripe', 'paypal')
           maxLength: 50
         isOnlinePayment:
           type: boolean
+          title: Είναι online πληρωμή
           description: Whether this payment method is processed online
         requiresConfirmation:
           type: boolean
@@ -36555,7 +36851,7 @@ components:
       - cod
       type: string
       description: |-
-        * `prepaid` - Prepaid
+        * `prepaid` - Προπληρωμένο
         * `cod` - Cash on delivery
     PaymentStatusEnum:
       enum:
@@ -36632,6 +36928,7 @@ components:
         points:
           type: integer
           readOnly: true
+          title: Πόντοι
           description: Positive for earn/bonus, negative for redeem/expire/adjust
         transactionType:
           allOf:
@@ -36649,6 +36946,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
       required:
       - createdAt
       - description
@@ -36665,11 +36963,11 @@ components:
       - CRITICAL
       type: string
       description: |-
-        * `LOW` - Low Priority
-        * `NORMAL` - Normal Priority
-        * `HIGH` - High Priority
-        * `URGENT` - Urgent Priority
-        * `CRITICAL` - Critical Priority
+        * `LOW` - Χαμηλή προτεραιότητα
+        * `NORMAL` - Κανονική προτεραιότητα
+        * `HIGH` - Υψηλή προτεραιότητα
+        * `URGENT` - Επείγουσα προτεραιότητα
+        * `CRITICAL` - Κρίσιμη προτεραιότητα
     Product:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -36719,6 +37017,7 @@ components:
         viewCount:
           type: integer
           readOnly: true
+          title: Προβολές
         stock:
           type: integer
           maximum: 2147483647
@@ -36727,6 +37026,7 @@ components:
         lowStockThreshold:
           type: integer
           readOnly: true
+          title: Όριο χαμηλού αποθέματος
           description: Stock level at or below which admins get a low-stock alert.
             Set to 0 to disable alerts for this product.
         active:
@@ -36812,10 +37112,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -36858,7 +37160,9 @@ components:
           format: uuid
           readOnly: true
         kind:
-          $ref: '#/components/schemas/ProductAlertKindEnum'
+          allOf:
+          - $ref: '#/components/schemas/ProductAlertKindEnum'
+          title: Είδος
         product:
           type: integer
         user:
@@ -36886,14 +37190,17 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+          title: Ειδοποιήθηκε στις
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - createdAt
       - id
@@ -36910,13 +37217,15 @@ components:
       - price_drop
       type: string
       description: |-
-        * `restock` - Restock
+        * `restock` - Αναπλήρωση
         * `price_drop` - Price drop
     ProductAlertRequest:
       type: object
       properties:
         kind:
-          $ref: '#/components/schemas/ProductAlertKindEnum'
+          allOf:
+          - $ref: '#/components/schemas/ProductAlertKindEnum'
+          title: Είδος
         product:
           type: integer
         email:
@@ -36961,6 +37270,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
       required:
       - attributeId
       - attributeName
@@ -37042,10 +37352,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -37110,10 +37422,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -37166,6 +37480,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ImageTypeEnum'
           default: MAIN
+          title: Τύπος εικόνας
         active:
           type: boolean
           title: Ενεργή
@@ -37173,6 +37488,7 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         translations:
           type: object
           properties:
@@ -37207,10 +37523,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -37260,6 +37578,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ImageTypeEnum'
           default: MAIN
+          title: Τύπος εικόνας
         active:
           type: boolean
           title: Ενεργή
@@ -37267,6 +37586,7 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         translations:
           type: object
           properties:
@@ -37301,10 +37621,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -37335,6 +37657,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ImageTypeEnum'
           default: MAIN
+          title: Τύπος εικόνας
         active:
           type: boolean
           title: Ενεργή
@@ -37466,6 +37789,7 @@ components:
         viewCount:
           type: integer
           readOnly: true
+          title: Προβολές
         stock:
           type: integer
           maximum: 2147483647
@@ -37474,6 +37798,7 @@ components:
         lowStockThreshold:
           type: integer
           readOnly: true
+          title: Όριο χαμηλού αποθέματος
           description: Stock level at or below which admins get a low-stock alert.
             Set to 0 to disable alerts for this product.
         active:
@@ -37559,10 +37884,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -37575,6 +37902,7 @@ components:
         priceDropAlertsEnabled:
           type: boolean
           readOnly: true
+          title: Ειδοποιήσεις πτώσης τιμής
           description: When enabled, customers can subscribe to a one-time email when
             this product's price drops below a target. Disabled by default — admins
             opt products in per SKU.
@@ -37650,6 +37978,7 @@ components:
         viewCount:
           type: integer
           readOnly: true
+          title: Προβολές
         stock:
           type: integer
           maximum: 2147483647
@@ -37658,6 +37987,7 @@ components:
         lowStockThreshold:
           type: integer
           readOnly: true
+          title: Όριο χαμηλού αποθέματος
           description: Stock level at or below which admins get a low-stock alert.
             Set to 0 to disable alerts for this product.
         active:
@@ -37743,10 +38073,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -37759,6 +38091,7 @@ components:
         priceDropAlertsEnabled:
           type: boolean
           readOnly: true
+          title: Ειδοποιήσεις πτώσης τιμής
           description: When enabled, customers can subscribe to a one-time email when
             this product's price drops below a target. Disabled by default — admins
             opt products in per SKU.
@@ -37805,6 +38138,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         uuid:
           type: string
           format: uuid
@@ -37864,6 +38198,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         uuid:
           type: string
           format: uuid
@@ -37875,6 +38210,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - createdAt
       - id
@@ -37932,10 +38268,12 @@ components:
           readOnly: true
         isMain:
           type: boolean
+          title: Κύριο
         sortOrder:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         translations:
           type: object
           properties:
@@ -37961,6 +38299,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
       required:
       - altText
       - createdAt
@@ -38004,10 +38343,12 @@ components:
           readOnly: true
         isMain:
           type: boolean
+          title: Κύριο
         sortOrder:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         translations:
           type: object
           properties:
@@ -38033,6 +38374,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         imageDimensions:
           type: object
           properties:
@@ -38062,6 +38404,7 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - altText
       - createdAt
@@ -38090,6 +38433,7 @@ components:
           title: Εικόνα
         isMain:
           type: boolean
+          title: Κύριο
         translations:
           type: object
           properties:
@@ -38262,15 +38606,18 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         publishedAt:
           type: string
           format: date-time
           readOnly: true
           nullable: true
+          title: Δημοσιεύθηκε στις
         uuid:
           type: string
           format: uuid
@@ -38334,15 +38681,18 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         publishedAt:
           type: string
           format: date-time
           readOnly: true
           nullable: true
+          title: Δημοσιεύθηκε στις
         uuid:
           type: string
           format: uuid
@@ -38509,16 +38859,16 @@ components:
       - 10
       type: integer
       description: |-
-        * `1` - One
-        * `2` - Two
-        * `3` - Three
-        * `4` - Four
-        * `5` - Five
-        * `6` - Six
-        * `7` - Seven
-        * `8` - Eight
-        * `9` - Nine
-        * `10` - Ten
+        * `1` - Ένα
+        * `2` - Δύο
+        * `3` - Τρία
+        * `4` - Τέσσερα
+        * `5` - Πέντε
+        * `6` - Έξι
+        * `7` - Επτά
+        * `8` - Οκτώ
+        * `9` - Εννέα
+        * `10` - Δέκα
     RedeemPointsRequestRequest:
       type: object
       description: Serializer for validating a points redemption request.
@@ -38598,7 +38948,7 @@ components:
                   type: string
         alpha:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
           maxLength: 10
         country:
           type: string
@@ -38607,14 +38957,17 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -38651,7 +39004,7 @@ components:
                   type: string
         alpha:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
           maxLength: 10
         country:
           type: string
@@ -38660,14 +39013,17 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -38705,7 +39061,7 @@ components:
         alpha:
           type: string
           minLength: 1
-          title: Region Code
+          title: Κωδικός περιφέρειας
           maxLength: 10
         country:
           type: string
@@ -38735,7 +39091,7 @@ components:
           description: Success message
         releasedCount:
           type: integer
-          description: Number of reservations released
+          description: Αριθμός αποδεσμευμένων κρατήσεων
         failedReleases:
           type: array
           items:
@@ -38917,14 +39273,14 @@ components:
       description: |-
         * `pending_creation` - Pending creation
         * `new` - Νέο
-        * `in_transit` - In transit
-        * `at_destination` - At destination station
+        * `in_transit` - Σε μεταφορά
+        * `at_destination` - Στο κατάστημα παράδοσης
         * `out_for_delivery` - Out for delivery
         * `delivered` - Παραδόθηκε
         * `attempted` - Delivery attempted
         * `returned` - Επιστράφηκε
         * `canceled` - Ακυρώθηκε
-        * `lost` - Lost
+        * `lost` - Χάθηκε
     ShippingKind:
       enum:
       - home_delivery
@@ -38993,6 +39349,7 @@ components:
         name:
           type: string
           readOnly: true
+          title: Όνομα
           description: Display name shown to customers (e.g. 'ACS Courier').
         isActive:
           type: boolean
@@ -39024,10 +39381,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - code
       - createdAt
@@ -39051,9 +39410,9 @@ components:
       - 8
       type: integer
       description: |-
-        * `1` - Shop
-        * `2` - Partner shop (2)
-        * `3` - Partner shop (3)
+        * `1` - Κατάστημα
+        * `2` - Συνεργαζόμενο κατάστημα (2)
+        * `3` - Συνεργαζόμενο κατάστημα (3)
         * `4` - Xpress Point
         * `5` - Kiosk
         * `7` - Smartpoint (inbound)
@@ -39068,8 +39427,8 @@ components:
       description: |-
         * `ACTIVE` - Ενεργή
         * `PENDING` - Pending Confirmation
-        * `UNSUBSCRIBED` - Unsubscribed
-        * `BOUNCED` - Bounced
+        * `UNSUBSCRIBED` - Διαγραφή
+        * `BOUNCED` - Επιστράφηκε
     SubscriptionTopic:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -39117,20 +39476,20 @@ components:
           description: |-
             Category of the subscription topic
 
-            * `MARKETING` - Marketing Campaigns
-            * `PRODUCT` - Product Updates
+            * `MARKETING` - Καμπάνιες marketing
+            * `PRODUCT` - Ενημερώσεις προϊόντων
             * `ACCOUNT` - Λογαριασμός Ανενεργός
             * `SYSTEM` - System Notifications
             * `NEWSLETTER` - Newsletter
-            * `PROMOTIONAL` - Promotional
-            * `OTHER` - Other
+            * `PROMOTIONAL` - Προωθητικό
+            * `OTHER` - Άλλο
         isActive:
           type: boolean
           title: Ενεργή
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
-          title: Default Subscription
+          title: Προεπιλεγμένη συνδρομή
           description: Whether new users are automatically subscribed to this topic
         requiresConfirmation:
           type: boolean
@@ -39191,20 +39550,20 @@ components:
           description: |-
             Category of the subscription topic
 
-            * `MARKETING` - Marketing Campaigns
-            * `PRODUCT` - Product Updates
+            * `MARKETING` - Καμπάνιες marketing
+            * `PRODUCT` - Ενημερώσεις προϊόντων
             * `ACCOUNT` - Λογαριασμός Ανενεργός
             * `SYSTEM` - System Notifications
             * `NEWSLETTER` - Newsletter
-            * `PROMOTIONAL` - Promotional
-            * `OTHER` - Other
+            * `PROMOTIONAL` - Προωθητικό
+            * `OTHER` - Άλλο
         isActive:
           type: boolean
           title: Ενεργή
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
-          title: Default Subscription
+          title: Προεπιλεγμένη συνδρομή
           description: Whether new users are automatically subscribed to this topic
         requiresConfirmation:
           type: boolean
@@ -39216,10 +39575,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - createdAt
       - id
@@ -39269,20 +39630,20 @@ components:
           description: |-
             Category of the subscription topic
 
-            * `MARKETING` - Marketing Campaigns
-            * `PRODUCT` - Product Updates
+            * `MARKETING` - Καμπάνιες marketing
+            * `PRODUCT` - Ενημερώσεις προϊόντων
             * `ACCOUNT` - Λογαριασμός Ανενεργός
             * `SYSTEM` - System Notifications
             * `NEWSLETTER` - Newsletter
-            * `PROMOTIONAL` - Promotional
-            * `OTHER` - Other
+            * `PROMOTIONAL` - Προωθητικό
+            * `OTHER` - Άλλο
         isActive:
           type: boolean
           title: Ενεργή
           description: Whether this topic is currently available for subscription
         isDefault:
           type: boolean
-          title: Default Subscription
+          title: Προεπιλεγμένη συνδρομή
           description: Whether new users are automatically subscribed to this topic
         requiresConfirmation:
           type: boolean
@@ -39322,18 +39683,21 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         usageCount:
           type: string
           readOnly: true
-          description: Number of times this tag is used
+          description: Πόσες φορές χρησιμοποιείται η ετικέτα
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -39378,18 +39742,21 @@ components:
           type: integer
           readOnly: true
           nullable: true
+          title: Σειρά ταξινόμησης
         usageCount:
           type: string
           readOnly: true
-          description: Number of times this tag is used
+          description: Πόσες φορές χρησιμοποιείται η ετικέτα
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -39449,7 +39816,7 @@ components:
         contentTypeName:
           type: string
           readOnly: true
-          description: Name of the content type
+          description: Όνομα τύπου περιεχομένου
         objectId:
           type: integer
           maximum: 2147483647
@@ -39479,10 +39846,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -39512,7 +39881,7 @@ components:
         contentTypeName:
           type: string
           readOnly: true
-          description: Name of the content type
+          description: Όνομα τύπου περιεχομένου
         objectId:
           type: integer
           maximum: 2147483647
@@ -39542,10 +39911,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -39566,7 +39937,7 @@ components:
         tagId:
           type: integer
           writeOnly: true
-          description: ID of the tag to assign
+          description: ID ετικέτας προς ανάθεση
         contentType:
           type: integer
         objectId:
@@ -39611,13 +39982,13 @@ components:
       - OTHER
       type: string
       description: |-
-        * `MARKETING` - Marketing Campaigns
-        * `PRODUCT` - Product Updates
+        * `MARKETING` - Καμπάνιες marketing
+        * `PRODUCT` - Ενημερώσεις προϊόντων
         * `ACCOUNT` - Λογαριασμός Ανενεργός
         * `SYSTEM` - System Notifications
         * `NEWSLETTER` - Newsletter
-        * `PROMOTIONAL` - Promotional
-        * `OTHER` - Other
+        * `PROMOTIONAL` - Προωθητικό
+        * `OTHER` - Άλλο
     TransactionTypeEnum:
       enum:
       - EARN
@@ -39627,8 +39998,8 @@ components:
       - BONUS
       type: string
       description: |-
-        * `EARN` - Earn
-        * `REDEEM` - Redeem
+        * `EARN` - Κερδίστε
+        * `REDEEM` - Εξαργύρωση
         * `EXPIRE` - Λήξη
         * `ADJUST` - Προσαρμογή
         * `BONUS` - Bonus
@@ -39681,9 +40052,9 @@ components:
       type: string
       description: |-
         * `apm` - APM
-        * `any_apm` - Any APM
-        * `warehouse` - Warehouse
-        * `depot` - Depot
+        * `any_apm` - Οποιοδήποτε APM
+        * `warehouse` - Αποθήκη
+        * `depot` - Αποθήκη
     UnsubscribeResponse:
       type: object
       properties:
@@ -39729,9 +40100,11 @@ components:
           maxLength: 255
         street:
           type: string
+          title: Οδός
           maxLength: 255
         streetNumber:
           type: string
+          title: Αριθμός
           maxLength: 255
         city:
           type: string
@@ -39742,10 +40115,12 @@ components:
           title: Ταχ. Κώδικας
           maxLength: 255
         floor:
+          title: Όροφος
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
           - $ref: '#/components/schemas/BlankEnum'
         locationType:
+          title: Τύπος τοποθεσίας
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -39758,6 +40133,7 @@ components:
         isMain:
           type: boolean
           default: false
+          title: Κύριο
         user:
           type: integer
           readOnly: true
@@ -39766,15 +40142,17 @@ components:
           title: Κωδικός Χώρας (Alpha 2)
         region:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -39815,9 +40193,11 @@ components:
           maxLength: 255
         street:
           type: string
+          title: Οδός
           maxLength: 255
         streetNumber:
           type: string
+          title: Αριθμός
           maxLength: 255
         city:
           type: string
@@ -39828,10 +40208,12 @@ components:
           title: Ταχ. Κώδικας
           maxLength: 255
         floor:
+          title: Όροφος
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
           - $ref: '#/components/schemas/BlankEnum'
         locationType:
+          title: Τύπος τοποθεσίας
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -39844,6 +40226,7 @@ components:
         isMain:
           type: boolean
           default: false
+          title: Κύριο
         user:
           type: integer
           readOnly: true
@@ -39852,15 +40235,17 @@ components:
           title: Κωδικός Χώρας (Alpha 2)
         region:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
         createdAt:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -39902,10 +40287,12 @@ components:
         street:
           type: string
           minLength: 1
+          title: Οδός
           maxLength: 255
         streetNumber:
           type: string
           minLength: 1
+          title: Αριθμός
           maxLength: 255
         city:
           type: string
@@ -39918,10 +40305,12 @@ components:
           title: Ταχ. Κώδικας
           maxLength: 255
         floor:
+          title: Όροφος
           oneOf:
           - $ref: '#/components/schemas/FloorEnum'
           - $ref: '#/components/schemas/BlankEnum'
         locationType:
+          title: Τύπος τοποθεσίας
           oneOf:
           - $ref: '#/components/schemas/LocationTypeEnum'
           - $ref: '#/components/schemas/BlankEnum'
@@ -39935,6 +40324,7 @@ components:
         isMain:
           type: boolean
           default: false
+          title: Κύριο
         country:
           type: string
           minLength: 1
@@ -39942,7 +40332,7 @@ components:
         region:
           type: string
           minLength: 1
-          title: Region Code
+          title: Κωδικός περιφέρειας
       required:
       - city
       - country
@@ -40040,6 +40430,7 @@ components:
           maxLength: 255
         place:
           type: string
+          title: Τόπος
           maxLength: 255
         country:
           type: string
@@ -40047,12 +40438,13 @@ components:
           nullable: true
         region:
           type: string
-          title: Region Code
+          title: Κωδικός περιφέρειας
           nullable: true
         birthDate:
           type: string
           format: date
           nullable: true
+          title: Ημ/νία γέννησης
         twitter:
           type: string
           nullable: true
@@ -40097,6 +40489,7 @@ components:
           readOnly: true
         bio:
           type: string
+          title: Βιογραφικό
         languageCode:
           type: string
           title: Γλώσσα
@@ -40109,7 +40502,7 @@ components:
         isStaff:
           type: boolean
           readOnly: true
-          title: Staff
+          title: Προσωπικό
         isSuperuser:
           type: boolean
           readOnly: true
@@ -40120,10 +40513,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
         uuid:
           type: string
           format: uuid
@@ -40173,11 +40568,13 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Εγγραφή στις
         unsubscribedAt:
           type: string
           format: date-time
           readOnly: true
           nullable: true
+          title: Διαγραφή στις
         metadata:
           title: Μεταδεδομένα
           description: Additional subscription preferences or data
@@ -40185,10 +40582,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - createdAt
       - id
@@ -40222,11 +40621,13 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Εγγραφή στις
         unsubscribedAt:
           type: string
           format: date-time
           readOnly: true
           nullable: true
+          title: Διαγραφή στις
         metadata:
           title: Μεταδεδομένα
           description: Additional subscription preferences or data
@@ -40234,10 +40635,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          title: Δημιουργήθηκε στις
         updatedAt:
           type: string
           format: date-time
           readOnly: true
+          title: Ενημερώθηκε στις
       required:
       - createdAt
       - id
@@ -40304,6 +40707,7 @@ components:
           maxLength: 255
         place:
           type: string
+          title: Τόπος
           maxLength: 255
         country:
           type: string
@@ -40313,55 +40717,58 @@ components:
         region:
           type: string
           minLength: 1
-          title: Region Code
+          title: Κωδικός περιφέρειας
           nullable: true
         birthDate:
           type: string
           format: date
           nullable: true
+          title: Ημ/νία γέννησης
         twitter:
           type: string
           format: uri
           nullable: true
-          title: Twitter Profile
+          title: Προφίλ Twitter
           maxLength: 200
         linkedin:
           type: string
           format: uri
           nullable: true
-          title: LinkedIn Profile
+          title: Προφίλ LinkedIn
           maxLength: 200
         facebook:
           type: string
           format: uri
           nullable: true
-          title: Facebook Profile
+          title: Προφίλ Facebook
           maxLength: 200
         instagram:
           type: string
           format: uri
           nullable: true
-          title: Instagram Profile
+          title: Προφίλ Instagram
           maxLength: 200
         website:
           type: string
           format: uri
           nullable: true
+          title: Ιστότοπος
           maxLength: 200
         youtube:
           type: string
           format: uri
           nullable: true
-          title: Youtube Profile
+          title: Προφίλ Youtube
           maxLength: 200
         github:
           type: string
           format: uri
           nullable: true
-          title: Github Profile
+          title: Προφίλ Github
           maxLength: 200
         bio:
           type: string
+          title: Βιογραφικό
         languageCode:
           type: string
           minLength: 1
@@ -40376,7 +40783,7 @@ components:
         username:
           type: string
           minLength: 1
-          description: New username
+          description: Νέο όνομα χρήστη
           maxLength: 150
       required:
       - username

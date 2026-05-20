@@ -9,13 +9,22 @@ from __future__ import annotations
 
 from django.urls import path
 
-from shipping.views import ShippingOptionsView, ShippingProviderListView
+from shipping.views import (
+    FreeShippingInfoView,
+    ShippingOptionsView,
+    ShippingProviderListView,
+)
 
 urlpatterns = [
     path(
         "shipping/options",
         ShippingOptionsView.as_view(),
         name="shipping-options",
+    ),
+    path(
+        "shipping/free-shipping-info",
+        FreeShippingInfoView.as_view(),
+        name="shipping-free-shipping-info",
     ),
     path(
         "shipping/providers",

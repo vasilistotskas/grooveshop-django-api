@@ -8,6 +8,7 @@ class so behaviour is unchanged from the pre-abstraction code path.
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.enum import ShippingKind
@@ -245,3 +246,17 @@ class BoxNowCarrier(ShippingCarrierInterface):
         if order_value_amount >= free_threshold:
             return (0.0, currency)
         return (base, currency)
+
+    def free_shipping_threshold(
+        self,
+        kind: ShippingKind,
+    ) -> Decimal | None:
+        # BoxNow only quotes for PICKUP_POINT; mirror the same kind
+        # gate the pricing path uses so the advertised threshold can
+        # never appear for a kind the carrier doesn't actually serve.
+        if kind != ShippingKind.PICKUP_POINT:
+            return None
+        from extra_settings.models import Setting
+
+        raw = Setting.get("BOXNOW_FREE_SHIPPING_THRESHOLD", default=30.00)
+        return Decimal(str(raw))

@@ -153,6 +153,67 @@ class ReserveStockResponseSerializer(serializers.Serializer):
     )
 
 
+class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
+    """Request body for ``POST /api/v1/cart/create-payment-intent``.
+
+    The shipping fields are required so the PaymentIntent amount uses
+    the same per-carrier shipping calculation the order-create
+    verification step runs.  Without them the view falls back to the
+    generic ``FREE_SHIPPING_THRESHOLD`` / ``CHECKOUT_SHIPPING_PRICE``
+    pair which silently disagrees with the carrier adapters whenever
+    the per-carrier thresholds differ — producing a
+    ``PaymentAmountMismatchError`` at order-create time.
+    """
+
+    pay_way_id = serializers.IntegerField(
+        min_value=1,
+        help_text=_("ID of the selected PayWay (must be online Stripe)."),
+    )
+    shipping_provider_code = serializers.CharField(
+        max_length=32,
+        help_text=_(
+            "Carrier code matching a registered shipping adapter "
+            "(e.g. 'acs', 'boxnow'). Used to compute shipping cost "
+            "with the same per-carrier free-shipping threshold the "
+            "order-create path will apply."
+        ),
+    )
+    shipping_kind = serializers.ChoiceField(
+        # Choices declared inline to avoid the circular import that
+        # would happen if ``shipping.enum`` were pulled in at module
+        # import time (cart -> shipping -> order -> cart).
+        choices=(
+            ("home_delivery", "home_delivery"),
+            ("pickup_point", "pickup_point"),
+        ),
+        help_text=_(
+            "Fulfilment kind for the carrier (home_delivery or "
+            "pickup_point). Required so the per-kind feature flags "
+            "(e.g. ACS_SMARTPOINT_ENABLED) and BoxNow's PICKUP_POINT "
+            "gate are honoured."
+        ),
+    )
+    country_id = serializers.CharField(
+        max_length=2,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Optional ISO 3166-1 alpha-2 country code — drives the "
+            "country-level shipping multiplier. Match what the "
+            "order-create body will carry."
+        ),
+    )
+    region_id = serializers.CharField(
+        max_length=16,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Optional region code — drives the region-level shipping "
+            "adjustment."
+        ),
+    )
+
+
 class CartPaymentIntentResponseSerializer(serializers.Serializer):
     """Response body returned by the create-payment-intent cart action."""
 

@@ -169,12 +169,17 @@ def test_pi_and_order_create_calcs_agree_in_gap_range(
     Without this anchor, a future refactor that splits the two calc
     paths would silently break Stripe checkouts for carts in the gap.
     """
+    # ``None`` provider with ``home_delivery`` exercises the auto-
+    # resolution path — the production storefront sends no provider
+    # code for home delivery, both PI and order-create receive None,
+    # both must resolve to the same active home-delivery carrier.
     cases = [
+        (None, "home_delivery", Decimal("35.00")),  # auto-resolves to ACS
         ("acs", "home_delivery", Decimal("35.00")),
         ("acs", "pickup_point", Decimal("35.00")),
         ("boxnow", "pickup_point", Decimal("35.00")),
-        ("acs", "home_delivery", Decimal("29.99")),  # one cent under
-        ("acs", "home_delivery", Decimal("30.00")),  # exact threshold
+        (None, "home_delivery", Decimal("29.99")),  # one cent under
+        (None, "home_delivery", Decimal("30.00")),  # exact threshold
     ]
     for provider, kind, total in cases:
         pi_calc = OrderService.calculate_shipping_cost(
@@ -190,8 +195,87 @@ def test_pi_and_order_create_calcs_agree_in_gap_range(
             weight_grams=500,
         )
         assert pi_calc.amount == order_calc.amount, (
-            f"PI vs order calc diverged for ({provider}, {kind}, {total})"
+            f"PI vs order calc diverged for ({provider}, {kind}, {total}): "
+            f"pi={pi_calc.amount} order={order_calc.amount}"
         )
+
+
+def test_home_delivery_without_explicit_code_uses_acs_threshold(
+    _per_carrier_below_generic,
+):
+    """``home_delivery`` is provider-agnostic at the form level, so the
+    storefront sends no ``shipping_provider_code`` — both order-create
+    and PI calc receive None. ``OrderService.calculate_shipping_cost``
+    must auto-resolve to the active home-delivery provider's code
+    (mirroring what ``_resolve_shipping_provider`` does for the FK)
+    so the cost matches the carrier the order will actually be served
+    by, not the legacy generic-fallback flat rate.
+
+    Without this auto-resolution, a 35€ home_delivery cart would be
+    charged 2.99€ (generic 50€ threshold not crossed) even though the
+    order ends up served by ACS (30€ threshold, free above 30€) —
+    customer-visible mismatch between the advertised "free above 30€"
+    notice and the price they pay.
+    """
+    quote = OrderService.calculate_shipping_cost(
+        order_value=Money(Decimal("35.00"), "EUR"),
+        shipping_kind="home_delivery",
+        weight_grams=500,
+        # NOTE: shipping_provider_code intentionally omitted — that's
+        # the production frontend's behaviour for home_delivery.
+    )
+    assert quote.amount == Decimal("0"), (
+        "home_delivery without explicit code must auto-resolve to ACS "
+        f"and use its 30€ threshold; got {quote.amount} EUR"
+    )
+
+
+def test_home_delivery_below_threshold_charges_carrier_rate(
+    _per_carrier_below_generic,
+):
+    """At 25€ (below the 30€ ACS threshold), home_delivery should
+    charge the ACS flat rate, not the generic ``CHECKOUT_SHIPPING_
+    PRICE``. Pins that auto-resolution uses the carrier's tariff in
+    both branches (free + paid), not just for the free case.
+    """
+    Setting.objects.update_or_create(
+        name="ACS_SHIPPING_PRICE",
+        defaults={"value_type": "decimal", "value_decimal": Decimal("3.50")},
+    )
+    Setting.objects.update_or_create(
+        name="CHECKOUT_SHIPPING_PRICE",
+        defaults={"value_type": "decimal", "value_decimal": Decimal("2.99")},
+    )
+    quote = OrderService.calculate_shipping_cost(
+        order_value=Money(Decimal("25.00"), "EUR"),
+        shipping_kind="home_delivery",
+        weight_grams=500,
+    )
+    # ACS_SHIPPING_PRICE (3.50), not CHECKOUT_SHIPPING_PRICE (2.99).
+    assert quote.amount == Decimal("3.5")
+
+
+def test_home_delivery_falls_back_to_generic_when_no_active_provider(
+    _per_carrier_below_generic,
+):
+    """If ops deactivates every home-delivery provider, the calc
+    legitimately falls through to the generic flat rate. Anchored so
+    we don't accidentally drop the fallback path entirely.
+    """
+    ShippingProvider.objects.filter(supports_home_delivery=True).update(
+        is_active=False
+    )
+    Setting.objects.update_or_create(
+        name="CHECKOUT_SHIPPING_PRICE",
+        defaults={"value_type": "decimal", "value_decimal": Decimal("2.99")},
+    )
+    quote = OrderService.calculate_shipping_cost(
+        order_value=Money(Decimal("35.00"), "EUR"),
+        shipping_kind="home_delivery",
+        weight_grams=500,
+    )
+    # 35 < generic 50 → CHECKOUT_SHIPPING_PRICE (2.99 EUR).
+    assert quote.amount == Decimal("2.99")
 
 
 def test_free_shipping_info_min_matches_carrier_at_threshold(

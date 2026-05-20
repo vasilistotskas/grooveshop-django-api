@@ -2097,20 +2097,11 @@ class OrderService:
         kind = order_data.get("shipping_kind") or "home_delivery"
 
         # Dynamic-routing fallback: a plain ``home_delivery`` request
-        # auto-routes to whichever active provider advertises
-        # ``supports_home_delivery=True``.  Lower ``priority`` wins
-        # the tie.  Adding a new courier (ELTA, Speedex …) is then a
-        # one-row Django admin change — no order-flow code touched.
+        # auto-routes to the active home-delivery carrier. Shared with
+        # ``calculate_shipping_cost`` so the cost we charge and the
+        # carrier the order is assigned to always agree.
         if not code and kind == "home_delivery":
-            picked = (
-                ShippingProvider.objects.filter(
-                    is_active=True, supports_home_delivery=True
-                )
-                .order_by("priority", "code")
-                .first()
-            )
-            if picked is not None:
-                code = picked.code
+            code = cls._resolve_active_home_delivery_code()
 
         if code:
             provider = ShippingProvider.objects.filter(code=code).first()
@@ -2124,6 +2115,32 @@ class OrderService:
                 order_data["shipping_provider"] = provider
 
         order_data["shipping_kind"] = kind
+
+    @classmethod
+    def _resolve_active_home_delivery_code(cls) -> str | None:
+        """Return the active home-delivery carrier's code, or None.
+
+        Lower ``ShippingProvider.priority`` wins the tie. Adding a new
+        courier (ELTA, Speedex …) is then a one-row Django admin
+        change — no order-flow code touched.
+
+        Shared between :meth:`calculate_shipping_cost` (pricing) and
+        :meth:`_resolve_shipping_provider` (FK assignment) so both
+        callers route ``home_delivery`` through the SAME carrier;
+        otherwise the order would be charged against one carrier's
+        threshold and served by another, producing the kind of silent
+        UI/charge mismatch that motivated this helper.
+        """
+        from shipping.models import ShippingProvider
+
+        picked = (
+            ShippingProvider.objects.filter(
+                is_active=True, supports_home_delivery=True
+            )
+            .order_by("priority", "code")
+            .first()
+        )
+        return picked.code if picked is not None else None
 
     @classmethod
     def _extract_shipment_payload(
@@ -2457,12 +2474,31 @@ class OrderService:
     ) -> Money:
         from extra_settings.models import Setting
 
-        # When the request carries a (provider, kind) pair, dispatch
-        # through the registry so each provider owns its own pricing
-        # rules. The provider's adapter has full control over flat
-        # rate, dynamic quotes, free-shipping thresholds, and per-
-        # country/region overrides — keeping per-carrier logic out of
-        # this generic dispatcher.
+        # Auto-resolve ``home_delivery`` to the active home-delivery
+        # provider's code when the caller didn't supply one — mirrors
+        # what ``_resolve_shipping_provider`` does for the order FK
+        # (same helper, single source of truth) so the cost calc and
+        # the assigned carrier always agree.
+        #
+        # Without this, a ``home_delivery`` cart with no explicit
+        # provider_code (the storefront sends ``null`` per
+        # ``shared/shipping/index.ts::carrierForMethod`` — home
+        # delivery is provider-agnostic at the form level) would fall
+        # through to the generic ``FREE_SHIPPING_THRESHOLD`` /
+        # ``CHECKOUT_SHIPPING_PRICE`` pair below, charging a flat
+        # rate against the wrong threshold. Meanwhile
+        # ``_resolve_shipping_provider`` would still set the order's
+        # FK to ACS, so the order DB row would look ACS-served but
+        # would have generic pricing — a silent disagreement between
+        # the carrier the customer was promised and the price they
+        # paid.
+        if not shipping_provider_code and shipping_kind == "home_delivery":
+            shipping_provider_code = cls._resolve_active_home_delivery_code()
+
+        # When we have a (provider, kind) pair, dispatch through the
+        # registry so each provider owns its own pricing rules. The
+        # adapter has full control over flat rate, dynamic quotes,
+        # free-shipping thresholds, and per-country/region overrides.
         if shipping_provider_code and shipping_kind:
             from shipping.services import ShippingService
 
@@ -2479,9 +2515,9 @@ class OrderService:
                 amount, currency = quote
                 return Money(amount, currency)
 
-        # Generic fallback for orders without a courier adapter — the
-        # platform's flat-rate home-delivery price, country/region
-        # overrides applied below.
+        # Generic fallback for the rare case with no active
+        # home-delivery carrier (a deploy mid-config) — the platform's
+        # flat-rate price, country/region overrides applied below.
         base_shipping_cost = Setting.get(
             "CHECKOUT_SHIPPING_PRICE", default=3.00
         )

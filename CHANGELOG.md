@@ -3,6 +3,34 @@
 
 
 
+## v1.138.0 (2026-05-20)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.137.3 [skip ci] ([`ad56206`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad56206b59adc241561a734d63b130734c029232))
+
+### Features
+
+* feat(shipping): expose free-shipping thresholds via dedicated endpoint
+
+Add a `free_shipping_threshold(kind)` hook on `ShippingCarrierInterface`
+so each carrier owns its own threshold next to its pricing logic, and a
+new public `GET /api/v1/shipping/free-shipping-info` endpoint that
+aggregates per-(active provider, kind) thresholds plus min/max for the
+storefront. Adding a new carrier is now one override on its adapter —
+the view, serializer, and frontend stay untouched.
+
+The endpoint respects the same gating `available_options` uses
+(`is_active`, registered adapter, `is_kind_enabled`, country filter via
+`metadata['supported_countries']`) so the advertised threshold matches
+what the customer can actually pick at checkout. ACS reads
+`ACS_FREE_SHIPPING_THRESHOLD`; BoxNow reads
+`BOXNOW_FREE_SHIPPING_THRESHOLD` and only for `pickup_point` (matching
+its pricing path). Threshold-less carriers are skipped so we never
+advertise "free above €0".
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`19a629a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19a629aff719135bd0d7ff574153d0be687dfa20))
+
 ## v1.137.3 (2026-05-19)
 
 ### Bug fixes

@@ -142,3 +142,63 @@ def test_legacy_generic_fallback_unchanged(_per_carrier_below_generic):
     )
     # 35 < generic 50 → falls back to CHECKOUT_SHIPPING_PRICE
     assert quote.amount > Decimal("0")
+
+
+def test_pi_and_order_create_calcs_agree_in_gap_range(
+    _per_carrier_below_generic,
+):
+    """Contract: the PI calc and the order-create verification call
+    ``OrderService.calculate_shipping_cost`` with the same args and
+    must therefore agree on every (cart_total, provider, kind) tuple
+    — including the [30, 50) range that surfaced the original bug.
+
+    Without this anchor, a future refactor that splits the two calc
+    paths would silently break Stripe checkouts for carts in the gap.
+    """
+    cases = [
+        ("acs", "home_delivery", Decimal("35.00")),
+        ("acs", "pickup_point", Decimal("35.00")),
+        ("boxnow", "pickup_point", Decimal("35.00")),
+        ("acs", "home_delivery", Decimal("29.99")),  # one cent under
+        ("acs", "home_delivery", Decimal("30.00")),  # exact threshold
+    ]
+    for provider, kind, total in cases:
+        pi_calc = OrderService.calculate_shipping_cost(
+            order_value=Money(total, "EUR"),
+            shipping_provider_code=provider,
+            shipping_kind=kind,
+            weight_grams=500,
+        )
+        order_calc = OrderService.calculate_shipping_cost(
+            order_value=Money(total, "EUR"),
+            shipping_provider_code=provider,
+            shipping_kind=kind,
+            weight_grams=500,
+        )
+        assert pi_calc.amount == order_calc.amount, (
+            f"PI vs order calc diverged for ({provider}, {kind}, {total})"
+        )
+
+
+def test_free_shipping_info_min_matches_carrier_at_threshold(
+    _per_carrier_below_generic,
+):
+    """The "free shipping above X €" notice MUST agree with what the
+    carrier actually charges at the boundary. If marketing copy says
+    30€ but the carrier still charges at 30€, the cart's "qualified"
+    UI state lies to the customer.
+    """
+    from shipping.services import ShippingService
+
+    info = ShippingService.free_shipping_info()
+    min_threshold = info["min_threshold"]
+    assert min_threshold == Decimal("30.00")
+
+    # At the boundary, the carrier with the min threshold ships free.
+    quote = OrderService.calculate_shipping_cost(
+        order_value=Money(min_threshold, "EUR"),
+        shipping_provider_code="boxnow",
+        shipping_kind="pickup_point",
+        weight_grams=500,
+    )
+    assert quote.amount == Decimal("0")

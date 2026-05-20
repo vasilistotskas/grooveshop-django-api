@@ -345,12 +345,40 @@ class OrderService:
             if "amount" in payment_data and payment_data["amount"] is not None:
                 provider_amount_cents = int(round(payment_data["amount"] * 100))
                 if provider_amount_cents != calculated_total_cents:
+                    # Log the full input set that produced the mismatch so
+                    # root-causing doesn't require re-running the checkout
+                    # under a debugger. The (provider, kind, weight,
+                    # country, region, cart_total, shipping_cost,
+                    # payment_fee) tuple is exactly what was fed into
+                    # ``calculate_shipping_cost`` + ``calculate_payment_
+                    # method_fee`` above — if any of these differ from
+                    # what the create-payment-intent step saw, the
+                    # mismatch is upstream of this point.
                     logger.warning(
                         "Payment amount mismatch for intent %s: "
                         "provider=%d cents, calculated=%d cents",
                         payment_intent_id,
                         provider_amount_cents,
                         calculated_total_cents,
+                        extra={
+                            "payment_intent_id": payment_intent_id,
+                            "cart_uuid": str(cart.uuid),
+                            "provider_amount_cents": provider_amount_cents,
+                            "calculated_amount_cents": calculated_total_cents,
+                            "cart_total_amount": str(_cart_total.amount),
+                            "shipping_cost_amount": str(_shipping_cost.amount),
+                            "payment_fee_amount": str(_payment_fee.amount),
+                            "shipping_provider_code": shipping_address.get(
+                                "shipping_provider_code"
+                            ),
+                            "shipping_kind": shipping_address.get(
+                                "shipping_kind"
+                            ),
+                            "cart_weight_grams": _cart_weight_grams,
+                            "country_id": shipping_address.get("country_id"),
+                            "region_id": shipping_address.get("region_id"),
+                            "pay_way_code": pay_way.provider_code,
+                        },
                     )
                     raise PaymentAmountMismatchError(
                         provider_amount_cents=provider_amount_cents,

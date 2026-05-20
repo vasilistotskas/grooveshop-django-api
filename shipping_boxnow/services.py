@@ -317,6 +317,30 @@ class BoxNowService:
         else:
             amount_to_collect_str = str(shipment.amount_to_be_collected.amount)
 
+        # Anchor log for the COD-vs-PREPAID decision so a future
+        # "why did the locker collect €0 / the wrong amount?" question
+        # can be answered from logs alone. ``payment_mode`` is the
+        # canonical discriminator; ``amount_to_be_collected`` is what
+        # the courier will actually charge at the locker.
+        logger.info(
+            "BoxNow deliveryRequest amount: order=%s payment_mode=%s "
+            "amount_to_collect=%s",
+            order.id,
+            shipment.payment_mode,
+            amount_to_collect_str,
+            extra={
+                "order_id": order.id,
+                "carrier": "boxnow",
+                "payment_mode": shipment.payment_mode,
+                "amount_to_collect": amount_to_collect_str,
+                "pay_way_code": getattr(
+                    getattr(order, "pay_way", None),
+                    "provider_code",
+                    None,
+                ),
+            },
+        )
+
         # BoxNow's ``description`` field carries free-text per-delivery
         # context (per API Manual §6.3.1 example). For us that's the
         # customer's checkout note ("ring twice", "leave with porter")

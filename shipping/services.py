@@ -421,10 +421,16 @@ class ShippingService:
         back to the global flat rate.
         """
         if not provider_code or not is_registered(provider_code):
+            logger.debug(
+                "ShippingService.calculate_shipping_cost: no adapter for "
+                "provider_code=%r — returning None (caller will use "
+                "generic fallback)",
+                provider_code,
+            )
             return None
         adapter = get_provider(provider_code)
         kind_enum = ShippingKind(kind)
-        return adapter.calculate_shipping_cost(
+        quote = adapter.calculate_shipping_cost(
             order_value_amount=order_value_amount,
             currency=currency,
             kind=kind_enum,
@@ -432,3 +438,34 @@ class ShippingService:
             region_id=region_id,
             weight_grams=weight_grams,
         )
+        # Anchor log for the per-carrier pricing decision. Used by ops
+        # to answer "did the free-shipping threshold fire for this
+        # cart?" without re-running the carrier adapter under a
+        # debugger. ``extra={}`` keys mirror the structured logging
+        # used in OrderService so a single query joins both halves of
+        # the calc trail.
+        if quote is not None:
+            amount, _ = quote
+            logger.info(
+                "Shipping quote: provider=%s kind=%s order_value=%.2f %s "
+                "weight_grams=%s -> %.2f %s",
+                provider_code,
+                kind,
+                order_value_amount,
+                currency,
+                weight_grams,
+                amount,
+                currency,
+                extra={
+                    "shipping_provider_code": provider_code,
+                    "shipping_kind": kind,
+                    "order_value_amount": order_value_amount,
+                    "currency": currency,
+                    "weight_grams": weight_grams,
+                    "country_id": country_id,
+                    "region_id": region_id,
+                    "shipping_amount": amount,
+                    "is_free": amount == 0.0,
+                },
+            )
+        return quote

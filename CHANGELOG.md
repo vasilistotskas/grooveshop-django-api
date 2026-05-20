@@ -3,6 +3,66 @@
 
 
 
+## v1.138.2 (2026-05-20)
+
+### Bug fixes
+
+* fix(cart): make shipping_provider_code optional on PI request
+
+Home delivery is intentionally provider-agnostic in checkout —
+``shared/shipping/index.ts::carrierForMethod`` returns null for
+``home_delivery``, and the order-create body carries no
+``shippingProviderCode`` for that path. The previous required-field
+check on the create-payment-intent request rejected every
+home_delivery Stripe checkout with a 400.
+
+Now ``shipping_provider_code`` is optional with a conditional
+``validate()`` requiring it only when ``shipping_kind ==
+pickup_point`` (the case where the carrier identity actually drives
+the quote). For home_delivery the backend falls through to the
+generic shipping calc — same path the order-create verification
+uses for the same body, so both calls agree.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`a796a31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a796a31d060a1ba4a645dd44e36114ca19b84665))
+
+### Chores
+
+* chore(observability): enrich PI mismatch + shipping-calc + boxnow logs
+
+Three surgical logs to make the next shipping/payment incident
+debuggable from logs alone, plus two anchor tests pinning the
+contract that surfaced today's bug.
+
+1) ``PaymentAmountMismatchError`` site now logs the full input set
+   (cart total, shipping cost, payment fee, shipping_provider_code,
+   shipping_kind, weight, country, region, pay_way_code) via
+   ``extra={}``. Today's bug fired this exception with only the two
+   amounts; root-causing required reading the cart view and the
+   order-create flow side-by-side. The new log makes the divergent
+   axis obvious in one line.
+
+2) ``ShippingService.calculate_shipping_cost`` (the per-carrier
+   dispatcher) now anchor-logs the quote decision at info level —
+   "did the free-shipping threshold fire for this cart?" answerable
+   from logs alone. Sits at the dispatcher so every carrier benefits
+   without per-adapter log-sprinkling.
+
+3) BoxNow ``create_shipment_for_order`` now logs the
+   PREPAID-vs-COD ``amountToBeCollected`` decision so a future
+   "why did the locker collect €0?" investigation has its anchor.
+
+Tests:
+* ``test_pi_and_order_create_calcs_agree_in_gap_range`` — pins that
+  the PI calc and the order-create verification calc agree across
+  the [30, 50) range that surfaced today's bug, plus boundary cases.
+* ``test_free_shipping_info_min_matches_carrier_at_threshold`` —
+  pins that the marketing copy threshold (free_shipping_info.min)
+  agrees with what the carrier actually charges at the boundary.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`cad1516`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cad151664076abe77891562034402165e12ee661))
+
+* chore(deps): sync uv.lock to 1.138.1 [skip ci] ([`e4cbe53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e4cbe53925c9b2b3b0c45031c55c3031f5967788))
+
 ## v1.138.1 (2026-05-20)
 
 ### Bug fixes

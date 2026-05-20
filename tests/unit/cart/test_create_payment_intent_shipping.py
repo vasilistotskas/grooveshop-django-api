@@ -59,9 +59,23 @@ def _per_carrier_below_generic():
     )
 
 
-def test_serializer_requires_shipping_provider_code():
+def test_serializer_allows_home_delivery_without_provider_code():
+    """``home_delivery`` is provider-agnostic in checkout — the
+    frontend's ``carrierForMethod`` returns null for it, the order-
+    create body carries no ``shippingProviderCode``, so the PI body
+    must accept the same shape (otherwise both calls run different
+    code paths and the PI amount mismatches the order-create amount).
+    """
     serializer = CartCreatePaymentIntentRequestSerializer(
         data={"pay_way_id": 1, "shipping_kind": "home_delivery"}
+    )
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["shipping_provider_code"] is None
+
+
+def test_serializer_requires_provider_code_for_pickup_point():
+    serializer = CartCreatePaymentIntentRequestSerializer(
+        data={"pay_way_id": 1, "shipping_kind": "pickup_point"}
     )
     assert not serializer.is_valid()
     assert "shipping_provider_code" in serializer.errors

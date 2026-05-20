@@ -480,9 +480,14 @@ class CartViewSet(BaseModelViewSet):
         )
         request_serializer.is_valid(raise_exception=True)
         pay_way_id = request_serializer.validated_data["pay_way_id"]
-        shipping_provider_code = request_serializer.validated_data[
+        # ``shipping_provider_code`` is normalised to None by the
+        # serializer's validate() when omitted (home_delivery is
+        # provider-agnostic in the frontend); pass it through so the
+        # order-create verification gets the same None and both calc
+        # paths agree on the generic-fallback shipping price.
+        shipping_provider_code = request_serializer.validated_data.get(
             "shipping_provider_code"
-        ]
+        )
         shipping_kind = request_serializer.validated_data["shipping_kind"]
         country_id = request_serializer.validated_data.get("country_id") or None
         region_id = request_serializer.validated_data.get("region_id") or None

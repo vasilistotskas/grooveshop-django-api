@@ -156,27 +156,21 @@ class ReserveStockResponseSerializer(serializers.Serializer):
 class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
     """Request body for ``POST /api/v1/cart/create-payment-intent``.
 
-    The shipping fields are required so the PaymentIntent amount uses
-    the same per-carrier shipping calculation the order-create
-    verification step runs.  Without them the view falls back to the
-    generic ``FREE_SHIPPING_THRESHOLD`` / ``CHECKOUT_SHIPPING_PRICE``
-    pair which silently disagrees with the carrier adapters whenever
-    the per-carrier thresholds differ — producing a
-    ``PaymentAmountMismatchError`` at order-create time.
+    ``shipping_kind`` is required so the view's shipping calculation
+    follows the same code path the order-create verification runs.
+    ``shipping_provider_code`` is required for ``pickup_point`` (the
+    carrier identity drives the locker quote + per-carrier threshold)
+    but **omitted for ``home_delivery``** — home delivery is
+    provider-agnostic in checkout per the frontend's
+    ``shared/shipping/index.ts::carrierForMethod`` contract, and the
+    backend resolves the active home-delivery provider at order
+    creation. Sending whatever the frontend has guarantees both calc
+    paths agree.
     """
 
     pay_way_id = serializers.IntegerField(
         min_value=1,
         help_text=_("ID of the selected PayWay (must be online Stripe)."),
-    )
-    shipping_provider_code = serializers.CharField(
-        max_length=32,
-        help_text=_(
-            "Carrier code matching a registered shipping adapter "
-            "(e.g. 'acs', 'boxnow'). Used to compute shipping cost "
-            "with the same per-carrier free-shipping threshold the "
-            "order-create path will apply."
-        ),
     )
     shipping_kind = serializers.ChoiceField(
         # Choices declared inline to avoid the circular import that
@@ -191,6 +185,18 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
             "pickup_point). Required so the per-kind feature flags "
             "(e.g. ACS_SMARTPOINT_ENABLED) and BoxNow's PICKUP_POINT "
             "gate are honoured."
+        ),
+    )
+    shipping_provider_code = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Carrier code matching a registered shipping adapter "
+            "(e.g. 'acs', 'boxnow'). Required for ``pickup_point``; "
+            "omit/empty for ``home_delivery`` (the backend uses the "
+            "generic flat rate, matching what the order-create "
+            "verification will compute for the same body)."
         ),
     )
     country_id = serializers.CharField(
@@ -212,6 +218,29 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
             "adjustment."
         ),
     )
+
+    def validate(self, attrs):
+        """Pickup-point requires a carrier code; home-delivery doesn't.
+
+        Mirrors the order-create body shape: ``shippingProviderCode``
+        is bound to ``shippingKind`` semantically and the backend
+        cannot route a locker pickup without knowing which carrier's
+        locker network to use.
+        """
+        kind = attrs.get("shipping_kind")
+        code = (attrs.get("shipping_provider_code") or "").strip()
+        if kind == "pickup_point" and not code:
+            raise serializers.ValidationError(
+                {
+                    "shipping_provider_code": _(
+                        "shipping_provider_code is required for pickup_point."
+                    )
+                }
+            )
+        # Normalise empty string → not present so the view's
+        # downstream None-check stays clean.
+        attrs["shipping_provider_code"] = code or None
+        return attrs
 
 
 class CartPaymentIntentResponseSerializer(serializers.Serializer):

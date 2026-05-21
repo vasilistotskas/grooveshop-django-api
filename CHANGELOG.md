@@ -3,6 +3,35 @@
 
 
 
+## v1.138.4 (2026-05-21)
+
+### Bug fixes
+
+* fix(admin): restore TinyMCE on HTMLField change forms
+
+Unfold's FORMFIELD_OVERRIDES maps models.TextField → UnfoldAdmin
+TextareaWidget. Django's formfield_for_dbfield walks the MRO of the
+field class, so HTMLField (a TextField subclass) matched the
+TextField override and the TinyMCE widget returned by HTMLField.
+formfield() was discarded. The form's media never pulled in
+tinymce.min.js, so description fields on Product / BlogPost /
+Category rendered as plain textareas.
+
+Add HTMLField → AdminTinyMCE to BaseModelAdmin.formfield_overrides
+so HTMLField wins the MRO race across every admin that inherits the
+base. Also drop the TINYMCE_JS_URL override that pointed at
+{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js — missing the
+/static/ prefix that StaticStorage(location="static") writes the
+asset under. The django-tinymce default routes the URL through the
+active staticfiles_storage and gets the prefix right. TINYMCE_JS_
+ROOT was never read by django-tinymce — dead setting.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d8c34a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d8c34a193a1a24d6c1b04387211b66cb549df010))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.3 [skip ci] ([`f1c6fcb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f1c6fcba26a3869fd43e5fee27cc11f21a45e0cd))
+
 ## v1.138.3 (2026-05-20)
 
 ### Bug fixes

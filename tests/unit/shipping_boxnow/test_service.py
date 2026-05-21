@@ -426,6 +426,58 @@ class TestCancelShipment:
         assert exc_info.value.code == "P420"
         mock_client.return_value.cancel_parcel.assert_not_called()
 
+    def test_cancel_pending_creation_marks_local_without_api_call(self):
+        """The canonical case revealed by prod order 76 (2026-05-21):
+        an unpaid online BoxNow order sits at ``parcel_state =
+        PENDING_CREATION`` (no mint ever ran because no payment
+        webhook fired). An admin form-save cancel should short-circuit
+        to a local-only cancel — nothing was ever created at BoxNow,
+        so there is nothing to cancel remotely. Previously the state
+        guard fired first and recorded a confusing
+        ``BoxNow API 409 [P420]`` error on the order metadata."""
+        shipment = BoxNowShipmentFactory(
+            parcel_id=None,
+            delivery_request_id=None,
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        mock_client = MagicMock()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_client):
+            BoxNowService.cancel_shipment(
+                shipment, reason="admin status change"
+            )
+
+        # No API call attempted — nothing at BoxNow to cancel.
+        mock_client.return_value.cancel_parcel.assert_not_called()
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.cancel_requested_at is not None
+        cancellations = (shipment.metadata or {}).get("cancellations") or []
+        assert len(cancellations) == 1
+        assert cancellations[0]["reason"] == "admin status change"
+        assert "no parcel_id" in cancellations[0]["note"]
+
+    def test_cancel_new_without_parcel_id_marks_local(self):
+        """Defence-in-depth: a (theoretically impossible) NEW state
+        with ``parcel_id=None`` — would happen if Phase 3 of
+        ``create_shipment_for_order`` crashed between the API success
+        and the local persist. We still short-circuit to a local cancel
+        because there is no carrier-side parcel to address."""
+        shipment = BoxNowShipmentFactory(
+            parcel_id=None,
+            delivery_request_id=None,
+            parcel_state=BoxNowParcelState.NEW,
+        )
+
+        mock_client = MagicMock()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_client):
+            BoxNowService.cancel_shipment(shipment, reason="manual cleanup")
+
+        mock_client.return_value.cancel_parcel.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+
 
 # ---------------------------------------------------------------------------
 # sync_lockers

@@ -579,7 +579,8 @@ class BoxNowService:
                       (stored in ``shipment.metadata["cancellations"]``).
 
         Raises:
-            BoxNowAPIError: Shipment is not in the ``NEW`` state (P420).
+            BoxNowAPIError: Shipment has a ``parcel_id`` but is not in
+                the ``NEW`` state (P420).
             BoxNowAPIError: BoxNow API rejected the request.
         """
         # ---- Phase 1: state guard + parcel_id snapshot ------------------
@@ -587,29 +588,29 @@ class BoxNowService:
             locked: BoxNowShipment = (
                 BoxNowShipment.objects.select_for_update().get(pk=shipment.pk)
             )
-            if locked.parcel_state != BoxNowParcelState.NEW:
-                raise BoxNowAPIError(
-                    409,
-                    code="P420",
-                    message=(
-                        "Parcel not cancellable in current state "
-                        f"({locked.parcel_state!r}). "
-                        "BoxNow only permits cancellation from the NEW state."
-                    ),
-                )
             parcel_id = locked.parcel_id
 
-            # Edge case: a shipment row exists (state=NEW) but the
-            # mint task never ran or crashed before persisting the
-            # parcel_id. Calling BoxNow with empty parcel_id would
-            # surface as P403/P404 (confusing). Mark CANCELED locally
-            # and short-circuit — there is nothing on BoxNow's side
-            # to cancel.
+            # No parcel_id ⇒ nothing at BoxNow to cancel. This covers
+            # the canonical ``pending_creation`` case (online order
+            # never paid, admin cancels — BoxNow create-shipment task
+            # never ran) AND the rarer ``NEW`` + crashed-mint case
+            # (Phase 3 persist crashed before saving the IDs).
+            # Either way: mark CANCELED locally, no API call.
+            #
+            # The state guard further down only fires when ``parcel_id``
+            # is set — i.e. there is a real BoxNow-side parcel that has
+            # progressed past NEW and can't safely be cancelled remotely.
+            # Verified against prod order 76 (2026-05-21): the admin
+            # form-save cancel on an unpaid BoxNow order in
+            # ``pending_creation`` previously stored a confusing
+            # ``BoxNow API 409 [P420]`` error in
+            # ``metadata.cancellation.shipment_cancel.error`` even
+            # though the order cancel itself succeeded.
             if not parcel_id:
                 logger.info(
                     "cancel_shipment: shipment=%s has no parcel_id "
-                    "(create task pending or crashed pre-persist) — "
-                    "marking CANCELED locally without an API call.",
+                    "(pending_creation or crashed mint) — marking "
+                    "CANCELED locally without an API call.",
                     shipment.pk,
                     extra={
                         "shipment_pk": shipment.pk,
@@ -642,6 +643,20 @@ class BoxNowService:
                     ]
                 )
                 return
+
+            # State guard: parcel_id is set, so a real BoxNow-side
+            # parcel exists. BoxNow only allows cancellation from
+            # the NEW state — refuse remote cancel for anything else.
+            if locked.parcel_state != BoxNowParcelState.NEW:
+                raise BoxNowAPIError(
+                    409,
+                    code="P420",
+                    message=(
+                        "Parcel not cancellable in current state "
+                        f"({locked.parcel_state!r}). "
+                        "BoxNow only permits cancellation from the NEW state."
+                    ),
+                )
 
         # ---- Phase 2: API call (no transaction, no lock) ----------------
         logger.info(

@@ -3,6 +3,47 @@
 
 
 
+## v1.138.5 (2026-05-21)
+
+### Bug fixes
+
+* fix(shipping_boxnow): cancel pending_creation shipments locally, no P420
+
+When an admin cancels an unpaid online BoxNow order via the change-
+form save, the cascade reaches ``BoxNowService.cancel_shipment``
+with the shipment in ``parcel_state=PENDING_CREATION`` (the
+create-shipment task only runs after the payment webhook fires —
+abandoned online checkouts never trigger it, so no parcel ever
+exists at BoxNow's side).
+
+Pre-fix order of checks in Phase 1:
+1. ``state != NEW`` → raise ``P420`` ← fires here for pending_creation
+2. ``parcel_id is None`` → local cancel ← unreachable for pending_creation
+
+The first check rejects pending_creation as "not cancellable" even
+though there's nothing remote to cancel. Order 76 (2026-05-21)
+showed this: order CANCELED correctly, but a confusing
+``BoxNow API 409 [P420]`` left behind in
+``metadata.cancellation.shipment_cancel.error``.
+
+Swap the check order so ``parcel_id is None`` runs first — for
+both the canonical pending_creation case AND the rare
+NEW-without-parcel-id defensive case (Phase 3 crashed before
+persisting IDs). Both correctly resolve to a local-only cancel.
+The state guard now only fires when ``parcel_id`` is set, which
+implies a real BoxNow-side parcel that has progressed past NEW
+and shouldn't be cancelled blindly.
+
+Safety property preserved: never call BoxNow on a non-NEW parcel
+that exists at BoxNow's side. Only behavior change: pre-mint
+admin cancels skip the API and mark CANCELED locally.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0bc22df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0bc22df8c3f69aa2c04ef75b2cb4842c841dd30b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.4 [skip ci] ([`a56e871`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a56e8718ff69957c4d217dcd294d451d7b57711b))
+
 ## v1.138.4 (2026-05-21)
 
 ### Bug fixes

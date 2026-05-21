@@ -3,6 +3,31 @@
 
 
 
+## v1.139.0 (2026-05-21)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.5 [skip ci] ([`65850b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/65850b6bd61f9e7927333331de6a31119ba1c563))
+
+### Features
+
+* feat(admin): promote Blog and Settings to top-level sidebar sections
+
+Blog was buried two levels deep under Sales -> Content alongside
+Notifications and Contact Messages. Move it to its own top-level
+section between Catalog and Sales so editors don't need to expand two
+collapsibles to manage posts. The remaining Notifications and Contact
+Messages items get flattened directly into Sales — the Content subtree
+no longer carries its weight with Blog gone.
+
+Pull Extra Settings out of System -> Configuration into a new top-level
+Settings section gated on is_staff (System stays superuser-only).
+Extra Settings exposes runtime toggles (cookie banner, public copy,
+feature flags) that any admin needs to flip; gating it on is_superuser
+locked it away from non-superuser staff. Other System items
+(Countries, Regions, Sites, Subscription Topics, Audit & Logs,
+Reconciliation, Background Jobs) remain superuser-only. ([`f4ae235`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4ae2350cd62896a05426659c882169515a18208))
+
 ## v1.138.5 (2026-05-21)
 
 ### Bug fixes

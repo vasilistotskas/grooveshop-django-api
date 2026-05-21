@@ -1905,6 +1905,47 @@ UNFOLD = {
                     },
                 ],
             },
+            # ── Blog (content management) ─────────────────────────────
+            {
+                "title": _("Blog"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Blog Posts"),
+                        "icon": "article",
+                        "link": reverse_lazy("admin:blog_blogpost_changelist"),
+                        "badge": "admin.badges.draft_blog_posts_badge",
+                    },
+                    {
+                        "title": _("Blog Categories"),
+                        "icon": "folder_open",
+                        "link": reverse_lazy(
+                            "admin:blog_blogcategory_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Blog Authors"),
+                        "icon": "edit_note",
+                        "link": reverse_lazy(
+                            "admin:blog_blogauthor_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Blog Comments"),
+                        "icon": "chat_bubble",
+                        "link": reverse_lazy(
+                            "admin:blog_blogcomment_changelist"
+                        ),
+                        "badge": "admin.badges.pending_comments_badge",
+                    },
+                    {
+                        "title": _("Blog Tags"),
+                        "icon": "tag",
+                        "link": reverse_lazy("admin:blog_blogtag_changelist"),
+                    },
+                ],
+            },
             # ── Sales (day-to-day order operations) ───────────────────
             {
                 "title": _("Sales"),
@@ -1938,68 +1979,20 @@ UNFOLD = {
                         "icon": "percent",
                         "link": reverse_lazy("admin:vat_vat_changelist"),
                     },
-                    # Content nests under Sales as a subtree — blog,
-                    # notifications, and contact messages all feed the
-                    # storefront sales funnel, so grouping them with
-                    # the order/payment items keeps related work in
-                    # one place.
                     {
-                        "title": _("Content"),
-                        "icon": "edit_square",
-                        "items": [
-                            {
-                                "title": _("Blog Posts"),
-                                "icon": "article",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogpost_changelist"
-                                ),
-                                "badge": "admin.badges.draft_blog_posts_badge",
-                            },
-                            {
-                                "title": _("Blog Categories"),
-                                "icon": "folder_open",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogcategory_changelist"
-                                ),
-                            },
-                            {
-                                "title": _("Blog Authors"),
-                                "icon": "edit_note",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogauthor_changelist"
-                                ),
-                            },
-                            {
-                                "title": _("Blog Comments"),
-                                "icon": "chat_bubble",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogcomment_changelist"
-                                ),
-                                "badge": "admin.badges.pending_comments_badge",
-                            },
-                            {
-                                "title": _("Blog Tags"),
-                                "icon": "tag",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogtag_changelist"
-                                ),
-                            },
-                            {
-                                "title": _("Notifications"),
-                                "icon": "notifications_active",
-                                "link": reverse_lazy(
-                                    "admin:notification_notification_changelist"
-                                ),
-                            },
-                            {
-                                "title": _("Contact Messages"),
-                                "icon": "contact_mail",
-                                "link": reverse_lazy(
-                                    "admin:contact_contact_changelist"
-                                ),
-                                "badge": "admin.badges.unread_messages_badge",
-                            },
-                        ],
+                        "title": _("Notifications"),
+                        "icon": "notifications_active",
+                        "link": reverse_lazy(
+                            "admin:notification_notification_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Contact Messages"),
+                        "icon": "contact_mail",
+                        "link": reverse_lazy(
+                            "admin:contact_contact_changelist"
+                        ),
+                        "badge": "admin.badges.unread_messages_badge",
                     },
                 ],
             },
@@ -2097,6 +2090,27 @@ UNFOLD = {
                     },
                 ],
             },
+            # ── Settings (content-side toggles, staff-accessible) ────
+            # Extra Settings exposes runtime-tunable flags (cookie
+            # banner, feature toggles, public copy) that the storefront
+            # reads via /api/v1/settings/get. Any admin needs to flip
+            # these — keep it out of the superuser-only System zone.
+            {
+                "title": _("Settings"),
+                "separator": True,
+                "collapsible": True,
+                "permission": "admin.permissions.is_staff",
+                "items": [
+                    {
+                        "title": _("Extra Settings"),
+                        "icon": "settings",
+                        "link": reverse_lazy(
+                            "admin:extra_settings_setting_changelist"
+                        ),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                ],
+            },
             # ──────────────────────────────────────────────────────────
             # SYSTEM ZONE — superuser-only. One parent group with four
             # nested subtrees (Configuration / Audit & Logs /
@@ -2139,14 +2153,6 @@ UNFOLD = {
                                 "icon": "language",
                                 "link": reverse_lazy(
                                     "admin:sites_site_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Extra Settings"),
-                                "icon": "settings",
-                                "link": reverse_lazy(
-                                    "admin:extra_settings_setting_changelist"
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },

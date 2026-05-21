@@ -2685,8 +2685,13 @@ if USE_AWS:
     }
     COMPRESS_STORAGE = "core.storages.StaticStorage"
     COMPRESS_OFFLINE_MANIFEST_STORAGE = "core.storages.StaticStorage"
-    TINYMCE_JS_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js"
-    TINYMCE_JS_ROOT = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/"
+    # No ``TINYMCE_JS_URL`` override here. The previous value pointed
+    # at ``{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js`` — missing
+    # the ``/static/`` prefix that ``StaticStorage(location="static")``
+    # writes the asset under — so the script 404'd in production. The
+    # django-tinymce default (``staticfiles_storage.url(...)``) returns
+    # the correctly prefixed URL through the active static storage.
+    # ``TINYMCE_JS_ROOT`` was never read by django-tinymce.
 elif not DEBUG:
     STATIC_URL = f"{STATIC_BASE_URL}/static/"
     STATIC_ROOT = path.join(BASE_DIR, "web", "staticfiles")

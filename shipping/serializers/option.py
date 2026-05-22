@@ -67,22 +67,13 @@ class ShippingOptionSerializer(serializers.Serializer):
         allow_null=True,
         required=False,
         help_text=_(
-            "Absolute URL for the operator-uploaded brand logo. Null "
-            "when no logo has been uploaded — the storefront then "
-            "falls back to its bundled default for the carrier so a "
-            "fresh deploy without uploaded assets still renders. "
-            "Note: ``settings.MEDIA_URL`` is absolute in every "
-            "environment (including local dev via ``STATIC_BASE_URL``) "
-            "so ``ImageField.url`` is always a full URL here."
-        ),
-    )
-    main_image_path = serializers.CharField(
-        required=False,
-        allow_blank=True,
-        help_text=_(
-            "Relative ``media/uploads/shipping/<filename>`` path. "
-            "Empty string when no logo is uploaded. Mirrors the "
-            "PayWay.icon path contract."
+            "Absolute URL for the operator-uploaded brand logo, "
+            "resolved per (provider, kind) so the home-delivery row "
+            "and the pickup-point row of the same carrier can show "
+            "different images. Null when no logo is uploaded — the "
+            "storefront then falls back to its bundled default. "
+            "``settings.MEDIA_URL`` is absolute in every environment "
+            "so this is always a full URL when present."
         ),
     )
     metadata = serializers.DictField()

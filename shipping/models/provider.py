@@ -127,31 +127,26 @@ class ShippingProvider(TimeStampMixinModel):
             return self.supports_pickup_point
         return False
 
-    @property
-    def main_image_path(self) -> str:
-        """Relative URL for the primary uploaded logo (mirrors ``PayWay.icon``).
+    # ------------------------------------------------------------------
+    # Logo helpers — kind-aware so the picker can show a different
+    # image for the same carrier's home-delivery vs pickup_point row.
+    # ------------------------------------------------------------------
 
-        Empty string when no logo is uploaded — the storefront then
-        falls back to its bundled default for the carrier.
+    @staticmethod
+    def _filename_of(field) -> str:
+        """Return ``os.path.basename`` of a ``FieldFile`` or '' when empty."""
+        if field and getattr(field, "name", ""):
+            return os.path.basename(str(field.name))
+        return ""
+
+    @classmethod
+    def _relative_path_of(cls, field) -> str:
+        """``media/uploads/shipping/<basename>`` for a non-empty field,
+        empty string otherwise. Mirrors the ``PayWay.icon`` contract
+        the search + Open-Graph serializers use elsewhere.
         """
-        if self.logo and hasattr(self.logo, "name"):
-            return (
-                f"media/uploads/shipping/"
-                f"{os.path.basename(str(self.logo.name))}"
-            )
-        return ""
-
-    @property
-    def logo_filename(self) -> str:
-        if self.logo and hasattr(self.logo, "name"):
-            return os.path.basename(str(self.logo.name))
-        return ""
-
-    @property
-    def logo_pickup_point_filename(self) -> str:
-        if self.logo_pickup_point and hasattr(self.logo_pickup_point, "name"):
-            return os.path.basename(str(self.logo_pickup_point.name))
-        return ""
+        name = cls._filename_of(field)
+        return f"media/uploads/shipping/{name}" if name else ""
 
     def logo_for_kind(self, kind: str):
         """Return the ``FieldFile`` to show for a given ``ShippingKind``.
@@ -163,10 +158,34 @@ class ShippingProvider(TimeStampMixinModel):
         sentinel) so callers can ``.url`` it the same way they would
         access either model field directly.
         """
-        if (
-            kind == "pickup_point"
-            and self.logo_pickup_point
-            and getattr(self.logo_pickup_point, "name", "")
-        ):
+        if kind == "pickup_point" and self._filename_of(self.logo_pickup_point):
             return self.logo_pickup_point
         return self.logo
+
+    def logo_url_for_kind(self, kind: str) -> str | None:
+        """Absolute URL for ``logo_for_kind(kind)``, or ``None`` when
+        no logo is uploaded for that kind (after the pickup→primary
+        fallback). ``settings.MEDIA_URL`` is absolute in every
+        environment so ``.url`` here is always a full URL.
+        """
+        field = self.logo_for_kind(kind)
+        return field.url if self._filename_of(field) else None
+
+    # ------------------------------------------------------------------
+    # Project-convention properties (parity with PayWay.icon /
+    # ProductImage.main_image_path) — kept even though the storefront
+    # consumes the absolute URL directly, because admin and search
+    # serializers elsewhere expect the relative-path / filename API.
+    # ------------------------------------------------------------------
+
+    @property
+    def main_image_path(self) -> str:
+        return self._relative_path_of(self.logo)
+
+    @property
+    def logo_filename(self) -> str:
+        return self._filename_of(self.logo)
+
+    @property
+    def logo_pickup_point_filename(self) -> str:
+        return self._filename_of(self.logo_pickup_point)

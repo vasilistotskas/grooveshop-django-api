@@ -9,7 +9,6 @@ DB-backed ``ShippingProvider`` row + the in-memory carrier registry.
 from __future__ import annotations
 
 import logging
-import os
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -289,21 +288,10 @@ class ShippingService:
                 # Per-(provider, kind) logo: ``pickup_point`` rows
                 # prefer ``logo_pickup_point`` when uploaded so a
                 # carrier can have a distinct locker illustration vs
-                # its home-delivery brand mark (e.g. ACS home delivery
-                # vs ACS Smartpoint). Falls back to the primary
-                # ``logo`` when the pickup-specific variant isn't
-                # set, then to ``None`` so the storefront renders its
-                # bundled default. ``MEDIA_URL`` is absolute in every
-                # environment so ``.url`` is always a full URL.
-                logo_field = provider.logo_for_kind(kind.value)
-                logo_url: str | None = None
-                main_image_path: str = ""
-                if logo_field and getattr(logo_field, "name", ""):
-                    logo_url = logo_field.url
-                    main_image_path = (
-                        f"media/uploads/shipping/"
-                        f"{os.path.basename(str(logo_field.name))}"
-                    )
+                # its home-delivery brand mark (e.g. ACS home
+                # delivery vs ACS Smartpoint). The model handles the
+                # fallback chain; this view just consumes the
+                # resolved URL.
                 options.append(
                     {
                         "provider_code": provider.code,
@@ -313,8 +301,7 @@ class ShippingService:
                         "currency": price[1] if price else currency,
                         "live_mode": provider.live_mode,
                         "priority": provider.priority,
-                        "logo_url": logo_url,
-                        "main_image_path": main_image_path,
+                        "logo_url": provider.logo_url_for_kind(kind.value),
                         "metadata": provider.metadata or {},
                     }
                 )

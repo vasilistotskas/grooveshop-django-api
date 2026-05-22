@@ -64,6 +64,78 @@ def test_main_image_path_reflects_upload():
     assert provider.main_image_path.endswith(provider.logo_filename)
 
 
+def test_logo_for_kind_no_uploads_returns_empty_primary():
+    """No uploads at all → both kinds return the empty primary
+    ``logo`` field (which downstream treats as "no logo, use bundled
+    fallback"). The model never throws or returns None directly —
+    it returns the (possibly empty) FieldFile to keep the
+    ``.url`` access pattern uniform.
+    """
+    provider = ShippingProvider.objects.get(code="acs")
+    home = provider.logo_for_kind("home_delivery")
+    pickup = provider.logo_for_kind("pickup_point")
+    # Both should be the same empty primary field.
+    assert not home
+    assert not pickup
+    assert provider.logo_url_for_kind("home_delivery") is None
+    assert provider.logo_url_for_kind("pickup_point") is None
+
+
+def test_logo_for_kind_primary_only_shared_across_kinds():
+    """Only ``logo`` uploaded → both kinds resolve to it. Pins the
+    backward-compat behaviour for carriers that haven't bothered to
+    set the pickup-specific variant.
+    """
+    provider = ShippingProvider.objects.get(code="acs")
+    provider.logo = _make_png_upload("acs-primary.png")
+    provider.save(update_fields=["logo"])
+
+    assert (
+        provider.logo_for_kind("home_delivery").name
+        == provider.logo_for_kind("pickup_point").name
+        == provider.logo.name
+    )
+    assert provider.logo_url_for_kind(
+        "home_delivery"
+    ) == provider.logo_url_for_kind("pickup_point")
+
+
+def test_logo_for_kind_pickup_specific_takes_precedence():
+    """Both fields uploaded → home delivery gets the primary, pickup
+    gets the pickup-specific one. The case the user reported (ACS
+    home vs Smartpoint should look different).
+    """
+    provider = ShippingProvider.objects.get(code="acs")
+    provider.logo = _make_png_upload("acs-home.png")
+    provider.logo_pickup_point = _make_png_upload("acs-locker.png")
+    provider.save(update_fields=["logo", "logo_pickup_point"])
+
+    assert (
+        provider.logo_for_kind("home_delivery").name
+        != provider.logo_for_kind("pickup_point").name
+    )
+    assert provider.logo_for_kind("home_delivery").name == provider.logo.name
+    assert (
+        provider.logo_for_kind("pickup_point").name
+        == provider.logo_pickup_point.name
+    )
+
+
+def test_logo_for_kind_unknown_kind_falls_back_to_primary():
+    """Defensive: a hypothetical future ``ShippingKind`` value that
+    isn't ``pickup_point`` falls through to ``logo`` instead of
+    crashing. Keeps the helper safe to call from generic code that
+    iterates ``ShippingKind.choices`` without coupling to specific
+    members.
+    """
+    provider = ShippingProvider.objects.get(code="acs")
+    provider.logo = _make_png_upload("acs-primary.png")
+    provider.save(update_fields=["logo"])
+
+    field = provider.logo_for_kind("express_delivery")
+    assert field.name == provider.logo.name
+
+
 @patch(
     "extra_settings.models.Setting.get",
     side_effect=_setting_get_with_smartpoint_enabled,
@@ -81,7 +153,6 @@ def test_options_endpoint_returns_null_logo_when_no_upload(_mock_setting):
     assert acs_rows, "ACS rows missing from options response"
     for row in acs_rows:
         assert row["logoUrl"] is None
-        assert row["mainImagePath"] == ""
 
 
 @patch(
@@ -176,7 +247,6 @@ def test_options_endpoint_surfaces_uploaded_logo_url(_mock_setting):
         assert row["logoUrl"], (
             f"Expected truthy logoUrl after upload, got {row['logoUrl']!r}"
         )
-        assert row["mainImagePath"].startswith("media/uploads/shipping/")
 
 
 def test_provider_serializer_returns_logo_fields():

@@ -9,9 +9,11 @@ class ShippingProviderSerializer(serializers.ModelSerializer[ShippingProvider]):
     logo = serializers.ImageField(
         read_only=True,
         help_text=(
-            "Absolute storage URL for the uploaded brand logo. ``null`` "
+            "Absolute URL for the operator-uploaded brand logo. ``null`` "
             "when the operator hasn't uploaded one — the storefront "
-            "falls back to its bundled default for the carrier."
+            "falls back to its bundled default for the carrier. "
+            "``settings.MEDIA_URL`` is absolute in every environment, "
+            "so ``ImageField.url`` is always a full URL here."
         ),
     )
     main_image_path = serializers.SerializerMethodField(

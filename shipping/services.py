@@ -285,24 +285,19 @@ class ShippingService:
                     kind=kind,
                     weight_grams=weight_grams,
                 )
-                # ``provider.logo.url`` is the absolute S3 URL when the
-                # operator has uploaded a logo via Django admin; falls
-                # back to None so the storefront can render its bundled
-                # default. ``main_image_path`` mirrors the PayWay.icon
-                # relative-path contract for consumers that want a
-                # storage-relative path.
+                # ``provider.logo.url`` is the absolute URL in every
+                # environment (``MEDIA_URL`` is absolute even in local
+                # dev — see settings.py). Falls back to None when no
+                # logo is uploaded so the storefront renders its
+                # bundled default. ``main_image_path`` mirrors the
+                # PayWay.icon relative-path contract for callers that
+                # want a storage-relative path.
                 logo_url: str | None = None
                 main_image_path: str = ""
                 if getattr(provider, "logo", None) and getattr(
                     provider.logo, "name", ""
                 ):
-                    try:
-                        logo_url = provider.logo.url
-                    except (
-                        ValueError,
-                        Exception,
-                    ):  # pragma: no cover — storage misconfigured
-                        logo_url = None
+                    logo_url = provider.logo.url
                     main_image_path = provider.main_image_path
                 options.append(
                     {

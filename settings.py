@@ -2714,7 +2714,19 @@ elif not DEBUG:
 else:
     STATIC_URL = "/static/"
     STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
-    MEDIA_URL = "/media/"
+    # ``MEDIA_URL`` must be ABSOLUTE in every environment, even local
+    # dev, because every ``ImageField``/``FileField`` rendered by
+    # DRF surfaces ``storage.url(name)`` to the frontend — drf-
+    # spectacular emits it with ``format: 'uri'`` and the Nuxt-side
+    # Zod 4 schema validates it with ``z.url()`` which rejects
+    # relative paths. Returning ``/media/...`` blew up every endpoint
+    # that exposes an uploaded image (PayWay icons, product images,
+    # shipping provider logos, ...) in dev with a Zod ZodError.
+    # ``STATIC_BASE_URL`` already defaults to ``http://localhost:8000``
+    # so the dev experience is unchanged for the default Django port;
+    # devs running Django on a different port override it via env var
+    # the same way ``elif not DEBUG`` does.
+    MEDIA_URL = f"{STATIC_BASE_URL}/media/"
     MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
     STORAGES = {
         "default": {

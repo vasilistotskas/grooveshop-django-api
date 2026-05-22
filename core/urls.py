@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
@@ -136,8 +138,15 @@ if bool(settings.ENABLE_DEBUG_TOOLBAR):
         ]
 
 if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci"]:
+    # ``MEDIA_URL`` is absolute in every environment (so DRF
+    # ``ImageField`` serialises to a full URL the Zod 4 schema
+    # accepts), but Django's ``static()`` helper no-ops when the
+    # prefix has a netloc — it would refuse to route ``/media/<path>``
+    # if we passed the full URL. Strip down to just the path portion
+    # so the dev media-serve view still mounts.
+    _media_path = urlsplit(settings.MEDIA_URL).path or settings.MEDIA_URL
     urlpatterns += static(
-        settings.MEDIA_URL,
+        _media_path,
         document_root=settings.MEDIA_ROOT,
     )
 

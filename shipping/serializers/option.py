@@ -67,10 +67,13 @@ class ShippingOptionSerializer(serializers.Serializer):
         allow_null=True,
         required=False,
         help_text=_(
-            "Absolute storage URL for the operator-uploaded brand logo. "
-            "Null when no logo has been uploaded — the storefront then "
+            "Absolute URL for the operator-uploaded brand logo. Null "
+            "when no logo has been uploaded — the storefront then "
             "falls back to its bundled default for the carrier so a "
-            "fresh deploy without uploaded assets still renders."
+            "fresh deploy without uploaded assets still renders. "
+            "Note: ``settings.MEDIA_URL`` is absolute in every "
+            "environment (including local dev via ``STATIC_BASE_URL``) "
+            "so ``ImageField.url`` is always a full URL here."
         ),
     )
     main_image_path = serializers.CharField(

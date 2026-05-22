@@ -2,7 +2,6 @@ from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from django.core.cache import cache
 from django.test import TestCase as DjangoTestCase
 from django.test import override_settings
 from django.utils import timezone
@@ -14,7 +13,6 @@ from order.tasks import (
     CONFIRMATION_EMAIL_SENT_AT_KEY,
     CONFIRMATION_EMAIL_SENT_FLAG,
     _confirmation_already_sent,
-    _confirmation_lock_key,
     _release_confirmation_email,
     check_pending_orders,
     generate_order_invoice,
@@ -128,8 +126,9 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
+    @patch("order.tasks.cache")
     def test_send_order_confirmation_email_worker_kill_recovery(
-        self, mock_render, mock_email
+        self, mock_cache, mock_render, mock_email
     ):
         """Simulate a worker OOM-kill mid-send.
 
@@ -142,30 +141,30 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         - If the worker is killed the lock auto-expires; the next invocation
           can acquire the lock and complete the send.
 
-        This test simulates the kill by manually holding the lock (as the
-        "dead" worker did) then releasing it (simulating TTL expiry) before
-        calling the task again. The second call must succeed and set the
-        permanent DB flag.
+        ``order.tasks.cache`` is mocked (not exercised via the live ``cache``
+        proxy) because the cache proxy in this test suite is bound to the
+        production Redis backend — keys clash across xdist workers whose
+        per-worker DBs both mint ``order.id=1`` and target the same
+        ``confirmation_email_lock:1`` Redis key, leaving the lock state
+        race-prone. The mock makes the worker-kill simulation deterministic
+        by directly controlling ``cache.add``'s return value across the two
+        call legs (held → released).
         """
         mock_email_instance = Mock()
         mock_email.return_value = mock_email_instance
         mock_render.side_effect = ["Email content", "HTML content"]
 
-        # Simulate worker-kill: hold the execution lock as if a dead worker
-        # acquired it but never released it (the lock expires naturally in
-        # production; here we force-release it to simulate the expiry).
-        lock_key = _confirmation_lock_key(self.order.id)
-        cache.set(lock_key, "1", 90)  # dead worker's lock
-
-        # First call sees the lock held and skips.
+        # Leg 1: dead worker's lock is still active → cache.add (atomic
+        # set-if-not-exists) returns False → task skips without sending.
+        mock_cache.add.return_value = False
         result_while_locked = send_order_confirmation_email(self.order.id)
         self.assertTrue(result_while_locked)  # skips gracefully, not an error
         mock_email_instance.send.assert_not_called()
 
-        # Simulate lock TTL expiry (worker is dead, Redis evicted the key).
-        cache.delete(lock_key)
-
-        # Second call acquires the lock, sends the email, writes DB flag.
+        # Leg 2: lock TTL expired (dead worker's key evicted) → cache.add
+        # returns True → task acquires the lock, sends, sets the permanent
+        # sent_at timestamp.
+        mock_cache.add.return_value = True
         result_after_expiry = send_order_confirmation_email(self.order.id)
         self.assertTrue(result_after_expiry)
         mock_email_instance.send.assert_called_once()

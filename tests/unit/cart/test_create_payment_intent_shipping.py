@@ -17,15 +17,22 @@ These tests pin the contract:
   threshold even when the generic threshold would still charge — which
   is exactly the case for the production thresholds (ACS/BoxNow=30€,
   generic=50€).
+
+Setting values are mocked at the ``extra_settings.models.Setting.get``
+integration boundary instead of written via ``Setting.objects.update_
+or_create`` — the project's ``_reseed_extra_settings`` autouse fixture
+races visibility on the savepoint under CI's xdist parallel workers
+(documented in ``project_settings_update_or_create_flake.md``), so DB-
+backed overrides flake-pass. Mocking sidesteps the race entirely.
 """
 
 from __future__ import annotations
 
 from decimal import Decimal
+from unittest.mock import patch
 
 import pytest
 from djmoney.money import Money
-from extra_settings.models import Setting
 
 from cart.serializers.cart import CartCreatePaymentIntentRequestSerializer
 from order.services import OrderService
@@ -34,29 +41,63 @@ from shipping.models import ShippingProvider
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture
-def _per_carrier_below_generic():
-    """Match the production-tuned thresholds.
+# Per-carrier 30€ vs generic 50€ is the configuration that surfaced
+# the original bug — any cart in [30, 50) sees free shipping via the
+# carrier but charged shipping via the generic fallback. ACS shipping
+# price is 3.50 €, BoxNow is 2.50 €, and the generic flat is 2.99 €.
+_DEFAULT_OVERRIDES: dict[str, object] = {
+    "ACS_FREE_SHIPPING_THRESHOLD": Decimal("30.00"),
+    "BOXNOW_FREE_SHIPPING_THRESHOLD": Decimal("30.00"),
+    "FREE_SHIPPING_THRESHOLD": Decimal("50.00"),
+    "ACS_SHIPPING_PRICE": Decimal("3.50"),
+    "BOXNOW_SHIPPING_PRICE": Decimal("2.50"),
+    "CHECKOUT_SHIPPING_PRICE": Decimal("2.99"),
+    "ACS_DYNAMIC_PRICING_ENABLED": False,
+    "ACS_SMARTPOINT_ENABLED": True,
+}
 
-    Per-carrier 30€ vs generic 50€ is the configuration that surfaced
-    the original bug — any cart in [30, 50) sees free shipping via the
-    carrier but charged shipping via the generic fallback.
+
+def _build_fake_setting_get(overrides: dict[str, object]):
+    """Return a ``Setting.get`` side_effect that honours the overrides
+    and falls through to the supplied ``default`` for everything else.
+
+    Mirrors the pattern in ``tests/integration/loyalty/test_loyalty_
+    lifecycle.py`` — Settings are read from many places (carrier
+    adapters, order services, free-shipping-info aggregator), and the
+    fixture has to cover every key the code path under test consults.
     """
-    Setting.objects.update_or_create(
-        name="ACS_FREE_SHIPPING_THRESHOLD",
-        defaults={"value_type": "decimal", "value_decimal": Decimal("30.00")},
-    )
-    Setting.objects.update_or_create(
-        name="BOXNOW_FREE_SHIPPING_THRESHOLD",
-        defaults={"value_type": "decimal", "value_decimal": Decimal("30.00")},
-    )
-    Setting.objects.update_or_create(
-        name="FREE_SHIPPING_THRESHOLD",
-        defaults={"value_type": "decimal", "value_decimal": Decimal("50.00")},
-    )
+
+    def fake_get(name: str, default=None):
+        if name in overrides:
+            return overrides[name]
+        return default
+
+    return fake_get
+
+
+@pytest.fixture
+def per_carrier_below_generic():
+    """Activate ACS+BoxNow providers and patch ``Setting.get`` to
+    return the per-carrier 30€ thresholds (below the generic 50€).
+
+    Yields the overrides dict so individual tests can mutate it
+    before exercising the code path (e.g. switching CHECKOUT_SHIPPING_
+    PRICE to test a different fallback amount).
+    """
+    overrides = dict(_DEFAULT_OVERRIDES)
+    # Activating the providers IS a DB write but only on
+    # ``ShippingProvider`` rows (not ``Setting`` rows), which the
+    # autouse ``_reseed_shipping_providers`` fixture handles
+    # restoratively (update_or_create no-op when in place) so the
+    # xdist visibility race doesn't bite here.
     ShippingProvider.objects.filter(code__in=["acs", "boxnow"]).update(
         is_active=True
     )
+    with patch(
+        "extra_settings.models.Setting.get",
+        side_effect=_build_fake_setting_get(overrides),
+    ):
+        yield overrides
 
 
 def test_serializer_allows_home_delivery_without_provider_code():
@@ -115,7 +156,7 @@ def test_serializer_accepts_full_payload():
     assert serializer.validated_data["shipping_kind"] == "home_delivery"
 
 
-def test_acs_pi_calc_returns_zero_in_mismatch_range(_per_carrier_below_generic):
+def test_acs_pi_calc_returns_zero_in_mismatch_range(per_carrier_below_generic):
     """Cart 35€ + ACS home delivery — fixed PI calc must return 0€.
 
     Mirrors what the view does now: passes provider+kind through to
@@ -133,7 +174,7 @@ def test_acs_pi_calc_returns_zero_in_mismatch_range(_per_carrier_below_generic):
 
 
 def test_boxnow_pi_calc_returns_zero_in_mismatch_range(
-    _per_carrier_below_generic,
+    per_carrier_below_generic,
 ):
     """Cart 35€ + BoxNow pickup — fixed PI calc must return 0€."""
     quote = OrderService.calculate_shipping_cost(
@@ -145,21 +186,21 @@ def test_boxnow_pi_calc_returns_zero_in_mismatch_range(
     assert quote.amount == Decimal("0")
 
 
-def test_legacy_generic_fallback_unchanged(_per_carrier_below_generic):
-    """No carrier code → generic fallback path with 50€ threshold.
-
-    Anchored as a regression test so a future refactor doesn't change
-    the generic path's behaviour for non-carrier-aware callers.
+def test_legacy_generic_fallback_unchanged(per_carrier_below_generic):
+    """No carrier code AND no auto-resolvable kind → generic fallback
+    path with the 50€ threshold. Anchored as a regression test so a
+    future refactor doesn't change the generic path's behaviour for
+    non-carrier-aware callers.
     """
     quote = OrderService.calculate_shipping_cost(
         order_value=Money(Decimal("35.00"), "EUR"),
     )
-    # 35 < generic 50 → falls back to CHECKOUT_SHIPPING_PRICE
-    assert quote.amount > Decimal("0")
+    # 35 < generic 50 → falls back to CHECKOUT_SHIPPING_PRICE (2.99).
+    assert quote.amount == Decimal("2.99")
 
 
 def test_pi_and_order_create_calcs_agree_in_gap_range(
-    _per_carrier_below_generic,
+    per_carrier_below_generic,
 ):
     """Contract: the PI calc and the order-create verification call
     ``OrderService.calculate_shipping_cost`` with the same args and
@@ -201,7 +242,7 @@ def test_pi_and_order_create_calcs_agree_in_gap_range(
 
 
 def test_home_delivery_without_explicit_code_uses_acs_threshold(
-    _per_carrier_below_generic,
+    per_carrier_below_generic,
 ):
     """``home_delivery`` is provider-agnostic at the form level, so the
     storefront sends no ``shipping_provider_code`` — both order-create
@@ -210,12 +251,6 @@ def test_home_delivery_without_explicit_code_uses_acs_threshold(
     (mirroring what ``_resolve_shipping_provider`` does for the FK)
     so the cost matches the carrier the order will actually be served
     by, not the legacy generic-fallback flat rate.
-
-    Without this auto-resolution, a 35€ home_delivery cart would be
-    charged 2.99€ (generic 50€ threshold not crossed) even though the
-    order ends up served by ACS (30€ threshold, free above 30€) —
-    customer-visible mismatch between the advertised "free above 30€"
-    notice and the price they pay.
     """
     quote = OrderService.calculate_shipping_cost(
         order_value=Money(Decimal("35.00"), "EUR"),
@@ -231,21 +266,13 @@ def test_home_delivery_without_explicit_code_uses_acs_threshold(
 
 
 def test_home_delivery_below_threshold_charges_carrier_rate(
-    _per_carrier_below_generic,
+    per_carrier_below_generic,
 ):
     """At 25€ (below the 30€ ACS threshold), home_delivery should
     charge the ACS flat rate, not the generic ``CHECKOUT_SHIPPING_
     PRICE``. Pins that auto-resolution uses the carrier's tariff in
     both branches (free + paid), not just for the free case.
     """
-    Setting.objects.update_or_create(
-        name="ACS_SHIPPING_PRICE",
-        defaults={"value_type": "decimal", "value_decimal": Decimal("3.50")},
-    )
-    Setting.objects.update_or_create(
-        name="CHECKOUT_SHIPPING_PRICE",
-        defaults={"value_type": "decimal", "value_decimal": Decimal("2.99")},
-    )
     quote = OrderService.calculate_shipping_cost(
         order_value=Money(Decimal("25.00"), "EUR"),
         shipping_kind="home_delivery",
@@ -256,7 +283,7 @@ def test_home_delivery_below_threshold_charges_carrier_rate(
 
 
 def test_home_delivery_falls_back_to_generic_when_no_active_provider(
-    _per_carrier_below_generic,
+    per_carrier_below_generic,
 ):
     """If ops deactivates every home-delivery provider, the calc
     legitimately falls through to the generic flat rate. Anchored so
@@ -264,10 +291,6 @@ def test_home_delivery_falls_back_to_generic_when_no_active_provider(
     """
     ShippingProvider.objects.filter(supports_home_delivery=True).update(
         is_active=False
-    )
-    Setting.objects.update_or_create(
-        name="CHECKOUT_SHIPPING_PRICE",
-        defaults={"value_type": "decimal", "value_decimal": Decimal("2.99")},
     )
     quote = OrderService.calculate_shipping_cost(
         order_value=Money(Decimal("35.00"), "EUR"),
@@ -279,7 +302,7 @@ def test_home_delivery_falls_back_to_generic_when_no_active_provider(
 
 
 def test_free_shipping_info_min_matches_carrier_at_threshold(
-    _per_carrier_below_generic,
+    per_carrier_below_generic,
 ):
     """The "free shipping above X €" notice MUST agree with what the
     carrier actually charges at the boundary. If marketing copy says

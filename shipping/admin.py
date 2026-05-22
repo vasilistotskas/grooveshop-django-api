@@ -16,6 +16,7 @@ class ShippingProviderAdmin(BaseModelAdmin):
         "supports_pickup_point",
         "live_mode",
         "priority",
+        "logo_filename",
     )
     list_filter = (
         "is_active",
@@ -50,6 +51,18 @@ class ShippingProviderAdmin(BaseModelAdmin):
                     "supports_pickup_point",
                     "live_mode",
                 )
+            },
+        ),
+        (
+            _("Branding"),
+            {
+                "fields": ("logo",),
+                "description": _(
+                    "Optional brand logo shown on the storefront's "
+                    "checkout shipping picker and the order summary. "
+                    "PNG/JPG/SVG supported. When blank the storefront "
+                    "renders its bundled default for the carrier."
+                ),
             },
         ),
         (

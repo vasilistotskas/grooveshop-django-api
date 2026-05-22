@@ -63,4 +63,23 @@ class ShippingOptionSerializer(serializers.Serializer):
     currency = serializers.CharField(max_length=3)
     live_mode = serializers.BooleanField()
     priority = serializers.IntegerField()
+    logo_url = serializers.URLField(
+        allow_null=True,
+        required=False,
+        help_text=_(
+            "Absolute storage URL for the operator-uploaded brand logo. "
+            "Null when no logo has been uploaded — the storefront then "
+            "falls back to its bundled default for the carrier so a "
+            "fresh deploy without uploaded assets still renders."
+        ),
+    )
+    main_image_path = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Relative ``media/uploads/shipping/<filename>`` path. "
+            "Empty string when no logo is uploaded. Mirrors the "
+            "PayWay.icon path contract."
+        ),
+    )
     metadata = serializers.DictField()

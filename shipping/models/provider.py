@@ -1,8 +1,11 @@
+import os
+
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
+from core.fields.image import ImageAndSvgField
 from core.models import TimeStampMixinModel
 
 
@@ -70,6 +73,18 @@ class ShippingProvider(TimeStampMixinModel):
             "feature flags, branding hints)."
         ),
     )
+    logo = ImageAndSvgField(
+        _("Logo"),
+        upload_to="uploads/shipping/",
+        blank=True,
+        null=True,
+        help_text=_(
+            "Brand logo shown on the checkout shipping picker and the "
+            "order summary. PNG/JPG/SVG supported. Falls back to a "
+            "shipped default in the storefront when blank, so a fresh "
+            "deploy without uploaded assets still renders."
+        ),
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Shipping Provider")
@@ -94,3 +109,23 @@ class ShippingProvider(TimeStampMixinModel):
         if kind == "pickup_point":
             return self.supports_pickup_point
         return False
+
+    @property
+    def main_image_path(self) -> str:
+        """Relative URL for the uploaded logo (mirrors ``PayWay.icon``).
+
+        Empty string when no logo is uploaded — the storefront then
+        falls back to its bundled default for the carrier.
+        """
+        if self.logo and hasattr(self.logo, "name"):
+            return (
+                f"media/uploads/shipping/"
+                f"{os.path.basename(str(self.logo.name))}"
+            )
+        return ""
+
+    @property
+    def logo_filename(self) -> str:
+        if self.logo and hasattr(self.logo, "name"):
+            return os.path.basename(str(self.logo.name))
+        return ""

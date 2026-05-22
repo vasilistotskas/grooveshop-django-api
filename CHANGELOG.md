@@ -3,6 +3,181 @@
 
 
 
+## v1.141.0 (2026-05-22)
+
+### Bug fixes
+
+* fix(measurement): accept lazy ``gettext_lazy`` for verbose_name
+
+``MeasurementField.__init__`` was typed ``verbose_name: str | None``,
+but the correct way to define a translated ``verbose_name`` is
+``_("Label")`` (a ``_StrPromise`` proxy) so ``makemigrations``
+captures the msgid instead of resolving to a locale-dependent
+string at import time. After the ``Product.weight`` fix landed
+that path, ``ty`` flagged the call site with
+``invalid-argument-type``.
+
+Widens the parameter to ``Any`` to accept both ``str`` and lazy
+proxies, mirroring the project's existing ``core.cache.registry.
+LazyStr = Any`` convention — keeps Django's private
+``_StrPromise`` out of the public API while staying ty-clean.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`bd625c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd625c434e389e57b99fe7890f1a6ba771e7c13a))
+
+* fix(product): stop forcing Product.weight verbose_name resolution at import time
+
+``str(_("Weight"))`` resolves the lazy ``gettext_lazy`` proxy to the
+locale active at module-import time, baking that resolved value into
+``makemigrations`` output as a plain string. The dev who generated
+``0035_alter_historicalproduct_weight_alter_product_weight`` had
+Greek active, so the migration stored ``verbose_name='Βάρος'``; CI
+runs with English active, sees ``_("Weight")`` resolving to
+``Weight``, and ``makemigrations --check`` reports drift forever —
+which is exactly what the last two CI runs were failing on.
+
+Dropping the ``str()`` keeps the lazy proxy intact: Django's
+migration serializer captures the msgid (``"Weight"``), so the
+migration file is locale-independent and resolves correctly per
+active locale at render time (admin still shows ``"Βάρος"`` for
+Greek users, ``"Weight"`` for English).
+
+``0036_alter_historicalproduct_weight_alter_product_weight`` lands
+the locale-independent definition for both ``Product`` and
+``HistoricalProduct`` (django-simple-history) so the drift loop
+closes.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`d52fc66`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d52fc66c33cdd27d3a388082d58fde7c6d44eae8))
+
+* fix(settings): make MEDIA_URL absolute in DEBUG too so DRF ImageField URLs validate
+
+drf-spectacular emits every ``serializers.ImageField`` (and every
+``ImageField.url`` exposed via ``SerializerMethodField`` /
+``FieldFile`` rendering) with ``format: 'uri'``, which the Nuxt-side
+Zod 4 schema validates with ``z.url()`` — strict, rejects relative
+paths. Production has always been fine because ``MEDIA_URL`` resolves
+to an absolute S3 (or ``STATIC_BASE_URL``) prefix, but local dev
+kept the legacy ``MEDIA_URL = "/media/"`` and so every endpoint that
+returns an uploaded asset (PayWay icons, product images, blog
+images, the new shipping logos) ``ZodError: Invalid URL`` -- a foot-
+gun that scaled with every new file field we added.
+
+Fix at the root: ``MEDIA_URL`` is now absolute in every environment
+(``STATIC_BASE_URL`` already defaults to ``http://localhost:8000``
+and devs override it via env var the same way ``elif not DEBUG``
+already does). ``core/urls.py``'s dev media-serve routing uses the
+path portion of ``MEDIA_URL`` so Django's ``static()`` helper still
+mounts the local serve view despite the absolute prefix.
+
+Reverts the shipping-only ``CharField`` / ``SerializerMethodField``
+detours from the previous commit — they no longer need to exist
+once the root cause is fixed and the codebase converges on the
+single, consistent ``ImageField`` / ``URLField`` -> ``z.url()``
+pattern.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`7b38f10`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b38f10676b257b84eee1485f21284e9d8a93778))
+
+* fix: missing migration ([`1642025`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1642025ee5a6e411239df6db1b6c9c7b1c4932c0))
+
+### Chores
+
+* chore(test): drop unused module-level imports in test_storage.py
+
+The previous edit kept the legacy ``from settings import MEDIA_URL,
+STATIC_URL`` at module level while moving the actual reads into
+each test method (so the values reflect the per-test
+``os.environ`` patch instead of whatever pytest collection time
+happened to import). ``ruff check .`` (used by CI's "Code Quality"
+step) flags F401 unused-import and F811 redefined-while-unused on
+the dangling top-level binding.
+
+Drops the dead imports; the per-test local imports already cover
+every read.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`e962a0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e962a0f72b8a76c23b34ee22d512789b0344a0f7))
+
+* chore(deps): sync uv.lock to 1.140.0 [skip ci] ([`777ba14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/777ba149602c3383d89455fe6e41ba3eb8e769b2))
+
+### Features
+
+* feat(admin): inline logo thumbnail on ShippingProvider list view
+
+The list page previously showed ``logo_filename`` (a bare string)
+which forced the operator to open each row to verify they uploaded
+the right asset to the right provider. Mirrors
+``PayWayAdmin.icon_preview`` so the carrier list matches the
+established admin convention — quick visual scan, mistakes caught
+at a glance.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`2221c65`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2221c65cb88880c73c906b2c89d40c26ec61ea46))
+
+### Testing
+
+* test(shipping): mock Setting.get in free-shipping-info + provider-logo tests
+
+Same xdist parallel-worker flake the previous commit covered for the
+PI tests: ``Setting.objects.update_or_create`` writes raced the
+``_reseed_extra_settings`` autouse fixture's savepoint visibility,
+so ``ACS_SMARTPOINT_ENABLED`` and the per-carrier thresholds came
+back as the seed defaults instead of the test's intended values,
+making CI fail with kinds={'home_delivery'} (no Smartpoint row)
+when the test expected both kinds.
+
+Both files now patch ``extra_settings.models.Setting.get`` at the
+integration boundary — same pattern as
+``tests/integration/loyalty/test_loyalty_lifecycle.py`` and
+``tests/unit/cart/test_create_payment_intent_shipping.py``. No DB
+writes for Setting state means zero exposure to the autouse
+reseed race; the test's intended values are the only ones the code
+under test sees.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`f341f5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f341f5e93f33f383c50e23193d507d302d147d31))
+
+* test: deflake shipping calc + email lock tests under xdist parallel runner
+
+Two CI-only flakes, same root cause: tests writing to externally-
+visible state (extra_settings rows, Redis cache keys) under pytest-
+xdist's parallel worker model where xdist gives each worker its own
+test DB but workers share the same Redis instance — so writes leak
+across workers, and reads return whatever the latest worker happened
+to write.
+
+1) ``tests/unit/cart/test_create_payment_intent_shipping.py``: the
+   per-test thresholds were written via ``Setting.objects.update_or_
+   create`` and the ``_reseed_extra_settings`` autouse fixture races
+   savepoint visibility with the code under test (documented in
+   ``project_settings_update_or_create_flake.md``). Now mocks
+   ``extra_settings.models.Setting.get`` at the integration boundary
+   — same pattern ``tests/integration/loyalty/test_loyalty_
+   lifecycle.py`` uses. Zero DB writes, deterministic across
+   workers.
+
+2) ``tests/integration/order/test_tasks.py::test_send_order_
+   confirmation_email_worker_kill_recovery``: ``cache.set(lock_key)``
+   in the test and ``cache.add(lock_key)`` in the task both routed
+   to the production Redis backend (the ``cache`` proxy in
+   ``conftest.py`` is explicitly NOT reset; see comment on lines
+   63-73). Since each xdist worker mints ``order.id=1`` against its
+   own test DB but all workers share ``confirmation_email_lock:1``
+   in Redis, one worker's ``cache.delete`` (release) clobbered
+   another worker's ``cache.set``. Mocking ``order.tasks.cache``
+   directly — the pattern the conftest comment recommends — pins
+   ``cache.add``'s return value per leg (held → released) so the
+test is deterministic regardless of shared Redis state.
+
+Local ``pytest -n auto`` already passes for both; this is the fix
+for CI's tighter parallelism.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`7c255c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c255c9d1fcb2a26c8133a362e07760fead32d78))
+
+* test(storage): pin MEDIA_URL to absolute STATIC_BASE_URL/media/ in dev
+
+The settings change in 7b38f106 made ``MEDIA_URL`` absolute in every
+environment (so DRF ``ImageField.url`` is always a full URL the Zod
+4 schema accepts). The legacy assertion still expected
+``"/media/"`` and was the only test failure on that CI run.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`c5c54f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5c54f8a2ed05d7a6b8550cf7b9b5cc2b78e2f17))
+
 ## v1.140.0 (2026-05-22)
 
 ### Chores

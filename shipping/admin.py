@@ -19,6 +19,7 @@ class ShippingProviderAdmin(BaseModelAdmin):
         "live_mode",
         "priority",
         "logo_preview",
+        "logo_pickup_point_preview",
     )
     list_filter = (
         "is_active",
@@ -36,7 +37,7 @@ class ShippingProviderAdmin(BaseModelAdmin):
 
     @admin.display(description=_("Logo"))
     def logo_preview(self, obj):
-        """Inline thumbnail of the uploaded carrier logo.
+        """Inline thumbnail of the primary carrier logo.
 
         Mirrors ``PayWayAdmin.icon_preview`` so the list view feels
         consistent across both "branded carrier-like" admins. Operator
@@ -52,6 +53,26 @@ class ShippingProviderAdmin(BaseModelAdmin):
             )
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No logo</span>'
+        )
+
+    @admin.display(description=_("Pickup logo"))
+    def logo_pickup_point_preview(self, obj):
+        """Inline thumbnail of the optional pickup-point logo.
+
+        Empty for carriers that don't differentiate pickup from home
+        delivery — those rows fall back to the primary logo at render
+        time, so an empty cell here is the expected state for BoxNow
+        (single-kind) and for any carrier the operator hasn't given a
+        distinct locker illustration.
+        """
+        if obj.logo_pickup_point:
+            return format_html(
+                '<img src="{url}" style="max-height: 32px; max-width: 64px; '
+                'border-radius: 4px; object-fit: contain;" />',
+                url=obj.logo_pickup_point.url,
+            )
+        return mark_safe(
+            '<span class="text-base-600 dark:text-base-300">—</span>'
         )
 
     fieldsets = (
@@ -79,12 +100,19 @@ class ShippingProviderAdmin(BaseModelAdmin):
         (
             _("Branding"),
             {
-                "fields": ("logo",),
+                "fields": ("logo", "logo_pickup_point"),
                 "description": _(
-                    "Optional brand logo shown on the storefront's "
-                    "checkout shipping picker and the order summary. "
-                    "PNG/JPG/SVG supported. When blank the storefront "
-                    "renders its bundled default for the carrier."
+                    "Brand assets shown on the storefront's checkout "
+                    "shipping picker and the order summary. "
+                    "``Logo`` is used for home-delivery rows and as "
+                    "the fallback for pickup-point rows. "
+                    "``Pickup-point logo`` is optional — set it only "
+                    "when you want the locker card to look different "
+                    "from the home-delivery card for the same carrier "
+                    "(e.g. an ACS Smartpoint locker illustration vs "
+                    "the ACS courier mark). PNG/JPG/SVG. When both "
+                    "are blank the storefront renders its bundled "
+                    "default for the carrier."
                 ),
             },
         ),

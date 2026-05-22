@@ -79,10 +79,27 @@ class ShippingProvider(TimeStampMixinModel):
         blank=True,
         null=True,
         help_text=_(
-            "Brand logo shown on the checkout shipping picker and the "
-            "order summary. PNG/JPG/SVG supported. Falls back to a "
-            "shipped default in the storefront when blank, so a fresh "
-            "deploy without uploaded assets still renders."
+            "Primary brand logo shown on the checkout shipping picker "
+            "and the order summary — used for home-delivery rows and "
+            "as the fallback for pickup-point rows when "
+            "``logo_pickup_point`` is empty. PNG/JPG/SVG. Falls back "
+            "to a shipped default in the storefront when blank, so a "
+            "fresh deploy without uploaded assets still renders."
+        ),
+    )
+    logo_pickup_point = ImageAndSvgField(
+        _("Pickup-point logo"),
+        upload_to="uploads/shipping/",
+        blank=True,
+        null=True,
+        help_text=_(
+            "Optional pickup-point-specific logo (e.g. a locker "
+            "illustration distinct from the carrier's home-delivery "
+            "brand mark). When set, the storefront's "
+            "``/api/v1/shipping/options`` endpoint surfaces it on the "
+            "pickup_point row's ``logoUrl`` so the locker card looks "
+            "different from the home-delivery card for the same "
+            "carrier. Falls back to ``logo`` when blank."
         ),
     )
 
@@ -112,7 +129,7 @@ class ShippingProvider(TimeStampMixinModel):
 
     @property
     def main_image_path(self) -> str:
-        """Relative URL for the uploaded logo (mirrors ``PayWay.icon``).
+        """Relative URL for the primary uploaded logo (mirrors ``PayWay.icon``).
 
         Empty string when no logo is uploaded — the storefront then
         falls back to its bundled default for the carrier.
@@ -129,3 +146,27 @@ class ShippingProvider(TimeStampMixinModel):
         if self.logo and hasattr(self.logo, "name"):
             return os.path.basename(str(self.logo.name))
         return ""
+
+    @property
+    def logo_pickup_point_filename(self) -> str:
+        if self.logo_pickup_point and hasattr(self.logo_pickup_point, "name"):
+            return os.path.basename(str(self.logo_pickup_point.name))
+        return ""
+
+    def logo_for_kind(self, kind: str):
+        """Return the ``FieldFile`` to show for a given ``ShippingKind``.
+
+        ``pickup_point`` rows prefer ``logo_pickup_point`` and fall
+        back to the primary ``logo`` when the pickup-specific variant
+        isn't uploaded. Every other kind uses ``logo`` directly. The
+        return is a ``FieldFile``-like object (or the empty-file
+        sentinel) so callers can ``.url`` it the same way they would
+        access either model field directly.
+        """
+        if (
+            kind == "pickup_point"
+            and self.logo_pickup_point
+            and getattr(self.logo_pickup_point, "name", "")
+        ):
+            return self.logo_pickup_point
+        return self.logo

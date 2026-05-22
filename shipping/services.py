@@ -9,6 +9,7 @@ DB-backed ``ShippingProvider`` row + the in-memory carrier registry.
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -285,20 +286,24 @@ class ShippingService:
                     kind=kind,
                     weight_grams=weight_grams,
                 )
-                # ``provider.logo.url`` is the absolute URL in every
-                # environment (``MEDIA_URL`` is absolute even in local
-                # dev — see settings.py). Falls back to None when no
-                # logo is uploaded so the storefront renders its
-                # bundled default. ``main_image_path`` mirrors the
-                # PayWay.icon relative-path contract for callers that
-                # want a storage-relative path.
+                # Per-(provider, kind) logo: ``pickup_point`` rows
+                # prefer ``logo_pickup_point`` when uploaded so a
+                # carrier can have a distinct locker illustration vs
+                # its home-delivery brand mark (e.g. ACS home delivery
+                # vs ACS Smartpoint). Falls back to the primary
+                # ``logo`` when the pickup-specific variant isn't
+                # set, then to ``None`` so the storefront renders its
+                # bundled default. ``MEDIA_URL`` is absolute in every
+                # environment so ``.url`` is always a full URL.
+                logo_field = provider.logo_for_kind(kind.value)
                 logo_url: str | None = None
                 main_image_path: str = ""
-                if getattr(provider, "logo", None) and getattr(
-                    provider.logo, "name", ""
-                ):
-                    logo_url = provider.logo.url
-                    main_image_path = provider.main_image_path
+                if logo_field and getattr(logo_field, "name", ""):
+                    logo_url = logo_field.url
+                    main_image_path = (
+                        f"media/uploads/shipping/"
+                        f"{os.path.basename(str(logo_field.name))}"
+                    )
                 options.append(
                     {
                         "provider_code": provider.code,

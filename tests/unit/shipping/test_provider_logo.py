@@ -88,6 +88,74 @@ def test_options_endpoint_returns_null_logo_when_no_upload(_mock_setting):
     "extra_settings.models.Setting.get",
     side_effect=_setting_get_with_smartpoint_enabled,
 )
+def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(_mock_setting):
+    """When ``logo_pickup_point`` is uploaded, the pickup_point
+    option row carries IT as logoUrl while the home_delivery row
+    keeps the primary ``logo``. Same ACS carrier, different image
+    per kind — the case the user reported (ACS home delivery vs ACS
+    Smartpoint should look different in the picker).
+    """
+    ShippingProvider.objects.filter(code="acs").update(is_active=True)
+    provider = ShippingProvider.objects.get(code="acs")
+    provider.logo = _make_png_upload("acs-home.png")
+    provider.logo_pickup_point = _make_png_upload("acs-smartpoint.png")
+    provider.save(update_fields=["logo", "logo_pickup_point"])
+
+    client = APIClient()
+    url = reverse("shipping-options")
+    response = client.get(url, {"orderValueAmount": "20", "currency": "EUR"})
+    assert response.status_code == 200
+
+    body = response.json()
+    home_rows = [
+        row
+        for row in body
+        if row["providerCode"] == "acs" and row["kind"] == "home_delivery"
+    ]
+    pickup_rows = [
+        row
+        for row in body
+        if row["providerCode"] == "acs" and row["kind"] == "pickup_point"
+    ]
+    assert home_rows and pickup_rows, "ACS rows missing from options response"
+    # The two rows must surface DIFFERENT logo URLs.
+    assert home_rows[0]["logoUrl"] != pickup_rows[0]["logoUrl"]
+    assert "acs-home" in home_rows[0]["logoUrl"]
+    assert "acs-smartpoint" in pickup_rows[0]["logoUrl"]
+
+
+@patch(
+    "extra_settings.models.Setting.get",
+    side_effect=_setting_get_with_smartpoint_enabled,
+)
+def test_options_endpoint_pickup_kind_falls_back_to_primary_logo(_mock_setting):
+    """When only ``logo`` is uploaded (no pickup-specific variant),
+    both home_delivery and pickup_point rows share the same URL —
+    the existing single-logo behaviour, preserved by
+    ``logo_for_kind``'s fallback.
+    """
+    ShippingProvider.objects.filter(code="acs").update(is_active=True)
+    provider = ShippingProvider.objects.get(code="acs")
+    provider.logo = _make_png_upload("acs-shared.png")
+    # logo_pickup_point intentionally NOT set
+    provider.save(update_fields=["logo"])
+
+    client = APIClient()
+    url = reverse("shipping-options")
+    response = client.get(url, {"orderValueAmount": "20", "currency": "EUR"})
+    body = response.json()
+    acs_rows = [row for row in body if row["providerCode"] == "acs"]
+    assert len({row["logoUrl"] for row in acs_rows}) == 1, (
+        "All ACS rows must share the same logoUrl when no pickup-"
+        "specific logo is uploaded; got "
+        f"{[row['logoUrl'] for row in acs_rows]}"
+    )
+
+
+@patch(
+    "extra_settings.models.Setting.get",
+    side_effect=_setting_get_with_smartpoint_enabled,
+)
 def test_options_endpoint_surfaces_uploaded_logo_url(_mock_setting):
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
     provider = ShippingProvider.objects.get(code="acs")

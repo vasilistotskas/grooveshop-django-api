@@ -14,10 +14,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any, ClassVar
+from unittest.mock import patch
 
 import pytest
 from django.urls import reverse
-from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -31,6 +31,30 @@ from shipping.models import ShippingProvider
 from shipping.services import ShippingService
 
 pytestmark = pytest.mark.django_db
+
+
+# Mock-driven Setting overrides for xdist safety: writes via
+# ``Setting.objects.update_or_create`` race the ``_reseed_extra_
+# settings`` autouse fixture's savepoint visibility under parallel
+# workers (see ``project_settings_update_or_create_flake.md``).
+# Mirrors the pattern in ``tests/integration/loyalty/test_loyalty_
+# lifecycle.py`` and ``tests/unit/cart/test_create_payment_intent_
+# shipping.py``.
+_DEFAULT_SETTING_OVERRIDES: dict[str, object] = {
+    "ACS_FREE_SHIPPING_THRESHOLD": Decimal("40.00"),
+    "BOXNOW_FREE_SHIPPING_THRESHOLD": Decimal("30.00"),
+    "FREE_SHIPPING_THRESHOLD": Decimal("50.00"),
+    "ACS_SMARTPOINT_ENABLED": True,
+}
+
+
+def _build_fake_setting_get(overrides: dict[str, object]):
+    def fake_get(name: str, default=None):
+        if name in overrides:
+            return overrides[name]
+        return default
+
+    return fake_get
 
 
 class _NoThresholdCarrier(ShippingCarrierInterface):
@@ -73,25 +97,35 @@ def _activate_acs_only():
 
     Mirrors a real deploy where ops have flipped ACS on but BoxNow
     is still off (BoxNow ships disabled by default per the seed).
+    Yields the Setting overrides dict so individual tests can mutate
+    it (e.g. flipping ``ACS_SMARTPOINT_ENABLED`` to False).
     """
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
     ShippingProvider.objects.filter(code="boxnow").update(is_active=False)
-    Setting.objects.update_or_create(
-        name="ACS_SMARTPOINT_ENABLED",
-        defaults={"value_type": "bool", "value_bool": True},
-    )
+    overrides = dict(_DEFAULT_SETTING_OVERRIDES)
+    with patch(
+        "extra_settings.models.Setting.get",
+        side_effect=_build_fake_setting_get(overrides),
+    ):
+        yield overrides
 
 
 @pytest.fixture
 def _activate_both():
-    """Activate both ACS and BoxNow with Smartpoint enabled."""
+    """Activate both ACS and BoxNow with Smartpoint enabled.
+
+    Yields the Setting overrides dict so individual tests can mutate
+    per-carrier thresholds before exercising the code path.
+    """
     ShippingProvider.objects.filter(code__in=["acs", "boxnow"]).update(
         is_active=True
     )
-    Setting.objects.update_or_create(
-        name="ACS_SMARTPOINT_ENABLED",
-        defaults={"value_type": "bool", "value_bool": True},
-    )
+    overrides = dict(_DEFAULT_SETTING_OVERRIDES)
+    with patch(
+        "extra_settings.models.Setting.get",
+        side_effect=_build_fake_setting_get(overrides),
+    ):
+        yield overrides
 
 
 def test_default_currency_is_eur():
@@ -120,10 +154,11 @@ def test_acs_only_emits_both_kinds(_activate_acs_only):
 
 
 def test_acs_smartpoint_disabled_hides_pickup(_activate_acs_only):
-    Setting.objects.update_or_create(
-        name="ACS_SMARTPOINT_ENABLED",
-        defaults={"value_type": "bool", "value_bool": False},
-    )
+    # Flip ``ACS_SMARTPOINT_ENABLED`` to False via the mock dict the
+    # fixture yields. ``Setting.get`` is patched, so the override
+    # takes effect immediately without a DB write (which would race
+    # the ``_reseed_extra_settings`` autouse fixture under xdist).
+    _activate_acs_only["ACS_SMARTPOINT_ENABLED"] = False
     info = ShippingService.free_shipping_info()
     kinds = {row["kind"] for row in info["providers"]}
     assert kinds == {ShippingKind.HOME_DELIVERY.value}
@@ -139,14 +174,8 @@ def test_boxnow_only_emits_pickup_point_only(_activate_both):
 
 
 def test_min_threshold_picks_smallest(_activate_both):
-    Setting.objects.update_or_create(
-        name="ACS_FREE_SHIPPING_THRESHOLD",
-        defaults={"value_type": "decimal", "value_decimal": Decimal("40.00")},
-    )
-    Setting.objects.update_or_create(
-        name="BOXNOW_FREE_SHIPPING_THRESHOLD",
-        defaults={"value_type": "decimal", "value_decimal": Decimal("30.00")},
-    )
+    # ``_DEFAULT_SETTING_OVERRIDES`` already pins ACS at 40 and
+    # BoxNow at 30, so the aggregation should pick 30/40.
     info = ShippingService.free_shipping_info()
     assert info["min_threshold"] == Decimal("30.00")
     assert info["max_threshold"] == Decimal("40.00")

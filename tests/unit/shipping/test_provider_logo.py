@@ -12,11 +12,11 @@ Pins the contract that:
 from __future__ import annotations
 
 import io
+from unittest.mock import patch
 
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
-from extra_settings.models import Setting
 from PIL import Image
 from rest_framework.test import APIClient
 
@@ -31,6 +31,18 @@ def _make_png_upload(name: str = "logo.png") -> SimpleUploadedFile:
     Image.new("RGB", (8, 8), color=(0, 0, 0)).save(buf, format="PNG")
     buf.seek(0)
     return SimpleUploadedFile(name, buf.read(), content_type="image/png")
+
+
+# Mock ``Setting.get`` instead of writing rows via ``update_or_create``
+# — the latter races the ``_reseed_extra_settings`` autouse fixture
+# under xdist parallel workers, leading to flaky reads. See
+# ``project_settings_update_or_create_flake.md`` and the matching
+# pattern in ``test_free_shipping_info.py`` / ``test_create_payment_
+# intent_shipping.py``.
+def _setting_get_with_smartpoint_enabled(name: str, default=None):
+    if name == "ACS_SMARTPOINT_ENABLED":
+        return True
+    return default
 
 
 def test_logo_defaults_to_blank():
@@ -52,12 +64,12 @@ def test_main_image_path_reflects_upload():
     assert provider.main_image_path.endswith(provider.logo_filename)
 
 
-def test_options_endpoint_returns_null_logo_when_no_upload():
+@patch(
+    "extra_settings.models.Setting.get",
+    side_effect=_setting_get_with_smartpoint_enabled,
+)
+def test_options_endpoint_returns_null_logo_when_no_upload(_mock_setting):
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
-    Setting.objects.update_or_create(
-        name="ACS_SMARTPOINT_ENABLED",
-        defaults={"value_type": "bool", "value_bool": True},
-    )
 
     client = APIClient()
     url = reverse("shipping-options")
@@ -72,12 +84,12 @@ def test_options_endpoint_returns_null_logo_when_no_upload():
         assert row["mainImagePath"] == ""
 
 
-def test_options_endpoint_surfaces_uploaded_logo_url():
+@patch(
+    "extra_settings.models.Setting.get",
+    side_effect=_setting_get_with_smartpoint_enabled,
+)
+def test_options_endpoint_surfaces_uploaded_logo_url(_mock_setting):
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
-    Setting.objects.update_or_create(
-        name="ACS_SMARTPOINT_ENABLED",
-        defaults={"value_type": "bool", "value_bool": True},
-    )
     provider = ShippingProvider.objects.get(code="acs")
     provider.logo = _make_png_upload("acs-test.png")
     provider.save(update_fields=["logo"])

@@ -5,7 +5,11 @@ from importlib import reload
 from os import getenv
 from unittest.mock import patch
 
-from settings import MEDIA_URL, STATIC_URL
+# Each test reloads the ``settings`` module inside an
+# ``os.environ`` patch and re-imports the URL constants — the
+# module-level re-import is intentionally avoided so the values
+# reflect the patched env, not whatever was first loaded at
+# pytest collection time.
 
 
 class TestStorage(unittest.TestCase):

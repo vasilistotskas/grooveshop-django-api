@@ -32,7 +32,18 @@ class MeasurementField(FloatField):
 
     def __init__(
         self,
-        verbose_name: str | None = None,
+        # ``verbose_name`` typed as ``Any`` so callers can pass a
+        # ``gettext_lazy`` proxy (``_("Weight")``) without ty
+        # complaining that ``_StrPromise`` isn't ``str``. Django
+        # itself accepts both at runtime — narrower stubs from
+        # ``django-stubs`` get this right elsewhere via private
+        # types we deliberately don't drag into our public API
+        # (mirrors ``core.cache.registry.LazyStr = Any``). The
+        # lazy form is the correct way to avoid baking a locale-
+        # resolved value into ``makemigrations`` output (see
+        # ``project_settings_update_or_create_flake.md``-adjacent
+        # migration loop the previous fix unwound).
+        verbose_name: Any = None,
         name: str | None = None,
         measurement: type[MeasureBase | BidimensionalMeasure] | None = None,
         unit_choices: list[tuple[str, str]] | None = None,

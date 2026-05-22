@@ -3,6 +3,82 @@
 
 
 
+## v1.142.0 (2026-05-22)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.141.0 [skip ci] ([`2387828`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2387828493450ebae632260be7f52f1d60ae990e))
+
+### Features
+
+* feat(shipping): per-kind logo on ShippingProvider for distinct picker rows
+
+Reported case: with both ACS and BoxNow active, the checkout picker
+shows three rows — BOX NOW Lockers, ``Παράδοση στη διεύθυνσή σας
+(acs)``, and ACS Smartpoint Lockers. The two ACS rows shared the
+same logo because the operator can only upload ONE image per
+provider; the storefront then surfaces it on every (provider, kind)
+row that maps to ACS.
+
+Adds an optional second ``logo_pickup_point`` ImageField on
+``ShippingProvider``. ``ShippingService.available_options()`` now
+picks the logo per (provider, kind) via the new
+``ShippingProvider.logo_for_kind`` helper: pickup_point rows prefer
+the pickup-specific variant when uploaded, falling back to the
+primary ``logo`` when blank. Home-delivery rows always use the
+primary logo. Carriers with only one kind (BoxNow → pickup_point
+only) work the same as before — no required change.
+
+Frontend needs zero code: ``ShippingOption.logoUrl`` now naturally
+differs per row, and ``StepShipping.vue`` / ``Sidebar.vue`` already
+pass each option's ``logoUrl`` straight through ``resolveShippingLogo``.
+
+Admin: new file picker in the Branding fieldset, list view gets a
+``Pickup logo`` thumbnail column alongside the primary one — empty
+``—`` cell for providers without the pickup-specific override.
+
+Tests:
+* ``test_options_endpoint_pickup_kind_uses_pickup_logo_when_set``
+* ``test_options_endpoint_pickup_kind_falls_back_to_primary_logo``
+
+Migration ``0008`` is additive nullable + a help_text-only
+``AlterField`` on ``logo`` — safe under the Argo CD PreSync deploy
+model (schema lands before code rolls out).
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`d117262`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1172629e65810441e320c07cf79d64f760544c2))
+
+### Refactoring
+
+* refactor(shipping): consolidate logo helpers + drop dead main_image_path field
+
+Two cleanups after the per-kind logo audit:
+
+1) ``ShippingProvider`` model: three nearly-identical helpers
+   (``main_image_path``, ``logo_filename``, ``logo_pickup_point_
+   filename``) repeated the same ``os.path.basename`` /
+   ``media/uploads/shipping/<basename>`` shape with slight
+   variations. Now share two static helpers (``_filename_of``,
+   ``_relative_path_of``) and a new pair of kind-aware methods
+   (``logo_for_kind`` / ``logo_url_for_kind``) so callers can
+   resolve the right field in one call. ``available_options`` drops
+   ~10 lines of inline path-construction in favour of
+   ``provider.logo_url_for_kind(kind.value)``.
+
+2) ``ShippingOptionSerializer`` drops the ``main_image_path`` field
+   — zero frontend consumers (verified by grepping ``app/`` and
+   ``server/``), and the storefront uses the absolute ``logo_url``
+   directly. The field was added for "PayWay.icon parity contract"
+   but neither side actually reads the relative-path form for
+   shipping logos.
+
+Five new model-level matrix tests pin ``logo_for_kind`` behaviour:
+no uploads → empty-primary for both kinds; primary only → shared;
+both uploaded → distinct per kind; unknown kind → defensive
+primary fallback. Plus the existing options-endpoint tests adapt
+to the dropped field (no ``mainImagePath`` assertion).
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`51cc83e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51cc83e3531a30f278a7e41e8c1f6d068fdd034c))
+
 ## v1.141.0 (2026-05-22)
 
 ### Bug fixes

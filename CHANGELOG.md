@@ -3,6 +3,42 @@
 
 
 
+## v1.140.0 (2026-05-22)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.139.0 [skip ci] ([`583b4f7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/583b4f7f2b863cf40489dacef431ebe89466f8f0))
+
+### Features
+
+* feat(shipping): admin-uploadable carrier logos via ShippingProvider.logo
+
+Adds an ``ImageAndSvgField`` (PNG / JPG / SVG, with the SVG-script
+hardening from ``core.fields.image``) directly on
+``ShippingProvider`` so operators can swap a carrier's brand asset
+from Django admin without a frontend redeploy. Mirrors the
+``PayWay.icon`` pattern: ``main_image_path`` + ``logo_filename``
+helpers, file lives at ``uploads/shipping/`` in S3 via
+``PublicMediaStorage``.
+
+The shipping-options endpoint now carries ``logo_url`` +
+``main_image_path`` on every row so the storefront's checkout
+picker and order-summary sidebar pick up the upload through their
+existing ``GET /api/v1/shipping/options`` call — no new endpoint,
+no extra round-trip, no frontend coupling to a per-provider URL
+convention.
+
+Backward-compatible:
+* Migration is a single additive nullable ``AddField`` — old code
+  pre-rollout doesn't reference ``logo``, new code reads ``None``
+  for existing rows and the storefront falls back to its bundled
+  default. Safe under the Argo CD PreSync deploy model.
+* When no logo has been uploaded, ``logo_url`` is ``null`` and the
+  storefront uses the bundled per-method default already shipped in
+  ``app/utils/shipping-methods.ts``.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`0dbaeaa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0dbaeaa0c29075fd971b0ef6e3f846ca07fc6354))
+
 ## v1.139.0 (2026-05-21)
 
 ### Chores

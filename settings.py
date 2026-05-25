@@ -2090,6 +2090,49 @@ UNFOLD = {
                     },
                 ],
             },
+            # ── Localization & Reference Data (staff-accessible) ────
+            # Reference data shop admins routinely need: reordering the
+            # Regions shown at checkout, toggling Countries, newsletter
+            # Subscription Topics. Previously these lived only inside the
+            # superuser-only System zone, so a non-superuser admin could
+            # not reach them at all — surfaced here as a top-level,
+            # staff-accessible group.
+            {
+                "title": _("Localization"),
+                "separator": True,
+                "collapsible": True,
+                "permission": "admin.permissions.is_staff",
+                "items": [
+                    {
+                        "title": _("Countries"),
+                        "icon": "public",
+                        "link": reverse_lazy(
+                            "admin:country_country_changelist"
+                        ),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                    {
+                        "title": _("Regions"),
+                        "icon": "map",
+                        "link": reverse_lazy("admin:region_region_changelist"),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                    {
+                        "title": _("Sites"),
+                        "icon": "language",
+                        "link": reverse_lazy("admin:sites_site_changelist"),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                    {
+                        "title": _("Subscription Topics"),
+                        "icon": "topic",
+                        "link": reverse_lazy(
+                            "admin:user_subscriptiontopic_changelist"
+                        ),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                ],
+            },
             # ── Settings (content-side toggles, staff-accessible) ────
             # Extra Settings exposes runtime-tunable flags (cookie
             # banner, feature toggles, public copy) that the storefront
@@ -2133,38 +2176,6 @@ UNFOLD = {
                         "permission": "admin.permissions.is_superuser",
                         "items": [
                             {
-                                "title": _("Countries"),
-                                "icon": "public",
-                                "link": reverse_lazy(
-                                    "admin:country_country_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Regions"),
-                                "icon": "map",
-                                "link": reverse_lazy(
-                                    "admin:region_region_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Sites"),
-                                "icon": "language",
-                                "link": reverse_lazy(
-                                    "admin:sites_site_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Subscription Topics"),
-                                "icon": "topic",
-                                "link": reverse_lazy(
-                                    "admin:user_subscriptiontopic_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
                                 "title": _("Shipping Providers"),
                                 "icon": "local_shipping",
                                 "link": reverse_lazy(
@@ -2177,6 +2188,53 @@ UNFOLD = {
                                 "icon": "shield_person",
                                 "link": reverse_lazy(
                                     "admin:auth_group_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
+                    },
+                    {
+                        "title": _("Security & Access"),
+                        "icon": "security",
+                        "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("User Sessions"),
+                                "icon": "devices",
+                                "link": reverse_lazy(
+                                    "admin:usersessions_usersession_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("MFA Authenticators"),
+                                "icon": "verified_user",
+                                "link": reverse_lazy(
+                                    "admin:mfa_authenticator_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Social Accounts"),
+                                "icon": "hub",
+                                "link": reverse_lazy(
+                                    "admin:socialaccount_socialaccount_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Email Addresses"),
+                                "icon": "alternate_email",
+                                "link": reverse_lazy(
+                                    "admin:account_emailaddress_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("API Tokens"),
+                                "icon": "key",
+                                "link": reverse_lazy(
+                                    "admin:knox_authtoken_changelist"
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -2334,6 +2392,22 @@ UNFOLD = {
                                 "icon": "wb_sunny",
                                 "link": reverse_lazy(
                                     "admin:django_celery_beat_solarschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Task Results"),
+                                "icon": "checklist",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_results_taskresult_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Group Results"),
+                                "icon": "ballot",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_results_groupresult_changelist"
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },

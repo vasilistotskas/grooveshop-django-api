@@ -1358,6 +1358,32 @@ class AcsService:
         if new_status is None or new_status == current_status:
             return
 
+        # ACS occasionally jumps a parcel straight to DELIVERED between
+        # two of our 15-min polls without us ever observing an
+        # intermediate IN_TRANSIT/OUT_FOR_DELIVERY state — fast COD
+        # routes especially go pickup_list → delivered same-day.
+        # The order state machine only allows PROCESSING → SHIPPED →
+        # DELIVERED, so a direct PROCESSING → DELIVERED jump is
+        # rejected and the order stays stale at PROCESSING (verified
+        # against prod order 73 on 2026-05-23: shipment_state=delivered
+        # but order.status=PROCESSING two days later). Walk the
+        # missing SHIPPED step first.
+        if (
+            new_status == "DELIVERED"
+            and current_status in _PRE_SHIPPED_ORDER_STATUSES
+        ):
+            try:
+                OrderService.update_order_status(order, "SHIPPED")
+            except InvalidStatusTransitionError as exc:
+                logger.warning(
+                    "ACS poll: cannot bridge order=%s through SHIPPED "
+                    "before DELIVERED (%r → SHIPPED): %s",
+                    order.id,
+                    current_status,
+                    exc,
+                )
+                return
+
         try:
             OrderService.update_order_status(order, new_status)
         except InvalidStatusTransitionError as exc:

@@ -418,6 +418,38 @@ class TestPollShipmentDeliveryTransitions:
         assert order.status == OrderStatus.DELIVERED
         assert order.payment_status == PaymentStatus.PENDING
 
+    def test_delivered_walks_through_shipped_when_processing(
+        self, acs_client_mock_delivered
+    ):
+        """ACS can skip an IN_TRANSIT/OUT_FOR_DELIVERY observation
+        when a fast COD parcel goes pickup_list → delivered between
+        two of our 15-min polls. The order is still at PROCESSING in
+        that case (the pickup_list path only advances PENDING →
+        PROCESSING). State-machine requires SHIPPED first, so we walk
+        the missing step before landing DELIVERED.
+        Regression guard for prod order 73 (2026-05-23): shipment_state
+        flipped to delivered but order stayed PROCESSING two days.
+        """
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9999998892",
+            shipment_state=AcsShipmentState.IN_TRANSIT,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        order.refresh_from_db()
+        shipment.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.DELIVERED
+        # Paid → DELIVERED auto-advances to COMPLETED.
+        assert order.status == OrderStatus.COMPLETED
+
     def test_terminal_order_status_never_regresses(
         self, acs_client_mock_delivered
     ):

@@ -383,6 +383,32 @@ class TestApplyWebhookEvent:
         order.refresh_from_db()
         assert order.status == OrderStatus.DELIVERED
 
+    def test_delivered_walks_through_shipped_when_processing(self):
+        """BoxNow can drop the intermediate final_destination webhook
+        when the customer picks up immediately, jumping straight from
+        a PROCESSING order to delivered. The state machine requires
+        SHIPPED first — walk the missing step. Mirrors the ACS gap
+        fix; same regression class as prod order 73."""
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = BoxNowShipmentFactory(
+            order=order,
+            with_parcel=True,
+            parcel_state=BoxNowParcelState.IN_DEPOT,
+        )
+
+        envelope = _build_envelope(
+            parcel_id=shipment.parcel_id,
+            event="delivered",
+        )
+        BoxNowService.apply_webhook_event(envelope)
+
+        order.refresh_from_db()
+        # Paid → DELIVERED auto-advances to COMPLETED.
+        assert order.status == OrderStatus.COMPLETED
+
 
 # ---------------------------------------------------------------------------
 # cancel_shipment

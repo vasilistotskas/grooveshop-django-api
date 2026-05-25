@@ -1418,6 +1418,29 @@ class BoxNowService:
         if new_status is None or new_status == current_status:
             return
 
+        # BoxNow can deliver a parcel between two polls / webhook
+        # deliveries without us ever observing an intermediate
+        # final_destination event (especially if the customer picks
+        # up immediately). The order state machine requires
+        # PROCESSING → SHIPPED → DELIVERED, so a direct jump is
+        # rejected. Walk the missing SHIPPED step first. Mirrors
+        # ``AcsService._apply_order_status_transition`` — same gap.
+        if (
+            new_status == "DELIVERED"
+            and current_status in _PRE_SHIPPED_STATUSES
+        ):
+            try:
+                OrderService.update_order_status(order, "SHIPPED")
+            except InvalidStatusTransitionError as exc:
+                logger.warning(
+                    "BoxNow: cannot bridge order=%s through SHIPPED "
+                    "before DELIVERED (%r → SHIPPED): %s",
+                    order.id,
+                    current_status,
+                    exc,
+                )
+                return
+
         logger.info(
             "_apply_order_status_transition: order=%s %r → %r "
             "(boxnow_event=%r)",

@@ -3,6 +3,22 @@
 
 
 
+## v1.142.2 (2026-05-25)
+
+### Bug fixes
+
+* fix: respect sort_order in pay_way and order item list ordering
+
+PayWayViewSet and OrderItemViewSet defaulted to `-created_at`, which discarded the admin-configured sort_order (both models declare Meta.ordering = ["sort_order"]). For pay ways this also changed the checkout default selection, since the storefront preselects results[0] and renders options in API order. Align both viewsets with the established pattern (["sort_order", "-created_at"]), matching the earlier region ordering fix.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`af9b8a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/af9b8a19d3155ad724879924bba6a56b867975a4))
+
+* fix: region ordering ([`86a9dce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/86a9dce9c546d20bd1e91614d50a142af51d9d61))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.142.1 [skip ci] ([`45f6b16`](https://github.com/vasilistotskas/grooveshop-django-api/commit/45f6b162718dbe361cdb8b514635d80735a30133))
+
 ## v1.142.1 (2026-05-25)
 
 ### Bug fixes

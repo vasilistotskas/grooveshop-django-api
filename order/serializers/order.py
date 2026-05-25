@@ -720,12 +720,6 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         allow_blank=True,
         help_text=_("Floor number or label (e.g. FIRST_FLOOR)"),
     )
-    place = serializers.CharField(
-        max_length=255,
-        required=False,
-        allow_blank=True,
-        help_text=_("Place or district (optional)"),
-    )
     location_type = serializers.CharField(
         max_length=100,
         required=False,

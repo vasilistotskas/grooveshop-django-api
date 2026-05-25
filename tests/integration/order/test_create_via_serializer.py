@@ -68,7 +68,7 @@ class TestOrderCreateSerializerValidation(APITestCase):
         return data
 
     def test_serializer_accepts_optional_address_fields(self):
-        """floor, place, and location_type are accepted without error."""
+        """floor and location_type are accepted without error."""
         data = {
             "pay_way_id": self.pay_way.id,
             "first_name": "Jane",
@@ -80,14 +80,12 @@ class TestOrderCreateSerializerValidation(APITestCase):
             "country_id": self.country.alpha_2,
             "phone": "+306900000001",
             "floor": "3",
-            "place": "City center",
             "location_type": "home",
         }
         serializer = OrderCreateFromCartSerializer(data=data)
         assert serializer.is_valid(), serializer.errors
         vd = serializer.validated_data
         assert vd["floor"] == "3"
-        assert vd["place"] == "City center"
         assert vd["location_type"] == "home"
 
     def test_serializer_rejects_invalid_email(self):
@@ -246,7 +244,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         self.assertIn("pay_way_id", response.data)
 
     def test_create_with_optional_address_extras(self):
-        """floor, place, location_type pass through without error."""
+        """floor, location_type pass through without error."""
         from unittest.mock import patch
 
         pay_way = PayWayFactory(provider_code="cod", is_online_payment=False)
@@ -254,7 +252,6 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             **self._base_address(),
             "pay_way_id": pay_way.id,
             "floor": "2",
-            "place": "downtown",
             "location_type": "office",
         }
 

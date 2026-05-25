@@ -881,7 +881,6 @@ class OrderViewSet(BaseModelViewSet):
             "street_number": validated_data.get("street_number"),
             "city": validated_data.get("city"),
             "zipcode": validated_data.get("zipcode"),
-            "place": validated_data.get("place", ""),
             "floor": validated_data.get("floor", ""),
             "location_type": validated_data.get("location_type", ""),
             "country_id": validated_data.get("country_id"),

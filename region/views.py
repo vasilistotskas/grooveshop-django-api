@@ -74,7 +74,7 @@ class RegionViewSet(BaseModelViewSet):
         return [AllowAny()]
 
     ordering_fields = ["created_at", "alpha", "sort_order"]
-    ordering = ["-created_at"]
+    ordering = ["sort_order"]
     search_fields = ["alpha", "translations__name", "country__alpha_2"]
     serializers_config = serializers_config
 

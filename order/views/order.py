@@ -31,6 +31,7 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
     PaymentAttemptAnonThrottle,
     PaymentAttemptThrottle,
+    VivaReturnThrottle,
 )
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -1346,6 +1347,7 @@ class OrderViewSet(BaseModelViewSet):
         detail=False,
         methods=["GET"],
         permission_classes=[AllowAny],
+        throttle_classes=[VivaReturnThrottle],
         url_path="viva_return",
     )
     def viva_return(self, request, *args, **kwargs):

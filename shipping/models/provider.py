@@ -141,12 +141,17 @@ class ShippingProvider(TimeStampMixinModel):
 
     @classmethod
     def _relative_path_of(cls, field) -> str:
-        """``media/uploads/shipping/<basename>`` for a non-empty field,
-        empty string otherwise. Mirrors the ``PayWay.icon`` contract
-        the search + Open-Graph serializers use elsewhere.
+        """Tenant-aware relative media path for a logo ``FieldFile``.
+
+        Delegates to ``image_to_media_path`` so the result carries the
+        active tenant's schema prefix (``media/{schema}/uploads/shipping/…``)
+        exactly like every other model's ``main_image_path``. A hardcoded
+        ``media/uploads/shipping/…`` literal drops the schema segment and
+        404s the media-stream on any non-public tenant.
         """
-        name = cls._filename_of(field)
-        return f"media/uploads/shipping/{name}" if name else ""
+        from core.utils.image_paths import image_to_media_path
+
+        return image_to_media_path(field)
 
     def logo_for_kind(self, kind: str):
         """Return the ``FieldFile`` to show for a given ``ShippingKind``.

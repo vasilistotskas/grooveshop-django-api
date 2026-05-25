@@ -95,8 +95,14 @@ def with_tenant_schema_from_event(func: Callable) -> Callable:
             try:
                 from tenant.models import Tenant  # noqa: PLC0415
 
+                # Mirror the Viva/BoxNow resolvers: a suspended tenant's
+                # Stripe events must not mutate its frozen data. Stripe
+                # will redeliver until the operator reactivates or the
+                # event ages out.
                 exists = Tenant.objects.filter(
-                    schema_name=schema_name, is_active=True
+                    schema_name=schema_name,
+                    is_active=True,
+                    suspended_at__isnull=True,
                 ).exists()
             except Exception:
                 exists = False

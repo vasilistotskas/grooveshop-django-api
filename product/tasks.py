@@ -250,12 +250,10 @@ def check_low_stock_products() -> dict:
             low_stock_alert_sent=True
         )
 
-    admin_email = (
-        getattr(settings, "ADMIN_EMAIL", None) or tenant_contact_email()
-    )
+    admin_email = tenant_contact_email()
     if not admin_email:
         logger.warning(
-            "check_low_stock_products: no ADMINS configured — rolling back claim"
+            "check_low_stock_products: no tenant contact email — rolling back claim"
         )
         # Release the claim so a future run with admins configured can send.
         Product.objects.filter(id__in=product_ids).update(

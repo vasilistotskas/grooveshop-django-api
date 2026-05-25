@@ -46,9 +46,13 @@ def run_for_all_tenants(task_name: str, **kwargs: Any) -> list:
     from tenant.models import Tenant
 
     results = []
-    for tenant in Tenant.objects.filter(is_active=True).exclude(
-        schema_name="public"
-    ):
+    # Skip suspended tenants — a suspended operator's beat-driven work
+    # (poll carriers, reconcile payouts, sync lockers/stations) must not
+    # fire: it would burn the carrier API budget and mutate a frozen
+    # tenant's data. Mirrors the webhook resolvers' suspended_at filter.
+    for tenant in Tenant.objects.filter(
+        is_active=True, suspended_at__isnull=True
+    ).exclude(schema_name="public"):
         from core import celery_app
 
         result = celery_app.send_task(

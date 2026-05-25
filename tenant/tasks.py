@@ -94,3 +94,18 @@ def fanout_poll_boxnow_tracking_batch():
     return run_for_all_tenants(
         "shipping_boxnow.tasks.poll_boxnow_tracking_batch"
     )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_sync_boxnow_lockers():
+    return run_for_all_tenants("shipping_boxnow.tasks.sync_boxnow_lockers")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_sync_acs_stations():
+    return run_for_all_tenants("shipping_acs.tasks.sync_acs_stations")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_issue_daily_acs_pickup_list():
+    return run_for_all_tenants("shipping_acs.tasks.issue_daily_acs_pickup_list")

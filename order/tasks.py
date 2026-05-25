@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
-from django.core.mail import EmailMultiAlternatives, mail_admins
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import F
 from django.template.loader import render_to_string
@@ -453,11 +453,13 @@ def send_dispute_notification_email(
     retry_jitter=True,
 )
 def send_admin_new_order_email(self, order_id: int) -> bool:
-    """Notify site administrators that a new order has been placed.
+    """Notify the store operator that a new order has been placed.
 
-    Sends via ``django.core.mail.mail_admins`` to every recipient in
-    ``settings.ADMINS``. Operational email — does not affect the
-    customer-facing flow. Skips silently if ``ADMINS`` is empty.
+    This is a MERCHANT-facing alert, not a platform one: it goes to the
+    tenant's ``tenant_contact_email()`` FROM ``tenant_from_email()``, so
+    each store's operator gets their own orders (NOT ``settings.ADMINS``,
+    which is the SaaS platform's admin list shared across all tenants).
+    Skips silently if the tenant has no contact email configured.
     """
     try:
         order = (
@@ -468,9 +470,10 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             .get(id=order_id)
         )
 
-        if not settings.ADMINS:
+        staff_email = tenant_contact_email()
+        if not staff_email:
             logger.warning(
-                "send_admin_new_order_email: no ADMINS configured — skipping",
+                "send_admin_new_order_email: no contact email configured — skipping",
                 extra={"order_id": order_id},
             )
             return False
@@ -480,8 +483,8 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             "items": order.items.all(),
             "pay_way": order.pay_way,
             "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": settings.INFO_EMAIL,
-            "SITE_URL": settings.NUXT_BASE_URL,
+            "INFO_EMAIL": staff_email,
+            "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
@@ -492,14 +495,17 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             "emails/order/admin_new_order.html", context
         )
 
-        mail_admins(
-            subject=f"New order — #{order_id}",
-            message=text_content,
-            html_message=html_content,
+        msg = EmailMultiAlternatives(
+            f"New order — #{order_id}",
+            text_content,
+            tenant_from_email(),
+            [staff_email],
         )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
 
         logger.info(
-            "Admin new-order email sent for order #%s",
+            "Merchant new-order email sent for order #%s",
             order_id,
             extra={"order_id": order_id},
         )
@@ -507,7 +513,7 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
 
     except Order.DoesNotExist:
         logger.error(
-            "Could not send admin new-order email — Order #%s not found",
+            "Could not send merchant new-order email — Order #%s not found",
             order_id,
             extra={"order_id": order_id},
         )

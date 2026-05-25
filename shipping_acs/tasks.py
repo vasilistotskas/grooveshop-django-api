@@ -27,6 +27,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from shipping_acs.exceptions import AcsAPIError, AcsRetryableError
+from core.utils.tenant_urls import get_tenant_base_url
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -375,7 +376,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
             "shipment": shipment,
             "voucher_no": shipment.voucher_no,
             "SITE_NAME": settings.SITE_NAME,
-            "SITE_URL": getattr(settings, "NUXT_BASE_URL", ""),
+            "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": getattr(settings, "STATIC_BASE_URL", ""),
         }
         text_body = render_to_string(

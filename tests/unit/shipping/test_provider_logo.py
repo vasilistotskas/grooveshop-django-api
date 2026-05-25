@@ -60,7 +60,7 @@ def test_main_image_path_reflects_upload():
     provider.save(update_fields=["logo"])
 
     assert provider.logo_filename.endswith(".png")
-    assert provider.main_image_path.startswith("media/uploads/shipping/")
+    assert provider.main_image_path.startswith("media/public/uploads/shipping/")
     assert provider.main_image_path.endswith(provider.logo_filename)
 
 
@@ -259,7 +259,7 @@ def test_provider_serializer_returns_logo_fields():
     from shipping.serializers import ShippingProviderSerializer
 
     data = ShippingProviderSerializer(provider).data
-    assert data["main_image_path"].startswith("media/uploads/shipping/")
+    assert data["main_image_path"].startswith("media/public/uploads/shipping/")
     assert data["logo_filename"].endswith(".png")
     # ImageField under DRF returns the storage URL or None.
     assert data["logo"] is not None

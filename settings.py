@@ -322,6 +322,7 @@ REST_FRAMEWORK = {
         "cart_mutation_anon": None if DEBUG else "30/minute",
         "search": None if DEBUG else "120/minute",
         "view_count": None if DEBUG else "60/hour",
+        "viva_return": None if DEBUG else "30/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -781,7 +782,10 @@ def get_celery_beat_schedule():
             else SCHEDULE_PRESETS["every_hour"],
         },
         "sync-boxnow-lockers": {
-            "task": "shipping_boxnow.tasks.sync_boxnow_lockers",
+            # Fanout: BoxNowLocker lives in each tenant schema; a direct
+            # beat call would sync into the empty public schema. Per-tenant
+            # fanout keeps every tenant's locker cache fresh.
+            "task": "tenant.tasks.fanout_sync_boxnow_lockers",
             "schedule": SCHEDULE_PRESETS["daily_2am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
@@ -815,7 +819,8 @@ def get_celery_beat_schedule():
         # mid-DST-fallback hour (Europe/Athens transitions twice yearly)
         # can't re-fire the task against a stale ``last_run_at``.
         "sync-acs-stations": {
-            "task": "shipping_acs.tasks.sync_acs_stations",
+            # Fanout: AcsStation is per-tenant; beat fires in public.
+            "task": "tenant.tasks.fanout_sync_acs_stations",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
@@ -825,7 +830,11 @@ def get_celery_beat_schedule():
         # Beats the close of the courier's daily collection window and
         # keeps the path matched to admin's manual override.
         "issue-acs-pickup-list": {
-            "task": "shipping_acs.tasks.issue_daily_acs_pickup_list",
+            # Fanout: AcsShipment is per-tenant; a direct beat call would
+            # query the empty public schema and never present vouchers to
+            # ACS for collection. Per-tenant fanout issues each tenant's
+            # daily manifest.
+            "task": "tenant.tasks.fanout_issue_daily_acs_pickup_list",
             "schedule": crontab(hour="16", minute="30", day_of_week="mon-fri"),
             "options": {"queue": "celery", "expires": 300},
         },

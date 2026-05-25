@@ -602,39 +602,48 @@ class SendAdminNewOrderEmailTestCase(DjangoTestCase):
             payment_status=PaymentStatus.PENDING,
         )
 
-    @patch("order.tasks.mail_admins")
+    @patch(
+        "order.tasks.tenant_contact_email", return_value="merchant@store.test"
+    )
+    @patch("order.tasks.tenant_from_email", return_value="orders@store.test")
     @patch("order.tasks.render_to_string")
     @override_settings(
-        ADMINS=["admin@example.com"],
-        SITE_NAME="GrooveShop",
-        INFO_EMAIL="support@example.com",
-        NUXT_BASE_URL="http://example.com",
-        STATIC_BASE_URL="http://example.com",
-        DEFAULT_FROM_EMAIL="no-reply@example.com",
+        SITE_NAME="GrooveShop", STATIC_BASE_URL="http://example.com"
     )
-    def test_send_admin_new_order_email_sends_to_admins(
-        self, mock_render, mock_mail_admins
+    def test_send_admin_new_order_email_sends_to_merchant(
+        self, mock_render, _mock_from, _mock_contact
     ):
+        # New-order alerts are MERCHANT-facing: they go to the tenant's
+        # contact email FROM the tenant's address, not platform ADMINS.
+        from django.core import mail
+
         mock_render.side_effect = ["Text body", "<p>HTML body</p>"]
+        # setUp's factory order already fired the eager order-created
+        # flow into the outbox; isolate this task's send.
+        mail.outbox.clear()
 
         result = send_admin_new_order_email(self.order.id)
 
         self.assertTrue(result)
-        mock_mail_admins.assert_called_once()
-        call_kwargs = mock_mail_admins.call_args[1]
-        self.assertIn(f"New order — #{self.order.id}", call_kwargs["subject"])
-        self.assertEqual(call_kwargs["message"], "Text body")
-        self.assertEqual(call_kwargs["html_message"], "<p>HTML body</p>")
+        self.assertEqual(len(mail.outbox), 1)
+        sent = mail.outbox[0]
+        self.assertIn(f"New order — #{self.order.id}", sent.subject)
+        self.assertEqual(sent.to, ["merchant@store.test"])
+        self.assertEqual(sent.from_email, "orders@store.test")
+        self.assertEqual(sent.body, "Text body")
 
-    @override_settings(ADMINS=[])
-    @patch("order.tasks.mail_admins")
+    @patch("order.tasks.tenant_contact_email", return_value="")
     def test_send_admin_new_order_email_skips_when_unconfigured(
-        self, mock_mail_admins
+        self, _mock_contact
     ):
+        # No tenant contact email configured → skip silently.
+        from django.core import mail
+
+        mail.outbox.clear()
         result = send_admin_new_order_email(self.order.id)
 
         self.assertFalse(result)
-        mock_mail_admins.assert_not_called()
+        self.assertEqual(len(mail.outbox), 0)
 
     @patch("order.tasks.logger.error")
     def test_send_admin_new_order_email_order_not_found(self, mock_logger):

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.utils import translation
 
 from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowRetryableError
+from core.utils.tenant_urls import get_tenant_base_url
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -260,7 +261,7 @@ def boxnow_send_arrival_notification(
             "locker_address": locker_address,
             "parcel_id": shipment.parcel_id,
             "SITE_NAME": settings.SITE_NAME,
-            "SITE_URL": getattr(settings, "NUXT_BASE_URL", ""),
+            "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": getattr(settings, "STATIC_BASE_URL", ""),
         }
         text_body = render_to_string(

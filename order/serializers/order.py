@@ -447,12 +447,32 @@ class OrderDetailSerializer(OrderSerializer):
                     "timestamp": history.created_at,
                     "description": self._describe_history_entry(history),
                     "user": history.user.full_name if history.user else None,
-                    "previous_value": history.previous_value,
-                    "new_value": history.new_value,
+                    "previous_value": self._sanitize_history_value(
+                        history.previous_value
+                    ),
+                    "new_value": self._sanitize_history_value(
+                        history.new_value
+                    ),
                 }
             )
 
         return timeline
+
+    # Internal provider tokens that must never reach the customer-facing
+    # timeline. PAYMENT history rows store the raw Stripe PaymentIntent id
+    # / Viva transaction id in ``new_value`` — useful for ops, but an
+    # internal reference the order owner has no business seeing.
+    _HISTORY_VALUE_BLOCKLIST = frozenset({"payment_id"})
+
+    @classmethod
+    def _sanitize_history_value(cls, value):
+        if not isinstance(value, dict):
+            return value
+        return {
+            k: v
+            for k, v in value.items()
+            if k not in cls._HISTORY_VALUE_BLOCKLIST
+        }
 
     @staticmethod
     def _describe_history_entry(history) -> str:

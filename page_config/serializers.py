@@ -17,6 +17,11 @@ class PageSectionSerializer(serializers.ModelSerializer):
             "props",
             "sort_order",
         )
+        # sort_order is owned by the SortableModel drag-drop / array-index
+        # ordering, never set via this serializer. Keeping it read-only here
+        # matches the invariant every other model's serializer follows and
+        # prevents schema drift in the generated OpenAPI contract.
+        read_only_fields = ("sort_order",)
 
 
 class PageLayoutSerializer(serializers.ModelSerializer):

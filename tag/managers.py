@@ -4,23 +4,24 @@ from typing import TYPE_CHECKING
 
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from parler.managers import TranslatableManager, TranslatableQuerySet
+
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class TagQuerySet(TranslatableQuerySet):
+class TagQuerySet(TranslatableOptimizedQuerySet):
     """
-    Optimized QuerySet for Tag model.
+    QuerySet for the Tag model.
 
-    Provides chainable methods for common operations and
-    standardized `for_list()` and `for_detail()` methods.
+    ``with_translations()`` / ``for_list()`` / ``for_detail()`` are
+    inherited from ``TranslatableOptimizedQuerySet``; only the
+    tag-specific filters live here.
     """
-
-    def with_translations(self) -> Self:
-        """Prefetch translations for better performance."""
-        return self.prefetch_related("translations")
 
     def active(self) -> Self:
         return self.filter(active=True)
@@ -28,30 +29,14 @@ class TagQuerySet(TranslatableQuerySet):
     def inactive(self) -> Self:
         return self.filter(active=False)
 
-    def for_list(self) -> Self:
-        """
-        Optimized queryset for list views.
 
-        Includes translations.
-        """
-        return self.with_translations()
-
-    def for_detail(self) -> Self:
-        """
-        Optimized queryset for detail views.
-
-        Same as for_list() for tags.
-        """
-        return self.for_list()
-
-
-class TagManager(TranslatableManager):
+class TagManager(TranslatableOptimizedManager):
     """
-    Manager for Tag model with optimized queryset methods.
+    Manager for the Tag model.
 
-    Most methods are automatically delegated to TagQuerySet
-    via __getattr__. Only for_list() and for_detail() are explicitly
-    defined for IDE support.
+    ``for_list()`` / ``for_detail()`` and delegation of queryset methods
+    (``active()``, ``inactive()``) are provided by
+    ``TranslatableOptimizedManager``.
 
     Usage in ViewSet:
         def get_queryset(self):
@@ -61,25 +46,6 @@ class TagManager(TranslatableManager):
     """
 
     queryset_class = TagQuerySet
-
-    def get_queryset(self) -> TagQuerySet:
-        return TagQuerySet(self.model, using=self._db)
-
-    def __getattr__(self, name: str):
-        """Delegate unknown attributes to the queryset."""
-        if name.startswith("_"):
-            raise AttributeError(
-                f"'{type(self).__name__}' object has no attribute '{name}'"
-            )
-        return getattr(self.get_queryset(), name)
-
-    def for_list(self) -> TagQuerySet:
-        """Return optimized queryset for list views."""
-        return self.get_queryset().for_list()
-
-    def for_detail(self) -> TagQuerySet:
-        """Return optimized queryset for detail views."""
-        return self.get_queryset().for_detail()
 
 
 class TaggedItemQuerySet(models.QuerySet):

@@ -2,60 +2,44 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from parler.managers import TranslatableManager, TranslatableQuerySet
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 
 if TYPE_CHECKING:
     from typing import Self
 
 
-class PayWayQuerySet(TranslatableQuerySet):
+class PayWayQuerySet(TranslatableOptimizedQuerySet):
     """
-    Optimized QuerySet for PayWay model.
+    QuerySet for the PayWay model.
 
-    Provides chainable methods for common operations and
-    standardized `for_list()` and `for_detail()` methods.
+    ``with_translations()`` / ``for_list()`` / ``for_detail()`` are
+    inherited from ``TranslatableOptimizedQuerySet``; only the
+    payment-specific filters live here.
     """
 
-    def with_translations(self) -> Self:
-        """Prefetch translations for better performance."""
-        return self.prefetch_related("translations")
-
-    def for_list(self) -> Self:
-        """
-        Optimized queryset for list views.
-
-        Includes translations.
-        """
-        return self.with_translations()
-
-    def for_detail(self) -> Self:
-        """
-        Optimized queryset for detail views.
-
-        Same as for_list() for this simple model.
-        """
-        return self.for_list()
-
-    def active(self):
+    def active(self) -> Self:
         return self.filter(active=True)
 
-    def inactive(self):
+    def inactive(self) -> Self:
         return self.filter(active=False)
 
-    def online_payments(self):
+    def online_payments(self) -> Self:
         return self.filter(is_online_payment=True)
 
-    def offline_payments(self):
+    def offline_payments(self) -> Self:
         return self.filter(is_online_payment=False)
 
 
-class PayWayManager(TranslatableManager):
+class PayWayManager(TranslatableOptimizedManager):
     """
-    Manager for PayWay model with optimized queryset methods.
+    Manager for the PayWay model.
 
-    Most methods are automatically delegated to PayWayQuerySet
-    via __getattr__. Only for_list() and for_detail() are explicitly
-    defined for IDE support.
+    ``for_list()`` / ``for_detail()`` and delegation of queryset methods
+    (``active()``, ``online_payments()``, …) are provided by
+    ``TranslatableOptimizedManager``.
 
     Usage in ViewSet:
         def get_queryset(self):
@@ -65,14 +49,3 @@ class PayWayManager(TranslatableManager):
     """
 
     queryset_class = PayWayQuerySet
-
-    def get_queryset(self) -> PayWayQuerySet:
-        return PayWayQuerySet(self.model, using=self._db)
-
-    def for_list(self) -> PayWayQuerySet:
-        """Return optimized queryset for list views."""
-        return self.get_queryset().for_list()
-
-    def for_detail(self) -> PayWayQuerySet:
-        """Return optimized queryset for detail views."""
-        return self.get_queryset().for_detail()

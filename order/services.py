@@ -2517,7 +2517,7 @@ class OrderService:
 
         # Generic fallback for the rare case with no active
         # home-delivery carrier (a deploy mid-config) — the platform's
-        # flat-rate price, country/region overrides applied below.
+        # flat-rate price.
         base_shipping_cost = Setting.get(
             "CHECKOUT_SHIPPING_PRICE", default=3.00
         )
@@ -2528,49 +2528,7 @@ class OrderService:
         if order_value.amount >= float(free_shipping_threshold):
             return Money(0, order_value.currency)
 
-        shipping_cost = float(base_shipping_cost)
-
-        if country_id:
-            from country.models import Country
-
-            try:
-                # Country uses alpha_2 as primary key, not id
-                country = Country.objects.get(alpha_2=country_id)
-
-                if (
-                    hasattr(country, "shipping_multiplier")
-                    and country.shipping_multiplier
-                ):
-                    shipping_cost *= country.shipping_multiplier
-
-            except (ImportError, Country.DoesNotExist) as e:
-                logger.warning(
-                    "Country with ID %s not found or country module not available: %s",
-                    country_id,
-                    e,
-                )
-
-        if region_id:
-            from region.models import Region
-
-            try:
-                # Region uses alpha as primary key, not id
-                region = Region.objects.get(alpha=region_id)
-
-                if (
-                    hasattr(region, "shipping_adjustment")
-                    and region.shipping_adjustment
-                ):
-                    shipping_cost += region.shipping_adjustment
-
-            except (ImportError, Region.DoesNotExist) as e:
-                logger.warning(
-                    "Region with ID %s not found or region module not available: %s",
-                    region_id,
-                    e,
-                )
-
-        return Money(shipping_cost, order_value.currency)
+        return Money(float(base_shipping_cost), order_value.currency)
 
     @classmethod
     def calculate_payment_method_fee(

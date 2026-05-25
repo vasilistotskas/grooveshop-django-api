@@ -3,6 +3,38 @@
 
 
 
+## v1.145.1 (2026-05-25)
+
+### Bug fixes
+
+* fix(admin): make category sorting work by switching MPTT admins to unfold drag
+
+DraggableMPTTAdmin's drag is non-functional under django-unfold: unfold's
+change_list_results.html overrides mptt's template and never emits the
+data-context / draggable-admin-context that mptt's draggable-admin.js
+reads to initialise, so the handles render but do nothing.
+
+The category trees are effectively flat (ProductCategory: all 600 rows at
+level 0; BlogCategory: 297 of 300 at level 0), so the tree view buys
+almost nothing. Drop DraggableMPTTAdmin on BlogCategoryAdmin and
+ProductCategoryAdmin and use unfold's flat ordering_field + hide_ordering_field
+sortable - the same mechanism that already works on Region.
+
+Blog: replace the mptt tree_actions/indented_title columns with a
+category_name link column and a parent_display column (+ list_select_related
+parent) so the few nested categories stay visible. Product: category_info
+already renders name/level/ancestor path, so just drop the mptt columns.
+Remove the now-unused DraggableMPTTAdmin import in product/admin.py;
+blog keeps it for BlogCommentAdmin's threaded display.
+
+Admin-only change: no model, serializer, migration, or schema changes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1bf151b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1bf151bbcbb5be095e28ef54bddf3fa5f9ec1954))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.145.0 [skip ci] ([`125ce51`](https://github.com/vasilistotskas/grooveshop-django-api/commit/125ce514f3cd20275b43202bf5ff6b5e8a173b83))
+
 ## v1.145.0 (2026-05-25)
 
 ### Bug fixes

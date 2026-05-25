@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
-from django.core.mail import EmailMultiAlternatives
+from django.core.mail import EmailMultiAlternatives, mail_admins
 from django.db import transaction
 from django.db.models import F
 from django.template.loader import render_to_string
@@ -68,7 +68,12 @@ def _confirmation_lock_key(order_id: int) -> str:
 
 
 def _confirmation_already_sent(metadata: dict | None) -> bool:
-    """Return True if the permanent DB timestamp shows the email was sent."""
+    """Return True if the permanent DB timestamp shows the email was sent.
+
+    The boolean ``CONFIRMATION_EMAIL_SENT_FLAG`` is checked as a
+    fallback because pre-timestamp-key orders persisted in the DB
+    only have that key set. New writes use the timestamp only.
+    """
     meta = metadata or {}
     return bool(
         meta.get(CONFIRMATION_EMAIL_SENT_AT_KEY)
@@ -87,9 +92,6 @@ def _mark_confirmation_sent(order_id: int) -> None:
         order.metadata[CONFIRMATION_EMAIL_SENT_AT_KEY] = (
             timezone.now().isoformat()
         )
-        # Also set the legacy boolean so callers that check the old key
-        # (e.g. retry_payment view that clears the flag) keep working.
-        order.metadata[CONFIRMATION_EMAIL_SENT_FLAG] = True
         order.save(update_fields=["metadata"])
     # Release the execution lock immediately after the DB commit so the
     # next accidental duplicate call sees the DB flag instead of waiting
@@ -438,6 +440,76 @@ def send_dispute_notification_email(
             "Could not send dispute notification — Order #%s not found",
             order_id,
             extra={"order_id": order_id, "dispute_id": dispute_id},
+        )
+        return False
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_admin_new_order_email(self, order_id: int) -> bool:
+    """Notify site administrators that a new order has been placed.
+
+    Sends via ``django.core.mail.mail_admins`` to every recipient in
+    ``settings.ADMINS``. Operational email — does not affect the
+    customer-facing flow. Skips silently if ``ADMINS`` is empty.
+    """
+    try:
+        order = (
+            Order.objects.select_related("user", "country", "region", "pay_way")
+            .prefetch_related(
+                "items__product__translations", "pay_way__translations"
+            )
+            .get(id=order_id)
+        )
+
+        if not settings.ADMINS:
+            logger.warning(
+                "send_admin_new_order_email: no ADMINS configured — skipping",
+                extra={"order_id": order_id},
+            )
+            return False
+
+        context = {
+            "order": order,
+            "items": order.items.all(),
+            "pay_way": order.pay_way,
+            "SITE_NAME": settings.SITE_NAME,
+            "INFO_EMAIL": settings.INFO_EMAIL,
+            "SITE_URL": settings.NUXT_BASE_URL,
+            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+        }
+
+        text_content = render_to_string(
+            "emails/order/admin_new_order.txt", context
+        )
+        html_content = render_to_string(
+            "emails/order/admin_new_order.html", context
+        )
+
+        mail_admins(
+            subject=f"New order — #{order_id}",
+            message=text_content,
+            html_message=html_content,
+        )
+
+        logger.info(
+            "Admin new-order email sent for order #%s",
+            order_id,
+            extra={"order_id": order_id},
+        )
+        return True
+
+    except Order.DoesNotExist:
+        logger.error(
+            "Could not send admin new-order email — Order #%s not found",
+            order_id,
+            extra={"order_id": order_id},
         )
         return False
 

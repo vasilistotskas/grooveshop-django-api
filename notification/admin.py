@@ -197,7 +197,12 @@ class NotificationAdmin(ModelAdmin, TranslatableAdmin):
     )
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request).prefetch_related("user__user")
+        # ``Notification`` is a broadcast model — it has no ``user``
+        # field (per-user delivery lives on ``UserNotification`` via
+        # the ``notification_users`` reverse manager). The previous
+        # ``prefetch_related("user__user")`` was always invalid and
+        # raised a 500 on every changelist load with non-empty data.
+        qs = super().get_queryset(request).prefetch_related("translations")
         return qs.annotate(
             nu_total=Count("notification_users"),
             nu_seen=Count(

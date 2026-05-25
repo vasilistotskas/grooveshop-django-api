@@ -43,6 +43,7 @@ class PayWaySerializer(
         )
         read_only_fields = (
             "id",
+            "sort_order",
             "main_image_path",
             "created_at",
             "updated_at",
@@ -109,3 +110,4 @@ class PayWayWriteSerializer(
             "requires_confirmation",
             "configuration",
         )
+        read_only_fields = ("sort_order",)

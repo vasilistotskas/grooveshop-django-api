@@ -271,7 +271,6 @@ def create_schema_view_config(
     model_class: type[models.Model],
     serializers_config: SerializersConfig,
     error_serializer=None,
-    additional_responses=None,
     display_config: DisplayConfig | Mapping[str, Any] | None = None,
     include_language_param: bool = True,
     include_pagination_params: bool = True,
@@ -280,10 +279,10 @@ def create_schema_view_config(
     Create schema configuration for a ViewSet with translation support.
 
     Iterates over ALL keys in ``serializers_config`` – including custom
-    actions – and auto-generates ``@extend_schema`` for each.
+    actions – and auto-generates ``@extend_schema`` for each. Per-action
+    response overrides are set via ``ActionConfig.responses`` on the
+    matching ``serializers_config`` entry — no separate parameter.
     """
-    if additional_responses is None:
-        additional_responses = {}
     if display_config is None:
         display_config = {}
 
@@ -364,10 +363,6 @@ def create_schema_view_config(
         if action_name in _NO_500_ACTIONS:
             responses.pop(500, None)
 
-        # Apply additional_responses overrides (backward compat)
-        if action_name in additional_responses:
-            responses.update(additional_responses[action_name])
-
         # Handle list action many=True
         if action_name == "list" and default_status in responses:
             resp_val = responses[default_status]
@@ -416,8 +411,6 @@ def create_schema_view_config(
                 responses.pop(400, None)
             if crud_action in _NO_500_ACTIONS:
                 responses.pop(500, None)
-            if crud_action in additional_responses:
-                responses.update(additional_responses[crud_action])
 
             parameters = None
             if crud_action == "list":

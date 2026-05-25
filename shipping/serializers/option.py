@@ -63,4 +63,17 @@ class ShippingOptionSerializer(serializers.Serializer):
     currency = serializers.CharField(max_length=3)
     live_mode = serializers.BooleanField()
     priority = serializers.IntegerField()
+    logo_url = serializers.URLField(
+        allow_null=True,
+        required=False,
+        help_text=_(
+            "Absolute URL for the operator-uploaded brand logo, "
+            "resolved per (provider, kind) so the home-delivery row "
+            "and the pickup-point row of the same carrier can show "
+            "different images. Null when no logo is uploaded — the "
+            "storefront then falls back to its bundled default. "
+            "``settings.MEDIA_URL`` is absolute in every environment "
+            "so this is always a full URL when present."
+        ),
+    )
     metadata = serializers.DictField()

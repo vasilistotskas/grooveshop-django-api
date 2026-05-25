@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
@@ -24,7 +26,7 @@ from core.views import (
     upload_image,
 )
 from order.views.viva_webhook import (
-    resolve_viva_order_code,
+    ResolveVivaOrderCodeView,
     viva_wallet_webhook,
 )
 from shipping_boxnow.views.webhook import BoxNowWebhookView
@@ -45,13 +47,25 @@ urlpatterns = [
     ),
     path(
         "viva-wallet/resolve-order",
-        resolve_viva_order_code.as_view(),
+        ResolveVivaOrderCodeView.as_view(),
         name="viva-wallet-resolve-order",
     ),
     path(
         "boxnow/webhook/",
         BoxNowWebhookView.as_view(),
         name="boxnow-webhook",
+    ),
+]
+
+urlpatterns += [
+    # allauth headless endpoints must be at the root (not inside i18n_patterns)
+    # so non-default locales don't get a /{lang}/_allauth/ prefix that
+    # the Nuxt proxy never sends.
+    path("_allauth/", include("allauth.headless.urls")),
+    path(
+        "_allauth/app/v1/account/authenticators/totp/svg",
+        ManageTOTPSvgView.as_api_view(client="app"),
+        name="manage_totp_svg",
     ),
 ]
 
@@ -64,12 +78,6 @@ urlpatterns += i18n_patterns(
     path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
-    path("_allauth/", include("allauth.headless.urls")),
-    path(
-        "_allauth/app/v1/account/authenticators/totp/svg",
-        ManageTOTPSvgView.as_api_view(client="app"),
-        name="manage_totp_svg",
-    ),
     # Our DBBackedTranslationFormView overrides the same URL that rosetta.urls
     # registers for the translation form; Django resolves the first match
     # so this override takes priority over the default `TranslationFormView`.
@@ -132,8 +140,15 @@ if bool(settings.ENABLE_DEBUG_TOOLBAR):
         ]
 
 if bool(settings.DEBUG) or settings.SYSTEM_ENV in ["dev", "ci"]:
+    # ``MEDIA_URL`` is absolute in every environment (so DRF
+    # ``ImageField`` serialises to a full URL the Zod 4 schema
+    # accepts), but Django's ``static()`` helper no-ops when the
+    # prefix has a netloc — it would refuse to route ``/media/<path>``
+    # if we passed the full URL. Strip down to just the path portion
+    # so the dev media-serve view still mounts.
+    _media_path = urlsplit(settings.MEDIA_URL).path or settings.MEDIA_URL
     urlpatterns += static(
-        settings.MEDIA_URL,
+        _media_path,
         document_root=settings.MEDIA_ROOT,
     )
 

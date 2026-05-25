@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from cart.filters.cart import CartFilter
 from cart.models import Cart
 from cart.serializers.cart import (
+    CartCreatePaymentIntentRequestSerializer,
     CartDetailSerializer,
     CartPaymentIntentResponseSerializer,
     CartSerializer,
@@ -147,6 +148,7 @@ serializers_config: SerializersConfig = {
         parameters=GUEST_CART_HEADERS,
     ),
     "create_payment_intent": ActionConfig(
+        request=CartCreatePaymentIntentRequestSerializer,
         response=CartPaymentIntentResponseSerializer,
         operation_id="createCartPaymentIntent",
         summary=_("Create payment intent from cart"),
@@ -485,6 +487,7 @@ class CartViewSet(BaseModelViewSet):
         """
         from pay_way.models import PayWay
         from pay_way.services import PayWayService
+        from shipping.utils import compute_total_weight_grams
 
         cart = self.cart_service.get_or_create_cart()
         if not cart:
@@ -502,14 +505,27 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Get and validate payment method
-        pay_way_id = request.data.get("pay_way_id")
-        if not pay_way_id:
-            logger.error("pay_way_id is missing from request")
-            return Response(
-                {"detail": "pay_way_id is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # Validate the request body so the PaymentIntent amount is
+        # always computed against the carrier the shopper picked —
+        # not the generic ``FREE_SHIPPING_THRESHOLD`` fallback. Any
+        # missing/invalid field surfaces as a 400 rather than a silent
+        # mismatch at order-create time.
+        request_serializer = CartCreatePaymentIntentRequestSerializer(
+            data=request.data
+        )
+        request_serializer.is_valid(raise_exception=True)
+        pay_way_id = request_serializer.validated_data["pay_way_id"]
+        # ``shipping_provider_code`` is normalised to None by the
+        # serializer's validate() when omitted (home_delivery is
+        # provider-agnostic in the frontend); pass it through so the
+        # order-create verification gets the same None and both calc
+        # paths agree on the generic-fallback shipping price.
+        shipping_provider_code = request_serializer.validated_data.get(
+            "shipping_provider_code"
+        )
+        shipping_kind = request_serializer.validated_data["shipping_kind"]
+        country_id = request_serializer.validated_data.get("country_id") or None
+        region_id = request_serializer.validated_data.get("region_id") or None
 
         try:
             pay_way = PayWay.objects.get(id=pay_way_id)
@@ -536,9 +552,23 @@ class CartViewSet(BaseModelViewSet):
             )
 
         # Calculate cart total including shipping and payment method fee
-        # to match the final order total that will be created later
+        # using the SAME inputs the order-create verification step uses
+        # (per-carrier free-shipping threshold + weight-banded quote +
+        # country/region multipliers). The intent must equal what
+        # ``OrderService.create_order_*`` will charge — otherwise
+        # ``PaymentAmountMismatchError`` raises at order-create time.
         cart_total = cart.total_price
-        shipping_cost = OrderService.calculate_shipping_cost(cart_total)
+        cart_weight_grams = compute_total_weight_grams(
+            (item.product, item.quantity) for item in cart.items.all()
+        )
+        shipping_cost = OrderService.calculate_shipping_cost(
+            order_value=cart_total,
+            country_id=country_id,
+            region_id=region_id,
+            shipping_provider_code=shipping_provider_code,
+            shipping_kind=shipping_kind,
+            weight_grams=cart_weight_grams,
+        )
         order_subtotal = Money(
             cart_total.amount + shipping_cost.amount,
             cart_total.currency,

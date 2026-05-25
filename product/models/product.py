@@ -111,7 +111,17 @@ class Product(
     )
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
     weight = MeasurementField(
-        str(_("Weight")),
+        # Lazy translation, NOT ``str(_("Weight"))``: forcing the
+        # string at module-import time bakes the locale-resolved
+        # value ("Βάρος" on a dev machine with Greek active, "Weight"
+        # on CI with English active) into ``makemigrations`` output,
+        # so the two environments fight forever — every CI run sees
+        # the model as "changed" relative to the last migration and
+        # demands a new one. Keeping the lazy proxy lets Django
+        # serialise as ``gettext_lazy('Weight')``, which is
+        # locale-independent in the migration file and resolves at
+        # render time per active locale.
+        _("Weight"),
         measurement=Weight,
         unit_choices=WeightUnits.CHOICES,
         default=zero_weight,

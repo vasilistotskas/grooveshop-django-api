@@ -61,6 +61,84 @@ class OrderDetailSerializerTestCase(TestCase):
             all(field in data for field in expected_additional_fields)
         )
 
+    def test_timeline_is_curated_for_customer(self):
+        """The customer-facing timeline is a curated subset of
+        ``OrderHistory`` — only state transitions that matter to
+        the buyer (STATUS, PAYMENT, SHIPPING, REFUND) plus the
+        synthetic CREATED entry. Operational NOTE rows (item-added,
+        order-created sentinel, confirmation-email-sent) belong
+        in the admin audit log only; surfacing them duplicates
+        information already visible on the order page and leaks
+        internal recipient addresses.
+
+        Lock the behaviour: NOTE is filtered out; STATUS/PAYMENT
+        are rendered with from→to transitions; the synthetic
+        CREATED entry carries no description (frontend renders
+        the localised title on its own).
+        """
+        from order.models.history import OrderHistory
+
+        OrderHistory.log_note(
+            order=self.order,
+            note="Shipping confirmation email sent to ops@example.com",
+        )
+        OrderHistory.log_status_change(
+            order=self.order,
+            previous_status="PENDING",
+            new_status="PROCESSING",
+        )
+        OrderHistory.log_payment_update(
+            order=self.order,
+            previous_value={"payment_status": "PENDING"},
+            new_value={
+                "payment_status": "COMPLETED",
+                "provider": "viva_wallet",
+                "payment_id": "internal-token-do-not-expose",
+            },
+        )
+
+        serializer = OrderDetailSerializer(instance=self.order)
+        timeline = serializer.data["order_timeline"]
+        change_types = [entry["change_type"] for entry in timeline]
+        descriptions = [entry["description"] for entry in timeline]
+
+        self.assertNotIn(
+            "NOTE",
+            change_types,
+            "NOTE rows must be filtered from the customer timeline",
+        )
+        self.assertNotIn(
+            "Shipping confirmation email sent to ops@example.com",
+            descriptions,
+            "NOTE note text must not leak into the customer timeline",
+        )
+
+        created = next(e for e in timeline if e["change_type"] == "CREATED")
+        self.assertEqual(
+            created["description"],
+            "",
+            "Synthetic CREATED entry must have empty description "
+            "(frontend renders the localised title alone)",
+        )
+
+        self.assertIn("STATUS", change_types)
+        self.assertIn("PENDING → PROCESSING", descriptions)
+
+        payment_descs = [
+            entry["description"]
+            for entry in timeline
+            if entry["change_type"] == "PAYMENT"
+        ]
+        self.assertTrue(payment_descs, "PAYMENT entry missing")
+        payment_desc = payment_descs[-1]
+        self.assertIn("PENDING → COMPLETED", payment_desc)
+        self.assertIn("viva_wallet", payment_desc)
+        self.assertNotIn(
+            "internal-token-do-not-expose",
+            payment_desc,
+            "PAYMENT description must not surface the payment_id token",
+        )
+
 
 class OrderCreateUpdateSerializerTestCase(TestCase):
     def setUp(self):

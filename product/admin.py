@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import admin_thumbnails
 from django.contrib import admin, messages
-from django.db.models import F, Q, Sum, Count, Avg, Prefetch
+from django.db.models import F, Q, Sum, Count, Prefetch
 from django.db.models.functions import TruncDay
 from django.http import HttpResponseRedirect, Http404
 from django.shortcuts import redirect, render
@@ -13,7 +13,6 @@ from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
-from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
 from simple_history.admin import SimpleHistoryAdmin
 from unfold.admin import TabularInline
@@ -181,19 +180,24 @@ class LikesCountFilter(RangeNumericListFilter):
     parameter_name = "likes_count"
 
     def queryset(self, request, queryset):
-        filters = {}
+        # Short-circuit when the filter is unused. Django admin
+        # invokes every ``list_filter``'s ``queryset()`` on every
+        # page load — without this guard ``with_likes_count()``
+        # added a ``LEFT JOIN productfavourite`` + GROUP BY to the
+        # main product fetch + the date-hierarchy DATE_TRUNC + the
+        # COUNT query, costing ~2s extra per changelist load.
+        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
+        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
+        if not value_from and not value_to:
+            return queryset
 
         queryset = queryset.with_likes_count()
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
+        filters = {}
+        if value_from:
             filters["likes_count__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
+        if value_to:
             filters["likes_count__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
+        return queryset.filter(**filters)
 
     def expected_parameters(self):
         return [
@@ -207,19 +211,20 @@ class ReviewAverageFilter(RangeNumericListFilter):
     parameter_name = "review_average"
 
     def queryset(self, request, queryset):
-        filters = {}
+        # Short-circuit when the filter is unused — same rationale
+        # as ``LikesCountFilter`` above.
+        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
+        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
+        if not value_from and not value_to:
+            return queryset
 
         queryset = queryset.with_review_average()
-
-        value_from = self.used_parameters.get(f"{self.parameter_name}_from")
-        if value_from and value_from != "":
+        filters = {}
+        if value_from:
             filters["review_average__gte"] = value_from
-
-        value_to = self.used_parameters.get(f"{self.parameter_name}_to")
-        if value_to and value_to != "":
+        if value_to:
             filters["review_average__lte"] = value_to
-
-        return queryset.filter(**filters) if filters else queryset
+        return queryset.filter(**filters)
 
     def expected_parameters(self):
         return [
@@ -280,7 +285,9 @@ class AttributeValueInline(TabularInline):
     model = AttributeValue
     extra = 0
     fields = ("value_display", "active", "sort_order", "usage_count_display")
-    readonly_fields = ("value_display", "usage_count_display", "sort_order")
+    readonly_fields = ("value_display", "usage_count_display")
+    ordering_field = "sort_order"
+    hide_ordering_field = True
 
     tab = True
     show_change_link = True
@@ -329,6 +336,8 @@ class AttributeValueInline(TabularInline):
 class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
     """Admin interface for managing product attributes."""
 
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = [
         "attribute_info",
         "active_status_badge",
@@ -350,7 +359,6 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
     readonly_fields = (
         "id",
         "uuid",
-        "sort_order",
         "created_at",
         "updated_at",
         "values_count_display",
@@ -579,6 +587,8 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
 class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
     """Admin interface for managing attribute values."""
 
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = [
         "value_info",
         "attribute_display",
@@ -601,7 +611,6 @@ class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
     readonly_fields = (
         "id",
         "uuid",
-        "sort_order",
         "created_at",
         "updated_at",
         "usage_count_display",
@@ -1322,7 +1331,17 @@ class ProductAdmin(
     def get_queryset(self, request):
         from order.models.stock_reservation import StockReservation
 
-        # Only apply expensive annotations when filtering/sorting requires them
+        # Only apply expensive annotations when filtering/sorting requires
+        # them. The ``else`` branches used to annotate unconditionally
+        # "to avoid attribute errors", but that fired both joins
+        # (``LEFT JOIN productfavourite`` + ``LEFT JOIN productreview``
+        # + ``GROUP BY``) on every changelist load — a cartesian product
+        # of favourites × reviews per product, costing 2.4s on the
+        # main query and 875ms on the date-hierarchy DATE_TRUNC.
+        # ``Product.likes_count`` / ``review_average`` properties
+        # already fall back to per-row queries when no annotation is
+        # present, so removing the unconditional annotation just shifts
+        # the cost from "2.4s once" to "~1ms × 25 rows = ~25ms".
         qs = super().get_queryset(request)
 
         # Check if we need likes_count or review_average based on filters/ordering
@@ -1338,15 +1357,9 @@ class ProductAdmin(
 
         if needs_likes:
             qs = qs.with_likes_count()
-        else:
-            # Add a default value to avoid attribute errors
-            qs = qs.annotate(likes_count=Count("favourited_by", distinct=True))
 
         if needs_reviews:
             qs = qs.with_review_average()
-        else:
-            # Add a default value to avoid attribute errors
-            qs = qs.annotate(review_average=Avg("reviews__rate"))
 
         # Optimize related queries
         now = timezone.now()
@@ -2239,13 +2252,10 @@ class ProductCategoryImageInline(TabularInline):
 
 
 @admin.register(ProductCategory)
-class ProductCategoryAdmin(
-    BaseModelAdmin, TranslatableAdmin, DraggableMPTTAdmin
-):
-    mptt_indent_field = "translations__name"
+class ProductCategoryAdmin(BaseModelAdmin, TranslatableAdmin):
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = (
-        "tree_actions",
-        "indented_title",
         "category_info",
         "category_stats",
         "category_status",
@@ -2769,6 +2779,8 @@ class ProductFavouriteAdmin(BaseModelAdmin):
 
 @admin.register(ProductCategoryImage)
 class ProductCategoryImageAdmin(BaseModelAdmin, TranslatableAdmin):
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = [
         "image_preview",
         "category_name",
@@ -2789,7 +2801,7 @@ class ProductCategoryImageAdmin(BaseModelAdmin, TranslatableAdmin):
         "translations__alt_text",
     ]
     list_select_related = ["category"]
-    readonly_fields = ("created_at", "updated_at", "uuid", "sort_order")
+    readonly_fields = ("created_at", "updated_at", "uuid")
     ordering = ["category", "image_type", "sort_order"]
 
     fieldsets = (
@@ -2906,6 +2918,8 @@ class ProductCategoryImageAdmin(BaseModelAdmin, TranslatableAdmin):
 
 @admin.register(ProductImage)
 class ProductImageAdmin(BaseModelAdmin, TranslatableAdmin):
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = [
         "image_preview",
         "product_name",
@@ -2924,7 +2938,7 @@ class ProductImageAdmin(BaseModelAdmin, TranslatableAdmin):
         "translations__title",
     ]
     list_select_related = ["product"]
-    readonly_fields = ("created_at", "updated_at", "uuid", "sort_order")
+    readonly_fields = ("created_at", "updated_at", "uuid")
     ordering = ["product", "-is_main", "sort_order"]
 
     fieldsets = (

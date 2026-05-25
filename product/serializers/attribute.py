@@ -3,6 +3,7 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
 from core.api.schema import generate_schema_multi_lang
+from core.api.serializers import RequiredDefaultTranslationMixin
 from core.utils.serializers import TranslatedFieldExtended
 from product.models.attribute import Attribute
 
@@ -12,8 +13,12 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class AttributeSerializer(TranslatableModelSerializer):
+class AttributeSerializer(
+    RequiredDefaultTranslationMixin, TranslatableModelSerializer
+):
     """Serializer for Attribute with translations."""
+
+    required_translation_field = "name"
 
     translations = TranslatedFieldsFieldExtend(shared_model=Attribute)
     values_count = serializers.IntegerField(read_only=True, required=False)
@@ -41,18 +46,3 @@ class AttributeSerializer(TranslatableModelSerializer):
             "created_at",
             "updated_at",
         ]
-
-    def validate_translations(self, value):
-        """Validate that at least the default language translation exists."""
-        if not value:
-            raise serializers.ValidationError(
-                "At least one translation is required."
-            )
-
-        # Check if default language (English) has a name
-        if "en" in value and not value["en"].get("name"):
-            raise serializers.ValidationError(
-                "Default language (English) translation is required."
-            )
-
-        return value

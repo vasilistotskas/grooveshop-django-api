@@ -336,7 +336,9 @@ class TestHandleStripePaymentFailed:
             patch(
                 "order.signals.handlers.OrderService.handle_payment_failed"
             ) as mock_service,
-            patch("order.signals.handlers.send_payment_failed_email.delay"),
+            patch(
+                "order.signals.handlers.send_payment_failed_email.apply_async"
+            ),
         ):
             mock_service.return_value = order
             handle_stripe_payment_failed(sender=None, event=mock_failed_event)

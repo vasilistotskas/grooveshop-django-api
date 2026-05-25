@@ -1,17 +1,20 @@
+import os
+
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
+from core.fields.image import ImageAndSvgField
 from core.models import TimeStampMixinModel
 
 
 class ShippingProvider(TimeStampMixinModel):
     """DB-backed registry row, one per courier integration.
 
-    Acts as the on/off switch for a provider in checkout — replaces the
-    per-app ``BOXNOW_ENABLED``-style ``extra_settings`` flag — and tells
-    the abstraction which fulfilment kinds the provider can handle.
+    Acts as the single on/off switch for a provider in checkout (via
+    ``is_active``) and tells the abstraction which fulfilment kinds the
+    provider can handle.
 
     The matching adapter class is looked up in the in-memory
     ``shipping.interfaces._REGISTRY`` by ``code``; the adapter is
@@ -70,6 +73,35 @@ class ShippingProvider(TimeStampMixinModel):
             "feature flags, branding hints)."
         ),
     )
+    logo = ImageAndSvgField(
+        _("Logo"),
+        upload_to="uploads/shipping/",
+        blank=True,
+        null=True,
+        help_text=_(
+            "Primary brand logo shown on the checkout shipping picker "
+            "and the order summary — used for home-delivery rows and "
+            "as the fallback for pickup-point rows when "
+            "``logo_pickup_point`` is empty. PNG/JPG/SVG. Falls back "
+            "to a shipped default in the storefront when blank, so a "
+            "fresh deploy without uploaded assets still renders."
+        ),
+    )
+    logo_pickup_point = ImageAndSvgField(
+        _("Pickup-point logo"),
+        upload_to="uploads/shipping/",
+        blank=True,
+        null=True,
+        help_text=_(
+            "Optional pickup-point-specific logo (e.g. a locker "
+            "illustration distinct from the carrier's home-delivery "
+            "brand mark). When set, the storefront's "
+            "``/api/v1/shipping/options`` endpoint surfaces it on the "
+            "pickup_point row's ``logoUrl`` so the locker card looks "
+            "different from the home-delivery card for the same "
+            "carrier. Falls back to ``logo`` when blank."
+        ),
+    )
 
     class Meta(TypedModelMeta):
         verbose_name = _("Shipping Provider")
@@ -94,3 +126,66 @@ class ShippingProvider(TimeStampMixinModel):
         if kind == "pickup_point":
             return self.supports_pickup_point
         return False
+
+    # ------------------------------------------------------------------
+    # Logo helpers — kind-aware so the picker can show a different
+    # image for the same carrier's home-delivery vs pickup_point row.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _filename_of(field) -> str:
+        """Return ``os.path.basename`` of a ``FieldFile`` or '' when empty."""
+        if field and getattr(field, "name", ""):
+            return os.path.basename(str(field.name))
+        return ""
+
+    @classmethod
+    def _relative_path_of(cls, field) -> str:
+        """``media/uploads/shipping/<basename>`` for a non-empty field,
+        empty string otherwise. Mirrors the ``PayWay.icon`` contract
+        the search + Open-Graph serializers use elsewhere.
+        """
+        name = cls._filename_of(field)
+        return f"media/uploads/shipping/{name}" if name else ""
+
+    def logo_for_kind(self, kind: str):
+        """Return the ``FieldFile`` to show for a given ``ShippingKind``.
+
+        ``pickup_point`` rows prefer ``logo_pickup_point`` and fall
+        back to the primary ``logo`` when the pickup-specific variant
+        isn't uploaded. Every other kind uses ``logo`` directly. The
+        return is a ``FieldFile``-like object (or the empty-file
+        sentinel) so callers can ``.url`` it the same way they would
+        access either model field directly.
+        """
+        if kind == "pickup_point" and self._filename_of(self.logo_pickup_point):
+            return self.logo_pickup_point
+        return self.logo
+
+    def logo_url_for_kind(self, kind: str) -> str | None:
+        """Absolute URL for ``logo_for_kind(kind)``, or ``None`` when
+        no logo is uploaded for that kind (after the pickup→primary
+        fallback). ``settings.MEDIA_URL`` is absolute in every
+        environment so ``.url`` here is always a full URL.
+        """
+        field = self.logo_for_kind(kind)
+        return field.url if self._filename_of(field) else None
+
+    # ------------------------------------------------------------------
+    # Project-convention properties (parity with PayWay.icon /
+    # ProductImage.main_image_path) — kept even though the storefront
+    # consumes the absolute URL directly, because admin and search
+    # serializers elsewhere expect the relative-path / filename API.
+    # ------------------------------------------------------------------
+
+    @property
+    def main_image_path(self) -> str:
+        return self._relative_path_of(self.logo)
+
+    @property
+    def logo_filename(self) -> str:
+        return self._filename_of(self.logo)
+
+    @property
+    def logo_pickup_point_filename(self) -> str:
+        return self._filename_of(self.logo_pickup_point)

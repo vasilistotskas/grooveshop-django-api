@@ -402,6 +402,7 @@ class TestUserAdmin:
         assert user.updated_at.strftime("%Y-%m-%d %H:%M") in result
         assert "tabular-nums" in result
 
+    @pytest.mark.assert_english
     def test_last_activity_never(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
         user = UserAccountFactory()

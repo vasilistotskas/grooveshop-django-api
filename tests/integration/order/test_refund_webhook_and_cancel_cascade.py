@@ -141,8 +141,11 @@ class TestChargeRefundedWebhook:
             amount=5000,
             amount_refunded=5000,
         )
+        # The handler dispatches via apply_async (not .delay) so it can
+        # pin the tenant schema in the task header — see the on_commit
+        # schema-capture pattern in handle_order_refunded.
         with patch(
-            "order.signals.handlers.send_refund_confirmation_email.delay"
+            "order.signals.handlers.send_refund_confirmation_email.apply_async"
         ) as mock_email:
             handle_stripe_charge_refunded(sender=None, event=event)
             # Stripe redelivers the same event ~10s later.
@@ -151,7 +154,9 @@ class TestChargeRefundedWebhook:
         # First call queued the email; second call short-circuited at
         # the webhook-event dedup before reaching the signal.
         assert mock_email.call_count == 1
-        mock_email.assert_called_with(order.id)
+        mock_email.assert_called_with(
+            args=[order.id], headers={"_schema_name": "public"}
+        )
 
 
 # ---------------------------------------------------------------------------

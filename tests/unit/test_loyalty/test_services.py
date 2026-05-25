@@ -17,6 +17,8 @@ from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
 
+pytestmark = pytest.mark.assert_english
+
 
 # ---------------------------------------------------------------------------
 # Helper: build a mock product

@@ -106,6 +106,8 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - `crud_config()` — shorthand for standard CRUD serializer mapping
 - `create_schema_view_config()` — auto-generates `@extend_schema` decorators from model verbose names
 
+**Translation validation** (`core/api/serializers.py`): `RequiredDefaultTranslationMixin` — mix into a `TranslatableModelSerializer` and set `required_translation_field` to require the `settings.PARLER_DEFAULT_LANGUAGE_CODE` translation (with that field non-empty); other locales stay optional. Never hardcode a language code (e.g. `if "en" in value`) — the default is `el` and the locale set can change.
+
 **Custom fields**: `ImageAndSvgField` (images + SVG), `MeasurementField` (physical measurements with unit conversion)
 
 **Permissions** (`core/api/permissions.py`): `IsOwnerOrAdmin`, `IsOwnerOrAdminOrGuest` — checks `user`, `owner`, or `created_by` fields. `IsOwnerOrAdminOrGuest` additionally handles guest orders: when `obj.user is None`, it verifies `request.query_params.get("uuid") == str(obj.uuid)`.

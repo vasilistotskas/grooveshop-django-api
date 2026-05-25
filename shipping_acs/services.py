@@ -22,6 +22,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from shipping.enum import ShippingKind
+from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
 from shipping_acs.client import AcsClient
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.exceptions import AcsAPIError
@@ -57,6 +58,39 @@ _TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
 )
 
 _LABEL_CACHE_TTL = 3600  # 1 hour, mirrors BoxNow
+
+# Subset of ACS_Create_Voucher params we mirror onto ``shipment.metadata
+# ['create_request']`` so a future "did X actually leave us?" question
+# (notes, COD amount, locker id, weight, …) can be answered from the
+# DB without re-running the payload builder. Strictly operational —
+# recipient PII (name/address/phone/email) is intentionally excluded
+# because shipment.metadata is not cleared by GDPR anonymisation
+# (see user/services/gdpr.py) and we don't want a shadow PII copy.
+_AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
+    "Pickup_Date",
+    "Sender",
+    # ISO-2 country code (e.g. "GR") — drives cross-border routing,
+    # NOT PII. Included so a future "wrong country" report can be
+    # answered from metadata without re-running the builder.
+    "Recipient_Country",
+    "Charge_Type",
+    "Item_Quantity",
+    "Weight",
+    "Cod_Ammount",
+    "Cod_Payment_Way",
+    "Acs_Delivery_Products",
+    "Acs_Station_Destination",
+    "Acs_Station_Branch_Destination",
+    "Reference_Key1",
+    "Reference_Key2",
+    "Language",
+    "Delivery_Notes",
+)
+
+
+def _audit_envelope(params: dict[str, Any]) -> dict[str, Any]:
+    """Return a PII-scrubbed copy of the create-voucher params."""
+    return {k: params[k] for k in _AUDIT_REQUEST_FIELDS if k in params}
 
 
 def _kg_from_grams(weight_grams: int | None) -> str:
@@ -102,6 +136,49 @@ def _kg_from_grams(weight_grams: int | None) -> str:
     if "." not in text:
         text = f"{text}.0"
     return text.replace(".", ",")
+
+
+def _normalize_zipcode_for_acs(value: object) -> str:
+    """Strip whitespace/hyphens/etc; return up to 5 leading digits.
+
+    ACS rejects any non-digit characters in ``Recipient_Zipcode``
+    (verified against order 57 on 2026-05-15 — the customer typed the
+    Greek convention ``"848 00"`` with a space and ACS returned the
+    generic ``"Error fill data error"`` rejection). The sample payload
+    in the ACS REST API guide §3 shows the field as a bare integer
+    (``17778``), so digits-only is the safe canonical form.
+    """
+    if not value:
+        return ""
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    return digits[:5]
+
+
+def _normalize_phone_for_acs(value: object) -> str:
+    """Return the 10-digit local Greek phone format ACS expects.
+
+    The ACS payload sample treats ``Recipient_Phone`` /
+    ``Recipient_Cell_Phone`` as bare integers (``2115005000``,
+    ``699999999``) with no country prefix. ``order.phone`` is a
+    ``phonenumber_field.PhoneNumber`` whose ``str()`` is E.164
+    (``+306989424342``), which ACS rejects.
+
+    ``PhoneNumber.national_number`` is the cleanest extractor. As a
+    fallback for plain-string inputs we strip non-digit characters and
+    drop a leading ``30`` / ``0030`` country code — but only when the
+    remaining length is exactly 10, so an ambiguous mistyped value is
+    left unchanged for ACS to flag rather than silently truncated.
+    """
+    if value is None or value == "":
+        return ""
+    national = getattr(value, "national_number", None)
+    if national:
+        return str(national)
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    for prefix in ("0030", "30"):
+        if digits.startswith(prefix) and len(digits) - len(prefix) == 10:
+            return digits[len(prefix) :]
+    return digits
 
 
 def _event_fingerprint(
@@ -245,8 +322,17 @@ class AcsService:
             metadata["mint_started_at"] = timezone.now().isoformat()
             shipment.metadata = metadata
 
+            # The contract is COD-only, so the carrier sets
+            # ``charge_type=COD`` for every voucher regardless of how the
+            # order was paid. Sync ``cod_amount`` to the order total
+            # ONLY for true COD pay-ways — online-paid orders (Viva,
+            # Stripe) must keep ``cod_amount=0`` or the courier will
+            # collect at the door a second time.
+            pay_way = getattr(order, "pay_way", None)
+            is_cod_payway = bool(pay_way and pay_way.is_cash_on_delivery)
             cod_synced = (
-                shipment.charge_type == AcsChargeType.COD
+                is_cod_payway
+                and shipment.charge_type == AcsChargeType.COD
                 and (not shipment.cod_amount or shipment.cod_amount.amount == 0)
                 and order.paid_amount
                 and order.paid_amount.amount > 0
@@ -275,8 +361,11 @@ class AcsService:
         try:
             result = client.create_voucher(params)
         except Exception as exc:
-            # API call failed — release the claim so a future retry
-            # can proceed without waiting out the TTL.
+            # API call failed — persist the failing payload + error to
+            # metadata['last_error'] for post-mortem, then release the
+            # claim so a future retry can proceed without waiting out
+            # the TTL.
+            cls._record_last_error(shipment, params, exc)
             cls._release_mint_claim(shipment)
             logger.warning(
                 "create_voucher_for_order: API call failed for order=%s "
@@ -295,16 +384,18 @@ class AcsService:
 
         voucher_no = (result.get("Voucher_No") or "").strip()
         if not voucher_no:
-            cls._release_mint_claim(shipment)
             error_message = (
                 result.get("Error_Message")
                 or "ACS_Create_Voucher succeeded but returned no Voucher_No."
             )
-            raise AcsAPIError(
+            api_error = AcsAPIError(
                 alias="ACS_Create_Voucher",
                 error_message=error_message,
                 raw=result,
             )
+            cls._record_last_error(shipment, params, api_error)
+            cls._release_mint_claim(shipment)
+            raise api_error
 
         children: list[str] = []
         if shipment.item_quantity > 1:
@@ -354,7 +445,14 @@ class AcsService:
 
             metadata = shipment.metadata or {}
             metadata.pop("mint_started_at", None)
+            # Clear any stale ``last_error`` from a prior failed
+            # attempt so ops looking at the row don't mistake an old
+            # error for the current state. Mirrors BoxNow's success
+            # path which already nulls ``last_error`` (see
+            # shipping_boxnow/services.py).
+            metadata.pop("last_error", None)
             metadata["create_response"] = result
+            metadata["create_request"] = _audit_envelope(params)
             metadata["multipart_vouchers"] = children
 
             shipment.voucher_no = voucher_no
@@ -364,9 +462,83 @@ class AcsService:
                 update_fields=["voucher_no", "shipment_state", "metadata"]
             )
 
+        sent_notes = params.get("Delivery_Notes", "") or ""
+        raw_notes_len = len(order.customer_notes or "")
+        # ``notes_truncated`` derives from the post-sanitize length —
+        # ``sanitize_delivery_notes`` collapses whitespace runs before
+        # truncating, so a raw note of 600 spaces sanitises to "" and
+        # was NOT truncated even though raw_len > MAX. The sanitiser
+        # caps at exactly MAX, so sent_len == MAX is the truncation
+        # signal (a 500-char all-content note will be a benign
+        # false-positive, but that's better than the false-negative
+        # the raw comparison produced).
+        logger.info(
+            "create_voucher_for_order: voucher minted for order=%s "
+            "shipment=%s voucher_no=%s",
+            order.id,
+            shipment.pk,
+            voucher_no,
+            extra={
+                "order_id": order.id,
+                "shipment_pk": shipment.pk,
+                "carrier": "acs",
+                "phase": "phase3_minted",
+                "voucher_no": voucher_no,
+                "notes_chars_raw": raw_notes_len,
+                "notes_chars_sent": len(sent_notes),
+                "notes_truncated": len(sent_notes) >= DELIVERY_NOTES_MAX_LEN,
+            },
+        )
+
         order.add_tracking_info(voucher_no, "acs")
         cls._advance_pending_order_to_processing(order)
         return shipment
+
+    @classmethod
+    def _record_last_error(
+        cls,
+        shipment: AcsShipment,
+        request_params: dict[str, Any],
+        exc: Exception,
+    ) -> None:
+        """Persist the failed request + ACS error to ``metadata['last_error']``.
+
+        Without this, an ACS rejection like ``"Error fill data error"``
+        is unactionable — the celery log carries only the message
+        string, not the offending payload, so reproducing the bug
+        requires re-running the offline payload-builder by hand
+        (verified against order 57 on 2026-05-15: metadata had only
+        ``mint_started_at``, the failing params were lost). Storing
+        the params plus the raw ACS response on the shipment row gives
+        admins everything needed for a post-mortem.
+        """
+        try:
+            with transaction.atomic():
+                # Full row fetch (no ``.only("metadata")``): django-money's
+                # ``cod_amount`` descriptor reads from ``__dict__`` directly,
+                # and the ``simple_history`` post-save hook snapshots every
+                # field even when ``metadata`` is excluded — together they
+                # raise ``KeyError: 'cod_amount'`` on a deferred-field
+                # save. Verified against the v1.134.x CI run after the
+                # initial ``.only("metadata")`` version of this method.
+                fresh = AcsShipment.objects.select_for_update().get(
+                    pk=shipment.pk
+                )
+                metadata = fresh.metadata or {}
+                metadata["last_error"] = {
+                    "occurred_at": timezone.now().isoformat(),
+                    "error": str(exc),
+                    "request_params": request_params,
+                    "response": getattr(exc, "raw", None),
+                }
+                fresh.metadata = metadata
+                fresh.save(update_fields=["metadata"])
+        except Exception:
+            logger.warning(
+                "Failed to persist last_error for shipment=%s",
+                shipment.pk,
+                exc_info=True,
+            )
 
     @classmethod
     def _release_mint_claim(cls, shipment: AcsShipment) -> None:
@@ -377,10 +549,15 @@ class AcsService:
         """
         try:
             with transaction.atomic():
-                fresh = (
-                    AcsShipment.objects.select_for_update()
-                    .only("metadata")
-                    .get(pk=shipment.pk)
+                # Full row fetch (no ``.only("metadata")``): see
+                # ``_record_last_error`` for the rationale — the
+                # deferred-field path raises ``KeyError: 'cod_amount'``
+                # on save via django-money's descriptor + simple-history
+                # snapshot. Latent bug verified against prod order 57
+                # on 2026-05-15 where ``mint_started_at`` remained set
+                # after a Phase 2 failure.
+                fresh = AcsShipment.objects.select_for_update().get(
+                    pk=shipment.pk
                 )
                 metadata = fresh.metadata or {}
                 if metadata.pop("mint_started_at", None) is not None:
@@ -404,6 +581,8 @@ class AcsService:
     ) -> dict[str, Any]:
         """Translate Order + AcsShipment fields to the ACS payload."""
         from shipping_acs import config as acs_config
+        from shipping_acs.enum.charge_type import AcsChargeType
+        from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
 
         sender = getattr(settings, "SITE_NAME", "GrooveShop")
         fallback_country = acs_config.default_country()
@@ -424,10 +603,10 @@ class AcsService:
             ),
             "Recipient_Address": order.street,
             "Recipient_Address_Number": order.street_number,
-            "Recipient_Zipcode": order.zipcode,
+            "Recipient_Zipcode": _normalize_zipcode_for_acs(order.zipcode),
             "Recipient_Region": order.city,
-            "Recipient_Phone": str(order.phone) if order.phone else "",
-            "Recipient_Cell_Phone": str(order.phone) if order.phone else "",
+            "Recipient_Phone": _normalize_phone_for_acs(order.phone),
+            "Recipient_Cell_Phone": _normalize_phone_for_acs(order.phone),
             "Recipient_Country": country_code or fallback_country,
             "Recipient_Email": order.email or "",
             "Charge_Type": shipment.charge_type,
@@ -436,6 +615,14 @@ class AcsService:
             "Reference_Key1": str(order.id),
             "Reference_Key2": str(order.uuid),
             "Language": acs_config.default_voucher_language(),
+            # ACS prints ``Delivery_Notes`` on the voucher's
+            # "Παρατηρήσεις" line — the customer's free-text checkout
+            # note (e.g. "ring twice", "leave at the porter"). Captured
+            # on ``Order.customer_notes`` at checkout and previously
+            # dropped on the floor between Django and the carrier
+            # (reported by the site owner 2026-05-16). Empty string
+            # is fine — ACS renders nothing.
+            "Delivery_Notes": sanitize_delivery_notes(order.customer_notes),
         }
 
         if shipment.delivery_kind == ShippingKind.PICKUP_POINT:
@@ -446,14 +633,32 @@ class AcsService:
                 shipment.station_branch_destination or ""
             )
 
-        if shipment.cod_amount and shipment.cod_amount.amount > 0:
+        if shipment.charge_type == AcsChargeType.COD:
             # ACS parses Cod_Ammount with the Greek locale: dot is the
             # thousands separator, comma is the decimal separator. So
             # "47.01" reads as 4701, which trips the 1500€ cash cap. Send
-            # it as a comma-decimal string.
-            cod_decimal = shipment.cod_amount.amount.quantize(Decimal("0.01"))
+            # it as a comma-decimal string — always, even at 0,00. The
+            # contract is COD-only so every voucher carries a
+            # Cod_Ammount; online-paid orders ship at 0,00 so the
+            # courier collects nothing on delivery.
+            cod_decimal = (
+                shipment.cod_amount.amount
+                if shipment.cod_amount
+                else Decimal("0")
+            ).quantize(Decimal("0.01"))
             params["Cod_Ammount"] = format(cod_decimal, "f").replace(".", ",")
-            params["Cod_Payment_Way"] = shipment.cod_payment_way or 0
+            # Per ACS PDF p.6: ``Cod_Payment_Way`` should be ``null``
+            # when no cash is actually collected. For online-paid
+            # orders our voucher is COD-with-zero (contract limitation);
+            # sending ``0`` (cash) here tells the driver to collect €0
+            # which they sometimes log as a confused PoD entry. Omit
+            # the field entirely when the amount is zero.
+            if cod_decimal > 0:
+                params["Cod_Payment_Way"] = (
+                    shipment.cod_payment_way
+                    if shipment.cod_payment_way is not None
+                    else AcsCodPaymentWay.CASH
+                )
 
         if shipment.delivery_products:
             params["Acs_Delivery_Products"] = shipment.delivery_products
@@ -923,7 +1128,16 @@ class AcsService:
 
     @classmethod
     def fetch_label_bytes(cls, shipment: AcsShipment) -> bytes:
-        """Return the PDF label bytes for ``shipment``, cached for 1h."""
+        """Return the PDF label bytes for ``shipment``, cached for 1h.
+
+        The print layout (thermal vs. laser) comes from the ACS
+        provider metadata via :func:`acs_config.print_type` so ops
+        can switch without a redeploy. The cache key includes the
+        print type so flipping the metadata invalidates only the
+        layout that changed.
+        """
+        from shipping_acs import config as acs_config
+
         if not shipment.voucher_no:
             raise AcsAPIError(
                 alias="ACS_Print_Voucher",
@@ -931,12 +1145,13 @@ class AcsService:
                     "Cannot fetch a label before the voucher is created."
                 ),
             )
-        cache_key = f"acs:label:{shipment.voucher_no}"
+        pt = acs_config.print_type()
+        cache_key = f"acs:label:{shipment.voucher_no}:pt{pt}"
         cached = cache.get(cache_key)
         if cached:
             return cached
 
-        pdf = AcsClient().print_voucher(shipment.voucher_no)
+        pdf = AcsClient().print_voucher(shipment.voucher_no, print_type=pt)
         cache.set(cache_key, pdf, timeout=_LABEL_CACHE_TTL)
         return pdf
 
@@ -1071,13 +1286,19 @@ class AcsService:
         Mirrors what ``Order.mark_as_paid`` does for online payments,
         but adapted for the COD path where the customer pays the
         courier in cash on delivery and ACS later remits the amount.
-        Fires ``order_paid`` and queues the confirmation email exactly
-        once via the standard signal chain. After the flip, attempts
-        the DELIVERED → COMPLETED auto-advance so accounting matches
-        the lifecycle.
+        Fires ``order_paid`` so the standard signal chain (Meta CAPI
+        Purchase dispatch) runs — ``mark_as_paid`` only persists
+        ``payment_status``; the post_save handler in
+        ``order/signals/handlers.py`` only emits ``order_paid`` on a
+        PENDING → PROCESSING status transition with ``is_paid=True``,
+        and COD orders are already at PROCESSING by the time we reach
+        here (status was advanced at voucher-mint time). After the
+        flip, attempts the DELIVERED → COMPLETED auto-advance so
+        accounting matches the lifecycle.
         """
         from order.enum.status import PaymentStatus
         from order.services import OrderService
+        from order.signals import order_paid
 
         order = getattr(shipment, "order", None)
         if order is None:
@@ -1091,6 +1312,13 @@ class AcsService:
             order.id,
             shipment.voucher_no,
         )
+        # Idempotent on the dispatch side: every Purchase reuses the
+        # event_id stored on order.metadata at checkout submit, the
+        # MetaCapiEventLog row is unique on event_id, and _dispatch
+        # short-circuits when an existing row is already SENT. So a
+        # double-fire (e.g. a payout being upserted twice) results in
+        # one Meta event, not two.
+        order_paid.send(sender=type(order), order=order)
         OrderService.maybe_advance_to_completed(order)
 
     # ------------------------------------------------------------------
@@ -1129,6 +1357,32 @@ class AcsService:
 
         if new_status is None or new_status == current_status:
             return
+
+        # ACS occasionally jumps a parcel straight to DELIVERED between
+        # two of our 15-min polls without us ever observing an
+        # intermediate IN_TRANSIT/OUT_FOR_DELIVERY state — fast COD
+        # routes especially go pickup_list → delivered same-day.
+        # The order state machine only allows PROCESSING → SHIPPED →
+        # DELIVERED, so a direct PROCESSING → DELIVERED jump is
+        # rejected and the order stays stale at PROCESSING (verified
+        # against prod order 73 on 2026-05-23: shipment_state=delivered
+        # but order.status=PROCESSING two days later). Walk the
+        # missing SHIPPED step first.
+        if (
+            new_status == "DELIVERED"
+            and current_status in _PRE_SHIPPED_ORDER_STATUSES
+        ):
+            try:
+                OrderService.update_order_status(order, "SHIPPED")
+            except InvalidStatusTransitionError as exc:
+                logger.warning(
+                    "ACS poll: cannot bridge order=%s through SHIPPED "
+                    "before DELIVERED (%r → SHIPPED): %s",
+                    order.id,
+                    current_status,
+                    exc,
+                )
+                return
 
         try:
             OrderService.update_order_status(order, new_status)

@@ -631,17 +631,17 @@ class TestMonitorSystemHealthTask:
     @patch("core.tasks.connections")
     @patch("core.tasks.cache")
     @patch("core.tasks.open")
-    @patch("core.tasks.send_mail")
+    @patch("core.tasks.mail_admins")
     @patch("core.tasks.logger")
     @override_settings(
         MEDIA_ROOT="/tmp/media",
         DEFAULT_FROM_EMAIL="admin@example.com",
-        ADMIN_EMAIL="admin@example.com",
+        ADMINS=["admin@example.com"],
     )
     def test_monitor_system_health_database_failure(
         self,
         mock_logger,
-        mock_send_mail,
+        mock_mail_admins,
         mock_file,
         mock_cache,
         mock_connections,
@@ -658,8 +658,8 @@ class TestMonitorSystemHealthTask:
         ):
             monitor_system_health()
 
-        mock_send_mail.assert_called_once()
-        call_args = mock_send_mail.call_args[1]
+        mock_mail_admins.assert_called_once()
+        call_args = mock_mail_admins.call_args[1]
         assert "CRITICAL: System Health Check Failed" in call_args["subject"]
 
     @patch("core.tasks.connections")
@@ -804,13 +804,14 @@ class TestScheduledDatabaseBackupTask:
 
     @patch("core.tasks.backup_database_task")
     @patch("core.tasks.cleanup_old_backups")
-    @patch("core.tasks.send_mail")
+    @patch("core.tasks.mail_admins")
     @patch("core.tasks.logger")
     @override_settings(
-        DEFAULT_FROM_EMAIL="admin@example.com", ADMIN_EMAIL="admin@example.com"
+        DEFAULT_FROM_EMAIL="admin@example.com",
+        ADMINS=["admin@example.com"],
     )
     def test_scheduled_backup_chain_failure(
-        self, mock_logger, mock_send_mail, mock_cleanup, mock_backup
+        self, mock_logger, mock_mail_admins, mock_cleanup, mock_backup
     ):
         mock_chain = Mock()
         mock_chain.apply_async.side_effect = Exception("Broker unreachable")
@@ -819,7 +820,7 @@ class TestScheduledDatabaseBackupTask:
             with pytest.raises(Exception, match="Broker unreachable"):
                 scheduled_database_backup()
 
-        mock_send_mail.assert_called_once()
+        mock_mail_admins.assert_called_once()
 
 
 @pytest.mark.django_db
@@ -912,7 +913,7 @@ class TestCleanupOldBackupsTask:
 class TestValidateTaskConfiguration:
     @override_settings(
         DEFAULT_FROM_EMAIL="test@example.com",
-        ADMIN_EMAIL="admin@example.com",
+        ADMINS=["admin@example.com"],
         MEDIA_ROOT="/tmp/media",
         BASE_DIR="/tmp/base",
     )
@@ -928,8 +929,8 @@ class TestValidateTaskConfiguration:
     def test_validate_task_configuration_missing_settings(self):
         if hasattr(settings, "DEFAULT_FROM_EMAIL"):
             del settings.DEFAULT_FROM_EMAIL
-        if hasattr(settings, "ADMIN_EMAIL"):
-            del settings.ADMIN_EMAIL
+        if hasattr(settings, "ADMINS"):
+            del settings.ADMINS
 
         with pytest.raises(
             ImproperlyConfigured, match="Missing required settings"

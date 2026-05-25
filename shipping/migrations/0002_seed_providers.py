@@ -5,10 +5,10 @@ Provider apps register their adapter classes at AppConfig.ready(), but
 the DB-side row is the on/off switch + capability declaration.
 
 Both providers ship with ``is_active=False`` so a fresh deploy never
-exposes the option to checkout until an admin flips the row.  The
-existing ``BOXNOW_ENABLED`` extra-setting Setting still gates BoxNow on
-the frontend during the dual-write transition; once Phase 3 lands the
-``ShippingProvider.is_active`` flag becomes the single source of truth.
+exposes the option to checkout until an admin flips the row.
+``ShippingProvider.is_active`` is the single source of truth — the
+legacy ``BOXNOW_ENABLED`` extra-setting Setting was retired in the
+dual-write cleanup pass.
 """
 
 from __future__ import annotations

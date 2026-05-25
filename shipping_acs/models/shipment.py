@@ -125,10 +125,21 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
     )
 
     # ── Charge / COD ────────────────────────────────────────────────
+    # Default is COD, matching the carrier-level default in
+    # ``shipping_acs.carrier.AcsCarrier.create_shipment_row``. Our
+    # ACS commercial contract is COD-only — PREPAID requests are
+    # rejected with "Μη αποδεκτή τιμή χρέωσης μεταφορικών". Keeping
+    # the model default in lockstep with the carrier default means a
+    # future code path that creates an ``AcsShipment`` without
+    # explicitly passing ``charge_type`` (an easy mistake) still
+    # produces a working voucher — defence-in-depth alongside the
+    # serializer field (no default) and the carrier method (COD
+    # fallback). See orders 53/55/56 and memory
+    # ``project_acs_contract_cod_only`` for the original incident.
     charge_type = models.PositiveSmallIntegerField(
         _("Charge type"),
         choices=AcsChargeType.choices,
-        default=AcsChargeType.PREPAID,
+        default=AcsChargeType.COD,
     )
     cod_amount = MoneyField(
         _("COD amount"),

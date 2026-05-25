@@ -29,16 +29,9 @@ from order.models.stock_reservation import StockReservation
 from order.signals import order_refunded
 from order.stock import StockManager
 
-# Re-export under the legacy private name so existing tests keep
-# passing without churn. The canonical home is ``shipping.utils``;
-# new call sites should import from there.
-from shipping.utils import (
-    compute_total_weight_grams as _compute_total_weight_grams,
-)
-
 logger = logging.getLogger(__name__)
 
-__all__ = ["OrderService", "_compute_total_weight_grams"]
+__all__ = ["OrderService"]
 
 
 def _log_price_drift_if_needed(cart_item, current_price) -> None:
@@ -62,11 +55,15 @@ def _log_price_drift_if_needed(cart_item, current_price) -> None:
     except (AttributeError, TypeError):
         return
     logger.warning(
-        "Cart price drift at checkout: cart_item=%s product=%s price_at_add=%s charged=%s",
+        "Cart price drift at checkout: cart_item=%s product=%s "
+        "price_at_add=%s charged=%s (raw price_at_add=%r charged=%r delta=%s)",
         getattr(cart_item, "id", "?"),
         getattr(getattr(cart_item, "product", None), "id", "?"),
         frozen,
         current_price,
+        frozen.amount,
+        current_price.amount,
+        current_price.amount - frozen.amount,
     )
 
 
@@ -108,8 +105,9 @@ class OrderService:
                 for item in items_data
             ]
 
-            # One generic dispatch — provider's create_shipment_row
-            # handles its own filtering on shipping_method / kind.
+            # One generic dispatch — the resolved provider's
+            # ``create_shipment_row`` reads ``order.shipping_kind`` to
+            # branch on home delivery vs pickup point.
             from shipping.services import ShippingService
 
             ShippingService.create_shipment_row_for_order(
@@ -347,12 +345,40 @@ class OrderService:
             if "amount" in payment_data and payment_data["amount"] is not None:
                 provider_amount_cents = int(round(payment_data["amount"] * 100))
                 if provider_amount_cents != calculated_total_cents:
+                    # Log the full input set that produced the mismatch so
+                    # root-causing doesn't require re-running the checkout
+                    # under a debugger. The (provider, kind, weight,
+                    # country, region, cart_total, shipping_cost,
+                    # payment_fee) tuple is exactly what was fed into
+                    # ``calculate_shipping_cost`` + ``calculate_payment_
+                    # method_fee`` above — if any of these differ from
+                    # what the create-payment-intent step saw, the
+                    # mismatch is upstream of this point.
                     logger.warning(
                         "Payment amount mismatch for intent %s: "
                         "provider=%d cents, calculated=%d cents",
                         payment_intent_id,
                         provider_amount_cents,
                         calculated_total_cents,
+                        extra={
+                            "payment_intent_id": payment_intent_id,
+                            "cart_uuid": str(cart.uuid),
+                            "provider_amount_cents": provider_amount_cents,
+                            "calculated_amount_cents": calculated_total_cents,
+                            "cart_total_amount": str(_cart_total.amount),
+                            "shipping_cost_amount": str(_shipping_cost.amount),
+                            "payment_fee_amount": str(_payment_fee.amount),
+                            "shipping_provider_code": shipping_address.get(
+                                "shipping_provider_code"
+                            ),
+                            "shipping_kind": shipping_address.get(
+                                "shipping_kind"
+                            ),
+                            "cart_weight_grams": _cart_weight_grams,
+                            "country_id": shipping_address.get("country_id"),
+                            "region_id": shipping_address.get("region_id"),
+                            "pay_way_code": pay_way.provider_code,
+                        },
                     )
                     raise PaymentAmountMismatchError(
                         provider_amount_cents=provider_amount_cents,
@@ -1820,13 +1846,15 @@ class OrderService:
                 old_status,
             )
 
-            # Cascade to the courier voucher when one is attached. ACS
-            # rejects cancellation once the voucher is in a daily
-            # pickup list (the parcel is already with the courier);
-            # we log + record on the order and continue, so admins
-            # can still cancel the order at our end while the courier
-            # handles the in-transit return out of band.
-            cls._cancel_attached_shipment(order, reason)
+            # Cascade to the courier voucher synchronously here so the
+            # existing programmatic API contract (cancel-order callers
+            # see ``metadata.cancellation.shipment_cancel`` populated
+            # before this method returns) is preserved. The signal-side
+            # cascade in ``handle_order_canceled`` covers paths that
+            # bypass this method (admin form save) — it short-circuits
+            # when ``shipment_cancel`` is already on the metadata, so
+            # we don't double-fire from this entry point.
+            cls.cancel_attached_shipment(order, reason)
 
             refund_info = None
             if (
@@ -2069,20 +2097,11 @@ class OrderService:
         kind = order_data.get("shipping_kind") or "home_delivery"
 
         # Dynamic-routing fallback: a plain ``home_delivery`` request
-        # auto-routes to whichever active provider advertises
-        # ``supports_home_delivery=True``.  Lower ``priority`` wins
-        # the tie.  Adding a new courier (ELTA, Speedex …) is then a
-        # one-row Django admin change — no order-flow code touched.
+        # auto-routes to the active home-delivery carrier. Shared with
+        # ``calculate_shipping_cost`` so the cost we charge and the
+        # carrier the order is assigned to always agree.
         if not code and kind == "home_delivery":
-            picked = (
-                ShippingProvider.objects.filter(
-                    is_active=True, supports_home_delivery=True
-                )
-                .order_by("priority", "code")
-                .first()
-            )
-            if picked is not None:
-                code = picked.code
+            code = cls._resolve_active_home_delivery_code()
 
         if code:
             provider = ShippingProvider.objects.filter(code=code).first()
@@ -2096,6 +2115,32 @@ class OrderService:
                 order_data["shipping_provider"] = provider
 
         order_data["shipping_kind"] = kind
+
+    @classmethod
+    def _resolve_active_home_delivery_code(cls) -> str | None:
+        """Return the active home-delivery carrier's code, or None.
+
+        Lower ``ShippingProvider.priority`` wins the tie. Adding a new
+        courier (ELTA, Speedex …) is then a one-row Django admin
+        change — no order-flow code touched.
+
+        Shared between :meth:`calculate_shipping_cost` (pricing) and
+        :meth:`_resolve_shipping_provider` (FK assignment) so both
+        callers route ``home_delivery`` through the SAME carrier;
+        otherwise the order would be charged against one carrier's
+        threshold and served by another, producing the kind of silent
+        UI/charge mismatch that motivated this helper.
+        """
+        from shipping.models import ShippingProvider
+
+        picked = (
+            ShippingProvider.objects.filter(
+                is_active=True, supports_home_delivery=True
+            )
+            .order_by("priority", "code")
+            .first()
+        )
+        return picked.code if picked is not None else None
 
     @classmethod
     def _extract_shipment_payload(
@@ -2209,8 +2254,17 @@ class OrderService:
         return out
 
     @classmethod
-    def _cancel_attached_shipment(cls, order: Order, reason: str) -> None:
+    def cancel_attached_shipment(cls, order: Order, reason: str) -> None:
         """Best-effort: cancel the courier voucher when the order is canceled.
+
+        Called from ``handle_order_canceled`` so the cascade fires for
+        every code path that produces ``order.status = CANCELED`` —
+        including admin form saves that go straight to ``Order.save()``
+        without touching :meth:`OrderService.cancel_order`. Verified
+        against prod order 60 on 2026-05-16: the admin status dropdown
+        was set to CANCELED via the change form, leaving voucher
+        9771614856 alive at ACS because the cascade lived only inside
+        ``cancel_order``.
 
         Routed through ``ShippingService.cancel_shipment`` so each
         carrier enforces its own cancellability rules. Common
@@ -2224,6 +2278,24 @@ class OrderService:
         even when the courier-side cancel fails.
         """
         from shipping.services import ShippingService
+
+        # Idempotency: short-circuit when the cascade has already run for
+        # this order. The two entry points (programmatic ``cancel_order``
+        # explicit call AND the ``order_canceled`` signal-side safety
+        # net) can otherwise double-fire — with the test
+        # ``on_commit``-immediate fixture, the signal cascade lands
+        # synchronously during the first ``order.save()`` inside
+        # ``cancel_order``, then the explicit call inside the same
+        # method would run again.
+        existing_cancellation = (order.metadata or {}).get("cancellation") or {}
+        if "shipment_cancel" in existing_cancellation:
+            return
+
+        logger.info(
+            "Cascading order cancel to carrier voucher | order=%s reason=%r",
+            order.id,
+            reason,
+        )
 
         info: dict[str, Any] = {}
         try:
@@ -2249,7 +2321,17 @@ class OrderService:
             order.metadata = {}
         cancellation = order.metadata.setdefault("cancellation", {})
         cancellation["shipment_cancel"] = info
-        order.save(update_fields=["metadata"])
+
+        # ``.update(...)`` bypasses ``Order.save()`` and its post_save
+        # signal cascade — important because this method runs INSIDE
+        # the ``order_canceled`` signal handler, which itself fires
+        # from inside ``Order.save()``'s post_save chain. A nested
+        # ``order.save()`` would see a stale ``_original_status``
+        # (refreshed only AFTER the outer ``super().save()`` returns)
+        # and re-fire ``order_status_changed``, causing infinite
+        # recursion or duplicate-signal failures (verified in CI on
+        # 2026-05-16).
+        Order.objects.filter(pk=order.pk).update(metadata=order.metadata)
 
     @classmethod
     def _dispatch_shipment_creation_task(cls, order: Order) -> None:
@@ -2392,12 +2474,31 @@ class OrderService:
     ) -> Money:
         from extra_settings.models import Setting
 
-        # When the request carries a (provider, kind) pair, dispatch
-        # through the registry so each provider owns its own pricing
-        # rules. The provider's adapter has full control over flat
-        # rate, dynamic quotes, free-shipping thresholds, and per-
-        # country/region overrides — keeping per-carrier logic out of
-        # this generic dispatcher.
+        # Auto-resolve ``home_delivery`` to the active home-delivery
+        # provider's code when the caller didn't supply one — mirrors
+        # what ``_resolve_shipping_provider`` does for the order FK
+        # (same helper, single source of truth) so the cost calc and
+        # the assigned carrier always agree.
+        #
+        # Without this, a ``home_delivery`` cart with no explicit
+        # provider_code (the storefront sends ``null`` per
+        # ``shared/shipping/index.ts::carrierForMethod`` — home
+        # delivery is provider-agnostic at the form level) would fall
+        # through to the generic ``FREE_SHIPPING_THRESHOLD`` /
+        # ``CHECKOUT_SHIPPING_PRICE`` pair below, charging a flat
+        # rate against the wrong threshold. Meanwhile
+        # ``_resolve_shipping_provider`` would still set the order's
+        # FK to ACS, so the order DB row would look ACS-served but
+        # would have generic pricing — a silent disagreement between
+        # the carrier the customer was promised and the price they
+        # paid.
+        if not shipping_provider_code and shipping_kind == "home_delivery":
+            shipping_provider_code = cls._resolve_active_home_delivery_code()
+
+        # When we have a (provider, kind) pair, dispatch through the
+        # registry so each provider owns its own pricing rules. The
+        # adapter has full control over flat rate, dynamic quotes,
+        # free-shipping thresholds, and per-country/region overrides.
         if shipping_provider_code and shipping_kind:
             from shipping.services import ShippingService
 
@@ -2414,9 +2515,9 @@ class OrderService:
                 amount, currency = quote
                 return Money(amount, currency)
 
-        # Generic fallback for orders without a courier adapter — the
-        # platform's flat-rate home-delivery price, country/region
-        # overrides applied below.
+        # Generic fallback for the rare case with no active
+        # home-delivery carrier (a deploy mid-config) — the platform's
+        # flat-rate price.
         base_shipping_cost = Setting.get(
             "CHECKOUT_SHIPPING_PRICE", default=3.00
         )
@@ -2427,49 +2528,7 @@ class OrderService:
         if order_value.amount >= float(free_shipping_threshold):
             return Money(0, order_value.currency)
 
-        shipping_cost = float(base_shipping_cost)
-
-        if country_id:
-            from country.models import Country
-
-            try:
-                # Country uses alpha_2 as primary key, not id
-                country = Country.objects.get(alpha_2=country_id)
-
-                if (
-                    hasattr(country, "shipping_multiplier")
-                    and country.shipping_multiplier
-                ):
-                    shipping_cost *= country.shipping_multiplier
-
-            except (ImportError, Country.DoesNotExist) as e:
-                logger.warning(
-                    "Country with ID %s not found or country module not available: %s",
-                    country_id,
-                    e,
-                )
-
-        if region_id:
-            from region.models import Region
-
-            try:
-                # Region uses alpha as primary key, not id
-                region = Region.objects.get(alpha=region_id)
-
-                if (
-                    hasattr(region, "shipping_adjustment")
-                    and region.shipping_adjustment
-                ):
-                    shipping_cost += region.shipping_adjustment
-
-            except (ImportError, Region.DoesNotExist) as e:
-                logger.warning(
-                    "Region with ID %s not found or region module not available: %s",
-                    region_id,
-                    e,
-                )
-
-        return Money(shipping_cost, order_value.currency)
+        return Money(float(base_shipping_cost), order_value.currency)
 
     @classmethod
     def calculate_payment_method_fee(

@@ -113,7 +113,11 @@ class TestClearCacheCommand:
         assert kwargs["include_related"] is False
 
     @patch("core.management.commands.clear_cache.cache_instance")
-    def test_legacy_prefix_clear_still_works(self, mock_cache):
+    def test_raw_prefix_mode_clears_via_clear_by_prefixes(self, mock_cache):
+        # ``--prefixes`` is the disaster-recovery escape hatch — it
+        # bypasses the cache-surface registry and clears raw key
+        # prefixes directly. Different semantic from --all (which
+        # iterates registered surfaces), so it has its own test.
         mock_cache.clear_by_prefixes.return_value = {"custom:": 3}
 
         out = StringIO()
@@ -132,4 +136,4 @@ class TestClearCacheCommand:
         mock_cache.clear_by_prefixes.assert_called_once_with(["custom:"])
         output = out.getvalue()
         assert "Cleared 3 keys" in output
-        assert "Legacy mode" in output
+        assert "Raw prefix mode" in output

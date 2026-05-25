@@ -33,6 +33,7 @@ class RegionSerializer(
             "uuid",
         )
         read_only_fields = (
+            "sort_order",
             "created_at",
             "updated_at",
             "uuid",
@@ -86,3 +87,4 @@ class RegionWriteSerializer(
             "country",
             "sort_order",
         )
+        read_only_fields = ("sort_order",)

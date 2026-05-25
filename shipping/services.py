@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from django.conf import settings
 from django.db.models import Q
 
 from shipping.enum import ShippingKind
@@ -21,6 +22,34 @@ if TYPE_CHECKING:
     from order.models.order import Order
 
 logger = logging.getLogger(__name__)
+
+
+# Defensive cap on free-text notes that ride along to the courier
+# voucher. Neither ACS_Create_Voucher nor BoxNow ``deliveryRequest``
+# documents a hard limit on the notes/description field, but the
+# printed ACS voucher's "Παρατηρήσεις" cell is only a few lines
+# wide and BoxNow's partner portal renders the description in a
+# fixed-height box; sending 2-3 sentences is helpful, sending a
+# novel just truncates ugly. 500 chars is comfortable for either
+# side.
+DELIVERY_NOTES_MAX_LEN = 500
+
+
+def sanitize_delivery_notes(value: object) -> str:
+    """Return courier-safe free-text notes — trimmed, single-spaced, capped.
+
+    Couriers render this field verbatim on the voucher / partner
+    portal. Embedded CRs and tabs make the layout shift
+    unpredictably (and a stray ``\\r`` can be interpreted as a
+    record separator on ACS's side), so we collapse whitespace runs
+    to a single space and trim to ``DELIVERY_NOTES_MAX_LEN``.
+    Lives here so both ``shipping_acs`` and ``shipping_boxnow``
+    payload builders can pull it without cross-app imports.
+    """
+    if not value:
+        return ""
+    text = " ".join(str(value).split())
+    return text[:DELIVERY_NOTES_MAX_LEN]
 
 
 class ShippingService:
@@ -256,6 +285,13 @@ class ShippingService:
                     kind=kind,
                     weight_grams=weight_grams,
                 )
+                # Per-(provider, kind) logo: ``pickup_point`` rows
+                # prefer ``logo_pickup_point`` when uploaded so a
+                # carrier can have a distinct locker illustration vs
+                # its home-delivery brand mark (e.g. ACS home
+                # delivery vs ACS Smartpoint). The model handles the
+                # fallback chain; this view just consumes the
+                # resolved URL.
                 options.append(
                     {
                         "provider_code": provider.code,
@@ -265,12 +301,111 @@ class ShippingService:
                         "currency": price[1] if price else currency,
                         "live_mode": provider.live_mode,
                         "priority": provider.priority,
+                        "logo_url": provider.logo_url_for_kind(kind.value),
                         "metadata": provider.metadata or {},
                     }
                 )
 
         options.sort(key=lambda opt: (opt["priority"], opt["provider_code"]))
         return options
+
+    # ------------------------------------------------------------------
+    # Free-shipping advertising
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def free_shipping_info(
+        cls,
+        *,
+        currency: str | None = None,
+        country_code: str | None = None,
+    ) -> dict[str, Any]:
+        """Aggregate per-(active provider, kind) free-shipping thresholds.
+
+        Powers ``GET /api/v1/shipping/free-shipping-info`` which the
+        storefront reads to render "Δωρεάν μεταφορικά άνω των X €" on
+        the product detail page and the cart summary. The semantics
+        keep marketing honest:
+
+        * ``min_threshold`` is the earliest cart subtotal at which at
+          least one carrier+kind ships free — i.e. the headline number
+          we want to advertise; matches the "from X €" mental model.
+        * ``max_threshold`` is the subtotal at which **every** active
+          carrier+kind ships free — useful for the cart page's "free
+          shipping unlocked" copy.
+        * ``providers`` carries the per-row breakdown so the checkout
+          summary can show carrier-specific badges if we want to in
+          the future without another round-trip.
+
+        Filters mirror :meth:`available_options`:
+        * ``ShippingProvider.is_active`` must be True.
+        * The provider's adapter must be registered (so a deploy
+          missing a provider app doesn't surface stale rows).
+        * ``country_code`` matches against the provider's
+          ``metadata['supported_countries']`` list when present.
+        * The carrier's ``is_kind_enabled(kind)`` hook lets a provider
+          gate a kind independently (e.g. ACS Smartpoint hidden
+          until ops flip ``ACS_SMARTPOINT_ENABLED``).
+        * Rows where the adapter returns ``None`` from
+          ``free_shipping_threshold`` are skipped — a missing
+          threshold is NOT the same as "free at €0".
+        """
+        active_currency = currency or settings.DEFAULT_CURRENCY
+
+        qs = ShippingProvider.objects.filter(is_active=True).filter(
+            Q(supports_home_delivery=True) | Q(supports_pickup_point=True),
+        )
+
+        providers: list[dict[str, Any]] = []
+        for provider in qs:
+            if not is_registered(provider.code):
+                logger.warning(
+                    "Active ShippingProvider '%s' has no registered adapter"
+                    " — skipping in free_shipping_info()",
+                    provider.code,
+                )
+                continue
+
+            supported_countries = (provider.metadata or {}).get(
+                "supported_countries"
+            )
+            if (
+                country_code
+                and supported_countries
+                and country_code.upper() not in supported_countries
+            ):
+                continue
+
+            adapter = get_provider(provider.code)
+
+            for kind, supported in (
+                (ShippingKind.HOME_DELIVERY, provider.supports_home_delivery),
+                (ShippingKind.PICKUP_POINT, provider.supports_pickup_point),
+            ):
+                if not supported or not adapter.is_kind_enabled(kind):
+                    continue
+                threshold = adapter.free_shipping_threshold(kind)
+                if threshold is None:
+                    continue
+                providers.append(
+                    {
+                        "provider_code": provider.code,
+                        "provider_name": provider.name,
+                        "kind": kind.value,
+                        "threshold": threshold,
+                        "priority": provider.priority,
+                    }
+                )
+
+        providers.sort(key=lambda row: (row["priority"], row["provider_code"]))
+
+        thresholds = [row["threshold"] for row in providers]
+        return {
+            "providers": providers,
+            "min_threshold": min(thresholds) if thresholds else None,
+            "max_threshold": max(thresholds) if thresholds else None,
+            "currency": active_currency,
+        }
 
     # ------------------------------------------------------------------
     # Pricing dispatcher
@@ -294,10 +429,16 @@ class ShippingService:
         back to the global flat rate.
         """
         if not provider_code or not is_registered(provider_code):
+            logger.debug(
+                "ShippingService.calculate_shipping_cost: no adapter for "
+                "provider_code=%r — returning None (caller will use "
+                "generic fallback)",
+                provider_code,
+            )
             return None
         adapter = get_provider(provider_code)
         kind_enum = ShippingKind(kind)
-        return adapter.calculate_shipping_cost(
+        quote = adapter.calculate_shipping_cost(
             order_value_amount=order_value_amount,
             currency=currency,
             kind=kind_enum,
@@ -305,3 +446,34 @@ class ShippingService:
             region_id=region_id,
             weight_grams=weight_grams,
         )
+        # Anchor log for the per-carrier pricing decision. Used by ops
+        # to answer "did the free-shipping threshold fire for this
+        # cart?" without re-running the carrier adapter under a
+        # debugger. ``extra={}`` keys mirror the structured logging
+        # used in OrderService so a single query joins both halves of
+        # the calc trail.
+        if quote is not None:
+            amount, _ = quote
+            logger.info(
+                "Shipping quote: provider=%s kind=%s order_value=%.2f %s "
+                "weight_grams=%s -> %.2f %s",
+                provider_code,
+                kind,
+                order_value_amount,
+                currency,
+                weight_grams,
+                amount,
+                currency,
+                extra={
+                    "shipping_provider_code": provider_code,
+                    "shipping_kind": kind,
+                    "order_value_amount": order_value_amount,
+                    "currency": currency,
+                    "weight_grams": weight_grams,
+                    "country_id": country_id,
+                    "region_id": region_id,
+                    "shipping_amount": amount,
+                    "is_free": amount == 0.0,
+                },
+            )
+        return quote

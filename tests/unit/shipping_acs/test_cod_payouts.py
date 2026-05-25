@@ -102,3 +102,72 @@ def test_reconcile_skips_rows_without_voucher_no():
 
     assert result["upserted"] == 1
     assert result["rows"] == 2
+
+
+def test_reconcile_fires_order_paid_for_cod_purchase_capi():
+    """COD reconcile must emit ``order_paid`` so Meta CAPI Purchase
+    dispatches.
+
+    Regression: the post_save chain only fires ``order_paid`` on a
+    PENDING → PROCESSING status transition with ``is_paid=True``.
+    COD orders are already at PROCESSING (status advanced at
+    voucher-mint), so the COD payment confirmation never reached
+    that branch and Meta saw zero Purchase events for COD revenue.
+    """
+    from order.enum.status import OrderStatus, PaymentStatus
+    from order.signals import order_paid
+
+    order = OrderFactory(
+        status=OrderStatus.PROCESSING, payment_status=PaymentStatus.PENDING
+    )
+    AcsShipmentFactory(order=order, voucher_no="7227891234")
+
+    received: list[dict] = []
+
+    def _listener(sender, order, **kwargs):
+        received.append({"order_id": order.id})
+
+    order_paid.connect(_listener, dispatch_uid="test.cod_order_paid")
+    try:
+        with patch("shipping_acs.services.AcsClient") as mock_class:
+            instance = mock_class.return_value
+            instance.cod_beneficiary_info.return_value = [_BASE_ROW]
+            AcsService.reconcile_cod_payouts()
+    finally:
+        order_paid.disconnect(dispatch_uid="test.cod_order_paid")
+
+    order.refresh_from_db()
+    assert order.payment_status == PaymentStatus.COMPLETED
+    assert received == [{"order_id": order.id}]
+
+
+def test_reconcile_does_not_refire_order_paid_when_already_paid():
+    """Idempotency: a payout row re-uploaded by ACS must not re-fire
+    ``order_paid``. ``_mark_cod_order_paid_if_pending`` gates on
+    ``payment_status == PENDING``; once flipped, subsequent payout
+    upserts are no-ops on the signal channel even if the row is
+    upserted again.
+    """
+    from order.enum.status import OrderStatus, PaymentStatus
+    from order.signals import order_paid
+
+    order = OrderFactory(
+        status=OrderStatus.PROCESSING, payment_status=PaymentStatus.COMPLETED
+    )
+    AcsShipmentFactory(order=order, voucher_no="7227891234")
+
+    fired: list[int] = []
+
+    def _listener(sender, order, **kwargs):
+        fired.append(order.id)
+
+    order_paid.connect(_listener, dispatch_uid="test.cod_no_refire")
+    try:
+        with patch("shipping_acs.services.AcsClient") as mock_class:
+            instance = mock_class.return_value
+            instance.cod_beneficiary_info.return_value = [_BASE_ROW]
+            AcsService.reconcile_cod_payouts()
+    finally:
+        order_paid.disconnect(dispatch_uid="test.cod_no_refire")
+
+    assert fired == []

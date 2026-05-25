@@ -60,6 +60,18 @@ settings.CACHES = {
     },
 }
 
+# Note: we intentionally do NOT reset ``django.core.cache.caches``
+# here, even though the ``settings.CACHES`` patch above is technically
+# inert against connections that materialised before this point. The
+# Channels middleware tests (``tests/unit/core/middleware/test_channels.py``)
+# patch ``cache._cache.get_client`` directly and assume the default
+# alias is the production Redis backend. Resetting the registry would
+# break those tests. The downstream consequence is that any test
+# caching a non-picklable value (e.g. a ``MagicMock``) via the real
+# ``cache.*`` proxy can crash with ``PicklingError`` — those tests
+# should patch ``cache`` at the module they're testing instead of
+# relying on the proxy (see ``test_dashboard.py``).
+
 
 # Route django-extra-settings through a DummyCache so every ``Setting.get``
 # falls through to the DB. The package's ``post_save`` hook updates the
@@ -207,6 +219,35 @@ def clear_caches():
 
 
 @pytest.fixture(autouse=True)
+def _assert_english_locale_if_marked(request):
+    """Pin the active gettext translation to English for any test (or
+    test class / test module) marked with ``@pytest.mark.assert_english``.
+
+    The project default is ``LANGUAGE_CODE='el'`` and most validators /
+    admin filter labels / error messages use ``gettext_lazy``. Tests
+    that assert on English substrings of those messages
+    (``"quantity"``, ``"greater"``, ``"insufficient stock"``, admin
+    filter labels in English, etc.) pass in CI — which has no
+    ``compilemessages`` step so falls back to the English source — but
+    fail on dev machines where the compiled ``el`` ``.mo`` files are
+    available and Django returns the translated Greek string.
+
+    Opting in per-module via ``pytestmark = pytest.mark.assert_english``
+    is the narrowest fix: it leaves parler / i18n tests alone (those
+    rely on ``LANGUAGE_CODE='el'`` to read translated content), and
+    keeps the override explicit so a future reader knows why the test
+    runs in English.
+    """
+    if request.node.get_closest_marker("assert_english"):
+        from django.utils import translation
+
+        with translation.override("en"):
+            yield
+    else:
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _run_transaction_on_commit_immediately(request, monkeypatch):
     """Execute ``transaction.on_commit`` callbacks synchronously in tests.
 
@@ -335,67 +376,66 @@ def _reset_payment_events_redis_client():
 
 @pytest.fixture(autouse=True)
 def _reseed_extra_settings(request):
-    """Ensure ``EXTRA_SETTINGS_DEFAULTS`` rows exist + drop any cached
-    Setting values before every DB test.
+    """Reset every ``EXTRA_SETTINGS_DEFAULTS`` row to its declared
+    baseline before each DB test.
 
-    Two failure modes that this guards:
+    Why **reset** and not just **re-seed**: tests that mutate a
+    setting (e.g. ``Setting.objects.update_or_create(name="ACS_SMARTPOINT_ENABLED",
+    ...)``) and run with ``@pytest.mark.django_db(transaction=True)``
+    commit the change to the shared test database. Under ``-n auto``
+    a subsequent test on a different worker reads the mutated value
+    and the assertion flakes. The previous version called
+    ``Setting.set_defaults_from_settings()`` which uses
+    ``get_or_create`` and only writes on creation — it restored
+    missing rows after a ``flush`` but didn't undo value mutations.
 
-    1. ``django-extra-settings`` seeds its rows via a ``post_migrate``
-       signal that only fires at DB creation. Tests marked
-       ``@pytest.mark.django_db(transaction=True)`` flush every table on
-       teardown, wiping ``Setting`` rows. A subsequent test calling
-       ``Setting.get(...)`` would hit an empty DB and fall back to the
-       code-level default. ``set_defaults_from_settings`` (uses
-       ``get_or_create``) is cheap when rows are intact, restorative
-       when they are not.
+    This version uses ``update_or_create`` keyed on ``name`` and
+    rewrites ``value_<type>`` to the declared default every time, so
+    each test starts from the same baseline regardless of what any
+    prior test did. The cost is one tiny UPDATE per declared setting
+    (~30 rows) per test — dwarfed by the EAGER signal cascades the
+    same tests trigger.
 
-    2. **Stale cache across xdist workers (CI repro)**. Although the
-       conftest patches ``extra_settings.cache._get_cache`` to a
-       DummyCache, the package's ``post_save`` signal can still write
-       through the cache helpers if any consumer imported the
-       ``set_cached_setting`` function before the patch landed. Calling
-       ``Setting.objects.update_or_create(name="MYDATA_ENABLED", ...)``
-       in test A would emit ``post_save`` → cache write to whichever
-       backend is live at signal time. Test B reading the same key
-       would then short-circuit on the stale cache value and never hit
-       the DB. Forcing every read to a freshly cleared cache eliminates
-       the entire class of "Setting set but read returns stale" CI
-       flakes (``test_routes_to_mydata_when_enabled``,
-       ``test_pickup_point_enabled_when_setting_on``, BoxNow availability
-       checks, etc.). Cost is one ``cache.clear`` per DB test, which is
-       a no-op for DummyCache and ~1ms for LocMem/Redis.
+    Notes:
+
+    * ``value_type`` is normalised the same way ``extra_settings``
+      does in its own ``set_defaults`` — strips the ``Setting.TYPE_``
+      prefix if present and lowercases — so both the long and short
+      forms in ``EXTRA_SETTINGS_DEFAULTS`` are accepted.
+    * Settings not declared in ``EXTRA_SETTINGS_DEFAULTS`` (rare —
+      ad-hoc admin-created rows) are left alone.
+    * The DummyCache patch above neutralises ``extra_settings``'s
+      caching; combined with this reset, every ``Setting.get`` is a
+      direct, current-test DB read with no cross-worker leakage.
     """
-    if request.node.get_closest_marker("django_db"):
-        try:
-            from extra_settings.cache import (
-                _get_cache as _es_get_cache,
-                _get_cache_key,
-            )
-            from extra_settings.models import Setting
+    if not request.node.get_closest_marker("django_db"):
+        return
+    from django.conf import settings as _dj_settings
 
-            # Clear via every possible cache route so a stale post_save
-            # write under any cache backend doesn't survive into the
-            # next test. The two ``cache.clear()`` calls are independent:
-            # one drops keys via the patched _get_cache (DummyCache no-op),
-            # the other drops keys via Django's default ``cache`` proxy
-            # (the real backend, possibly Redis in CI).
-            try:
-                _es_get_cache().clear()
-            except Exception:
-                pass
-            try:
-                cache.delete_many(
-                    [
-                        _get_cache_key(item["name"])
-                        for item in settings.EXTRA_SETTINGS_DEFAULTS
-                        if isinstance(item, dict) and "name" in item
-                    ]
-                )
-            except Exception:
-                pass
-            Setting.set_defaults_from_settings()
-        except Exception:
-            pass
+    try:
+        from extra_settings.models import Setting
+
+        for default in getattr(_dj_settings, "EXTRA_SETTINGS_DEFAULTS", ()):
+            name = default.get("name")
+            value_type = (
+                default.get("type", "string")
+                .replace("Setting.TYPE_", "")
+                .lower()
+            )
+            value = default.get("value")
+            if not name or value is None:
+                continue
+            Setting.objects.update_or_create(
+                name=name,
+                defaults={
+                    "value_type": value_type,
+                    f"value_{value_type}": value,
+                },
+            )
+    except Exception:
+        # Fixture is best-effort — a transient DB connection error
+        # must not mask the real failure of the test itself.
+        pass
 
 
 @pytest.fixture(autouse=True)
@@ -465,6 +505,7 @@ def _reseed_shipping_providers(request):
                         "min_weight_kg": "0.5",
                         "max_weight_kg": "999",
                         "default_voucher_language": "GR",
+                        "print_type": 1,
                         "default_map_center": [37.9838, 23.7275],
                         "default_map_zoom": 11,
                         "tile_provider": {

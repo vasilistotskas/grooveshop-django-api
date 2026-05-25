@@ -1,3 +1,4 @@
+import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
@@ -11,6 +12,8 @@ from product.serializers.favourite import (
     ProductFavouriteSerializer,
 )
 from user.factories.account import UserAccountFactory
+
+pytestmark = pytest.mark.assert_english
 
 User = get_user_model()
 

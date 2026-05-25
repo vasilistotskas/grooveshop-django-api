@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.enum import BoxNowParcelState
 from shipping_boxnow.exceptions import BoxNowAPIError
@@ -49,6 +50,42 @@ _TERMINAL_ORDER_STATUSES: frozenset[str] = frozenset(
 
 # Label cache TTL in seconds (1 hour).
 _LABEL_CACHE_TTL = 3600
+
+# Subset of the deliveryRequest payload we mirror onto ``shipment.metadata
+# ['create_request']`` so a future "did X actually leave us?" question
+# (description/notes, COD amount, locker id, weight, …) can be answered
+# from the DB without re-running the payload builder. Strictly
+# operational — destination/origin contact details are intentionally
+# excluded because shipment.metadata is not cleared by GDPR
+# anonymisation (see user/services/gdpr.py).
+_AUDIT_REQUEST_FIELDS: tuple[str, ...] = (
+    "orderNumber",
+    "description",
+    "invoiceValue",
+    "paymentMode",
+    "amountToBeCollected",
+)
+
+
+def _audit_envelope(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return a PII-scrubbed copy of the BoxNow deliveryRequest payload.
+
+    Includes the operational subset plus ``destination.locationId``
+    (locker id — not PII) and the ``items`` array (weights /
+    compartment size / value — not PII). Keys mirror the BoxNow
+    payload shape (camelCase) so a reader who knows the API can
+    grep this envelope by the same field names.
+    """
+    envelope: dict[str, Any] = {
+        k: payload[k] for k in _AUDIT_REQUEST_FIELDS if k in payload
+    }
+    dest = payload.get("destination") or {}
+    if "locationId" in dest:
+        envelope["destination"] = {"locationId": dest["locationId"]}
+    if payload.get("items"):
+        envelope["items"] = payload["items"]
+    return envelope
+
 
 # BoxNow's voucher template prints ``items[].weight`` directly with a
 # ``kg`` label and 2-decimal formatting — empirically verified by
@@ -274,11 +311,57 @@ class BoxNowService:
 
         partner_notify_email = tenant_contact_email() or tenant_from_email()
 
+        # BoxNow P408 rejects ``amountToBeCollected`` outside (0, 5000).
+        # For PREPAID parcels the courier shouldn't collect anything;
+        # force ``"0.00"`` so a prepaid cart over €5000 still mints.
+        # COD parcels carry the real amount and are pre-validated at
+        # row creation time (carrier.create_shipment_row).
+        from shipping_boxnow.enum import BoxNowPaymentMode
+
+        if shipment.payment_mode == BoxNowPaymentMode.PREPAID:
+            amount_to_collect_str = "0.00"
+        else:
+            amount_to_collect_str = str(shipment.amount_to_be_collected.amount)
+
+        # Anchor log for the COD-vs-PREPAID decision so a future
+        # "why did the locker collect €0 / the wrong amount?" question
+        # can be answered from logs alone. ``payment_mode`` is the
+        # canonical discriminator; ``amount_to_be_collected`` is what
+        # the courier will actually charge at the locker.
+        logger.info(
+            "BoxNow deliveryRequest amount: order=%s payment_mode=%s "
+            "amount_to_collect=%s",
+            order.id,
+            shipment.payment_mode,
+            amount_to_collect_str,
+            extra={
+                "order_id": order.id,
+                "carrier": "boxnow",
+                "payment_mode": shipment.payment_mode,
+                "amount_to_collect": amount_to_collect_str,
+                "pay_way_code": getattr(
+                    getattr(order, "pay_way", None),
+                    "provider_code",
+                    None,
+                ),
+            },
+        )
+
+        # BoxNow's ``description`` field carries free-text per-delivery
+        # context (per API Manual §6.3.1 example). For us that's the
+        # customer's checkout note ("ring twice", "leave with porter")
+        # — captured on ``Order.customer_notes`` and previously dropped
+        # on the floor between Django and the carrier (reported by the
+        # site owner 2026-05-16). Shared helper trims + caps to keep
+        # the partner-portal box readable.
+        from shipping.services import sanitize_delivery_notes
+
         payload: dict[str, Any] = {
             "orderNumber": str(order.id),
+            "description": sanitize_delivery_notes(order.customer_notes),
             "invoiceValue": invoice_value,
             "paymentMode": shipment.payment_mode,
-            "amountToBeCollected": str(shipment.amount_to_be_collected.amount),
+            "amountToBeCollected": amount_to_collect_str,
             "notifyOnAccepted": partner_notify_email,
             "origin": {
                 "contactNumber": notify_phone,
@@ -396,6 +479,7 @@ class BoxNowService:
             shipment.metadata = {
                 **shipment.metadata,
                 "create_response": response,
+                "create_request": _audit_envelope(payload),
                 "last_error": None,
                 "mint_started_at": None,
             }
@@ -417,12 +501,27 @@ class BoxNowService:
             )
             cls._advance_pending_order_to_processing(order)
 
+        sent_notes = payload.get("description", "") or ""
+        raw_notes_len = len(order.customer_notes or "")
+        # ``notes_truncated`` derives from the post-sanitize length —
+        # mirrors AcsService for the same reason.
         logger.info(
-            "create_shipment_for_order: order=%s → "
+            "create_shipment_for_order: parcel minted for order=%s "
             "delivery_request_id=%s parcel_id=%s",
             order.id,
             delivery_request_id,
             parcel_id,
+            extra={
+                "order_id": order.id,
+                "shipment_pk": shipment.pk,
+                "carrier": "boxnow",
+                "phase": "phase3_minted",
+                "delivery_request_id": delivery_request_id,
+                "parcel_id": parcel_id,
+                "notes_chars_raw": raw_notes_len,
+                "notes_chars_sent": len(sent_notes),
+                "notes_truncated": len(sent_notes) >= DELIVERY_NOTES_MAX_LEN,
+            },
         )
         return shipment
 
@@ -486,7 +585,8 @@ class BoxNowService:
                       (stored in ``shipment.metadata["cancellations"]``).
 
         Raises:
-            BoxNowAPIError: Shipment is not in the ``NEW`` state (P420).
+            BoxNowAPIError: Shipment has a ``parcel_id`` but is not in
+                the ``NEW`` state (P420).
             BoxNowAPIError: BoxNow API rejected the request.
         """
         # ---- Phase 1: state guard + parcel_id snapshot ------------------
@@ -494,29 +594,29 @@ class BoxNowService:
             locked: BoxNowShipment = (
                 BoxNowShipment.objects.select_for_update().get(pk=shipment.pk)
             )
-            if locked.parcel_state != BoxNowParcelState.NEW:
-                raise BoxNowAPIError(
-                    409,
-                    code="P420",
-                    message=(
-                        "Parcel not cancellable in current state "
-                        f"({locked.parcel_state!r}). "
-                        "BoxNow only permits cancellation from the NEW state."
-                    ),
-                )
             parcel_id = locked.parcel_id
 
-            # Edge case: a shipment row exists (state=NEW) but the
-            # mint task never ran or crashed before persisting the
-            # parcel_id. Calling BoxNow with empty parcel_id would
-            # surface as P403/P404 (confusing). Mark CANCELED locally
-            # and short-circuit — there is nothing on BoxNow's side
-            # to cancel.
+            # No parcel_id ⇒ nothing at BoxNow to cancel. This covers
+            # the canonical ``pending_creation`` case (online order
+            # never paid, admin cancels — BoxNow create-shipment task
+            # never ran) AND the rarer ``NEW`` + crashed-mint case
+            # (Phase 3 persist crashed before saving the IDs).
+            # Either way: mark CANCELED locally, no API call.
+            #
+            # The state guard further down only fires when ``parcel_id``
+            # is set — i.e. there is a real BoxNow-side parcel that has
+            # progressed past NEW and can't safely be cancelled remotely.
+            # Verified against prod order 76 (2026-05-21): the admin
+            # form-save cancel on an unpaid BoxNow order in
+            # ``pending_creation`` previously stored a confusing
+            # ``BoxNow API 409 [P420]`` error in
+            # ``metadata.cancellation.shipment_cancel.error`` even
+            # though the order cancel itself succeeded.
             if not parcel_id:
                 logger.info(
                     "cancel_shipment: shipment=%s has no parcel_id "
-                    "(create task pending or crashed pre-persist) — "
-                    "marking CANCELED locally without an API call.",
+                    "(pending_creation or crashed mint) — marking "
+                    "CANCELED locally without an API call.",
                     shipment.pk,
                     extra={
                         "shipment_pk": shipment.pk,
@@ -549,6 +649,20 @@ class BoxNowService:
                     ]
                 )
                 return
+
+            # State guard: parcel_id is set, so a real BoxNow-side
+            # parcel exists. BoxNow only allows cancellation from
+            # the NEW state — refuse remote cancel for anything else.
+            if locked.parcel_state != BoxNowParcelState.NEW:
+                raise BoxNowAPIError(
+                    409,
+                    code="P420",
+                    message=(
+                        "Parcel not cancellable in current state "
+                        f"({locked.parcel_state!r}). "
+                        "BoxNow only permits cancellation from the NEW state."
+                    ),
+                )
 
         # ---- Phase 2: API call (no transaction, no lock) ----------------
         logger.info(
@@ -787,6 +901,12 @@ class BoxNowService:
             cls._apply_order_status_transition(order, mapped_state)
 
             # --- Enqueue arrival notification for final-destination -------
+            # Wrap ``.delay`` in ``transaction.on_commit`` so the Celery
+            # worker only sees the BoxNowParcelEvent row AFTER this
+            # atomic block commits. Without the wrapper the worker can
+            # dequeue before commit and crash on ``DoesNotExist`` (same
+            # class of bug as ACS order 47 — see project memory
+            # ``project_shipping_dispatch_on_commit``).
             if mapped_state == BoxNowParcelState.FINAL_DESTINATION:
                 try:
                     from shipping_boxnow.tasks import (  # noqa: PLC0415
@@ -794,13 +914,13 @@ class BoxNowService:
                     )
 
                     # Defer to on_commit — we're inside ``transaction.atomic``
-                    # (line 704) and Celery dispatched mid-transaction can
-                    # deliver to a worker that races the COMMIT, causing
+                    # and Celery dispatched mid-transaction can deliver to a
+                    # worker that races the COMMIT, causing
                     # ``BoxNowParcelEvent.DoesNotExist``. Mirrors the
                     # ShippingService.dispatch_create_shipment_task pattern.
                     transaction.on_commit(
-                        lambda evt_id=event.id: (
-                            boxnow_send_arrival_notification.delay(evt_id)
+                        lambda eid=event.id: (
+                            boxnow_send_arrival_notification.delay(eid)
                         )
                     )
                 except ImportError:
@@ -875,6 +995,243 @@ class BoxNowService:
                 order.id,
                 shipment.parcel_id,
             )
+
+    # ------------------------------------------------------------------
+    # sync_shipment_state — REST poll fallback (defence-in-depth)
+    # ------------------------------------------------------------------
+
+    # Synthetic message-id prefix for events recorded via the REST poll
+    # path instead of a CloudEvents webhook delivery. Stays compatible
+    # with the unique-key idempotency contract on
+    # ``BoxNowParcelEvent.webhook_message_id`` while making the source
+    # of each row traceable in audits.
+    _POLL_MESSAGE_ID_PREFIX = "poll"
+
+    @classmethod
+    def sync_shipment_state(cls, shipment: BoxNowShipment) -> dict[str, Any]:
+        """Reconcile one shipment with the BoxNow REST API.
+
+        Why this exists
+        ---------------
+        BoxNow's webhook URL is **partner-managed on BoxNow's side**
+        (per Webhook-Based Parcel Tracking Guide v1.4 §"Hook
+        Management": _"BOX NOW will assist partners in configuring
+        their webhook to the appropriate URL"_). There is no
+        self-serve registration. If their support hasn't wired our
+        URL yet — or a single delivery is silently dropped — the
+        webhook path goes dark and parcel state freezes at whatever
+        we last observed (e.g. ``new`` after creation). A 15-minute
+        poll converges state independent of webhook health.
+
+        How it stays consistent with the webhook path
+        ---------------------------------------------
+        * Each event row inserted carries a deterministic synthetic
+          ``webhook_message_id`` of the form
+          ``poll:{parcel_id}:{event_type}:{event_time_iso}``. The
+          unique constraint on the column means a re-poll of the
+          same parcel is idempotent — duplicates collapse silently.
+        * Before inserting we also check for an event matching
+          ``(shipment, event_type, event_time)`` so that a real
+          webhook event that landed first (with BoxNow's own message
+          id) is never duplicated by the poll.
+        * State updates honour the same out-of-order protection as
+          ``apply_webhook_event``: ``shipment.parcel_state`` only
+          moves forward when the new event's ``event_time`` is
+          strictly greater than ``shipment.last_event_at``.
+        * Downstream side-effects mirror the webhook path: order
+          status cascades via ``_apply_order_status_transition``,
+          locker-arrival notification on
+          ``final-destination``, delivered notification on
+          ``delivered``.
+
+        Returns:
+            ``{"parcel_id", "events_synced", "state", "last_event_at"}``
+        """
+        if not shipment.parcel_id:
+            logger.warning(
+                "sync_shipment_state: shipment %s has no parcel_id — "
+                "cannot poll",
+                shipment.pk,
+            )
+            return {
+                "parcel_id": None,
+                "events_synced": 0,
+                "state": shipment.parcel_state,
+                "last_event_at": shipment.last_event_at,
+            }
+
+        parcel_id = shipment.parcel_id
+        logger.info(
+            "sync_shipment_state: polling BoxNow for parcel_id=%s",
+            parcel_id,
+        )
+
+        response = BoxNowClient().get_parcel_info(parcel_id=parcel_id)
+        data_rows: list[dict] = (response or {}).get("data") or []
+        if not data_rows:
+            logger.warning(
+                "sync_shipment_state: BoxNow returned no data for "
+                "parcel_id=%s — likely not yet visible or wrong id",
+                parcel_id,
+            )
+            # Still bump last_polled_at so the batch task can move on
+            # to next candidates rather than spinning on this one.
+            BoxNowShipment.objects.filter(pk=shipment.pk).update(
+                last_polled_at=timezone.now()
+            )
+            return {
+                "parcel_id": parcel_id,
+                "events_synced": 0,
+                "state": shipment.parcel_state,
+                "last_event_at": shipment.last_event_at,
+            }
+
+        parcel = data_rows[0]
+        events: list[dict] = parcel.get("events") or []
+        events_synced = 0
+
+        # Apply events in chronological order so the state machine
+        # observes transitions the same way the webhook stream would
+        # have delivered them (oldest first).
+        for event in sorted(events, key=lambda e: e.get("createTime") or ""):
+            applied = cls._apply_poll_event(shipment, parcel, event)
+            if applied is not None:
+                events_synced += 1
+
+        BoxNowShipment.objects.filter(pk=shipment.pk).update(
+            last_polled_at=timezone.now()
+        )
+        shipment.refresh_from_db(
+            fields=["parcel_state", "last_event_at", "last_polled_at"]
+        )
+
+        logger.info(
+            "sync_shipment_state: parcel_id=%s events_synced=%d state=%s",
+            parcel_id,
+            events_synced,
+            shipment.parcel_state,
+        )
+
+        return {
+            "parcel_id": parcel_id,
+            "events_synced": events_synced,
+            "state": shipment.parcel_state,
+            "last_event_at": shipment.last_event_at,
+        }
+
+    @classmethod
+    def _apply_poll_event(
+        cls,
+        shipment: BoxNowShipment,
+        parcel: dict,
+        event: dict,
+    ) -> BoxNowParcelEvent | None:
+        """Idempotently insert one poll-derived event and cascade state.
+
+        Returns the new ``BoxNowParcelEvent`` row, or ``None`` if the
+        event was already recorded (via webhook or a prior poll).
+        """
+        raw_event = event.get("type") or ""
+        event_time_raw = event.get("createTime")
+        if not raw_event or not event_time_raw:
+            logger.warning(
+                "_apply_poll_event: malformed event for parcel_id=%s — %r",
+                shipment.parcel_id,
+                event,
+            )
+            return None
+
+        try:
+            mapped_state = BoxNowParcelState.from_webhook_event(raw_event)
+        except ValueError:
+            logger.warning(
+                "_apply_poll_event: unknown BoxNow event %r for "
+                "parcel_id=%s — recording as-is",
+                raw_event,
+                shipment.parcel_id,
+            )
+            mapped_state = raw_event
+
+        event_time = parse_datetime(event_time_raw)
+
+        with transaction.atomic():
+            locked = (
+                BoxNowShipment.objects.select_for_update()
+                .select_related("order")
+                .get(pk=shipment.pk)
+            )
+
+            # Two-stage dedup so the poll never duplicates a webhook
+            # row that arrived with BoxNow's own CloudEvents id.
+            already_recorded = BoxNowParcelEvent.objects.filter(
+                shipment=locked,
+                event_type=mapped_state,
+                event_time=event_time,
+            ).exists()
+            if already_recorded:
+                return None
+
+            synthetic_id = (
+                f"{cls._POLL_MESSAGE_ID_PREFIX}:{locked.parcel_id}:"
+                f"{mapped_state}:{event_time_raw}"
+            )
+
+            new_event, created = BoxNowParcelEvent.objects.get_or_create(
+                webhook_message_id=synthetic_id,
+                defaults={
+                    "shipment": locked,
+                    "event_type": mapped_state,
+                    "parcel_state": parcel.get("state", ""),
+                    "event_time": event_time,
+                    "display_name": event.get("locationDisplayName", "") or "",
+                    "postal_code": event.get("postalCode", "") or "",
+                    "additional_information": "",
+                    "raw_payload": {
+                        "source": "poll",
+                        "event": event,
+                        "parcel_summary": {
+                            "id": parcel.get("id"),
+                            "state": parcel.get("state"),
+                            "updateTime": parcel.get("updateTime"),
+                        },
+                    },
+                },
+            )
+
+            if not created:
+                # Lost a race with a concurrent poll that won the
+                # unique-key insert microseconds earlier.
+                return None
+
+            if locked.last_event_at is None or (
+                event_time is not None and event_time > locked.last_event_at
+            ):
+                locked.parcel_state = mapped_state
+                locked.last_event_at = event_time
+                locked.save(
+                    update_fields=[
+                        "parcel_state",
+                        "last_event_at",
+                        "updated_at",
+                    ]
+                )
+
+            cls._apply_order_status_transition(locked.order, mapped_state)
+
+            if mapped_state == BoxNowParcelState.FINAL_DESTINATION:
+                from shipping_boxnow.tasks import (  # noqa: PLC0415
+                    boxnow_send_arrival_notification,
+                )
+
+                transaction.on_commit(
+                    lambda eid=new_event.id: (
+                        boxnow_send_arrival_notification.delay(eid)
+                    )
+                )
+            elif mapped_state == BoxNowParcelState.DELIVERED:
+                cls._dispatch_delivered_notification(locked)
+
+        return new_event
 
     # ------------------------------------------------------------------
     # sync_lockers
@@ -1072,6 +1429,29 @@ class BoxNowService:
         if new_status is None or new_status == current_status:
             return
 
+        # BoxNow can deliver a parcel between two polls / webhook
+        # deliveries without us ever observing an intermediate
+        # final_destination event (especially if the customer picks
+        # up immediately). The order state machine requires
+        # PROCESSING → SHIPPED → DELIVERED, so a direct jump is
+        # rejected. Walk the missing SHIPPED step first. Mirrors
+        # ``AcsService._apply_order_status_transition`` — same gap.
+        if (
+            new_status == "DELIVERED"
+            and current_status in _PRE_SHIPPED_STATUSES
+        ):
+            try:
+                OrderService.update_order_status(order, "SHIPPED")
+            except InvalidStatusTransitionError as exc:
+                logger.warning(
+                    "BoxNow: cannot bridge order=%s through SHIPPED "
+                    "before DELIVERED (%r → SHIPPED): %s",
+                    order.id,
+                    current_status,
+                    exc,
+                )
+                return
+
         logger.info(
             "_apply_order_status_transition: order=%s %r → %r "
             "(boxnow_event=%r)",
@@ -1152,8 +1532,13 @@ class BoxNowService:
         except ValueError:
             locker_type = BoxNowLockerType.APM
 
-        address: dict = dest.get("address", {})
-
+        # BoxNow returns the address fields at the **top level** of the
+        # destination object (``addressLine1`` / ``postalCode`` /
+        # ``country``), not nested under an ``address`` sub-object. The
+        # previous version of this method walked a non-existent
+        # ``dest["address"]`` dict, so every synced locker landed in
+        # the DB with empty address fields — silently breaking
+        # postal-code filtering and the admin display.
         return {
             "type": locker_type,
             "image_url": dest.get("imageUrl") or None,
@@ -1161,10 +1546,10 @@ class BoxNowService:
             "lng": dest.get("lng", 0),
             "title": dest.get("title", ""),
             "name": dest.get("name", ""),
-            "address_line_1": address.get("addressLine1", ""),
-            "address_line_2": address.get("addressLine2", ""),
-            "postal_code": address.get("postalCode", ""),
-            "country_code": address.get("countryCode", "GR"),
+            "address_line_1": dest.get("addressLine1", ""),
+            "address_line_2": dest.get("addressLine2", ""),
+            "postal_code": dest.get("postalCode", ""),
+            "country_code": dest.get("country") or "GR",
             "note": dest.get("note", ""),
             "is_active": True,
             "last_synced_at": timezone.now(),

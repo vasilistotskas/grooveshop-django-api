@@ -19,6 +19,8 @@ class LoyaltyTierAdmin(ModelAdmin, TranslatableAdmin):
     warn_unsaved_form = True
     list_fullwidth = True
     list_filter_submit = True
+    ordering_field = "sort_order"
+    hide_ordering_field = True
 
     list_display = (
         "name",

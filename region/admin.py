@@ -322,7 +322,8 @@ class RegionInline(TranslatableTabularInline):
     model = Region
     extra = 0
     fields = ("alpha", "name", "sort_order")
-    readonly_fields = ("sort_order",)
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     tab = True
     show_change_link = True
 
@@ -357,9 +358,10 @@ class RegionAdmin(ModelAdmin, TranslatableAdmin):
         "country__alpha_3",
         "country__translations__name",
     ]
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     readonly_fields = (
         "uuid",
-        "sort_order",
         "created_at",
         "updated_at",
         "region_analytics",

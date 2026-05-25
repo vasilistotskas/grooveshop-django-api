@@ -67,6 +67,9 @@ _ALLOWED_PRODUCT_FACETS: frozenset[str] = frozenset(
         "price_range",
         "final_price",
         "language_code",
+        "likes_count",
+        "view_count",
+        "attribute_values",
     }
 )
 
@@ -323,11 +326,7 @@ def product_meili_search(request):
     likes_min = request.query_params.get("likes_min")
     views_min = request.query_params.get("views_min")
     categories_param = request.query_params.get("categories", "")
-    # Prefer plural camelCase key; fall back to the legacy singular name.
-    attribute_value_param = request.query_params.get(
-        "attributeValues",
-        request.query_params.get("attribute_value", ""),
-    )
+    attribute_value_param = request.query_params.get("attributeValues", "")
     sort_param = request.query_params.get("sort")
 
     # Parse facets parameter — restrict to known-safe facet fields.

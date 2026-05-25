@@ -255,13 +255,13 @@ def check_low_stock_products() -> dict:
     )
     if not admin_email:
         logger.warning(
-            "check_low_stock_products: no ADMIN_EMAIL/INFO_EMAIL configured — rolling back claim"
+            "check_low_stock_products: no ADMINS configured — rolling back claim"
         )
-        # Release the claim so a future run with email configured can send.
+        # Release the claim so a future run with admins configured can send.
         Product.objects.filter(id__in=product_ids).update(
             low_stock_alert_sent=False
         )
-        return {"alerted": 0, "reason": "no_admin_email"}
+        return {"alerted": 0, "reason": "no_admins"}
 
     products_to_alert = list(
         Product.objects.filter(id__in=product_ids).prefetch_related(

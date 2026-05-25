@@ -4,6 +4,7 @@ from typing import Any
 from django.db import connection, transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.utils import timezone
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
@@ -37,6 +38,7 @@ from order.notifications import (
 )
 from order.tasks import (
     generate_order_invoice,
+    send_admin_new_order_email,
     send_dispute_notification_email,
     send_order_confirmation_email,
     send_order_status_update_email,
@@ -153,8 +155,9 @@ def handle_order_created(
     # Offline payments (COD, bank transfer) and already-paid orders get the
     # confirmation email immediately. Online payments (Stripe, Viva Wallet)
     # defer it to the payment-success webhook so the email only goes out
-    # once the payment actually succeeds. Missing pay_way is treated as
-    # offline to preserve the legacy fallback behavior.
+    # once the payment actually succeeds. Missing pay_way (the FK was
+    # ``SET_NULL`` because someone deleted the PayWay row) is treated as
+    # offline so the customer still receives a confirmation.
     pay_way = order.pay_way
     is_online_pending = (
         pay_way is not None
@@ -163,6 +166,7 @@ def handle_order_created(
     )
     if not is_online_pending:
         send_order_confirmation_email.delay(order.id)
+    send_admin_new_order_email.delay(order.id)
     OrderHistory.log_note(order=order, note="Order created")
 
     # Live in-app notification for authenticated shoppers. The task
@@ -505,18 +509,65 @@ def handle_order_delivered(
 def handle_order_canceled(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Handle order canceled signal."""
+    """Handle order canceled signal.
+
+    Single source of truth for cancellation side-effects beyond the
+    status flip itself: history note, courier-voucher cascade, and
+    backfilling ``metadata['cancellation']`` for entry points (like
+    Django admin's form save) that bypass
+    :meth:`OrderService.cancel_order`. Verified necessary on
+    2026-05-16 after prod order 60 had ``status=CANCELED`` but
+    ``metadata.cancellation = null`` and voucher 9771614856 still
+    alive at ACS.
+    """
     previous_status = kwargs.get("previous_status")
+    # ``order_canceled`` is dispatched by ``handle_order_status_changed``
+    # without forwarding the ``reason`` kwarg, so the programmatic path
+    # (``OrderService.cancel_order`` with a meaningful reason) needs us
+    # to recover it from the metadata that ``cancel_order`` writes
+    # BEFORE the save that triggers this signal chain. Falls back to
+    # "admin status change" for the admin-form-save path where neither
+    # the kwarg nor the metadata is populated.
+    metadata_reason = (
+        (order.metadata or {}).get("cancellation", {}).get("reason")
+    )
+    cancellation_reason = (
+        kwargs.get("reason") or metadata_reason or "admin status change"
+    )
 
     try:
-        cancellation_reason = kwargs.get("reason")
-        if cancellation_reason:
+        # Defensive: ``OrderService.cancel_order`` writes a rich
+        # ``metadata['cancellation']`` dict (reason / canceled_by /
+        # canceled_at / previous_status) BEFORE saving the row, so
+        # this block is a no-op on that path. For the admin form
+        # path we initialise it here so the carrier cascade has a
+        # parent dict to write its ``shipment_cancel`` outcome into.
+        if not order.metadata:
+            order.metadata = {}
+        cancellation = order.metadata.setdefault("cancellation", {})
+        cancellation.setdefault("canceled_at", timezone.now().isoformat())
+        cancellation.setdefault("previous_status", previous_status)
+        cancellation.setdefault("reason", cancellation_reason)
+
+        if kwargs.get("reason"):
             OrderHistory.log_note(
                 order=order,
-                note=f"Order canceled. Reason: {cancellation_reason}",
+                note=f"Order canceled. Reason: {kwargs['reason']}",
             )
         # Email is sent by handle_order_status_changed via
         # send_order_status_update_email (uses the canceled template)
+
+        # Cascade to the courier voucher. Lives here as a safety net
+        # so every path that flips ``order.status`` to CANCELED —
+        # including admin form saves that go straight to Order.save()
+        # — reaches the carrier. ``OrderService.cancel_order`` runs
+        # the cascade synchronously itself; we detect that via the
+        # ``shipment_cancel`` outcome breadcrumb and skip, so the
+        # programmatic path doesn't double-fire and pre-existing
+        # tests that rely on synchronous cascade behaviour keep
+        # working.
+        if "shipment_cancel" not in cancellation:
+            OrderService.cancel_attached_shipment(order, cancellation_reason)
 
         logger.info(
             "Order %s canceled (previous status: %s)",
@@ -824,29 +875,88 @@ def handle_stripe_payment_failed(sender, **kwargs):
 @djstripe_receiver("payment_intent.requires_action")
 @with_tenant_schema_from_event
 def handle_stripe_payment_requires_action(sender, **kwargs):
-    """Handle Stripe payment requiring action webhook."""
+    """Handle Stripe ``payment_intent.requires_action`` webhook.
+
+    Stripe redelivers events on retry; this handler must be idempotent
+    AND must not regress a terminal payment_status. A delayed
+    ``requires_action`` arriving after a ``succeeded`` event would
+    otherwise overwrite ``COMPLETED`` back to ``PENDING`` — leaving the
+    order paid-but-not-paid and the customer with no signal.
+    """
     logger.debug("Processing payment_intent.requires_action webhook")
 
     try:
         event: Event = kwargs["event"]
         payment_intent_id = event.data["object"]["id"]
+        event_id = event.id
 
         logger.info("Stripe payment requires action: %s", payment_intent_id)
 
-        try:
-            order = Order.objects.get(payment_id=payment_intent_id)
-        except Order.DoesNotExist:
-            logger.error(
-                "Order not found for payment_intent: %s", payment_intent_id
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .filter(payment_id=payment_intent_id)
+                .first()
             )
-            return
+            if order is None:
+                logger.error(
+                    "Order not found for payment_intent: %s", payment_intent_id
+                )
+                return
 
-        order.payment_status = PaymentStatus.PENDING
-        order.save(update_fields=["payment_status"])
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                return
+
+            # Only relax PROCESSING/PENDING back to PENDING — never
+            # walk back COMPLETED/FAILED/REFUNDED. Webhook redelivery
+            # ordering is not guaranteed.
+            if order.payment_status not in (
+                PaymentStatus.PROCESSING,
+                PaymentStatus.PENDING,
+            ):
+                logger.warning(
+                    "requires_action ignored: order=%s already in terminal "
+                    "payment_status=%s (event=%s)",
+                    order.id,
+                    order.payment_status,
+                    event_id,
+                    extra={
+                        "order_id": order.id,
+                        "payment_status": order.payment_status,
+                        "event_id": event_id,
+                    },
+                )
+                return
+
+            previous_payment_status = order.payment_status
+            order.payment_status = PaymentStatus.PENDING
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata[f"webhook_processed_{event_id}"] = True
+            order.save(update_fields=["payment_status", "metadata"])
 
         OrderHistory.log_note(
             order=order,
-            note=f"Payment requires additional action (3D Secure, etc.) - Payment ID: {payment_intent_id}",
+            note=(
+                f"Payment requires additional action (3D Secure, etc.) - "
+                f"Payment ID: {payment_intent_id}"
+            ),
+        )
+        logger.info(
+            "Stripe payment_intent.requires_action handled",
+            extra={
+                "order_id": order.id,
+                "payment_intent_id": payment_intent_id,
+                "previous_payment_status": str(previous_payment_status),
+                "event_id": event_id,
+            },
         )
 
     except Exception as e:
@@ -1006,23 +1116,44 @@ def handle_stripe_dispute_created(sender, **kwargs):
             )
             return
 
-        order = Order.objects.filter(payment_id=charge_id).first()
-        if order is None:
-            logger.warning(
-                "No order found for disputed charge %s (dispute=%s)",
-                charge_id,
-                dispute_id,
-            )
-            return
+        event_id = event.id
 
-        # Flag the order for staff review. Do NOT change order status —
-        # refund/acceptance is a manual decision.
-        if not order.metadata:
-            order.metadata = {}
-        order.metadata["disputed"] = True
-        order.metadata["dispute_id"] = dispute_id
-        order.metadata["dispute_reason"] = reason
-        order.save(update_fields=["metadata"])
+        # Lock the order row + idempotency-check the event so Stripe
+        # redeliveries don't (1) overwrite later dispute fields, or
+        # (2) re-trigger the staff notification email.
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update()
+                .filter(payment_id=charge_id)
+                .first()
+            )
+            if order is None:
+                logger.warning(
+                    "No order found for disputed charge %s (dispute=%s)",
+                    charge_id,
+                    dispute_id,
+                )
+                return
+
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                return
+
+            # Flag the order for staff review. Do NOT change order
+            # status — refund/acceptance is a manual decision.
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata["disputed"] = True
+            order.metadata["dispute_id"] = dispute_id
+            order.metadata["dispute_reason"] = reason
+            order.metadata[f"webhook_processed_{event_id}"] = True
+            order.save(update_fields=["metadata"])
 
         OrderHistory.log_note(
             order=order,
@@ -1040,6 +1171,7 @@ def handle_stripe_dispute_created(sender, **kwargs):
                 "dispute_id": dispute_id,
                 "charge_id": charge_id,
                 "reason": reason,
+                "event_id": event_id,
             },
         )
 
@@ -1181,13 +1313,19 @@ def handle_stripe_checkout_completed(sender, **kwargs):
 @djstripe_receiver("checkout.session.expired")
 @with_tenant_schema_from_event
 def handle_stripe_checkout_expired(sender, **kwargs):
-    """Handle Stripe checkout session expiration webhook."""
+    """Handle Stripe ``checkout.session.expired`` webhook.
+
+    Stripe redelivers expirations; lock the row and idempotency-check
+    so redeliveries don't append duplicate "session expired" history
+    rows or thrash the metadata flag.
+    """
     logger.debug("Processing checkout.session.expired webhook")
 
     try:
         event: Event = kwargs["event"]
         session_data = event.data["object"]
         session_id = session_data["id"]
+        event_id = event.id
         order_id = session_data.get("metadata", {}).get("order_id")
 
         logger.info("Checkout session expired: %s", session_id)
@@ -1195,31 +1333,52 @@ def handle_stripe_checkout_expired(sender, **kwargs):
         if not order_id:
             return
 
-        try:
-            order = Order.objects.get(id=order_id)
-
-            if not order.is_paid:
-                if not order.metadata:
-                    order.metadata = {}
-                order.metadata["stripe_checkout_expired"] = True
-                order.metadata["stripe_checkout_session_id"] = session_id
-                order.save(update_fields=["metadata"])
-
-                OrderHistory.log_note(
-                    order=order,
-                    note=f"Checkout session expired: {session_id}",
-                )
-
-                logger.info(
-                    "Marked order %s checkout session as expired", order_id
-                )
-
-        except Order.DoesNotExist:
-            logger.error(
-                "Order %s not found for expired session %s",
-                order_id,
-                session_id,
+        with transaction.atomic():
+            order = (
+                Order.objects.select_for_update().filter(id=order_id).first()
             )
+            if order is None:
+                logger.error(
+                    "Order %s not found for expired session %s",
+                    order_id,
+                    session_id,
+                )
+                return
+
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                return
+
+            if order.is_paid:
+                return
+
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata["stripe_checkout_expired"] = True
+            order.metadata["stripe_checkout_session_id"] = session_id
+            order.metadata[f"webhook_processed_{event_id}"] = True
+            order.save(update_fields=["metadata"])
+
+        OrderHistory.log_note(
+            order=order,
+            note=f"Checkout session expired: {session_id}",
+        )
+
+        logger.info(
+            "Marked order %s checkout session as expired",
+            order_id,
+            extra={
+                "order_id": order.id,
+                "session_id": session_id,
+                "event_id": event_id,
+            },
+        )
 
     except Exception as e:
         logger.error(

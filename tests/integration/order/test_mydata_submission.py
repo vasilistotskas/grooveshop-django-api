@@ -25,12 +25,12 @@ from django.core import mail
 from django.test import TestCase, override_settings
 from djmoney.money import Money
 
-from extra_settings.models import Setting
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from order.invoicing import generate_invoice
 from order.models.invoice import MyDataStatus
+from order.mydata.config import MyDataConfig
 from order.mydata.exceptions import MyDataTransportError
 from order.tasks import (
     cancel_mydata_invoice,
@@ -40,33 +40,48 @@ from order.tasks import (
 from product.factories.product import ProductFactory
 from vat.factories import VatFactory
 
+_READY_CONFIG = MyDataConfig(
+    enabled=True,
+    auto_submit=True,
+    environment="dev",
+    user_id="test-user",
+    subscription_key="test-subscription-key",
+    invoice_series_prefix="GRVP",
+    issuer_branch=0,
+    request_timeout_seconds=30,
+)
 
-def _enable_mydata() -> None:
-    """Flip the runtime toggles + credentials so
-    ``MyDataConfig.is_ready()`` returns True."""
-    Setting.objects.update_or_create(
-        name="MYDATA_ENABLED",
-        defaults={"value_type": "bool", "value_bool": True},
-    )
-    Setting.objects.update_or_create(
-        name="MYDATA_AUTO_SUBMIT",
-        defaults={"value_type": "bool", "value_bool": True},
-    )
-    Setting.objects.update_or_create(
-        name="MYDATA_USER_ID",
-        defaults={"value_type": "string", "value_string": "test-user"},
-    )
-    Setting.objects.update_or_create(
-        name="MYDATA_SUBSCRIPTION_KEY",
-        defaults={
-            "value_type": "string",
-            "value_string": "test-subscription-key",
-        },
-    )
-    Setting.objects.update_or_create(
-        name="INVOICE_SELLER_VAT_ID",
-        defaults={"value_type": "string", "value_string": "123456789"},
-    )
+
+def _enable_mydata(test_case: TestCase) -> None:
+    """Patch the myDATA integration boundary so the rest of the call
+    chain sees "enabled and configured".
+
+    Sidesteps the ``Setting.objects.update_or_create`` → ``Setting.get``
+    round-trip that flaked under CI's parallel xdist run: the autouse
+    ``_reseed_extra_settings`` fixture (conftest.py) rewrites the same
+    ``EXTRA_SETTINGS_DEFAULTS`` rows on every worker for every test,
+    and the resulting savepoint-visibility interaction occasionally
+    causes ``Setting.get`` to return the seeded default instead of the
+    just-written test value. Patching ``load_config`` +
+    ``_resolve_issuer_vat`` removes the dependency on ``Setting``
+    entirely for these tests — the same boundary the service-level
+    docstring already calls out as "kept separate so tests can
+    monkey-patch without spinning the whole config stack".
+    """
+    # Patch both bound names: ``order.tasks`` lazy-imports
+    # ``load_config`` inside the task body (so patching the source
+    # module is enough there), but ``order.mydata.service`` does a
+    # top-level ``from order.mydata.config import load_config`` and
+    # therefore holds its own bound reference that the source-module
+    # patch doesn't reach.
+    for target, retval in (
+        ("order.mydata.config.load_config", _READY_CONFIG),
+        ("order.mydata.service.load_config", _READY_CONFIG),
+        ("order.mydata.service._resolve_issuer_vat", "123456789"),
+    ):
+        p = patch(target, return_value=retval)
+        p.start()
+        test_case.addCleanup(p.stop)
 
 
 def _make_invoice():
@@ -178,7 +193,7 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
             price=Money(Decimal("10.00"), "EUR"),
             quantity=1,
         )
-        # No _enable_mydata() call — integration is off.
+        # No _enable_mydata(self) call — integration is off.
         result = generate_order_invoice(order.id)
         self.assertTrue(result)
         mock_email.assert_called_once_with(order.id)
@@ -190,7 +205,7 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
     def test_routes_to_mydata_when_enabled(
         self, mock_email, mock_submit, _mock_render
     ):
-        _enable_mydata()
+        _enable_mydata(self)
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PENDING,
@@ -227,7 +242,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         """Happy path: AADE returns Success → MARK + qr_url persisted,
         PDF regenerated (so customer's copy carries the MARK), email
         queued as the last step in the chain."""
-        _enable_mydata()
+        _enable_mydata(self)
         order, invoice = _make_invoice()
         mock_send.return_value = _SUCCESS_XML
 
@@ -253,7 +268,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         still deliver the pre-transmission PDF to the customer —
         leaving them without an invoice while ops reconciles is a
         worse outcome than a slightly non-compliant PDF they can keep."""
-        _enable_mydata()
+        _enable_mydata(self)
         order, invoice = _make_invoice()
         mock_send.return_value = _VALIDATION_ERROR_XML
 
@@ -274,7 +289,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         """Transport errors retry automatically via Celery. Once
         retries are exhausted, we send the email with the pre-
         transmission PDF so the customer isn't left empty-handed."""
-        _enable_mydata()
+        _enable_mydata(self)
         order, invoice = _make_invoice()
         mock_send.side_effect = MyDataTransportError("upstream 503")
 
@@ -303,7 +318,7 @@ class SendInvoiceToMydataTestCase(TestCase):
         answers 228 every time because the content is identical).
         Now the task treats it as terminal, delivers the email, and
         logs the uid for manual reconciliation."""
-        _enable_mydata()
+        _enable_mydata(self)
         order, invoice = _make_invoice()
         duplicate_xml = b"""<?xml version="1.0" encoding="UTF-8"?>
 <ResponseDoc>
@@ -333,7 +348,7 @@ class SendInvoiceToMydataTestCase(TestCase):
     def test_missing_invoice_returns_false(self):
         """An order without an Invoice row (e.g. document_type ≠
         INVOICE) must short-circuit to the email chain, not crash."""
-        _enable_mydata()
+        _enable_mydata(self)
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PENDING,
@@ -367,7 +382,7 @@ class CancelMydataInvoiceTestCase(TestCase):
     def test_persists_cancellation_mark_on_success(
         self, _mock_email, mock_cancel, mock_send, _mock_render
     ):
-        _enable_mydata()
+        _enable_mydata(self)
         order, invoice = _make_invoice()
         mock_send.return_value = _SUCCESS_XML
         send_invoice_to_mydata(order.id)
@@ -381,7 +396,7 @@ class CancelMydataInvoiceTestCase(TestCase):
         self.assertEqual(invoice.mydata_cancellation_mark, 900000000000001)
 
     def test_no_mark_skips_without_error(self):
-        _enable_mydata()
+        _enable_mydata(self)
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PENDING,
@@ -416,7 +431,7 @@ class MydataEmailWithMarkTestCase(TestCase):
 
     @patch("order.mydata.client.MyDataClient.send_invoices")
     def test_email_attachment_has_mark_embedded(self, mock_send):
-        _enable_mydata()
+        _enable_mydata(self)
         mock_send.return_value = _SUCCESS_XML
 
         # Real render path (no ``_render_pdf_bytes`` patch) so the

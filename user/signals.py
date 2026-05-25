@@ -5,6 +5,7 @@ import logging
 from allauth.account.signals import (
     email_changed,
     password_changed,
+    password_reset,
     user_signed_up,
 )
 from django.dispatch import receiver
@@ -71,6 +72,24 @@ def revoke_knox_tokens_on_password_change(request, user, **kwargs):
     revoked = _revoke_knox_tokens(user)
     logger.info(
         "Revoked Knox tokens after password change",
+        extra={"user_id": user.pk, "revoked_count": revoked},
+    )
+    _broadcast_force_logout(user)
+
+
+@receiver(
+    password_reset, dispatch_uid="user.revoke_knox_tokens_on_password_reset"
+)
+def revoke_knox_tokens_on_password_reset(request, user, **kwargs):
+    """
+    Revoke all Knox access tokens after a forgot-password reset.
+    password_changed covers in-session changes; this covers the
+    email-link/code reset path where the user is not logged in and
+    ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE does not apply.
+    """
+    revoked = _revoke_knox_tokens(user)
+    logger.info(
+        "Revoked Knox tokens after password reset",
         extra={"user_id": user.pk, "revoked_count": revoked},
     )
     _broadcast_force_logout(user)

@@ -69,13 +69,37 @@ class AcsShipmentState(models.TextChoices):
         except (TypeError, ValueError):
             status = None
 
+        # ``shipment_status=5`` is ambiguous: per ACS PDF it can mean
+        # either "delivered" (paired with ``delivery_flag=1``, handled
+        # above) OR "delivery attempted but failed" (paired with a
+        # populated ``non_delivery_reason_code``). It also empirically
+        # appears on in-transit parcels with ``delivery_flag=0`` and
+        # an EMPTY ``non_delivery_reason_code`` — verified 2026-05-18
+        # against live tracking summaries for vouchers 9771670285,
+        # 9771670576, 9771662342 that had just departed the origin
+        # warehouse with ``delivery_info`` "Η αποστολή βρίσκεται στην
+        # διαδρομή προς το κατάστημα παράδοσης". Mapping those to
+        # ATTEMPTED produced false "Delivery attempted" badges on
+        # every active shipment in admin (reported by site owner).
+        #
+        # Treat status=5 + delivery_flag=0 as ATTEMPTED only when the
+        # ACS-side non-delivery reason is populated. Otherwise fall
+        # through to ``current`` so a subsequent poll lifts the state
+        # when ACS surfaces clearer signal (delivery_flag=1, an
+        # explicit non_delivery_reason_code, or shipment_status=4).
+        if status == 5:
+            non_delivery_reason = str(
+                payload.get("non_delivery_reason_code") or ""
+            ).strip()
+            if non_delivery_reason:
+                return cls.ATTEMPTED
+            return current
+
         mapping: dict[int, AcsShipmentState] = {
             1: cls.NEW,
             2: cls.IN_TRANSIT,
             3: cls.AT_DESTINATION,
             4: cls.OUT_FOR_DELIVERY,
-            5: cls.ATTEMPTED,  # delivery_flag handled above; status=5
-            # alone implies attempted but not delivered
         }
         if status in mapping:
             return mapping[status]

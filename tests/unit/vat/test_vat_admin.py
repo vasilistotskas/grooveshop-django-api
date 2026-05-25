@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
+import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
@@ -8,6 +9,8 @@ from django.utils.html import strip_tags
 
 from vat.admin import VatAdmin, VatRangeFilter, VatUsageFilter
 from vat.models import Vat
+
+pytestmark = pytest.mark.assert_english
 
 User = get_user_model()
 

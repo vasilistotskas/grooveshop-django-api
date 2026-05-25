@@ -41,6 +41,11 @@ _DEFAULT_NEAREST_LIMIT = 20
 _DEFAULT_MIN_WEIGHT_KG = Decimal("0.5")
 _DEFAULT_MAX_WEIGHT_KG = Decimal("999")
 _DEFAULT_VOUCHER_LANGUAGE = "GR"
+# ACS_Print_Voucher Print_Type values (per the ACS REST API PDF):
+# 1 = thermal/roll printer (single voucher per page); 2 = laser
+# (4 vouchers per A4). Ops uses thermal printers, so 1 is the
+# default — admins can flip via ``ShippingProvider.metadata["print_type"]``.
+_DEFAULT_PRINT_TYPE = 1
 
 
 def _provider_metadata() -> dict[str, Any]:
@@ -159,6 +164,25 @@ def default_voucher_language() -> str:
     return str(
         metadata.get("default_voucher_language") or _DEFAULT_VOUCHER_LANGUAGE
     )
+
+
+def print_type() -> int:
+    """ACS_Print_Voucher ``Print_Type`` value — defaults to thermal (1).
+
+    ACS only accepts two values: ``1`` for thermal/roll printers
+    (single voucher per page) and ``2`` for laser (4 vouchers per
+    A4). Any other value is clamped to the default so a bad admin
+    entry can't dead-letter the label download flow.
+    """
+    metadata = _provider_metadata()
+    raw = metadata.get("print_type", _DEFAULT_PRINT_TYPE)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return _DEFAULT_PRINT_TYPE
+    if value not in (1, 2):
+        return _DEFAULT_PRINT_TYPE
+    return value
 
 
 def station_origin() -> str | None:

@@ -9,7 +9,7 @@ from core.caches import cache_instance
 class Command(BaseCommand):
     help = (
         "Purge cached keys. By default targets registered cache surfaces"
-        " (recommended). Pass --prefixes for legacy raw-prefix clearing."
+        " (recommended). Pass --prefixes for raw-prefix disaster recovery."
     )
 
     def add_arguments(self, parser):
@@ -43,15 +43,17 @@ class Command(BaseCommand):
             type=str,
             default=None,
             help=(
-                "Legacy mode: raw key-prefix UNLINK against Django Redis"
-                " (does NOT touch Nuxt cache). Use only for disaster"
-                " recovery."
+                "Disaster-recovery escape hatch: raw key-prefix UNLINK"
+                " against Django Redis (does NOT touch Nuxt SSR cache,"
+                " bypasses the cache-surface registry). Use when the"
+                " registry coverage is suspect or you need to nuke keys"
+                " written by something outside the surface system."
             ),
         )
 
     def handle(self, *args, **options):
         if options["prefixes"]:
-            self._legacy_prefix_clear(options["prefixes"])
+            self._raw_prefix_clear(options["prefixes"])
             return
 
         if options["all"]:
@@ -98,11 +100,13 @@ class Command(BaseCommand):
         )
         self.stdout.write("       clear_cache --all [--dry-run]")
 
-    def _legacy_prefix_clear(self, prefixes: list[str]) -> None:
+    def _raw_prefix_clear(self, prefixes: list[str]) -> None:
         self.stdout.write(
             self.style.WARNING(
-                "Legacy mode: clearing by raw prefix. This does NOT"
-                " purge Nuxt SSR cache and may match unintended keys."
+                "Raw prefix mode (disaster recovery): bypassing the"
+                " cache-surface registry. This does NOT purge Nuxt SSR"
+                " cache and may match unintended keys — prefer surface"
+                " codes unless you know what you're doing."
             )
         )
         try:

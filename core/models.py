@@ -40,7 +40,7 @@ class SortableModel(models.Model):
     Provides thread-safe ordering with database-level locking to prevent race conditions.
     """
 
-    sort_order = models.IntegerField(_("Sort Order"), editable=False, null=True)
+    sort_order = models.IntegerField(_("Sort Order"), null=True)
 
     class Meta(TypedModelMeta):
         abstract = True

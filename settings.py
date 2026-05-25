@@ -243,8 +243,8 @@ TEMPLATES = [
 
 LOGIN_URL = "/admin/"
 AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
+    "django.contrib.auth.backends.ModelBackend",
 ]
 
 WSGI_APPLICATION = "wsgi.application"
@@ -365,10 +365,7 @@ LOCALE_PATHS = [path.join(BASE_DIR, "locale/")]
 
 ENABLE_DEBUG_TOOLBAR = getenv("ENABLE_DEBUG_TOOLBAR", "False") == "True"
 
-ADMINS = [
-    ("Admin", getenv("ADMIN_EMAIL", "")),
-    ("Info", getenv("INFO_EMAIL", "")),
-]
+ADMINS = [email for email in [getenv("ADMIN_EMAIL", "")] if email]
 
 if DEBUG:
     MIDDLEWARE += [
@@ -385,8 +382,18 @@ if ENABLE_DEBUG_TOOLBAR:
         "debug_toolbar.panels.timer.TimerPanel",
         "debug_toolbar.panels.settings.SettingsPanel",
         "debug_toolbar.panels.headers.HeadersPanel",
+        # Request panel surfaces the resolved view + GET/POST/cookies.
+        "debug_toolbar.panels.request.RequestPanel",
+        # SQL panel is the load-bearing diagnostic for N+1 hunting.
+        # Without it the toolbar can show wall-clock time but not
+        # WHERE that time goes — which is the only useful question.
+        "debug_toolbar.panels.sql.SQLPanel",
         "debug_toolbar.panels.staticfiles.StaticFilesPanel",
         "debug_toolbar.panels.templates.TemplatesPanel",
+        # Cache panel reveals get/set/hit/miss on Redis — critical for
+        # validating that the admin dashboard cache (5 min TTL on
+        # ``admin:dashboard:data:v3``) is actually warm under load.
+        "debug_toolbar.panels.cache.CachePanel",
         "debug_toolbar.panels.signals.SignalsPanel",
         "debug_toolbar.panels.redirects.RedirectsPanel",
         "debug_toolbar.panels.profiling.ProfilingPanel",
@@ -446,6 +453,7 @@ SOCIALACCOUNT_PROVIDERS = {
         "GRAPH_API_URL": "https://graph.facebook.com/v20.0",
         "FIELDS": [
             "id",
+            "email",
             "first_name",
             "last_name",
             "middle_name",
@@ -497,6 +505,7 @@ USERSESSIONS_TRACK_ACTIVITY = True
 # latter hard-requires the header — direct-to-Django paths (health probes,
 # Celery-triggered HTTP calls, tests) would otherwise 403 on every hit.
 
+HEADLESS_CLIENTS = ("app",)
 HEADLESS_TOKEN_STRATEGY = "core.api.tokens.SessionTokenStrategy"
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": f"{NUXT_BASE_URL}/account/verify-email/{{key}}",
@@ -776,6 +785,27 @@ def get_celery_beat_schedule():
             "schedule": SCHEDULE_PRESETS["daily_2am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
+            "options": {"queue": "celery", "expires": 300},
+        },
+        # Poll BoxNow's REST API every 15 min for non-terminal
+        # shipments. Defence-in-depth against a missed webhook
+        # delivery: BoxNow's webhook URL is partner-managed by
+        # BoxNow support (one URL per partner, no self-serve
+        # registration), so a single misconfiguration would freeze
+        # parcel state at our last observed value. The poll
+        # converges state independent of webhook health.
+        # ``expires=300`` keeps a beat-pod restart from re-firing
+        # stale enqueues.
+        "poll-boxnow-tracking": {
+            # Fanout wrapper, not the task directly: beat fires in the
+            # public schema, so calling poll_boxnow_tracking_batch
+            # directly would query the empty public-schema
+            # BoxNowShipment table. The fanout iterates active tenants
+            # and dispatches the batch per-schema. Mirrors
+            # poll-acs-tracking. (Regression: main's b32aea39 added this
+            # beat task without a tenant fanout.)
+            "task": "tenant.tasks.fanout_poll_boxnow_tracking_batch",
+            "schedule": crontab(minute="*/15"),
             "options": {"queue": "celery", "expires": 300},
         },
         # ACS — daily station sync at 03:00 Athens (Phase 2 only fires
@@ -1097,20 +1127,6 @@ EXTRA_SETTINGS_DEFAULTS = [
             "Cart subtotal in EUR above which BoxNow shipping becomes "
             "free. Admin-tunable; mirrors FREE_SHIPPING_THRESHOLD for "
             "the home-delivery flow."
-        ),
-    },
-    {
-        "name": "BOXNOW_ENABLED",
-        "type": "bool",
-        "value": False,
-        "description": (
-            "Master switch for the BoxNow locker shipping option in "
-            "checkout. Defaults to False so a fresh production deploy "
-            "doesn't expose the option to customers until BoxNow has "
-            "explicitly approved the partner account for live traffic "
-            "(stage credentials return 403 against api-production.boxnow.gr "
-            "until they activate). Flip to True in Django admin once "
-            "BoxNow confirms."
         ),
     },
     {
@@ -1512,8 +1528,15 @@ if EMAIL_HOST_PASSWORD == "changeme" and SYSTEM_ENV == "production":
     )
 EMAIL_USE_TLS = getenv("EMAIL_USE_TLS", "True") == "True"
 DEFAULT_FROM_EMAIL = getenv("DEFAULT_FROM_EMAIL", "localhost@gmail.com")
-ADMIN_EMAIL = getenv("ADMIN_EMAIL", "localhost@gmail.com")
 INFO_EMAIL = getenv("INFO_EMAIL", "localhost@gmail.com")
+# Used by mail_admins() as the From: header for operational alerts
+# (system health, low stock, new-order notifications). Aliased to
+# DEFAULT_FROM_EMAIL so all outbound mail uses one verified sender.
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
+# Site administrator email is sourced via the ADMINS setting + mail_admins()
+# — there is no separate ADMIN_EMAIL Django setting. The ADMIN_EMAIL env
+# var is read once at module import time into ADMINS (see top of file).
 
 REST_KNOX = {
     "TOKEN_TTL": datetime.timedelta(days=7),
@@ -1971,6 +1994,47 @@ UNFOLD = {
                     },
                 ],
             },
+            # ── Blog (content management) ─────────────────────────────
+            {
+                "title": _("Blog"),
+                "separator": True,
+                "collapsible": True,
+                "items": [
+                    {
+                        "title": _("Blog Posts"),
+                        "icon": "article",
+                        "link": reverse_lazy("admin:blog_blogpost_changelist"),
+                        "badge": "admin.badges.draft_blog_posts_badge",
+                    },
+                    {
+                        "title": _("Blog Categories"),
+                        "icon": "folder_open",
+                        "link": reverse_lazy(
+                            "admin:blog_blogcategory_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Blog Authors"),
+                        "icon": "edit_note",
+                        "link": reverse_lazy(
+                            "admin:blog_blogauthor_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Blog Comments"),
+                        "icon": "chat_bubble",
+                        "link": reverse_lazy(
+                            "admin:blog_blogcomment_changelist"
+                        ),
+                        "badge": "admin.badges.pending_comments_badge",
+                    },
+                    {
+                        "title": _("Blog Tags"),
+                        "icon": "tag",
+                        "link": reverse_lazy("admin:blog_blogtag_changelist"),
+                    },
+                ],
+            },
             # ── Sales (day-to-day order operations) ───────────────────
             {
                 "title": _("Sales"),
@@ -2004,68 +2068,20 @@ UNFOLD = {
                         "icon": "percent",
                         "link": reverse_lazy("admin:vat_vat_changelist"),
                     },
-                    # Content nests under Sales as a subtree — blog,
-                    # notifications, and contact messages all feed the
-                    # storefront sales funnel, so grouping them with
-                    # the order/payment items keeps related work in
-                    # one place.
                     {
-                        "title": _("Content"),
-                        "icon": "edit_square",
-                        "items": [
-                            {
-                                "title": _("Blog Posts"),
-                                "icon": "article",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogpost_changelist"
-                                ),
-                                "badge": "admin.badges.draft_blog_posts_badge",
-                            },
-                            {
-                                "title": _("Blog Categories"),
-                                "icon": "folder_open",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogcategory_changelist"
-                                ),
-                            },
-                            {
-                                "title": _("Blog Authors"),
-                                "icon": "edit_note",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogauthor_changelist"
-                                ),
-                            },
-                            {
-                                "title": _("Blog Comments"),
-                                "icon": "chat_bubble",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogcomment_changelist"
-                                ),
-                                "badge": "admin.badges.pending_comments_badge",
-                            },
-                            {
-                                "title": _("Blog Tags"),
-                                "icon": "tag",
-                                "link": reverse_lazy(
-                                    "admin:blog_blogtag_changelist"
-                                ),
-                            },
-                            {
-                                "title": _("Notifications"),
-                                "icon": "notifications_active",
-                                "link": reverse_lazy(
-                                    "admin:notification_notification_changelist"
-                                ),
-                            },
-                            {
-                                "title": _("Contact Messages"),
-                                "icon": "contact_mail",
-                                "link": reverse_lazy(
-                                    "admin:contact_contact_changelist"
-                                ),
-                                "badge": "admin.badges.unread_messages_badge",
-                            },
-                        ],
+                        "title": _("Notifications"),
+                        "icon": "notifications_active",
+                        "link": reverse_lazy(
+                            "admin:notification_notification_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Contact Messages"),
+                        "icon": "contact_mail",
+                        "link": reverse_lazy(
+                            "admin:contact_contact_changelist"
+                        ),
+                        "badge": "admin.badges.unread_messages_badge",
                     },
                 ],
             },
@@ -2075,6 +2091,13 @@ UNFOLD = {
                 "separator": True,
                 "collapsible": True,
                 "items": [
+                    {
+                        "title": _("Shipping Providers"),
+                        "icon": "local_shipping",
+                        "link": reverse_lazy(
+                            "admin:shipping_shippingprovider_changelist"
+                        ),
+                    },
                     {
                         "title": _("BoxNow Shipments"),
                         "icon": "package_2",
@@ -2156,6 +2179,70 @@ UNFOLD = {
                     },
                 ],
             },
+            # ── Localization & Reference Data (staff-accessible) ────
+            # Reference data shop admins routinely need: reordering the
+            # Regions shown at checkout, toggling Countries, newsletter
+            # Subscription Topics. Previously these lived only inside the
+            # superuser-only System zone, so a non-superuser admin could
+            # not reach them at all — surfaced here as a top-level,
+            # staff-accessible group.
+            {
+                "title": _("Localization"),
+                "separator": True,
+                "collapsible": True,
+                "permission": "admin.permissions.is_staff",
+                "items": [
+                    {
+                        "title": _("Countries"),
+                        "icon": "public",
+                        "link": reverse_lazy(
+                            "admin:country_country_changelist"
+                        ),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                    {
+                        "title": _("Regions"),
+                        "icon": "map",
+                        "link": reverse_lazy("admin:region_region_changelist"),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                    {
+                        "title": _("Sites"),
+                        "icon": "language",
+                        "link": reverse_lazy("admin:sites_site_changelist"),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                    {
+                        "title": _("Subscription Topics"),
+                        "icon": "topic",
+                        "link": reverse_lazy(
+                            "admin:user_subscriptiontopic_changelist"
+                        ),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                ],
+            },
+            # ── Settings (content-side toggles, staff-accessible) ────
+            # Extra Settings exposes runtime-tunable flags (cookie
+            # banner, feature toggles, public copy) that the storefront
+            # reads via /api/v1/settings/get. Any admin needs to flip
+            # these — keep it out of the superuser-only System zone.
+            {
+                "title": _("Settings"),
+                "separator": True,
+                "collapsible": True,
+                "permission": "admin.permissions.is_staff",
+                "items": [
+                    {
+                        "title": _("Extra Settings"),
+                        "icon": "settings",
+                        "link": reverse_lazy(
+                            "admin:extra_settings_setting_changelist"
+                        ),
+                        "permission": "admin.permissions.is_staff",
+                    },
+                ],
+            },
             # ──────────────────────────────────────────────────────────
             # SYSTEM ZONE — superuser-only. One parent group with four
             # nested subtrees (Configuration / Audit & Logs /
@@ -2178,46 +2265,6 @@ UNFOLD = {
                         "permission": "admin.permissions.is_superuser",
                         "items": [
                             {
-                                "title": _("Countries"),
-                                "icon": "public",
-                                "link": reverse_lazy(
-                                    "admin:country_country_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Regions"),
-                                "icon": "map",
-                                "link": reverse_lazy(
-                                    "admin:region_region_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Sites"),
-                                "icon": "language",
-                                "link": reverse_lazy(
-                                    "admin:sites_site_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Extra Settings"),
-                                "icon": "settings",
-                                "link": reverse_lazy(
-                                    "admin:extra_settings_setting_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
-                                "title": _("Subscription Topics"),
-                                "icon": "topic",
-                                "link": reverse_lazy(
-                                    "admin:user_subscriptiontopic_changelist"
-                                ),
-                                "permission": "admin.permissions.is_superuser",
-                            },
-                            {
                                 "title": _("Shipping Providers"),
                                 "icon": "local_shipping",
                                 "link": reverse_lazy(
@@ -2230,6 +2277,53 @@ UNFOLD = {
                                 "icon": "shield_person",
                                 "link": reverse_lazy(
                                     "admin:auth_group_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                        ],
+                    },
+                    {
+                        "title": _("Security & Access"),
+                        "icon": "security",
+                        "permission": "admin.permissions.is_superuser",
+                        "items": [
+                            {
+                                "title": _("User Sessions"),
+                                "icon": "devices",
+                                "link": reverse_lazy(
+                                    "admin:usersessions_usersession_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("MFA Authenticators"),
+                                "icon": "verified_user",
+                                "link": reverse_lazy(
+                                    "admin:mfa_authenticator_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Social Accounts"),
+                                "icon": "hub",
+                                "link": reverse_lazy(
+                                    "admin:socialaccount_socialaccount_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Email Addresses"),
+                                "icon": "alternate_email",
+                                "link": reverse_lazy(
+                                    "admin:account_emailaddress_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("API Tokens"),
+                                "icon": "key",
+                                "link": reverse_lazy(
+                                    "admin:knox_authtoken_changelist"
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -2387,6 +2481,22 @@ UNFOLD = {
                                 "icon": "wb_sunny",
                                 "link": reverse_lazy(
                                     "admin:django_celery_beat_solarschedule_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Task Results"),
+                                "icon": "checklist",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_results_taskresult_changelist"
+                                ),
+                                "permission": "admin.permissions.is_superuser",
+                            },
+                            {
+                                "title": _("Group Results"),
+                                "icon": "ballot",
+                                "link": reverse_lazy(
+                                    "admin:django_celery_results_groupresult_changelist"
                                 ),
                                 "permission": "admin.permissions.is_superuser",
                             },
@@ -2746,8 +2856,13 @@ if USE_AWS:
     }
     COMPRESS_STORAGE = "core.storages.StaticStorage"
     COMPRESS_OFFLINE_MANIFEST_STORAGE = "core.storages.StaticStorage"
-    TINYMCE_JS_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js"
-    TINYMCE_JS_ROOT = f"https://{AWS_S3_CUSTOM_DOMAIN}/tinymce/"
+    # No ``TINYMCE_JS_URL`` override here. The previous value pointed
+    # at ``{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js`` — missing
+    # the ``/static/`` prefix that ``StaticStorage(location="static")``
+    # writes the asset under — so the script 404'd in production. The
+    # django-tinymce default (``staticfiles_storage.url(...)``) returns
+    # the correctly prefixed URL through the active static storage.
+    # ``TINYMCE_JS_ROOT`` was never read by django-tinymce.
 elif not DEBUG:
     STATIC_URL = f"{STATIC_BASE_URL}/static/"
     STATIC_ROOT = path.join(BASE_DIR, "web", "staticfiles")
@@ -2764,7 +2879,19 @@ elif not DEBUG:
 else:
     STATIC_URL = "/static/"
     STATIC_ROOT = path.join(BASE_DIR, "staticfiles")
-    MEDIA_URL = "/media/"
+    # ``MEDIA_URL`` must be ABSOLUTE in every environment, even local
+    # dev, because every ``ImageField``/``FileField`` rendered by
+    # DRF surfaces ``storage.url(name)`` to the frontend — drf-
+    # spectacular emits it with ``format: 'uri'`` and the Nuxt-side
+    # Zod 4 schema validates it with ``z.url()`` which rejects
+    # relative paths. Returning ``/media/...`` blew up every endpoint
+    # that exposes an uploaded image (PayWay icons, product images,
+    # shipping provider logos, ...) in dev with a Zod ZodError.
+    # ``STATIC_BASE_URL`` already defaults to ``http://localhost:8000``
+    # so the dev experience is unchanged for the default Django port;
+    # devs running Django on a different port override it via env var
+    # the same way ``elif not DEBUG`` does.
+    MEDIA_URL = f"{STATIC_BASE_URL}/media/"
     MEDIA_ROOT = path.join(BASE_DIR, "mediafiles")
     STORAGES = {
         "default": {

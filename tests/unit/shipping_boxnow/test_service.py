@@ -157,6 +157,90 @@ class TestCreateShipmentForOrder:
 
         assert exc_info.value.code == "P402"
 
+    def test_customer_notes_flow_to_boxnow_description(self):
+        """``Order.customer_notes`` must land on
+        ``deliveryRequest.description`` so the partner portal /
+        downstream BoxNow tooling sees the customer's note.
+
+        Site owner reported on 2026-05-16 that checkout
+        παρατηρήσεις/σημειώσεις never made it to the courier; this
+        locks the wiring."""
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            customer_notes="Αφήστε το στη θυρωρό  παρακαλώ.\nΕυχαριστώ!",
+        )
+        BoxNowShipmentFactory(
+            order=order,
+            locker_external_id="4",
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        mock_cls = _mock_client_create_ok()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_cls):
+            BoxNowService.create_shipment_for_order(order)
+
+        sent = mock_cls.return_value.create_delivery_request.call_args[0][0]
+        assert (
+            sent["description"] == "Αφήστε το στη θυρωρό παρακαλώ. Ευχαριστώ!"
+        )
+
+    def test_empty_customer_notes_sends_empty_description(self):
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            customer_notes="",
+        )
+        BoxNowShipmentFactory(
+            order=order,
+            locker_external_id="4",
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        mock_cls = _mock_client_create_ok()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_cls):
+            BoxNowService.create_shipment_for_order(order)
+
+        sent = mock_cls.return_value.create_delivery_request.call_args[0][0]
+        assert sent["description"] == ""
+
+    def test_create_request_envelope_persisted_on_success(self):
+        """``metadata['create_request']`` mirrors the operational subset
+        of the BoxNow deliveryRequest so future "did we send X?"
+        audits don't need to re-run the builder. Also locks the PII
+        exclusion — destination contact fields MUST NOT leak."""
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            customer_notes="Αφήστε στον θυρωρό.",
+        )
+        BoxNowShipmentFactory(
+            order=order,
+            locker_external_id="4",
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        mock_cls = _mock_client_create_ok()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_cls):
+            result = BoxNowService.create_shipment_for_order(order)
+        # Verify against the DB row, not the in-memory mutation, so a
+        # JSONField round-trip regression would be caught.
+        result.refresh_from_db()
+
+        envelope = result.metadata["create_request"]
+        assert envelope["description"] == "Αφήστε στον θυρωρό."
+        # Operational routing fields are present.
+        assert envelope["paymentMode"]
+        assert envelope["items"]
+        # ``destination`` is nested — same camelCase shape as the
+        # outgoing BoxNow payload, but stripped of contact PII.
+        assert envelope["destination"] == {"locationId": "4"}
+        # PII MUST NOT leak — the inner destination dict in the
+        # actual payload carries contactName / contactNumber /
+        # contactEmail. The envelope must mirror ONLY the locationId.
+        assert set(envelope["destination"].keys()) == {"locationId"}
+        assert "origin" not in envelope
+
 
 # ---------------------------------------------------------------------------
 # apply_webhook_event
@@ -299,6 +383,32 @@ class TestApplyWebhookEvent:
         order.refresh_from_db()
         assert order.status == OrderStatus.DELIVERED
 
+    def test_delivered_walks_through_shipped_when_processing(self):
+        """BoxNow can drop the intermediate final_destination webhook
+        when the customer picks up immediately, jumping straight from
+        a PROCESSING order to delivered. The state machine requires
+        SHIPPED first — walk the missing step. Mirrors the ACS gap
+        fix; same regression class as prod order 73."""
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = BoxNowShipmentFactory(
+            order=order,
+            with_parcel=True,
+            parcel_state=BoxNowParcelState.IN_DEPOT,
+        )
+
+        envelope = _build_envelope(
+            parcel_id=shipment.parcel_id,
+            event="delivered",
+        )
+        BoxNowService.apply_webhook_event(envelope)
+
+        order.refresh_from_db()
+        # Paid → DELIVERED auto-advances to COMPLETED.
+        assert order.status == OrderStatus.COMPLETED
+
 
 # ---------------------------------------------------------------------------
 # cancel_shipment
@@ -341,6 +451,58 @@ class TestCancelShipment:
 
         assert exc_info.value.code == "P420"
         mock_client.return_value.cancel_parcel.assert_not_called()
+
+    def test_cancel_pending_creation_marks_local_without_api_call(self):
+        """The canonical case revealed by prod order 76 (2026-05-21):
+        an unpaid online BoxNow order sits at ``parcel_state =
+        PENDING_CREATION`` (no mint ever ran because no payment
+        webhook fired). An admin form-save cancel should short-circuit
+        to a local-only cancel — nothing was ever created at BoxNow,
+        so there is nothing to cancel remotely. Previously the state
+        guard fired first and recorded a confusing
+        ``BoxNow API 409 [P420]`` error on the order metadata."""
+        shipment = BoxNowShipmentFactory(
+            parcel_id=None,
+            delivery_request_id=None,
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        mock_client = MagicMock()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_client):
+            BoxNowService.cancel_shipment(
+                shipment, reason="admin status change"
+            )
+
+        # No API call attempted — nothing at BoxNow to cancel.
+        mock_client.return_value.cancel_parcel.assert_not_called()
+
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
+        assert shipment.cancel_requested_at is not None
+        cancellations = (shipment.metadata or {}).get("cancellations") or []
+        assert len(cancellations) == 1
+        assert cancellations[0]["reason"] == "admin status change"
+        assert "no parcel_id" in cancellations[0]["note"]
+
+    def test_cancel_new_without_parcel_id_marks_local(self):
+        """Defence-in-depth: a (theoretically impossible) NEW state
+        with ``parcel_id=None`` — would happen if Phase 3 of
+        ``create_shipment_for_order`` crashed between the API success
+        and the local persist. We still short-circuit to a local cancel
+        because there is no carrier-side parcel to address."""
+        shipment = BoxNowShipmentFactory(
+            parcel_id=None,
+            delivery_request_id=None,
+            parcel_state=BoxNowParcelState.NEW,
+        )
+
+        mock_client = MagicMock()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_client):
+            BoxNowService.cancel_shipment(shipment, reason="manual cleanup")
+
+        mock_client.return_value.cancel_parcel.assert_not_called()
+        shipment.refresh_from_db()
+        assert shipment.parcel_state == BoxNowParcelState.CANCELED
 
 
 # ---------------------------------------------------------------------------

@@ -87,3 +87,10 @@ def fanout_poll_acs_tracking_batch():
 @celery_app.task(base=TenantTask)
 def fanout_reconcile_acs_cod_payouts():
     return run_for_all_tenants("shipping_acs.tasks.reconcile_acs_cod_payouts")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_poll_boxnow_tracking_batch():
+    return run_for_all_tenants(
+        "shipping_boxnow.tasks.poll_boxnow_tracking_batch"
+    )

@@ -3,6 +3,8 @@ from django.core.exceptions import ValidationError
 
 from order.services import OrderService
 
+pytestmark = pytest.mark.assert_english
+
 
 class TestAddressValidation:
     @pytest.mark.parametrize(

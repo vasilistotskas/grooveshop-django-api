@@ -13,7 +13,12 @@ from shipping_acs.factories import (
     AcsShipmentFactory,
 )
 from shipping_acs.models import AcsShipment, AcsTrackingEvent
-from shipping_acs.services import AcsService, _kg_from_grams
+from shipping_acs.services import (
+    AcsService,
+    _kg_from_grams,
+    _normalize_phone_for_acs,
+    _normalize_zipcode_for_acs,
+)
 
 pytestmark = pytest.mark.django_db
 
@@ -413,6 +418,38 @@ class TestPollShipmentDeliveryTransitions:
         assert order.status == OrderStatus.DELIVERED
         assert order.payment_status == PaymentStatus.PENDING
 
+    def test_delivered_walks_through_shipped_when_processing(
+        self, acs_client_mock_delivered
+    ):
+        """ACS can skip an IN_TRANSIT/OUT_FOR_DELIVERY observation
+        when a fast COD parcel goes pickup_list → delivered between
+        two of our 15-min polls. The order is still at PROCESSING in
+        that case (the pickup_list path only advances PENDING →
+        PROCESSING). State-machine requires SHIPPED first, so we walk
+        the missing step before landing DELIVERED.
+        Regression guard for prod order 73 (2026-05-23): shipment_state
+        flipped to delivered but order stayed PROCESSING two days.
+        """
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9999998892",
+            shipment_state=AcsShipmentState.IN_TRANSIT,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        order.refresh_from_db()
+        shipment.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.DELIVERED
+        # Paid → DELIVERED auto-advances to COMPLETED.
+        assert order.status == OrderStatus.COMPLETED
+
     def test_terminal_order_status_never_regresses(
         self, acs_client_mock_delivered
     ):
@@ -481,3 +518,302 @@ class TestIssueDailyPickupList:
             voucher_no__in=["7227891111", "7227891222"]
         ):
             assert shipment.pickup_list_id == result.id
+
+
+# ---------------------------------------------------------------------------
+# Field normalizers — locked after order 57 (2026-05-15) was rejected by ACS
+# with "Error fill data error" because the customer's zipcode "848 00"
+# (Greek convention) and PhoneNumberField's E.164 "+306989424342" were
+# passed verbatim. ACS sample payload uses digits-only zipcode + bare
+# 10-digit local phone.
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeZipcodeForAcs:
+    def test_strips_internal_whitespace(self):
+        assert _normalize_zipcode_for_acs("848 00") == "84800"
+
+    def test_strips_punctuation_and_keeps_first_five(self):
+        assert _normalize_zipcode_for_acs("12345-6") == "12345"
+
+    def test_blank_returns_empty(self):
+        assert _normalize_zipcode_for_acs("") == ""
+        assert _normalize_zipcode_for_acs(None) == ""
+
+    def test_truncates_to_five_digits(self):
+        assert _normalize_zipcode_for_acs("123456789") == "12345"
+
+    def test_handles_integer_input(self):
+        assert _normalize_zipcode_for_acs(17778) == "17778"
+
+
+class TestNormalizePhoneForAcs:
+    def test_strips_e164_country_code(self):
+        assert _normalize_phone_for_acs("+306989424342") == "6989424342"
+
+    def test_strips_double_zero_country_code(self):
+        assert _normalize_phone_for_acs("00306989424342") == "6989424342"
+
+    def test_local_format_unchanged(self):
+        assert _normalize_phone_for_acs("6989424342") == "6989424342"
+
+    def test_blank_returns_empty(self):
+        assert _normalize_phone_for_acs("") == ""
+        assert _normalize_phone_for_acs(None) == ""
+
+    def test_phonenumber_object_uses_national_number(self):
+        # PhoneNumberField returns a phonenumbers.PhoneNumber whose
+        # ``national_number`` is the canonical local-format integer.
+        # We can't easily import phonenumbers here without adding a
+        # dependency to the test setup, so simulate with a stub object.
+        class _PhoneStub:
+            national_number = 6989424342
+
+        assert _normalize_phone_for_acs(_PhoneStub()) == "6989424342"
+
+    def test_ambiguous_length_left_untouched(self):
+        # 30 prefix + 9 digits doesn't match the 10-digit local rule —
+        # leave it so ACS rejects loudly instead of silently truncating.
+        assert _normalize_phone_for_acs("30123456789") == "30123456789"
+
+
+# ---------------------------------------------------------------------------
+# last_error persistence
+# ---------------------------------------------------------------------------
+
+
+class TestLastErrorPersisted:
+    """``_record_last_error`` must capture the failing payload so admins
+    can diagnose ACS rejections without re-running the request builder."""
+
+    def test_writes_request_and_error_to_metadata_when_voucher_no_empty(
+        self, monkeypatch
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+        from shipping_acs import services
+
+        class _BadClient:
+            billing_code = "X"
+
+            def create_voucher(self, params):
+                return {
+                    "Voucher_No": "",
+                    "Error_Message": "ACS:Error fill data error",
+                }
+
+        monkeypatch.setattr(services, "AcsClient", _BadClient)
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        shipment = AcsShipmentFactory(order=order)
+
+        with pytest.raises(AcsAPIError):
+            AcsService.create_voucher_for_order(order)
+
+        shipment.refresh_from_db()
+        last_error = shipment.metadata.get("last_error")
+        assert last_error is not None
+        assert "Error fill data error" in last_error["error"]
+        assert "Recipient_Zipcode" in last_error["request_params"]
+        assert last_error["occurred_at"]
+        # mint_started_at must be released so the next retry isn't
+        # stuck waiting for the 300s TTL.
+        assert "mint_started_at" not in shipment.metadata
+
+    def test_writes_request_and_error_to_metadata_when_client_raises(
+        self, monkeypatch
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+        from shipping_acs import services
+
+        class _ExplodingClient:
+            billing_code = "X"
+
+            def create_voucher(self, params):
+                raise ConnectionError("ACS host unreachable")
+
+        monkeypatch.setattr(services, "AcsClient", _ExplodingClient)
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        shipment = AcsShipmentFactory(order=order)
+
+        with pytest.raises(ConnectionError):
+            AcsService.create_voucher_for_order(order)
+
+        shipment.refresh_from_db()
+        last_error = shipment.metadata.get("last_error")
+        assert last_error is not None
+        assert "ACS host unreachable" in last_error["error"]
+        assert last_error["request_params"]["Billing_Code"] == "X"
+        assert "mint_started_at" not in shipment.metadata
+
+
+# ---------------------------------------------------------------------------
+# Payload builder — zipcode/phone flow from order → ACS
+# ---------------------------------------------------------------------------
+
+
+class TestBuildCreateVoucherParamsNormalizes:
+    """End-to-end check that the normalizers are wired into the
+    outbound ACS payload — guards against a future edit dropping
+    them silently."""
+
+    def test_normalizes_zipcode_and_phone_in_outgoing_payload(
+        self, acs_client_mock
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            zipcode="848 00",
+            phone="+306989424342",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        sent = acs_client_mock.last_create_payload
+        assert sent["Recipient_Zipcode"] == "84800"
+        assert sent["Recipient_Phone"] == "6989424342"
+        assert sent["Recipient_Cell_Phone"] == "6989424342"
+
+
+# ---------------------------------------------------------------------------
+# Delivery_Notes — site owner reported on 2026-05-16 that the checkout
+# "παρατηρήσεις/σημειώσεις" field was not appearing on the courier
+# voucher. The helper lives in shipping.services so BoxNow can reuse
+# it; these tests lock both the normalisation and the wiring into
+# the ACS payload.
+# ---------------------------------------------------------------------------
+
+
+class TestSanitizeDeliveryNotes:
+    def test_collapses_whitespace_runs(self):
+        from shipping.services import sanitize_delivery_notes
+
+        assert (
+            sanitize_delivery_notes("Ring   twice.\n\n  Leave\twith porter.")
+            == "Ring twice. Leave with porter."
+        )
+
+    def test_blank_returns_empty(self):
+        from shipping.services import sanitize_delivery_notes
+
+        assert sanitize_delivery_notes("") == ""
+        assert sanitize_delivery_notes(None) == ""
+
+    def test_truncates_to_500_chars(self):
+        from shipping.services import (
+            DELIVERY_NOTES_MAX_LEN,
+            sanitize_delivery_notes,
+        )
+
+        long_note = "α" * 800
+        assert len(sanitize_delivery_notes(long_note)) == DELIVERY_NOTES_MAX_LEN
+
+
+class TestDeliveryNotesInPayload:
+    def test_customer_notes_lands_in_Delivery_Notes(self, acs_client_mock):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            customer_notes="Χτυπήστε το κουδούνι 2  φορές.\nΘυρωρός.",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+
+        sent = acs_client_mock.last_create_payload
+        assert (
+            sent["Delivery_Notes"] == "Χτυπήστε το κουδούνι 2 φορές. Θυρωρός."
+        )
+
+    def test_empty_customer_notes_sends_empty_string(self, acs_client_mock):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            customer_notes="",
+        )
+        AcsShipmentFactory(order=order)
+
+        AcsService.create_voucher_for_order(order)
+        assert acs_client_mock.last_create_payload["Delivery_Notes"] == ""
+
+    def test_create_request_envelope_persisted_on_success(
+        self, acs_client_mock
+    ):
+        """``metadata['create_request']`` mirrors the operational subset
+        of the ACS payload so future "did we send X?" audits don't
+        need to re-run the builder. Also locks the PII exclusion —
+        recipient name/address/phone/email MUST NOT be on the row."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            customer_notes="Χτυπήστε το κουδούνι 2 φορές.",
+        )
+        AcsShipmentFactory(order=order)
+
+        result = AcsService.create_voucher_for_order(order)
+        # Verify against the DB row, not the in-memory mutation, so a
+        # JSONField round-trip regression would be caught.
+        result.refresh_from_db()
+
+        envelope = result.metadata["create_request"]
+        assert envelope["Delivery_Notes"] == "Χτυπήστε το κουδούνι 2 φορές."
+        # Operational routing fields are present (these drove the
+        # owner's "wrong COD / wrong locker / wrong country" class
+        # of audit too).
+        assert "Charge_Type" in envelope
+        assert "Weight" in envelope
+        assert "Recipient_Country" in envelope
+        # PII MUST NOT leak into shipment.metadata — gdpr.py only
+        # scrubs Order columns, not shipment JSON.
+        for forbidden in (
+            "Recipient_Name",
+            "Recipient_Address",
+            "Recipient_Address_Number",
+            "Recipient_Region",
+            "Recipient_Phone",
+            "Recipient_Cell_Phone",
+            "Recipient_Email",
+            "Recipient_Zipcode",
+        ):
+            assert forbidden not in envelope, (
+                f"PII leak in create_request envelope: {forbidden}"
+            )
+
+    def test_success_clears_stale_last_error(self, acs_client_mock):
+        """A retry after a prior failed mint must wipe ``last_error`` so
+        ops looking at the row don't mistake a stale error for the
+        current state. Mirrors the BoxNow success path."""
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = AcsShipmentFactory(order=order)
+        # Seed a stale error from a "prior failed attempt".
+        shipment.metadata = {
+            "last_error": {
+                "occurred_at": "2026-05-17T00:00:00+00:00",
+                "error": "Error fill data error",
+                "request_params": {"Delivery_Notes": "stale"},
+                "response": None,
+            }
+        }
+        shipment.save(update_fields=["metadata"])
+
+        result = AcsService.create_voucher_for_order(order)
+        result.refresh_from_db()
+
+        assert "last_error" not in result.metadata
+        assert "create_request" in result.metadata

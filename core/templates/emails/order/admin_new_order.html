@@ -1,0 +1,66 @@
+{% extends "emails/base/email_base.html" %}
+
+{% block email_title %}New order #{{ order.id }} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>New order placed — #{{ order.id }}</h1>
+
+<p>A new order has just been placed on {{ SITE_NAME }}. Review the details below and follow up if needed.</p>
+
+<div class="email-card">
+    <h2>Order</h2>
+    <p><strong>Order ID:</strong> #{{ order.id }}</p>
+    <p><strong>Placed:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
+    <p><strong>Status:</strong> {{ order.status }}</p>
+    <p><strong>Payment status:</strong> {{ order.payment_status }}</p>
+    {% if pay_way %}<p><strong>Payment method:</strong> {{ pay_way.name }}</p>{% endif %}
+    <p><strong>Total:</strong> {{ order.total_price }}</p>
+</div>
+
+<div class="email-card">
+    <h2>Customer</h2>
+    <p>
+        {{ order.first_name }} {{ order.last_name }}<br>
+        <a href="mailto:{{ order.email }}">{{ order.email }}</a>{% if order.phone %}<br>{{ order.phone }}{% endif %}
+    </p>
+</div>
+
+<div class="email-card">
+    <h2>Shipping address</h2>
+    <p>
+        {{ order.street }} {{ order.street_number }}<br>
+        {{ order.city }}, {{ order.zipcode }}<br>
+        {{ order.country }}
+    </p>
+</div>
+
+<h2>Items</h2>
+<table class="email-table">
+    <thead>
+        <tr>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Price</th>
+            <th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.product.name }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.price }}</td>
+            <td>{{ item.total_price }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div class="text-right mt-3">
+    <p><strong>Subtotal:</strong> {{ order.total_price_items }}</p>
+    <p><strong>Shipping:</strong> {{ order.shipping_price }}</p>
+    <p class="text-bold"><strong>Total:</strong> {{ order.total_price }}</p>
+</div>
+
+<p class="mt-3">This email is operational; staff only.</p>
+{% endblock %}

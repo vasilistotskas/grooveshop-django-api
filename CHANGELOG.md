@@ -3,6 +3,2606 @@
 
 
 
+## v1.145.1 (2026-05-25)
+
+### Bug fixes
+
+* fix(admin): make category sorting work by switching MPTT admins to unfold drag
+
+DraggableMPTTAdmin's drag is non-functional under django-unfold: unfold's
+change_list_results.html overrides mptt's template and never emits the
+data-context / draggable-admin-context that mptt's draggable-admin.js
+reads to initialise, so the handles render but do nothing.
+
+The category trees are effectively flat (ProductCategory: all 600 rows at
+level 0; BlogCategory: 297 of 300 at level 0), so the tree view buys
+almost nothing. Drop DraggableMPTTAdmin on BlogCategoryAdmin and
+ProductCategoryAdmin and use unfold's flat ordering_field + hide_ordering_field
+sortable - the same mechanism that already works on Region.
+
+Blog: replace the mptt tree_actions/indented_title columns with a
+category_name link column and a parent_display column (+ list_select_related
+parent) so the few nested categories stay visible. Product: category_info
+already renders name/level/ancestor path, so just drop the mptt columns.
+Remove the now-unused DraggableMPTTAdmin import in product/admin.py;
+blog keeps it for BlogCommentAdmin's threaded display.
+
+Admin-only change: no model, serializer, migration, or schema changes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1bf151b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1bf151bbcbb5be095e28ef54bddf3fa5f9ec1954))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.145.0 [skip ci] ([`125ce51`](https://github.com/vasilistotskas/grooveshop-django-api/commit/125ce514f3cd20275b43202bf5ff6b5e8a173b83))
+
+## v1.145.0 (2026-05-25)
+
+### Bug fixes
+
+* fix(product): validate default-language translation by settings, not hardcoded 'en'
+
+AttributeSerializer/AttributeValueSerializer validated translations with a hardcoded 'if "en" in value' check (message claimed English is the default) while PARLER_DEFAULT_LANGUAGE_CODE is 'el'. The check never enforced its stated contract and didn't scale as locales change.
+
+Add RequiredDefaultTranslationMixin in core/api/serializers.py: requires the settings.PARLER_DEFAULT_LANGUAGE_CODE translation (with required_translation_field non-empty); other locales stay optional, so the rule follows the configured locale set with no code changes. Apply to both serializers (name / value). Adds focused tests (the validation previously had none) and documents the mixin in CLAUDE.md.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`82d6c21`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82d6c21bfc3162bec8b83401c06c36186b0d613e))
+
+### Chores
+
+* chore(i18n): translate admin panel strings to Greek
+
+Refresh el catalog via makemessages and translate the 265 untranslated
++ fuzzy strings that surface in the Django admin (model verbose names /
+field help_text, admin.py actions, fieldsets, result messages, forms,
+and the cache-purge log). Fuzzy entries had unrelated Greek grabbed by
+msgmerge and were retranslated.
+
+Terminology kept in English per request (BoxNow, ACS, Smartpoint, Locker,
+Stripe, Meta/fbtrace_id, Nuxt, Django, myDATA/MARK, SKU, slug, voucher,
+webhooks, Cache, PayWay); real Greek terms applied where they exist
+(VAT->ΦΠΑ, COD->Αντικαταβολή, Parcel->Δέμα, Shipment->Αποστολή).
+
+API/Swagger help_text (filters/serializers/views) intentionally left
+untranslated — not part of the admin surface.
+
+Drops the bogus #, python-format flag re-added by makemessages on 6
+literal-% msgids (see v1.137.2) so compilemessages passes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3a2ee8e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a2ee8ede14b7b9726f61624b898d621b51d5073))
+
+* chore(deps): sync uv.lock to 1.144.0 [skip ci] ([`74a230f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74a230f7f1ba4b5db115ec2e8700bd1d20b85f3d))
+
+### Features
+
+* feat(admin): enable drag-and-drop sort_order reordering across admins
+
+Make SortableModel.sort_order editable (drop editable=False) so
+django-unfold drag-and-drop works; the ordering field has to be in
+list_editable, which Django forbids for non-editable fields.
+
+Wire ordering_field + hide_ordering_field on every flat sortable admin
+and inline (Country, Region, PayWay, Tag, BlogTag, Attribute,
+AttributeValue, ProductImage, ProductCategoryImage, LoyaltyTier).
+MPTT category admins (BlogCategory, ProductCategory) are intentionally
+left on DraggableMPTTAdmin tree drag - layering unfold flat drag adds a
+second, conflicting handle per row.
+
+Keep sort_order in read_only_fields on every serializer that exposes it
+(they previously relied on editable=False), preserving the OpenAPI
+contract - zero schema drift. The editable flip produces no-op
+AlterField migrations, safe under the Argo PreSync deploy model.
+
+Tests: assert region list_display by membership (unfold appends the
+ordering field), mark the user last_activity "Never" test assert_english,
+and add the missing token-cache delete to the boxnow 401-retry test for
+worker-order independence.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`613f95f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/613f95f273c4dacbfd14eb4398324e887cd38850))
+
+* feat(order): stop collecting place (Περιοχή) on checkout order-create
+
+Removes the optional 'place' field from OrderCreateFromCartSerializer and stops writing it into new orders. place never reached the order from the storefront anyway (the checkout payload only sent regionId), so the invoice address_line_2 was already always blank for storefront orders. region is intentionally left untouched.
+
+Order.place column, the Order/OrderWrite response serializers, admin, and UserAccount.place are all kept. Schema regenerated. region remains fully present everywhere (request + response).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c8c68c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8c68c2618bb2cc9b671889ae185205d0feba73d))
+
+### Refactoring
+
+* refactor: align PayWay/Tag managers with TranslatableOptimizedManager
+
+PayWayManager/TagManager (and their querysets) inherited plain parler TranslatableManager/TranslatableQuerySet and hand-rolled with_translations()/for_list()/for_detail()/get_queryset() that were byte-for-byte identical to the canonical TranslatableOptimizedManager base used by region/product. Switched both to the optimized base, keeping only model-specific filters (active/online_payments/etc.). PayWay also gains the __getattr__ queryset delegation it was missing. TaggedItem (non-translatable) left on plain managers. for_list/for_detail produce identical querysets — verified behavior-preserving by the pay_way + tag suites.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`cfad1da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cfad1daf60e6aa89a31da34dd3fbf041ab6131dd))
+
+* refactor(order): remove dead region/country shipping-cost branches
+
+calculate_shipping_cost had two fallback branches guarded by hasattr(country, 'shipping_multiplier') and hasattr(region, 'shipping_adjustment') — neither field exists on any model, so both branches were permanently dead (speculative code). Removed both, plus their now-unused model fetches and except handlers. The country_id/region_id params are kept: they are still forwarded to the live provider-dispatch path (ShippingService). Behavior is unchanged (the branches never executed); verified by the shipping-cost test suite.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4bbf626`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4bbf626adfd49f81adecd3fc50c90ab37cf9d928))
+
+## v1.144.0 (2026-05-25)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.143.0 [skip ci] ([`9c20dfd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9c20dfd65678a63e68bfae326036a2e4a0e73eb8))
+
+### Features
+
+* feat: Bump Versions ([`5a45744`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a45744f1c3931ffd37444d8f5dc89a9c3c6d001))
+
+## v1.143.0 (2026-05-25)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.142.2 [skip ci] ([`7397b10`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7397b101e4df5bfe1607293fbb97f973645cad2c))
+
+### Features
+
+* feat(admin): surface localization, security & task-result links in sidebar
+
+Countries / Regions / Sites / Subscription Topics were reachable only inside the superuser-only System zone, nested two levels deep, so they were effectively unfindable. Promote them to a top-level staff-accessible Localization group and drop the duplicate entries from System > Configuration.
+
+Add a superuser-only Security & Access subtree (User Sessions, MFA Authenticators, Social Accounts, Email Addresses, Knox API Tokens) and surface Celery Task Results / Group Results under System > Background Jobs, so previously menu-orphaned but useful admins are reachable without enabling show_all_applications.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`643a23e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/643a23e49c7315cf21d06bf5c2bc3b25501092f8))
+
+## v1.142.2 (2026-05-25)
+
+### Bug fixes
+
+* fix: respect sort_order in pay_way and order item list ordering
+
+PayWayViewSet and OrderItemViewSet defaulted to `-created_at`, which discarded the admin-configured sort_order (both models declare Meta.ordering = ["sort_order"]). For pay ways this also changed the checkout default selection, since the storefront preselects results[0] and renders options in API order. Align both viewsets with the established pattern (["sort_order", "-created_at"]), matching the earlier region ordering fix.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`af9b8a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/af9b8a19d3155ad724879924bba6a56b867975a4))
+
+* fix: region ordering ([`86a9dce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/86a9dce9c546d20bd1e91614d50a142af51d9d61))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.142.1 [skip ci] ([`45f6b16`](https://github.com/vasilistotskas/grooveshop-django-api/commit/45f6b162718dbe361cdb8b514635d80735a30133))
+
+## v1.142.1 (2026-05-25)
+
+### Bug fixes
+
+* fix(shipping): walk SHIPPED before DELIVERED on carrier delivered-jump
+
+When ACS or BoxNow report a parcel as delivered between two polls /
+webhooks without us ever observing an intermediate IN_TRANSIT /
+final_destination event (fast COD same-day, or customer picks up
+immediately), ``_apply_order_status_transition`` would attempt
+``PROCESSING -> DELIVERED`` directly. The order state machine only
+allows ``PROCESSING -> SHIPPED -> DELIVERED``, so the transition was
+rejected and the order silently stayed at PROCESSING forever.
+
+Prod regression: order 73 was minted via the COD path on 2026-05-21,
+ACS flipped shipment_state to ``delivered`` the same day, but order
+status remained PROCESSING through 2026-05-25. Confirmed via 48h
+log sweep ("Cannot transition from PROCESSING to DELIVERED. Allowed
+transitions: SHIPPED, CANCELED").
+
+Same gap existed in both services; fix both for parity, with mirror
+regression tests pinning the new walk-through-SHIPPED path. Order 73
+backfilled manually with customer notifications suppressed (4-day-
+stale shipment). ([`480ae23`](https://github.com/vasilistotskas/grooveshop-django-api/commit/480ae232cdd4d7885946d497347c8af553323b49))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.142.0 [skip ci] ([`5ff05fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ff05fd14a7d60eed04560f6f55b0aeec507c953))
+
+## v1.142.0 (2026-05-22)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.141.0 [skip ci] ([`2387828`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2387828493450ebae632260be7f52f1d60ae990e))
+
+### Features
+
+* feat(shipping): per-kind logo on ShippingProvider for distinct picker rows
+
+Reported case: with both ACS and BoxNow active, the checkout picker
+shows three rows — BOX NOW Lockers, ``Παράδοση στη διεύθυνσή σας
+(acs)``, and ACS Smartpoint Lockers. The two ACS rows shared the
+same logo because the operator can only upload ONE image per
+provider; the storefront then surfaces it on every (provider, kind)
+row that maps to ACS.
+
+Adds an optional second ``logo_pickup_point`` ImageField on
+``ShippingProvider``. ``ShippingService.available_options()`` now
+picks the logo per (provider, kind) via the new
+``ShippingProvider.logo_for_kind`` helper: pickup_point rows prefer
+the pickup-specific variant when uploaded, falling back to the
+primary ``logo`` when blank. Home-delivery rows always use the
+primary logo. Carriers with only one kind (BoxNow → pickup_point
+only) work the same as before — no required change.
+
+Frontend needs zero code: ``ShippingOption.logoUrl`` now naturally
+differs per row, and ``StepShipping.vue`` / ``Sidebar.vue`` already
+pass each option's ``logoUrl`` straight through ``resolveShippingLogo``.
+
+Admin: new file picker in the Branding fieldset, list view gets a
+``Pickup logo`` thumbnail column alongside the primary one — empty
+``—`` cell for providers without the pickup-specific override.
+
+Tests:
+* ``test_options_endpoint_pickup_kind_uses_pickup_logo_when_set``
+* ``test_options_endpoint_pickup_kind_falls_back_to_primary_logo``
+
+Migration ``0008`` is additive nullable + a help_text-only
+``AlterField`` on ``logo`` — safe under the Argo CD PreSync deploy
+model (schema lands before code rolls out).
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`d117262`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1172629e65810441e320c07cf79d64f760544c2))
+
+### Refactoring
+
+* refactor(shipping): consolidate logo helpers + drop dead main_image_path field
+
+Two cleanups after the per-kind logo audit:
+
+1) ``ShippingProvider`` model: three nearly-identical helpers
+   (``main_image_path``, ``logo_filename``, ``logo_pickup_point_
+   filename``) repeated the same ``os.path.basename`` /
+   ``media/uploads/shipping/<basename>`` shape with slight
+   variations. Now share two static helpers (``_filename_of``,
+   ``_relative_path_of``) and a new pair of kind-aware methods
+   (``logo_for_kind`` / ``logo_url_for_kind``) so callers can
+   resolve the right field in one call. ``available_options`` drops
+   ~10 lines of inline path-construction in favour of
+   ``provider.logo_url_for_kind(kind.value)``.
+
+2) ``ShippingOptionSerializer`` drops the ``main_image_path`` field
+   — zero frontend consumers (verified by grepping ``app/`` and
+   ``server/``), and the storefront uses the absolute ``logo_url``
+   directly. The field was added for "PayWay.icon parity contract"
+   but neither side actually reads the relative-path form for
+   shipping logos.
+
+Five new model-level matrix tests pin ``logo_for_kind`` behaviour:
+no uploads → empty-primary for both kinds; primary only → shared;
+both uploaded → distinct per kind; unknown kind → defensive
+primary fallback. Plus the existing options-endpoint tests adapt
+to the dropped field (no ``mainImagePath`` assertion).
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`51cc83e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/51cc83e3531a30f278a7e41e8c1f6d068fdd034c))
+
+## v1.141.0 (2026-05-22)
+
+### Bug fixes
+
+* fix(measurement): accept lazy ``gettext_lazy`` for verbose_name
+
+``MeasurementField.__init__`` was typed ``verbose_name: str | None``,
+but the correct way to define a translated ``verbose_name`` is
+``_("Label")`` (a ``_StrPromise`` proxy) so ``makemigrations``
+captures the msgid instead of resolving to a locale-dependent
+string at import time. After the ``Product.weight`` fix landed
+that path, ``ty`` flagged the call site with
+``invalid-argument-type``.
+
+Widens the parameter to ``Any`` to accept both ``str`` and lazy
+proxies, mirroring the project's existing ``core.cache.registry.
+LazyStr = Any`` convention — keeps Django's private
+``_StrPromise`` out of the public API while staying ty-clean.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`bd625c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd625c434e389e57b99fe7890f1a6ba771e7c13a))
+
+* fix(product): stop forcing Product.weight verbose_name resolution at import time
+
+``str(_("Weight"))`` resolves the lazy ``gettext_lazy`` proxy to the
+locale active at module-import time, baking that resolved value into
+``makemigrations`` output as a plain string. The dev who generated
+``0035_alter_historicalproduct_weight_alter_product_weight`` had
+Greek active, so the migration stored ``verbose_name='Βάρος'``; CI
+runs with English active, sees ``_("Weight")`` resolving to
+``Weight``, and ``makemigrations --check`` reports drift forever —
+which is exactly what the last two CI runs were failing on.
+
+Dropping the ``str()`` keeps the lazy proxy intact: Django's
+migration serializer captures the msgid (``"Weight"``), so the
+migration file is locale-independent and resolves correctly per
+active locale at render time (admin still shows ``"Βάρος"`` for
+Greek users, ``"Weight"`` for English).
+
+``0036_alter_historicalproduct_weight_alter_product_weight`` lands
+the locale-independent definition for both ``Product`` and
+``HistoricalProduct`` (django-simple-history) so the drift loop
+closes.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`d52fc66`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d52fc66c33cdd27d3a388082d58fde7c6d44eae8))
+
+* fix(settings): make MEDIA_URL absolute in DEBUG too so DRF ImageField URLs validate
+
+drf-spectacular emits every ``serializers.ImageField`` (and every
+``ImageField.url`` exposed via ``SerializerMethodField`` /
+``FieldFile`` rendering) with ``format: 'uri'``, which the Nuxt-side
+Zod 4 schema validates with ``z.url()`` — strict, rejects relative
+paths. Production has always been fine because ``MEDIA_URL`` resolves
+to an absolute S3 (or ``STATIC_BASE_URL``) prefix, but local dev
+kept the legacy ``MEDIA_URL = "/media/"`` and so every endpoint that
+returns an uploaded asset (PayWay icons, product images, blog
+images, the new shipping logos) ``ZodError: Invalid URL`` -- a foot-
+gun that scaled with every new file field we added.
+
+Fix at the root: ``MEDIA_URL`` is now absolute in every environment
+(``STATIC_BASE_URL`` already defaults to ``http://localhost:8000``
+and devs override it via env var the same way ``elif not DEBUG``
+already does). ``core/urls.py``'s dev media-serve routing uses the
+path portion of ``MEDIA_URL`` so Django's ``static()`` helper still
+mounts the local serve view despite the absolute prefix.
+
+Reverts the shipping-only ``CharField`` / ``SerializerMethodField``
+detours from the previous commit — they no longer need to exist
+once the root cause is fixed and the codebase converges on the
+single, consistent ``ImageField`` / ``URLField`` -> ``z.url()``
+pattern.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`7b38f10`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b38f10676b257b84eee1485f21284e9d8a93778))
+
+* fix: missing migration ([`1642025`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1642025ee5a6e411239df6db1b6c9c7b1c4932c0))
+
+### Chores
+
+* chore(test): drop unused module-level imports in test_storage.py
+
+The previous edit kept the legacy ``from settings import MEDIA_URL,
+STATIC_URL`` at module level while moving the actual reads into
+each test method (so the values reflect the per-test
+``os.environ`` patch instead of whatever pytest collection time
+happened to import). ``ruff check .`` (used by CI's "Code Quality"
+step) flags F401 unused-import and F811 redefined-while-unused on
+the dangling top-level binding.
+
+Drops the dead imports; the per-test local imports already cover
+every read.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`e962a0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e962a0f72b8a76c23b34ee22d512789b0344a0f7))
+
+* chore(deps): sync uv.lock to 1.140.0 [skip ci] ([`777ba14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/777ba149602c3383d89455fe6e41ba3eb8e769b2))
+
+### Features
+
+* feat(admin): inline logo thumbnail on ShippingProvider list view
+
+The list page previously showed ``logo_filename`` (a bare string)
+which forced the operator to open each row to verify they uploaded
+the right asset to the right provider. Mirrors
+``PayWayAdmin.icon_preview`` so the carrier list matches the
+established admin convention — quick visual scan, mistakes caught
+at a glance.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`2221c65`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2221c65cb88880c73c906b2c89d40c26ec61ea46))
+
+### Testing
+
+* test(shipping): mock Setting.get in free-shipping-info + provider-logo tests
+
+Same xdist parallel-worker flake the previous commit covered for the
+PI tests: ``Setting.objects.update_or_create`` writes raced the
+``_reseed_extra_settings`` autouse fixture's savepoint visibility,
+so ``ACS_SMARTPOINT_ENABLED`` and the per-carrier thresholds came
+back as the seed defaults instead of the test's intended values,
+making CI fail with kinds={'home_delivery'} (no Smartpoint row)
+when the test expected both kinds.
+
+Both files now patch ``extra_settings.models.Setting.get`` at the
+integration boundary — same pattern as
+``tests/integration/loyalty/test_loyalty_lifecycle.py`` and
+``tests/unit/cart/test_create_payment_intent_shipping.py``. No DB
+writes for Setting state means zero exposure to the autouse
+reseed race; the test's intended values are the only ones the code
+under test sees.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`f341f5e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f341f5e93f33f383c50e23193d507d302d147d31))
+
+* test: deflake shipping calc + email lock tests under xdist parallel runner
+
+Two CI-only flakes, same root cause: tests writing to externally-
+visible state (extra_settings rows, Redis cache keys) under pytest-
+xdist's parallel worker model where xdist gives each worker its own
+test DB but workers share the same Redis instance — so writes leak
+across workers, and reads return whatever the latest worker happened
+to write.
+
+1) ``tests/unit/cart/test_create_payment_intent_shipping.py``: the
+   per-test thresholds were written via ``Setting.objects.update_or_
+   create`` and the ``_reseed_extra_settings`` autouse fixture races
+   savepoint visibility with the code under test (documented in
+   ``project_settings_update_or_create_flake.md``). Now mocks
+   ``extra_settings.models.Setting.get`` at the integration boundary
+   — same pattern ``tests/integration/loyalty/test_loyalty_
+   lifecycle.py`` uses. Zero DB writes, deterministic across
+   workers.
+
+2) ``tests/integration/order/test_tasks.py::test_send_order_
+   confirmation_email_worker_kill_recovery``: ``cache.set(lock_key)``
+   in the test and ``cache.add(lock_key)`` in the task both routed
+   to the production Redis backend (the ``cache`` proxy in
+   ``conftest.py`` is explicitly NOT reset; see comment on lines
+   63-73). Since each xdist worker mints ``order.id=1`` against its
+   own test DB but all workers share ``confirmation_email_lock:1``
+   in Redis, one worker's ``cache.delete`` (release) clobbered
+   another worker's ``cache.set``. Mocking ``order.tasks.cache``
+   directly — the pattern the conftest comment recommends — pins
+   ``cache.add``'s return value per leg (held → released) so the
+test is deterministic regardless of shared Redis state.
+
+Local ``pytest -n auto`` already passes for both; this is the fix
+for CI's tighter parallelism.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`7c255c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c255c9d1fcb2a26c8133a362e07760fead32d78))
+
+* test(storage): pin MEDIA_URL to absolute STATIC_BASE_URL/media/ in dev
+
+The settings change in 7b38f106 made ``MEDIA_URL`` absolute in every
+environment (so DRF ``ImageField.url`` is always a full URL the Zod
+4 schema accepts). The legacy assertion still expected
+``"/media/"`` and was the only test failure on that CI run.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`c5c54f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5c54f8a2ed05d7a6b8550cf7b9b5cc2b78e2f17))
+
+## v1.140.0 (2026-05-22)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.139.0 [skip ci] ([`583b4f7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/583b4f7f2b863cf40489dacef431ebe89466f8f0))
+
+### Features
+
+* feat(shipping): admin-uploadable carrier logos via ShippingProvider.logo
+
+Adds an ``ImageAndSvgField`` (PNG / JPG / SVG, with the SVG-script
+hardening from ``core.fields.image``) directly on
+``ShippingProvider`` so operators can swap a carrier's brand asset
+from Django admin without a frontend redeploy. Mirrors the
+``PayWay.icon`` pattern: ``main_image_path`` + ``logo_filename``
+helpers, file lives at ``uploads/shipping/`` in S3 via
+``PublicMediaStorage``.
+
+The shipping-options endpoint now carries ``logo_url`` +
+``main_image_path`` on every row so the storefront's checkout
+picker and order-summary sidebar pick up the upload through their
+existing ``GET /api/v1/shipping/options`` call — no new endpoint,
+no extra round-trip, no frontend coupling to a per-provider URL
+convention.
+
+Backward-compatible:
+* Migration is a single additive nullable ``AddField`` — old code
+  pre-rollout doesn't reference ``logo``, new code reads ``None``
+  for existing rows and the storefront falls back to its bundled
+  default. Safe under the Argo CD PreSync deploy model.
+* When no logo has been uploaded, ``logo_url`` is ``null`` and the
+  storefront uses the bundled per-method default already shipped in
+  ``app/utils/shipping-methods.ts``.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`0dbaeaa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0dbaeaa0c29075fd971b0ef6e3f846ca07fc6354))
+
+## v1.139.0 (2026-05-21)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.5 [skip ci] ([`65850b6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/65850b6bd61f9e7927333331de6a31119ba1c563))
+
+### Features
+
+* feat(admin): promote Blog and Settings to top-level sidebar sections
+
+Blog was buried two levels deep under Sales -> Content alongside
+Notifications and Contact Messages. Move it to its own top-level
+section between Catalog and Sales so editors don't need to expand two
+collapsibles to manage posts. The remaining Notifications and Contact
+Messages items get flattened directly into Sales — the Content subtree
+no longer carries its weight with Blog gone.
+
+Pull Extra Settings out of System -> Configuration into a new top-level
+Settings section gated on is_staff (System stays superuser-only).
+Extra Settings exposes runtime toggles (cookie banner, public copy,
+feature flags) that any admin needs to flip; gating it on is_superuser
+locked it away from non-superuser staff. Other System items
+(Countries, Regions, Sites, Subscription Topics, Audit & Logs,
+Reconciliation, Background Jobs) remain superuser-only. ([`f4ae235`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f4ae2350cd62896a05426659c882169515a18208))
+
+## v1.138.5 (2026-05-21)
+
+### Bug fixes
+
+* fix(shipping_boxnow): cancel pending_creation shipments locally, no P420
+
+When an admin cancels an unpaid online BoxNow order via the change-
+form save, the cascade reaches ``BoxNowService.cancel_shipment``
+with the shipment in ``parcel_state=PENDING_CREATION`` (the
+create-shipment task only runs after the payment webhook fires —
+abandoned online checkouts never trigger it, so no parcel ever
+exists at BoxNow's side).
+
+Pre-fix order of checks in Phase 1:
+1. ``state != NEW`` → raise ``P420`` ← fires here for pending_creation
+2. ``parcel_id is None`` → local cancel ← unreachable for pending_creation
+
+The first check rejects pending_creation as "not cancellable" even
+though there's nothing remote to cancel. Order 76 (2026-05-21)
+showed this: order CANCELED correctly, but a confusing
+``BoxNow API 409 [P420]`` left behind in
+``metadata.cancellation.shipment_cancel.error``.
+
+Swap the check order so ``parcel_id is None`` runs first — for
+both the canonical pending_creation case AND the rare
+NEW-without-parcel-id defensive case (Phase 3 crashed before
+persisting IDs). Both correctly resolve to a local-only cancel.
+The state guard now only fires when ``parcel_id`` is set, which
+implies a real BoxNow-side parcel that has progressed past NEW
+and shouldn't be cancelled blindly.
+
+Safety property preserved: never call BoxNow on a non-NEW parcel
+that exists at BoxNow's side. Only behavior change: pre-mint
+admin cancels skip the API and mark CANCELED locally.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0bc22df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0bc22df8c3f69aa2c04ef75b2cb4842c841dd30b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.4 [skip ci] ([`a56e871`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a56e8718ff69957c4d217dcd294d451d7b57711b))
+
+## v1.138.4 (2026-05-21)
+
+### Bug fixes
+
+* fix(admin): restore TinyMCE on HTMLField change forms
+
+Unfold's FORMFIELD_OVERRIDES maps models.TextField → UnfoldAdmin
+TextareaWidget. Django's formfield_for_dbfield walks the MRO of the
+field class, so HTMLField (a TextField subclass) matched the
+TextField override and the TinyMCE widget returned by HTMLField.
+formfield() was discarded. The form's media never pulled in
+tinymce.min.js, so description fields on Product / BlogPost /
+Category rendered as plain textareas.
+
+Add HTMLField → AdminTinyMCE to BaseModelAdmin.formfield_overrides
+so HTMLField wins the MRO race across every admin that inherits the
+base. Also drop the TINYMCE_JS_URL override that pointed at
+{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js — missing the
+/static/ prefix that StaticStorage(location="static") writes the
+asset under. The django-tinymce default routes the URL through the
+active staticfiles_storage and gets the prefix right. TINYMCE_JS_
+ROOT was never read by django-tinymce — dead setting.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`d8c34a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d8c34a193a1a24d6c1b04387211b66cb549df010))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.3 [skip ci] ([`f1c6fcb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f1c6fcba26a3869fd43e5fee27cc11f21a45e0cd))
+
+## v1.138.3 (2026-05-20)
+
+### Bug fixes
+
+* fix(order): auto-resolve home_delivery carrier before shipping cost calc
+
+A ``home_delivery`` cart with no explicit ``shipping_provider_code``
+(the storefront sends ``null`` for home_delivery per
+``shared/shipping/index.ts::carrierForMethod``) was charged at the
+generic ``CHECKOUT_SHIPPING_PRICE`` / ``FREE_SHIPPING_THRESHOLD``
+rate, even though ``_resolve_shipping_provider`` would still set the
+order's FK to ACS. Result: at 35 € the cart sidebar showed 0 €
+shipping (ACS quoted directly via ``/api/v1/shipping/options``) but
+the order ended up charging 2,99 € (generic 50 € threshold not
+crossed) — silent disagreement between the carrier the customer was
+promised and the price they paid, and a wider gap between the
+"free above 30 €" marketing copy and the real charge.
+
+``OrderService.calculate_shipping_cost`` now auto-resolves
+``home_delivery`` to the active home-delivery carrier's code before
+dispatching to ``ShippingService.calculate_shipping_cost``, using
+the same priority-ordered query ``_resolve_shipping_provider``
+already uses. Both call sites now share a single helper
+(``_resolve_active_home_delivery_code``) so a future routing
+refactor (region-aware, dynamic priority, ...) cannot drift the
+pricing path from the FK-assignment path.
+
+Affects every caller of ``OrderService.calculate_shipping_cost``:
+* Stripe PI flow (``cart/views/cart.py::create_payment_intent``)
+* Order-create initial calc (``create_order_from_cart_offline`` etc.)
+* Order-create verification calc (``create_order_from_cart``)
+
+Three regression tests pin the contract:
+* ``test_home_delivery_without_explicit_code_uses_acs_threshold``
+* ``test_home_delivery_below_threshold_charges_carrier_rate``
+* ``test_home_delivery_falls_back_to_generic_when_no_active_provider``
+Plus the ``test_pi_and_order_create_calcs_agree_in_gap_range`` anchor
+now includes ``(None, "home_delivery", ...)`` cases that would have
+failed before the fix.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`c786cd5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c786cd574d4471d620485513ed0057bd25133289))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.2 [skip ci] ([`ea83ced`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ea83ced92668c99851c2cb90e47c7a1411483e39))
+
+## v1.138.2 (2026-05-20)
+
+### Bug fixes
+
+* fix(cart): make shipping_provider_code optional on PI request
+
+Home delivery is intentionally provider-agnostic in checkout —
+``shared/shipping/index.ts::carrierForMethod`` returns null for
+``home_delivery``, and the order-create body carries no
+``shippingProviderCode`` for that path. The previous required-field
+check on the create-payment-intent request rejected every
+home_delivery Stripe checkout with a 400.
+
+Now ``shipping_provider_code`` is optional with a conditional
+``validate()`` requiring it only when ``shipping_kind ==
+pickup_point`` (the case where the carrier identity actually drives
+the quote). For home_delivery the backend falls through to the
+generic shipping calc — same path the order-create verification
+uses for the same body, so both calls agree.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`a796a31`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a796a31d060a1ba4a645dd44e36114ca19b84665))
+
+### Chores
+
+* chore(observability): enrich PI mismatch + shipping-calc + boxnow logs
+
+Three surgical logs to make the next shipping/payment incident
+debuggable from logs alone, plus two anchor tests pinning the
+contract that surfaced today's bug.
+
+1) ``PaymentAmountMismatchError`` site now logs the full input set
+   (cart total, shipping cost, payment fee, shipping_provider_code,
+   shipping_kind, weight, country, region, pay_way_code) via
+   ``extra={}``. Today's bug fired this exception with only the two
+   amounts; root-causing required reading the cart view and the
+   order-create flow side-by-side. The new log makes the divergent
+   axis obvious in one line.
+
+2) ``ShippingService.calculate_shipping_cost`` (the per-carrier
+   dispatcher) now anchor-logs the quote decision at info level —
+   "did the free-shipping threshold fire for this cart?" answerable
+   from logs alone. Sits at the dispatcher so every carrier benefits
+   without per-adapter log-sprinkling.
+
+3) BoxNow ``create_shipment_for_order`` now logs the
+   PREPAID-vs-COD ``amountToBeCollected`` decision so a future
+   "why did the locker collect €0?" investigation has its anchor.
+
+Tests:
+* ``test_pi_and_order_create_calcs_agree_in_gap_range`` — pins that
+  the PI calc and the order-create verification calc agree across
+  the [30, 50) range that surfaced today's bug, plus boundary cases.
+* ``test_free_shipping_info_min_matches_carrier_at_threshold`` —
+  pins that the marketing copy threshold (free_shipping_info.min)
+  agrees with what the carrier actually charges at the boundary.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`cad1516`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cad151664076abe77891562034402165e12ee661))
+
+* chore(deps): sync uv.lock to 1.138.1 [skip ci] ([`e4cbe53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e4cbe53925c9b2b3b0c45031c55c3031f5967788))
+
+## v1.138.1 (2026-05-20)
+
+### Bug fixes
+
+* fix(cart): pass shipping carrier to create-payment-intent to match order-create
+
+The Stripe PI flow was calling ``OrderService.calculate_shipping_cost``
+without ``shipping_provider_code`` / ``shipping_kind``, so the PI
+amount always used the generic ``FREE_SHIPPING_THRESHOLD`` /
+``CHECKOUT_SHIPPING_PRICE`` fallback. The order-create verification
+step DOES pass the per-carrier context, so the two calls silently
+disagreed whenever the carrier and generic thresholds differed — for
+the production tuning of ACS/BoxNow=30€ vs generic=50€, any cart in
+[30, 50) using Stripe was greeted with PaymentAmountMismatchError at
+order create time.
+
+Adds an explicit ``CartCreatePaymentIntentRequestSerializer`` that
+requires the shipping fields, computes weight from cart items, and
+threads everything into ``OrderService.calculate_shipping_cost`` so
+the PI amount matches what the order-create step will verify.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`ca03caf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca03cafdba5c4af272749974413d804edaf21d61))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.138.0 [skip ci] ([`628c779`](https://github.com/vasilistotskas/grooveshop-django-api/commit/628c779a4804b4fb70ff7e61dc047aed881ee975))
+
+## v1.138.0 (2026-05-20)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.137.3 [skip ci] ([`ad56206`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad56206b59adc241561a734d63b130734c029232))
+
+### Features
+
+* feat(shipping): expose free-shipping thresholds via dedicated endpoint
+
+Add a `free_shipping_threshold(kind)` hook on `ShippingCarrierInterface`
+so each carrier owns its own threshold next to its pricing logic, and a
+new public `GET /api/v1/shipping/free-shipping-info` endpoint that
+aggregates per-(active provider, kind) thresholds plus min/max for the
+storefront. Adding a new carrier is now one override on its adapter —
+the view, serializer, and frontend stay untouched.
+
+The endpoint respects the same gating `available_options` uses
+(`is_active`, registered adapter, `is_kind_enabled`, country filter via
+`metadata['supported_countries']`) so the advertised threshold matches
+what the customer can actually pick at checkout. ACS reads
+`ACS_FREE_SHIPPING_THRESHOLD`; BoxNow reads
+`BOXNOW_FREE_SHIPPING_THRESHOLD` and only for `pickup_point` (matching
+its pricing path). Threshold-less carriers are skipped so we never
+advertise "free above €0".
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com> ([`19a629a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19a629aff719135bd0d7ff574153d0be687dfa20))
+
+## v1.137.3 (2026-05-19)
+
+### Bug fixes
+
+* fix(tests): drop Setting.get.__func__ fallthrough to survive worker reuse
+
+CI run 26116850104 failed at:
+
+tests/unit/order/test_b2b_invoicing_gate.py: AttributeError: __func__
+tests/unit/shipping_acs/test_smartpoint_gating.py: AttributeError: __func__
+
+at the ``real_get = Setting.get.__func__`` line of the test helper.
+Both files use the same pattern (captured during the earlier
+Setting-round-trip-flake refactor) to call the real classmethod for
+keys other than the one under test. The pattern breaks under pytest-
+xdist worker reuse when an earlier test on the same worker patches
+``Setting.get`` to a ``MagicMock`` and the cleanup hasn't fully
+unwound before this helper executes — ``MagicMock.__func__`` raises
+``AttributeError``.
+
+Drop the fallthrough. The stubs now return the call-site's
+``default`` for keys other than the one each file targets, which is
+behaviourally identical to a real cache miss / no-row state. Both
+test paths only consult their single feature flag during the
+exercised codepath, so removing the fallthrough doesn't lose
+coverage — and the helper no longer depends on whatever shape
+``Setting.get`` happens to be in when the helper is first called.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ad412c1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad412c12c5768ea0df058162e5ada1e81dbcb28f))
+
+* fix(viva): resolve viva_return via order UUID to dodge the webhook race
+
+Order #71 paid via Viva Wallet but the customer never landed on the
+``/checkout/success`` page. The DB shows the order completed cleanly
+at 12:37:43 EEST (payment_status → COMPLETED, voucher 9772350954
+minted, confirmation emails sent), but the storefront kept the
+customer on the ``checkout/viva-return`` page with the
+``error.lookup_failed`` toast.
+
+Root cause:
+
+- We sent ``merchantTrns = str(order.id)`` to Viva at hosted-checkout
+  session creation. Viva echoed it back as ``eventId`` in the return
+  URL (``?t=<txn>&eventId=71&s=F``).
+- ``/order/viva_return`` only looked up the order by
+  ``payment_id=t AND payment_method='viva_wallet'``. Both fields are
+  set inside ``viva_webhook.py`` AFTER Viva calls our webhook —
+  which can lag the customer's browser redirect by tens of seconds.
+- During that window the lookup returned 404; the Nuxt page showed
+  the error and offered "back to checkout"; the customer disengaged
+  even though the payment had already cleared.
+
+Fix:
+
+- Send ``merchantTrns = str(order.uuid)`` so the round-trip identifier
+  is set BEFORE the redirect (uuid is assigned at order creation).
+  Customer-facing label stays human readable via ``customerTrns``
+  (``"Order #{id}"``) so Viva's dashboard still shows the order
+  number — only the machine identifier moved to the unguessable UUID.
+- ``viva_return`` keeps the ``t`` lookup as the primary path (works
+  once the webhook has fired) and falls back to ``eventId`` (= the
+  UUID) when ``t`` doesn't resolve yet. The fallback gates on
+  ``metadata.viva_order_code`` so it cannot dump arbitrary order
+  UUIDs — only orders that have been through Viva session creation
+  match.
+- ``viva_return`` added to the viewset's ``public_actions`` set —
+  the action's own ``permission_classes=[AllowAny]`` was overridden
+  by the viewset's ``get_permissions`` fall-through to ``IsAdminUser``
+  (and so the fix wouldn't have worked end-to-end without this).
+- Uses ``.values(...)`` rather than ``.only(...)`` to avoid the
+  ``Order.__init__`` ``_original_tracking_number`` lazy-load
+  recursion documented in ``project_order_state_machine_invariants``.
+- ``CamelCaseMiddleWare`` rewrites incoming query keys to snake_case,
+  so the endpoint reads ``event_id`` (with ``eventId`` as a
+  defensive fallback if the middleware is ever reconfigured).
+- 6 new integration tests cover both lookup paths, the
+  ``viva_order_code`` guard, malformed/unknown UUIDs, and the
+  400-on-missing-params case.
+
+Nuxt-side change in a follow-up commit (forward ``eventId`` from the
+return URL through ``/api/checkout/viva-return``).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`efd001a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/efd001aca67ccdc210d0567d9dfac786aae6e8bf))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.137.2 [skip ci] ([`5e6a6c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e6a6c5b80f9ff9830024f1191740bffb8cdb7dd))
+
+## v1.137.2 (2026-05-19)
+
+### Bug fixes
+
+* fix(i18n): drop bogus #, python-format flags on literal-% msgids
+
+``v1.137.1`` Docker publish (run 26109262745) failed at
+``compilemessages``:
+
+msgfmt failed: locale/el/LC_MESSAGES/django.po:8721:
+'msgstr' is not a valid Python format string, unlike 'msgid'.
+Reason: The character that terminates the directive number 1
+is not a valid conversion specifier.
+
+The Greek translation entries for 6 admin labels carry literal ``%``
+characters as the percent symbol (``"High Reservations (>50% stock)"``,
+``"Low VAT (0.1% - 10%)"``, etc.). The ``i18n(admin)`` commit at
+``131f3e19`` annotated them with ``#, python-format`` even though the
+source strings are plain ``_("...")`` calls with no ``%(name)s`` /
+``%s`` substitutions — ``%`` is just the percent symbol. ``msgfmt``
+then parses ``% stock`` / ``% - 10%`` and rejects it because a space
+or ``-`` is not a valid conversion specifier.
+
+Dropping the flag tells ``msgfmt`` to treat the string as opaque
+text. No source-code changes needed; ``django.po`` regeneration via
+``makemessages`` won't re-add the flag because ``xgettext`` only
+flags strings that match true format-spec patterns (``%s``, ``%d``,
+``%(name)s``).
+
+Affected entries:
+- ``product/admin.py:239`` — High Reservations (>50% stock)
+- ``product/forms.py:32`` — Enter a value between 0 and 100. For
+  example, 25 for 25% discount.
+- ``vat/admin.py:24`` — Low VAT (0.1% - 10%)
+- ``vat/admin.py:25`` — Standard VAT (10% - 25%)
+- ``vat/admin.py:26`` — High VAT (25% - 50%)
+- ``vat/admin.py:119`` — Set the VAT percentage rate (0.0% - 100.0%)
+
+Verified locally: ``uv run python manage.py compilemessages --ignore=.venv``
+now exits 0 across de / el / en.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`edfc0fa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/edfc0faea6ceab295773372153cadf6da567a13a))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.137.1 [skip ci] ([`982f7ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/982f7ba7a6ae9f35ed3e37e02a701935dde6ada2))
+
+## v1.137.1 (2026-05-19)
+
+### Bug fixes
+
+* fix(tests): patch admin.dashboard.cache to dodge Redis PicklingError flake
+
+CI run 26105645872 (test-only commit at 587db078) failed on:
+
+tests/unit/admin/test_dashboard.py::DashboardCallbackCachingTests::
+test_callback_caches_zones_a_b_c
+_pickle.PicklingError: Can't pickle <class 'unittest.mock.MagicMock'>:
+it's not the same object as unittest.mock.MagicMock
+
+Traceback: the test seeded ``DASHBOARD_CACHE_KEY`` via ``cache.set``,
+patched ``_build_zones_a_b_c`` with a ``MagicMock``, and called
+``dashboard_callback``. ``cache.get_or_set`` saw a cache miss (the
+``post_save`` signal in ``admin/signals.py`` invalidates the key on
+every ``UserAccount`` save — and ``_make_request`` creates one), so
+it called the patched builder and tried to persist the ``MagicMock``
+return value back into the cache.
+
+The ``cache`` proxy resolves to the production ``RedisCache``
+backend even in tests: conftest's ``settings.CACHES =
+{LocMemCache}`` patch sets the dict, but Django's ``CacheHandler``
+materialises ``settings`` (a ``cached_property``) and ``_connections``
+during app/setting startup — anything that touched ``cache.*`` before
+conftest ran has already bound the default alias to Redis, and the
+patch is a no-op. Tried resetting the CacheHandler registry instead
+and that breaks the Channels middleware tests, which patch
+``cache._cache.get_client`` and depend on the default alias staying
+Redis-bound.
+
+Fix: patch ``admin.dashboard.cache`` directly in the test, supplying
+a ``MagicMock`` whose ``.get_or_set(...)`` returns the test payload.
+That bypasses the real cache + Redis serialization entirely and
+lets the assertion stay focused on its actual contract ("the
+callback uses ``cache.get_or_set`` with the documented key/TTL and
+doesn't invoke the builder when the cache says it has a value").
+The new ``assert_called_once_with(DASHBOARD_CACHE_KEY, builder, 300)``
+pins both the key and the 300s TTL, which the original assertion
+didn't cover.
+
+Also extends the conftest's ``CACHES`` comment so the next reader
+knows why we *don't* reset the CacheHandler registry and what the
+downstream consequence is for tests that need pickle-unsafe
+fixtures in cache (patch ``cache`` at the module under test).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`7915e7a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7915e7a79e8e82237ecf62443fce1cb67a1d514b))
+
+* fix(release): cut patch release after test-stability + legacy-cleanup sweep
+
+Patch release marker after a series of test-only and refactor commits
+since 1.137.0 that don't carry an individual fix/feat/perf prefix but
+together justify cutting a deployable version:
+
+- 7822e900 + frontend companion: drop legacy ``BOXNOW_ENABLED``
+  ``Setting`` (single-source-of-truth now is
+  ``ShippingProvider.is_active``); admin no longer shows the
+  duplicate toggle that could disagree with the FK.
+- dcf9dcb0 / 938bf61a / 069713d5 / 0a11000e: rename / drop
+  misnamed-as-``legacy`` code paths now that the actual legacy
+  ``Order.shipping_method`` enum was removed in 0038. Includes
+  ``boxnow_summary`` → ``carrier_shipment_summary`` (now serves both
+  ACS + BoxNow), ``resolve_viva_order_code`` → ``ResolveVivaOrderCodeView``
+  (function-style class fixed), dropped ``additional_responses``
+  kwarg from ``create_schema_view_config`` (no callers), removed
+  ``optimized_for_list()`` back-compat alias.
+- f877a08f: ``_legacy_prefix_clear`` → ``_raw_prefix_clear`` — the
+  helper is an actively-used disaster-recovery escape hatch, not
+  legacy code.
+- a318420a: test-suite stability — mock myDATA / B2B / ACS Smartpoint
+  integration at the boundary (``load_config`` + ``_resolve_issuer_vat``
+  + ``Setting.get``) instead of round-tripping ``Setting.update_or_create``
+  → ``Setting.get``, which flaked under parallel xdist on commit
+  0a11000e (9 unrelated tests failed; same code path passed on
+  e9e3f0db). Cancels the misdiagnosis in
+  ``project_test_suite_remaining_failures.md`` (premise was
+  ``.delay`` → ``.apply_async`` mock targets; actual cause was
+  ``extra_settings`` round-trip).
+- 0236836e: pin gettext active language to English for tests that
+  assert on English substrings (validator messages, admin filter
+  labels, ``CategoryImageTypeEnum.BANNER`` display value). New
+  ``pytest.mark.assert_english`` marker + autouse fixture in
+  ``conftest.py`` keeps the opt-in narrow so parler / i18n tests
+  are untouched.
+
+No production-code behaviour change since 1.137.0 — only legacy /
+back-compat removals + test infrastructure. Cut as patch (not
+minor) because the user-visible removal of ``BOXNOW_ENABLED`` is the
+only thing closer to a feature, and even that is a cleanup of a
+duplicate flag rather than a new capability. ([`587db07`](https://github.com/vasilistotskas/grooveshop-django-api/commit/587db078d19ba57521dd3c427a10f2280e6582a6))
+
+### Chores
+
+* chore(invoicing): clarify _pay_way_display fallback comment
+
+Last "legacy" mention in the backend source. ``Order.payment_method``
+is an actively-written field (the payment-confirmation handlers
+populate it with the gateway code that processed the charge — see
+``order/services.py`` Stripe path and ``order/views/viva_webhook.py``
+Viva path), not legacy code awaiting removal. The comment's "legacy
+free-text" framing was misleading.
+
+Reframed to describe the field's actual semantics (raw gateway
+code, written by payment-confirmation handlers) without invoking
+the "legacy" label.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0a11000`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0a11000ee1687fcc66515442aa407246b8b6e23a))
+
+* chore(tests): drop last 'legacy shipping_method' comment in BoxNow test
+
+Caught during a validation sweep after ``ba6ad203``. The BoxNow
+integration test had one more inline comment describing the
+``(provider, kind)`` payload pair as "the only supported routing"
+and contrasting it with the "legacy ``shipping_method`` enum" —
+same misframing as the production-code comments cleaned up in
+``ba6ad203``. The enum is gone (migration 0038); future readers
+of the test shouldn't be told it still exists.
+
+Reframed to describe what the payload triggers without the
+gone-field reference.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`069713d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/069713d53286c161401a81d720a02852463c15b2))
+
+* chore(clear_cache): rename _legacy_prefix_clear to _raw_prefix_clear
+
+The ``--prefixes`` mode was labelled "Legacy" in the command help,
+the private method (``_legacy_prefix_clear``), the warning text,
+and the test name — implying it was a transitional code path
+queued for removal. But the method is actually a current,
+deliberately-kept escape hatch with a different semantic from
+``CacheService.purge_all()``: it bypasses the cache-surface
+registry and clears raw key prefixes directly, for disaster
+recovery when registry coverage is suspect or keys were written
+outside the surface system.
+
+"Legacy" mischaracterised the code. Renamed end-to-end to
+``_raw_prefix_clear`` + "Raw prefix mode (disaster recovery)"
+labels + clearer help text describing when to use it.
+
+  * ``Command.help`` — drops "legacy" framing
+  * ``--prefixes`` argument help — explains the escape-hatch
+    semantic instead of calling it "legacy mode"
+  * method renamed ``_legacy_prefix_clear`` → ``_raw_prefix_clear``
+  * warning string ``"Legacy mode: ..."`` → ``"Raw prefix mode
+    (disaster recovery): ..."``
+test renamed + assertion updated to match new warning
+
+No behaviour change.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`f877a08`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f877a08f81af920af5778013b41d3d71c6bcdc65))
+
+* chore(deps): sync uv.lock to 1.137.0 [skip ci] ([`20a5bb4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/20a5bb43f6300d877f4138379b8d656d5931be69))
+
+### Refactoring
+
+* refactor(product/managers): drop optimized_for_list backward-compat alias
+
+``ProductImageQuerySet.optimized_for_list()`` was a one-line alias
+that returned ``self.for_list()`` — comment said "for backward
+compatibility". Grep confirmed zero production callers: only three
+tests inside ``test_image.py`` exercised the alias, and they were
+literally testing that the alias works.
+
+Removed the alias + renamed/updated the three test callsites to
+use the canonical ``for_list()``:
+
+* ``test_optimized_for_list`` → ``test_for_list_eager_loads_product``
+* ``test_manager_delegates_to_queryset_optimized_for_list`` →
+  ``test_manager_delegates_to_queryset_for_list``
+* ``test_chained_filters`` — internal ``.optimized_for_list()``
+  call in the chain swapped to ``.for_list()``
+
+38/38 product manager tests pass.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3d246d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d246d2e133bdcd60402ed16404ae9840ecf86da))
+
+* refactor: drop remaining legacy/back-compat tails from the cleanup sweep
+
+A second pass through the codebase (triggered by a paranoid
+cross-repo verification of the earlier cleanup PRs) found five more
+legacy-flavoured items that slipped past the first sweep. Each one
+is either dead code, redundant dual-write, or a misleading "legacy"
+comment on current code.
+
+order/services.py:
+  Remove the ``from shipping.utils import compute_total_weight_grams
+  as _compute_total_weight_grams`` re-export + the matching ``__all__``
+  entry. Comment claimed it was kept "so existing tests keep passing
+  without churn", but a grep confirmed the test imports the function
+  directly from ``shipping.utils`` — zero callers of the re-export
+  alias.
+
+order/tasks.py + order/views/order.py + tests:
+  Stop dual-writing the legacy ``confirmation_email_sent`` boolean
+  alongside the modern ``confirmation_email_sent_at`` timestamp. New
+  writes use only the timestamp. The reader
+  (``_confirmation_already_sent``) still checks the boolean as a
+  fallback so pre-timestamp DB rows continue to dedupe correctly.
+  Comment updated to describe the fallback as data-shape protection,
+  not "legacy". Test assertion ``"legacy boolean flag must also be
+  set for backward compat"`` flipped to assert the boolean is now
+  absent. Earlier integration test updated to assert on the timestamp
+  key instead of the dropped boolean.
+
+order/signals/handlers.py:
+  Comment claiming "missing pay_way is treated as offline to preserve
+  the legacy fallback behavior" rewritten to describe what actually
+  happens — ``pay_way`` becomes None when its row is deleted
+  (``on_delete=SET_NULL``), not just for legacy orders, and treating
+  None as offline keeps the confirmation flow working in that case.
+
+search/views.py:
+  Drop the undocumented fallback that accepted the singular
+  ``attribute_value`` query parameter alongside the plural
+  ``attributeValues`` (which is the only form in the OpenAPI schema
+  and the only form the Nuxt frontend sends). Confirmed via grep:
+  zero Nuxt callers + schema.yml advertises only the plural form.
+
+order/serializers/order.py:
+  Comment in the CARRIER_TRACKING_URLS table called ACS's older
+  ``/el/track-and-trace/?p={number}`` URL "legacy" — it's just an
+  older URL on an external (ACS-owned) website. Reframed to
+  "older" so the rationale doesn't read like there's legacy code
+  here to remove.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`938bf61`](https://github.com/vasilistotskas/grooveshop-django-api/commit/938bf61a4ffe9add8f90f0cc00713f31f6912ab5))
+
+* refactor(order/core): drop 3 misnamed-as-legacy code paths
+
+Three small "backwards-compat" labels that didn't describe legacy
+code — they were either misnamed current code or genuinely unused
+dead parameters.
+
+OrderAdmin.carrier_shipment_summary (was boxnow_summary)
+  The display method handles BOTH ACS and BoxNow shipments — keying
+  on ``obj.shipping_provider.code``. The name was kept as
+  ``boxnow_summary`` "for backwards-compat" but no caller cares about
+  the field name; only the four references inside OrderAdmin itself
+  (readonly_fields + fieldsets + method def + helper docstring).
+  Renamed end-to-end to ``carrier_shipment_summary`` which actually
+  describes what it does. Stale inline comment about "BoxNow parcel
+  state" rewritten to mention both carriers.
+
+ResolveVivaOrderCodeView (was resolve_viva_order_code)
+  Class was function-style (``class resolve_viva_order_code(APIView):``
+  + ``noqa: N801``) with a comment claiming "URL conf compat". The
+  only two references are in ``core/urls.py`` (import + .as_view()) —
+  neither cares about the class name. Renamed to canonical Django/
+  DRF ``ResolveVivaOrderCodeView``, dropped the noqa, dropped the
+  misleading comment.
+
+create_schema_view_config: drop additional_responses parameter
+  The parameter was labelled "(backward compat)" — and rightly so:
+  ``ActionConfig.responses`` (the per-action override on the
+  serializers_config dict) covers every case it used to handle, and
+  zero production ViewSets in the codebase actually passed it. The
+  parameter was dead, the two branches inside the function were
+  dead, and the test ``test_config_with_additional_responses`` was
+  testing dead code. Removed all of it. Function signature stays
+  backwards-compatible-by-keyword for any external caller, since
+  the dropped param was the only positional change (still positional-
+  by-name, default ``None`` → simply removed).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`dcf9dcb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dcf9dcb01adf49f766d3467c7d0087f7cb2254cf))
+
+### Testing
+
+* test: pin gettext language to English for tests asserting English error text
+
+Tests across 14 files assert on English substrings of validator /
+admin filter / error messages (e.g. ``"quantity"``, ``"greater"``,
+``"insufficient stock"``, ``"Banner Image"``, admin filter labels).
+The project default is ``LANGUAGE_CODE='el'`` and those strings go
+through ``gettext_lazy``, so the tests pass in CI — which has no
+``compilemessages`` step and silently falls back to the English
+source — but fail on dev machines that have the compiled ``el``
+``.mo`` files present.
+
+Pin English at the **active-translation** layer (not via
+``LANGUAGE_CODE``) by opting modules in with
+``pytestmark = pytest.mark.assert_english``. A new autouse fixture in
+``tests/conftest.py`` activates ``translation.override("en")`` only
+when the marker is present, so parler / i18n tests that rely on the
+default Greek locale are untouched. Marker is registered in
+``pyproject.toml`` so pytest doesn't warn about unknown markers.
+
+Files marked:
+
+- ``tests/unit/order/test_address_validation.py``
+- ``tests/integration/order/test_stock_validation.py``
+- ``tests/integration/order/test_service_payment_flow.py``
+- ``tests/integration/order/test_order_service_payment_first.py``
+- ``tests/unit/contact/test_admin.py``
+- ``tests/unit/contact/test_utils.py``
+- ``tests/unit/country/test_country_admin.py``
+- ``tests/unit/notification/test_notification_admin.py``
+- ``tests/unit/region/test_region_admin.py``
+- ``tests/unit/test_loyalty/test_services.py``
+- ``tests/unit/vat/test_vat_admin.py``
+- ``tests/integration/product/favourite/test_view_product_favourite.py``
+- ``tests/integration/product/category_image/test_model_product_category_image.py``
+- ``tests/integration/user/test_view_user_subscription.py``
+
+A global pin in ``conftest.py`` was tried first and produced ~20
+collateral failures (parler queryset tests reading the wrong language,
+OpenAPI schema tests breaking on translated paths, smartpoint fixture
+ERRORs). The targeted opt-in marker leaves all of those alone.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0236836`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0236836e1edcb60d67391642e357280ae0592748))
+
+* test(extra_settings): mock integration boundary instead of round-tripping Setting
+
+The 9 tests that wrote ``Setting.objects.update_or_create(...)`` and
+then asserted behaviour reading ``Setting.get(...)`` flaked under CI's
+parallel xdist run on commit ``0a11000e`` (a 5-line comment-only diff,
+so the failures are infrastructure not regression). The conftest
+patches ``extra_settings.cache._get_cache`` to ``DummyCache`` and an
+autouse ``_reseed_extra_settings`` fixture rewrites the
+``EXTRA_SETTINGS_DEFAULTS`` rows before every test on every worker.
+The resulting savepoint-visibility interaction occasionally causes
+``Setting.get`` to return the seeded default instead of the just-
+written test value — symptom: ``Expected 'delay' to be called once.
+Called 0 times.`` / ``True is not false`` / ``'NOT_SENT' != CONFIRMED``.
+Same code paths on the very next commit (``e9e3f0db``) passed cleanly,
+so the failure mode is intermittent and not reproducible locally.
+
+The fix patches the integration boundary instead. For mydata,
+``_enable_mydata(self)`` patches ``load_config`` at both bound names
+(``order.mydata.config.load_config`` for the lazy-imported ``order.tasks``
+path AND ``order.mydata.service.load_config`` for the top-level
+``from order.mydata.config import load_config`` in ``service.py``)
+plus ``order.mydata.service._resolve_issuer_vat``. The service-level
+docstring on ``_resolve_issuer_vat`` already calls this out as the
+intended monkey-patch boundary: "Kept separate so tests can monkey-
+patch without spinning the whole config stack."
+
+For ``test_b2b_invoicing_gate`` and ``test_smartpoint_gating``, the
+read sites call ``Setting.get`` directly. Patch ``Setting.get`` with a
+stub that returns the chosen value for the test's specific key and
+falls through to the real classmethod for everything else — narrow
+enough to not affect unrelated Setting reads in the same test path.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a318420`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a318420a5377af476235d4eb745513ac5169686d))
+
+* test(order/tasks): add coverage for the _confirmation_already_sent fallback
+
+The cleanup pass that removed the
+``CONFIRMATION_EMAIL_SENT_FLAG`` dual-write left a load-bearing
+promise: the reader's boolean fallback would keep dedup correct
+for older DB rows that have only the boolean key (no timestamp).
+That promise had no regression test — if a future refactor drops
+the ``or meta.get(CONFIRMATION_EMAIL_SENT_FLAG)`` line, those
+older rows would re-fire the confirmation email and no test would
+catch it.
+
+New ``test_confirmation_already_sent_dedupes_via_either_key`` covers
+all three input shapes:
+  * timestamp only (current writer output) → True
+  * boolean only (older DB rows) → True
+  * neither (brand-new order) → False
+  * ``None`` metadata → False
+
+25/25 tests in ``test_tasks.py`` pass.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`e9e3f0d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e9e3f0db6a45496ec4dcacff9a9353cd75e9fbce))
+
+## v1.137.0 (2026-05-19)
+
+### Chores
+
+* chore(order): drop stale 'legacy shipping_method' comments
+
+The ``shipping_method`` CharField enum was dropped from the Order
+model in migration ``0038_drop_shipping_method`` (commit ``056f2c65``
+removed the last read; ``d521e066`` deleted the enum class). The
+column is gone, the dual-write transition is complete, but five
+inline comments still describe the gone field as "legacy" — as if
+the cleanup were pending. That framing is wrong now: the field is
+not legacy code awaiting removal, it's simply gone.
+
+Reframed each comment to describe what the code does *now* — the
+registry-driven ``(shipping_provider FK, shipping_kind CharField)``
+pair — without referencing the gone enum. Pure documentation
+cleanup, no behavior change.
+
+* ``order/serializers/order.py:get_boxnow_shipment`` (gate
+  rationale)
+* ``order/serializers/order.py:validate`` (BoxNow cross-field
+  validation header)
+* ``order/admin.py:list_filter`` (shipping_provider filter
+  rationale)
+* ``order/admin.py:get_inlines`` (registry-driven inline routing
+  rationale)
+* ``order/services.py:create_order_from_cart_offline`` (dispatch
+  comment)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`ba6ad20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ba6ad20343b2c35c9a8c989c6c7e7d9a86629350))
+
+* chore(scripts): drop duplicate dict keys + unused import in i18n helpers
+
+CI Code Quality on commit ``131f3e19`` (i18n bulk translation add)
+failed ruff lint with 8 F601 (duplicate dict literal keys) + 1 F401
+(unused ``re`` import). All 8 duplicate keys in
+``scripts/fill_greek_translations.py`` had identical values to their
+earlier definitions, so removing the later occurrence is value-
+preserving:
+
+"Card" (line 635 → already at line 410)
+"Active" (line 846 → already at line 41)
+"Inactive" (line 847 → already at line 42)
+"Slug is required." (line 996 → already at line 750)
+"Email is required." (line 997 → already at line 751)
+"Cart is empty" (line 1042 → already at line 638)
+"Bonus" (line 1177 → already at line 533)
+"Recently Created" (line 1178 → already at line 619)
+"Recently Added" (line 1180 → already at line 621)
+"Hi %(first_name)s," (line 1183 → already at line 774)
+
+Each removal is replaced with a short ``# already defined at line ~N
+with the same value.`` comment as a paper trail. Plus dropped the
+unused ``re`` import in ``scripts/list_untranslated.py``.
+
+``ruff check .`` and ``ruff format`` clean on the full tree.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9d8168d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9d8168d4b3500321c2fc7c01ea8cd6309e64c661))
+
+* chore(deps): sync uv.lock to 1.136.2 [skip ci] ([`0451395`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0451395ebf7002ba64a8706baec6845be5a34c18))
+
+### Features
+
+* feat: Bump Versions ([`1fad684`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1fad684d72a978f2e39706c20791a4afa876c02d))
+
+### Refactoring
+
+* refactor(shipping): drop legacy BOXNOW_ENABLED setting
+
+``ShippingProvider(code='boxnow').is_active`` is now the single
+source of truth for whether BoxNow appears at checkout. The
+``BOXNOW_ENABLED`` ``extra_settings`` row predates the provider
+registry (introduced when each carrier had its own ``extra_settings``
+toggle) and was kept around as a secondary gate during the
+dual-write transition flagged in
+``shipping/migrations/0002_seed_providers.py``.
+
+The dual-flag setup confused the site owner: ``BOXNOW_ENABLED`` was
+True in Settings admin while ``ShippingProvider.is_active`` was
+False, and the API silently filtered BoxNow out. "We never keep
+legacy / backward compatibility code" per the project standard —
+removing all of it in one pass.
+
+Changes
+-------
+
+Order serializer (``order/serializers/order.py``):
+  Defence-in-depth gate against stale frontend caches now reads
+  ``ShippingProvider.objects.filter(code='boxnow', is_active=True)
+  .exists()`` instead of ``Setting.get("BOXNOW_ENABLED")``. Same
+  intent, single source of truth.
+
+Settings declarations:
+  * ``settings.py:EXTRA_SETTINGS_DEFAULTS`` — entry deleted.
+  * ``core/api/views.py:PUBLIC_SETTING_KEYS`` — key removed from
+    the anonymous-readable allowlist.
+
+Data migration (``shipping/migrations/0006_drop_legacy_boxnow_enabled_setting.py``):
+  ``Setting.objects.filter(name="BOXNOW_ENABLED").delete()`` so the
+  orphan row in prod stops cluttering the Settings admin list.
+  Idempotent + safe under Argo PreSync (no schema change, just a
+  row delete in extra_settings.Setting).
+
+Tests:
+  Integration tests in ``test_order_create_with_boxnow.py`` swap
+  ``Setting.objects.filter(name='BOXNOW_ENABLED').update(value_bool=...)``
+  for ``ShippingProvider.objects.filter(code='boxnow').update(is_active=...)``.
+  Stale docstring references updated.
+
+Docstrings:
+  * ``shipping/models/provider.py`` — drops the "replaces the per-app
+    BOXNOW_ENABLED-style" caveat.
+  * ``shipping/migrations/0002_seed_providers.py`` — updates the
+    transitional-state note to say the cleanup landed.
+  * ``tests/conftest.py`` — swaps the example.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`7822e90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7822e900111708c3d209a72c057e9abbdf78c9bb))
+
+### Unknown
+
+* i18n(admin): add ~870 Greek translations for admin-visible strings
+
+The Greek .po file was at 2,151 of 2,801 entries untranslated (77%).
+Bulk-fill the most user-visible admin terms: column headers, status
+labels, action button copy, fieldset titles, filter descriptions,
+validation messages, payment / shipping / order vocabulary, common
+filter labels (``Filter by …``), GET-endpoint descriptions, and
+notification/loyalty/subscription terms.
+
+Adds two one-shot helper scripts:
+- ``scripts/fill_greek_translations.py`` — curated dictionary +
+  in-place .po rewrite, idempotent on rerun.
+- ``scripts/list_untranslated.py`` — diagnostic listing of
+  remaining empty-msgstr entries for follow-up passes through
+  Rosetta.
+
+Remaining ~1,283 untranslated entries are mostly long-form copy
+(email templates, sentence-level admin help text, paragraph
+descriptions) better suited to Rosetta translation by an admin
+than to a curated dictionary.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`131f3e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/131f3e19ad1e6a0111050e75883fb8501f89bbbb))
+
+## v1.136.2 (2026-05-18)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.136.1 [skip ci] ([`f79ec7b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f79ec7bf7d2a764221e76dacd04673c9eb9bcaf5))
+
+### Performance improvements
+
+* perf(admin): swap RelatedDropdownFilter → AutocompleteSelectFilter on high-cardinality FKs
+
+Prod sweep of v1.136.1 (the previous follow-up) showed CartItem and
+OrderItemHistory changelists still slow despite the get_queryset
+prefetches — drill-down revealed the remaining N+1 lives in the
+filter dropdowns, not the main queryset:
+
+cart.cartitem (368q / 1262ms / 3794ms):
+  ×197 cart_cartitem ← Cart dropdown rendering str(cart) per
+                        option, triggering cart.items.all()
+  ×151 product_product_translation ← Product dropdown rendering
+                        str(product) per option
+
+order.orderitemhistory (115q / 346ms / 1085ms):
+  ×52 product_product ← order_item dropdown rendering
+                        OrderItem.__str__ → self.product
+  ×52 order_order ← same, → self.order
+
+Root cause: ``RelatedDropdownFilter`` (from
+``unfold.contrib.filters``) populates its dropdown by calling
+``RelatedFieldListFilter.field_choices()``, which does
+``RelatedModel.objects.all()`` and then renders ``str(obj)`` for
+each option — when ``__str__`` reaches into other related models,
+this fans out into a per-option query chain on every changelist
+page load.
+
+Fix: swap to ``AutocompleteSelectFilter`` for the high-cardinality
+FK filters. Source confirms ``AutocompleteMixin.field_choices()``
+in ``unfold/contrib/filters/admin/mixins.py`` returns just
+``[("", BLANK_CHOICE_DASH)]`` — the dropdown is populated lazily
+via the standard ``/admin/autocomplete/`` XHR endpoint only when
+the admin user types in the search box.
+
+cart.cartitem:
+  ("cart", RelatedDropdownFilter) → ("cart", AutocompleteSelectFilter)
+  ("product", RelatedDropdownFilter) → ("product", AutocompleteSelectFilter)
+
+order.orderitemhistory:
+  ("order_item", RelatedDropdownFilter) → ("order_item", AutocompleteSelectFilter)
+  ("user", RelatedDropdownFilter) → ("user", AutocompleteSelectFilter)
+
+Prerequisites verified:
+- ``unfold.contrib.filters`` already in INSTALLED_APPS
+- CartAdmin / ProductAdmin / OrderItemAdmin / UserAdmin all have
+  ``search_fields`` (required by the autocomplete endpoint)
+
+Bounded-cardinality dropdowns (Country, Region, PayWay,
+ShippingProvider, VAT, Attribute, etc.) keep ``RelatedDropdownFilter``
+on purpose — those tables are small (< 200 rows), the dropdown UX
+is more discoverable than autocomplete, and the per-option
+``__str__`` chains there don't N+1 in measurable ways.
+
+Expected impact on prod once rolled:
+  cart.cartitem: 368q → ~20q (~18× fewer)
+  order.orderitemhistory: 115q → ~15q (~8× fewer)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c3f634f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c3f634fb91c0d573674b49385f8c5c0d1dfb943f))
+
+## v1.136.1 (2026-05-18)
+
+### Bug fixes
+
+* fix(shipping_acs): only map status=5 → ATTEMPTED when ACS provides a reason
+
+ACS's ``shipment_status=5`` is overloaded: paired with
+``delivery_flag=1`` it means "delivered" (handled separately), but
+paired with ``delivery_flag=0`` it can be either a failed delivery
+attempt (when ``non_delivery_reason_code`` is populated, e.g. "1"
+= recipient absent) OR an in-transit parcel that has only just
+left the origin warehouse.
+
+Verified 2026-05-18 against live tracking summaries for vouchers
+9771670285, 9771670576, 9771662342 — all freshly minted, all
+freshly departed Marousi ("ΑΝΑΧΩΡΗΣΗ ΚΟΜΟΤΗΝΗ" / "ΤΟΥΜΠΑ"),
+``delivery_info="Η αποστολή βρίσκεται στην διαδρομή προς το
+κατάστημα παράδοσης"``, ``non_delivery_reason_code=""`` —
+incorrectly painted as "Delivery attempted" in admin.
+
+Tighten the mapping: status=5 + delivery_flag=0 maps to ATTEMPTED
+only when ``non_delivery_reason_code`` is non-empty. Otherwise
+preserve ``current`` and let a subsequent poll lift the state via
+a clearer signal (``delivery_flag=1``, an explicit reason code,
+or ``shipment_status=4``).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`5833a62`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5833a625315659a2706553b21cf6c4da1de75e6f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.136.0 [skip ci] ([`d790173`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d7901738a77747f3d3896ca474d3922c9327903f))
+
+### Performance improvements
+
+* perf(admin): follow-up prefetches for CartItem + OrderItemHistory
+
+Prod sweep of v1.136.0 (the bundled performance pass) flagged
+two remaining N+1 changelists that weren't in the original scope:
+
+cart.cartitem 441q / 766ms SQL / 2976ms wall
+order.orderitemhistory 115q / 191ms / 853ms
+
+Both have the same root cause as the CartAdmin / blog admin
+fixes already shipped — display methods read parler-translated
+fields and the property chain ``item.final_price →
+product.final_price → product.vat_value → product.vat`` per row,
+with no prefetch backing them up.
+
+CartItemAdmin
+  ``product_display`` calls ``safe_translation_getter``;
+  ``pricing_info`` reads the property chain ending at
+  ``product.vat``. Adds an explicit ``get_queryset`` that
+  ``select_related("cart", "cart__user", "product", "product__vat")``
+  (FK chain — single join on the main query is cheaper than
+  prefetch) plus ``prefetch_related("product__translations")``
+  (reverse relation, prefetch is the only option).
+
+OrderItemHistoryAdmin
+  ``description_display`` calls ``safe_translation_getter`` per
+  row. Adds ``prefetch_related("translations")``.
+
+OrderHistoryAdmin has the same pattern but the prod sweep
+showed 19q / 35ms / 534ms — within budget, so left alone to
+avoid scope creep. Same fix would apply if it ever grows.
+
+Expected impact on prod once rolled:
+  cart.cartitem: 441q → ~15q (~30× fewer)
+  order.orderitemhistory: 115q → ~15q (~8× fewer)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`58bfcbf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58bfcbf01a1061e85a8e84e2ffd983aa07998d60))
+
+## v1.136.0 (2026-05-18)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.135.0 [skip ci] ([`7acfdf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7acfdf20a224e6c0e0c0fa3f3e8e3d1c8db606e7))
+
+### Features
+
+* feat(order): show carrier shipment state and status age in admin changelist
+
+Replace the Currency and Document Type columns on the Order changelist
+with two columns that are actually used by ops: a carrier-aware shipment
+state badge (BoxNow parcel_state / ACS shipment_state) and the elapsed
+time since the order last transitioned status. select_related now pulls
+shipping_provider, boxnow_shipment, and acs_shipment so the new columns
+don't N+1 the list view.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`76021d7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76021d791443d21833ea5aaae3b29d6c70a0056a))
+
+### Performance improvements
+
+* perf(admin): bundled admin changelist performance pass
+
+End-to-end pass to fix a 500 in NotificationAdmin and dial back
+several N+1s / JOIN-explosions across the most-trafficked admin
+changelists. All findings were captured by profiling every
+registered ModelAdmin via ``Client.force_login`` +
+``connection.queries`` against the local DB, then mapped back to
+source.
+
+NotificationAdmin (FIXES a 500)
+  Removed ``prefetch_related("user__user")`` — ``Notification``
+  has no ``user`` FK (it's a broadcast model; per-user delivery
+  lives on ``UserNotification`` via ``notification_users``).
+  Every changelist load was raising ``AttributeError: Cannot
+  find 'user' on Notification object``. Replaced with
+  ``prefetch_related("translations")`` which is what the per-row
+  title/message display actually needs. Test updated to lock the
+  new shape.
+
+OrderAdmin (already pushed in 76021d79 with carrier changelist columns)
+  Adds ``.with_total_amounts()`` so ``Order.total_price_items``
+  reads its ``items_total`` annotation from ``__dict__`` instead
+  of falling back to per-row ``SUM(price*qty)`` aggregation.
+  Cut order changelist from 156 → 50 queries (3.1×).
+
+CartAdmin
+  Extended ``prefetch_related("items__product")`` to
+  ``"items__product__vat"`` — ``cart.total_price`` walks
+  ``item.final_price → product.final_price → product.vat_value
+  → product.vat``, costing 89 VAT lookups on a 12-cart page.
+  Cut cart changelist from 103 → 15 queries (6.9×).
+
+ProductAdmin (the big one)
+  * Two ``RangeNumericListFilter``s (LikesCountFilter,
+    ReviewAverageFilter) called ``with_likes_count()`` /
+    ``with_review_average()`` UNCONDITIONALLY in ``queryset()``.
+    Django admin invokes every filter's ``queryset()`` on every
+    page load, so the JOINs fired even when no filter value was
+    set — exploding the main fetch + the date-hierarchy
+    DATE_TRUNC + the COUNT query. Now short-circuits when both
+    range values are empty.
+  * ``get_queryset`` previously annotated likes/reviews by
+    default "to avoid attribute errors". The model's properties
+    already fall back to per-row queries via ``__dict__`` check,
+    so removing the default annotation shifts the cost from
+    "2.4s JOIN once" to "~25ms per-row counts" on the rare path
+    where filters aren't engaged.
+  Result: product changelist SQL 4.6s → 1.0s (4.6×), wall 5.5s
+  → 2.4s (2.3×).
+
+BlogAdmin (audit found the same filter pattern as Product)
+  Same unconditional-annotation bug across four
+  ``RangeNumericListFilter``s — LikesCountFilter,
+  CommentsCountFilter, TagsCountFilter, PostsCountFilter. All
+  now short-circuit when both range values are empty, so the
+  JOIN to blog_blogpost_likes / blog_blogcomment / blog_blogtag
+  doesn't fire on every blog admin page load.
+
+BlogCommentAdmin / BlogComment model
+  Added the ``__dict__`` + setter pattern to
+  ``BlogComment.likes_count`` / ``replies_count`` properties
+  (mirrors ``Product.likes_count``) so a future caller that
+  pre-aggregates via ``Subquery``-based manager method can
+  short-circuit the per-row count. Admin's ``get_queryset``
+  documents WHY the obvious-looking ``Count(... distinct=True)``
+  annotation isn't applied: empirically the JOIN+GROUP BY on
+  the main fetch was MORE expensive than the per-row counts it
+  saved. The paper trail is left for the next person tempted.
+
+Debug toolbar config
+  Added ``SQLPanel`` + ``CachePanel`` + ``RequestPanel`` to
+  ``DEBUG_TOOLBAR_PANELS`` — the toolbar previously couldn't
+  show the load-bearing diagnostic for N+1 hunting (SQL panel).
+
+Net measured impact (cold hits, single run per page):
+  notification.notification: 500 ERROR → 200 (62q / 11ms / 530ms)
+  order.order: 156q → 50q (3.1× fewer queries)
+  product.product: 5.5s → 2.4s wall, 4.6s → 1.0s SQL
+  cart.cart: 103q → 15q (6.9× fewer queries)
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c18d45b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c18d45b93744834054cbfe0b10944f93850f81ff))
+
+## v1.135.0 (2026-05-18)
+
+### Chores
+
+* chore(migrations): regenerate translation unique constraints for django-parler 2.4
+
+django-parler 2.4 (bumped in 650a91845) declares the per-language
+uniqueness on translation models with a named ``UniqueConstraint``
+instead of the legacy ``unique_together``. The model state changed
+but no migrations were generated, so CI's ``makemigrations --check``
+fails on every commit.
+
+Adds the 9 missing migrations (blog, country, notification, order,
+pay_way, product, region, tag, user). Each one:
+
+1. Sets ``unique_together`` to ``set()`` on every TranslatableModel
+2. Adds ``UniqueConstraint(fields=('language_code', 'master'), name='<app>_<model>_translation_uniq_lang')``
+
+Same fields, same uniqueness — just renamed from auto-generated
+``_unique_together`` indexes to explicit named constraints.
+
+Safe under Argo PreSync (schema lands before code rolls): the
+DB-level uniqueness is preserved at all times during the swap,
+so old pods still serving traffic don't see any divergence.
+Verified by ``migrate`` against a fresh DB and re-running the
+shipping unit suite under the new schema.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2d41688`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2d416888989d1d90f24f590241b2412527536404))
+
+* chore(deps): sync uv.lock to 1.134.5 [skip ci] ([`f315991`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f315991d3256a54be5c1949c07c613ea6698e653))
+
+### Features
+
+* feat: Bump Versions ([`650a918`](https://github.com/vasilistotskas/grooveshop-django-api/commit/650a91845d3ec98c42950d926608dbf8c426990b))
+
+* feat(shipping): persist audit envelope + structured mint log
+
+The fix for piping Order.customer_notes to ACS Delivery_Notes and
+BoxNow description landed in commit 93232755 (v1.134.4), but
+existing prod orders with notes still showed empty vouchers — and
+we couldn't verify the fix worked because shipment.metadata only
+stored the carrier RESPONSE, not the request payload we sent.
+
+Adds metadata["create_request"] to both ACS and BoxNow success
+paths via a per-carrier _audit_envelope() helper that emits an
+operational subset of the request (delivery notes, COD amount,
+locker/station id, weights, charge type, country for ACS, items
+for BoxNow, etc.) — intentionally PII-free so the row doesn't
+become a GDPR-scrub gap (gdpr.py only clears Order columns, not
+shipment JSON).
+
+Also emits a structured logger.info("voucher/parcel minted",
+extra={...}) with notes_chars_raw, notes_chars_sent,
+notes_truncated, voucher/parcel id, carrier, phase — single grep
+target for future "did notes leave us?" investigations. The
+notes_truncated flag derives from the post-sanitize length to
+avoid a false-positive when sanitize_delivery_notes collapses
+whitespace runs (a 600-char all-whitespace note sanitises to "").
+
+Side fix: ACS success path now also clears stale last_error from a
+prior failed mint attempt, mirroring BoxNow's existing behaviour
+so ops don't see ghost errors after a retry succeeds.
+
+Tests lock the envelope shape, the PII exclusion (specific
+forbidden Recipient_* keys), and the stale-last_error wipe.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2e767c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2e767c78bb4323ddd31b1385fc71ea96bad1006e))
+
+## v1.134.5 (2026-05-17)
+
+### Bug fixes
+
+* fix(meta_capi): fire order_paid on COD reconcile so Purchase dispatches
+
+The post_save chain only emits order_paid on a PENDING -> PROCESSING
+status transition with is_paid=True. COD orders are already at
+PROCESSING by the time payment confirms (status advanced at ACS
+voucher mint), so _mark_cod_order_paid_if_pending was silently
+dropping every COD Purchase event — Meta saw zero attribution for
+COD revenue, which is the dominant payment method in Greece.
+
+mark_as_paid only persists payment_status; it does not fire any
+signal. The existing docstring on _mark_cod_order_paid_if_pending
+claimed otherwise. Fix is one explicit order_paid.send right after
+mark_as_paid, gated by the existing payment_status==PENDING check so
+re-running a payout upsert never re-fires.
+
+Dedup is safe at three layers: storefront mints a stable purchase
+event_id per checkout submit and persists it on order.metadata, the
+MetaCapiEventLog.event_id column is unique, and _dispatch
+short-circuits when the row is already SENT.
+
+Also enriches the cart-price-drift warning to log raw Decimal +
+delta — current format shows both sides as "19,99 EUR" when they
+differ by a sub-cent fraction, making the warning unactionable.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a4bd03e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a4bd03ec27f5d99dead00aa8746f19f1405d5c99))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.4 [skip ci] ([`e84b216`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e84b216587eeb24dabc29f541f8e1489cd2d612e))
+
+## v1.134.4 (2026-05-16)
+
+### Bug fixes
+
+* fix(order): cancel cascade idempotent + non-recursive
+
+Two follow-up fixes after the cancel cascade move:
+
+1. ``cancel_attached_shipment`` now short-circuits when the
+   ``shipment_cancel`` breadcrumb is already on the metadata. The
+   signal-side cascade fires from inside ``Order.save()``'s
+   post_save chain (under the test ``on_commit``-immediate
+   fixture), then ``cancel_order``'s explicit call ran the same
+   cascade again before the idempotency check caught it. Moving
+   the check into the cascade method itself covers both entry
+   points symmetrically.
+
+2. The cascade's metadata save switched from
+   ``order.save(update_fields=["metadata"])`` to
+   ``Order.objects.filter(pk=...).update(metadata=...)``. The
+   nested ``order.save()`` was firing ``post_save`` with a stale
+   ``_original_status`` (Django sends post_save inside
+   ``super().save()``, but ``Order.save()`` refreshes
+   ``_original_status`` only AFTER ``super().save()`` returns) —
+   the handler then re-fired ``order_status_changed`` and tests
+   in ``test_property_17_status_changes_trigger_signals`` saw
+   the signal called twice for a single transition.
+   ``.update()`` bypasses model save entirely; metadata-only
+   writes don't need the lifecycle signals anyway.
+
+3. ``handle_order_canceled`` now reads the cancellation reason
+   from ``metadata['cancellation']['reason']`` when the
+   ``order_canceled`` signal kwarg is missing (which happens
+   because ``handle_order_status_changed`` doesn't forward it).
+   Preserves the programmatic reason all the way through to
+   the carrier API while keeping the admin-form-save default.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`5f5abf4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f5abf4bc680bc6e5de2cdb2cb381c1406549c8e))
+
+* fix(order/admin): handle OrderCancellationError + per-order isolation in bulk cancel
+
+The ``Cancel selected orders and restore stock`` admin action only
+caught ``ValueError``, but ``OrderService.cancel_order`` raises
+``OrderCancellationError`` (subclass of ``OrderServiceError``) when
+an order is in a terminal state (COMPLETED / DELIVERED / already
+CANCELED). With the prior code that unhandled exception bubbled
+into the response and the whole change-list view returned a 500.
+Verified against prod admin action on 2026-05-16: order 43
+cancelled cleanly, then order 41 in COMPLETED state raised and
+took down the response.
+
+The action was also wrapped in a single ``transaction.atomic()``
+around the entire batch loop, so the raise also rolled back the
+successful cancel(s) earlier in the batch. ``cancel_order`` is
+already wrapped in its own atomic — the outer block was redundant
+and dangerous.
+
+Drop the outer atomic, catch ``OrderCancellationError`` as a
+warning-level skip (one selected row in a terminal state is normal
+operator behaviour, not an error), and catch ``Exception`` as a
+last-ditch error-level message with a logger.exception so the
+trace is preserved for ops review without breaking the batch.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1b47092`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b4709264cd4e1b24d6a4416576ae36ad9b23afc))
+
+* fix(order): keep cancel cascade in both entry points, idempotent in signal
+
+The previous commit moved the carrier cascade out of
+``OrderService.cancel_order`` and into ``handle_order_canceled``,
+which broke the programmatic-cancel test contract because
+``@pytest.mark.django_db`` does not fire ``transaction.on_commit``
+hooks — pre-existing tests that drove ``cancel_order`` directly
+expected the cascade to have run synchronously by the time the
+method returned.
+
+Restore the explicit ``cancel_attached_shipment`` call inside
+``OrderService.cancel_order`` (synchronous, as before) and keep
+the signal-side cascade as a safety net for paths that bypass
+``cancel_order`` (admin form save). The signal-side cascade
+short-circuits when ``metadata.cancellation.shipment_cancel`` is
+already set, so the programmatic path's on-commit signal fan-out
+does not re-fire the carrier API.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`667993f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/667993f960e3e53f1b9b7b91fa9df54fb381ddf7))
+
+* fix(order): cascade courier-voucher cancel from order_canceled signal
+
+The cascade lived inside ``OrderService.cancel_order``, so any
+entry point that flips ``order.status`` to CANCELED through
+``Order.save()`` instead of going through the service — Django
+admin's change-form Save button is the canonical example —
+bypassed the cascade and left the courier voucher alive at ACS /
+BoxNow. Verified on prod order 60 (2026-05-16): the admin
+dropdown was set to CANCELED, ``status`` flipped, but voucher
+9771614856 stayed active because the cascade never ran and
+``metadata.cancellation`` was ``null``.
+
+Move the cascade into ``handle_order_canceled`` (the single
+``order_canceled`` signal receiver). The handler also seeds
+``metadata['cancellation']`` (reason / previous_status /
+canceled_at) when missing — so the admin-form path gets the same
+breadcrumb the programmatic path already produces.
+``OrderService.cancel_order`` no longer invokes the cascade
+explicitly; doing so would be a redundant second round-trip since
+the signal already fires synchronously off the ``Order.save()``
+inside that method.
+
+Rename ``_cancel_attached_shipment`` → ``cancel_attached_shipment``
+(public) since it's now called across modules. Add an info log
+line on cascade start so the next prod incident is easy to trace.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`5fcd314`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5fcd314ff2de41c475a4747ab63f934bf5e3e180))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.3 [skip ci] ([`d36cc99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d36cc998748e63d642742911ad3b0e048a3800ad))
+
+## v1.134.3 (2026-05-15)
+
+### Bug fixes
+
+* fix(shipping): pipe Order.customer_notes to ACS Delivery_Notes + BoxNow description
+
+Site owner flagged 2026-05-16 that the customer's checkout
+παρατηρήσεις / σημειώσεις never appeared on the courier voucher.
+Root cause: ``Order.customer_notes`` is captured at checkout,
+persisted to the DB, and shown in admin, but neither carrier
+payload builder includes it.
+
+* ACS_Create_Voucher carries notes in ``Delivery_Notes`` (printed on
+  the voucher's "Παρατηρήσεις" line — per ACS REST API guide §3).
+* BoxNow ``deliveryRequest`` carries them in ``description``
+  (BoxNow API Manual §6.3.1).
+
+Add ``shipping.services.sanitize_delivery_notes`` as the single
+trim/cap helper (collapses CR/LF/tab runs to a space, caps at 500
+chars so ACS's voucher cell + BoxNow's portal box stay readable),
+and wire it into both payload builders.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`9323275`](https://github.com/vasilistotskas/grooveshop-django-api/commit/932327550f59ed5b919ebb7b5cdcfdc66bc11f8c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.2 [skip ci] ([`8d44430`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d44430c355c9dc7082f1f7e15620a7e01dd950b))
+
+## v1.134.2 (2026-05-15)
+
+### Bug fixes
+
+* fix(shipping_acs): drop .only("metadata") in mint-claim helpers
+
+``simple_history`` snapshots every non-excluded field on save, and
+django-money's ``cod_amount`` descriptor reads ``__dict__['cod_amount']``
+directly — together they raise ``KeyError: 'cod_amount'`` when the
+shipment row was fetched with ``.only("metadata")``. The exception
+was swallowed by the broad ``except`` so ``last_error`` was never
+persisted AND ``mint_started_at`` lingered (verified against prod
+order 57 on 2026-05-15, whose ``metadata`` still showed
+``mint_started_at`` after a Phase 2 failure that supposedly
+"released mint claim").
+
+Fetch the full row in both ``_record_last_error`` and
+``_release_mint_claim``; the row is small and lives for the
+duration of a brief ``transaction.atomic`` block.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`844b3c6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/844b3c68e8f6457686e951e4e5191ce98204974d))
+
+* fix(shipping_acs): strip whitespace + country code from voucher fields
+
+Order 57 was rejected by ACS_Create_Voucher with the generic
+"ACS:Error fill data error" because two outbound fields had the
+wrong format:
+
+- ``Recipient_Zipcode`` = ``"848 00"`` — customer typed the Greek
+  postal convention (3+2 with a space). ACS's sample payload uses
+  a digits-only integer (``17778``).
+- ``Recipient_Phone`` = ``"+306989424342"`` — ``PhoneNumberField``'s
+  ``str()`` is E.164. ACS's sample is the bare 10-digit local form
+  (``2115005000``).
+
+Add ``_normalize_zipcode_for_acs`` (digits only, 5 chars) and
+``_normalize_phone_for_acs`` (prefer ``PhoneNumber.national_number``;
+strip ``+30`` / ``0030`` only when the remainder is exactly 10
+digits so ambiguous mistypes still surface to ACS) and wire both
+into ``_build_create_voucher_params``.
+
+Also persist the failing payload + ACS error to
+``shipment.metadata['last_error']`` on both API exception and
+empty-``Voucher_No`` paths. Without this, prod debugging needed
+re-running the offline builder by hand — verified against order 57
+where ``metadata`` carried only ``mint_started_at`` and the failing
+params were lost.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3a66fba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a66fba8d9d8240913de71a0ab3769fe09b3a980))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.1 [skip ci] ([`e3c9971`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3c99716aa4ca409bc9fead4c1ff74c9e1c8b78f))
+
+## v1.134.1 (2026-05-14)
+
+### Bug fixes
+
+* fix(search): allow attribute_values, likes_count, view_count facets
+
+These three Meilisearch facets were silently dropped by the product
+search facet allowlist, even though all three are configured as
+filterable fields in ProductTranslation.MeiliMeta. The frontend's
+AttributeFilter, PopularityFilter, and ViewCountFilter all requested
+these facets and fell back to defaults — the most visible symptom was
+every Χαρακτηριστικά option (e.g. "80*38.5*26 mm") rendering with a
+"0 products" badge and disabled state on /products.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`23d2c2a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23d2c2a3dd716c7547a541d06e44b1824cf1ec79))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.134.0 [skip ci] ([`19f76d8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19f76d88cd5325d0965634f30272459b9edf20b3))
+
+## v1.134.0 (2026-05-13)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.133.0 [skip ci] ([`f62f2c3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f62f2c37d9d69a87d613d3a85f4bbae0a84c960e))
+
+### Features
+
+* feat(boxnow): poll fallback + curate customer order timeline
+
+BoxNow webhook delivery has been silent across 6 shipments — their
+partner-managed registration is the only knob (doc §Hook Management:
+"BOX NOW will assist partners in configuring their webhook"), so a
+single misconfiguration freezes parcel state on our side. Add
+``BoxNowService.sync_shipment_state`` and a 15-min ``poll-boxnow-tracking``
+beat task that reconciles state from ``GET /api/v1/parcels``,
+idempotent with the webhook path via ``(shipment, event_type,
+event_time)`` dedup and synthetic ``poll:`` message ids.
+
+Also strip operational NOTE rows ("Order created", "Item X added",
+confirmation-email-sent — leaking ``admin@admin.gr``) from the
+customer order timeline; they stay in ``OrderHistory`` for the
+admin audit log. Synthetic CREATED entry drops its English
+description so the storefront renders the i18n title alone.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`b32aea3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b32aea39e3f7a22f8db08424f34b61e3cb84d424))
+
+## v1.133.0 (2026-05-13)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.132.3 [skip ci] ([`83ad48f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/83ad48f24a9f1bd65066dcbf81b28dc888c406ac))
+
+### Features
+
+* feat(admin): expose Shipping Providers in Unfold sidebar
+
+The provider rows are the on/off switch and capability declaration for
+every carrier (BoxNow, ACS), and since 1436161e they also host the
+``PayWayShippingExclusion`` inline that toggles COD-on-lockers without
+a redeploy. Ops were navigating to it via raw URL because the only
+shipping entries in the sidebar were the per-carrier shipment and
+locker changelists. Adds a "Shipping Providers" item at the top of
+the Shipping group linking to the standard
+``admin:shipping_shippingprovider_changelist`` route.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`2cca385`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2cca385b1815e9c946c5b99539720f0451f8a983))
+
+## v1.132.3 (2026-05-13)
+
+### Bug fixes
+
+* fix(order): restore ACS deep-link tracking URL (webapp SPA path-based)
+
+Revert the previous commit's decision to drop ACS from
+``CARRIER_TRACKING_URLS``. ACS does publish a working customer-
+facing deep-link — it just isn't where the earlier audit looked.
+
+The legacy ``/el/track-and-trace/?p={number}`` URL on the main
+marketing site is indeed a static search page that ignores query
+parameters. Same for ``/el/myacs/anafores-apostolwn/anazitisi-
+apostolwn/``. Concluding "no deep-link exists" from that was
+wrong — the actual customer-facing tracker is the Vue SPA at:
+
+https://webapp.acscourier.net/track-shipment/{voucher_no}
+
+Path-based, not query-string. The SPA reads the voucher off the
+URL path and auto-runs the search on load. Verified end-to-end via
+Chrome MCP with voucher 9770932931 — page rendered route
+``ΜΑΡΟΥΣΙ → ΣΤΑΥΡΟΥΠΟΛΗ`` with the voucher pre-populated.
+
+Why the previous miss: WebFetch can't render JS — the SPA returns
+only the bare ``"ACS"`` shell to a non-JS client, so the earlier
+check looked indistinguishable from a static "search not found"
+page. The lesson is documented in memory
+``project_acs_tracking_url`` so it doesn't recur.
+
+Schema regenerated (no shape change — same ``tracking_url`` field
+on ``tracking_details``).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0475048`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0475048e63ecdd783ae1c4d6c2d73f62c9e70db4))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.132.2 [skip ci] ([`aff869c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aff869c83ed4e9f75775a39f7051b1a5d1523a50))
+
+## v1.132.2 (2026-05-13)
+
+### Bug fixes
+
+* fix(order): meaningful timeline + correct carrier tracking URLs
+
+Two storefront-visible fixes packaged together because both flow
+through ``OrderDetailSerializer``:
+
+**Timeline descriptions**: ``get_order_timeline`` returned
+``OrderHistory.description``, which is the generic stored sentinel
+(``"Note added to order"``, ``"Payment information updated"``,
+``"Status changed from X to Y"``). The actual content the log
+helpers write lives in ``new_value`` JSON. Result on the
+storefront's ``Ιστορικό Παραγγελίας`` card: a wall of identical
+``NOTE / Note added to order`` rows that told the customer nothing.
+
+New ``_describe_history_entry`` helper unwraps the JSON payload:
+
+* NOTE → ``new_value['note']`` (the real email/event text)
+* STATUS → ``"PENDING → PROCESSING"`` style transition
+* PAYMENT → ``"PENDING → COMPLETED (viva_wallet)"`` — surfaces the
+  provider but NOT the ``payment_id`` token (which is an internal
+  reference, not customer-facing)
+* SHIPPING/CUSTOMER/etc. fall back to the stored description (no
+  richer log helper to unwrap from yet)
+
+**Carrier tracking URLs**:
+
+* BoxNow ``CARRIER_TRACKING_URLS`` entry was missing entirely —
+  ``tracking_details.tracking_url`` returned None for every BoxNow
+  order. Added ``https://boxnow.gr/en?track={number}`` which is
+  the public-facing tracking page (the internal subdomain
+  ``tracking.boxnow.gr/track/...`` previously hard-coded in
+  ``BoxNowTracking.vue`` is not reachable for customers).
+* ACS removed from the dict with a comment explaining why: the
+  public tracking page (``/el/track-and-trace/`` and the
+  ``anazitisi-apostolwn`` admin page) is a JS-only search form
+  that ignores ``?p=``/``?id=`` and any other query parameter. A
+  deep-link is impossible until ACS publishes a proper URL.
+  The frontend now hides the broken external-tracking button on
+  ACS cards and displays the voucher number prominently for
+  copy-paste.
+
+OpenAPI schema regenerated (schema.yml + schema.json) — no shape
+change, only doc-string updates for the timeline help_text.
+
+Regression test pins all three contracts: NOTE surfaces note text,
+STATUS shows from→to, PAYMENT shows transition + provider AND
+does NOT leak the ``payment_id`` token.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`15b072a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/15b072adb2f57cb2d5b08ed01eaf66e46686c847))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.132.1 [skip ci] ([`6bca710`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6bca71091b8829cbd6b8c5167623ace55a5d486a))
+
+## v1.132.1 (2026-05-13)
+
+### Bug fixes
+
+* fix(shipping_acs): always send Item_Quantity=1 — one parcel per order
+
+Reported by the shop admin on order #56: a 3-item cart produced 3
+ACS vouchers. Root cause: ``AcsCarrier.create_shipment_row``
+computed ``item_quantity = sum(cart quantities)`` from the items
+iterable, conflating "cart line items" with ACS's ``Item_Quantity``
+field — which actually means "number of **physical parcels** in
+the shipment" (ACS PDF p.9). When ``Item_Quantity > 1`` ACS
+auto-mints child vouchers via ``ACS_Get_Multipart_Vouchers``
+(handled by ``shipping_acs.services.create_voucher_for_order`` at
+line 319), producing one extra voucher per "piece."
+
+The shop physically bundles every order into one box, so
+``Item_Quantity`` should always be 1. Future merchants that
+genuinely ship one order in multiple boxes can pass
+``acsItemQuantity`` in the order body — added as an optional
+admin-override hatch with the same "no DRF default" treatment we
+applied to ``acsChargeType`` after the PREPAID-leak incident.
+
+Changes:
+
+* ``AcsCarrier.payload_keys`` declares ``acs_item_quantity`` so the
+  view forwards it to the carrier payload.
+* ``AcsCarrier.create_shipment_row`` reads ``acs_item_quantity``
+  from the payload with a hard fallback to ``1`` (rejects invalid
+  inputs, clamps to a positive integer).
+* The Smartpoint clamp (``if kind == PICKUP_POINT and qty > 1``)
+  is gone — subsumed by the single hard default of 1, which is
+  also what ACS PDF p.8 requires for Smartpoint anyway.
+* ``OrderCreateFromCartSerializer.acs_item_quantity`` field added
+  with ``required=False``, ``min_value=1``, ``max_value=20``, and
+  EXPLICITLY no ``default=`` so DRF omits it from
+  ``validated_data`` when the storefront doesn't send it — the
+  carrier-level default of 1 then fires cleanly.
+* ``_build_shipping_address_from_validated`` forwards the new key.
+
+Three new regression tests pin all three layers:
+
+* ``test_create_shipment_row_item_quantity_defaults_to_one`` —
+  5-line fake cart (would have been Item_Quantity=10 pre-fix) now
+  produces 1.
+* ``test_create_shipment_row_item_quantity_admin_override`` —
+  explicit override still wins.
+* ``test_order_create_serializer_omits_acs_item_quantity_by_default``
+  — asserts ``field.default is empty`` (DRF sentinel) so the
+  PREPAID-leak pattern can't recur for this field either.
+
+Note: this fix is forward-looking — order #56's three minted
+vouchers exist on ACS's side. Admin can simply use one and discard
+the other two physical labels, or we can cancel them via
+``ACS_Delete_Voucher`` and re-mint as a single-parcel voucher.
+Discussed separately.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`6369a72`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6369a7295392a2abd98c6bedd9beaa6e45879d30))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.132.0 [skip ci] ([`5305442`](https://github.com/vasilistotskas/grooveshop-django-api/commit/53054429552ed3d1195bf5c4cad496411a36b7ad))
+
+## v1.132.0 (2026-05-13)
+
+### Bug fixes
+
+* fix(tests): drop dead defensive import from conftest fixture
+
+``ty`` correctly flagged ``from django.conf import django_settings_module``
+in ``_reseed_extra_settings`` as ``unresolved-import`` — there is no
+such symbol on ``django.conf`` (the actual one is the
+``DJANGO_SETTINGS_MODULE`` *env var*, not an attribute). The
+try/except was a stray hangover from an earlier draft; the
+``from django.conf import settings as _dj_settings`` line right
+below it is what the fixture actually needs.
+
+Pure dead-code removal. Fixture body and behaviour unchanged.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`69b77ac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/69b77ac421b7e1d392de1f3ddfd929465b6c2ac4))
+
+* fix(shipping_acs): align AcsShipment.charge_type model default to COD
+
+Defence-in-depth alongside ``00d3d654`` (carrier default) and
+``c20af461`` (serializer default removed). The model field default
+was still ``AcsChargeType.PREPAID``, which is the deepest layer of
+the stack: if any future code path constructs an ``AcsShipment``
+row without explicitly passing ``charge_type`` (e.g. a new admin
+form, a data migration, or a test helper), the model default kicks
+in and we'd be back to ACS rejecting every voucher.
+
+Today there's only one creation site — ``AcsCarrier.create_shipment_row``
+— and it explicitly passes ``charge_type=charge_type``. The model
+default is academic for the current call graph. But aligning it
+with COD makes the "what's the safe default if you forget to pass
+it?" answer consistent across all four layers (model field,
+serializer field, view payload builder, carrier method) — so the
+class of bug that caused orders 53/55/56 truly can't recur via any
+combination of upstream regressions.
+
+Migration is a state-only ``AlterField`` — no SQL changes the
+on-disk values of existing rows, no rewrite, safe under the Argo CD
+PreSync hook.
+
+A new test (``test_acs_shipment_model_default_is_cod``) pins the
+field's default explicitly so a future "let's be conservative,
+revert to PREPAID" change fails the suite loudly.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`96de158`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96de15850e65b7e4655c1a4f5177c4c9dd993728))
+
+* fix(order): drop OrderCreateFromCartSerializer.acs_charge_type default
+
+This is the upstream half of the PREPAID-leak fix from commit
+``00d3d654``. That commit set the carrier's ``create_shipment_row``
+default to ``AcsChargeType.COD`` because our ACS contract is
+COD-only — every PREPAID voucher request is rejected with
+"Μη αποδεκτή τιμή χρέωσης μεταφορικών". The carrier-level fix
+shipped, but order 56 was placed today and rejected by ACS with the
+same error.
+
+Root cause: ``order/serializers/order.py:747-751`` has
+``serializers.ChoiceField(..., required=False, default=1)``. DRF
+injects ``default=1`` into ``validated_data`` even when the request
+body doesn't supply ``acsChargeType``. The view passes that ``1``
+through to the carrier's payload. In the carrier,
+``int(payload.get("acs_charge_type") or AcsChargeType.COD)``
+short-circuits because ``1`` is truthy — so the COD fallback never
+fires and the new AcsShipment is created with ``charge_type=1``
+(PREPAID), which ACS then rejects.
+
+Fix: remove ``default=1`` from the serializer field. The field
+stays as an optional per-order admin override (an admin can still
+flip an individual order back to PREPAID if the contract ever gets
+that enabled), but the platform-wide default lives in one place
+only — the carrier code. Three regression tests pin both halves of
+the contract: serializer omits the default; carrier defaults to COD
+when payload doesn't override; explicit overrides still work.
+
+Affects orders 53, 55, 56 going forward (all three had to be
+minted manually with charge_type=COD via shell — see commit
+messages on the original ``00d3d654`` and live fixes recorded in
+memory ``project_acs_contract_cod_only``).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c20af46`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c20af461a92247006a2579e1c3808fe6fb975d05))
+
+* fix(pay_way): shorten PayWayShippingExclusion index names to satisfy E034
+
+The inherited ``TimeStampMixinModel.Meta.indexes`` use a
+``%(class)s_..._ix`` template; resolved for this model it produced
+``paywayshippingexclusion_created_at_ix`` (37 chars), tripping
+Django's ``models.E034`` 30-char index-name limit and crashing
+``manage.py migrate`` in CI with a ``SystemCheckError`` before any
+SQL ran.
+
+Two changes:
+
+* Override the inherited indexes in the model's ``Meta`` with
+  explicit short names (``payway_excl_*``) so the system check
+  passes.
+* Amend the just-pushed migration ``0013`` in place to write those
+  short names from the start. ``0013`` had not been applied to any
+  environment yet (CI failed before deploy), so there is no
+  rename-migration churn — a single migration creates the table
+  with the final index names.
+
+No model field changes, no constraint changes, no filter-logic
+changes — index-name fix only.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`78d7d80`](https://github.com/vasilistotskas/grooveshop-django-api/commit/78d7d805cd1f8e604f08dbd39275645a710b2d73))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.131.0 [skip ci] ([`c5020e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5020e09eca8859c1ef5ee4507a6a33c419afeb3))
+
+### Code style
+
+* style(pay_way): apply ruff format to PayWayShippingExclusion
+
+CI's ``ruff format --check`` ran with the project's pinned 0.15.12
+and flagged a minor formatting diff in ``pay_way/models.py`` left
+over from the previous index-name fix. Local ``uv run ruff format``
+applies the canonical layout. Format-only — no semantic changes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0b22a74`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0b22a7485a78bc425aa373b5bc26e831f5ec6e17))
+
+### Features
+
+* feat(pay_way): admin-configurable pay-way exclusions per (provider, kind)
+
+Adds runtime-toggleable rules for "this pay-way is unavailable when
+the customer picks this shipping (provider, kind) combination."
+Previously the only escape valve was either a code-level
+``ShippingCarrierInterface.filter_pay_ways`` override (which
+required a redeploy and couldn't differentiate kinds for the same
+provider) or globally deactivating the pay-way (too coarse).
+
+A real motivating case: BoxNow's PAY ON THE GO product collects
+cash/card at the locker on delivery and our partner contract honours
+COD on lockers, but partners without PAY ON THE GO active need to
+hide ``Αντικαταβολή`` from the BoxNow checkout step without
+disabling the pay-way for ACS Smartpoint or home delivery. The
+previous design forced an all-or-nothing toggle; this PR lets ops
+flip the specific (provider, kind, pay_way) row from Django admin.
+
+Design — two-layer filter in
+``PayWayService.filter_by_carrier``:
+
+1. **Layer 1 — admin-configured exclusions** (this PR):
+   ``PayWayShippingExclusion`` rows index by (provider, kind, pay_way).
+   Empty table = default-permissive (current behaviour preserved
+   without any data migration).
+2. **Layer 2 — carrier hard constraints**: the existing
+   ``ShippingCarrierInterface.filter_pay_ways`` hook is reserved for
+   code-level vetoes where the courier API itself rejects a combo
+   regardless of operator preference. Default base implementation
+   stays pass-through.
+
+Layer 1 runs first so an operator-blocked combo short-circuits
+without consulting the carrier adapter at all.
+
+Changes:
+
+* New ``PayWayShippingExclusion`` model with a unique constraint on
+  (pay_way, shipping_provider, shipping_kind), composite BTree
+  index on (provider, kind) sized for the read-heavy filter query,
+  and an optional ``note`` text field for ops to document why a row
+  was added (visible to admins only, never reaches customers).
+* Reusable Unfold ``TabularInline`` registered on both
+  ``PayWayAdmin`` and ``ShippingProviderAdmin`` — ops can manage
+  rules from whichever side they land on.
+* ``BoxNowCarrier.filter_pay_ways`` no-op override removed (its
+  whole purpose — operator-configurable per-combo toggle — now
+  lives in the DB).
+* ``PayWayShippingExclusionFactory`` mirrors the existing factory
+  conventions; ``django_get_or_create`` keys the unique triple so
+  the fixture is safe under ``-n auto``.
+
+Migration is purely additive — new table, no FK changes elsewhere,
+old code ignores the new model. Safe under the Argo CD PreSync hook
+deploy model (schema lands before new code).
+
+No frontend changes: the storefront already calls
+``/api/v1/pay_way?shippingProviderCode=…&shippingKind=…`` and
+results respect the new exclusions transparently.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`1436161`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1436161e5b64eee00a2792abade5db970a0ab604))
+
+### Testing
+
+* test(conftest): reset extra_settings to declared baseline per test
+
+CI under -n auto intermittently fails ~10 tests across mydata,
+smartpoint-gating, boxnow-order-creation, and b2b-invoicing, all
+gated on a feature flag in ``EXTRA_SETTINGS_DEFAULTS`` (BOXNOW_ENABLED,
+ACS_SMARTPOINT_ENABLED, MYDATA_ENABLED, B2B_INVOICING_ENABLED, etc).
+Local reruns with -n0 always pass — the failure is non-deterministic
+and worker-count-sensitive.
+
+Root cause: the previous ``_reseed_extra_settings`` autouse fixture
+called ``Setting.set_defaults_from_settings()`` which uses
+``get_or_create`` — it restored MISSING rows after a
+``django_db(transaction=True)`` flush but did NOT undo VALUE
+mutations from prior tests. A test like
+``Setting.objects.update_or_create(name="BOXNOW_ENABLED", ...,
+defaults={..., "value_bool": True})`` would commit the change to
+the shared test DB; the next test on a different worker would read
+the mutated True instead of the declared False default and the
+assertion flaked.
+
+Fix: replace ``set_defaults_from_settings`` with ``update_or_create``
+keyed on ``name`` that rewrites ``value_<type>`` to the declared
+default every time the fixture runs (i.e. before every test). Each
+test now starts from the same baseline regardless of what any prior
+test did. Cost is one tiny UPDATE per declared setting (~30 rows)
+per test — dwarfed by the EAGER signal cascades the same tests
+already trigger.
+
+Verified locally with two consecutive runs of the originally-failing
+tests under -n auto (22/22 each), and a 1636-test broad sweep
+across order + shipping + pay_way under -n auto (1636/1636).
+
+Reruns are no longer required — tests are now deterministic across
+any worker count.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`fbb402e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fbb402e93174091a0b030b1fa86c4260c27bf314))
+
+## v1.131.0 (2026-05-12)
+
+### Bug fixes
+
+* fix(auth): close audit gaps across signals, headless config, urls, CORS
+
+- user/signals.py: revoke Knox tokens on password_reset signal (forgot-password
+  flow). password_changed only covers in-session changes; without this, an
+  account taken over via reset email kept the victim's Knox tokens valid for
+  the full 7-day TTL.
+- settings.py: HEADLESS_CLIENTS=("app",) — disables browser-mode allauth
+  endpoints that bypassed our SessionTokenStrategy Knox token issuance.
+- settings.py: swap AUTHENTICATION_BACKENDS so allauth precedes ModelBackend;
+  ModelBackend-first lets is_active=False users authenticate via the legacy
+  path.
+- settings.py: add "email" to Facebook FIELDS — the custom override dropped
+  the default, so Graph API never returned an email and signup/auto-connect
+  silently failed for Facebook.
+- core/urls.py: move _allauth/ and TOTP SVG include out of i18n_patterns so
+  non-default locales don't get a /{lang}/_allauth/ prefix the Nuxt proxy
+  never sends.
+- asgi/cors_handler.py: add GET/PUT/PATCH/DELETE to the allowed-methods
+  preflight response and expand allowed-headers to include X-Session-Token,
+  X-Cart-Id, X-Forwarded-Host, X-Real-IP, X-CSRFToken, X-Requested-With,
+  Idempotency-Key, Location. The previous POST-only list silently broke
+  every cross-origin browser request that wasn't a POST.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0c22cb5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c22cb5fe43efde67f2abb7802fa46560e82ee73))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.130.0 [skip ci] ([`c85679b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c85679b14b1ffd8bfa08437733d55f6d60b97d44))
+
+### Features
+
+* feat(order): add Viva Wallet return-URL lookup endpoint
+
+Viva's hosted checkout (``POST /checkout/v2/orders``) only accepts a
+per-order ``urlFail`` — the success URL is configured once in the
+merchant portal source settings and points at a static string with
+no per-order substitution. The storefront needs a way to translate
+the ``?t=<transaction_id>`` query param Viva appends to the
+success-callback URL into the order's UUID so it can forward the
+customer to the canonical ``/checkout/success/{uuid}`` route.
+
+Adds ``GET /api/v1/order/viva_return?t=<transaction_id>`` with
+``AllowAny`` permission. The transaction_id is a Viva-generated UUID
+(unguessable) and the response is intentionally minimal — id, uuid,
+status, paymentStatus — so the endpoint can't be used to enumerate
+PII.
+
+Companion change in the storefront (see next commit on the Nuxt
+side) adds ``/checkout/viva-return`` that hits this endpoint and
+``navigateTo`` the success page; operator then sets the Viva
+merchant portal source success URL to
+``https://webside.gr/el/checkout/viva-return``.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`8746c3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8746c3a34ef5e2a0fd66a6454b1a062fb43aace0))
+
+### Testing
+
+* test(asgi): sync CORS preflight assertions with handler
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`24fca55`](https://github.com/vasilistotskas/grooveshop-django-api/commit/24fca55ed2163275303f3fede38a3b39782d7657))
+
+## v1.130.0 (2026-05-12)
+
+### Bug fixes
+
+* fix(shipping): tighten BoxNow + ACS API contract handling
+
+BoxNow:
+* ``_locker_defaults_from_dest`` was reading ``dest["address"]["..."]``
+  but BoxNow's ``/destinations`` response has those fields at the top
+  level. Every synced locker was silently saved with empty
+  ``address_line_1`` / ``postal_code`` and a hardcoded ``"GR"`` country
+  — postal-code filtering and admin display were both broken.
+* ``boxnow_send_arrival_notification.delay()`` now fires through
+  ``transaction.on_commit`` so the worker sees the committed
+  ``BoxNowParcelEvent`` row. Without the wrapper the dequeue could
+  race past the commit and crash on ``DoesNotExist`` — the same class
+  of bug as ACS order 47 (see memory
+  ``project_shipping_dispatch_on_commit``).
+* ``amountToBeCollected`` is forced to ``"0.00"`` for PREPAID parcels
+  per BoxNow API §3.4. Previously the full order total was sent
+  regardless of payment mode, which combined with the P408 ``(0,
+  5000)`` cap to silently reject prepaid carts above €5000.
+
+ACS:
+* ``_build_create_voucher_params`` no longer sends ``Cod_Payment_Way``
+  when ``Cod_Ammount`` is ``0,00`` (online-paid orders that ship as
+  COD-with-zero because the contract doesn't enable PREPAID). Per
+  ACS PDF p.6 the field should be ``null`` when no cash is collected;
+  sending ``0`` (cash) tells the driver to ``collect €0`` which has
+  been observed to produce confused PoD entries.
+* ``create_shipment_row`` clamps ``Item_Quantity`` to ``1`` when the
+  destination is a Smartpoint locker. Per ACS PDF p.8 Smartpoint
+  pickups are restricted to single-piece vouchers; a 2-line cart
+  routed to a locker would otherwise mint a voucher that ACS rejects
+  at locker-load time.
+
+Plus a dispatch-enqueue log entry on both carriers so an order's
+shipment lifecycle can be reconstructed from grep alone.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`299bc17`](https://github.com/vasilistotskas/grooveshop-django-api/commit/299bc1744e76ddf8021de4580ea3c9195bc51de6))
+
+* fix(order): tighten Stripe webhook race + idempotency + refund state
+
+Three related fixes surfaced by the order/payment audit:
+
+* ``handle_stripe_payment_requires_action`` now wraps in
+  ``transaction.atomic`` + ``select_for_update`` and (a) idempotency-
+  checks the event_id, (b) refuses to walk back a terminal
+  ``payment_status`` (COMPLETED/FAILED/REFUNDED). Stripe redelivery
+  ordering is not guaranteed; a late ``requires_action`` could
+  previously overwrite ``COMPLETED`` back to ``PENDING`` and leave
+  the order paid-but-not-paid with no signal.
+* ``handle_stripe_dispute_created`` now locks the order row and
+  honours ``webhook_processed_{event_id}`` so a redelivered dispute
+  event no longer fires duplicate staff notification emails or
+  re-overwrites later dispute fields.
+* ``handle_stripe_checkout_expired`` gets the same lock + idempotency
+  treatment to stop a redelivered expiry from appending duplicate
+  history rows.
+* ``PayWayService.refund_payment`` no longer writes
+  ``order.status = REFUNDED`` directly — that bypassed the canonical
+  state-machine table (which only allows RETURNED→REFUNDED) and the
+  ``order_refunded`` signal. ``payment_status`` is still flipped to
+  ``REFUNDED`` and the ``order_refunded`` signal now fires
+  consistently from both online and offline refund paths, matching
+  the policy in ``handle_stripe_charge_refunded``. Admin drives the
+  RETURNED→REFUNDED status transition manually when the goods are
+  actually returned.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`8bf22d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8bf22d29dec76924b7ef032240fbdd7bf1fdf042))
+
+* fix(shipping_acs): switch ACS voucher print layout to thermal by default
+
+The PDF returned by ACS_Print_Voucher was always rendered as laser
+(Print_Type=2 — 4 vouchers per A4) because the client default was
+hardcoded and never overridden. Ops uses thermal/roll printers
+(Print_Type=1 — single voucher per page), so every printed sheet
+arrived with one voucher in the top-left and three blank slots.
+
+Surface the value as ``ShippingProvider.metadata["print_type"]`` via
+a new ``acs_config.print_type()`` accessor (mirroring the existing
+metadata-driven config pattern for shop kinds, weight bounds, etc.).
+``AcsService.fetch_label_bytes`` reads the accessor and passes it
+through to ``AcsClient.print_voucher`` — and the PDF cache key now
+includes the print type so flipping the metadata invalidates only
+the layout that changed instead of waiting an hour for the cached
+laser PDF to expire.
+
+Migration ``shipping/0005`` seeds ``print_type=1`` on fresh deploys;
+the live ACS row in production was updated out-of-band so the next
+voucher download (manual fix for order 53's voucher 9770584611
+applied alongside this change) returns thermal.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c7f2bbc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7f2bbc838fe84804e26a0c8bee13b69a443a2e5))
+
+* fix(shipping_acs): default Charge_Type to COD on contract that disallows PREPAID
+
+ACS rejects Charge_Type=1 (PREPAID) on our billing code with "Μη
+αποδεκτή τιμή χρέωσης μεταφορικών" — discovered after Viva-paid order
+53 minted no voucher (0/2 prepaid attempts ever succeeded in prod;
+2/2 COD ones did). The carrier now defaults to COD for every order
+regardless of pay-way and ``_build_create_voucher_params`` always
+emits ``Cod_Ammount`` (comma-decimal, e.g. ``"0,00"``) plus
+``Cod_Payment_Way`` when Charge_Type=COD. ``cod_synced`` is gated on
+``pay_way.is_cash_on_delivery`` so online-paid orders keep
+``cod_amount=0`` and the courier collects nothing on delivery
+instead of double-charging the recipient. The ``acs_charge_type``
+payload override hatch is preserved so admins can force PREPAID per
+order if ACS ever enables it on the contract.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`00d3d65`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00d3d65415c92d6a929d7852db922c0c18cdc6d2))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.129.0 [skip ci] ([`91f4c20`](https://github.com/vasilistotskas/grooveshop-django-api/commit/91f4c209387be39015e58cd934264b397e0c728f))
+
+### Features
+
+* feat(order): notify admin on new order via mail_admins()
+
+Add `send_admin_new_order_email` Celery task that fires on the
+`order_created` signal and notifies every recipient in `settings.ADMINS`.
+The task renders `emails/order/admin_new_order.{html,txt}` with the
+order summary, customer, shipping address, and items.
+
+Migrate the codebase to Django 6.0's canonical admin-email pattern:
+- Drop the custom `settings.ADMIN_EMAIL` setting. The `ADMIN_EMAIL`
+  env var still exists, but it is now read once into `ADMINS`.
+- Switch `ADMINS` to the Django 6.0+ list-of-strings form; the old
+  `[(name, email)]` tuple form raises `RemovedInDjango70Warning`.
+- Remove `("Info", INFO_EMAIL)` from `ADMINS`. INFO_EMAIL is the
+  public support inbox, not a site administrator — Django routes
+  500-error reports and AdminEmailHandler logs to ADMINS, which
+  must never leak stack traces to a customer-facing address.
+- Add `SERVER_EMAIL = DEFAULT_FROM_EMAIL` and
+  `EMAIL_SUBJECT_PREFIX = "[Webside] "` so `mail_admins()` produces
+  a well-formed From: and subject (defaults are `root@localhost`
+  and `[Django] `).
+- Migrate four call sites to `mail_admins()`: new-order admin
+  notification, system health critical alert, scheduled backup
+  failure alert, low-stock alert.
+- Drop the bogus `INFO_EMAIL` fallback in
+  `check_low_stock_products` — INFO_EMAIL is not an admin recipient.
+- Update `contact/tasks.py` for the new ADMINS shape (strings,
+  not tuples).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`a1f6d54`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a1f6d549e292c8b07ade496fc68efc3da8827d18))
+
+### Testing
+
+* test(shipping_acs): mock AcsClient at the import site so CI can run
+
+Follow-up to c7f2bbc8 (Print_Type metadata-driven config). The new
+``test_fetch_label_bytes_passes_print_type_and_keys_cache_by_it``
+patched ``shipping_acs.client.AcsClient.print_voucher`` (the method)
+but ``AcsService.fetch_label_bytes`` instantiates a fresh
+``AcsClient()`` first, and the constructor validates every
+``ACS_*`` env var. CI doesn't set those vars, so the test failed
+with ``AcsConfigError: Missing required ACS settings``.
+
+Patch the ``AcsClient`` class at the services import site instead so
+the constructor is bypassed entirely; this is the same pattern the
+other shipping_acs tests use when they cross the service↔client
+boundary.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0ef3d59`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ef3d59de2e11d6a2bbb54ccfab5f9ea68028699))
+
 ## v1.129.0 (2026-05-12)
 
 ### Chores

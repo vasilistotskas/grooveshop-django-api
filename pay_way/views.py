@@ -54,7 +54,7 @@ class PayWayViewSet(BaseModelViewSet):
         "requires_confirmation",
         "sort_order",
     ]
-    ordering = ["-created_at"]
+    ordering = ["sort_order", "-created_at"]
     search_fields = [
         "provider_code",
         "translations__name",

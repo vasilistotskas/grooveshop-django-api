@@ -2,7 +2,6 @@ from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from django.core.cache import cache
 from django.test import TestCase as DjangoTestCase
 from django.test import override_settings
 from django.utils import timezone
@@ -13,10 +12,11 @@ from order.models.order import Order
 from order.tasks import (
     CONFIRMATION_EMAIL_SENT_AT_KEY,
     CONFIRMATION_EMAIL_SENT_FLAG,
-    _confirmation_lock_key,
+    _confirmation_already_sent,
     _release_confirmation_email,
     check_pending_orders,
     generate_order_invoice,
+    send_admin_new_order_email,
     send_invoice_email,
     send_order_confirmation_email,
     send_order_status_update_email,
@@ -112,9 +112,9 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         mock_email_instance.send.assert_called_once()
 
         self.order.refresh_from_db()
-        self.assertTrue(
-            self.order.metadata.get("confirmation_email_sent"),
-            "metadata flag must be set after a successful send",
+        self.assertIsNotNone(
+            self.order.metadata.get(CONFIRMATION_EMAIL_SENT_AT_KEY),
+            "permanent sent_at timestamp must be set after a successful send",
         )
 
     @patch("order.tasks.EmailMultiAlternatives")
@@ -126,8 +126,9 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         STATIC_BASE_URL="http://example.com",
         DEFAULT_FROM_EMAIL="no-reply@example.com",
     )
+    @patch("order.tasks.cache")
     def test_send_order_confirmation_email_worker_kill_recovery(
-        self, mock_render, mock_email
+        self, mock_cache, mock_render, mock_email
     ):
         """Simulate a worker OOM-kill mid-send.
 
@@ -140,30 +141,30 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         - If the worker is killed the lock auto-expires; the next invocation
           can acquire the lock and complete the send.
 
-        This test simulates the kill by manually holding the lock (as the
-        "dead" worker did) then releasing it (simulating TTL expiry) before
-        calling the task again. The second call must succeed and set the
-        permanent DB flag.
+        ``order.tasks.cache`` is mocked (not exercised via the live ``cache``
+        proxy) because the cache proxy in this test suite is bound to the
+        production Redis backend — keys clash across xdist workers whose
+        per-worker DBs both mint ``order.id=1`` and target the same
+        ``confirmation_email_lock:1`` Redis key, leaving the lock state
+        race-prone. The mock makes the worker-kill simulation deterministic
+        by directly controlling ``cache.add``'s return value across the two
+        call legs (held → released).
         """
         mock_email_instance = Mock()
         mock_email.return_value = mock_email_instance
         mock_render.side_effect = ["Email content", "HTML content"]
 
-        # Simulate worker-kill: hold the execution lock as if a dead worker
-        # acquired it but never released it (the lock expires naturally in
-        # production; here we force-release it to simulate the expiry).
-        lock_key = _confirmation_lock_key(self.order.id)
-        cache.set(lock_key, "1", 90)  # dead worker's lock
-
-        # First call sees the lock held and skips.
+        # Leg 1: dead worker's lock is still active → cache.add (atomic
+        # set-if-not-exists) returns False → task skips without sending.
+        mock_cache.add.return_value = False
         result_while_locked = send_order_confirmation_email(self.order.id)
         self.assertTrue(result_while_locked)  # skips gracefully, not an error
         mock_email_instance.send.assert_not_called()
 
-        # Simulate lock TTL expiry (worker is dead, Redis evicted the key).
-        cache.delete(lock_key)
-
-        # Second call acquires the lock, sends the email, writes DB flag.
+        # Leg 2: lock TTL expired (dead worker's key evicted) → cache.add
+        # returns True → task acquires the lock, sends, sets the permanent
+        # sent_at timestamp.
+        mock_cache.add.return_value = True
         result_after_expiry = send_order_confirmation_email(self.order.id)
         self.assertTrue(result_after_expiry)
         mock_email_instance.send.assert_called_once()
@@ -173,16 +174,40 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             self.order.metadata.get(CONFIRMATION_EMAIL_SENT_AT_KEY),
             "permanent sent_at timestamp must be set after successful send",
         )
-        self.assertTrue(
-            self.order.metadata.get(CONFIRMATION_EMAIL_SENT_FLAG),
-            "legacy boolean flag must also be set for backward compat",
-        )
+        # The legacy boolean key (``CONFIRMATION_EMAIL_SENT_FLAG``) is
+        # no longer dual-written — new writes use only the timestamp.
+        # The reader's fallback at ``_confirmation_already_sent`` still
+        # honours the boolean for pre-timestamp DB rows.
+        self.assertNotIn(CONFIRMATION_EMAIL_SENT_FLAG, self.order.metadata)
 
         # Third call: permanent DB flag present → skip without touching Redis.
         mock_email_instance.send.reset_mock()
         result_already_sent = send_order_confirmation_email(self.order.id)
         self.assertTrue(result_already_sent)
         mock_email_instance.send.assert_not_called()
+
+    def test_confirmation_already_sent_dedupes_via_either_key(self):
+        """The reader honours BOTH the timestamp key (current writers
+        set this) AND the boolean key (older DB rows have only this).
+        Guards the load-bearing promise made when the dual-write was
+        dropped: new writes use only the timestamp, but the boolean
+        fallback ensures older rows never re-fire the confirmation
+        email."""
+        # Current writer shape: timestamp set, no boolean.
+        self.assertTrue(
+            _confirmation_already_sent(
+                {CONFIRMATION_EMAIL_SENT_AT_KEY: "2026-01-01T00:00:00+00:00"}
+            )
+        )
+        # Older DB rows: boolean only, no timestamp. The fallback at
+        # the end of ``_confirmation_already_sent`` honours these.
+        self.assertTrue(
+            _confirmation_already_sent({CONFIRMATION_EMAIL_SENT_FLAG: True})
+        )
+        # Brand-new order with no email-sent state yet — neither key
+        # set, dedupe must return False so the first send fires.
+        self.assertFalse(_confirmation_already_sent({}))
+        self.assertFalse(_confirmation_already_sent(None))
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
@@ -564,3 +589,56 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         # Invoice generation must not mutate the order's status.
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, original_status)
+
+
+@pytest.mark.django_db
+class SendAdminNewOrderEmailTestCase(DjangoTestCase):
+    def setUp(self):
+        self.order = OrderFactory.create(
+            email="customer@example.com",
+            first_name="John",
+            last_name="Doe",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+
+    @patch("order.tasks.mail_admins")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        ADMINS=["admin@example.com"],
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_send_admin_new_order_email_sends_to_admins(
+        self, mock_render, mock_mail_admins
+    ):
+        mock_render.side_effect = ["Text body", "<p>HTML body</p>"]
+
+        result = send_admin_new_order_email(self.order.id)
+
+        self.assertTrue(result)
+        mock_mail_admins.assert_called_once()
+        call_kwargs = mock_mail_admins.call_args[1]
+        self.assertIn(f"New order — #{self.order.id}", call_kwargs["subject"])
+        self.assertEqual(call_kwargs["message"], "Text body")
+        self.assertEqual(call_kwargs["html_message"], "<p>HTML body</p>")
+
+    @override_settings(ADMINS=[])
+    @patch("order.tasks.mail_admins")
+    def test_send_admin_new_order_email_skips_when_unconfigured(
+        self, mock_mail_admins
+    ):
+        result = send_admin_new_order_email(self.order.id)
+
+        self.assertFalse(result)
+        mock_mail_admins.assert_not_called()
+
+    @patch("order.tasks.logger.error")
+    def test_send_admin_new_order_email_order_not_found(self, mock_logger):
+        result = send_admin_new_order_email(999999)
+
+        self.assertFalse(result)
+        mock_logger.assert_called_once()

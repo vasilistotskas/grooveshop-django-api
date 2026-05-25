@@ -153,6 +153,96 @@ class ReserveStockResponseSerializer(serializers.Serializer):
     )
 
 
+class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
+    """Request body for ``POST /api/v1/cart/create-payment-intent``.
+
+    ``shipping_kind`` is required so the view's shipping calculation
+    follows the same code path the order-create verification runs.
+    ``shipping_provider_code`` is required for ``pickup_point`` (the
+    carrier identity drives the locker quote + per-carrier threshold)
+    but **omitted for ``home_delivery``** — home delivery is
+    provider-agnostic in checkout per the frontend's
+    ``shared/shipping/index.ts::carrierForMethod`` contract, and the
+    backend resolves the active home-delivery provider at order
+    creation. Sending whatever the frontend has guarantees both calc
+    paths agree.
+    """
+
+    pay_way_id = serializers.IntegerField(
+        min_value=1,
+        help_text=_("ID of the selected PayWay (must be online Stripe)."),
+    )
+    shipping_kind = serializers.ChoiceField(
+        # Choices declared inline to avoid the circular import that
+        # would happen if ``shipping.enum`` were pulled in at module
+        # import time (cart -> shipping -> order -> cart).
+        choices=(
+            ("home_delivery", "home_delivery"),
+            ("pickup_point", "pickup_point"),
+        ),
+        help_text=_(
+            "Fulfilment kind for the carrier (home_delivery or "
+            "pickup_point). Required so the per-kind feature flags "
+            "(e.g. ACS_SMARTPOINT_ENABLED) and BoxNow's PICKUP_POINT "
+            "gate are honoured."
+        ),
+    )
+    shipping_provider_code = serializers.CharField(
+        max_length=32,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Carrier code matching a registered shipping adapter "
+            "(e.g. 'acs', 'boxnow'). Required for ``pickup_point``; "
+            "omit/empty for ``home_delivery`` (the backend uses the "
+            "generic flat rate, matching what the order-create "
+            "verification will compute for the same body)."
+        ),
+    )
+    country_id = serializers.CharField(
+        max_length=2,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Optional ISO 3166-1 alpha-2 country code — drives the "
+            "country-level shipping multiplier. Match what the "
+            "order-create body will carry."
+        ),
+    )
+    region_id = serializers.CharField(
+        max_length=16,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Optional region code — drives the region-level shipping "
+            "adjustment."
+        ),
+    )
+
+    def validate(self, attrs):
+        """Pickup-point requires a carrier code; home-delivery doesn't.
+
+        Mirrors the order-create body shape: ``shippingProviderCode``
+        is bound to ``shippingKind`` semantically and the backend
+        cannot route a locker pickup without knowing which carrier's
+        locker network to use.
+        """
+        kind = attrs.get("shipping_kind")
+        code = (attrs.get("shipping_provider_code") or "").strip()
+        if kind == "pickup_point" and not code:
+            raise serializers.ValidationError(
+                {
+                    "shipping_provider_code": _(
+                        "shipping_provider_code is required for pickup_point."
+                    )
+                }
+            )
+        # Normalise empty string → not present so the view's
+        # downstream None-check stays clean.
+        attrs["shipping_provider_code"] = code or None
+        return attrs
+
+
 class CartPaymentIntentResponseSerializer(serializers.Serializer):
     """Response body returned by the create-payment-intent cart action."""
 

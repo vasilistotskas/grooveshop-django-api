@@ -17,6 +17,8 @@ Example:
 
 from __future__ import annotations
 
+from tinymce.models import HTMLField
+from tinymce.widgets import AdminTinyMCE
 from unfold.admin import ModelAdmin
 
 
@@ -62,3 +64,18 @@ class BaseModelAdmin(ModelAdmin):
     list_filter_sheet = True
     save_on_top = True
     list_per_page = 25
+
+    # Unfold's FORMFIELD_OVERRIDES maps ``models.TextField`` to
+    # ``UnfoldAdminTextareaWidget``. Django admin's MRO-walk in
+    # ``formfield_for_dbfield`` matches that override on every
+    # ``HTMLField`` (subclass of TextField), wiping the TinyMCE widget
+    # that ``HTMLField.formfield()`` would otherwise return — so
+    # description fields on Product / BlogPost / Category rendered as
+    # plain textareas with no editor, and ``form.media`` never pulled
+    # in ``tinymce.min.js``. Putting ``HTMLField`` itself in the
+    # overrides dict wins the MRO race (HTMLField is checked before
+    # TextField) and restores the rich-text editor across every admin
+    # that inherits this base.
+    formfield_overrides = {
+        HTMLField: {"widget": AdminTinyMCE},
+    }

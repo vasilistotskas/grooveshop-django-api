@@ -363,6 +363,8 @@ class PayWayAdminTestCase(TestCase):
         # `configuration` is in the base readonly_fields because it holds
         # payment-provider secrets; get_readonly_fields() removes it for
         # superusers (see test_get_readonly_fields_*).
+        # `sort_order` is no longer in readonly_fields; it is editable via
+        # drag-and-drop (ordering_field = "sort_order").
         expected_fields = [
             "id",
             "created_at",
@@ -371,7 +373,6 @@ class PayWayAdminTestCase(TestCase):
             "configuration_preview",
             "effective_cost_display",
             "is_configured_status",
-            "sort_order",
         ]
         self.assertEqual(self.admin.readonly_fields, expected_fields)
 

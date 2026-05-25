@@ -80,11 +80,26 @@ class BlogComment(TranslatableModel, TimeStampMixinModel, UUIDModel, MPTTModel):
 
     @property
     def likes_count(self) -> int:
+        # Short-circuit to queryset annotation when present so callers
+        # that pre-aggregate (e.g. admin changelist) avoid per-row
+        # ``COUNT(*)`` queries. Mirrors ``Product.likes_count``.
+        if "likes_count" in self.__dict__:
+            return self.__dict__["likes_count"]
         return self.likes.count()
+
+    @likes_count.setter
+    def likes_count(self, value):
+        self.__dict__["likes_count"] = value
 
     @property
     def replies_count(self) -> int:
+        if "replies_count" in self.__dict__:
+            return self.__dict__["replies_count"]
         return self.get_children().filter(approved=True).count()
+
+    @replies_count.setter
+    def replies_count(self, value):
+        self.__dict__["replies_count"] = value
 
     @property
     def approved_descendants_count(self) -> int:

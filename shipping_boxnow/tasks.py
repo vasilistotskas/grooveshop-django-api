@@ -313,3 +313,128 @@ def boxnow_send_arrival_notification(
         "order_id": order.id,
         "parcel_id": shipment.parcel_id,
     }
+
+
+# ---------------------------------------------------------------------------
+# Poll-based reconciliation tasks (defence-in-depth against missed webhooks).
+# ---------------------------------------------------------------------------
+
+# Cluster-wide single-flight mutex for the batch dispatcher. Multiple
+# beat consumers must not each dispatch the full fan-out; ``cache.add``
+# on Redis is atomic (SET NX + TTL).
+_BOXNOW_POLL_BATCH_LOCK_KEY = "boxnow:poll_batch:lock"
+_BOXNOW_POLL_BATCH_LOCK_TTL = 13 * 60  # 13 minutes — beat fires every 15.
+
+# Sub-task dispatch stagger. BoxNow does not publish a hard request
+# rate limit, but 5 req/sec is a polite default that matches the ACS
+# poll pattern (which has been running cleanly).
+_BOXNOW_POLL_DISPATCH_STAGGER_SECONDS = 0.2
+
+
+@shared_task(
+    bind=True,
+    base=TenantTask,
+    autoretry_for=(BoxNowRetryableError,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    max_retries=3,
+)
+def poll_boxnow_tracking_batch(
+    self, *, max_per_run: int = 200
+) -> dict[str, Any]:
+    """Dispatch one ``poll_boxnow_tracking_one`` task per active shipment.
+
+    Beat-scheduled to run every 15 minutes. Sub-tasks fan out with a
+    fixed dispatch stagger so even a 200-shipment fan-out is paced
+    well within any reasonable rate budget. A Redis-backed mutex
+    keeps the dispatch single-flight across worker pods (the same
+    pattern the ACS batch poll uses).
+    """
+    from datetime import timedelta
+
+    from django.core.cache import cache
+    from django.db.models import Q
+    from django.utils import timezone
+
+    from shipping_boxnow.enum.parcel_state import BoxNowParcelState
+    from shipping_boxnow.models import BoxNowShipment
+
+    if not cache.add(
+        _BOXNOW_POLL_BATCH_LOCK_KEY, 1, _BOXNOW_POLL_BATCH_LOCK_TTL
+    ):
+        logger.info(
+            "poll_boxnow_tracking_batch: another worker holds the lock "
+            "— skipping this tick"
+        )
+        return {"dispatched": 0, "skipped": True}
+
+    try:
+        cutoff = timezone.now() - timedelta(minutes=15)
+        candidates = list(
+            BoxNowShipment.objects.filter(parcel_id__isnull=False)
+            .exclude(
+                parcel_state__in=[
+                    BoxNowParcelState.PENDING_CREATION,
+                    BoxNowParcelState.DELIVERED,
+                    BoxNowParcelState.RETURNED,
+                    BoxNowParcelState.EXPIRED,
+                    BoxNowParcelState.CANCELED,
+                    BoxNowParcelState.LOST,
+                    BoxNowParcelState.MISSING,
+                ]
+            )
+            .filter(
+                Q(last_polled_at__lt=cutoff) | Q(last_polled_at__isnull=True)
+            )
+            .order_by("last_polled_at")
+            .values_list("id", flat=True)[:max_per_run]
+        )
+
+        for index, shipment_id in enumerate(candidates):
+            poll_boxnow_tracking_one.apply_async(
+                args=[shipment_id],
+                countdown=index * _BOXNOW_POLL_DISPATCH_STAGGER_SECONDS,
+            )
+        return {"dispatched": len(candidates)}
+    finally:
+        cache.delete(_BOXNOW_POLL_BATCH_LOCK_KEY)
+
+
+@shared_task(
+    bind=True,
+    base=TenantTask,
+    autoretry_for=(BoxNowRetryableError, ConnectionError),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
+def poll_boxnow_tracking_one(self, shipment_id: int) -> dict[str, Any]:
+    """Poll one BoxNowShipment and apply any new state transitions."""
+    from shipping_boxnow.models import BoxNowShipment
+    from shipping_boxnow.services import BoxNowService
+
+    try:
+        shipment = BoxNowShipment.objects.select_related("order").get(
+            id=shipment_id
+        )
+    except BoxNowShipment.DoesNotExist:
+        return {"status": "not_found", "shipment_id": shipment_id}
+
+    try:
+        result = BoxNowService.sync_shipment_state(shipment)
+    except BoxNowAPIError as exc:
+        logger.warning(
+            "BoxNow poll failed for shipment=%s: %s", shipment_id, exc
+        )
+        return {
+            "status": "boxnow_api_error",
+            "shipment_id": shipment_id,
+            "message": str(exc),
+        }
+
+    return {
+        "status": "ok",
+        "shipment_id": shipment_id,
+        **result,
+    }

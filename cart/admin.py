@@ -9,6 +9,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
+    AutocompleteSelectFilter,
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericListFilter,
@@ -243,7 +244,16 @@ class CartAdmin(ModelAdmin):
     inlines = [CartItemInline]
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("items__product")
+        # ``price_summary`` reads ``cart.total_price`` → ``item.final_price``
+        # → ``product.final_price`` → ``product.vat_value`` → ``product.vat``.
+        # Without ``items__product__vat`` in the prefetch chain, every
+        # cart-item product fetched its own VAT row, costing 89 queries
+        # on a 12-cart page.
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("items__product__vat")
+        )
 
     @admin.display(description=_("Cart Owner"))
     def cart_owner_display(self, obj):
@@ -420,8 +430,18 @@ class CartItemAdmin(ModelAdmin):
         "created_at",
     )
     list_filter = (
-        ("cart", RelatedDropdownFilter),
-        ("product", RelatedDropdownFilter),
+        # AutocompleteSelectFilter populates the dropdown lazily via
+        # /admin/autocomplete/ XHR only when the admin user types — it
+        # does NOT pre-fetch every Cart / Product row on changelist
+        # load. RelatedDropdownFilter previously fetched all rows and
+        # rendered ``str(obj)`` for each, triggering ``Cart.__str__`` →
+        # ``cart.items.all()`` (×197) and ``Product`` →
+        # ``product.translations`` (×151) per-option chains — the
+        # bulk of the 368-query / 3s wall cost on /admin/cart/cartitem/.
+        # Requires search_fields on CartAdmin + ProductAdmin (both
+        # already defined).
+        ("cart", AutocompleteSelectFilter),
+        ("product", AutocompleteSelectFilter),
         ("quantity", SliderNumericFilter),
         ("created_at", RangeDateTimeFilter),
     )
@@ -469,6 +489,23 @@ class CartItemAdmin(ModelAdmin):
         "decrease_quantity",
         "remove_from_cart",
     ]
+
+    def get_queryset(self, request):
+        # ``product_display`` calls ``safe_translation_getter`` and
+        # ``pricing_info`` reads ``obj.final_price`` → which walks
+        # ``product.final_price → product.vat_value → product.vat``.
+        # Without these, every row fires two extra queries — costing
+        # 441 queries (766ms SQL, ~3s wall) on a typical changelist
+        # page. ``product__vat`` is a FK chain so ``select_related``
+        # (single join on the main query) is cheaper than prefetch.
+        # Translations are a reverse relation, so prefetch is the
+        # only option. Mirrors the ``CartAdmin`` fix in ``c18d45b9``.
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("cart", "cart__user", "product", "product__vat")
+            .prefetch_related("product__translations")
+        )
 
     @admin.display(description=_("Cart"))
     def cart_info(self, obj):

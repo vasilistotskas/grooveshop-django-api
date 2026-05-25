@@ -157,8 +157,8 @@ class TestEnhancedImageQuerySet:
         assert ordered_images.index(image2) < ordered_images.index(image3)
         assert ordered_images.index(image3) < ordered_images.index(image1)
 
-    def test_optimized_for_list(self, product_image):
-        optimized_images = ProductImage.objects.optimized_for_list()
+    def test_for_list_eager_loads_product(self, product_image):
+        optimized_images = ProductImage.objects.for_list()
         image = optimized_images.get(id=product_image.id)
 
         assert hasattr(image, "product")
@@ -363,10 +363,8 @@ class TestEnhancedImageManager:
         assert recent_image in recent_images
         assert old_image not in recent_images
 
-    def test_manager_delegates_to_queryset_optimized_for_list(
-        self, product_image
-    ):
-        optimized_images = ProductImage.objects.optimized_for_list()
+    def test_manager_delegates_to_queryset_for_list(self, product_image):
+        optimized_images = ProductImage.objects.for_list()
         image = optimized_images.get(id=product_image.id)
 
         assert hasattr(image, "product")
@@ -444,7 +442,7 @@ class TestEnhancedImageManager:
             ProductImage.objects.for_product(product_image.product)
             .main_images()
             .recent()
-            .optimized_for_list()
+            .for_list()
         )
 
         assert product_image in chained_images

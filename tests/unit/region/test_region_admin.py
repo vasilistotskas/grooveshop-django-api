@@ -1,5 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
+
+import pytest
 from django.test import override_settings
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
@@ -16,6 +18,8 @@ from region.admin import (
     RegionStatusFilter,
 )
 from region.models import Region
+
+pytestmark = pytest.mark.assert_english
 
 User = get_user_model()
 
@@ -280,7 +284,10 @@ class TestRegionInline(TestCase):
         self.assertEqual(inline.model, Region)
         self.assertEqual(inline.extra, 0)
         self.assertEqual(inline.fields, ("alpha", "name", "sort_order"))
-        self.assertEqual(inline.readonly_fields, ("sort_order",))
+        # sort_order is now editable via drag-and-drop (ordering_field);
+        # it is no longer in readonly_fields.
+        self.assertEqual(inline.readonly_fields, ())
+        self.assertEqual(inline.ordering_field, "sort_order")
         self.assertTrue(inline.tab)
         self.assertTrue(inline.show_change_link)
 
@@ -333,7 +340,14 @@ class TestRegionAdmin(TestCase):
             "completeness_badge",
             "created_display",
         ]
-        self.assertEqual(self.admin.list_display, expected_display)
+        # Unfold appends the drag-and-drop ordering field (sort_order) to
+        # list_display on changelist render (mutating the shared list), so
+        # assert the configured columns are present rather than exact
+        # equality, and that the ordering field is wired up.
+        for column in expected_display:
+            self.assertIn(column, self.admin.list_display)
+        self.assertEqual(self.admin.ordering_field, "sort_order")
+        self.assertTrue(self.admin.hide_ordering_field)
 
     def test_list_filter(self):
         from unfold.contrib.filters.admin import (
@@ -361,9 +375,10 @@ class TestRegionAdmin(TestCase):
         self.assertEqual(self.admin.search_fields, expected_fields)
 
     def test_readonly_fields(self):
+        # sort_order is now editable via drag-and-drop (ordering_field = "sort_order");
+        # it is no longer forced into readonly_fields.
         expected_fields = (
             "uuid",
-            "sort_order",
             "created_at",
             "updated_at",
             "region_analytics",

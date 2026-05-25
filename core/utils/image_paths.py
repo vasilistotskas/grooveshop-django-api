@@ -21,6 +21,7 @@ builder.
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
 
 
 def image_to_media_path(image_field: Any) -> str:
@@ -43,4 +44,11 @@ def image_to_media_path(image_field: Any) -> str:
         return ""
     if not url:
         return ""
-    return url.lstrip("/")
+    # ``settings.MEDIA_URL`` is absolute in every environment (DRF
+    # ImageField URL validation requires it), so ``image_field.url`` may
+    # be ``https://host/media/{schema}/uploads/...``. Strip the scheme +
+    # host back off so this helper keeps its contract — a relative
+    # ``media/{schema}/uploads/...`` path the Nuxt mediaStream provider
+    # and media-stream service prepend their own origin onto. ``urlparse``
+    # leaves an already-relative ``/media/...`` path untouched.
+    return urlparse(url).path.lstrip("/")

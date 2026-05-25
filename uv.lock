@@ -217,30 +217,30 @@ wheels = [
 
 [[package]]
 name = "boto3"
-version = "1.43.6"
+version = "1.43.14"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore" },
     { name = "jmespath" },
     { name = "s3transfer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0a/37/78c630d1308964aa9abf44951d9c4df776546ff37251ec2434944e205c4e/boto3-1.43.6.tar.gz", hash = "sha256:e6315effaf12b890b99956e6f8e2c3000a3f64e4ee91943cec3895ce9a836afb", size = 113153, upload-time = "2026-05-07T20:49:59.694Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/4b/616367e871ce3f1cb3e8545a97736b6331b9fb081497f2d44c5b2aa6959d/boto3-1.43.14.tar.gz", hash = "sha256:5c0a994b3182061ee101812e721100717a4d664f9f4ceaf4a86b6d032ce9fc2d", size = 113142, upload-time = "2026-05-22T19:28:47.861Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/e2/3c2eef44f55eafab256836d1d9479bd6a74f70c26cbfdc0639a0e23e4327/boto3-1.43.6-py3-none-any.whl", hash = "sha256:179601ec2992726a718053bf41e43c223ceba397d31ceab11f64d9c910d9fc3a", size = 140502, upload-time = "2026-05-07T20:49:57.8Z" },
+    { url = "https://files.pythonhosted.org/packages/cb/00/59cb9329c18e2d3aa23062ceaa87d065f2e81e7d2931df24d64e9a7815aa/boto3-1.43.14-py3-none-any.whl", hash = "sha256:574335744656cfed0b362a0a0467aaf2eb2bf15526edcd02d31d3c661f4b09e4", size = 140536, upload-time = "2026-05-22T19:28:46.49Z" },
 ]
 
 [[package]]
 name = "botocore"
-version = "1.43.6"
+version = "1.43.14"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "jmespath" },
     { name = "python-dateutil" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/79/a7/23d0f5028011455096a1eeac0ddf3cbe147b3e855e127342f8202552194d/botocore-1.43.6.tar.gz", hash = "sha256:b1e395b347356860398da42e61c808cf1e34b6fa7180cf2b9d87d986e1a06ba0", size = 15336070, upload-time = "2026-05-07T20:49:48.14Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/78/3c/798d2f7deb118241930c7c6bcfb0b970d3f0245bf580700663199aeed2c3/botocore-1.43.14.tar.gz", hash = "sha256:b9e500737e43d2f147c9d4e23b54360335e77d4c0ba90a318f51b65e06cb8516", size = 15382604, upload-time = "2026-05-22T19:28:36.363Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/c8/6f47223840e8d8cfa8c9f7c0ec1b77970417f257fc885169ff4f6326ce09/botocore-1.43.6-py3-none-any.whl", hash = "sha256:b6d1fdbc6f65a5fe0b7e947823aa37535d3f39f3ba4d21110fab1f55bbbcc04b", size = 15017094, upload-time = "2026-05-07T20:49:44.964Z" },
+    { url = "https://files.pythonhosted.org/packages/27/7e/6e64821077cd2efc4aa51b7d638fb6d48e1c7c450201c529fbaf1de8bfd3/botocore-1.43.14-py3-none-any.whl", hash = "sha256:1f4a2a95ea78c10398e78431e98c1fe47adb54a7b10a32975144c1f541186658", size = 15061424, upload-time = "2026-05-22T19:28:32.682Z" },
 ]
 
 [[package]]
@@ -710,11 +710,11 @@ wheels = [
 
 [[package]]
 name = "disposable-email-domains"
-version = "0.0.181"
+version = "0.0.188"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/8a/d8/9e074c474a62e68b3cd4a0afb5865b7eb90e05f8c96d7ec8d7551a554d87/disposable_email_domains-0.0.181.tar.gz", hash = "sha256:06d5b43178054e985a7b73b95cf0e78b1f114ca0f1fedbf3a53378ce76631522", size = 64693, upload-time = "2026-05-08T11:09:52.704Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/a8/4844db55bfb6e80f02a5c063c7b6edb7236ae86042bcc22cf39a31c45f13/disposable_email_domains-0.0.188.tar.gz", hash = "sha256:091485ad2a3bc12508058de5fe7e547f7c0cd00c1baf146210b7a9cf43563974", size = 64914, upload-time = "2026-05-20T17:05:11.687Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1e/24/4d573da5a3c01a87b1009b7d83cd2e77e692015c8d47e0863f2a2b869332/disposable_email_domains-0.0.181-py3-none-any.whl", hash = "sha256:0d289271e51a4ebaee9a5b935b5d6e315b25c2c28ba522cb07f82daadff5c986", size = 33282, upload-time = "2026-05-08T11:09:51.355Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/f2/f39b23407e5250aef4d877880500523af7073e6413154a0f4c1439128ce8/disposable_email_domains-0.0.188-py3-none-any.whl", hash = "sha256:145715ff8100a3ddc8083ca72929facaa6db399edb001706809b68df47e0bdec", size = 33396, upload-time = "2026-05-20T17:05:10.271Z" },
 ]
 
 [[package]]
@@ -764,15 +764,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/30/cb/ff506351ed5418a36
 
 [[package]]
 name = "django-allauth"
-version = "65.16.1"
+version = "65.17.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "asgiref" },
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/df/357187dfff18c7783e4911827a6c69437e290d7259a32a99c23fcd85997f/django_allauth-65.16.1.tar.gz", hash = "sha256:4425ac3088541c4c54983e16e08f6e3eb9f438dc1b1009534fa51c8bb739ed31", size = 2232835, upload-time = "2026-04-17T18:53:59.475Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/55/5580ab770bae3a885d1ef5a49646c3958c49cf67edfe956703a9bf815371/django_allauth-65.17.0.tar.gz", hash = "sha256:72bea057eaaf2952e4e22cd0195e031ef8e7de2cbac065cf35bd0067ef50a1e7", size = 2237395, upload-time = "2026-05-20T17:43:29.727Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ad/58/d95b6c3088d83697bfd93782ee57bc6a6462e41eb19121a947b8a015396a/django_allauth-65.16.1-py3-none-any.whl", hash = "sha256:e49df24056bf37c44e56aaad1e51f78994b7d175bc3476d65e8f8f58390a8ce8", size = 2051868, upload-time = "2026-04-17T18:54:12.032Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/5f/dbe29bb38ffc32c6c17590caa346fba8055876a54109a6f914b5916f5819/django_allauth-65.17.0-py3-none-any.whl", hash = "sha256:ff041190bc6f9b2854aa5d7215a1f64f1fc8eb0907990690daad19144b7d2757", size = 2054996, upload-time = "2026-05-20T17:43:41.601Z" },
 ]
 
 [[package]]
@@ -891,14 +891,14 @@ wheels = [
 
 [[package]]
 name = "django-parler"
-version = "2.3"
+version = "2.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8c/2b/2423d31620efe8ab0d0390e60afab4f9cc2e62d4bf39fe0e05df0eef1b93/django-parler-2.3.tar.gz", hash = "sha256:2c8f5012ceb5e49af93b16ea3fe4d0c83d70b91b2d0f470c05d7d742b6f3083d", size = 69167, upload-time = "2021-11-18T09:32:28.959Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/96/e336bd885f185c5d4336217b26dfdd1a8a295ed6f5ea8d8b24a2e0f4d870/django_parler-2.4.tar.gz", hash = "sha256:6c70f853cf19c09fd72d9a10aa784ae57da9094178c650eab0c5d30c0a48be40", size = 91503, upload-time = "2026-05-14T08:58:08.128Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/38/11f1a7e3d56f3a6b74cf99e307f2554b741cadebc9b1c45b05e2ec1f35a2/django_parler-2.3-py3-none-any.whl", hash = "sha256:8f6c8061e4b5690f1ee2d8e5760940ef06bf78a5bfa033d11178377559c749cf", size = 83288, upload-time = "2021-11-18T09:32:27.193Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/87/6d6129e14a7815bb383b61e7f86ffa85a4f43132eafa15de4a3a30ff9424/django_parler-2.4-py3-none-any.whl", hash = "sha256:0fff7185d581790d7063cbe0f7c57a399517d5ec976536b6c6bc06cf8ad4b956", size = 112605, upload-time = "2026-05-14T08:58:06.545Z" },
 ]
 
 [[package]]
@@ -1044,14 +1044,14 @@ wheels = [
 
 [[package]]
 name = "django-unfold"
-version = "0.93.0"
+version = "0.94.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/95/55/0649c4e7b540528f80078c300db7ae299502f3c2fccd4d6882193fa104d1/django_unfold-0.93.0.tar.gz", hash = "sha256:bce719989d199484c989e4042f338c287394c4562af05785f4fa511a8e3be859", size = 1124076, upload-time = "2026-05-11T10:13:07.855Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c5/26/d1e4f9ca3b23e020323c2b90ac57ac515acdfb6108fff47ad9354a47edd8/django_unfold-0.94.0.tar.gz", hash = "sha256:4c1f73b5371e8b45be548e520a9dc1b7b18e9de5bba65267784407776941f627", size = 1124721, upload-time = "2026-05-18T08:00:13.14Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/6c/c6c63af9eaabf85877005ba307a7af80088e9d28efd77c6431ec8c61c3c3/django_unfold-0.93.0-py3-none-any.whl", hash = "sha256:d0a09ebe906278fa994d6eb808880ba3f24c20d8c3a5ca37f82ee89969fd459c", size = 1249541, upload-time = "2026-05-11T10:13:09.185Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/fe/a064bb7195d0d50890c15562d7257646d1bce9240545af7c0e2a48fab408/django_unfold-0.94.0-py3-none-any.whl", hash = "sha256:89de4e1fe3be3477358afa92aa847940ca250e05e88724dd78f7e9499dccda0e", size = 1250343, upload-time = "2026-05-18T08:00:15.342Z" },
 ]
 
 [[package]]
@@ -1315,7 +1315,7 @@ wheels = [
 
 [[package]]
 name = "grooveshop-django-api"
-version = "1.129.0"
+version = "1.145.1"
 source = { virtual = "." }
 dependencies = [
     { name = "argon2-cffi" },
@@ -1409,18 +1409,18 @@ dev = [
 requires-dist = [
     { name = "argon2-cffi", specifier = ">=25.1.0" },
     { name = "asgiref", specifier = "==3.11.1" },
-    { name = "boto3", specifier = "==1.43.6" },
+    { name = "boto3", specifier = "==1.43.14" },
     { name = "celery", extras = ["redis"], specifier = ">=5.6.3,<6.0.0" },
     { name = "channels", extras = ["daphne"], specifier = "==4.3.2" },
     { name = "channels-redis", specifier = "==4.3.0" },
     { name = "charset-normalizer", specifier = "==3.4.7" },
     { name = "cryptography", specifier = "==48.0.0" },
     { name = "defusedxml", specifier = ">=0.7.1" },
-    { name = "disposable-email-domains", specifier = "==0.0.181" },
+    { name = "disposable-email-domains", specifier = "==0.0.188" },
     { name = "dj-stripe", specifier = "==2.10.3" },
     { name = "django", specifier = "==6.0.5" },
     { name = "django-admin-thumbnails", specifier = "==1.0.0" },
-    { name = "django-allauth", specifier = "==65.16.1" },
+    { name = "django-allauth", specifier = "==65.17.0" },
     { name = "django-celery-beat", specifier = "==2.9.0" },
     { name = "django-celery-results", specifier = "==2.6.0" },
     { name = "django-cors-headers", specifier = "==4.9.0" },
@@ -1428,7 +1428,7 @@ requires-dist = [
     { name = "django-filter", specifier = "==25.2" },
     { name = "django-money", specifier = "==3.6.0" },
     { name = "django-mptt", specifier = "==0.18.0" },
-    { name = "django-parler", specifier = "==2.3.0" },
+    { name = "django-parler", specifier = "==2.4.0" },
     { name = "django-parler-rest", specifier = "==2.2.0" },
     { name = "django-phonenumber-field", specifier = "==8.4.0" },
     { name = "django-rest-knox", specifier = "==5.0.4" },
@@ -1438,7 +1438,7 @@ requires-dist = [
     { name = "django-stubs-ext", specifier = "==6.0.4" },
     { name = "django-tenants", specifier = ">=3.7.0,<4.0.0" },
     { name = "django-tinymce", specifier = "==5.0.0" },
-    { name = "django-unfold", specifier = "==0.93.0" },
+    { name = "django-unfold", specifier = "==0.94.0" },
     { name = "djangorestframework", specifier = "==3.17.1" },
     { name = "djangorestframework-camel-case", specifier = "==1.4.2" },
     { name = "drf-spectacular", specifier = "==0.29.0" },
@@ -1450,16 +1450,16 @@ requires-dist = [
     { name = "measurement", specifier = "==3.2.2" },
     { name = "meilisearch", specifier = "==0.41.0" },
     { name = "nh3", specifier = ">=0.3.5" },
-    { name = "phonenumbers", specifier = "==9.0.30" },
+    { name = "phonenumbers", specifier = "==9.0.31" },
     { name = "pillow", specifier = "==12.2.0" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = "==3.3.4" },
-    { name = "pyjwt", specifier = "==2.12.1" },
+    { name = "pyjwt", specifier = "==2.13.0" },
     { name = "python-dotenv", specifier = "==1.2.2" },
     { name = "qrcode", specifier = "==8.2" },
-    { name = "requests", specifier = "==2.34.0" },
-    { name = "twisted", extras = ["http2", "tls"], specifier = "==25.5.0" },
+    { name = "requests", specifier = "==2.34.2" },
+    { name = "twisted", extras = ["http2", "tls"], specifier = "==26.4.0" },
     { name = "urllib3", specifier = "==2.7.0" },
-    { name = "uvicorn", specifier = "==0.46.0" },
+    { name = "uvicorn", specifier = "==0.48.0" },
     { name = "weasyprint", specifier = ">=68.1" },
     { name = "xmlschema", specifier = "==4.3.1" },
 ]
@@ -1970,11 +1970,11 @@ wheels = [
 
 [[package]]
 name = "phonenumbers"
-version = "9.0.30"
+version = "9.0.31"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a6/f1/249f843f4107c6a6ed17e5ece17620d75e532c2a355106e26d889a0c72c7/phonenumbers-9.0.30.tar.gz", hash = "sha256:d42d232ccde69c1af1bb5916a7e46f4edbcc72975b02759830f4ea1fba7b00c9", size = 2306521, upload-time = "2026-05-07T10:20:38.884Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/20/51f0eafd5819e923d09c6f508a764b84d00e7e7d96c4087627a1adab8d30/phonenumbers-9.0.31.tar.gz", hash = "sha256:287dbd012b12cf9bcc4803b55a29e0d204db5a0df747d38c9130fee1b1b6b0aa", size = 2306679, upload-time = "2026-05-23T06:09:06.338Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/83/22/e4442aabea04daf16fda50d89bce2ff585e44f204089986b2cc6679cae10/phonenumbers-9.0.30-py2.py3-none-any.whl", hash = "sha256:e0890d4cda206ef6ac18ef07e8f3ab225c31c7edce237ac870b4729d4c1d2520", size = 2595222, upload-time = "2026-05-07T10:20:35.387Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/d3/17268202ea3fa5a597c98ca5dd178ca013f96b42373c54604e59b3bb8d02/phonenumbers-9.0.31-py2.py3-none-any.whl", hash = "sha256:f308c1f425e2637b92ff34a174f0888ddf47aacfa6199531f7097e00ad90f57c", size = 2595455, upload-time = "2026-05-23T06:09:03.35Z" },
 ]
 
 [[package]]
@@ -2337,11 +2337,11 @@ wheels = [
 
 [[package]]
 name = "pyjwt"
-version = "2.12.1"
+version = "2.13.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/c2/27/a3b6e5bf6ff856d2509292e95c8f57f0df7017cf5394921fc4e4ef40308a/pyjwt-2.12.1.tar.gz", hash = "sha256:c74a7a2adf861c04d002db713dd85f84beb242228e671280bf709d765b03672b", size = 102564, upload-time = "2026-03-13T19:27:37.25Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3b/81/58d0ac84e1ef3a3843791d6954d94c0b33d526c75eeb1efbce9d0a4c4077/pyjwt-2.13.0.tar.gz", hash = "sha256:41571c89ca91598c79e8ef18a2d07367d4810fbbd6f637794879baf1b7703423", size = 107515, upload-time = "2026-05-21T19:54:36.618Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e5/7a/8dd906bd22e79e47397a61742927f6747fe93242ef86645ee9092e610244/pyjwt-2.12.1-py3-none-any.whl", hash = "sha256:28ca37c070cad8ba8cd9790cd940535d40274d22f80ab87f3ac6a713e6e8454c", size = 29726, upload-time = "2026-03-13T19:27:35.677Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/5e/ecf12fdb62546d64385c158514e9b2b671f7832108ef2ecd2020ce0af2d1/pyjwt-2.13.0-py3-none-any.whl", hash = "sha256:66adcc2aff09b3f1bbd95fc1e1577df8ac8723c978552fd43304c8a290ac5728", size = 31274, upload-time = "2026-05-21T19:54:35.362Z" },
 ]
 
 [[package]]
@@ -2612,7 +2612,7 @@ wheels = [
 
 [[package]]
 name = "requests"
-version = "2.34.0"
+version = "2.34.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "certifi" },
@@ -2620,9 +2620,9 @@ dependencies = [
     { name = "idna" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/43/b8/7a707d60fea4c49094e40262cc0e2ca6c768cca21587e34d3f705afec47e/requests-2.34.0.tar.gz", hash = "sha256:7d62fe92f50eb82c529b0916bb445afa1531a566fc8f35ffdc64446e771b856a", size = 142436, upload-time = "2026-05-11T19:29:51.717Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179abd6d00ebd70bff6273f37fb3e0cc209f48b39d00cbf/requests-2.34.2.tar.gz", hash = "sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed", size = 142856, upload-time = "2026-05-14T19:25:27.735Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/e6/e300fce5fe83c30520607a015dabd985df3251e188d234bfe9492e17a389/requests-2.34.0-py3-none-any.whl", hash = "sha256:917520a21b767485ce7c588f4ebb917c436b24a31231b44228715eaeb5a52c60", size = 73021, upload-time = "2026-05-11T19:29:49.923Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl", hash = "sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0", size = 73075, upload-time = "2026-05-14T19:25:26.443Z" },
 ]
 
 [[package]]
@@ -3011,15 +3011,15 @@ wheels = [
 
 [[package]]
 name = "uvicorn"
-version = "0.46.0"
+version = "0.48.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "h11" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1f/93/041fca8274050e40e6791f267d82e0e2e27dd165627bd640d3e0e378d877/uvicorn-0.46.0.tar.gz", hash = "sha256:fb9da0926999cc6cb22dc7cd71a94a632f078e6ae47ff683c5c420750fb7413d", size = 88758, upload-time = "2026-04-23T07:16:00.151Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/bf/f6544ba992ddb9a6077343a576f9844f7f8f06ab819aefd00206e9255f18/uvicorn-0.48.0.tar.gz", hash = "sha256:a5504207195d08c2511bf9125ede5ac4a4b71725d519e758d01dcf0bc2d31c37", size = 91074, upload-time = "2026-05-24T12:08:41.925Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/a3/5b1562db76a5a488274b2332a97199b32d0442aca0ed193697fd47786316/uvicorn-0.46.0-py3-none-any.whl", hash = "sha256:bbebbcbed972d162afca128605223022bedd345b7bc7855ce66deb31487a9048", size = 70926, upload-time = "2026-04-23T07:15:58.355Z" },
+    { url = "https://files.pythonhosted.org/packages/01/be/72532be3da7acc5fdfbccdb95215cd04f995a0886532a5b423f929cda4cc/uvicorn-0.48.0-py3-none-any.whl", hash = "sha256:48097851328b87ec36117d3d575234519eb58c2b22d79666e9bbc6c49a761dad", size = 71410, upload-time = "2026-05-24T12:08:40.258Z" },
 ]
 
 [[package]]

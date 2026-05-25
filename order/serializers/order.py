@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.utils import extend_schema_field
@@ -25,7 +27,14 @@ from shipping_boxnow.serializers.shipment import (
 
 CARRIER_TRACKING_URLS: dict[str, str] = {
     "elta": "https://www.elta.gr/en/tracking?code={number}",
-    "acs": "https://www.acscourier.net/el/track-and-trace/?p={number}",
+    # ACS's public Vue SPA at ``webapp.acscourier.net`` reads the
+    # voucher number from the URL path (NOT a query string) and
+    # auto-runs the search on page load. The older
+    # ``/el/track-and-trace/?p={number}`` URL on the main site is a
+    # generic search page that ignores query parameters, which is
+    # why path-based deep-linking on the SPA is the right form.
+    "acs": "https://webapp.acscourier.net/track-shipment/{number}",
+    "boxnow": "https://boxnow.gr/en?track={number}",
     "speedex": "https://www.speedex.gr/en/track-and-trace/?p_code={number}",
     "dhl": "https://www.dhl.com/en/express/tracking.html?AWB={number}",
     "fedex": "https://www.fedex.com/fedextrack/?trknbr={number}",
@@ -304,9 +313,8 @@ class OrderDetailSerializer(OrderSerializer):
     @extend_schema_field(BoxNowShipmentDetailSerializer(allow_null=True))
     def get_boxnow_shipment(self, obj: Order) -> dict | None:
         # Mirror ``get_acs_shipment`` — gate on the registry-backed
-        # ``shipping_provider`` FK rather than the denormalised
-        # ``shipping_method`` enum so the field stays consistent
-        # across carriers and the legacy column can be dropped.
+        # ``shipping_provider`` FK so a new carrier slots in via one
+        # more provider code check.
         provider = getattr(obj, "shipping_provider", None)
         if provider is None or provider.code != "boxnow":
             return None
@@ -386,6 +394,18 @@ class OrderDetailSerializer(OrderSerializer):
             }
         return out or None
 
+    # OrderHistory is the full audit trail (visible in Django admin);
+    # the customer-facing timeline is a curated subset of state
+    # transitions that actually matter to the buyer. Operational
+    # NOTE rows ("email sent", "item added", "Order created")
+    # belong in the admin log only — surfacing them as customer
+    # timeline entries duplicates information already in the order
+    # body and leaks internal addresses (e.g. confirmation email
+    # recipients).
+    CUSTOMER_VISIBLE_HISTORY_TYPES: ClassVar[frozenset[str]] = frozenset(
+        {"STATUS", "PAYMENT", "SHIPPING", "REFUND"}
+    )
+
     @extend_schema_field(
         {
             "type": "array",
@@ -403,28 +423,29 @@ class OrderDetailSerializer(OrderSerializer):
         }
     )
     def get_order_timeline(self, obj):
-        timeline = []
-
-        timeline.append(
+        # The synthetic CREATED entry carries no description: the
+        # storefront localises the title via ``timeline.title.created``
+        # and the row reads cleanly as just the title + timestamp.
+        timeline = [
             {
                 "change_type": "CREATED",
                 "timestamp": obj.created_at,
-                "description": _("Order was created"),
+                "description": "",
                 "user": None,
                 "previous_value": None,
                 "new_value": None,
             }
-        )
+        ]
 
         # Uses prefetched data from for_detail() — no extra query
-        history_records = obj.history.all()
-
-        for history in history_records:
+        for history in obj.history.all():
+            if history.change_type not in self.CUSTOMER_VISIBLE_HISTORY_TYPES:
+                continue
             timeline.append(
                 {
                     "change_type": history.change_type,
                     "timestamp": history.created_at,
-                    "description": history.description,
+                    "description": self._describe_history_entry(history),
                     "user": history.user.full_name if history.user else None,
                     "previous_value": history.previous_value,
                     "new_value": history.new_value,
@@ -432,6 +453,67 @@ class OrderDetailSerializer(OrderSerializer):
             )
 
         return timeline
+
+    @staticmethod
+    def _describe_history_entry(history) -> str:
+        """Render a customer-readable description for an OrderHistory row.
+
+        ``OrderHistory.log_*`` helpers store a short generic
+        ``description`` ("Payment information updated") and put the
+        real content in ``new_value`` / ``previous_value``. This
+        helper unwraps the JSON payload so the customer sees the
+        actual transition instead of the generic sentinel.
+        """
+        change_type = history.change_type
+        new_value = history.new_value or {}
+        previous_value = history.previous_value or {}
+
+        if change_type == "STATUS":
+            prev = (
+                previous_value.get("status")
+                if isinstance(previous_value, dict)
+                else None
+            )
+            new = (
+                new_value.get("status") if isinstance(new_value, dict) else None
+            )
+            if prev and new:
+                return f"{prev} → {new}"
+            return history.description
+
+        if change_type == "PAYMENT":
+            # ``previous_value`` may carry ``payment_status``; new
+            # may carry ``payment_status`` + ``provider`` +
+            # ``payment_id``. Surface the status transition + the
+            # provider (no payment_id — that's an internal token).
+            if isinstance(new_value, dict):
+                new_status = new_value.get("payment_status")
+                provider = new_value.get("provider")
+                prev_status = (
+                    previous_value.get("payment_status")
+                    if isinstance(previous_value, dict)
+                    else None
+                )
+                parts = []
+                if prev_status and new_status:
+                    parts.append(f"{prev_status} → {new_status}")
+                elif new_status:
+                    parts.append(str(new_status))
+                if provider:
+                    parts.append(f"({provider})")
+                if parts:
+                    return " ".join(parts)
+            return history.description
+
+        if change_type == "REFUND":
+            # ``log_refund`` already builds a useful description
+            # from ``refund_data``; keep it but trim noise.
+            return history.description
+
+        # SHIPPING / CUSTOMER / ITEMS / ADDRESS / OTHER — fall back
+        # to the generic stored description until we have a richer
+        # log helper for them.
+        return history.description
 
     @extend_schema_field(
         {
@@ -638,12 +720,6 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         allow_blank=True,
         help_text=_("Floor number or label (e.g. FIRST_FLOOR)"),
     )
-    place = serializers.CharField(
-        max_length=255,
-        required=False,
-        allow_blank=True,
-        help_text=_("Place or district (optional)"),
-    )
     location_type = serializers.CharField(
         max_length=100,
         required=False,
@@ -747,7 +823,42 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
     acs_charge_type = serializers.ChoiceField(
         choices=[(1, _("Prepaid")), (2, _("Cash on delivery"))],
         required=False,
-        default=1,
+        # No ``default=`` — when the field is absent, DRF omits it
+        # from ``validated_data`` so the carrier's own default
+        # (``AcsChargeType.COD`` in ``shipping_acs.carrier``) wins.
+        # Our ACS contract is COD-only; PREPAID is rejected at the
+        # API. Setting ``default=1`` here used to leak that PREPAID
+        # past the carrier fix (orders 53, 55, 56). The field stays
+        # as an *optional* admin override so an admin can flip an
+        # individual order back to PREPAID if the contract ever
+        # gets it enabled — but the platform-wide default lives in
+        # the carrier code, not here.
+        help_text=_(
+            "Optional per-order ACS Charge_Type override. Leave "
+            "unset to use the carrier-level default (COD on a "
+            "COD-only contract). Setting this here only makes "
+            "sense if the ACS commercial contract permits the "
+            "chosen value — invalid combinations are rejected by "
+            "ACS_Create_Voucher."
+        ),
+    )
+    acs_item_quantity = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        max_value=20,
+        # No ``default=`` — same lesson as ``acs_charge_type`` above.
+        # Carrier-level default is 1 (single physical parcel per
+        # order). Override here only when the merchant ships a
+        # single order in multiple physical boxes; ACS will mint a
+        # parent voucher + N-1 child vouchers. The shop's
+        # operational reality is one box per order, so leaving this
+        # unset is correct for every normal order.
+        help_text=_(
+            "Optional per-order override for ACS Item_Quantity (number "
+            "of physical parcels in the shipment). Defaults to 1. "
+            "Must NOT be set for Smartpoint pickup — ACS rejects "
+            "multipart vouchers on lockers."
+        ),
     )
 
     # ---------- Meta Conversions API context ----------
@@ -853,19 +964,22 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
 
         # BoxNow cross-field validation. Trigger condition is the
         # registry-driven ``(shipping_provider_code, shipping_kind)``
-        # pair — the legacy ``shipping_method`` enum no longer drives
-        # carrier selection.
+        # pair.
         is_boxnow_pickup = (
             attrs.get("shipping_provider_code") == "boxnow"
             and attrs.get("shipping_kind") == "pickup_point"
         )
         if is_boxnow_pickup:
-            # Master switch — admin can hide BoxNow without redeploy.
-            # Production starts disabled (BOXNOW_ENABLED defaults to
-            # False); we only allow BoxNow locker orders once an admin
-            # has flipped the Setting row to True. Defends against a
-            # stale frontend cache surfacing the option.
-            if not Setting.get("BOXNOW_ENABLED", default=False):
+            # Defence-in-depth — ``/api/v1/shipping/options`` already
+            # filters by ``ShippingProvider.is_active``, but a stale
+            # frontend cache could still POST an order with a hidden
+            # provider. Re-check the registry row before accepting.
+            from shipping.models import ShippingProvider
+
+            boxnow_active = ShippingProvider.objects.filter(
+                code="boxnow", is_active=True
+            ).exists()
+            if not boxnow_active:
                 raise serializers.ValidationError(
                     {
                         "shipping_provider_code": _(

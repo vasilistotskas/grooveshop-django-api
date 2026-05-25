@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.enum import ShippingKind
@@ -27,6 +28,7 @@ class AcsCarrier(ShippingCarrierInterface):
         "acs_station_external_id",
         "acs_station_branch",
         "acs_charge_type",
+        "acs_item_quantity",
     )
 
     def create_shipment(
@@ -129,11 +131,18 @@ class AcsCarrier(ShippingCarrierInterface):
         charge type out of the checkout payload and computes the
         item quantity / weight from the cart line items.
 
-        ``charge_type`` defaults to PREPAID but is overridden to COD
-        when the order's pay_way is an offline (cash-on-delivery)
-        provider — that way ACS collects the parcel total from the
-        recipient at the door instead of expecting the partner to
-        pre-fund the shipment.
+        ``Charge_Type`` is **always** COD on the ACS voucher because our
+        commercial contract does not enable PREPAID (Charge_Type=1) —
+        ACS rejects PREPAID calls with "Μη αποδεκτή τιμή χρέωσης
+        μεταφορικών". What the courier collects at the door depends on
+        the pay-way: COD pay-ways sync ``cod_amount`` to the order
+        total at mint time (see ``AcsService.create_voucher_for_order``);
+        online pay-ways (Viva, Stripe) leave it at 0 so the voucher
+        mints but nothing is collected on delivery.
+
+        The explicit ``acs_charge_type`` payload key still wins so an
+        admin can force a per-order override if the contract ever gets
+        PREPAID enabled.
 
         Idempotent — re-runs are no-ops because the order already has
         a row at that point.
@@ -159,28 +168,51 @@ class AcsCarrier(ShippingCarrierInterface):
         branch_code = payload.get("acs_station_branch", "") or ""
         delivery_kind = order.shipping_kind or kind.value
 
-        # COD detection uses ``PayWay.is_cash_on_delivery`` (offline
-        # AND not requires_confirmation) so bank-transfer-style pay-ways
-        # — which are settled off-platform — ship as PREPAID instead of
-        # being double-billed at the door. The explicit ``acs_charge_type``
-        # payload key still wins so an admin override can force either
-        # direction (e.g. flip a COD order to PREPAID for B2B invoice
-        # settlement).
         pay_way = getattr(order, "pay_way", None)
         is_cod = bool(pay_way and pay_way.is_cash_on_delivery)
-        default_charge = AcsChargeType.COD if is_cod else AcsChargeType.PREPAID
-        charge_type = int(payload.get("acs_charge_type") or default_charge)
+        # Default to COD because the contract is COD-only; admins can
+        # still override per order via the ``acs_charge_type`` payload
+        # key. ``Acs_Delivery_Products="COD"`` only goes on the voucher
+        # for real COD pay-ways — online-paid orders get a COD voucher
+        # with Cod_Ammount=0 but should not carry the COD product flag.
+        charge_type = int(payload.get("acs_charge_type") or AcsChargeType.COD)
         cod_payment_way = (
             AcsCodPaymentWay.CASH if charge_type == AcsChargeType.COD else None
         )
-        delivery_products = "COD" if charge_type == AcsChargeType.COD else ""
+        delivery_products = "COD" if is_cod else ""
 
         weight_grams = 0
-        item_quantity = 1
         if items is not None:
-            items_list = list(items)
-            weight_grams = compute_total_weight_grams(items_list)
-            item_quantity = max(sum(int(q or 0) for _, q in items_list) or 1, 1)
+            weight_grams = compute_total_weight_grams(list(items))
+
+        # ACS ``Item_Quantity`` is the number of **physical parcels**
+        # in the shipment — NOT the number of cart line items. For a
+        # shop that bundles every order into one box (the default
+        # ours operates under), this is always ``1``. When we sent
+        # ``sum(cart quantities)`` instead, ACS interpreted it as a
+        # multi-parcel shipment and ``get_multipart_vouchers`` minted
+        # one child voucher per "piece" (parent + N-1 children) —
+        # see order #56, which produced 3 vouchers for a 3-item cart.
+        #
+        # ACS PDF p.8 also explicitly forbids ``Item_Quantity > 1``
+        # for Smartpoint pickup, so a single hard default of 1 is
+        # safe everywhere; the Smartpoint clamp the previous version
+        # carried is now redundant.
+        #
+        # Admins who genuinely ship in multiple parcels can pass
+        # ``acs_item_quantity`` in the order payload to override
+        # per-order — same admin-override hatch we use for
+        # ``acs_charge_type``. Lesson from the PREPAID-leak incident:
+        # the serializer field for that override MUST NOT carry a
+        # default (any default leaks past this fallback because
+        # truthy values short-circuit ``or``).
+        raw_qty = payload.get("acs_item_quantity")
+        try:
+            item_quantity = int(raw_qty) if raw_qty is not None else 1
+        except (TypeError, ValueError):
+            item_quantity = 1
+        if item_quantity < 1:
+            item_quantity = 1
 
         station = None
         if external_id:
@@ -211,6 +243,11 @@ class AcsCarrier(ShippingCarrierInterface):
             )
             return
 
+        logger.info(
+            "ACS dispatch: queued voucher mint for order=%s",
+            order.id,
+            extra={"order_id": order.id, "carrier": "acs"},
+        )
         create_acs_voucher_for_order.delay(order.id)
 
     # ------------------------------------------------------------------
@@ -251,6 +288,17 @@ class AcsCarrier(ShippingCarrierInterface):
 
         base = float(Setting.get("ACS_SHIPPING_PRICE", default=3.50))
         return (base, currency)
+
+    def free_shipping_threshold(
+        self,
+        kind: ShippingKind,
+    ) -> Decimal | None:
+        from extra_settings.models import Setting
+
+        # ACS applies the same threshold to both home delivery and
+        # Smartpoint pickup (see :meth:`calculate_shipping_cost`).
+        raw = Setting.get("ACS_FREE_SHIPPING_THRESHOLD", default=40.00)
+        return Decimal(str(raw))
 
     # ACS minimum chargeable weight per published tariff. Anything
     # below 500g is billed at 500g.

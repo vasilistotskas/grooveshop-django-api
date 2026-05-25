@@ -39,14 +39,15 @@ class TestOrderCreateWithBoxNow(APITestCase):
 
     def setUp(self):
         super().setUp()
-        # The BOXNOW_ENABLED Setting defaults to False (production
-        # safety: hide the option until BoxNow activates the partner
-        # account). Tests that exercise the box_now_locker path need
-        # to flip it on; the row is auto-seeded by the conftest's
-        # `_reseed_extra_settings` fixture.
-        from extra_settings.models import Setting
+        # ``ShippingProvider.is_active`` is the master switch in
+        # checkout — defaults to False from the seed migration so a
+        # fresh deploy hides the option until an admin activates it.
+        # Tests that exercise the box_now_locker path need to flip it
+        # on. ``boxnow`` is auto-seeded by ``shipping/migrations/
+        # 0002_seed_providers.py``.
+        from shipping.models import ShippingProvider
 
-        Setting.objects.filter(name="BOXNOW_ENABLED").update(value_bool=True)
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
 
         self.user = UserAccountFactory(num_addresses=0)
         self.country = CountryFactory(num_regions=0)
@@ -93,9 +94,9 @@ class TestOrderCreateWithBoxNow(APITestCase):
             "region_id": self.region.alpha,
             "phone": "+302100000000",
             "shipping_price": "2.50",
-            # Registry-driven dispatch: explicit (provider, kind) is the
-            # only supported routing — the legacy ``shipping_method``
-            # enum no longer drives provider lookup.
+            # Registry-driven dispatch — the order serializer resolves
+            # the carrier adapter from this explicit ``(provider, kind)``
+            # pair (see ``order/services._resolve_shipping_provider``).
             "shipping_provider_code": "boxnow",
             "shipping_kind": "pickup_point",
             "boxnow_compartment_size": 1,
@@ -234,13 +235,14 @@ class TestOrderCreateWithBoxNow(APITestCase):
         mock_validate_cart,
         mock_get_payment_provider,
     ):
-        """When the admin flips BOXNOW_ENABLED to False the API must
-        reject ``box_now_locker`` orders even if the request is
-        otherwise valid — defends against a stale frontend cache that
-        still surfaces the option after admin hides it."""
-        from extra_settings.models import Setting
+        """When the admin flips ``ShippingProvider.is_active`` to
+        False the API must reject ``box_now_locker`` orders even if
+        the request is otherwise valid — defends against a stale
+        frontend cache that still surfaces the option after admin
+        hides it."""
+        from shipping.models import ShippingProvider
 
-        Setting.objects.filter(name="BOXNOW_ENABLED").update(value_bool=False)
+        ShippingProvider.objects.filter(code="boxnow").update(is_active=False)
 
         mock_validate_cart.return_value = {
             "valid": True,

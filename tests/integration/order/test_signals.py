@@ -37,8 +37,11 @@ class OrderSignalsTestCase(TestCase):
         self.product.refresh_from_db()
         self.initial_stock = self.product.stock
 
+    @patch("order.signals.handlers.send_admin_new_order_email.delay")
     @patch("order.signals.handlers.send_order_confirmation_email.delay")
-    def test_order_created_offline_payment_sends_email(self, mock_email_task):
+    def test_order_created_offline_payment_sends_email(
+        self, mock_email_task, mock_admin_task
+    ):
         # Offline payment methods (COD, bank transfer) need the
         # confirmation email immediately so the customer has the order
         # details before paying manually.
@@ -48,6 +51,7 @@ class OrderSignalsTestCase(TestCase):
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_called_once_with(self.order.id)
+        mock_admin_task.assert_called_once_with(self.order.id)
 
         self.assertTrue(
             OrderHistory.objects.filter(
@@ -57,11 +61,15 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
+    @patch("order.signals.handlers.send_admin_new_order_email.delay")
     @patch("order.signals.handlers.send_order_confirmation_email.delay")
-    def test_order_created_online_payment_defers_email(self, mock_email_task):
+    def test_order_created_online_payment_defers_email(
+        self, mock_email_task, mock_admin_task
+    ):
         # Online payments (Stripe, Viva) must defer the confirmation
         # email to the payment-success webhook — the customer should
-        # only get the email once the payment actually clears.
+        # only get the email once the payment actually clears. The
+        # admin notification still fires on creation regardless.
         self.order.pay_way = PayWayFactory.create_online_payment(
             provider_code="stripe"
         )
@@ -71,6 +79,7 @@ class OrderSignalsTestCase(TestCase):
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_not_called()
+        mock_admin_task.assert_called_once_with(self.order.id)
 
         self.assertTrue(
             OrderHistory.objects.filter(
@@ -80,9 +89,10 @@ class OrderSignalsTestCase(TestCase):
             ).exists()
         )
 
+    @patch("order.signals.handlers.send_admin_new_order_email.delay")
     @patch("order.signals.handlers.send_order_confirmation_email.delay")
     def test_order_created_online_payment_already_paid_sends_email(
-        self, mock_email_task
+        self, mock_email_task, mock_admin_task
     ):
         # Safety net: if an online-payment order is somehow already
         # paid at creation time, we still send the email immediately.
@@ -95,6 +105,7 @@ class OrderSignalsTestCase(TestCase):
         order_created.send(sender=Order, order=self.order)
 
         mock_email_task.assert_called_once_with(self.order.id)
+        mock_admin_task.assert_called_once_with(self.order.id)
 
     @patch("order.tasks.send_order_status_update_email.delay")
     def test_order_status_changed_signal(self, mock_email_task):
@@ -286,6 +297,82 @@ class OrderSignalsTestCase(TestCase):
                 change_type="NOTE",
                 new_value={"note": "Order canceled. Reason: Customer request"},
             ).exists()
+        )
+
+    @patch("order.services.OrderService.cancel_attached_shipment")
+    def test_handle_order_canceled_cascades_when_not_yet_run(
+        self, mock_cascade
+    ):
+        """When ``OrderService.cancel_order`` hasn't already run the
+        cascade (admin-form-save path), the signal handler must do
+        it. Verified necessary on 2026-05-16 after prod order 60 was
+        cancelled via the admin form and the ACS voucher stayed
+        alive."""
+        order_canceled.send(
+            sender=Order, order=self.order, reason="Customer request"
+        )
+
+        mock_cascade.assert_called_once_with(self.order, "Customer request")
+
+    @patch("order.services.OrderService.cancel_attached_shipment")
+    def test_handle_order_canceled_admin_form_path_uses_default_reason(
+        self, mock_cascade
+    ):
+        """When the admin form save flips ``order.status`` to CANCELED
+        directly (no kwargs/reason), the cascade still runs with a
+        sensible default reason."""
+        order_canceled.send(sender=Order, order=self.order)
+
+        mock_cascade.assert_called_once_with(self.order, "admin status change")
+
+    @patch("order.services.OrderService.cancel_attached_shipment")
+    def test_handle_order_canceled_skips_cascade_when_already_run(
+        self, mock_cascade
+    ):
+        """``OrderService.cancel_order`` runs the cascade synchronously
+        and leaves a ``shipment_cancel`` breadcrumb on the metadata.
+        The signal handler must detect that and skip — otherwise the
+        programmatic cancel path would double-fire the carrier API."""
+        self.order.metadata = {
+            "cancellation": {
+                "shipment_cancel": {"attempted": True, "dispatched": True}
+            }
+        }
+        self.order.save(update_fields=["metadata"])
+
+        order_canceled.send(
+            sender=Order, order=self.order, reason="programmatic"
+        )
+
+        mock_cascade.assert_not_called()
+
+    def test_handle_order_canceled_initialises_metadata_cancellation(self):
+        """The admin-form-save path leaves ``metadata.cancellation``
+        absent. The signal handler must seed it so the cascade has a
+        parent dict to write its ``shipment_cancel`` outcome into.
+
+        Uses the real cascade — the test order has no shipping
+        provider attached, so ``ShippingService.cancel_shipment``
+        short-circuits to ``False``, but the metadata save still runs
+        end of cascade. That's what persists the seeded fields."""
+        # Baseline: ensure the test order has no cancellation dict.
+        self.order.metadata = {}
+        self.order.save(update_fields=["metadata"])
+
+        order_canceled.send(
+            sender=Order, order=self.order, previous_status="PROCESSING"
+        )
+
+        self.order.refresh_from_db()
+        cancellation = (self.order.metadata or {}).get("cancellation") or {}
+        assert cancellation.get("previous_status") == "PROCESSING"
+        assert cancellation.get("reason") == "admin status change"
+        assert cancellation.get("canceled_at")  # truthy ISO timestamp
+        # The cascade ran and wrote its outcome (no shipment attached
+        # → dispatched=False).
+        assert cancellation.get("shipment_cancel", {}).get("attempted") is True
+        assert (
+            cancellation.get("shipment_cancel", {}).get("dispatched") is False
         )
 
     def test_handle_order_refunded(self):

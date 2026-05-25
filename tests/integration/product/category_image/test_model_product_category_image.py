@@ -1,3 +1,4 @@
+import pytest
 from django.db import IntegrityError
 from django.test import TestCase
 
@@ -5,6 +6,8 @@ from product.enum.category import CategoryImageTypeEnum
 from product.factories.category import ProductCategoryFactory
 from product.factories.category_image import ProductCategoryImageFactory
 from product.models.category_image import ProductCategoryImage
+
+pytestmark = pytest.mark.assert_english
 
 
 class ProductCategoryImageModelTestCase(TestCase):

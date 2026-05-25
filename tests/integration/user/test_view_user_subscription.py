@@ -1,3 +1,4 @@
+import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from knox.models import get_token_model
@@ -5,6 +6,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from user.models.subscription import SubscriptionTopic, UserSubscription
+
+pytestmark = pytest.mark.assert_english
 
 User = get_user_model()
 AuthToken = get_token_model()

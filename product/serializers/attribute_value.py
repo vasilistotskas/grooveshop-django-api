@@ -5,6 +5,7 @@ from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
 from core.api.schema import generate_schema_multi_lang
+from core.api.serializers import RequiredDefaultTranslationMixin
 from core.utils.serializers import TranslatedFieldExtended
 from product.models.attribute import Attribute
 from product.models.attribute_value import AttributeValue
@@ -15,8 +16,12 @@ class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
     pass
 
 
-class AttributeValueSerializer(TranslatableModelSerializer):
+class AttributeValueSerializer(
+    RequiredDefaultTranslationMixin, TranslatableModelSerializer
+):
     """Serializer for AttributeValue with translations."""
+
+    required_translation_field = "value"
 
     translations = TranslatedFieldsFieldExtend(shared_model=AttributeValue)
     attribute = PrimaryKeyRelatedField(queryset=Attribute.objects.all())
@@ -59,21 +64,6 @@ class AttributeValueSerializer(TranslatableModelSerializer):
         if not value.active:
             raise serializers.ValidationError(
                 _("Cannot assign value to inactive attribute.")
-            )
-
-        return value
-
-    def validate_translations(self, value):
-        """Validate that at least the default language translation exists."""
-        if not value:
-            raise serializers.ValidationError(
-                "At least one translation is required."
-            )
-
-        # Check if default language (English) has a value
-        if "en" in value and not value["en"].get("value"):
-            raise serializers.ValidationError(
-                "Default language (English) translation is required."
             )
 
         return value

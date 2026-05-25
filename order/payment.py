@@ -622,10 +622,24 @@ class VivaWalletPaymentProvider(PaymentProvider):
             access_token = self._get_access_token()
             viva_amount = int(round(amount.amount * 100))
 
+            # ``merchantTrns`` is echoed back as ``eventId`` in the
+            # hosted-checkout return URL, and the ``/order/viva_return``
+            # endpoint uses it to resolve the order during the brief
+            # window before the webhook has set ``payment_id`` on the
+            # row. We send ``order.uuid`` (unguessable, already the
+            # guest-access token) rather than the integer PK so an
+            # attacker cannot enumerate IDs to extract the UUID via
+            # the return endpoint. The human-readable ``Order #{id}``
+            # label is on ``customerTrns`` (which Viva surfaces in the
+            # merchant dashboard and customer email), so swapping
+            # ``merchantTrns`` to a UUID doesn't hurt ops readability.
+            order_uuid = kwargs.get("order_uuid", "")
             payload = {
                 "amount": viva_amount,
                 "customerTrns": kwargs.get("description", f"Order #{order_id}"),
-                "merchantTrns": str(order_id),
+                "merchantTrns": str(order_uuid)
+                if order_uuid
+                else str(order_id),
                 "sourceCode": self.source_code,
                 "currencyCode": 978,
                 "disableCash": True,

@@ -181,6 +181,8 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         "translations__instructions",
     ]
 
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     readonly_fields = [
         "id",
         "created_at",
@@ -189,7 +191,6 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         "configuration_preview",
         "effective_cost_display",
         "is_configured_status",
-        "sort_order",
     ]
 
     def get_readonly_fields(self, request, obj=None):

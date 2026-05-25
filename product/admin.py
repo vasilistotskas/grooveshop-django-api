@@ -286,7 +286,9 @@ class AttributeValueInline(TabularInline):
     model = AttributeValue
     extra = 0
     fields = ("value_display", "active", "sort_order", "usage_count_display")
-    readonly_fields = ("value_display", "usage_count_display", "sort_order")
+    readonly_fields = ("value_display", "usage_count_display")
+    ordering_field = "sort_order"
+    hide_ordering_field = True
 
     tab = True
     show_change_link = True
@@ -335,6 +337,8 @@ class AttributeValueInline(TabularInline):
 class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
     """Admin interface for managing product attributes."""
 
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = [
         "attribute_info",
         "active_status_badge",
@@ -356,7 +360,6 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
     readonly_fields = (
         "id",
         "uuid",
-        "sort_order",
         "created_at",
         "updated_at",
         "values_count_display",
@@ -585,6 +588,8 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
 class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
     """Admin interface for managing attribute values."""
 
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = [
         "value_info",
         "attribute_display",
@@ -607,7 +612,6 @@ class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
     readonly_fields = (
         "id",
         "uuid",
-        "sort_order",
         "created_at",
         "updated_at",
         "usage_count_display",
@@ -2779,6 +2783,8 @@ class ProductFavouriteAdmin(BaseModelAdmin):
 
 @admin.register(ProductCategoryImage)
 class ProductCategoryImageAdmin(BaseModelAdmin, TranslatableAdmin):
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = [
         "image_preview",
         "category_name",
@@ -2799,7 +2805,7 @@ class ProductCategoryImageAdmin(BaseModelAdmin, TranslatableAdmin):
         "translations__alt_text",
     ]
     list_select_related = ["category"]
-    readonly_fields = ("created_at", "updated_at", "uuid", "sort_order")
+    readonly_fields = ("created_at", "updated_at", "uuid")
     ordering = ["category", "image_type", "sort_order"]
 
     fieldsets = (
@@ -2916,6 +2922,8 @@ class ProductCategoryImageAdmin(BaseModelAdmin, TranslatableAdmin):
 
 @admin.register(ProductImage)
 class ProductImageAdmin(BaseModelAdmin, TranslatableAdmin):
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = [
         "image_preview",
         "product_name",
@@ -2934,7 +2942,7 @@ class ProductImageAdmin(BaseModelAdmin, TranslatableAdmin):
         "translations__title",
     ]
     list_select_related = ["product"]
-    readonly_fields = ("created_at", "updated_at", "uuid", "sort_order")
+    readonly_fields = ("created_at", "updated_at", "uuid")
     ordering = ["product", "-is_main", "sort_order"]
 
     fieldsets = (

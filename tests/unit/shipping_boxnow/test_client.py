@@ -174,7 +174,10 @@ class TestRequest:
     @pytest.mark.django_db
     def test_request_401_refreshes_token_and_retries(self):
         """On 401 response, client refreshes token once and retries."""
+        from django.core.cache import cache
+
         client = _make_client()
+        cache.delete(client._token_cache_key)
         auth_resp_1 = _make_response(
             200, {"access_token": "old-tok", "expires_in": 3600}
         )

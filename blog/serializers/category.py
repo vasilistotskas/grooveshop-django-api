@@ -60,6 +60,7 @@ class BlogCategorySerializer(
         )
         read_only_fields = (
             "id",
+            "sort_order",
             "level",
             "post_count",
             "has_children",
@@ -185,6 +186,7 @@ class BlogCategoryWriteSerializer(
             "sort_order",
             "image",
         )
+        read_only_fields = ("sort_order",)
 
 
 class BlogCategoryReorderItemSerializer(serializers.Serializer):

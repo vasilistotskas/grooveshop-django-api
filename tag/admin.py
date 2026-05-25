@@ -137,10 +137,11 @@ class TagAdmin(ModelAdmin, TranslatableAdmin):
         ("updated_at", RangeDateTimeFilter),
     ]
     search_fields = ["translations__label", "id"]
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     readonly_fields = (
         "id",
         "uuid",
-        "sort_order",
         "created_at",
         "updated_at",
         "tag_analytics",

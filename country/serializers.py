@@ -36,6 +36,7 @@ class CountrySerializer(
             "main_image_path",
         )
         read_only_fields = (
+            "sort_order",
             "created_at",
             "updated_at",
             "uuid",
@@ -96,3 +97,4 @@ class CountryWriteSerializer(
             "phone_code",
             "sort_order",
         )
+        read_only_fields = ("sort_order",)

@@ -323,9 +323,8 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
     list_editable = ("active",)
     search_fields = ("translations__name",)
     ordering = ("sort_order",)
-    readonly_fields = [
-        "sort_order",
-    ]
+    ordering_field = "sort_order"
+    hide_ordering_field = True
 
     fieldsets = (
         (
@@ -414,7 +413,6 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         "id",
         "posts_count_display",
         "recursive_posts_display",
-        "sort_order",
     ]
 
     fieldsets = (

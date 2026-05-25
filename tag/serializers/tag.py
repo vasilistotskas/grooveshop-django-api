@@ -37,6 +37,7 @@ class TagSerializer(
         )
         read_only_fields = (
             "id",
+            "sort_order",
             "usage_count",
             "created_at",
             "updated_at",
@@ -74,3 +75,4 @@ class TagWriteSerializer(
             "active",
             "sort_order",
         )
+        read_only_fields = ("sort_order",)

@@ -45,6 +45,7 @@ class ProductCategoryImageSerializer(
         )
         read_only_fields = (
             "id",
+            "sort_order",
             "category_name",
             "image_path",
             "image_url",
@@ -81,6 +82,7 @@ class ProductCategoryImageWriteSerializer(
             "sort_order",
             "translations",
         )
+        read_only_fields = ("sort_order",)
 
     def validate(self, attrs):
         category = attrs.get("category")

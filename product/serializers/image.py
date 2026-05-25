@@ -49,6 +49,7 @@ class ProductImageSerializer(
             "id",
             "uuid",
             "product",
+            "sort_order",
             "image_url",
             "image_size_kb",
             "alt_text",
@@ -181,6 +182,7 @@ class ProductImageWriteSerializer(
             "sort_order",
             "translations",
         )
+        read_only_fields = ("sort_order",)
 
     def validate_image(self, value: ImageFieldFile) -> ImageFieldFile:
         from PIL import Image as PILImage  # noqa: PLC0415

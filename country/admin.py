@@ -78,9 +78,10 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         "iso_cc",
         "phone_code",
     ]
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     readonly_fields = (
         "uuid",
-        "sort_order",
         "created_at",
         "updated_at",
     )
@@ -114,9 +115,16 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
             },
         ),
         (
+            _("Organization"),
+            {
+                "fields": ("sort_order",),
+                "classes": ("wide",),
+            },
+        ),
+        (
             _("System Information"),
             {
-                "fields": ("uuid", "sort_order", "created_at", "updated_at"),
+                "fields": ("uuid", "created_at", "updated_at"),
                 "classes": ("collapse",),
             },
         ),

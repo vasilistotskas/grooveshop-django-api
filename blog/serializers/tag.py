@@ -37,6 +37,7 @@ class BlogTagSerializer(
         )
         read_only_fields = (
             "id",
+            "sort_order",
             "posts_count",
             "created_at",
             "updated_at",
@@ -68,3 +69,4 @@ class BlogTagWriteSerializer(
             "active",
             "sort_order",
         )
+        read_only_fields = ("sort_order",)

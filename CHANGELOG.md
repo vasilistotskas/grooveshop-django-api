@@ -3,6 +3,35 @@
 
 
 
+## v1.142.1 (2026-05-25)
+
+### Bug fixes
+
+* fix(shipping): walk SHIPPED before DELIVERED on carrier delivered-jump
+
+When ACS or BoxNow report a parcel as delivered between two polls /
+webhooks without us ever observing an intermediate IN_TRANSIT /
+final_destination event (fast COD same-day, or customer picks up
+immediately), ``_apply_order_status_transition`` would attempt
+``PROCESSING -> DELIVERED`` directly. The order state machine only
+allows ``PROCESSING -> SHIPPED -> DELIVERED``, so the transition was
+rejected and the order silently stayed at PROCESSING forever.
+
+Prod regression: order 73 was minted via the COD path on 2026-05-21,
+ACS flipped shipment_state to ``delivered`` the same day, but order
+status remained PROCESSING through 2026-05-25. Confirmed via 48h
+log sweep ("Cannot transition from PROCESSING to DELIVERED. Allowed
+transitions: SHIPPED, CANCELED").
+
+Same gap existed in both services; fix both for parity, with mirror
+regression tests pinning the new walk-through-SHIPPED path. Order 73
+backfilled manually with customer notifications suppressed (4-day-
+stale shipment). ([`480ae23`](https://github.com/vasilistotskas/grooveshop-django-api/commit/480ae232cdd4d7885946d497347c8af553323b49))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.142.0 [skip ci] ([`5ff05fd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ff05fd14a7d60eed04560f6f55b0aeec507c953))
+
 ## v1.142.0 (2026-05-22)
 
 ### Chores

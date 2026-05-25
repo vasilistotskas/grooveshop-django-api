@@ -3,6 +3,92 @@
 
 
 
+## v1.145.0 (2026-05-25)
+
+### Bug fixes
+
+* fix(product): validate default-language translation by settings, not hardcoded 'en'
+
+AttributeSerializer/AttributeValueSerializer validated translations with a hardcoded 'if "en" in value' check (message claimed English is the default) while PARLER_DEFAULT_LANGUAGE_CODE is 'el'. The check never enforced its stated contract and didn't scale as locales change.
+
+Add RequiredDefaultTranslationMixin in core/api/serializers.py: requires the settings.PARLER_DEFAULT_LANGUAGE_CODE translation (with required_translation_field non-empty); other locales stay optional, so the rule follows the configured locale set with no code changes. Apply to both serializers (name / value). Adds focused tests (the validation previously had none) and documents the mixin in CLAUDE.md.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`82d6c21`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82d6c21bfc3162bec8b83401c06c36186b0d613e))
+
+### Chores
+
+* chore(i18n): translate admin panel strings to Greek
+
+Refresh el catalog via makemessages and translate the 265 untranslated
++ fuzzy strings that surface in the Django admin (model verbose names /
+field help_text, admin.py actions, fieldsets, result messages, forms,
+and the cache-purge log). Fuzzy entries had unrelated Greek grabbed by
+msgmerge and were retranslated.
+
+Terminology kept in English per request (BoxNow, ACS, Smartpoint, Locker,
+Stripe, Meta/fbtrace_id, Nuxt, Django, myDATA/MARK, SKU, slug, voucher,
+webhooks, Cache, PayWay); real Greek terms applied where they exist
+(VAT->ΦΠΑ, COD->Αντικαταβολή, Parcel->Δέμα, Shipment->Αποστολή).
+
+API/Swagger help_text (filters/serializers/views) intentionally left
+untranslated — not part of the admin surface.
+
+Drops the bogus #, python-format flag re-added by makemessages on 6
+literal-% msgids (see v1.137.2) so compilemessages passes.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`3a2ee8e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3a2ee8ede14b7b9726f61624b898d621b51d5073))
+
+* chore(deps): sync uv.lock to 1.144.0 [skip ci] ([`74a230f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/74a230f7f1ba4b5db115ec2e8700bd1d20b85f3d))
+
+### Features
+
+* feat(admin): enable drag-and-drop sort_order reordering across admins
+
+Make SortableModel.sort_order editable (drop editable=False) so
+django-unfold drag-and-drop works; the ordering field has to be in
+list_editable, which Django forbids for non-editable fields.
+
+Wire ordering_field + hide_ordering_field on every flat sortable admin
+and inline (Country, Region, PayWay, Tag, BlogTag, Attribute,
+AttributeValue, ProductImage, ProductCategoryImage, LoyaltyTier).
+MPTT category admins (BlogCategory, ProductCategory) are intentionally
+left on DraggableMPTTAdmin tree drag - layering unfold flat drag adds a
+second, conflicting handle per row.
+
+Keep sort_order in read_only_fields on every serializer that exposes it
+(they previously relied on editable=False), preserving the OpenAPI
+contract - zero schema drift. The editable flip produces no-op
+AlterField migrations, safe under the Argo PreSync deploy model.
+
+Tests: assert region list_display by membership (unfold appends the
+ordering field), mark the user last_activity "Never" test assert_english,
+and add the missing token-cache delete to the boxnow 401-retry test for
+worker-order independence.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`613f95f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/613f95f273c4dacbfd14eb4398324e887cd38850))
+
+* feat(order): stop collecting place (Περιοχή) on checkout order-create
+
+Removes the optional 'place' field from OrderCreateFromCartSerializer and stops writing it into new orders. place never reached the order from the storefront anyway (the checkout payload only sent regionId), so the invoice address_line_2 was already always blank for storefront orders. region is intentionally left untouched.
+
+Order.place column, the Order/OrderWrite response serializers, admin, and UserAccount.place are all kept. Schema regenerated. region remains fully present everywhere (request + response).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`c8c68c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8c68c2618bb2cc9b671889ae185205d0feba73d))
+
+### Refactoring
+
+* refactor: align PayWay/Tag managers with TranslatableOptimizedManager
+
+PayWayManager/TagManager (and their querysets) inherited plain parler TranslatableManager/TranslatableQuerySet and hand-rolled with_translations()/for_list()/for_detail()/get_queryset() that were byte-for-byte identical to the canonical TranslatableOptimizedManager base used by region/product. Switched both to the optimized base, keeping only model-specific filters (active/online_payments/etc.). PayWay also gains the __getattr__ queryset delegation it was missing. TaggedItem (non-translatable) left on plain managers. for_list/for_detail produce identical querysets — verified behavior-preserving by the pay_way + tag suites.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`cfad1da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cfad1daf60e6aa89a31da34dd3fbf041ab6131dd))
+
+* refactor(order): remove dead region/country shipping-cost branches
+
+calculate_shipping_cost had two fallback branches guarded by hasattr(country, 'shipping_multiplier') and hasattr(region, 'shipping_adjustment') — neither field exists on any model, so both branches were permanently dead (speculative code). Removed both, plus their now-unused model fetches and except handlers. The country_id/region_id params are kept: they are still forwarded to the live provider-dispatch path (ShippingService). Behavior is unchanged (the branches never executed); verified by the shipping-cost test suite.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`4bbf626`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4bbf626adfd49f81adecd3fc50c90ab37cf9d928))
+
 ## v1.144.0 (2026-05-25)
 
 ### Chores

@@ -71,7 +71,7 @@ class OrderItemViewSet(BaseModelViewSet):
         "price",
         "sort_order",
     ]
-    ordering = ["-created_at"]
+    ordering = ["sort_order", "-created_at"]
     search_fields = [
         "product__translations__name",
         "notes",

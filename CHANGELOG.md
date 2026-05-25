@@ -3,6 +3,22 @@
 
 
 
+## v1.143.0 (2026-05-25)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.142.2 [skip ci] ([`7397b10`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7397b101e4df5bfe1607293fbb97f973645cad2c))
+
+### Features
+
+* feat(admin): surface localization, security & task-result links in sidebar
+
+Countries / Regions / Sites / Subscription Topics were reachable only inside the superuser-only System zone, nested two levels deep, so they were effectively unfindable. Promote them to a top-level staff-accessible Localization group and drop the duplicate entries from System > Configuration.
+
+Add a superuser-only Security & Access subtree (User Sessions, MFA Authenticators, Social Accounts, Email Addresses, Knox API Tokens) and surface Celery Task Results / Group Results under System > Background Jobs, so previously menu-orphaned but useful admins are reachable without enabling show_all_applications.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`643a23e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/643a23e49c7315cf21d06bf5c2bc3b25501092f8))
+
 ## v1.142.2 (2026-05-25)
 
 ### Bug fixes

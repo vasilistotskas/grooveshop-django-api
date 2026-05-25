@@ -13,7 +13,6 @@ from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import ngettext
-from mptt.admin import DraggableMPTTAdmin
 from parler.admin import TranslatableAdmin
 from simple_history.admin import SimpleHistoryAdmin
 from unfold.admin import TabularInline
@@ -2253,13 +2252,10 @@ class ProductCategoryImageInline(TabularInline):
 
 
 @admin.register(ProductCategory)
-class ProductCategoryAdmin(
-    BaseModelAdmin, TranslatableAdmin, DraggableMPTTAdmin
-):
-    mptt_indent_field = "translations__name"
+class ProductCategoryAdmin(BaseModelAdmin, TranslatableAdmin):
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_display = (
-        "tree_actions",
-        "indented_title",
         "category_info",
         "category_stats",
         "category_status",

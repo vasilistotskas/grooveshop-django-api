@@ -391,23 +391,25 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
 
 
 @admin.register(BlogCategory)
-class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
+class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin):
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True
     list_filter_submit = True
     list_filter_sheet = False
 
-    mptt_indent_field = "translations__name"
+    ordering_field = "sort_order"
+    hide_ordering_field = True
     list_per_page = 15
     list_display = (
-        "tree_actions",
-        "indented_title",
+        "category_name",
+        "parent_display",
         "category_image",
         "posts_count_display",
         "recursive_posts_display",
     )
-    list_display_links = ("indented_title",)
+    list_display_links = ("category_name",)
+    list_select_related = ("parent",)
     search_fields = ("translations__name", "translations__description")
     readonly_fields = [
         "id",
@@ -467,6 +469,24 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
         return {
             "slug": ("name",),
         }
+
+    @admin.display(description=_("Name"), ordering="translations__name")
+    def category_name(self, obj):
+        return (
+            obj.safe_translation_getter("name", any_language=True)
+            or f"#{obj.pk}"
+        )
+
+    @admin.display(description=_("Parent"))
+    def parent_display(self, obj):
+        if obj.parent_id:
+            return (
+                obj.parent.safe_translation_getter("name", any_language=True)
+                or f"#{obj.parent_id}"
+            )
+        return mark_safe(
+            '<span class="text-base-500 dark:text-base-400">—</span>'
+        )
 
     @admin.display(description=_("Image"))
     def category_image(self, obj):

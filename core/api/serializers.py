@@ -1,12 +1,60 @@
 import decimal
 import importlib
 from typing import Any, TypedDict
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from measurement.base import BidimensionalMeasure, MeasureBase
 from rest_framework import serializers
 
 from product.models import Product
+
+
+class RequiredDefaultTranslationMixin:
+    """Enforce that the configured default-language translation is present.
+
+    Parler treats translations as optional at the model layer, so any
+    serializer that needs a guaranteed default-language entry mixes this
+    in and sets ``required_translation_field`` to the translated field
+    that must be non-empty (e.g. ``"name"``).
+
+    The default language is read from
+    ``settings.PARLER_DEFAULT_LANGUAGE_CODE`` rather than hardcoded, so
+    the rule follows the configured locales — adding or changing
+    languages on either end needs no change here. Non-default languages
+    stay optional.
+    """
+
+    required_translation_field: str | None = None
+
+    def validate_translations(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                _("At least one translation is required.")
+            )
+
+        default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
+        default_translation = value.get(default_language)
+        if not default_translation:
+            raise serializers.ValidationError(
+                _(
+                    "A translation for the default language (%(lang)s) "
+                    "is required."
+                )
+                % {"lang": default_language}
+            )
+
+        field = self.required_translation_field
+        if field and not default_translation.get(field):
+            raise serializers.ValidationError(
+                _(
+                    "The '%(field)s' field is required for the default "
+                    "language (%(lang)s)."
+                )
+                % {"field": field, "lang": default_language}
+            )
+
+        return value
 
 
 def is_valid_unit(

@@ -246,10 +246,13 @@ class TestCustomExceptionsNotReraisedAsValueError:
     @pytest.mark.parametrize(
         "scenario,exception_type,description",
         [
-            # PaymentNotFoundError scenarios
+            # A missing payment_intent_id is a validation error, not a
+            # "payment not found" — create_order_from_cart raises
+            # InvalidOrderDataError (still a custom OrderServiceError, the
+            # property this test guards).
             (
                 "missing_payment_intent",
-                PaymentNotFoundError,
+                InvalidOrderDataError,
                 "no_payment_intent_id",
             ),
             # InvalidOrderDataError scenarios

@@ -27,14 +27,9 @@ from order.tasks import (
 @pytest.mark.django_db
 class OrderTasksSimpleTestCase(DjangoTestCase):
     def setUp(self):
-        # Pin both status and payment_status so tests that exercise the
-        # PROCESSING email path (status-update, template fallback) are
-        # deterministic — the factory's default payment_status is a
-        # random choice across all PaymentStatus values, which made
-        # these tests flake whenever COMPLETED was rolled (the task
-        # intentionally skips the PROCESSING status-update email when
-        # the payment is already complete, to avoid duplicating the
-        # separate "Payment Confirmed" email).
+        # Pin both status and payment_status so the status-update /
+        # shipping-notification tests start from a deterministic state
+        # (the factory's defaults are random across all enum values).
         self.order = OrderFactory.create(
             email="customer@example.com",
             first_name="John",
@@ -227,8 +222,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         mock_render.side_effect = ["Email content", "HTML content"]
 
+        # DELIVERED is a shopper-facing status that uses the generic
+        # template. PROCESSING/SHIPPED are intentionally not sent here
+        # (PROCESSING is internal; SHIPPED has its own dedicated email).
         result = send_order_status_update_email(
-            self.order.id, OrderStatus.PROCESSING
+            self.order.id, OrderStatus.DELIVERED
         )
 
         self.assertTrue(result)
@@ -243,6 +241,19 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
 
         self.assertTrue(result)
+
+    @patch("order.tasks.EmailMultiAlternatives")
+    def test_send_order_status_update_email_skip_internal_statuses(
+        self, mock_email
+    ):
+        """PROCESSING and SHIPPED are not sent through the generic
+        status-update email: PROCESSING is an internal milestone, and
+        SHIPPED is owned by the dedicated shipping-notification email.
+        Both must short-circuit before building a message."""
+        for status in (OrderStatus.PROCESSING, OrderStatus.SHIPPED):
+            result = send_order_status_update_email(self.order.id, status)
+            self.assertTrue(result)
+        mock_email.assert_not_called()
 
     @patch("order.tasks.logger.error")
     def test_send_order_status_update_email_order_not_found(self, mock_logger):
@@ -269,7 +280,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         mock_email.return_value = mock_email_instance
 
         def render_side_effect(template_name, context):
-            if "order_processing" in template_name:
+            if "order_delivered" in template_name:
                 raise Exception("Template not found")
             else:
                 return "Generic email content"
@@ -277,7 +288,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         mock_render.side_effect = render_side_effect
 
         result = send_order_status_update_email(
-            self.order.id, OrderStatus.PROCESSING
+            self.order.id, OrderStatus.DELIVERED
         )
 
         self.assertTrue(result)
@@ -297,7 +308,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     def test_send_shipping_notification_email_success(
         self, mock_render, mock_email, mock_log_note
     ):
-        order_with_tracking = OrderFactory.create(email="customer@example.com")
+        # The shipped email only sends once the parcel is genuinely in
+        # transit (status SHIPPED) AND tracking is present — so pin both.
+        order_with_tracking = OrderFactory.create(
+            email="customer@example.com", status=OrderStatus.SHIPPED
+        )
         order_with_tracking.tracking_number = "TRACK123456"
         order_with_tracking.shipping_carrier = "UPS"
         order_with_tracking.save()
@@ -326,17 +341,50 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertTrue(mock_log_note.called)
 
     @patch("order.tasks.logger.warning")
-    def test_send_shipping_notification_email_no_tracking_info(
+    def test_send_shipping_notification_email_shipped_without_tracking_defers(
         self, mock_logger
     ):
+        # An order flipped to SHIPPED before tracking lands defers (and
+        # warns) rather than erroring — the email re-dispatches when
+        # order_shipment_dispatched fires with the tracking number. It
+        # must NOT reserve the idempotency flag, or the real send would
+        # be permanently blocked.
+        self.order.status = OrderStatus.SHIPPED
         self.order.tracking_number = ""
         self.order.shipping_carrier = ""
+        self.order.save()
+        # The save() above eagerly fired the SHIPPED transition's own
+        # dispatch; ignore those calls and assert on the explicit one.
+        mock_logger.reset_mock()
+
+        result = send_shipping_notification_email(self.order.id)
+
+        self.assertTrue(result)
+        mock_logger.assert_called_once()
+        self.order.refresh_from_db()
+        self.assertNotIn(
+            "shipping_notification_email_sent", self.order.metadata or {}
+        )
+
+    @patch("order.tasks.logger.debug")
+    def test_send_shipping_notification_email_not_shipped_defers(
+        self, mock_logger
+    ):
+        # Fired at voucher-mint (status still PROCESSING) the task must
+        # quietly defer — this is the normal COD/online ordering where
+        # tracking lands before the parcel is in transit.
+        self.order.status = OrderStatus.PROCESSING
+        self.order.tracking_number = "TRACK999"
+        self.order.shipping_carrier = "acs"
         self.order.save()
 
         result = send_shipping_notification_email(self.order.id)
 
-        self.assertFalse(result)
-        mock_logger.assert_called_once()
+        self.assertTrue(result)
+        self.order.refresh_from_db()
+        self.assertNotIn(
+            "shipping_notification_email_sent", self.order.metadata or {}
+        )
 
     @patch("order.tasks.logger.error")
     def test_send_shipping_notification_email_order_not_found(
@@ -534,10 +582,9 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 @pytest.mark.django_db
 class OrderTasksIntegrationTestCase(DjangoTestCase):
     def setUp(self):
-        # Pin payment_status: OrderFactory's default is random (see factories
-        # /order.py:180) and can land on COMPLETED, which makes
-        # send_order_status_update_email skip the PROCESSING email as a
-        # duplicate of the payment-confirmed email.
+        # Pin status + payment_status: OrderFactory's defaults are random
+        # (see factories/order.py:180), so fix them for deterministic
+        # email-sequence assertions.
         self.order = OrderFactory.create(
             email="integration@example.com",
             status=OrderStatus.PROCESSING,
@@ -565,15 +612,23 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         mock_email_instance = MagicMock()
         mock_email.return_value = mock_email_instance
 
-        confirmation_result = send_order_confirmation_email(self.order.id)
-        status_result = send_order_status_update_email(
-            self.order.id, OrderStatus.PROCESSING
+        # The three customer-facing emails across an order's real
+        # lifecycle: order received → shipped (in transit, with tracking)
+        # → delivered. PROCESSING never emails (internal milestone), so
+        # it's deliberately absent from this sequence.
+        Order.objects.filter(id=self.order.id).update(
+            status=OrderStatus.SHIPPED
         )
+
+        confirmation_result = send_order_confirmation_email(self.order.id)
         shipping_result = send_shipping_notification_email(self.order.id)
+        status_result = send_order_status_update_email(
+            self.order.id, OrderStatus.DELIVERED
+        )
 
         self.assertTrue(confirmation_result)
-        self.assertTrue(status_result)
         self.assertTrue(shipping_result)
+        self.assertTrue(status_result)
 
         self.assertEqual(mock_email_instance.send.call_count, 3)
 

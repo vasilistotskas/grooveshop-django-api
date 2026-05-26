@@ -20,6 +20,7 @@ from order.exceptions import (
     PaymentCurrencyMismatchError,
     PaymentError,
     PaymentNotFoundError,
+    PaymentVerificationError,
     ProductNotFoundError,
     StockReservationError,
 )
@@ -30,6 +31,20 @@ from order.signals import order_refunded
 from order.stock import StockManager
 
 logger = logging.getLogger(__name__)
+
+# Payment statuses that represent a financially settled (terminal) state.
+# A stale or out-of-order webhook event MUST NOT overwrite any of these.
+# Stripe/Viva do NOT guarantee delivery order, so e.g. a delayed
+# ``payment_failed`` event could arrive after a ``charge.refunded`` event
+# that already moved the order to REFUNDED — that must not regress it to FAILED.
+SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
+    {
+        PaymentStatus.COMPLETED,
+        PaymentStatus.REFUNDED,
+        PaymentStatus.PARTIALLY_REFUNDED,
+        PaymentStatus.CANCELED,
+    }
+)
 
 __all__ = ["OrderService"]
 
@@ -275,7 +290,7 @@ class OrderService:
             from order.payment import get_payment_provider
 
             if not payment_intent_id:
-                raise PaymentNotFoundError(
+                raise InvalidOrderDataError(
                     str(_("Payment intent ID is required for order creation"))
                 )
 
@@ -293,12 +308,11 @@ class OrderService:
                 PaymentStatus.PROCESSING,
                 PaymentStatus.COMPLETED,
             ]:
-                raise PaymentNotFoundError(
-                    _(
-                        "Payment intent {payment_id} is in invalid state. Status: {status}"
-                    ).format(
-                        payment_id=payment_intent_id, status=payment_status
-                    )
+                raise PaymentVerificationError(
+                    payment_intent_id,
+                    _("payment intent is in an invalid state: {status}").format(
+                        status=payment_status
+                    ),
                 )
 
             # Verify the provider amount matches the server-calculated total.
@@ -776,6 +790,9 @@ class OrderService:
             InsufficientStockError,
             InvalidOrderDataError,
             PaymentNotFoundError,
+            PaymentVerificationError,
+            PaymentAmountMismatchError,
+            PaymentCurrencyMismatchError,
         ):
             raise
         except Exception as e:
@@ -2401,6 +2418,26 @@ class OrderService:
             )
             return None
 
+        # Guard: a stale or out-of-order "payment succeeded" event must not
+        # un-refund or un-cancel an order that is already in a settled state.
+        # Stripe does NOT guarantee event delivery order.  COMPLETED is
+        # allowed through (idempotent — mark_as_paid just writes COMPLETED
+        # again, and the PENDING→PROCESSING block below is gated on
+        # order.status so no double-shipment dispatch occurs).
+        _refund_or_cancel = {
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.CANCELED,
+        }
+        if order.payment_status in _refund_or_cancel:
+            logger.warning(
+                "Ignoring stale payment_succeeded for order %s: "
+                "payment_status already %s",
+                order.id,
+                order.payment_status,
+            )
+            return order
+
         order.mark_as_paid(
             payment_id=payment_intent_id, payment_method="stripe"
         )
@@ -2454,6 +2491,20 @@ class OrderService:
                 "Order not found for payment_intent: %s", payment_intent_id
             )
             return None
+
+        # Guard: a stale or out-of-order "payment failed" event must not
+        # overwrite a financially settled state.  Stripe does NOT guarantee
+        # event delivery order, so a delayed payment_intent.payment_failed
+        # could arrive after charge.refunded already moved the order to
+        # REFUNDED.  FAILED is only written from non-settled states.
+        if order.payment_status in SETTLED_PAYMENT_STATUSES:
+            logger.warning(
+                "Ignoring stale payment_failed for order %s: "
+                "payment_status already %s",
+                order.id,
+                order.payment_status,
+            )
+            return order
 
         order.payment_status = PaymentStatus.FAILED
         order.save(update_fields=["payment_status"])

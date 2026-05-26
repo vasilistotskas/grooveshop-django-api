@@ -825,25 +825,25 @@ def send_order_status_update_email(
             .get(id=order_id)
         )
 
-        if status in [OrderStatus.PENDING]:
-            return True
-
-        # Skip the generic status-update email when the transition is
-        # PENDING → PROCESSING triggered by a successful payment. The
-        # confirmation email (`order_payment_confirmed` template) is
-        # sent separately by the webhook handler and is the
-        # authoritative "payment received, now processing" notification.
-        # Sending both produced a duplicate "Σε επεξεργασία" + "Payment
-        # Confirmed" pair for every online order.
-        if (
-            status in (OrderStatus.PROCESSING, OrderStatus.PROCESSING.value)
-            and order.payment_status == PaymentStatus.COMPLETED
+        # Internal-only milestones never get their own customer email:
+        #   • PENDING — covered by the order-received confirmation.
+        #   • PROCESSING — an internal "we're preparing it" step,
+        #     covered by order-received (offline) or the payment-
+        #     confirmed notification (online). Surfacing it as its own
+        #     email produced a duplicate right after the confirmation.
+        #   • SHIPPED — owned by the dedicated
+        #     ``send_shipping_notification_email`` task, which carries
+        #     the tracking number and only fires once the parcel is
+        #     genuinely in transit. Routing it through the generic
+        #     status template here would double-send.
+        if status in (
+            OrderStatus.PENDING,
+            OrderStatus.PENDING.value,
+            OrderStatus.PROCESSING,
+            OrderStatus.PROCESSING.value,
+            OrderStatus.SHIPPED,
+            OrderStatus.SHIPPED.value,
         ):
-            logger.info(
-                "Order %s already has payment_status=COMPLETED; skipping "
-                "PROCESSING status-update email (confirmation email covers it)",
-                order.id,
-            )
             return True
 
         context = {
@@ -856,10 +856,6 @@ def send_order_status_update_email(
             "SITE_URL": settings.NUXT_BASE_URL,
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
-
-        if status in (OrderStatus.SHIPPED, OrderStatus.SHIPPED.value):
-            context["tracking_number"] = order.tracking_number
-            context["carrier"] = order.shipping_carrier
 
         template_base = f"emails/order/order_{status.lower()}"
 
@@ -968,40 +964,53 @@ def _reserve_shipping_notification_email(order_id: int) -> bool:
 @shared_task(bind=True, max_retries=3, default_retry_delay=300)
 def send_shipping_notification_email(self, order_id: int) -> bool:
     try:
-        # Only reserve on the first attempt. Retries are expected to
-        # re-send because the flag is held by this worker; releasing
-        # on every retry would defeat idempotency, and re-checking
-        # would block a legitimate retry after a transient failure.
-        if self.request.retries == 0:
-            try:
-                if not _reserve_shipping_notification_email(order_id):
-                    logger.info(
-                        "Shipping notification email already sent (or reserved) "
-                        "for order #%s, skipping",
-                        order_id,
-                    )
-                    return True
-            except Order.DoesNotExist:
-                logger.error(
-                    "Could not reserve shipping notification email — Order #%s "
-                    "not found",
-                    order_id,
-                    extra={"order_id": order_id},
-                )
-                return False
-
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
             .prefetch_related("items__product__translations")
             .get(id=order_id)
         )
 
+        # "Your order has shipped" must stay honest: it only goes out
+        # once the parcel is genuinely in transit (status SHIPPED) AND we
+        # have a tracking number to show. This task is dispatched from
+        # two events — the moment tracking lands
+        # (``order_shipment_dispatched``, which on a COD/online order
+        # fires at voucher-mint while the order is still PROCESSING) and
+        # the moment the order reaches SHIPPED (``order_status_changed``).
+        # Whichever fires first finds the other condition unmet and
+        # defers; the second one sends. Deferrals return ``True``
+        # (success, no-op) so Celery doesn't retry, and — crucially — we
+        # DON'T reserve the idempotency flag on a deferral, or the real
+        # send would be permanently blocked.
+        if order.status != OrderStatus.SHIPPED.value:
+            logger.debug(
+                "Order #%s is %s, not SHIPPED yet — deferring shipped email",
+                order_id,
+                order.status,
+            )
+            return True
+
         if not order.tracking_number or not order.shipping_carrier:
             logger.warning(
-                f"Attempted to send shipping notification for order #{order_id} without tracking info",
+                "Order #%s reached SHIPPED without tracking info — deferring "
+                "shipped email until tracking lands",
+                order_id,
                 extra={"order_id": order_id},
             )
-            return False
+            return True
+
+        # Only reserve on the first attempt. Retries are expected to
+        # re-send because the flag is held by this worker; releasing
+        # on every retry would defeat idempotency, and re-checking
+        # would block a legitimate retry after a transient failure.
+        if self.request.retries == 0:
+            if not _reserve_shipping_notification_email(order_id):
+                logger.info(
+                    "Shipping notification email already sent (or reserved) "
+                    "for order #%s, skipping",
+                    order_id,
+                )
+                return True
 
         context = {
             "order": order,
@@ -1341,17 +1350,16 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         send_invoice_email.delay(order_id)
         return False
     except MyDataDuplicateError as exc:
-        # AADE error 228: the same uid is already registered under
-        # another MARK. Retrying will only loop — the response is
-        # identical every time. Tier A.5 will call
-        # ``RequestTransmittedDocs`` to recover the existing MARK and
-        # flip the row to CONFIRMED; for now we log loud, leave
-        # REJECTED state in place, and deliver the pre-transmission
-        # PDF so the customer isn't blocked.
+        # AADE error 228: ``submit_invoice`` already attempted Tier A.5
+        # recovery via ``recover_mark_for_invoice`` / RequestTransmittedDocs.
+        # This branch is reached only when that recovery failed (zero
+        # matches, multiple matches, transport error during recovery query,
+        # or matched doc had no MARK). Leave REJECTED state in place and
+        # deliver the pre-transmission PDF so the customer isn't blocked.
         logger.error(
-            "myDATA submission rejected as duplicate for order #%s "
-            "(uid=%s). Ops reconciliation needed via "
-            "RequestTransmittedDocs: %s",
+            "myDATA submission duplicate uid for order #%s "
+            "(uid=%s); MARK recovery via RequestTransmittedDocs failed. "
+            "Manual reconciliation required: %s",
             order_id,
             invoice.mydata_uid,
             exc,
@@ -1359,9 +1367,10 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         OrderHistory.log_note(
             order=order,
             note=(
-                f"myDATA reported duplicate uid for invoice "
-                f"{invoice.invoice_number} — manual reconciliation required "
-                f"(query RequestTransmittedDocs with uid={invoice.mydata_uid})"
+                f"myDATA duplicate uid for invoice "
+                f"{invoice.invoice_number}; automatic MARK recovery "
+                f"failed — manual reconciliation required "
+                f"(uid={invoice.mydata_uid})"
             ),
         )
         send_invoice_email.delay(order_id)

@@ -152,7 +152,7 @@ class EmailTemplateConfig:
             description="Status update for completed orders",
             subject_template="Order #{order[id]} - Completed",
             order_statuses=[OrderStatus.COMPLETED],
-            is_used=False,
+            is_used=True,
             context_keys=["order", "items"],
         ),
         "order_refunded": TemplateConfig(
@@ -161,7 +161,7 @@ class EmailTemplateConfig:
             description="Status update for refunded orders",
             subject_template="Order #{order[id]} - Refunded",
             order_statuses=[OrderStatus.REFUNDED],
-            is_used=False,
+            is_used=True,
             context_keys=["order", "items"],
         ),
         "order_returned": TemplateConfig(
@@ -170,7 +170,7 @@ class EmailTemplateConfig:
             description="Status update for returned orders",
             subject_template="Order #{order[id]} - Returned",
             order_statuses=[OrderStatus.RETURNED],
-            is_used=False,
+            is_used=True,
             context_keys=["order", "items"],
         ),
         # Subscription templates

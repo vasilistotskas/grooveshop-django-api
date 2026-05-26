@@ -86,26 +86,26 @@ def _make_transmitted_xml_with_uid(
     if duplicate:
         return (
             f"""<?xml version="1.0" encoding="UTF-8"?>
-<RequestedDoc>
+<RequestedDoc xmlns="http://www.aade.gr/myDATA/invoice/v1.0">
     <invoicesDoc>
         <invoice>
             <uid>{uid}</uid>
-            <invoiceMark>{_RECOVERED_MARK}</invoiceMark>
+            <mark>{_RECOVERED_MARK}</mark>
         </invoice>
         <invoice>
             <uid>{uid}</uid>
-            <invoiceMark>{_RECOVERED_MARK + 111}</invoiceMark>
+            <mark>{_RECOVERED_MARK + 111}</mark>
         </invoice>
     </invoicesDoc>
 </RequestedDoc>"""
         ).encode()
     return (
         f"""<?xml version="1.0" encoding="UTF-8"?>
-<RequestedDoc>
+<RequestedDoc xmlns="http://www.aade.gr/myDATA/invoice/v1.0">
     <invoicesDoc>
         <invoice>
             <uid>{uid}</uid>
-            <invoiceMark>{_RECOVERED_MARK}</invoiceMark>
+            <mark>{_RECOVERED_MARK}</mark>
         </invoice>
     </invoicesDoc>
 </RequestedDoc>"""
@@ -336,3 +336,74 @@ class MarkRecoveryTestCase(TestCase):
         # RequestTransmittedDocs was attempted exactly once (no recovery
         # retry — transport errors during recovery fall back immediately).
         mock_query.assert_called_once()
+
+    # ------------------------------------------------------------------
+    # Scenario 5: 228 + match on a later page → follow continuationToken
+    # ------------------------------------------------------------------
+
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch("order.tasks.send_invoice_email.delay")
+    def test_228_recovery_follows_continuation_token_pagination(
+        self, mock_email, mock_send, _mock_render
+    ):
+        """The matching doc can live on a second page. Recovery must read
+        the ``<continuationToken>`` wrapper (nextPartitionKey/nextRowKey),
+        feed those keys to the next call, and still confirm the invoice."""
+        _enable_mydata(self)
+        order, invoice = _make_invoice()
+        mock_send.return_value = _DUPLICATE_228_XML
+
+        query_mock = MagicMock()
+
+        def _query_side_effect(**kwargs):
+            from order.models.invoice import Invoice as _Invoice
+
+            real_uid = (
+                _Invoice.objects.filter(pk=invoice.pk)
+                .values_list("mydata_uid", flat=True)
+                .first()
+                or ""
+            )
+            # Page 1 (no continuation supplied): a non-matching doc plus a
+            # continuationToken pointing at page 2.
+            if not kwargs.get("next_partition_key"):
+                return (
+                    """<?xml version="1.0" encoding="UTF-8"?>
+<RequestedDoc xmlns="http://www.aade.gr/myDATA/invoice/v1.0">
+    <continuationToken>
+        <nextPartitionKey>PK1</nextPartitionKey>
+        <nextRowKey>RK1</nextRowKey>
+    </continuationToken>
+    <invoicesDoc>
+        <invoice>
+            <uid>some-other-uid</uid>
+            <mark>111</mark>
+        </invoice>
+    </invoicesDoc>
+</RequestedDoc>"""
+                ).encode()
+            # Page 2 (continuation supplied): the matching doc, no token.
+            return _make_transmitted_xml_with_uid(real_uid)
+
+        query_mock.side_effect = _query_side_effect
+
+        with patch(
+            "order.mydata.client.MyDataClient.request_transmitted_docs",
+            new=query_mock,
+        ):
+            result = send_invoice_to_mydata(order.id)
+
+        self.assertTrue(result)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.mydata_status, MyDataStatus.CONFIRMED)
+        self.assertEqual(invoice.mydata_mark, _RECOVERED_MARK)
+
+        # Two pages fetched: initial + one continuation.
+        self.assertEqual(query_mock.call_count, 2)
+        # The second call received the continuation keys parsed from the
+        # page-1 <continuationToken> wrapper.
+        second_call_kwargs = query_mock.call_args_list[1].kwargs
+        self.assertEqual(second_call_kwargs.get("next_partition_key"), "PK1")
+        self.assertEqual(second_call_kwargs.get("next_row_key"), "RK1")
+        mock_email.assert_called_once_with(order.id)

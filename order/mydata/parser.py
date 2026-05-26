@@ -183,19 +183,16 @@ def _local(tag: str) -> str:
 class TransmittedDoc:
     """One ``<invoice>`` element inside a ``RequestedDoc`` response.
 
-    Per AADE myDATA API Documentation v1.0.10, the ``RequestedDoc``
-    envelope wraps an ``invoicesDoc`` element containing ``invoice``
-    children. Each invoice carries ``invoiceMark`` (the AADE-assigned
-    MARK) and ``uid`` (the submitter-generated SHA-1 we sent).
+    AADE's ``RequestTransmittedDocs`` returns a ``RequestedDoc`` whose
+    ``<invoicesDoc>`` wraps ``<invoice>`` children (``AadeBookInvoiceType``).
+    Each invoice carries ``<uid>`` (the submitter-generated SHA-1 we sent)
+    and ``<mark>`` (the AADE-assigned Registration Number). Only those two
+    fields are extracted — they're all MARK recovery needs; the rest of
+    the invoice (issuer, lines, totals) is present but ignored.
 
-    Only ``uid`` and ``invoice_mark`` are extracted — they're the only
-    fields needed for MARK recovery. Other invoice fields (issuer, lines,
-    totals) are present in the XML but ignored here.
-
-    ASSUMPTION: The ``uid`` element lives directly inside ``<invoice>``
-    (same level as ``invoiceMark``), matching the InvoicesDoc v1.0.10
-    XSD structure. Validate against AADE sandbox before relying on this
-    in production.
+    Element names validated against the AADE myDATA invoice schema
+    (``AadeBookInvoiceType``: ``uid`` + ``mark`` as direct children of
+    ``<invoice>``) and the reference ``firebed/aade-mydata`` library.
     """
 
     uid: str
@@ -221,30 +218,30 @@ class RequestedDocResult:
 def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
     """Parse the ``RequestedDoc`` XML returned by ``RequestTransmittedDocs``.
 
-    The expected structure (AADE v1.0.10 spec, confirmed from PDF
-    hyperlink parameters) is:
+    Validated structure (AADE myDATA invoice schema; confirmed against the
+    official RequestTransmittedDocs endpoint docs and the reference
+    ``firebed/aade-mydata`` library, incl. its sample response):
 
-        <RequestedDoc>
+        <RequestedDoc xmlns="http://www.aade.gr/myDATA/invoice/v1.0">
+          <continuationToken>            <!-- present only when paged -->
+            <nextPartitionKey>...</nextPartitionKey>
+            <nextRowKey>...</nextRowKey>
+          </continuationToken>
           <invoicesDoc>
             <invoice>
               <uid>...</uid>
-              <invoiceMark>...</invoiceMark>
+              <mark>...</mark>
               ...
             </invoice>
             ...
           </invoicesDoc>
-          <nextPartitionKey>...</nextPartitionKey>  <!-- optional -->
-          <nextRowKey>...</nextRowKey>              <!-- optional -->
         </RequestedDoc>
 
-    When no documents exist in the queried window, ``invoicesDoc`` may be
-    absent or empty — we return an empty ``docs`` list in that case.
-
-    ASSUMPTION: The continuation tokens live as direct children of
-    ``RequestedDoc`` (not inside ``invoicesDoc``). This matches the Azure
-    Table Storage paging pattern referenced in the PDF URL parameters and
-    is the common pattern for AADE's query endpoints. Validate against
-    the AADE sandbox before relying on this in production.
+    When no documents match the query, ``invoicesDoc`` may be absent or
+    empty — we return an empty ``docs`` list. The ``continuationToken`` is
+    absent on the final (or only) page, leaving both keys ``None``.
+    Namespaces are stripped via ``_local`` so the default ``xmlns`` AADE
+    sets does not affect element matching.
     """
     root = fromstring(xml_bytes)
     if _local(root.tag) == "string" and root.text:
@@ -253,12 +250,21 @@ def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
     docs: list[TransmittedDoc] = []
     for invoices_doc_el in _iter_children(root, "invoicesDoc"):
         for invoice_el in _iter_children(invoices_doc_el, "invoice"):
-            uid = _text(invoice_el, "uid") or ""
-            mark = _int_or_none(_text(invoice_el, "invoiceMark"))
-            docs.append(TransmittedDoc(uid=uid, invoice_mark=mark))
+            docs.append(
+                TransmittedDoc(
+                    uid=_text(invoice_el, "uid") or "",
+                    invoice_mark=_int_or_none(_text(invoice_el, "mark")),
+                )
+            )
 
-    next_partition_key = _text(root, "nextPartitionKey")
-    next_row_key = _text(root, "nextRowKey")
+    # nextPartitionKey / nextRowKey live INSIDE the <continuationToken>
+    # wrapper, not as direct children of <RequestedDoc>.
+    next_partition_key: str | None = None
+    next_row_key: str | None = None
+    for ct_el in _iter_children(root, "continuationToken"):
+        next_partition_key = _text(ct_el, "nextPartitionKey")
+        next_row_key = _text(ct_el, "nextRowKey")
+        break
 
     return RequestedDocResult(
         docs=docs,

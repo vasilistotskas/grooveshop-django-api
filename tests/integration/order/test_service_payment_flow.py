@@ -12,7 +12,8 @@ from cart.models.cart import Cart
 from cart.models.item import CartItem
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
-    PaymentNotFoundError,
+    InvalidOrderDataError,
+    PaymentVerificationError,
 )
 from order.models.order import Order
 from order.models.stock_reservation import StockReservation
@@ -157,9 +158,9 @@ class TestOrderServiceCreateOrderFromCart:
 
     def test_missing_payment_intent_id_error(self):
         """
-        Test that missing payment_intent_id raises PaymentNotFoundError.
+        Test that missing payment_intent_id raises InvalidOrderDataError.
         """
-        with pytest.raises(PaymentNotFoundError) as exc_info:
+        with pytest.raises(InvalidOrderDataError) as exc_info:
             OrderService.create_order_from_cart(
                 cart=self.cart,
                 shipping_address=self.shipping_address,
@@ -173,7 +174,7 @@ class TestOrderServiceCreateOrderFromCart:
     @patch("order.payment.get_payment_provider")
     def test_invalid_payment_intent_id_error(self, mock_get_provider):
         """
-        Test that invalid payment_intent_id raises PaymentNotFoundError.
+        Test that invalid payment_intent_id raises PaymentVerificationError.
 
         Validates: Payment intent in invalid state (FAILED, CANCELED) raises error.
         Note: PENDING status is now accepted for Stripe's standard flow where
@@ -187,7 +188,7 @@ class TestOrderServiceCreateOrderFromCart:
         )
         mock_get_provider.return_value = mock_provider
 
-        with pytest.raises(PaymentNotFoundError) as exc_info:
+        with pytest.raises(PaymentVerificationError) as exc_info:
             OrderService.create_order_from_cart(
                 cart=self.cart,
                 shipping_address=self.shipping_address,

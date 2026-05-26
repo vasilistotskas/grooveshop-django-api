@@ -46,6 +46,7 @@ from order.exceptions import (
     PaymentAmountMismatchError,
     PaymentCurrencyMismatchError,
     PaymentNotFoundError,
+    PaymentVerificationError,
 )
 from order.filters import OrderFilter
 from order.models.history import OrderHistory
@@ -575,6 +576,16 @@ class OrderViewSet(BaseModelViewSet):
                     "error": {
                         "type": "payment_not_found",
                     },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except PaymentVerificationError as e:
+            logger.warning("Payment verification failed: %s", e)
+            return Response(
+                {
+                    "detail": _("Payment verification failed"),
+                    "error": {"type": "payment_verification"},
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )

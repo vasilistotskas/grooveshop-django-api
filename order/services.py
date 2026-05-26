@@ -20,6 +20,7 @@ from order.exceptions import (
     PaymentCurrencyMismatchError,
     PaymentError,
     PaymentNotFoundError,
+    PaymentVerificationError,
     ProductNotFoundError,
     StockReservationError,
 )
@@ -275,7 +276,7 @@ class OrderService:
             from order.payment import get_payment_provider
 
             if not payment_intent_id:
-                raise PaymentNotFoundError(
+                raise InvalidOrderDataError(
                     str(_("Payment intent ID is required for order creation"))
                 )
 
@@ -293,12 +294,11 @@ class OrderService:
                 PaymentStatus.PROCESSING,
                 PaymentStatus.COMPLETED,
             ]:
-                raise PaymentNotFoundError(
-                    _(
-                        "Payment intent {payment_id} is in invalid state. Status: {status}"
-                    ).format(
-                        payment_id=payment_intent_id, status=payment_status
-                    )
+                raise PaymentVerificationError(
+                    payment_intent_id,
+                    _("payment intent is in an invalid state: {status}").format(
+                        status=payment_status
+                    ),
                 )
 
             # Verify the provider amount matches the server-calculated total.
@@ -776,6 +776,9 @@ class OrderService:
             InsufficientStockError,
             InvalidOrderDataError,
             PaymentNotFoundError,
+            PaymentVerificationError,
+            PaymentAmountMismatchError,
+            PaymentCurrencyMismatchError,
         ):
             raise
         except Exception as e:

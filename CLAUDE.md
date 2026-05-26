@@ -127,6 +127,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 ### Domain Patterns
 
 - **Order / payment / shipping / notification system**: see [`docs/order-system.md`](docs/order-system.md) for the full reference — state machines, creation paths, carrier integrations, email + WS dedup, critical invariants, common-task playbook. Read this first before changing anything in `order/`, `shipping_acs/`, `shipping_boxnow/`, or `pay_way/`.
+- **Transactional email rendering (`core/templates/emails/**`)**: admin-authored WYSIWYG/HTML model fields (e.g. `PayWay.instructions` — `PayWayAdmin` forces every `TextField` through `WysiwygWidget`, so it holds HTML) must render as `{{ field|safe }}` in `.html` templates and `{{ field_text|safe }}` in `.txt` templates, where `field_text` is pre-built in the email task via `unescape(strip_tags(field))`. Django **autoescapes `.txt` templates too**, so the stripped plain text must be marked `|safe` or it re-encodes `& < >` back into entities. Escaping such a field (e.g. `|linebreaksbr`) renders literal `<div>` tags to the customer.
 - **Translations**: django-parler `TranslatableModel` on Product, BlogPost, Category, LoyaltyTier, etc. Languages: el (default), en, de. Factories create translations for all languages.
 - **Audit history**: django-simple-history on models
 - **Tree structures**: django-mptt `TreeForeignKey` for ProductCategory, BlogCategory

@@ -670,6 +670,63 @@ class TestOrderServiceHandlePaymentSucceeded:
                 "Order not found for payment_intent: %s", "pi_nonexistent"
             )
 
+    @pytest.mark.parametrize(
+        "settled_payment_status",
+        [
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.CANCELED,
+        ],
+    )
+    def test_payment_succeeded_does_not_regress_settled_payment_status(
+        self, settled_payment_status
+    ):
+        """
+        A stale or out-of-order payment_intent.succeeded webhook must NOT
+        overwrite a financially settled payment_status.  Stripe does NOT
+        guarantee event delivery order — a delayed 'succeeded' could arrive
+        after a 'charge.refunded' already moved the order to REFUNDED.
+        """
+        from django.conf import settings
+        from djmoney.money import Money
+        from order.models.order import Order
+
+        payment_id = f"pi_settled_{settled_payment_status.value}"
+        order = Order.objects.create(
+            user=self.user,
+            pay_way=self.pay_way,
+            payment_id=payment_id,
+            payment_status=settled_payment_status,
+            status=OrderStatus.DELIVERED,
+            email="test@example.com",
+            first_name="John",
+            last_name="Doe",
+            street="Main St",
+            street_number="123",
+            city="Athens",
+            zipcode="12345",
+            phone="+306900000000",
+            shipping_price=Money("5.00", settings.DEFAULT_CURRENCY),
+            paid_amount=Money("55.00", settings.DEFAULT_CURRENCY),
+        )
+
+        result = OrderService.handle_payment_succeeded(payment_id)
+
+        # Handler must return the order (not None)
+        assert result is not None
+        assert result.id == order.id
+
+        # payment_status must NOT have been regressed to COMPLETED
+        order.refresh_from_db()
+        assert order.payment_status == settled_payment_status, (
+            f"Settled payment_status {settled_payment_status} must not "
+            f"be overwritten by a stale succeeded event, "
+            f"got {order.payment_status}"
+        )
+
+        # order.status must be untouched
+        assert order.status == OrderStatus.DELIVERED
+
 
 @pytest.mark.django_db
 class TestOrderServiceHandlePaymentFailed:
@@ -1075,6 +1132,57 @@ class TestOrderServiceHandlePaymentFailed:
 
         # Note: Once implementation is updated to release reservations,
         # verify all reservations were released
+
+    @pytest.mark.parametrize(
+        "settled_payment_status",
+        [
+            PaymentStatus.COMPLETED,
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.CANCELED,
+        ],
+    )
+    def test_payment_failed_does_not_regress_settled_payment_status(
+        self, settled_payment_status
+    ):
+        """
+        A stale or out-of-order payment_intent.payment_failed webhook must
+        NOT overwrite a financially settled payment_status.  Stripe does
+        NOT guarantee event delivery order — a delayed 'failed' could
+        arrive after 'charge.refunded' already moved the order to REFUNDED.
+        """
+        payment_id = f"pi_settled_fail_{settled_payment_status.value}"
+        order = Order.objects.create(
+            user=self.user,
+            pay_way=self.pay_way,
+            payment_id=payment_id,
+            payment_status=settled_payment_status,
+            status=OrderStatus.DELIVERED,
+            email="test@example.com",
+            first_name="John",
+            last_name="Doe",
+            street="Main St",
+            street_number="123",
+            city="Athens",
+            zipcode="12345",
+            phone="+306900000000",
+            shipping_price=Money("5.00", settings.DEFAULT_CURRENCY),
+            paid_amount=Money("55.00", settings.DEFAULT_CURRENCY),
+        )
+
+        result = OrderService.handle_payment_failed(payment_id)
+
+        # Handler must return the order (not None)
+        assert result is not None
+        assert result.id == order.id
+
+        # payment_status must NOT have been regressed to FAILED
+        order.refresh_from_db()
+        assert order.payment_status == settled_payment_status, (
+            f"Settled payment_status {settled_payment_status} must not "
+            f"be overwritten by a stale failed event, "
+            f"got {order.payment_status}"
+        )
 
 
 @pytest.mark.django_db

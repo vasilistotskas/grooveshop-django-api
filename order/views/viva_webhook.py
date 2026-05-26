@@ -37,6 +37,17 @@ class ResolveVivaOrderCodeErrorSerializer(serializers.Serializer):
 
 logger = logging.getLogger(__name__)
 
+# Payment statuses representing a financially settled (terminal) state.
+# A stale or out-of-order Viva webhook event MUST NOT overwrite any of these.
+_SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
+    {
+        PaymentStatus.COMPLETED,
+        PaymentStatus.REFUNDED,
+        PaymentStatus.PARTIALLY_REFUNDED,
+        PaymentStatus.CANCELED,
+    }
+)
+
 # Viva Wallet production webhook source IPs (from official docs).
 # https://developer.viva.com/webhooks-for-payments/
 VIVA_WEBHOOK_IPS_PRODUCTION = [
@@ -619,6 +630,25 @@ def _handle_payment_created(order, event_data, transaction_id):
         order.id,
     )
 
+    # Guard: a stale or out-of-order Viva webhook must not un-refund or
+    # un-cancel an order that is already in a settled financial state.
+    # Viva does NOT guarantee delivery order.  COMPLETED is allowed
+    # through (idempotent — the PENDING→PROCESSING block below is gated
+    # on order.status so no double-shipment dispatch occurs).
+    _refund_or_cancel = {
+        PaymentStatus.REFUNDED,
+        PaymentStatus.PARTIALLY_REFUNDED,
+        PaymentStatus.CANCELED,
+    }
+    if order.payment_status in _refund_or_cancel:
+        logger.warning(
+            "Ignoring stale payment_created (Viva) for order %s: "
+            "payment_status already %s",
+            order.id,
+            order.payment_status,
+        )
+        return
+
     # Capture previous state for audit log before mutating
     previous_payment_status = order.payment_status
 
@@ -696,6 +726,18 @@ def _handle_payment_failed(order, event_data, transaction_id):
         "Viva Wallet payment failed for order %s",
         order.id,
     )
+
+    # Guard: a stale or out-of-order "payment failed" Viva event must not
+    # overwrite a financially settled state.  Viva does NOT guarantee
+    # delivery order.
+    if order.payment_status in _SETTLED_PAYMENT_STATUSES:
+        logger.warning(
+            "Ignoring stale payment_failed (Viva) for order %s: "
+            "payment_status already %s",
+            order.id,
+            order.payment_status,
+        )
+        return
 
     previous_payment_status = order.payment_status
     order.payment_status = PaymentStatus.FAILED

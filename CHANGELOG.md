@@ -3,6 +3,41 @@
 
 
 
+## v1.147.0 (2026-05-26)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.146.1 [skip ci] ([`559c71a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/559c71aaa7cb2ef6b30aa45d99ddee7ab691a075))
+
+### Documentation
+
+* docs: capture order-email + payment-webhook + logging learnings
+
+- CLAUDE.md: transactional-email rendering rule for admin-WYSIWYG/HTML
+  fields (|safe in .html, unescape(strip_tags()) + |safe in .txt — Django
+  autoescapes .txt too); PayWayAdmin forces all TextFields to WysiwygWidget.
+docs/order-system.md §8 invariants: webhook payment_status writes must not
+  regress a SETTLED state (SETTLED_PAYMENT_STATUSES); shipped email/toast
+  fires only at genuine SHIPPED (status + tracking), PROCESSING is internal;
+  admin-WYSIWYG email rendering rule.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`50b21eb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50b21eb1c525bdc3d1114fee10f83d365114c526))
+
+### Features
+
+* feat(api): add dependency-free liveness endpoint
+
+``/api/v1/health`` pings the database, Redis, and Celery (a blocking
+``celery_app.control.ping(timeout=3)`` over RabbitMQ). Using it for the
+k8s liveness probe means a slow or unavailable backing service can time
+out the probe and restart otherwise-healthy web workers — a cascading
+failure. Add ``/api/v1/health/live``: auth-free, touches no dependency,
+returns 200 immediately. Intended for liveness/startup probes;
+``/api/v1/health`` stays for readiness and monitoring. Excluded from the
+OpenAPI schema (infra-only, no client contract).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`23cdfff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23cdfff9949c8f2815cfaca8050f71b1de2a9178))
+
 ## v1.146.1 (2026-05-26)
 
 ### Bug fixes

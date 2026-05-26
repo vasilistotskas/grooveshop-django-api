@@ -1350,17 +1350,16 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         send_invoice_email.delay(order_id)
         return False
     except MyDataDuplicateError as exc:
-        # AADE error 228: the same uid is already registered under
-        # another MARK. Retrying will only loop — the response is
-        # identical every time. Tier A.5 will call
-        # ``RequestTransmittedDocs`` to recover the existing MARK and
-        # flip the row to CONFIRMED; for now we log loud, leave
-        # REJECTED state in place, and deliver the pre-transmission
-        # PDF so the customer isn't blocked.
+        # AADE error 228: ``submit_invoice`` already attempted Tier A.5
+        # recovery via ``recover_mark_for_invoice`` / RequestTransmittedDocs.
+        # This branch is reached only when that recovery failed (zero
+        # matches, multiple matches, transport error during recovery query,
+        # or matched doc had no MARK). Leave REJECTED state in place and
+        # deliver the pre-transmission PDF so the customer isn't blocked.
         logger.error(
-            "myDATA submission rejected as duplicate for order #%s "
-            "(uid=%s). Ops reconciliation needed via "
-            "RequestTransmittedDocs: %s",
+            "myDATA submission duplicate uid for order #%s "
+            "(uid=%s); MARK recovery via RequestTransmittedDocs failed. "
+            "Manual reconciliation required: %s",
             order_id,
             invoice.mydata_uid,
             exc,
@@ -1368,9 +1367,10 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         OrderHistory.log_note(
             order=order,
             note=(
-                f"myDATA reported duplicate uid for invoice "
-                f"{invoice.invoice_number} — manual reconciliation required "
-                f"(query RequestTransmittedDocs with uid={invoice.mydata_uid})"
+                f"myDATA duplicate uid for invoice "
+                f"{invoice.invoice_number}; automatic MARK recovery "
+                f"failed — manual reconciliation required "
+                f"(uid={invoice.mydata_uid})"
             ),
         )
         send_invoice_email.delay(order_id)

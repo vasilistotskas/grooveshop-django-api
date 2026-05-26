@@ -17,15 +17,17 @@ Error handling:
 - Auth errors bubble as ``MyDataAuthError`` — not retryable.
 - Row-level ``ValidationError`` / ``XMLSyntaxError`` from AADE become
   ``MyDataValidationError`` — terminal; invoice stays ``REJECTED``.
-- Error 228 (duplicate uid) becomes ``MyDataDuplicateError`` — the
-  caller can opt to recover via ``RequestTransmittedDocs`` in a later
-  iteration (not implemented yet — logs + marks ``CONFIRMED`` with
-  the original MARK will be Tier A.5).
+- Error 228 (duplicate uid) triggers the Tier A.5 recovery path:
+  ``recover_mark_for_invoice`` queries ``RequestTransmittedDocs`` and
+  writes the existing MARK back if exactly one matching doc is found.
+  If recovery fails for any reason the invoice stays ``REJECTED`` and
+  the caller falls back to the existing manual-reconciliation path.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import Any
 
 from django.db import transaction
@@ -39,9 +41,14 @@ from order.mydata.config import load_config
 from order.mydata.exceptions import (
     MyDataDuplicateError,
     MyDataInactiveCounterpartError,
+    MyDataTransportError,
     MyDataValidationError,
 )
-from order.mydata.parser import ResponseRow, parse_response_doc
+from order.mydata.parser import (
+    ResponseRow,
+    parse_requested_doc,
+    parse_response_doc,
+)
 from order.mydata.types import ERROR_DUPLICATE_UID, ERROR_INACTIVE_VAT
 from order.mydata.validator import validate_invoice_doc
 
@@ -140,12 +147,27 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
     message = first_error.message if first_error else row.status_code
 
     if code == ERROR_DUPLICATE_UID:
-        # Recovery path: AADE already has this uid registered under
-        # another MARK. Tier A.5 will query RequestTransmittedDocs and
-        # write back that MARK so the invoice ends up CONFIRMED. For
-        # now we surface it as a distinct exception so the caller can
-        # log loud and schedule manual reconciliation.
+        # Tier A.5 recovery: AADE already has this uid registered under
+        # a MARK from a prior transmission whose response we never
+        # received. Persist the error first (leaves REJECTED + uid set
+        # so recover_mark_for_invoice can use the uid), then attempt to
+        # recover the MARK via RequestTransmittedDocs.
         _persist_failure(invoice, code=code, message=message)
+        recovered = recover_mark_for_invoice(invoice)
+        if recovered:
+            # Return a synthetic success row so the caller treats this
+            # as CONFIRMED and chains the post-submission steps (PDF
+            # re-render + email delivery). We don't have a real
+            # ResponseRow from AADE, so synthesise one that carries
+            # only the fields _persist_recovered_mark wrote.
+            from order.mydata.parser import ResponseRow as _ResponseRow
+
+            return _ResponseRow(
+                index=0,
+                status_code="Success",
+                invoice_uid=invoice.mydata_uid or "",
+                invoice_mark=invoice.mydata_mark,
+            )
         raise MyDataDuplicateError(message, code=code)
 
     if code == ERROR_INACTIVE_VAT:
@@ -191,6 +213,169 @@ def cancel_invoice(invoice: Any) -> ResponseRow | None:
     message = first_error.message if first_error else row.status_code
     _persist_failure(invoice, code=code, message=message)
     raise MyDataValidationError(message, code=code)
+
+
+def recover_mark_for_invoice(invoice: Any) -> bool:
+    """Attempt to recover a MARK for an invoice that received error 228.
+
+    Error 228 means AADE already has our ``uid`` registered under a MARK
+    (from a prior successful transmission whose response we never
+    received). This function calls ``RequestTransmittedDocs`` scoped to
+    the invoice's issue date ± 1 day and our entity VAT, then finds the
+    single transmitted doc whose ``uid`` matches ``invoice.mydata_uid``.
+
+    SAFETY CONTRACT — the MARK is only written when ALL of:
+      1. Exactly one transmitted doc matches the invoice's uid.
+      2. That doc has a non-None ``invoiceMark``.
+    If zero docs match, more than one match, or the matched doc has no
+    MARK, this function returns ``False`` and writes nothing. A wrong
+    MARK must be impossible.
+
+    Returns ``True`` when the MARK was successfully recovered and the
+    invoice has been flipped to ``CONFIRMED``.
+    Returns ``False`` in every other case:
+      - config not ready
+      - no uid to look up
+      - transport error during the query
+      - zero matches
+      - multiple matches (uid collision — should never happen)
+      - match found but invoiceMark is None
+
+    The caller (``send_invoice_to_mydata`` task) keeps the existing
+    ``REJECTED`` state and manual-reconciliation path when this returns
+    ``False``.
+    """
+    uid_to_find = getattr(invoice, "mydata_uid", "") or ""
+    if not uid_to_find:
+        logger.warning(
+            "recover_mark_for_invoice: invoice pk=%s has no mydata_uid "
+            "— cannot query RequestTransmittedDocs",
+            invoice.pk,
+        )
+        return False
+
+    config = load_config()
+    if not config.is_ready():
+        logger.debug(
+            "recover_mark_for_invoice: myDATA not ready, skipping recovery "
+            "for invoice pk=%s",
+            invoice.pk,
+        )
+        return False
+
+    issuer_vat = _resolve_issuer_vat()
+    if not issuer_vat:
+        logger.warning(
+            "recover_mark_for_invoice: INVOICE_SELLER_VAT_ID is empty, "
+            "cannot scope RequestTransmittedDocs query for invoice pk=%s",
+            invoice.pk,
+        )
+        return False
+
+    # Scope the query as narrowly as possible: ±1 day around the invoice
+    # issue date. AADE's date filter uses the document issue date so a
+    # ±1-day window covers any timezone edge cases without pulling in
+    # unrelated documents from weeks of history.
+    issue_date = getattr(invoice, "issue_date", None)
+    if issue_date is None:
+        logger.warning(
+            "recover_mark_for_invoice: invoice pk=%s has no issue_date, "
+            "cannot scope the date window",
+            invoice.pk,
+        )
+        return False
+
+    date_from = issue_date - timedelta(days=1)
+    date_to = issue_date + timedelta(days=1)
+
+    client = MyDataClient(config)
+    all_docs = []
+
+    # Follow pagination until exhausted. In practice a ±1-day window
+    # scoped to our own VAT should return at most a handful of docs
+    # (one per order that day), so pagination is extremely unlikely —
+    # but we implement it for correctness.
+    next_partition_key: str | None = None
+    next_row_key: str | None = None
+    max_pages = 20  # hard ceiling against infinite loops on bad responses
+    for _ in range(max_pages):
+        try:
+            raw = client.request_transmitted_docs(
+                entity_vat_number=issuer_vat,
+                date_from=date_from,
+                date_to=date_to,
+                next_partition_key=next_partition_key,
+                next_row_key=next_row_key,
+            )
+        except MyDataTransportError as exc:
+            logger.warning(
+                "recover_mark_for_invoice: transport error querying "
+                "RequestTransmittedDocs for invoice pk=%s uid=%s: %s",
+                invoice.pk,
+                uid_to_find,
+                exc,
+            )
+            # Do NOT re-raise — caller keeps REJECTED + logs.
+            return False
+
+        result = parse_requested_doc(raw)
+        all_docs.extend(result.docs)
+
+        if result.next_partition_key is None and result.next_row_key is None:
+            break
+        next_partition_key = result.next_partition_key
+        next_row_key = result.next_row_key
+
+    # SAFETY: require exactly one match for our uid.
+    matches = [d for d in all_docs if d.uid == uid_to_find]
+
+    if len(matches) == 0:
+        logger.warning(
+            "recover_mark_for_invoice: uid=%s not found in "
+            "RequestTransmittedDocs window %s–%s for invoice pk=%s "
+            "(retrieved %d docs). Keeping REJECTED state.",
+            uid_to_find,
+            date_from,
+            date_to,
+            invoice.pk,
+            len(all_docs),
+        )
+        return False
+
+    if len(matches) > 1:
+        # uid collision — should be mathematically impossible (SHA-1
+        # over the seven-field tuple), but we must not silently pick
+        # one arbitrarily.
+        logger.error(
+            "recover_mark_for_invoice: uid=%s matched %d docs in "
+            "RequestTransmittedDocs (expected 1). Refusing to write "
+            "any MARK for invoice pk=%s to avoid data corruption.",
+            uid_to_find,
+            len(matches),
+            invoice.pk,
+        )
+        return False
+
+    matched = matches[0]
+    if matched.invoice_mark is None:
+        logger.warning(
+            "recover_mark_for_invoice: uid=%s matched but invoiceMark "
+            "is None for invoice pk=%s. Keeping REJECTED state.",
+            uid_to_find,
+            invoice.pk,
+        )
+        return False
+
+    # All safety checks passed — write the recovered MARK.
+    logger.info(
+        "recover_mark_for_invoice: recovered MARK=%s for invoice pk=%s "
+        "uid=%s via RequestTransmittedDocs",
+        matched.invoice_mark,
+        invoice.pk,
+        uid_to_find,
+    )
+    _persist_recovered_mark(invoice, mark=matched.invoice_mark)
+    return True
 
 
 def _guard_b2b_invoice_integrity(invoice: Any) -> None:
@@ -346,3 +531,31 @@ def _persist_cancellation(invoice: Any, *, cancellation_mark: int) -> None:
         )
     invoice.mydata_status = MyDataStatus.CANCELED
     invoice.mydata_cancellation_mark = cancellation_mark
+
+
+def _persist_recovered_mark(invoice: Any, *, mark: int) -> None:
+    """Flip invoice to CONFIRMED with a MARK recovered via
+    ``RequestTransmittedDocs``. Uses the same locked pattern as
+    ``_persist_success`` — no qr_url or authentication_code because
+    those aren't returned by the query endpoint."""
+    from order.models.invoice import Invoice, MyDataStatus
+
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        locked.mydata_status = MyDataStatus.CONFIRMED
+        locked.mydata_mark = mark
+        locked.mydata_confirmed_at = timezone.now()
+        locked.mydata_error_code = ""
+        locked.mydata_error_message = ""
+        locked.save(
+            update_fields=[
+                "mydata_status",
+                "mydata_mark",
+                "mydata_confirmed_at",
+                "mydata_error_code",
+                "mydata_error_message",
+                "updated_at",
+            ]
+        )
+    invoice.mydata_status = MyDataStatus.CONFIRMED
+    invoice.mydata_mark = mark

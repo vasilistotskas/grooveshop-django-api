@@ -179,6 +179,94 @@ def _local(tag: str) -> str:
     return tag
 
 
+@dataclass(frozen=True)
+class TransmittedDoc:
+    """One ``<invoice>`` element inside a ``RequestedDoc`` response.
+
+    Per AADE myDATA API Documentation v1.0.10, the ``RequestedDoc``
+    envelope wraps an ``invoicesDoc`` element containing ``invoice``
+    children. Each invoice carries ``invoiceMark`` (the AADE-assigned
+    MARK) and ``uid`` (the submitter-generated SHA-1 we sent).
+
+    Only ``uid`` and ``invoice_mark`` are extracted — they're the only
+    fields needed for MARK recovery. Other invoice fields (issuer, lines,
+    totals) are present in the XML but ignored here.
+
+    ASSUMPTION: The ``uid`` element lives directly inside ``<invoice>``
+    (same level as ``invoiceMark``), matching the InvoicesDoc v1.0.10
+    XSD structure. Validate against AADE sandbox before relying on this
+    in production.
+    """
+
+    uid: str
+    invoice_mark: int | None
+
+
+@dataclass(frozen=True)
+class RequestedDocResult:
+    """Parsed ``RequestedDoc`` response from ``RequestTransmittedDocs``.
+
+    ``docs`` is the flat list of all ``<invoice>`` elements found across
+    all ``<invoicesDoc>`` groups. ``next_partition_key`` and
+    ``next_row_key`` are the Azure Table Storage continuation tokens;
+    both are ``None`` when the result set is exhausted (i.e. no more
+    pages to fetch).
+    """
+
+    docs: list[TransmittedDoc]
+    next_partition_key: str | None = None
+    next_row_key: str | None = None
+
+
+def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
+    """Parse the ``RequestedDoc`` XML returned by ``RequestTransmittedDocs``.
+
+    The expected structure (AADE v1.0.10 spec, confirmed from PDF
+    hyperlink parameters) is:
+
+        <RequestedDoc>
+          <invoicesDoc>
+            <invoice>
+              <uid>...</uid>
+              <invoiceMark>...</invoiceMark>
+              ...
+            </invoice>
+            ...
+          </invoicesDoc>
+          <nextPartitionKey>...</nextPartitionKey>  <!-- optional -->
+          <nextRowKey>...</nextRowKey>              <!-- optional -->
+        </RequestedDoc>
+
+    When no documents exist in the queried window, ``invoicesDoc`` may be
+    absent or empty — we return an empty ``docs`` list in that case.
+
+    ASSUMPTION: The continuation tokens live as direct children of
+    ``RequestedDoc`` (not inside ``invoicesDoc``). This matches the Azure
+    Table Storage paging pattern referenced in the PDF URL parameters and
+    is the common pattern for AADE's query endpoints. Validate against
+    the AADE sandbox before relying on this in production.
+    """
+    root = fromstring(xml_bytes)
+    if _local(root.tag) == "string" and root.text:
+        root = fromstring(root.text.encode("utf-8"))
+
+    docs: list[TransmittedDoc] = []
+    for invoices_doc_el in _iter_children(root, "invoicesDoc"):
+        for invoice_el in _iter_children(invoices_doc_el, "invoice"):
+            uid = _text(invoice_el, "uid") or ""
+            mark = _int_or_none(_text(invoice_el, "invoiceMark"))
+            docs.append(TransmittedDoc(uid=uid, invoice_mark=mark))
+
+    next_partition_key = _text(root, "nextPartitionKey")
+    next_row_key = _text(root, "nextRowKey")
+
+    return RequestedDocResult(
+        docs=docs,
+        next_partition_key=next_partition_key,
+        next_row_key=next_row_key,
+    )
+
+
 def _int_or_none(value: str | None) -> int | None:
     if not value:
         return None

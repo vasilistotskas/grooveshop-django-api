@@ -3,9 +3,15 @@
 Public surface used by ``order.tasks`` and the admin layer:
 
 - :func:`submit_invoice` — serialise an :class:`Invoice`, POST it to
-  ``SendInvoices``, persist the MARK / UID / QR on the row.
+  ``SendInvoices``, persist the MARK / UID / QR on the row. When AADE
+  returns error 228 (duplicate uid), :func:`recover_mark_for_invoice`
+  is called inline to recover the existing MARK via
+  ``RequestTransmittedDocs``.
 - :func:`cancel_invoice` — POST ``CancelInvoice``, persist the
   cancellation MARK.
+- :func:`recover_mark_for_invoice` — Tier A.5 MARK recovery: query
+  ``RequestTransmittedDocs`` and flip the invoice to CONFIRMED when
+  exactly one matching uid is found with a valid MARK.
 - :class:`MyDataError` and subclasses — typed exceptions distinguishing
   retryable transport errors from terminal validation errors.
 
@@ -16,7 +22,8 @@ Internals:
 - :mod:`order.mydata.uid` — deterministic request UID generation.
 - :mod:`order.mydata.builder` — ``Invoice`` → ``InvoicesDoc`` XML.
 - :mod:`order.mydata.client` — HTTP layer with retry/backoff.
-- :mod:`order.mydata.parser` — ``ResponseDoc`` → Python dataclass.
+- :mod:`order.mydata.parser` — ``ResponseDoc`` / ``RequestedDoc`` →
+  Python dataclasses.
 - :mod:`order.mydata.validator` — optional XSD pre-validation.
 
 Pinned schema: AADE ``myDATA v1.0.12`` (under ``xsd/``). Schema bumps
@@ -32,7 +39,11 @@ from order.mydata.exceptions import (
     MyDataTransportError,
     MyDataValidationError,
 )
-from order.mydata.service import cancel_invoice, submit_invoice
+from order.mydata.service import (
+    cancel_invoice,
+    recover_mark_for_invoice,
+    submit_invoice,
+)
 
 __all__ = [
     "MyDataAuthError",
@@ -42,5 +53,6 @@ __all__ = [
     "MyDataTransportError",
     "MyDataValidationError",
     "cancel_invoice",
+    "recover_mark_for_invoice",
     "submit_invoice",
 ]

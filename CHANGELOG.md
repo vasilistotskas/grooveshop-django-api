@@ -3,6 +3,37 @@
 
 
 
+## v1.146.1 (2026-05-26)
+
+### Bug fixes
+
+* fix(order): render WYSIWYG payment instructions safely in order-received email
+
+PayWayAdmin forces every TextField through the WYSIWYG editor, so
+PayWay.instructions is HTML (e.g. <div>…</div>). The order-received email
+rendered it with |linebreaksbr (which autoescapes), so COD customers saw a
+literal "<div>…</div>" instead of the formatted instructions. The .txt
+variant printed the raw HTML too.
+
+- HTML email: render payment_instructions with |safe (trusted admin-authored
+  WYSIWYG content) instead of |linebreaksbr.
+- Text email: the task now builds payment_instructions_text via
+  unescape(strip_tags(...)) and the template renders it |safe so the .txt
+  autoescape doesn't re-encode & < > back into entities.
+
+Audited every order/marketing/subscription email: this was the only field
+affected — topic.description is a plain TextField, the newsletter's
+featured_articles/promo are empty, and no model uses tinymce HTMLField.
+Adds a regression test that renders the real templates with HTML instructions
+and asserts the HTML email keeps the markup while the text email is stripped
+and entity-unescaped.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`dcf4b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dcf4b3a35cbf5c20ad981e4d41fb798e3629ff2f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.146.0 [skip ci] ([`2861a48`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2861a48f64072ffb86a4fa755e5de6805f1b8f00))
+
 ## v1.146.0 (2026-05-26)
 
 ### Bug fixes

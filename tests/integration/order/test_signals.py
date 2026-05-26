@@ -109,8 +109,10 @@ class OrderSignalsTestCase(TestCase):
 
     @patch("order.tasks.send_order_status_update_email.delay")
     def test_order_status_changed_signal(self, mock_email_task):
-        old_status = OrderStatus.PENDING.value
-        new_status = OrderStatus.PROCESSING.value
+        # DELIVERED is a shopper-facing transition that uses the generic
+        # status-update email (PROCESSING/SHIPPED are handled separately).
+        old_status = OrderStatus.SHIPPED.value
+        new_status = OrderStatus.DELIVERED.value
 
         order_status_changed.send(
             sender=Order,
@@ -129,6 +131,29 @@ class OrderSignalsTestCase(TestCase):
                 new_value={"status": new_status},
             ).exists()
         )
+
+    @patch("order.tasks.send_shipping_notification_email.delay")
+    @patch("order.tasks.send_order_status_update_email.delay")
+    def test_processing_transition_sends_no_customer_email(
+        self, mock_status_email, mock_shipping_email
+    ):
+        """PROCESSING is an internal milestone — the order-received and
+        payment-confirmed notifications already cover it, so neither the
+        generic status-update email nor the shipped email may fire.
+
+        Regression guard for the COD "three emails on order creation"
+        bug: voucher-mint flipped PENDING → PROCESSING and sent a
+        redundant "Σε εξέλιξη" status email on top of the confirmation.
+        """
+        order_status_changed.send(
+            sender=Order,
+            order=self.order,
+            old_status=OrderStatus.PENDING.value,
+            new_status=OrderStatus.PROCESSING.value,
+        )
+
+        mock_status_email.assert_not_called()
+        mock_shipping_email.assert_not_called()
 
     def test_order_status_changed_to_paid(self):
         old_status = OrderStatus.PENDING.value
@@ -164,21 +189,39 @@ class OrderSignalsTestCase(TestCase):
             )
 
     def test_order_status_changed_to_shipped(self):
-        self.order.status = OrderStatus.PROCESSING
-        self.order.save()
+        # Reflect a real transition: the order row is already SHIPPED by
+        # the time the post-save signal fires, so handle_order_shipped's
+        # safety re-sync is a no-op. (Setting it to PROCESSING here would
+        # make that re-sync re-drive update_order_status and double-fire
+        # the signal — a test artifact, not production behaviour.)
+        Order.objects.filter(id=self.order.id).update(
+            status=OrderStatus.SHIPPED
+        )
+        self.order.status = OrderStatus.SHIPPED
 
         old_status = OrderStatus.PROCESSING.value
         new_status = OrderStatus.SHIPPED.value
 
-        with patch(
-            "order.tasks.send_shipping_notification_email.delay"
-        ) as _mock_task:
+        with (
+            patch(
+                "order.tasks.send_shipping_notification_email.delay"
+            ) as mock_shipping_task,
+            patch(
+                "order.tasks.send_order_status_update_email.delay"
+            ) as mock_status_task,
+        ):
             order_status_changed.send(
                 sender=Order,
                 order=self.order,
                 old_status=old_status,
                 new_status=new_status,
             )
+
+        # SHIPPED is owned by the dedicated shipping-notification email
+        # (it carries the tracking number); the generic status template
+        # must not also fire, or the shopper gets two "shipped" emails.
+        mock_shipping_task.assert_called_once_with(self.order.id)
+        mock_status_task.assert_not_called()
 
     def test_handle_order_saved(self):
         self.order._previous_status = OrderStatus.PENDING.value

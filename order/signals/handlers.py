@@ -29,7 +29,6 @@ from order.signals import (
 from order.notifications import (
     notify_order_created_live,
     notify_order_refunded_live,
-    notify_order_shipment_dispatched_live,
     notify_order_status_changed_live,
     notify_payment_confirmed_live,
     notify_payment_failed_live,
@@ -244,19 +243,39 @@ def handle_order_status_changed(
     # Customer-notifications suppression flag (set by
     # OrderService._suppress_customer_status_notifications for chained
     # transitions where the customer just got the previous status's
-    # email/toast and a second one ms later would feel like spam).
-    # The email task already short-circuits via its own metadata flag;
-    # checking the WS-flag here keeps the toast in lockstep with that.
+    # email/toast and a second one ms later would feel like spam, e.g.
+    # the DELIVERED → COMPLETED auto-advance). Gates both the email and
+    # the WS toast below so they stay in lockstep.
     suppress_customer = bool(
         order.metadata
         and order.metadata.get(f"suppress_status_ws_{new_status}")
     )
 
-    transaction.on_commit(
-        lambda oid=order.id, s=new_status: send_order_status_update_email.delay(
-            oid, s
-        )
-    )
+    # Customer email dispatch policy — single source of truth.
+    #   • PENDING / PROCESSING are internal milestones (covered by the
+    #     order-received and payment-confirmed notifications) and never
+    #     get their own email.
+    #   • SHIPPED is owned by the dedicated shipping-notification email,
+    #     which carries the tracking number and only sends once the
+    #     parcel is genuinely in transit (the task self-gates on
+    #     status == SHIPPED + tracking present, so an early fire at
+    #     voucher-mint harmlessly defers).
+    #   • Everything else (DELIVERED, CANCELED, COMPLETED, REFUNDED,
+    #     RETURNED) uses the generic status-update template.
+    if not suppress_customer:
+        if new_status == OrderStatus.SHIPPED.value:
+            transaction.on_commit(
+                lambda oid=order.id: send_shipping_notification_email.delay(oid)
+            )
+        elif new_status not in (
+            OrderStatus.PENDING.value,
+            OrderStatus.PROCESSING.value,
+        ):
+            transaction.on_commit(
+                lambda oid=order.id, s=new_status: (
+                    send_order_status_update_email.delay(oid, s)
+                )
+            )
 
     # Live in-app notification. ``notify_order_status_changed_live``
     # filters internally for statuses we actually want to surface in the
@@ -303,44 +322,27 @@ def handle_order_status_changed(
 
 @receiver(
     order_shipment_dispatched,
-    dispatch_uid="order.notify_shipment_dispatched",
-)
-def notify_shipment_dispatched(
-    sender: type[Order], order: Order, **kwargs: Any
-) -> None:
-    """Forward the shipment-dispatched signal to the live notification task.
-
-    The signal is already fired via ``transaction.on_commit`` in
-    ``handle_order_post_save``, so we can call ``.delay`` directly — the
-    row is guaranteed committed by the time we run.
-    """
-    if not order.user_id:
-        return
-    notify_order_shipment_dispatched_live.delay(order.id)
-
-
-@receiver(
-    order_shipment_dispatched,
     dispatch_uid="order.email_shipment_dispatched",
 )
 def email_shipment_dispatched(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Send the customer their carrier-tracking email.
+    """Dispatch the customer's carrier-tracking email when tracking lands.
 
-    Fires alongside the live in-app notification: when the order
-    transitions from "no tracking" to "has tracking + carrier" — i.e.
-    a courier voucher minted and the parcel ID is on the order. Both
-    online (Stripe / Viva → handle_payment_succeeded → courier
-    dispatch) and COD (offline create → courier dispatch) paths land
-    here because both end in ``order.add_tracking_info(...)`` →
-    post-save → ``order_shipment_dispatched`` signal.
+    Fires when the order transitions from "no tracking" to "has
+    tracking + carrier" — i.e. a courier voucher minted. On a normal
+    COD/online order that happens at voucher-mint while the order is
+    still PROCESSING, so the shipping-notification task self-defers
+    (it only sends once ``status == SHIPPED``). This receiver exists
+    for the inverse ordering: an admin who flips the order to SHIPPED
+    first and attaches the tracking number afterwards — here the
+    SHIPPED transition deferred, and this fire is the one that
+    actually sends.
 
-    The shipping-notification task itself is idempotent on the
-    ``shipping_notification_email_sent`` metadata flag, so a duplicate
-    fire (e.g. tracking re-set by an admin correction) won't email
-    twice. Deferred to ``transaction.on_commit`` for the same reason
-    the live notification is — the worker must see the persisted
+    The task is idempotent on the ``shipping_notification_email_sent``
+    metadata flag, so the two dispatch points (this signal and the
+    SHIPPED status transition) collapse to a single email. Deferred to
+    ``transaction.on_commit`` so the worker sees the persisted
     tracking_number.
     """
     transaction.on_commit(

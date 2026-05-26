@@ -210,14 +210,34 @@ Each carrier implements `ShippingCarrierInterface` in
 | Order created (online, pending payment) | — | (deferred to payment success) | n/a |
 | Payment succeeded (online) | `send_order_confirmation_email` | webhook handler | `confirmation_email_sent` |
 | Payment failed | `send_payment_failed_email` | webhook handler | `payment_failed_email_sent` |
-| Status changed | `send_order_status_update_email` | `order_status_changed` signal | `status_update_email_sent_<status>` |
-| Tracking info set | `send_shipping_notification_email` | `order_shipment_dispatched` signal (PR #4) | `shipping_notification_email_sent` |
+| Status changed → DELIVERED / CANCELED / COMPLETED / REFUNDED / RETURNED | `send_order_status_update_email` | `order_status_changed` signal | `status_update_email_sent_<status>` |
+| Status changed → PENDING / PROCESSING | — | (internal milestones — never a customer email) | n/a |
+| Order genuinely SHIPPED (status SHIPPED **and** tracking present) | `send_shipping_notification_email` | `order_status_changed`→SHIPPED **or** `order_shipment_dispatched`, whichever completes both conditions | `shipping_notification_email_sent` |
 | Refund (in-app or webhook) | `send_refund_confirmation_email` | `order_refunded` signal (PR #8) | `refund_confirmation_email_sent` |
 | Invoice generated | `send_invoice_email` | from `generate_order_invoice` | `invoice_email_sent` |
 | Dispute opened (staff) | `send_dispute_notification_email` | `charge.dispute.created` webhook | n/a (rare) |
 
 All transactional emails carry `List-Unsubscribe: mailto:` headers
 via `build_transactional_list_headers` (PR #4).
+
+**The "your order has shipped" email is honest about timing.** It only
+goes out once the order is *genuinely in transit* — `status == SHIPPED`
+**and** a tracking number is present — never at voucher-mint. The
+courier voucher mints during checkout (COD) or payment-success (online),
+which sets the tracking number while the order is still PROCESSING; the
+parcel only becomes SHIPPED later, when the carrier reports it moving
+(ACS poll / BoxNow webhook). `send_shipping_notification_email` is
+therefore dispatched from **two** events and self-gates on both
+conditions: `order_shipment_dispatched` (tracking lands) and the
+`order_status_changed`→SHIPPED transition. Whichever fires first finds
+the other condition unmet and returns a no-op `True` *without* reserving
+the `shipping_notification_email_sent` flag; the second one sends. This
+also covers the admin who attaches tracking after flipping to SHIPPED
+(or vice-versa). PROCESSING is never a customer email/toast — the
+order-received (offline) / payment-confirmed (online) notification
+already says "we're preparing your order". This is why placing a COD
+order used to send three emails at once (received + "processing" +
+premature "shipped"); now it sends only the confirmation.
 
 ### 6.2 Locale handling
 
@@ -244,13 +264,25 @@ emails / toasts within ms:
 
 Internal state still flows: signal fires, `OrderHistory` rows logged, post-save handler runs. Only user-visible dispatches are skipped.
 
+> Since `handle_order_status_changed` now categorically skips the
+> customer email/toast for PENDING and PROCESSING (they're internal
+> milestones), the PROCESSING suppression in paths 2 and 3 above is
+> belt-and-suspenders. The **COMPLETED** suppression in path 1 is still
+> load-bearing — COMPLETED *does* normally notify, so the
+> DELIVERED→COMPLETED auto-advance must suppress it to avoid a duplicate
+> right after the DELIVERED notification.
+
 ### 6.4 Live notifications (WebSocket toasts)
 
 - `notify_order_created_live` — every order create.
 - `notify_payment_confirmed_live` / `notify_payment_failed_live` — payment webhooks.
-- `notify_order_status_changed_live` — every status transition (modulo PR #7 suppression).
-- `notify_order_shipment_dispatched_live` — tracking-info-set transition.
+- `notify_order_status_changed_live` — meaningful status transitions only. Policy lives in `_ORDER_STATUS_COPY` (`order/notifications.py`): SHIPPED, DELIVERED, COMPLETED, CANCELED. **PENDING and PROCESSING are intentionally absent** — they're covered by the order-created / payment-confirmed toasts, so surfacing them again would be redundant.
 - `notify_order_refunded_live` — refund signal.
+
+There is no standalone "tracking available" toast: it fired at
+voucher-mint (the same premature moment as the old shipped email) and
+was redundant with the SHIPPED toast, so it was removed alongside the
+email fix.
 
 All WS notifications go through `notification.consumers.NotificationConsumer` and require auth; **guest orders silently get no live notification** (the email IS sent for guests since it goes to `order.email`).
 

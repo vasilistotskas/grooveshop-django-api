@@ -513,16 +513,15 @@ class TestOrderServiceHandlePaymentSucceeded:
         # So we need to check for the status update email instead
 
     @patch("order.signals.handlers.send_order_status_update_email.delay")
-    def test_payment_succeeded_triggers_status_update_email(
+    def test_payment_succeeded_sends_no_processing_status_email(
         self, mock_email_task
     ):
         """
-        Test that payment success triggers status update email via signal.
-
-        When order status changes from PENDING to PROCESSING, the
-        handle_order_status_changed signal handler sends a status update email.
-
-        Validates: Status update email is triggered (mocked Celery task)
+        Payment success transitions PENDING → PROCESSING, but that must
+        NOT send a generic status-update email: PROCESSING is an internal
+        milestone covered by the order-confirmation / payment-confirmed
+        email the webhook handler sends separately. Emitting both is the
+        duplicate-email bug this guards against.
         """
         # Handle payment succeeded
         result_order = OrderService.handle_payment_succeeded(
@@ -532,11 +531,8 @@ class TestOrderServiceHandlePaymentSucceeded:
         # Verify order status changed
         assert result_order.status == OrderStatus.PROCESSING
 
-        # Verify email task was called with correct arguments
-        # The signal handler should have been triggered by the status change
-        mock_email_task.assert_called_once_with(
-            self.order.id, OrderStatus.PROCESSING
-        )
+        # No generic status-update email for the PROCESSING transition.
+        mock_email_task.assert_not_called()
 
     def test_payment_succeeded_is_idempotent(self):
         """

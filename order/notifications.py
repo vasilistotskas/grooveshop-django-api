@@ -61,24 +61,16 @@ __all__ = ("RETRYABLE_DB_ERRORS", "TASK_DEFAULTS", "DatabaseError")
 
 
 # Status → (category, kind, notification_type, i18n (title_msgid, message_msgid))
-# Only transitions worth surfacing live are declared here. PENDING is
-# covered separately by the ``order_created`` task (the initial "thanks,
-# we got your order" moment). All message strings go through gettext so
-# they end up in ``locale/*/LC_MESSAGES/django.po`` alongside the email
-# copy and can be reviewed by the same translator pass.
+# Only transitions worth surfacing live are declared here. PENDING and
+# PROCESSING are intentionally omitted: they're internal milestones the
+# shopper already hears about through the ``order_created`` task ("thanks,
+# we got your order") and, for online orders, the payment-confirmed
+# notification ("we're preparing your order now"). Surfacing PROCESSING
+# on its own produced a redundant toast moments after those. All message
+# strings go through gettext so they end up in
+# ``locale/*/LC_MESSAGES/django.po`` alongside the email copy and can be
+# reviewed by the same translator pass.
 _ORDER_STATUS_COPY: dict[str, tuple[str, str, str, tuple[str, str]]] = {
-    OrderStatus.PROCESSING.value: (
-        NotificationCategoryEnum.ORDER,
-        NotificationKindEnum.INFO,
-        NotificationTypeEnum.ORDER_PROCESSING,
-        (
-            gettext_noop("Order #{order_id} is being prepared"),
-            gettext_noop(
-                "We're getting your items ready — you'll hear from us "
-                "again once they're on the way."
-            ),
-        ),
-    ),
     OrderStatus.SHIPPED.value: (
         NotificationCategoryEnum.SHIPPING,
         NotificationKindEnum.INFO,
@@ -240,33 +232,6 @@ def notify_order_status_changed_live(
         ),
     )
     return {"status": "sent", "order_id": order.id, "new_status": new_status}
-
-
-@shared_task(name="notify_order_shipment_dispatched_live", **TASK_DEFAULTS)
-def notify_order_shipment_dispatched_live(self, order_id: int) -> dict:
-    """Fire when tracking info is attached (carrier + number present)."""
-    order = _load_order(order_id)
-    if order is None:
-        return {"status": "skipped"}
-
-    create_user_notification(
-        order.user,
-        kind=NotificationKindEnum.INFO,
-        category=NotificationCategoryEnum.SHIPPING,
-        notification_type=NotificationTypeEnum.SHIPMENT_DISPATCHED,
-        link=_order_link(order),
-        translations=_render_translations(
-            gettext_noop("Tracking available for order #{order_id}"),
-            gettext_noop(
-                "Your package is being handled by {carrier}. Tracking "
-                "number: {tracking_number}."
-            ),
-            order_id=order.id,
-            carrier=order.shipping_carrier or "",
-            tracking_number=order.tracking_number or "",
-        ),
-    )
-    return {"status": "sent", "order_id": order.id}
 
 
 @shared_task(name="notify_payment_confirmed_live", **TASK_DEFAULTS)

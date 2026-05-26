@@ -16,9 +16,10 @@ from rest_framework import status
 from rest_framework.decorators import (
     action,
     api_view,
+    authentication_classes,
     permission_classes,
 )
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -449,6 +450,21 @@ def health_check(request):
     response = Response(health_status)
     get_token(request)
     return response
+
+
+@extend_schema(exclude=True)
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def health_live(request):
+    """Lightweight liveness probe — confirms the worker is responsive.
+
+    Unlike ``health_check`` (which pings the database, Redis, and Celery
+    and is suited to *readiness*), this touches no backing service, so a
+    slow or unavailable dependency can never time out the Kubernetes
+    liveness probe and trigger a cascading restart of healthy workers.
+    """
+    return Response({"status": "ok"})
 
 
 @extend_schema(

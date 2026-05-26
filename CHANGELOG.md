@@ -3,6 +3,163 @@
 
 
 
+## v1.146.0 (2026-05-26)
+
+### Bug fixes
+
+* fix(mydata): correct RequestTransmittedDocs response parsing to AADE schema
+
+Validated the RequestTransmittedDocs response shape against the official
+AADE endpoint docs and the reference firebed/aade-mydata library (incl. its
+sample response XML), replacing the spec-inferred shape from the initial
+Tier A.5 implementation. Two corrections to parse_requested_doc:
+
+- Per-invoice MARK element is <mark> (AadeBookInvoiceType), not
+  <invoiceMark> (that name belongs to the SendInvoices ResponseDoc, a
+  different document).
+- Continuation tokens live inside a <continuationToken> wrapper
+  (<nextPartitionKey>/<nextRowKey>), not as direct children of
+  <RequestedDoc>.
+
+The client was already correct: mandatory mark=0, dd/MM/yyyy date window,
+entityVatNumber scoping, dev/prod endpoints. Test fixtures updated to the
+real schema and a continuation-token pagination test added (match on page
+2 via the token) — the previously mis-parsed path now has coverage. This
+resolves the "validate against AADE sandbox" caveat for the parsing shape;
+the exactly-one-match safety guard remains the backstop.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`67dcc36`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67dcc36ba19c5a1d96069d965a54021bea288203))
+
+* fix(order): don't let stale payment webhooks regress a settled state
+
+Stripe (and Viva) do not guarantee webhook event ordering and may deliver
+duplicates, so a delayed/out-of-order event must not undo a financially
+settled payment_status. Added guards keyed on a shared
+SETTLED_PAYMENT_STATUSES = {COMPLETED, REFUNDED, PARTIALLY_REFUNDED, CANCELED}:
+
+- handle_payment_failed / Viva _handle_payment_failed: ignore a stale
+  "failed" when payment_status is already settled (previously a late
+  payment_failed could flip a COMPLETED/REFUNDED order to FAILED).
+- handle_payment_succeeded / Viva _handle_payment_created: ignore a stale
+  "succeeded" when already REFUNDED/PARTIALLY_REFUNDED/CANCELED (don't
+  un-refund/un-cancel). COMPLETED stays idempotent (mark_as_paid + the
+  status-gated shipment dispatch already no-op).
+
+_handle_reversal_created is untouched — COMPLETED -> REFUNDED is a
+legitimate forward refund. Updates the tests that asserted the old
+regressing behavior and adds settled-state regression coverage.
+
+Validated against Stripe's documented "events are not ordered, may be
+duplicated" guidance.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`0c8e642`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c8e642ab9ddf9fbe67e3f593c1952c3da4e834a))
+
+* fix(email): mark completed/refunded/returned templates as used
+
+The admin email-template catalog flagged order_completed, order_refunded,
+and order_returned as is_used=False, but all three are wired to a live
+customer send path via send_order_status_update_email (the same generic
+status-update path as order_delivered / order_canceled, which were already
+True). Only order_pending and order_processing are genuinely unsent (the
+task early-returns for PENDING/PROCESSING), so they correctly stay False.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`cbe6f2e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cbe6f2efff165c981323e9a9900b133a1c49de98))
+
+* fix(order): use correct exception types for payment-intent validation
+
+create_order_from_cart raised PaymentNotFoundError with a *message string*
+in the payment_id slot for two non-"not found" cases, producing garbled
+errors ("Payment intent with ID <message> not found") and the wrong
+semantic type:
+
+- Missing payment_intent_id is a validation error -> InvalidOrderDataError
+  (view maps to 400 "invalid_order_data", already handled by the frontend).
+- Payment intent in an invalid state is a verification failure ->
+  PaymentVerificationError, with a new view handler returning 400
+  "payment_verification".
+
+A genuine provider "payment intent does not exist" still raises
+PaymentNotFoundError -> 400 "payment_not_found". The create_order_from_cart
+re-raise guard now passes through every domain exception (incl. the
+amount/currency mismatch errors, which the broad except could previously
+wrap), so each reaches its dedicated view handler and error "type".
+
+Tests updated to expect the corrected types (message-substring assertions
+preserved). Frontend (separate repo) updated to treat payment_verification
+like payment_not_found.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`8d4acff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d4acff5ec4dfc4fc2d5c8b3308160789ceddf80))
+
+* fix(order): send one email on order placement, ship email at real shipment
+
+Placing a COD order fired three customer emails at once (order received +
+"processing" status + premature "shipped") because the voucher-mint
+sequence conflated tracking-assigned with shipped, and the PROCESSING
+status email was only suppressed for already-paid (online) orders.
+
+- send_shipping_notification_email now self-gates on status==SHIPPED AND
+  tracking present, deferring (without reserving its idempotency flag)
+  when fired early at voucher-mint; the real SHIPPED transition sends it.
+- send_order_status_update_email skips PENDING/PROCESSING/SHIPPED
+  (PROCESSING is internal; SHIPPED is owned by the dedicated email).
+- handle_order_status_changed dispatch policy centralised: SHIPPED ->
+  shipping email, PENDING/PROCESSING -> none, else -> generic status email.
+- Align in-app/WS toasts: drop the redundant PROCESSING toast and the
+  premature "tracking available" toast (removed notify_order_shipment_
+  dispatched_live); the SHIPPED toast covers the shipping moment.
+- Carriers (ACS/BoxNow) unchanged: they already route transitions through
+  the central order_status_changed signal.
+
+Result: order placement sends only the confirmation; "shipped" fires when
+the parcel is genuinely in transit. Validated against Stripe webhook
+event-ordering guidance. Updates tests + docs/order-system.md.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`fb7a624`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fb7a624572ddfd2310a12a3789782a9e5b927315))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.145.1 [skip ci] ([`60ca259`](https://github.com/vasilistotskas/grooveshop-django-api/commit/60ca259428c11895b0dd5642be8002254b8f46ae))
+
+### Features
+
+* feat(mydata): recover MARK on error 228 via RequestTransmittedDocs (Tier A.5)
+
+When AADE returns error 228 (uid already registered under another MARK) —
+which means a prior submission succeeded but we lost the response — attempt
+to recover the existing MARK instead of leaving the invoice REJECTED.
+
+recover_mark_for_invoice queries RequestTransmittedDocs scoped to the
+issuer VAT and the invoice issue date ±1 day, then matches by uid under a
+strict safety contract: the MARK is written (invoice -> CONFIRMED) ONLY
+when exactly one transmitted doc matches our uid AND it carries a MARK.
+Zero matches, >1 matches, a null MARK, a transport error, or missing
+config all return False and preserve the existing REJECTED + manual-
+reconciliation behavior. A wrong MARK is therefore impossible.
+
+Adds MyDataClient.request_transmitted_docs + parse_requested_doc (with
+continuation-token pagination, capped at 20 pages). Mocked tests cover the
+recover / zero-match / multi-match / transport-error paths.
+
+CAVEAT: the RequestTransmittedDocs request/response shape (element names,
+date format, continuation tokens) was implemented from the myDATA v1.0.10
+spec and MUST be validated against AADE's sandbox before being relied on in
+production. The exactly-one-match safety guard means an unvalidated shape
+degrades to "no recovery" (current behavior), never a wrong MARK.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`22b9fe2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/22b9fe25e9129551d630bb47d952c9dd4367d307))
+
+### Testing
+
+* test(order): expect InvalidOrderDataError for missing payment_intent_id
+
+Follow-up to the payment-exception cleanup (8d4acff5): this regression
+test still expected PaymentNotFoundError for the missing-payment_intent_id
+case. The corrected behavior raises InvalidOrderDataError, which is still a
+custom OrderServiceError (not ValueError) — the property this test guards.
+Caught by the full suite.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com> ([`cd01b29`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd01b29145d332c058cf66b0f9e3670d9f8a91a0))
+
 ## v1.145.1 (2026-05-25)
 
 ### Bug fixes

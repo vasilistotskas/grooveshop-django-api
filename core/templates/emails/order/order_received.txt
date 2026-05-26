@@ -6,8 +6,9 @@
 {% trans "Date" %}: {{ order.created_at|date:"SHORT_DATE_FORMAT" }}
 {% trans "Payment Status" %}: {% trans "Awaiting payment" %}
 
-{% if payment_instructions %}{% trans "HOW TO COMPLETE YOUR PAYMENT" %}
-{{ payment_instructions }}
+{% if payment_instructions_text %}{% trans "HOW TO COMPLETE YOUR PAYMENT" %}
+{# already tag-stripped + entity-unescaped plain text; |safe stops the .txt template re-escaping & < > #}
+{{ payment_instructions_text|safe }}
 {% trans "Please include your order number" %} #{{ order.id }} {% trans "in the payment reference." %}
 
 {% endif %}{% trans "SHIPPING ADDRESS" %}

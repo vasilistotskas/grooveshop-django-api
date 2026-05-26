@@ -1,5 +1,6 @@
 import logging
 from datetime import timedelta
+from html import unescape
 
 from celery import shared_task
 from django.conf import settings
@@ -11,6 +12,7 @@ from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.encoding import force_bytes
+from django.utils.html import strip_tags
 from django.utils.http import urlsafe_base64_encode
 from django.utils.translation import gettext as _
 from django.utils import translation
@@ -206,6 +208,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                 )
 
             payment_instructions = ""
+            payment_instructions_text = ""
             if pay_way and not pay_way.is_online_payment:
                 payment_instructions = (
                     pay_way.safe_translation_getter(
@@ -213,12 +216,21 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                     )
                     or ""
                 )
+                # ``PayWay.instructions`` is authored in the admin WYSIWYG
+                # editor, so it carries HTML (e.g. ``<div>…</div>``). The
+                # HTML email renders it with ``|safe``; the plain-text email
+                # needs the tags stripped and entities unescaped, otherwise
+                # the customer sees raw ``<div>`` markup.
+                payment_instructions_text = unescape(
+                    strip_tags(payment_instructions)
+                ).strip()
 
             context = {
                 "order": order,
                 "items": order.items.all(),
                 "pay_way": pay_way,
                 "payment_instructions": payment_instructions,
+                "payment_instructions_text": payment_instructions_text,
                 "is_paid": is_paid,
                 "SITE_NAME": settings.SITE_NAME,
                 "INFO_EMAIL": settings.INFO_EMAIL,

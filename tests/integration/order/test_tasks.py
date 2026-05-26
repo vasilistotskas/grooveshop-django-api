@@ -76,6 +76,61 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertFalse(result)
         mock_logger.assert_called_once()
 
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_order_received_renders_wysiwyg_instructions_safely(self):
+        """``PayWay.instructions`` is admin-authored WYSIWYG HTML. The HTML
+        email must render it as HTML (no literal ``<div>`` shown), and the
+        plain-text email must show stripped, entity-unescaped text — not raw
+        markup. Regression for the COD order-received email that displayed a
+        literal ``<div>`` to the customer.
+
+        Renders the REAL templates (render_to_string is NOT mocked) and
+        captures the EmailMultiAlternatives bodies.
+        """
+        from pay_way.factories import PayWayFactory
+
+        html_instr = "<div>Pay 5 EUR cash &amp; carry to the courier.</div>"
+        pay_way = PayWayFactory.create_offline_payment()
+        # Set the WYSIWYG HTML across every parler language so the order's
+        # resolved language always returns it (overrides the factory faker).
+        for lang in ("el", "en", "de"):
+            pay_way.set_current_language(lang)
+            pay_way.instructions = html_instr
+        pay_way.save()
+
+        order = OrderFactory.create(
+            email="cod@example.com",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            pay_way=pay_way,
+        )
+        _release_confirmation_email(order.id)
+
+        with patch("order.tasks.EmailMultiAlternatives") as mock_email:
+            instance = MagicMock()
+            mock_email.return_value = instance
+            result = send_order_confirmation_email(order.id)
+
+        self.assertTrue(result)
+        text_body = mock_email.call_args.args[1]
+        html_body = instance.attach_alternative.call_args.args[0]
+
+        # Plain-text email: tags stripped, entities unescaped — no markup.
+        self.assertIn("Pay 5 EUR cash & carry to the courier.", text_body)
+        self.assertNotIn("<div>", text_body)
+        self.assertNotIn("&amp;", text_body)
+        # HTML email: rendered as HTML, not escaped (no literal <div> shown).
+        self.assertIn(
+            "<div>Pay 5 EUR cash &amp; carry to the courier.</div>", html_body
+        )
+        self.assertNotIn("&lt;div&gt;", html_body)
+
     @patch("order.tasks.EmailMultiAlternatives")
     @patch("order.tasks.render_to_string")
     @override_settings(

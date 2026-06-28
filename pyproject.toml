@@ -18,7 +18,7 @@ dependencies = [
   "charset_normalizer==3.4.7",
   "channels[daphne]==4.3.2",
   "channels-redis==4.3.0",
-  "cryptography==48.0.0",
+  "cryptography==48.0.1",
   "django==6.0.6",
   "django-admin-thumbnails==1.0.0",
   "django-allauth==65.18.0",
@@ -100,7 +100,7 @@ dev = [
     "rpds-py==0.30.0",
     "celery-stubs==0.1.3",
     "psutil==7.2.2",
-    "msgpack==1.1.2",
+    "msgpack==1.2.1",
     "hypothesis==6.152.6",
     "ty==0.0.35",
 ]
@@ -247,7 +247,8 @@ markers = [
 [tool.uv]
 override-dependencies = [
     # CVE-2026-35536, CVE-2026-31958 (HIGH) — fixed in 6.5.5
-    "tornado>=6.5.5",
+    # CVE-2026-49855, CVE-2026-49853 (HIGH) — fixed in 6.5.6
+    "tornado>=6.5.6",
     # CVE-2026-30922, CVE-2026-23490 (HIGH) — fixed in 0.6.3 / 0.6.2
     "pyasn1>=0.6.3",
     # CVE-2026-42304 (HIGH) — DoS in twisted.names DNS compression

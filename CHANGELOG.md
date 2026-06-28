@@ -3,6 +3,28 @@
 
 
 
+## v1.148.0 (2026-06-28)
+
+### Bug fixes
+
+* fix(deps): patch HIGH-severity CVEs flagged by Trivy
+
+Bump cryptography 48.0.0->48.0.1 (GHSA-537c-gmf6-5ccf), msgpack
+1.1.2->1.2.1 (GHSA-6v7p-g79w-8964), and the tornado override to
+>=6.5.6 (CVE-2026-49855, CVE-2026-49853) so the Security Scan
+(Trivy) CI job no longer fails on HIGH findings.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019jYWes2txGf5ZvrbRmRUM6 ([`a344884`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a34488440bb49185605ae80e8b484687b03e417f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.147.0 [skip ci] ([`0e7efc4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0e7efc40b21afe14cc32db11040eda9884a7b299))
+
+### Features
+
+* feat: Bump Versions ([`cf00cbb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cf00cbb838cee491a69e01c57772a6fb9134df23))
+
 ## v1.147.0 (2026-05-26)
 
 ### Chores

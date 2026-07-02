@@ -14,6 +14,7 @@ typical typing-storm pattern (street → zip → typo → fix).
 
 from __future__ import annotations
 
+import hashlib
 import logging
 
 from django.conf import settings
@@ -112,7 +113,11 @@ class AcsAddressValidationView(APIView):
         address_id = serializer.validated_data.get("address_id") or None
         language = serializer.validated_data.get("language") or "GR"
 
-        cache_key = f"acs:address_validation:{language}:{address}"
+        # The address is shopper-typed free text (spaces, Greek, anything) —
+        # hash it so the cache key stays within Django's memcached-safe
+        # charset instead of tripping CacheKeyWarning on every lookup.
+        address_digest = hashlib.sha256(address.encode("utf-8")).hexdigest()
+        cache_key = f"acs:address_validation:{language}:{address_digest}"
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(_normalise_response(cached))

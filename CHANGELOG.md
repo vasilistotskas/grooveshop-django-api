@@ -3,6 +3,29 @@
 
 
 
+## v1.152.0 (2026-07-02)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.151.0 [skip ci] ([`6ee54b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6ee54b55d99b9977cb4ad4a68d72d8bc56ab9873))
+
+### Features
+
+* feat(admin): show variant family on product changelist
+
+Products in a variant group now display a Variants column on the
+product list — the family name linked to its group page plus the
+sibling count — so grouped products are visible at a glance, with
+a variant_group dropdown filter alongside category/vat. Ungrouped
+products render a muted dash.
+
+Sibling counts read from a prefetch cache (one extra query per
+page) rather than a Count() annotation, which would cartesian
+with the conditional likes/reviews annotations on the changelist.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01S6zSWVznsXYCZ1QXb6zTHT ([`c7a00b1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c7a00b1d5de05b57ab2bd5db345c65698e90e794))
+
 ## v1.151.0 (2026-07-02)
 
 ### Chores

@@ -3,6 +3,25 @@
 
 
 
+## v1.151.0 (2026-07-02)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.150.1 [skip ci] ([`ad9fe89`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad9fe8968abef1dfdccf8682b308687c4c8b39c8))
+
+### Features
+
+* feat(admin): add Variant Groups to sidebar and tabs
+
+The Unfold sidebar is a curated list (show_all_applications off),
+so the ProductVariantGroup admin was only reachable by direct URL.
+Add it to the Catalog section after Attribute Values, and to the
+attributes tab group so Attributes / Attribute Values / Variant
+Groups cross-link as one variations toolset.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01S6zSWVznsXYCZ1QXb6zTHT ([`f81e7a9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f81e7a9f60290c0c14590d71876683503a82039d))
+
 ## v1.150.1 (2026-07-02)
 
 ### Bug fixes

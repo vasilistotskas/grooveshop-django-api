@@ -3,6 +3,24 @@
 
 
 
+## v1.152.2 (2026-07-02)
+
+### Bug fixes
+
+* fix(asgi): disable gunicorn control socket
+
+Unused, and its default path ($HOME/.gunicorn/gunicorn.ctl) fails on
+the pod read-only root filesystem with a boot-time "Control server
+error: [Errno 30] Read-only file system". Setting verified against
+the installed gunicorn 26 source (added in 25.1.0).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HGpXy5J6UF4GRmQRshn2BZ ([`7c372f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c372f9fe269e47457b2d2b7a70fc7133f6b3c71))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.152.1 [skip ci] ([`c0b316e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c0b316e23eff87153282aefb803c4a0377114342))
+
 ## v1.152.1 (2026-07-02)
 
 ### Bug fixes

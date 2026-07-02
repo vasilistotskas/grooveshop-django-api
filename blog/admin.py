@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.db import models, transaction
+from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
 from django.utils.html import format_html
@@ -15,10 +15,10 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
-from unfold.contrib.forms.widgets import WysiwygWidget
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
+from admin.base import BaseModelAdmin
 from core.admin import ExportActionMixin
 
 from blog.models.author import BlogAuthor
@@ -524,19 +524,13 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin):
 
 
 @admin.register(BlogPost)
-class BlogPostAdmin(ExportActionMixin, ModelAdmin, TranslatableAdmin):
+class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True
     list_filter_submit = True
     list_filter_sheet = True
     list_horizontal_scrollbar_top = False
-
-    formfield_overrides = {
-        models.TextField: {
-            "widget": WysiwygWidget,
-        },
-    }
 
     list_display = (
         "title_display",

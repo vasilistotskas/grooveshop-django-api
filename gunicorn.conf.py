@@ -30,6 +30,12 @@ graceful_timeout = 30
 # always closes idle connections first (avoids close/reuse races).
 keepalive = 65
 
+# No control socket (gunicornc runtime management, gunicorn 25.1+):
+# unused here, and its default path ($HOME/.gunicorn/gunicorn.ctl)
+# fails on the pod's read-only root filesystem with a boot-time
+# "Control server error: [Errno 30] Read-only file system".
+control_socket_disable = True
+
 # Worker lifecycle events to stderr; per-request access logging stays
 # off — Django logging owns the request trail.
 errorlog = "-"

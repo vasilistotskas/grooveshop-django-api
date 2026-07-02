@@ -1903,6 +1903,13 @@ UNFOLD = {
                             "admin:product_attributevalue_changelist"
                         ),
                     },
+                    {
+                        "title": _("Variant Groups"),
+                        "icon": "workspaces",
+                        "link": reverse_lazy(
+                            "admin:product_productvariantgroup_changelist"
+                        ),
+                    },
                 ],
             },
             # ── Blog (content management) ─────────────────────────────
@@ -2527,6 +2534,7 @@ UNFOLD = {
             "models": [
                 "product.attribute",
                 "product.attributevalue",
+                "product.productvariantgroup",
             ],
             "items": [
                 {
@@ -2537,6 +2545,12 @@ UNFOLD = {
                     "title": _("Attribute Values"),
                     "link": reverse_lazy(
                         "admin:product_attributevalue_changelist"
+                    ),
+                },
+                {
+                    "title": _("Variant Groups"),
+                    "link": reverse_lazy(
+                        "admin:product_productvariantgroup_changelist"
                     ),
                 },
             ],

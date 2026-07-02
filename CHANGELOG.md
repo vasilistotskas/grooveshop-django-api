@@ -3,6 +3,48 @@
 
 
 
+## v1.150.0 (2026-07-02)
+
+### Bug fixes
+
+* fix(shipping): hash ACS address cache key
+
+The address-validation cache key embedded shopper-typed free text
+(spaces, Greek characters), tripping Django's CacheKeyWarning on
+every lookup. Hash the address part so the key stays within the
+memcached-safe charset; keys remain deterministic per input.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01S6zSWVznsXYCZ1QXb6zTHT ([`3cda3f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3cda3f56d7d6eaa2b6d0eb12e9825012ced23f21))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.149.0 [skip ci] ([`6ac1298`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6ac1298dbd74dd599ffc793e5c2562d44d3b6c70))
+
+### Features
+
+* feat(product): add product variant groups
+
+Group sibling products that are the same item in different
+variations (e.g. one cable clip in five colours) so the storefront
+can render variant selectors:
+
+- ProductVariantGroup model + nullable Product.variant_group FK;
+  each variant stays a full Product (price, stock, images, slug,
+  SEO, cart/order references untouched)
+- Attribute.is_variant flag marks selector axes (Colour, Memory)
+  versus plain read-only spec attributes
+- GET /api/v1/product/{id}/variants returns { axes, variants }
+  with per-sibling image/price and no N+1 (query-count tested)
+- Unfold admin: variant group registry with annotated member
+  counts, variant_group autocomplete on ProductAdmin, is_variant
+  on AttributeAdmin
+- factory, integration tests, regenerated OpenAPI schema
+- migration 0038 is fully additive (PreSync-safe)
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01S6zSWVznsXYCZ1QXb6zTHT ([`23dbb17`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23dbb1714a89952df663676bcf3982b268d51ee1))
+
 ## v1.149.0 (2026-07-02)
 
 ### Chores

@@ -3,6 +3,38 @@
 
 
 
+## v1.152.3 (2026-07-02)
+
+### Bug fixes
+
+* fix(order): resolve Viva post-payment return during webhook race
+
+Successful card payments bounced the customer to the homepage: the
+storefront's return handler called the IsAuthenticated-locked
+/viva-wallet/resolve-order with no user token (Viva's redirect is a
+cold external navigation), got 401, fell back to /checkout, whose
+empty-cart middleware bounced to the homepage.
+
+Per the Viva Smart Checkout docs the redirect carries t (transaction
+id, may be absent on failures), s (the 16-digit order code), lang,
+eventId (an int32 event code) and eci. The public order/viva_return
+lookup now resolves t -> payment_id (post-webhook) with fallback
+s -> metadata.viva_order_code (written at session creation, so it
+wins the browser-vs-webhook race), and logs which key resolved. The
+eventId-as-order-UUID fallback is removed - Viva sends an integer
+event code there, so it could never match. The auth-locked
+ResolveVivaOrderCodeView is deleted (nothing calls it now), a typed
+response serializer is declared for codegen, docs/order-system.md
+documents the corrected flow, and the endpoint tests cover the
+order-code race path.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01S6zSWVznsXYCZ1QXb6zTHT ([`13f1f06`](https://github.com/vasilistotskas/grooveshop-django-api/commit/13f1f0686b8d8b15f5893b5f49bab050348a566c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.152.2 [skip ci] ([`8533631`](https://github.com/vasilistotskas/grooveshop-django-api/commit/853363140168aa703ad041eeba7a9d89d221f119))
+
 ## v1.152.2 (2026-07-02)
 
 ### Bug fixes

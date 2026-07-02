@@ -1410,6 +1410,15 @@ class PaymentStatusResponseSerializer(serializers.Serializer):
     error = serializers.CharField(required=False)
 
 
+class VivaReturnLookupResponseSerializer(serializers.Serializer):
+    """Minimal, PII-free payload for the Viva post-payment redirect hop."""
+
+    id = serializers.IntegerField()
+    uuid = serializers.UUIDField()
+    status = serializers.CharField()
+    payment_status = serializers.CharField()
+
+
 class CancelOrderRequestSerializer(serializers.Serializer):
     reason = serializers.CharField(
         max_length=500,

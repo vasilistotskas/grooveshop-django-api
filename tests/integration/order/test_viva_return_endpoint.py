@@ -1,17 +1,17 @@
 """Integration tests for the ``/order/viva_return`` endpoint.
 
-The endpoint translates Viva Wallet's hosted-checkout return URL
-params (``?t=<txn>&eventId=<uuid>&s=F``) into the order UUID so the
-Nuxt frontend can forward the customer to ``/checkout/success/{uuid}``.
+The endpoint translates Viva Wallet's Smart Checkout return URL
+params (``?t=<transaction_id>&s=<order_code>&lang=..&eventId=<int>``)
+into the order UUID so the Nuxt frontend can forward the customer to
+``/checkout/success/{uuid}``.
 
 The lookup races the Viva webhook: ``payment_id`` (which equals
 ``t``) is only set when the webhook arrives, but the customer's
 browser redirect can hit this endpoint tens of seconds earlier. The
-fallback via ``eventId`` (set to ``order.uuid`` at session-creation
-time) closes that gap.
+fallback via ``s`` (the Viva order code, stored in
+``metadata.viva_order_code`` at session-creation time) closes that
+gap.
 """
-
-import uuid
 
 from django.urls import reverse
 from rest_framework import status
@@ -42,63 +42,79 @@ class VivaReturnEndpointTestCase(APITestCase):
         self.assertEqual(response.data["uuid"], str(order.uuid))
         self.assertEqual(response.data["paymentStatus"], "COMPLETED")
 
-    def test_lookup_by_event_id_before_webhook(self):
-        """Pre-webhook: ``payment_id`` isn't set yet, but ``eventId``
-        (the order UUID we sent as ``merchantTrns``) resolves the
-        order so the customer isn't stuck on an error page."""
+    def test_lookup_by_order_code_before_webhook(self):
+        """Pre-webhook: ``payment_id`` isn't set yet, but ``s`` (the
+        Viva order code stored at session creation) resolves the order
+        so the customer isn't stuck on an error page during the race."""
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             payment_method="",
             payment_id="",
-            metadata={"viva_order_code": "9999"},
+            metadata={"viva_order_code": "6836925145972608"},
         )
 
         response = self.client.get(
-            self.url, {"t": "txn-xyz-123", "eventId": str(order.uuid)}
+            self.url,
+            {"t": "txn-not-in-db-yet", "s": "6836925145972608"},
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["uuid"], str(order.uuid))
         self.assertEqual(response.data["paymentStatus"], "PENDING")
 
-    def test_event_id_without_viva_order_code_is_rejected(self):
-        """Defence-in-depth: the ``eventId`` fallback only resolves
-        orders that have a ``viva_order_code`` in metadata, so a
-        non-Viva order's UUID (which is unguessable but could in
-        principle be scraped from elsewhere) cannot be confirmed via
-        this endpoint as a Viva order."""
+    def test_lookup_by_order_code_only(self):
+        """Failed transactions may omit ``t`` entirely — ``s`` alone
+        must still resolve (the success page then shows the real
+        payment status)."""
         order = OrderFactory(
             num_order_items=0,
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             payment_method="",
             payment_id="",
-            metadata={},
+            metadata={"viva_order_code": "7680701046572600"},
         )
 
-        response = self.client.get(
-            self.url, {"t": "txn-xyz-123", "eventId": str(order.uuid)}
+        response = self.client.get(self.url, {"s": "7680701046572600"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["uuid"], str(order.uuid))
+
+    def test_transaction_id_wins_over_order_code(self):
+        """When both keys are present and ``t`` matches, the
+        authoritative ``payment_id`` row is returned even if ``s``
+        points elsewhere."""
+        order_by_txn = OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            payment_method="viva_wallet",
+            payment_id="txn-priority",
+            metadata={"viva_order_code": "1111"},
         )
+        OrderFactory(
+            num_order_items=0,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            payment_method="",
+            payment_id="",
+            metadata={"viva_order_code": "2222"},
+        )
+
+        response = self.client.get(self.url, {"t": "txn-priority", "s": "2222"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["uuid"], str(order_by_txn.uuid))
+
+    def test_unknown_order_code_returns_404(self):
+        response = self.client.get(self.url, {"s": "0000000000000000"})
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_malformed_event_id_returns_404(self):
-        """A garbage ``eventId`` (not a valid UUID) is treated as
-        a miss, not a crash."""
-        response = self.client.get(
-            self.url, {"t": "txn-xyz-123", "eventId": "not-a-uuid"}
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_unknown_event_id_returns_404(self):
-        """A well-formed but unknown UUID returns 404 (no DB row)."""
-        response = self.client.get(
-            self.url,
-            {"t": "txn-xyz-123", "eventId": str(uuid.uuid4())},
-        )
+    def test_unknown_transaction_id_without_order_code_returns_404(self):
+        response = self.client.get(self.url, {"t": "txn-nope"})
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 

@@ -149,6 +149,24 @@ Differences from the Stripe path that are easy to miss:
   + the WS toasts that fire on later state changes (SHIPPED,
   DELIVERED).
 
+**Post-payment redirect (fixed 2026-07-02).** Smart Checkout's
+success/failure URLs are static strings configured on the source in
+the Viva merchant portal — the API accepts no per-order success URL.
+Viva appends ``?t=<transaction_id>&s=<order_code>&lang=..&eventId=<int32
+event code>&eci=..`` (developer.viva.com → Smart Checkout
+integration). The portal success URL points at the storefront's
+Nitro route ``/checkout/viva-return``, which calls the public
+``GET /api/v1/order/viva_return`` and 302s to
+``/checkout/success/{uuid}``. The endpoint resolves ``t`` →
+``payment_id`` (post-webhook) with fallback ``s`` →
+``metadata.viva_order_code`` (written at session creation, so it
+wins the browser-vs-webhook race). Pitfalls encoded in history:
+``s`` is the 16-digit order code, NOT an ``F`` status flag, and
+``eventId`` is an int32 Viva event code, NOT ``merchantTrns`` — two
+earlier frontend implementations assumed otherwise and broke the
+success redirect (customer landed on the homepage via the
+``/checkout`` empty-cart bounce).
+
 ### 4.4 COD / PAY_ON_DELIVERY (offline)
 
 ```

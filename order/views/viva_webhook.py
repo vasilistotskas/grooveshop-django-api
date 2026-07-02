@@ -11,12 +11,6 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework import serializers, status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.throttling import UserRateThrottle
-from rest_framework.views import APIView
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory
@@ -25,14 +19,6 @@ from order.tasks import (
     send_order_confirmation_email,
     send_payment_failed_email,
 )
-
-
-class ResolveVivaOrderCodeResponseSerializer(serializers.Serializer):
-    uuid = serializers.UUIDField()
-
-
-class ResolveVivaOrderCodeErrorSerializer(serializers.Serializer):
-    error = serializers.CharField()
 
 
 logger = logging.getLogger(__name__)
@@ -72,67 +58,6 @@ VIVA_WEBHOOK_IPS_DEMO = [
     ipaddress.ip_network("20.13.195.185/32"),
     ipaddress.ip_network("94.70.174.36/32"),
 ]
-
-
-class _ResolveOrderThrottle(UserRateThrottle):
-    """60 resolutions per hour per authenticated user."""
-
-    scope = "viva_resolve_order"
-    rate = "60/hour"
-
-
-class ResolveVivaOrderCodeView(APIView):
-    """Resolve a Viva Wallet order code to an order UUID.
-
-    Used by the frontend to redirect from Viva's payment page to the
-    order success page. Requires authentication so anonymous callers
-    cannot enumerate order UUIDs by brute-forcing order codes.
-    """
-
-    permission_classes = [IsAuthenticated]
-    throttle_classes = [_ResolveOrderThrottle]
-    serializer_class = ResolveVivaOrderCodeResponseSerializer
-
-    @extend_schema(
-        operation_id="resolveVivaOrderCode",
-        summary="Resolve a Viva Wallet order code to an order UUID",
-        parameters=[
-            OpenApiParameter(
-                name="order_code",
-                type=str,
-                location=OpenApiParameter.QUERY,
-                required=True,
-                description="Viva Wallet ``OrderCode`` returned to the customer "
-                "after a successful checkout.",
-            ),
-        ],
-        responses={
-            200: ResolveVivaOrderCodeResponseSerializer,
-            400: ResolveVivaOrderCodeErrorSerializer,
-            404: ResolveVivaOrderCodeErrorSerializer,
-        },
-        tags=["Viva Wallet"],
-    )
-    def get(self, request, *args, **kwargs):
-        order_code = request.query_params.get("order_code", "")
-        if not order_code:
-            return Response(
-                {"error": "order_code required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        order = (
-            Order.objects.filter(metadata__viva_order_code=str(order_code))
-            .values("uuid")
-            .first()
-        )
-
-        if not order:
-            return Response(
-                {"error": "not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        return Response({"uuid": str(order["uuid"])})
 
 
 @csrf_exempt

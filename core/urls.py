@@ -26,10 +26,7 @@ from core.views import (
     robots_txt,
     upload_image,
 )
-from order.views.viva_webhook import (
-    ResolveVivaOrderCodeView,
-    viva_wallet_webhook,
-)
+from order.views.viva_webhook import viva_wallet_webhook
 from shipping_boxnow.views.webhook import BoxNowWebhookView
 
 import core.filters.camel_case_filters  # noqa
@@ -45,11 +42,6 @@ urlpatterns = [
         "viva-wallet/webhook/",
         viva_wallet_webhook,
         name="viva-wallet-webhook",
-    ),
-    path(
-        "viva-wallet/resolve-order",
-        ResolveVivaOrderCodeView.as_view(),
-        name="viva-wallet-resolve-order",
     ),
     path(
         "boxnow/webhook/",

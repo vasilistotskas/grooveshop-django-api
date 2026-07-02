@@ -69,6 +69,7 @@ from order.serializers.order import (
     RefundOrderResponseSerializer,
     ReorderResponseSerializer,
     UpdateStatusSerializer,
+    VivaReturnLookupResponseSerializer,
 )
 from order.services import OrderService
 from pay_way.models import PayWay
@@ -1328,30 +1329,45 @@ class OrderViewSet(BaseModelViewSet):
         operation_id="vivaReturnLookup",
         tags=["Orders"],
         summary=_(
-            "Look up an order by Viva Wallet transaction id (post-payment redirect)"
+            "Look up an order from Viva Wallet's post-payment redirect params"
         ),
         description=_(
-            "Viva's hosted checkout redirects to a static success URL "
-            "configured in the merchant portal — Viva does not support "
-            "per-order success URLs (only ``urlFail``). This endpoint "
-            "translates the ``t`` (transaction_id) query param that "
-            "Viva appends to the redirect into the order's UUID so the "
-            "Nuxt return page can forward the customer to the canonical "
-            "``/checkout/success/{uuid}`` route. Permission is open "
-            "because the transaction_id is a Viva-generated UUID "
-            "(unguessable) and the response carries no PII — just the "
-            "order's UUID, public id, status, and payment_status."
+            "Viva's Smart Checkout redirects to a static success URL "
+            "configured in the merchant portal and appends "
+            "``?t=<transaction_id>&s=<order_code>&lang=..&eventId=<int>&eci=..`` "
+            "(see developer.viva.com Smart Checkout integration). This "
+            "endpoint translates those params into the order's UUID so "
+            "the storefront can forward the customer to the canonical "
+            "``/checkout/success/{uuid}`` route. ``t`` resolves via "
+            "``payment_id`` (set by the webhook, may lag the redirect); "
+            "``s`` resolves via the ``viva_order_code`` stored at "
+            "session creation, so it works during the webhook race. "
+            "Permission is open because both keys are unguessable "
+            "Viva-generated identifiers and the response carries no PII "
+            "— just the order's UUID, public id, status, and "
+            "payment_status."
         ),
         parameters=[
             OpenApiParameter(
                 name="t",
                 location=OpenApiParameter.QUERY,
-                required=True,
+                required=False,
                 description="Viva transaction_id (UUID).",
                 type=str,
             ),
+            OpenApiParameter(
+                name="s",
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Viva order code (16-digit id of the payment order).",
+                type=str,
+            ),
         ],
-        responses={200: None, 400: None, 404: None},
+        responses={
+            200: VivaReturnLookupResponseSerializer,
+            400: None,
+            404: None,
+        },
     )
     @action(
         detail=False,
@@ -1360,40 +1376,30 @@ class OrderViewSet(BaseModelViewSet):
         url_path="viva_return",
     )
     def viva_return(self, request, *args, **kwargs):
-        """Resolve a Viva hosted-checkout return URL to the order UUID.
+        """Resolve Viva's post-payment redirect params to the order UUID.
 
-        The customer's browser races the Viva webhook: Viva redirects
-        them back to ``/checkout/viva-return?t=<txn>&eventId=<uuid>&s=F``
-        immediately after they confirm payment, but the webhook (which
-        sets ``order.payment_id`` and ``order.payment_method``) may not
-        arrive for tens of seconds. To avoid leaving the customer on
-        an error page while the backend catches up, this endpoint
-        accepts two lookup keys and tries both:
+        Per the Viva Smart Checkout docs, the redirect back to the
+        merchant carries ``t`` (transaction id, UUID — may be absent on
+        failed transactions), ``s`` (the 16-digit order code), ``lang``,
+        ``eventId`` (an int32 Viva event code, e.g. 10051 = insufficient
+        funds) and ``eci``. The customer's browser races the Viva
+        webhook, so two lookup keys are tried:
 
-        1. ``t`` — Viva transaction id. ``payment_id`` is set to this
-           value by the webhook handler, so the lookup succeeds once
-           the webhook has fired (post-race path).
-        2. ``eventId`` — echoes ``merchantTrns`` which we set to
-           ``order.uuid`` at session-creation time, so it is always
-           populated before the redirect (pre-webhook path). The
-           ``viva_order_code`` metadata check confirms the row is
-           genuinely a Viva-paid order, so this fallback can't be
-           abused to dump arbitrary order UUIDs via guessed query
-           params (UUID itself is unguessable; the guard is defence
-           in depth in case Viva ever forwards a malformed eventId).
+        1. ``t`` → ``payment_id``: authoritative, but only populated
+           once the webhook has fired (can lag by tens of seconds).
+        2. ``s`` → ``metadata.viva_order_code``: written at session
+           creation, so it resolves during the webhook race window.
+
+        ``eventId`` is deliberately NOT a lookup key — an earlier
+        revision assumed it echoed ``merchantTrns`` (our order UUID),
+        but Viva sends an integer event code there, so that fallback
+        could never match.
         """
         transaction_id = request.query_params.get("t", "").strip()
-        # ``CamelCaseMiddleWare`` rewrites query keys to snake_case on
-        # the way in, so ``?eventId=...`` from Viva surfaces here as
-        # ``event_id``. Accept both for defence in case the middleware
-        # is reconfigured upstream.
-        event_id = (
-            request.query_params.get("event_id", "")
-            or request.query_params.get("eventId", "")
-        ).strip()
-        if not transaction_id and not event_id:
+        order_code = request.query_params.get("s", "").strip()
+        if not transaction_id and not order_code:
             return Response(
-                {"detail": _("Missing transaction id (t or eventId).")},
+                {"detail": _("Missing transaction id (t) or order code (s).")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1410,6 +1416,7 @@ class OrderViewSet(BaseModelViewSet):
             "metadata",
         )
         row = None
+        resolved_via = None
         if transaction_id:
             row = (
                 Order.objects.filter(
@@ -1418,31 +1425,40 @@ class OrderViewSet(BaseModelViewSet):
                 .values(*value_fields)
                 .first()
             )
+            if row is not None:
+                resolved_via = "transaction_id"
 
-        if row is None and event_id:
-            try:
-                event_uuid = uuid.UUID(event_id)
-            except (ValueError, TypeError):
-                event_uuid = None
-            if event_uuid is not None:
-                candidate = (
-                    Order.objects.filter(uuid=event_uuid)
-                    .values(*value_fields)
-                    .first()
-                )
-                if (
-                    candidate is not None
-                    and candidate.get("metadata")
-                    and candidate["metadata"].get("viva_order_code")
-                ):
-                    row = candidate
+        if row is None and order_code:
+            row = (
+                Order.objects.filter(metadata__viva_order_code=str(order_code))
+                .values(*value_fields)
+                .first()
+            )
+            if row is not None:
+                resolved_via = "order_code"
 
         if row is None:
+            logger.warning(
+                "Viva return lookup found no order",
+                extra={
+                    "transaction_id": transaction_id,
+                    "order_code": order_code,
+                },
+            )
             raise NotFound(
                 _("No order found for transaction id {t}").format(
-                    t=transaction_id or event_id
+                    t=transaction_id or order_code
                 )
             )
+
+        logger.info(
+            "Viva return lookup resolved order",
+            extra={
+                "order_id": row["id"],
+                "resolved_via": resolved_via,
+                "payment_status": str(row["payment_status"]),
+            },
+        )
 
         return Response(
             {

@@ -1,15 +1,17 @@
 """Signal receivers that translate domain events into CAPI dispatches.
 
 Hooks (intentionally narrow):
-* ``order.signals.order_paid``      → Purchase
-* ``order.signals.order_created``   → InitiateCheckout (server-leg)
+* ``order.signals.order_paid``      → Purchase (online payments — the
+  provider webhook confirms the charge seconds after checkout)
+* ``order.signals.order_created``   → InitiateCheckout (server-leg),
+  plus Purchase for OFFLINE pay-ways (COD): the confirmation page is
+  the conversion — no webhook ever fires at purchase time (the ACS
+  COD reconcile emits ``order_paid`` days later at cash remittance,
+  and BoxNow COD has no reconcile at all). The event-log's unique
+  ``event_id`` + SENT short-circuit make any later ``order_paid``
+  re-dispatch a no-op, so both hooks can safely coexist.
 * ``order.signals.order_refunded``  → Refund (custom)
 * ``allauth.account.signals.user_signed_up`` → CompleteRegistration
-
-The Purchase hook is the load-bearing one: it fires from BOTH the
-Stripe ``payment_intent.succeeded`` webhook AND the COD offline
-order path, so we don't have to touch payment-provider-specific code
-to cover both flows.
 """
 
 from __future__ import annotations
@@ -40,6 +42,19 @@ def _on_order_paid(sender: Any, order: Any, **kwargs: Any) -> None:
 @receiver(order_created, dispatch_uid="meta_capi.send_initiate_checkout")
 def _on_order_created(sender: Any, order: Any, **kwargs: Any) -> None:
     schedule_initiate_checkout(order.id)
+
+    # Offline pay-ways (COD): dispatch Purchase at confirmation time —
+    # matching the browser pixel leg on the success page so Meta
+    # dedups the pair via the shared event_id within its window.
+    # Consent + kill-switch gating happens inside the task
+    # (``should_dispatch_for_order``), so admin-created orders and
+    # consent-declined shoppers are excluded there.
+    pay_way = getattr(order, "pay_way", None)
+    if pay_way is not None and not pay_way.is_online_payment:
+        logger.debug(
+            "Scheduling offline-payway Purchase for order %s", order.id
+        )
+        schedule_purchase(order.id)
 
 
 @receiver(order_refunded, dispatch_uid="meta_capi.send_refund")

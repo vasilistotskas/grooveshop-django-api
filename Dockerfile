@@ -79,4 +79,8 @@ COPY --from=builder --chown=app:app ${APP_PATH} .
 RUN mkdir -p ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles ${APP_PATH}/backups \
     && chown -R app:app ${APP_PATH}/staticfiles ${APP_PATH}/mediafiles ${APP_PATH}/backups
 
-CMD [".venv/bin/daphne", "-b", "0.0.0.0", "-p", "8000", "asgi:application"]
+# Multi-process ASGI serving: gunicorn master + uvicorn workers (see
+# gunicorn.conf.py). Replaced single-process daphne, whose lone event
+# loop stalled all requests — including K8s health probes — under any
+# CPU-bound work (prod incident 2026-07-02).
+CMD [".venv/bin/gunicorn", "-c", "gunicorn.conf.py", "asgi:application"]

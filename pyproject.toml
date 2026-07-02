@@ -67,6 +67,8 @@ dependencies = [
   "xmlschema==4.3.2",
   "argon2-cffi>=25.1.0",
   "facebook-business==25.0.2",
+  "uvicorn-worker>=0.4.0",
+  "websockets>=16.0",
 ]
 
 [project.urls]
@@ -129,7 +131,7 @@ omit = [
     "*/manage.py",
     "*/factories.py",
     "*/setup.py",
-    "asgi/gunicorn_worker.py",
+    "gunicorn_worker.py",
     "core/storages.py",
     "*/wsgi/*",
 ]

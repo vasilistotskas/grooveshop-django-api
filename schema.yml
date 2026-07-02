@@ -16598,6 +16598,75 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProductDetail'
           description: ''
+  /api/v1/product/{id}/variants:
+    get:
+      operationId: listProductVariants
+      description: Get the sibling products in this product's variant group, plus
+        the variant axes (e.g. Colour, Memory) to render as selectors. Returns just
+        the product itself when it has no variant group.
+      summary: Get product variants
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        description: Product ID
+        required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Language code for translations (el, en, de)
+      tags:
+      - Products
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductVariantsResponse'
+          description: ''
   /api/v1/product/alert:
     get:
       operationId: listProductAlert
@@ -27044,7 +27113,7 @@ paths:
           * `MARKETING` - Καμπάνιες marketing
           * `PRODUCT` - Ενημερώσεις προϊόντων
           * `ACCOUNT` - Λογαριασμός Ανενεργός
-          * `SYSTEM` - System Notifications
+          * `SYSTEM` - Ειδοποιήσεις Συστήματος
           * `NEWSLETTER` - Newsletter
           * `PROMOTIONAL` - Προωθητικό
           * `OTHER` - Άλλο
@@ -27686,7 +27755,7 @@ paths:
           * `MARKETING` - Καμπάνιες marketing
           * `PRODUCT` - Ενημερώσεις προϊόντων
           * `ACCOUNT` - Λογαριασμός Ανενεργός
-          * `SYSTEM` - System Notifications
+          * `SYSTEM` - Ειδοποιήσεις Συστήματος
           * `NEWSLETTER` - Newsletter
           * `PROMOTIONAL` - Προωθητικό
           * `OTHER` - Άλλο
@@ -28790,6 +28859,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/ShipmentStateEnum'
           readOnly: true
+          title: Κατάσταση αποστολής
         shipmentStateDisplay:
           type: string
           readOnly: true
@@ -30201,6 +30271,7 @@ components:
           readOnly: true
         isPublished:
           type: boolean
+          title: Δημοσιευμένο
         publishedAt:
           type: string
           format: date-time
@@ -30329,6 +30400,7 @@ components:
           readOnly: true
         isPublished:
           type: boolean
+          title: Δημοσιευμένο
         publishedAt:
           type: string
           format: date-time
@@ -30359,12 +30431,15 @@ components:
           readOnly: true
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
       required:
       - author
@@ -30516,14 +30591,18 @@ components:
           title: Προβεβλημένο
         isPublished:
           type: boolean
+          title: Δημοσιευμένο
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
       required:
       - author
@@ -31087,6 +31166,7 @@ components:
         parcelState:
           type: string
           readOnly: true
+          title: Κατάσταση Δέματος
           description: Raw 'data.parcelState' value from BoxNow webhook payload
         eventTime:
           type: string
@@ -31106,6 +31186,7 @@ components:
         additionalInformation:
           type: string
           readOnly: true
+          title: Πρόσθετες Πληροφορίες
         receivedAt:
           type: string
           format: date-time
@@ -31201,6 +31282,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/BoxNowParcelState'
           readOnly: true
+          title: Κατάσταση Δέματος
         parcelStateDisplay:
           type: string
           readOnly: true
@@ -32942,22 +33024,22 @@ components:
           description: |-
             Fine-grained event identifier. See ``notification.enum.NotificationTypeEnum`` for the full catalogue. Left blank for ad-hoc admin broadcasts.
 
-            * `order_created` - Order created
-            * `order_processing` - Order processing
-            * `order_shipped` - Order shipped
-            * `order_delivered` - Order delivered
-            * `order_completed` - Order completed
-            * `order_canceled` - Order canceled
-            * `order_refunded` - Order refunded
+            * `order_created` - Η παραγγελία δημιουργήθηκε
+            * `order_processing` - Επεξεργασία παραγγελίας
+            * `order_shipped` - Η παραγγελία απεστάλη
+            * `order_delivered` - Η παραγγελία παραδόθηκε
+            * `order_completed` - Η παραγγελία ολοκληρώθηκε
+            * `order_canceled` - Η παραγγελία ακυρώθηκε
+            * `order_refunded` - Επιστροφή χρημάτων παραγγελίας
             * `shipment_dispatched` - Αποστολή απεστάλη
-            * `payment_confirmed` - Payment confirmed
-            * `payment_failed` - Payment failed
+            * `payment_confirmed` - Η πληρωμή επιβεβαιώθηκε
+            * `payment_failed` - Η πληρωμή απέτυχε
             * `price_drop_favourite` - Πτώση τιμής (αγαπημένο προϊόν)
-            * `restock_favourite` - Back in stock (favourited product)
-            * `loyalty_tier_up` - Loyalty tier promotion
+            * `restock_favourite` - Διαθέσιμο ξανά (αγαπημένο προϊόν)
+            * `loyalty_tier_up` - Αναβάθμιση επιπέδου επιβράβευσης
             * `comment_liked` - Επισήμανση σχολίου blog
-            * `BOXNOW_PARCEL_AT_LOCKER` - BoxNow parcel arrived at locker
-            * `BOXNOW_PARCEL_DELIVERED` - BoxNow parcel delivered
+            * `BOXNOW_PARCEL_AT_LOCKER` - Το δέμα BoxNow έφτασε στο locker
+            * `BOXNOW_PARCEL_DELIVERED` - Το δέμα BoxNow παραδόθηκε
             * `ACS_OUT_FOR_DELIVERY` - Δέμα ACS προς παράδοση
           oneOf:
           - $ref: '#/components/schemas/NotificationTypeEnum'
@@ -33078,22 +33160,22 @@ components:
       - ACS_OUT_FOR_DELIVERY
       type: string
       description: |-
-        * `order_created` - Order created
-        * `order_processing` - Order processing
-        * `order_shipped` - Order shipped
-        * `order_delivered` - Order delivered
-        * `order_completed` - Order completed
-        * `order_canceled` - Order canceled
-        * `order_refunded` - Order refunded
+        * `order_created` - Η παραγγελία δημιουργήθηκε
+        * `order_processing` - Επεξεργασία παραγγελίας
+        * `order_shipped` - Η παραγγελία απεστάλη
+        * `order_delivered` - Η παραγγελία παραδόθηκε
+        * `order_completed` - Η παραγγελία ολοκληρώθηκε
+        * `order_canceled` - Η παραγγελία ακυρώθηκε
+        * `order_refunded` - Επιστροφή χρημάτων παραγγελίας
         * `shipment_dispatched` - Αποστολή απεστάλη
-        * `payment_confirmed` - Payment confirmed
-        * `payment_failed` - Payment failed
+        * `payment_confirmed` - Η πληρωμή επιβεβαιώθηκε
+        * `payment_failed` - Η πληρωμή απέτυχε
         * `price_drop_favourite` - Πτώση τιμής (αγαπημένο προϊόν)
-        * `restock_favourite` - Back in stock (favourited product)
-        * `loyalty_tier_up` - Loyalty tier promotion
+        * `restock_favourite` - Διαθέσιμο ξανά (αγαπημένο προϊόν)
+        * `loyalty_tier_up` - Αναβάθμιση επιπέδου επιβράβευσης
         * `comment_liked` - Επισήμανση σχολίου blog
-        * `BOXNOW_PARCEL_AT_LOCKER` - BoxNow parcel arrived at locker
-        * `BOXNOW_PARCEL_DELIVERED` - BoxNow parcel delivered
+        * `BOXNOW_PARCEL_AT_LOCKER` - Το δέμα BoxNow έφτασε στο locker
+        * `BOXNOW_PARCEL_DELIVERED` - Το δέμα BoxNow παραδόθηκε
         * `ACS_OUT_FOR_DELIVERY` - Δέμα ACS προς παράδοση
     NotificationUser:
       type: object
@@ -35771,14 +35853,18 @@ components:
           title: Προβεβλημένο
         isPublished:
           type: boolean
+          title: Δημοσιευμένο
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
     PatchedBlogTagWriteRequest:
       type: object
@@ -36030,21 +36116,22 @@ components:
         providerCode:
           type: string
           title: Κωδικός παρόχου
-          description: Code used to identify the payment provider in the system (e.g.,
-            'stripe', 'paypal')
+          description: Κωδικός που χρησιμοποιείται για την αναγνώριση του παρόχου
+            πληρωμών στο σύστημα (π.χ. 'stripe', 'paypal')
           maxLength: 50
         isOnlinePayment:
           type: boolean
           title: Είναι online πληρωμή
-          description: Whether this payment method is processed online
+          description: Αν αυτή η μέθοδος πληρωμής διεκπεραιώνεται online
         requiresConfirmation:
           type: boolean
-          description: Whether this payment method requires manual confirmation (e.g.,
-            bank transfer)
+          title: Απαιτείται Επιβεβαίωση
+          description: Αν αυτή η μέθοδος πληρωμής απαιτεί χειροκίνητη επιβεβαίωση
+            (π.χ. τραπεζική κατάθεση)
         configuration:
           nullable: true
-          title: Provider Configuration
-          description: Provider-specific configuration (API keys, webhooks, etc.)
+          title: Διαμόρφωση Παρόχου
+          description: Διαμόρφωση ειδική για τον πάροχο (κλειδιά API, webhooks κ.λπ.)
     PatchedProductCategoryImageBulkUpdateRequest:
       type: object
       properties:
@@ -36139,12 +36226,15 @@ components:
           nullable: true
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
     PatchedProductFavouriteWriteRequest:
       type: object
@@ -36282,12 +36372,15 @@ components:
           title: Ποσοστό Έκπτωσης
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
         active:
           type: boolean
@@ -36367,7 +36460,7 @@ components:
             * `MARKETING` - Καμπάνιες marketing
             * `PRODUCT` - Ενημερώσεις προϊόντων
             * `ACCOUNT` - Λογαριασμός Ανενεργός
-            * `SYSTEM` - System Notifications
+            * `SYSTEM` - Ειδοποιήσεις Συστήματος
             * `NEWSLETTER` - Newsletter
             * `PROMOTIONAL` - Προωθητικό
             * `OTHER` - Άλλο
@@ -36381,6 +36474,7 @@ components:
           description: Whether new users are automatically subscribed to this topic
         requiresConfirmation:
           type: boolean
+          title: Απαιτείται Επιβεβαίωση
           description: Whether subscription to this topic requires email confirmation
     PatchedTagWriteRequest:
       type: object
@@ -36697,17 +36791,18 @@ components:
         providerCode:
           type: string
           title: Κωδικός παρόχου
-          description: Code used to identify the payment provider in the system (e.g.,
-            'stripe', 'paypal')
+          description: Κωδικός που χρησιμοποιείται για την αναγνώριση του παρόχου
+            πληρωμών στο σύστημα (π.χ. 'stripe', 'paypal')
           maxLength: 50
         isOnlinePayment:
           type: boolean
           title: Είναι online πληρωμή
-          description: Whether this payment method is processed online
+          description: Αν αυτή η μέθοδος πληρωμής διεκπεραιώνεται online
         requiresConfirmation:
           type: boolean
-          description: Whether this payment method requires manual confirmation (e.g.,
-            bank transfer)
+          title: Απαιτείται Επιβεβαίωση
+          description: Αν αυτή η μέθοδος πληρωμής απαιτεί χειροκίνητη επιβεβαίωση
+            (π.χ. τραπεζική κατάθεση)
       required:
       - cost
       - createdAt
@@ -36806,17 +36901,18 @@ components:
         providerCode:
           type: string
           title: Κωδικός παρόχου
-          description: Code used to identify the payment provider in the system (e.g.,
-            'stripe', 'paypal')
+          description: Κωδικός που χρησιμοποιείται για την αναγνώριση του παρόχου
+            πληρωμών στο σύστημα (π.χ. 'stripe', 'paypal')
           maxLength: 50
         isOnlinePayment:
           type: boolean
           title: Είναι online πληρωμή
-          description: Whether this payment method is processed online
+          description: Αν αυτή η μέθοδος πληρωμής διεκπεραιώνεται online
         requiresConfirmation:
           type: boolean
-          description: Whether this payment method requires manual confirmation (e.g.,
-            bank transfer)
+          title: Απαιτείται Επιβεβαίωση
+          description: Αν αυτή η μέθοδος πληρωμής απαιτεί χειροκίνητη επιβεβαίωση
+            (π.χ. τραπεζική κατάθεση)
         configuration:
           readOnly: true
       required:
@@ -36890,21 +36986,22 @@ components:
         providerCode:
           type: string
           title: Κωδικός παρόχου
-          description: Code used to identify the payment provider in the system (e.g.,
-            'stripe', 'paypal')
+          description: Κωδικός που χρησιμοποιείται για την αναγνώριση του παρόχου
+            πληρωμών στο σύστημα (π.χ. 'stripe', 'paypal')
           maxLength: 50
         isOnlinePayment:
           type: boolean
           title: Είναι online πληρωμή
-          description: Whether this payment method is processed online
+          description: Αν αυτή η μέθοδος πληρωμής διεκπεραιώνεται online
         requiresConfirmation:
           type: boolean
-          description: Whether this payment method requires manual confirmation (e.g.,
-            bank transfer)
+          title: Απαιτείται Επιβεβαίωση
+          description: Αν αυτή η μέθοδος πληρωμής απαιτεί χειροκίνητη επιβεβαίωση
+            (π.χ. τραπεζική κατάθεση)
         configuration:
           nullable: true
-          title: Provider Configuration
-          description: Provider-specific configuration (API keys, webhooks, etc.)
+          title: Διαμόρφωση Παρόχου
+          description: Διαμόρφωση ειδική για τον πάροχο (κλειδιά API, webhooks κ.λπ.)
       required:
       - cost
       - translations
@@ -37068,6 +37165,12 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         category:
           type: integer
+        variantGroup:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Links this product to its sibling variations (e.g. the same
+            item in other colours). Members share variant selectors on the storefront.
         price:
           type: number
           format: double
@@ -37108,12 +37211,15 @@ components:
           nullable: true
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
         discountPercent:
           type: number
@@ -37208,6 +37314,7 @@ components:
       - translations
       - updatedAt
       - uuid
+      - variantGroup
       - vat
       - vatPercent
       - vatValue
@@ -37505,12 +37612,15 @@ components:
           readOnly: true
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
       required:
       - children
@@ -37793,12 +37903,15 @@ components:
           nullable: true
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
       required:
       - slug
@@ -37840,6 +37953,12 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         category:
           type: integer
+        variantGroup:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Links this product to its sibling variations (e.g. the same
+            item in other colours). Members share variant selectors on the storefront.
         price:
           type: number
           format: double
@@ -37880,12 +37999,15 @@ components:
           nullable: true
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
         discountPercent:
           type: number
@@ -37988,6 +38110,7 @@ components:
       - translations
       - updatedAt
       - uuid
+      - variantGroup
       - vat
       - vatPercent
       - vatValue
@@ -38029,6 +38152,12 @@ components:
           pattern: ^[-a-zA-Z0-9_]+$
         category:
           type: integer
+        variantGroup:
+          type: integer
+          readOnly: true
+          nullable: true
+          description: Links this product to its sibling variations (e.g. the same
+            item in other colours). Members share variant selectors on the storefront.
         price:
           type: number
           format: double
@@ -38069,12 +38198,15 @@ components:
           nullable: true
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
         discountPercent:
           type: number
@@ -38177,6 +38309,7 @@ components:
       - translations
       - updatedAt
       - uuid
+      - variantGroup
       - vat
       - vatPercent
       - vatValue
@@ -38665,6 +38798,7 @@ components:
           title: Κατάσταση
         isPublished:
           type: boolean
+          title: Δημοσιευμένο
         createdAt:
           type: string
           format: date-time
@@ -38740,6 +38874,7 @@ components:
           title: Κατάσταση
         isPublished:
           type: boolean
+          title: Δημοσιευμένο
         createdAt:
           type: string
           format: date-time
@@ -38822,6 +38957,113 @@ components:
       - product
       - rate
       - translations
+    ProductVariant:
+      type: object
+      description: |-
+        A single sibling product within a variant group, trimmed to what a
+        storefront swatch card needs: identity, image, price and its
+        variant-axis attribute values (Colour, Memory, …).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        translations:
+          type: object
+          properties:
+            el:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            en:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+            de:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+        slug:
+          type: string
+          readOnly: true
+          pattern: ^[-a-zA-Z0-9_]+$
+        active:
+          type: boolean
+          readOnly: true
+          title: Ενεργή
+        stock:
+          type: integer
+          readOnly: true
+          title: Απόθεμα
+        price:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        finalPrice:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        discountPercent:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          title: Ποσοστό Έκπτωσης
+        mainImagePath:
+          type: string
+          readOnly: true
+        attributeValues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductAttribute'
+          readOnly: true
+      required:
+      - active
+      - attributeValues
+      - discountPercent
+      - finalPrice
+      - id
+      - mainImagePath
+      - price
+      - slug
+      - stock
+      - translations
+    ProductVariantsResponse:
+      type: object
+      description: |-
+        Payload for ``GET /product/{id}/variants`` — the axes to render and the
+        sibling products that fill them.
+      properties:
+        axes:
+          type: array
+          items:
+            $ref: '#/components/schemas/VariantAxis'
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductVariant'
+      required:
+      - axes
+      - variants
     ProductWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -38892,12 +39134,15 @@ components:
           title: Ποσοστό Έκπτωσης
         seoTitle:
           type: string
+          title: Τίτλος SEO
           maxLength: 70
         seoDescription:
           type: string
+          title: Περιγραφή SEO
           maxLength: 300
         seoKeywords:
           type: string
+          title: Λέξεις-κλειδιά SEO
           maxLength: 255
         active:
           type: boolean
@@ -39585,7 +39830,7 @@ components:
             * `MARKETING` - Καμπάνιες marketing
             * `PRODUCT` - Ενημερώσεις προϊόντων
             * `ACCOUNT` - Λογαριασμός Ανενεργός
-            * `SYSTEM` - System Notifications
+            * `SYSTEM` - Ειδοποιήσεις Συστήματος
             * `NEWSLETTER` - Newsletter
             * `PROMOTIONAL` - Προωθητικό
             * `OTHER` - Άλλο
@@ -39599,6 +39844,7 @@ components:
           description: Whether new users are automatically subscribed to this topic
         requiresConfirmation:
           type: boolean
+          title: Απαιτείται Επιβεβαίωση
           description: Whether subscription to this topic requires email confirmation
         subscriberCount:
           type: integer
@@ -39659,7 +39905,7 @@ components:
             * `MARKETING` - Καμπάνιες marketing
             * `PRODUCT` - Ενημερώσεις προϊόντων
             * `ACCOUNT` - Λογαριασμός Ανενεργός
-            * `SYSTEM` - System Notifications
+            * `SYSTEM` - Ειδοποιήσεις Συστήματος
             * `NEWSLETTER` - Newsletter
             * `PROMOTIONAL` - Προωθητικό
             * `OTHER` - Άλλο
@@ -39673,6 +39919,7 @@ components:
           description: Whether new users are automatically subscribed to this topic
         requiresConfirmation:
           type: boolean
+          title: Απαιτείται Επιβεβαίωση
           description: Whether subscription to this topic requires email confirmation
         subscriberCount:
           type: integer
@@ -39739,7 +39986,7 @@ components:
             * `MARKETING` - Καμπάνιες marketing
             * `PRODUCT` - Ενημερώσεις προϊόντων
             * `ACCOUNT` - Λογαριασμός Ανενεργός
-            * `SYSTEM` - System Notifications
+            * `SYSTEM` - Ειδοποιήσεις Συστήματος
             * `NEWSLETTER` - Newsletter
             * `PROMOTIONAL` - Προωθητικό
             * `OTHER` - Άλλο
@@ -39753,6 +40000,7 @@ components:
           description: Whether new users are automatically subscribed to this topic
         requiresConfirmation:
           type: boolean
+          title: Απαιτείται Επιβεβαίωση
           description: Whether subscription to this topic requires email confirmation
       required:
       - slug
@@ -40091,7 +40339,7 @@ components:
         * `MARKETING` - Καμπάνιες marketing
         * `PRODUCT` - Ενημερώσεις προϊόντων
         * `ACCOUNT` - Λογαριασμός Ανενεργός
-        * `SYSTEM` - System Notifications
+        * `SYSTEM` - Ειδοποιήσεις Συστήματος
         * `NEWSLETTER` - Newsletter
         * `PROMOTIONAL` - Προωθητικό
         * `OTHER` - Άλλο
@@ -40901,6 +41149,35 @@ components:
           description: Success message for username update
       required:
       - detail
+    VariantAxis:
+      type: object
+      description: |-
+        A variant axis (an ``Attribute`` flagged ``is_variant``) plus the
+        distinct values present across the group, both ordered by ``sort_order``.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        values:
+          type: array
+          items:
+            $ref: '#/components/schemas/VariantAxisValue'
+      required:
+      - id
+      - name
+      - values
+    VariantAxisValue:
+      type: object
+      description: One selectable value on a variant axis (an ``AttributeValue``).
+      properties:
+        id:
+          type: integer
+        value:
+          type: string
+      required:
+      - id
+      - value
     WebSocketTicketResponse:
       type: object
       properties:

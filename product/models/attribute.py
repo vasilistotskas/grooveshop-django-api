@@ -18,6 +18,15 @@ class Attribute(
 
     id = models.BigAutoField(primary_key=True)
     active = models.BooleanField(_("Active"), default=True)
+    is_variant = models.BooleanField(
+        _("Is Variant Axis"),
+        default=False,
+        help_text=_(
+            "When enabled, this attribute is rendered as a variant selector "
+            "(e.g. Colour, Memory) across a product's variant group instead of "
+            "as a plain read-only specification."
+        ),
+    )
 
     # Parler translations
     translations = TranslatedFields(
@@ -34,6 +43,7 @@ class Attribute(
             *TimeStampMixinModel.Meta.indexes,
             *SortableModel.Meta.indexes,
             BTreeIndex(fields=["active"], name="attribute_active_ix"),
+            BTreeIndex(fields=["is_variant"], name="attribute_is_variant_ix"),
         ]
 
     def __str__(self):

@@ -30,6 +30,7 @@ from product.serializers.product import (
     ProductWriteSerializer,
 )
 from product.serializers.review import ProductReviewSerializer
+from product.serializers.variant import ProductVariantsResponseSerializer
 from tag.serializers.tag import TagSerializer
 
 serializers_config: SerializersConfig = {
@@ -125,6 +126,34 @@ serializers_config: SerializersConfig = {
             ),
         ],
     ),
+    "variants": ActionConfig(
+        response=ProductVariantsResponseSerializer,
+        operation_id="listProductVariants",
+        summary=_("Get product variants"),
+        description=_(
+            "Get the sibling products in this product's variant group, plus "
+            "the variant axes (e.g. Colour, Memory) to render as selectors. "
+            "Returns just the product itself when it has no variant group."
+        ),
+        tags=["Products"],
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                description="Product ID",
+            ),
+            OpenApiParameter(
+                name="language_code",
+                description=_("Language code for translations (el, en, de)"),
+                required=False,
+                type=str,
+                enum=["el", "en", "de"],
+                default="el",
+                location=OpenApiParameter.QUERY,
+            ),
+        ],
+    ),
 }
 
 
@@ -174,7 +203,7 @@ class ProductViewSet(BaseModelViewSet):
     def get_filterset_class(self):
         # For custom actions that don't use the main queryset, return None
         # to avoid FilterSet/queryset model mismatch
-        if self.action in ["reviews", "images", "tags"]:
+        if self.action in ["reviews", "images", "tags", "variants"]:
             return None
         return ProductFilter
 
@@ -187,7 +216,7 @@ class ProductViewSet(BaseModelViewSet):
         """
         if self.action == "list":
             queryset = Product.objects.for_list()
-        elif self.action in ["reviews", "images", "tags"]:
+        elif self.action in ["reviews", "images", "tags", "variants"]:
             # For action endpoints, we just need the product itself
             queryset = Product.objects.for_detail()
         else:
@@ -283,3 +312,90 @@ class ProductViewSet(BaseModelViewSet):
             tags, many=True, context=self.get_serializer_context()
         )
         return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        pagination_class=None,
+    )
+    def variants(self, request, pk=None):
+        product = get_object_or_404(Product, pk=pk)
+
+        # Sibling variants share a variant_group. An ungrouped product is its
+        # own (single) variant. Only active, non-deleted siblings are surfaced
+        # to the storefront so dead colours never render as selectable cards.
+        if product.variant_group_id is None:
+            siblings_qs = Product.objects.filter(pk=product.pk)
+        else:
+            siblings_qs = Product.objects.active().filter(
+                variant_group_id=product.variant_group_id
+            )
+
+        siblings = list(
+            siblings_qs.with_translations()
+            .with_category()  # select_related vat → final_price has no N+1
+            .with_main_image()
+            .with_product_attributes()
+            .order_by("id")
+        )
+
+        payload = {
+            "axes": self._build_variant_axes(siblings),
+            "variants": siblings,
+        }
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            payload, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+    @staticmethod
+    def _build_variant_axes(siblings):
+        """Collect the distinct variant axes (``is_variant`` attributes) and
+        their values present across ``siblings``, ordered by ``sort_order``.
+
+        Operates entirely over the prefetched ``product_attributes`` — no extra
+        queries.
+        """
+        axes: dict[int, dict] = {}
+        for product in siblings:
+            for pa in product.product_attributes.all():
+                attribute = pa.attribute_value.attribute
+                if not attribute.is_variant:
+                    continue
+                axis = axes.setdefault(
+                    attribute.id,
+                    {
+                        "id": attribute.id,
+                        "name": attribute.safe_translation_getter(
+                            "name", any_language=True
+                        )
+                        or "",
+                        "sort_order": attribute.sort_order or 0,
+                        "_values": {},
+                    },
+                )
+                value = pa.attribute_value
+                axis["_values"].setdefault(
+                    value.id,
+                    {
+                        "id": value.id,
+                        "value": value.safe_translation_getter(
+                            "value", any_language=True
+                        )
+                        or "",
+                        "sort_order": value.sort_order or 0,
+                    },
+                )
+
+        ordered = sorted(
+            axes.values(), key=lambda a: (a["sort_order"], a["id"])
+        )
+        for axis in ordered:
+            axis["values"] = sorted(
+                axis.pop("_values").values(),
+                key=lambda v: (v["sort_order"], v["id"]),
+            )
+            axis.pop("sort_order", None)
+        return ordered

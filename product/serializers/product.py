@@ -45,6 +45,7 @@ class ProductSerializer(
             "translations",
             "slug",
             "category",
+            "variant_group",
             "price",
             "vat",
             "view_count",
@@ -73,6 +74,7 @@ class ProductSerializer(
 
         read_only_fields = (
             "id",
+            "variant_group",
             "discount_value",
             "price_save_percent",
             "vat_percent",

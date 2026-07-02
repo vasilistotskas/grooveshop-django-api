@@ -43,6 +43,7 @@ from product.models.image import ProductImage
 from product.models.product import Product
 from product.models.product_attribute import ProductAttribute
 from product.models.review import ProductReview
+from product.models.variant_group import ProductVariantGroup
 from tag.admin import TaggedItemInline
 
 
@@ -341,6 +342,7 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
     list_display = [
         "attribute_info",
         "active_status_badge",
+        "is_variant",
         "values_count_display",
         "usage_count_display",
         "sort_order",
@@ -352,6 +354,7 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
     ]
     list_filter = [
         "active",
+        "is_variant",
         ("created_at", RangeDateTimeFilter),
         ("updated_at", RangeDateTimeFilter),
     ]
@@ -379,6 +382,7 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
                 "fields": (
                     "name",
                     "active",
+                    "is_variant",
                 ),
                 "classes": ("wide",),
             },
@@ -1201,7 +1205,7 @@ class ProductAdmin(
         "stock_reservation_summary",
     )
     list_select_related = ["category", "vat", "changed_by"]
-    autocomplete_fields = ["category", "vat"]
+    autocomplete_fields = ["category", "vat", "variant_group"]
     search_help_text = _(
         "Search by ID, SKU, name, description, or category name."
     )
@@ -1223,11 +1227,18 @@ class ProductAdmin(
                 "fields": (
                     "sku",
                     "category",
+                    "variant_group",
                     "active",
                     "name",
                     "description",
                 ),
                 "classes": ("tab",),
+                "description": _(
+                    "Assign a variant group to link this product with its "
+                    "sibling variations (e.g. other colours). Flag the relevant "
+                    "attributes (Colour, Memory) as variant axes under "
+                    "Attributes for them to render as storefront selectors."
+                ),
             },
         ),
         (
@@ -3013,4 +3024,119 @@ class ProductImageAdmin(BaseModelAdmin, TranslatableAdmin):
             'bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-700 rounded-full">'
             "📷 Gallery"
             "</span>"
+        )
+
+
+@admin.register(ProductVariantGroup)
+class ProductVariantGroupAdmin(TranslatableAdmin, BaseModelAdmin):
+    """Admin for variant groups that link sibling product variations.
+
+    Products are assigned to a group from the Product page (the
+    ``variant_group`` autocomplete); this page is a registry of groups and an
+    at-a-glance view of their members.
+    """
+
+    list_display = [
+        "group_info",
+        "active",
+        "members_count_display",
+        "created_at",
+    ]
+    search_fields = [
+        "id",
+        "translations__name",
+    ]
+    list_filter = [
+        "active",
+        ("created_at", RangeDateTimeFilter),
+    ]
+    readonly_fields = (
+        "id",
+        "uuid",
+        "created_at",
+        "updated_at",
+        "members_display",
+    )
+    date_hierarchy = "created_at"
+
+    fieldsets = (
+        (
+            _("Variant Group"),
+            {
+                "fields": (
+                    "name",
+                    "active",
+                ),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("Members"),
+            {
+                "fields": ("members_display",),
+                "description": _(
+                    "Products assigned to this group. Add or remove members "
+                    "from each Product's page via the Variant Group field."
+                ),
+            },
+        ),
+        (
+            _("System Information"),
+            {
+                "fields": (
+                    "id",
+                    "uuid",
+                    "created_at",
+                    "updated_at",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def get_queryset(self, request):
+        # Annotated count keeps the changelist to one query; the prefetch
+        # feeds ``members_display`` on the change page.
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("translations", "variants__translations")
+            .annotate(members_count=Count("variants", distinct=True))
+        )
+
+    @admin.display(description=_("Group"))
+    def group_info(self, obj):
+        name = (
+            obj.safe_translation_getter("name", any_language=True) or "Unnamed"
+        )
+        return format_html(
+            '<div class="text-sm">'
+            '<div class="font-medium text-base-900 dark:text-base-100">🎨 {name}</div>'
+            '<div class="text-xs text-base-600 dark:text-base-300">ID: {id}</div>'
+            "</div>",
+            name=name,
+            id=obj.id,
+        )
+
+    @admin.display(description=_("Members"), ordering="members_count")
+    def members_count_display(self, obj):
+        return obj.members_count
+
+    @admin.display(description=_("Members"))
+    def members_display(self, obj):
+        variants = obj.variants.all()
+        if not variants:
+            return _("No products assigned yet.")
+        return format_html_join(
+            mark_safe("<br>"),
+            '<a href="{}">{} (#{})</a>',
+            (
+                (
+                    reverse("admin:product_product_change", args=[v.pk]),
+                    v.safe_translation_getter("name", any_language=True)
+                    or v.sku,
+                    v.pk,
+                )
+                for v in variants
+            ),
         )

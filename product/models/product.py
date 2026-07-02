@@ -65,6 +65,17 @@ class Product(
         null=True,
         blank=True,
     )
+    variant_group = models.ForeignKey(
+        "product.ProductVariantGroup",
+        on_delete=models.SET_NULL,
+        related_name="variants",
+        null=True,
+        blank=True,
+        help_text=_(
+            "Links this product to its sibling variations (e.g. the same item "
+            "in other colours). Members share variant selectors on the storefront."
+        ),
+    )
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
     price = MoneyField(
         _("Price"),
@@ -173,6 +184,9 @@ class Product(
             BTreeIndex(fields=["weight"], name="product_weight_ix"),
             BTreeIndex(fields=["active"], name="product_active_ix"),
             BTreeIndex(fields=["category"], name="product_category_ix"),
+            BTreeIndex(
+                fields=["variant_group"], name="product_variant_group_ix"
+            ),
             BTreeIndex(
                 fields=["active", "price"], name="product_active_price_ix"
             ),

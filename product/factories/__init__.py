@@ -10,6 +10,10 @@ from .image import ProductImageFactory
 from .product import ProductFactory
 from .product_attribute import ProductAttributeFactory
 from .review import ProductReviewFactory
+from .variant_group import (
+    ProductVariantGroupFactory,
+    ProductVariantGroupTranslationFactory,
+)
 
 __all__ = [
     "AttributeFactory",
@@ -23,4 +27,6 @@ __all__ = [
     "ProductFavouriteFactory",
     "ProductImageFactory",
     "ProductReviewFactory",
+    "ProductVariantGroupFactory",
+    "ProductVariantGroupTranslationFactory",
 ]

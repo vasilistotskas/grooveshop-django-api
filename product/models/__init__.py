@@ -8,6 +8,7 @@ from .image import ProductImage
 from .product import Product
 from .product_attribute import ProductAttribute
 from .review import ProductReview
+from .variant_group import ProductVariantGroup
 
 __all__ = [
     "Attribute",
@@ -21,4 +22,5 @@ __all__ = [
     "ProductFavourite",
     "ProductImage",
     "ProductReview",
+    "ProductVariantGroup",
 ]

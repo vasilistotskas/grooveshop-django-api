@@ -3,6 +3,33 @@
 
 
 
+## v1.152.4 (2026-07-02)
+
+### Bug fixes
+
+* fix(meta-capi): dispatch Purchase at creation for offline pay-ways
+
+COD orders sent their server-side Meta Purchase days late or never:
+order_paid only fires from payment webhooks (online) or the ACS COD
+remittance reconcile (days after checkout), and BoxNow COD has no
+reconcile at all — production shows 16 Purchases against 82
+InitiateCheckouts. The signals module docstring always claimed the
+COD offline path fires Purchase, but nothing wired it.
+
+Schedule Purchase from order_created when the order's pay-way is
+offline — the confirmation page is the conversion and pairs with the
+browser pixel's event_id for Meta dedup within seconds. Consent +
+kill-switch gating stays in the task (should_dispatch_for_order),
+and the ACS reconcile's later order_paid re-dispatch is already a
+no-op via the event log's unique event_id + SENT short-circuit.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01S6zSWVznsXYCZ1QXb6zTHT ([`de06982`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de06982fb33c06f6366610d1325c27b02bcd1b6b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.152.3 [skip ci] ([`260ea3c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/260ea3c813eb273d7eead8e6377db89fefe5329c))
+
 ## v1.152.3 (2026-07-02)
 
 ### Bug fixes

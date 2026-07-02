@@ -3,6 +3,30 @@
 
 
 
+## v1.150.1 (2026-07-02)
+
+### Bug fixes
+
+* fix(blog): restore TinyMCE editor in post admin
+
+BlogPostAdmin forced every TextField through unfold's Trix-based
+WysiwygWidget via formfield_overrides. HTMLField subclasses
+TextField, so the override clobbered the TinyMCE widget on the
+post body — unlike the product admin, which renders it correctly.
+
+Inherit BaseModelAdmin (like all product admins), whose
+HTMLField -> AdminTinyMCE mapping wins Django's MRO walk in
+formfield_for_dbfield, and drop the blanket override — body is
+the only TextField-derived field on the form, so nothing else
+loses a widget.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HGpXy5J6UF4GRmQRshn2BZ ([`a7bd252`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7bd252440bfa038f930f49150678695d6f8d440))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.150.0 [skip ci] ([`f2bfd49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f2bfd499b27e0a2d20c5a06952a325ccc645e693))
+
 ## v1.150.0 (2026-07-02)
 
 ### Bug fixes

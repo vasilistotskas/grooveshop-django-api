@@ -1152,6 +1152,7 @@ class ProductAdmin(
     list_display = [
         "product_info",
         "category_display",
+        "variant_group_display",
         "pricing_info",
         "stock_info",
         "performance_metrics",
@@ -1173,6 +1174,7 @@ class ProductAdmin(
         PopularityFilter,
         "active",
         ("category", RelatedDropdownFilter),
+        ("variant_group", RelatedDropdownFilter),
         ("vat", RelatedDropdownFilter),
         ("stock", RangeNumericFilter),
         ("price", RangeNumericFilter),
@@ -1390,11 +1392,22 @@ class ProductAdmin(
             to_attr="main_images_list",
         )
 
+        # Sibling ids per group via prefetch (one cheap extra query) instead
+        # of a Count() annotation — an unconditional multi-valued join here
+        # would cartesian with the conditional likes/reviews annotations
+        # above, the exact blowup this method exists to avoid.
+        variant_siblings = Prefetch(
+            "variant_group__variants",
+            queryset=Product.objects.only("id", "variant_group_id"),
+        )
+
         return (
-            qs.select_related("category", "vat", "changed_by")
+            qs.select_related("category", "vat", "changed_by", "variant_group")
             .prefetch_related(
                 main_images,
                 active_reservations,
+                variant_siblings,
+                "variant_group__translations",
                 Prefetch(
                     "category__parent", queryset=ProductCategory.objects.all()
                 ),
@@ -1414,6 +1427,7 @@ class ProductAdmin(
                 "category_id",
                 "vat_id",
                 "changed_by_id",
+                "variant_group_id",
             )
         )
 
@@ -1478,6 +1492,34 @@ class ProductAdmin(
             )
         return mark_safe(
             '<span class="text-base-600 dark:text-base-300">No Category</span>'
+        )
+
+    @admin.display(description=_("Variants"))
+    def variant_group_display(self, obj):
+        """Which variant family this product belongs to, linked to the
+        group page, with the sibling count. Reads only prefetched data."""
+        group = obj.variant_group
+        if group is None:
+            return mark_safe(
+                '<span class="text-base-400 dark:text-base-500">—</span>'
+            )
+        name = (
+            group.safe_translation_getter("name", any_language=True)
+            or f"Group #{group.pk}"
+        )
+        # len() over the prefetch cache — no per-row COUNT query.
+        siblings = len(group.variants.all())
+        return format_html(
+            '<div class="text-sm">'
+            '<a href="{url}" class="font-medium text-base-900 dark:text-base-100">🎨 {name}</a>'
+            '<div class="text-xs text-base-600 dark:text-base-300">{count} {label}</div>'
+            "</div>",
+            url=reverse(
+                "admin:product_productvariantgroup_change", args=[group.pk]
+            ),
+            name=name,
+            count=siblings,
+            label=_("variants"),
         )
 
     @admin.display(description=_("Pricing"))

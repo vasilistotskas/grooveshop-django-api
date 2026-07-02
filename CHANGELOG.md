@@ -3,6 +3,45 @@
 
 
 
+## v1.152.1 (2026-07-02)
+
+### Bug fixes
+
+* fix(asgi): serve with gunicorn + 2 uvicorn workers
+
+Production incident 2026-07-02: single-process daphne means one event
+loop per pod — any CPU-bound work stalls every concurrent request,
+including the health probes, so under load BOTH pods failed
+readiness simultaneously and dropped out of the Service.
+
+- gunicorn master + uvicorn workers (uvicorn-worker package, the
+  documented replacement for the deprecated uvicorn.workers). Worker
+  count from WEB_CONCURRENCY (default 2). websockets dependency added
+  for the Channels ws/notifications leg (verified: 101 handshake +
+  consumer close through the new stack).
+- Custom GrooveshopUvicornWorker (top-level module so the gunicorn
+  master never imports the Django app pre-fork): lifespan off —
+  ProtocolTypeRouter has no lifespan handler — and ws pinned to
+  websockets.
+- Wedged-loop self-heal: uvicorn heartbeats gunicorn via
+  callback_notify on the loop; a blocked loop stops notifying and the
+  master restarts just that worker (timeout 60s).
+- health views exempted from DRF throttling: the throttle Redis GET
+  ran before the view, so a Redis blip 500'd both probes on every pod
+  at once — and probes must not consume the shared anon bucket.
+
+Smoke-tested in the production image: gunicorn boots 2 workers;
+/health/ answers at the ASGI layer pre-SecurityMiddleware;
+/api/v1/health/live and /api/v1/health return 200 with all
+dependencies green; websocket handshake completes through Channels.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HGpXy5J6UF4GRmQRshn2BZ ([`1b25b48`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b25b48495f121a08d3182a40c17c7252a30b73f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.152.0 [skip ci] ([`ca9ecdf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ca9ecdf916ae5687bfc3ba07e4c3f7c4456e1482))
+
 ## v1.152.0 (2026-07-02)
 
 ### Chores

@@ -3,6 +3,39 @@
 
 
 
+## v1.153.1 (2026-07-04)
+
+### Bug fixes
+
+* fix(product): order variant-group admin queryset
+
+The Count() annotation in ProductVariantGroupAdmin.get_queryset
+strips the model's default Meta.ordering (Django drops default
+ordering on GROUP BY queries), so the autocomplete paginator emitted
+UnorderedObjectListWarning on every Product-page lookup. An explicit
+admin ordering survives the annotation.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Cf7vqyrzDMhrnn1Qra78mj ([`5583ed0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5583ed0dded3839cf44dc9b8838186049ca02e78))
+
+* fix(shipping): wrap request timeouts as retryable
+
+requests.ReadTimeout is not a ConnectionError subclass, so the ACS
+and BoxNow clients let read timeouts escape unwrapped: a 15s ACS
+timeout surfaced as an unhandled 500 on the address-validation
+checkout endpoint and crashed sync_acs_stations (prod 2026-07-04).
+Both clients now raise their retryable error on requests.Timeout —
+the view maps it to a clean 502 and Celery autoretry backs off and
+retries; the 3-phase mint claim already makes a retried
+ACS_Create_Voucher safe.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Cf7vqyrzDMhrnn1Qra78mj ([`24d5e07`](https://github.com/vasilistotskas/grooveshop-django-api/commit/24d5e07f83cd78c2cb0c25e56d3b4b8754ff1121))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.153.0 [skip ci] ([`eee3fff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eee3fff453a3ed9eca570b4ed222a5fc6158452a))
+
 ## v1.153.0 (2026-07-04)
 
 ### Chores

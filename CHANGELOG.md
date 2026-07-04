@@ -3,6 +3,28 @@
 
 
 
+## v1.153.0 (2026-07-04)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.152.4 [skip ci] ([`71ee812`](https://github.com/vasilistotskas/grooveshop-django-api/commit/71ee812ac3da67054f3029c6f83a13650ff9216c))
+
+### Features
+
+* feat(product): add Brand model and expose brandName for catalog feeds
+
+Add a Brand registry (unique name, admin-managed) with a nullable FK on
+Product, exposed read-only as brand/brandName in the product serializers
+for the new Meta/TikTok XML catalog feeds. Brand rides select_related in
+with_category() so list and detail payloads stay free of N+1 queries.
+
+Register the Nitro feed caches (ProductFeed, feeds:products,
+feeds:product-category) on the products cache surface so a catalog
+purge also refreshes the storefront feeds. Regenerate schema.yml.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CkotUsqBoPCBtUXwtjLePP ([`885832c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/885832c1544c3128e43e3ad2e2cbeb855d732ffa))
+
 ## v1.152.4 (2026-07-02)
 
 ### Bug fixes

@@ -3103,6 +3103,11 @@ class ProductVariantGroupAdmin(TranslatableAdmin, BaseModelAdmin):
         "updated_at",
         "members_display",
     )
+    # The Count() annotation in get_queryset strips the model's default
+    # Meta.ordering (Django drops default ordering on GROUP BY queries),
+    # which made the autocomplete paginator emit UnorderedObjectListWarning.
+    # An explicit admin ordering survives the annotation.
+    ordering = ["-created_at"]
     date_hierarchy = "created_at"
 
     fieldsets = (

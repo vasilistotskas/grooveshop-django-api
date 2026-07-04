@@ -241,6 +241,31 @@ class TestRequest:
         assert "Invalid phone" in err.message
         assert err.status_code == 400
 
+    @pytest.mark.django_db
+    def test_request_read_timeout_raises_retryable_error(self):
+        """ReadTimeout is not a ConnectionError subclass — it must be
+        wrapped explicitly so Celery's autoretry can target it."""
+        client = _make_client()
+        auth_resp = _make_response(
+            200, {"access_token": "tok", "expires_in": 3600}
+        )
+        client._session.post.return_value = auth_resp
+        client._session.request.side_effect = requests.ReadTimeout("slow")
+
+        with pytest.raises(BoxNowRetryableError):
+            client._request("GET", "/api/v1/test")
+
+    @pytest.mark.django_db
+    def test_token_fetch_read_timeout_raises_retryable_error(self):
+        from django.core.cache import cache
+
+        client = _make_client()
+        cache.delete(client._token_cache_key)
+        client._session.post.side_effect = requests.ReadTimeout("slow")
+
+        with pytest.raises(BoxNowRetryableError):
+            client._get_access_token()
+
 
 # ---------------------------------------------------------------------------
 # Public method tests

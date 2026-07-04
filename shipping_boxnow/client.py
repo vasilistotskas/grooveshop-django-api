@@ -150,6 +150,11 @@ class BoxNowClient:
                 0,
                 message=f"Connection error fetching BoxNow token: {exc}",
             ) from exc
+        except requests.Timeout as exc:
+            raise BoxNowRetryableError(
+                0,
+                message=f"Timeout fetching BoxNow token: {exc}",
+            ) from exc
 
         if response.status_code != 200:
             raise BoxNowAuthError(
@@ -229,6 +234,11 @@ class BoxNowClient:
             raise BoxNowRetryableError(
                 0,
                 message=f"BoxNow connection error: {exc}",
+            ) from exc
+        except requests.Timeout as exc:
+            raise BoxNowRetryableError(
+                0,
+                message=f"BoxNow timeout after {self.timeout}s: {exc}",
             ) from exc
 
         if response.status_code == 401 and _retry_on_401:

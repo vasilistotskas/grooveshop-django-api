@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.urls import reverse
@@ -81,6 +81,37 @@ def test_acs_api_error_returns_502():
         response = client.post(
             reverse("shipping-acs-address-validation"),
             {"address": "x x x"},
+            format="json",
+        )
+    assert response.status_code == status.HTTP_502_BAD_GATEWAY
+
+
+def test_acs_read_timeout_returns_502_not_500():
+    """Regression: prod 2026-07-04 — a 15s ACS read timeout escaped
+    the client unwrapped and surfaced as an unhandled 500 during
+    checkout. The client now wraps ``requests.Timeout`` into
+    ``AcsRetryableError`` (an ``AcsAPIError`` subclass), which this
+    view maps to a clean 502."""
+    import requests as requests_lib
+
+    from shipping_acs.client import AcsClient as RealAcsClient
+
+    client = APIClient()
+    session = MagicMock()
+    session.post.side_effect = requests_lib.ReadTimeout("read timed out")
+    acs_client = RealAcsClient(
+        api_key="k",
+        company_id="c",
+        company_password="p",
+        user_id="u",
+        user_password="up",
+        session=session,
+    )
+    with patch("shipping_acs.client.AcsClient") as mock_class:
+        mock_class.return_value = acs_client
+        response = client.post(
+            reverse("shipping-acs-address-validation"),
+            {"address": "ΠΕΙΡΑΙΩΣ 25 17778 timeout-case"},
             format="json",
         )
     assert response.status_code == status.HTTP_502_BAD_GATEWAY

@@ -157,6 +157,22 @@ class TestCall:
         with pytest.raises(AcsRetryableError):
             client._call("ACS_Create_Voucher")
 
+    def test_read_timeout_raises_retryable(self):
+        """ReadTimeout is not a ConnectionError subclass — it must be
+        wrapped explicitly or it escapes raw (prod 2026-07-04: 15s
+        ACS read timeout surfaced as an unhandled 500 on the
+        address-validation checkout endpoint)."""
+        client = _make_client()
+        client._session.post.side_effect = requests.ReadTimeout("slow ACS")
+        with pytest.raises(AcsRetryableError):
+            client._call("ACS_Address_Validation")
+
+    def test_connect_timeout_raises_retryable(self):
+        client = _make_client()
+        client._session.post.side_effect = requests.ConnectTimeout("no route")
+        with pytest.raises(AcsRetryableError):
+            client._call("ACS_Address_Validation")
+
     def test_payload_includes_creds_and_acs_alias(self):
         client = _make_client()
         client._session.post.return_value = _make_response(

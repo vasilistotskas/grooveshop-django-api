@@ -66,8 +66,8 @@ class ProductQuerySet(
         return self.filter(stock=0)
 
     def with_category(self) -> Self:
-        """Select related category and VAT."""
-        return self.select_related("category", "vat")
+        """Select related category, VAT and brand."""
+        return self.select_related("category", "vat", "brand")
 
     def with_main_image(self) -> Self:
         """Prefetch only the main image to avoid N+1 in main_image_path."""

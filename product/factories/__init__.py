@@ -3,6 +3,7 @@ from .attribute_value import (
     AttributeValueFactory,
     AttributeValueTranslationFactory,
 )
+from .brand import BrandFactory
 from .category import ProductCategoryFactory
 from .category_image import ProductCategoryImageFactory
 from .favourite import ProductFavouriteFactory
@@ -20,6 +21,7 @@ __all__ = [
     "AttributeTranslationFactory",
     "AttributeValueFactory",
     "AttributeValueTranslationFactory",
+    "BrandFactory",
     "ProductAttributeFactory",
     "ProductCategoryFactory",
     "ProductCategoryImageFactory",

@@ -6,6 +6,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from product.factories.brand import BrandFactory
 from product.factories.category import ProductCategoryFactory
 from product.factories.favourite import ProductFavouriteFactory
 from product.factories.image import ProductImageFactory
@@ -93,6 +94,8 @@ class ProductViewSetTestCase(APITestCase):
                 "id",
                 "slug",
                 "category",
+                "brand",
+                "brand_name",
                 "price",
                 "vat",
                 "view_count",
@@ -117,6 +120,8 @@ class ProductViewSetTestCase(APITestCase):
             "id",
             "slug",
             "category",
+            "brand",
+            "brand_name",
             "price",
             "vat",
             "view_count",
@@ -130,6 +135,29 @@ class ProductViewSetTestCase(APITestCase):
             "likes_count",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+    def test_brand_name_when_brand_set(self):
+        brand = BrandFactory(name="Acme Audio")
+        product = ProductFactory(
+            category=self.category,
+            vat=self.vat,
+            brand=brand,
+        )
+
+        url = self.get_product_detail_url(product.pk)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["brand"], brand.pk)
+        self.assertEqual(response.data["brand_name"], "Acme Audio")
+
+    def test_brand_name_null_when_brand_unset(self):
+        url = self.get_product_detail_url(self.product.pk)
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["brand"])
+        self.assertIsNone(response.data["brand_name"])
 
     def test_create_request_response_serializers(self):
         payload = {

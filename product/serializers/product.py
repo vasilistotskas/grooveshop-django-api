@@ -10,6 +10,7 @@ from rest_framework.relations import PrimaryKeyRelatedField
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import MeasurementSerializerField
 from core.utils.serializers import TranslatedFieldExtended
+from product.models.brand import Brand
 from product.models.category import ProductCategory
 from product.models.product import Product
 from product.serializers.product_attribute import ProductAttributeSerializer
@@ -27,6 +28,9 @@ class ProductSerializer(
     translations = TranslatedFieldsFieldExtend(shared_model=Product)
     category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
     vat = PrimaryKeyRelatedField(queryset=Vat.objects.all())
+    brand_name = serializers.CharField(
+        source="brand.name", read_only=True, allow_null=True
+    )
     price = MoneyField(max_digits=11, decimal_places=2)
     final_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     discount_value = MoneyField(max_digits=11, decimal_places=2, read_only=True)
@@ -46,6 +50,8 @@ class ProductSerializer(
             "slug",
             "category",
             "variant_group",
+            "brand",
+            "brand_name",
             "price",
             "vat",
             "view_count",
@@ -75,6 +81,8 @@ class ProductSerializer(
         read_only_fields = (
             "id",
             "variant_group",
+            "brand",
+            "brand_name",
             "discount_value",
             "price_save_percent",
             "vat_percent",
@@ -107,6 +115,9 @@ class ProductWriteSerializer(
 ):
     category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
     vat = PrimaryKeyRelatedField(queryset=Vat.objects.all())
+    brand = PrimaryKeyRelatedField(
+        queryset=Brand.objects.all(), required=False, allow_null=True
+    )
     price = MoneyField(max_digits=11, decimal_places=2)
     weight = MeasurementSerializerField(
         measurement=Weight, required=False, allow_null=True
@@ -155,6 +166,7 @@ class ProductWriteSerializer(
             "translations",
             "slug",
             "category",
+            "brand",
             "price",
             "vat",
             "stock",

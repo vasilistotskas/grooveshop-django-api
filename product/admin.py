@@ -36,6 +36,7 @@ from product.enum.review import ReviewStatus
 from product.forms import ApplyDiscountForm
 from product.models.attribute import Attribute
 from product.models.attribute_value import AttributeValue
+from product.models.brand import Brand
 from product.models.category import ProductCategory
 from product.models.category_image import ProductCategoryImage
 from product.models.favourite import ProductFavourite
@@ -1165,6 +1166,7 @@ class ProductAdmin(
         "translations__name",
         "translations__description",
         "category__translations__name",
+        "brand__name",
     ]
     list_filter = [
         StockStatusFilter,
@@ -1175,6 +1177,7 @@ class ProductAdmin(
         "active",
         ("category", RelatedDropdownFilter),
         ("variant_group", RelatedDropdownFilter),
+        ("brand", RelatedDropdownFilter),
         ("vat", RelatedDropdownFilter),
         ("stock", RangeNumericFilter),
         ("price", RangeNumericFilter),
@@ -1206,8 +1209,8 @@ class ProductAdmin(
         "performance_summary",
         "stock_reservation_summary",
     )
-    list_select_related = ["category", "vat", "changed_by"]
-    autocomplete_fields = ["category", "vat", "variant_group"]
+    list_select_related = ["category", "vat", "brand", "changed_by"]
+    autocomplete_fields = ["category", "vat", "variant_group", "brand"]
     search_help_text = _(
         "Search by ID, SKU, name, description, or category name."
     )
@@ -1230,6 +1233,7 @@ class ProductAdmin(
                     "sku",
                     "category",
                     "variant_group",
+                    "brand",
                     "active",
                     "name",
                     "description",
@@ -3182,3 +3186,60 @@ class ProductVariantGroupAdmin(TranslatableAdmin, BaseModelAdmin):
                 for v in variants
             ),
         )
+
+
+@admin.register(Brand)
+class BrandAdmin(BaseModelAdmin):
+    """Registry of product brands consumed by the Meta/TikTok catalog feeds.
+
+    Products are assigned a brand from the Product page (the ``brand``
+    autocomplete); this page manages the canonical brand names.
+    """
+
+    list_display = [
+        "name",
+        "products_count_display",
+        "created_at",
+    ]
+    search_fields = ["name"]
+    list_filter = [
+        ("created_at", RangeDateTimeFilter),
+    ]
+    readonly_fields = (
+        "id",
+        "created_at",
+        "updated_at",
+    )
+    date_hierarchy = "created_at"
+
+    fieldsets = (
+        (
+            _("Brand"),
+            {
+                "fields": ("name",),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("System Information"),
+            {
+                "fields": (
+                    "id",
+                    "created_at",
+                    "updated_at",
+                ),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def get_queryset(self, request):
+        return (
+            super()
+            .get_queryset(request)
+            .annotate(products_count=Count("products", distinct=True))
+        )
+
+    @admin.display(description=_("Products"), ordering="products_count")
+    def products_count_display(self, obj):
+        return obj.products_count

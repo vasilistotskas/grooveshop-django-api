@@ -76,6 +76,13 @@ class Product(
             "in other colours). Members share variant selectors on the storefront."
         ),
     )
+    brand = models.ForeignKey(
+        "product.Brand",
+        on_delete=models.SET_NULL,
+        related_name="products",
+        null=True,
+        blank=True,
+    )
     slug = models.SlugField(_("Slug"), max_length=255, unique=True)
     price = MoneyField(
         _("Price"),

@@ -1,6 +1,7 @@
 from .alert import ProductAlert, ProductAlertKind
 from .attribute import Attribute
 from .attribute_value import AttributeValue
+from .brand import Brand
 from .category import ProductCategory
 from .category_image import ProductCategoryImage
 from .favourite import ProductFavourite
@@ -13,6 +14,7 @@ from .variant_group import ProductVariantGroup
 __all__ = [
     "Attribute",
     "AttributeValue",
+    "Brand",
     "Product",
     "ProductAlert",
     "ProductAlertKind",

@@ -3,6 +3,33 @@
 
 
 
+## v1.153.2 (2026-07-05)
+
+### Bug fixes
+
+* fix(product): quantize pricing properties to whole cents
+
+Percentage-derived amounts (VAT, discount) carried sub-cent precision
+(16.12 x 24% = 3.8688), so final_price leaked values like 19.9888 into
+CartItem.price_at_add comparisons, cart totals and order metadata
+snapshots while the numeric(11,2) columns rounded independently on
+insert. Every checkout with such a product fired a phantom "Cart price
+drift at checkout" warning for identical displayed prices; customers
+were always charged the rounded amount (order totals aggregate the
+DB-stored item prices).
+
+Quantize discount_value, vat_value and final_price to 2dp with
+ROUND_HALF_UP - the AADE convention already used by the myDATA builder
+- so in-memory, persisted, displayed and charged amounts all agree.
+The drift logger now only fires on genuine price changes.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CkotUsqBoPCBtUXwtjLePP ([`4252412`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4252412a2b646a46c829b54134147c8a933e34bc))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.153.1 [skip ci] ([`435fd51`](https://github.com/vasilistotskas/grooveshop-django-api/commit/435fd5167d3b59525ff77951e3510bcd0fb86674))
+
 ## v1.153.1 (2026-07-04)
 
 ### Bug fixes

@@ -1,16 +1,19 @@
 """Unit tests for BoxNowClient.
 
 All external HTTP calls are mocked with unittest.mock; no network I/O.
-The Django cache is the in-process LocMemCache configured in conftest.py.
+The Django cache is patched per test with a private LocMemCache (see
+``_isolated_cache``) so token state never touches the shared backend.
 """
 
 from __future__ import annotations
 
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 import pytest
 import requests
+from django.core.cache.backends.locmem import LocMemCache
 
 from shipping_boxnow.client import BoxNowClient
 from shipping_boxnow.exceptions import (
@@ -62,6 +65,25 @@ def _make_client(**kwargs) -> BoxNowClient:
     return BoxNowClient(**defaults)
 
 
+@pytest.fixture(autouse=True)
+def _isolated_cache():
+    """Give every test its own LocMemCache via ``django.core.cache.cache``.
+
+    The conftest ``settings.CACHES`` LocMem override is inert for cache
+    connections that materialised at app-load (see the note in
+    ``tests/conftest.py``), so in CI the default proxy is the *shared*
+    Redis — where another xdist worker's autouse ``cache.clear()`` can
+    wipe the token between this module's ``cache.set`` and ``cache.get``
+    (flaky ``test_authenticate_success``). Patching the module attribute
+    covers both the client's call-time import and the tests' own local
+    ``from django.core.cache import cache`` imports; the unique LOCATION
+    keeps state from leaking between tests in the same worker.
+    """
+    local = LocMemCache(f"boxnow-client-test-{uuid4()}", {})
+    with patch("django.core.cache.cache", local):
+        yield local
+
+
 # ---------------------------------------------------------------------------
 # Authentication tests
 # ---------------------------------------------------------------------------
@@ -70,12 +92,12 @@ def _make_client(**kwargs) -> BoxNowClient:
 class TestAuthenticate:
     """Tests for BoxNowClient._get_access_token.
 
-    Each test owns its cache state. The conftest ``clear_caches`` fixture
-    clears AFTER yield, so a stale entry written by a previous test in the
-    same xdist worker would still be visible at the START of the next
-    test. Each test here calls ``cache.delete(_token_cache_key())`` at the
-    top to make the starting cache state explicit and worker-order
-    independent.
+    Each test owns its cache state: ``_isolated_cache`` patches in a
+    fresh private LocMemCache per test, so state can neither leak in
+    from earlier tests nor be wiped mid-test by another xdist worker's
+    ``cache.clear()`` on the shared backend. The explicit
+    ``cache.delete(...)`` calls at the top of tests are kept as
+    documentation of the expected starting state.
     """
 
     @staticmethod

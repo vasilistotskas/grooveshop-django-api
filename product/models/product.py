@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
@@ -43,6 +43,22 @@ from tag.models.tagged_item import TaggedModel
 
 DISCOUNT_PERCENT_MIN = Decimal("0.0")
 DISCOUNT_PERCENT_MAX = Decimal("100.0")
+
+TWO_PLACES = Decimal("0.01")
+
+
+def _quantize_cents(value: Decimal) -> Decimal:
+    """Round a monetary amount to whole cents (2dp, ROUND_HALF_UP — the
+    AADE convention, see ``order/mydata/builder.py``).
+
+    Percentage-derived amounts (VAT, discount) carry sub-cent precision
+    (e.g. 16.12 × 24% = 3.8688). Left unquantized they leak into
+    ``CartItem.price_at_add`` comparisons, cart totals and order metadata
+    snapshots, while the DB ``numeric(11,2)`` columns round independently
+    on insert — producing phantom "price drift" between in-memory and
+    persisted values.
+    """
+    return value.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
 
 
 class Product(
@@ -278,7 +294,7 @@ class Product(
     @property
     def discount_value(self) -> Money:
         value = (self.price.amount * self.discount_percent) / 100
-        return Money(value, settings.DEFAULT_CURRENCY)
+        return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
 
     @property
     def price_save_percent(self) -> Decimal:
@@ -342,7 +358,7 @@ class Product(
     def vat_value(self) -> Money:
         if self.vat:
             value = (self.price.amount * self.vat.value) / 100
-            return Money(value, settings.DEFAULT_CURRENCY)
+            return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
         return Money(0, settings.DEFAULT_CURRENCY)
 
     @property
@@ -358,7 +374,8 @@ class Product(
             if self.discount_value.currency != price_currency
             else self.discount_value
         )
-        return self.price + vat_value - discount_value
+        total = self.price + vat_value - discount_value
+        return Money(_quantize_cents(total.amount), price_currency)
 
     @property
     def main_image_path(self) -> str:

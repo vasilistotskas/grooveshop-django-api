@@ -215,6 +215,21 @@ def test_reconcile_does_not_refire_order_paid_when_already_paid():
     assert fired == []
 
 
+def test_nightly_beat_task_is_silent_for_customers():
+    """The beat wrapper must pass ``silent_for_customer=True`` — the
+    COD reconcile never emails customers (site-owner decision
+    2026-07-11)."""
+    from shipping_acs.tasks import reconcile_acs_cod_payouts
+
+    with patch(
+        "shipping_acs.services.AcsService.reconcile_cod_payouts",
+        return_value={"upserted": 0, "linked": 0, "skipped": 0, "rows": 0},
+    ) as mock_reconcile:
+        reconcile_acs_cod_payouts.run()
+
+    assert mock_reconcile.call_args.kwargs["silent_for_customer"] is True
+
+
 def test_reconcile_silent_mode_suppresses_completed_notification():
     """``silent_for_customer=True`` (backfill path) pre-stamps the
     COMPLETED suppression flags so a weeks-old order flipping to paid

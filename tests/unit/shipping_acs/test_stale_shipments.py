@@ -27,7 +27,7 @@ pytestmark = pytest.mark.django_db
 _ADMINS = ["admin@example.com"]
 
 
-def _stale_shipment(**overrides) -> AcsShipment:
+def _stale_shipment(**overrides):
     """A NEW shipment with a voucher whose last event is 5 days old."""
     defaults = {
         "voucher_no": overrides.pop("voucher_no", "9700000001"),

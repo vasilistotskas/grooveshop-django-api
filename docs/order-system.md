@@ -176,7 +176,10 @@ success redirect (customer landed on the homepage via the
 4. Carrier polls: shipment_state advances → status flips PROCESSING → SHIPPED → DELIVERED
 5. Daily ACS COD reconcile (02:30 Athens, queries yesterday's payouts):
    AcsService._mark_cod_order_paid_if_pending → payment_status=PENDING → COMPLETED
-   Then maybe_advance_to_completed → status=DELIVERED → COMPLETED
+   Then maybe_advance_to_completed → status=DELIVERED → COMPLETED.
+   Always silent for customers (email + toast suppressed; the shopper
+   paid in person and already got the DELIVERED notification) — both
+   the beat task and the backfill command pass silent_for_customer.
 6. Customer email + WS toast at every meaningful transition.
 ```
 

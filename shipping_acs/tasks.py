@@ -447,7 +447,14 @@ def reconcile_acs_cod_payouts(self) -> dict[str, int]:
     from shipping_acs.services import AcsService
 
     yesterday = (timezone.localtime() - timedelta(days=1)).date()
-    result = AcsService.reconcile_cod_payouts(cod_payment_date=yesterday)
+    # silent_for_customer: the payment-flip and DELIVERED → COMPLETED
+    # advance are internal bookkeeping — the customer already received
+    # the DELIVERED notification days earlier and paid the courier in
+    # person, so a "completed" email now adds nothing (site-owner
+    # decision 2026-07-11: COD reconcile must never email customers).
+    result = AcsService.reconcile_cod_payouts(
+        cod_payment_date=yesterday, silent_for_customer=True
+    )
     # ``extra=result`` would crash because ``result['created'/'updated']``
     # collide with built-in ``LogRecord`` attributes. Namespace under a
     # wrapper key so the structured fields stay queryable.

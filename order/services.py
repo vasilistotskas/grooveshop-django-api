@@ -1621,9 +1621,10 @@ class OrderService:
           got the DELIVERED email + toast and a COMPLETED message ~ms
           later would feel like a duplicate.
         * COD reconcile, after flipping payment_status to COMPLETED.
-          Leave ``silent_for_customer=False`` (default) — DELIVERED
-          fired hours/days earlier, so a fresh "thanks for your loyalty
-          points" message is welcome, not redundant.
+          Also passes ``silent_for_customer=True`` — the customer paid
+          the courier in person and already received the DELIVERED
+          notification; the reconcile is internal bookkeeping
+          (site-owner decision 2026-07-11: it never emails customers).
 
         Idempotent and silent when the order is not eligible — a
         non-paid order or one already past DELIVERED no-ops.

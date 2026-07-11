@@ -1208,10 +1208,13 @@ class AcsService:
         fallback match keys when ``POD`` is empty or unknown.
 
         ``silent_for_customer=True`` suppresses the customer-facing
-        COMPLETED email/toast for orders flipped by this run — used by
-        the backfill management command so weeks-old orders don't
-        suddenly email customers. The nightly beat task keeps the
-        default (a next-day COMPLETED message is intended behaviour).
+        COMPLETED email/toast for orders flipped by this run. Both
+        callers pass it: the backfill command (weeks-old orders must
+        not suddenly email customers) and the nightly beat task (the
+        customer already got the DELIVERED notification and paid the
+        courier in person — site-owner decision 2026-07-11 that the
+        COD reconcile never emails customers). Internal state still
+        flows: order_paid fires, history is logged, status advances.
 
         Returns a counters dict for the Celery task to log; ``skipped``
         rows (no voucher and no reference match) additionally alert

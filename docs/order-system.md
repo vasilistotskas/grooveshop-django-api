@@ -174,7 +174,7 @@ success redirect (customer landed on the homepage via the
 2. _dispatch_shipment_creation_task (on_commit) → courier voucher mints
 3. AcsService._advance_pending_order_to_processing → status=PROCESSING
 4. Carrier polls: shipment_state advances → status flips PROCESSING → SHIPPED → DELIVERED
-5. Daily ACS COD reconcile (Mon-Fri 16:30 Athens):
+5. Daily ACS COD reconcile (02:30 Athens, queries yesterday's payouts):
    AcsService._mark_cod_order_paid_if_pending → payment_status=PENDING → COMPLETED
    Then maybe_advance_to_completed → status=DELIVERED → COMPLETED
 6. Customer email + WS toast at every meaningful transition.
@@ -199,7 +199,15 @@ Each carrier implements `ShippingCarrierInterface` in
   losing `last_polled_at`.
 - COD: `reconcile_cod_payouts` runs daily, upserts `AcsCodPayout`
   rows from the ACS COD beneficiary endpoint, and flips
-  `Order.payment_status` for matched vouchers.
+  `Order.payment_status` for matched vouchers. **Wire schema**: the
+  voucher number arrives in the `POD` column (there is no
+  `Voucher_No` in this response); `Customer_RefNo_1/2` echo
+  `Reference_Key1/2` from voucher mint (`order.id` / `order.uuid`)
+  and are the fallback match keys. Unmatched rows are counted as
+  `skipped` and alert ADMINS. Backfill missed dates with
+  `manage.py reconcile_acs_cod --days N [--silent]` (`--silent`
+  suppresses customer COMPLETED notifications — mandatory for
+  backfills).
 - HTTP 403/406 (`AcsAuthError`) is **retryable**: prod ACS returns
   sporadic transient 406s (~2% of tracking polls, self-healing —
   verified 2026-07-11); only a persistent rejection means a bad

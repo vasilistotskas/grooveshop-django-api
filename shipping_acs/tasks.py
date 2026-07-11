@@ -68,6 +68,12 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
     try:
         shipment = AcsService.create_voucher_for_order(order)
     except AcsAPIError as exc:
+        # Business error (bad address, unacceptable destination
+        # station, …) — permanent, no retry. Tell a human immediately:
+        # the customer has checked out and is waiting (prod order 143
+        # stranded invisibly for 10 days on exactly this path).
+        from shipping.alerts import alert_admins_shipment_creation_failed
+
         logger.error(
             "ACS business error for order %s: %s",
             order_id,
@@ -77,6 +83,9 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
                 "alias": exc.alias,
                 "http_status": exc.http_status,
             },
+        )
+        alert_admins_shipment_creation_failed(
+            order_id=order_id, carrier="ACS", error=str(exc)
         )
         return {
             "status": "acs_api_error",
@@ -272,14 +281,20 @@ def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:
 def check_stale_acs_shipments(self) -> dict[str, Any]:
     """Alert admins about non-terminal shipments with no tracking movement.
 
-    A shipment is *stale* when its voucher exists, its state is
-    non-terminal, and no tracking event has arrived for
-    ``settings.ACS_STALE_SHIPMENT_DAYS`` days (falling back to
-    ``created_at`` when no event was ever recorded). Real prod cases
-    this catches (2026-07-11): a parcel stuck at the destination
-    station after a failed delivery with a wrong address, and a
-    voucher that sat in ``new`` for 50 days because the parcel was
-    never handed over — both polled forever with nobody notified.
+    Two staleness classes are reported (real prod cases, 2026-07-11):
+
+    * **Stale tracking** — voucher exists, state non-terminal, and no
+      tracking event for ``settings.ACS_STALE_SHIPMENT_DAYS`` days
+      (falling back to ``created_at`` when no event was ever
+      recorded). Caught: a parcel stuck at the destination station
+      after a wrong-address delivery failure; a voucher sitting in
+      ``new`` for 50 days because the parcel was never handed over.
+    * **Stranded mint** — ``pending_creation`` for over 24 hours.
+      Voucher creation normally completes in seconds; a day-old
+      pending row means the mint task failed permanently or was lost
+      (order 143 stranded 10 days). The immediate mint-failure alert
+      (``shipping.alerts``) is the fast path; this digest is the
+      backstop for failures where no exception handler ran.
 
     Mirrors ``product.tasks.check_low_stock_products``: rows are
     claimed atomically (``stale_alert_sent=True``) before the email so
@@ -301,25 +316,35 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
     from shipping_acs.models import AcsShipment
 
     threshold_days = getattr(settings, "ACS_STALE_SHIPMENT_DAYS", 3)
-    cutoff = timezone.now() - timedelta(days=threshold_days)
+    now = timezone.now()
+    cutoff = now - timedelta(days=threshold_days)
+
+    stale_tracking = (
+        Q(voucher_no__isnull=False)
+        & ~Q(
+            shipment_state__in=[
+                AcsShipmentState.PENDING_CREATION,
+                AcsShipmentState.DELIVERED,
+                AcsShipmentState.RETURNED,
+                AcsShipmentState.CANCELED,
+                AcsShipmentState.LOST,
+            ]
+        )
+        & (
+            Q(last_event_at__lt=cutoff)
+            | (Q(last_event_at__isnull=True) & Q(created_at__lt=cutoff))
+        )
+    )
+    stranded_mint = Q(
+        shipment_state=AcsShipmentState.PENDING_CREATION,
+        created_at__lt=now - timedelta(hours=24),
+    )
 
     with transaction.atomic():
         shipment_ids = list(
             AcsShipment.objects.select_for_update(skip_locked=True)
-            .filter(voucher_no__isnull=False, stale_alert_sent=False)
-            .exclude(
-                shipment_state__in=[
-                    AcsShipmentState.PENDING_CREATION,
-                    AcsShipmentState.DELIVERED,
-                    AcsShipmentState.RETURNED,
-                    AcsShipmentState.CANCELED,
-                    AcsShipmentState.LOST,
-                ]
-            )
-            .filter(
-                Q(last_event_at__lt=cutoff)
-                | (Q(last_event_at__isnull=True) & Q(created_at__lt=cutoff))
-            )
+            .filter(stale_alert_sent=False)
+            .filter(stale_tracking | stranded_mint)
             .values_list("id", flat=True)
         )
         if not shipment_ids:
@@ -338,13 +363,12 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         )
         return {"alerted": 0, "reason": "no_admins"}
 
-    now = timezone.now()
     shipments = AcsShipment.objects.filter(id__in=shipment_ids).select_related(
         "order"
     )
     rows = [
         {
-            "voucher_no": s.voucher_no,
+            "voucher_no": s.voucher_no or "—",
             "order_id": s.order_id,
             "shipment_state": s.get_shipment_state_display(),
             "last_movement_at": s.last_event_at or s.created_at,

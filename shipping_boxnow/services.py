@@ -11,7 +11,7 @@ from django.utils.dateparse import parse_datetime
 
 from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
-from shipping_boxnow.enum import BoxNowParcelState
+from shipping_boxnow.enum import BoxNowParcelState, BoxNowPaymentMode
 from shipping_boxnow.exceptions import BoxNowAPIError
 from shipping_boxnow.models import (
     BoxNowLocker,
@@ -275,8 +275,6 @@ class BoxNowService:
             # — which happens after the create_shipment_row hook fires.
             # Idempotent: re-runs see the existing non-zero amount and
             # skip the recompute.
-            from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
-
             if (
                 shipment.payment_mode == BoxNowPaymentMode.COD
                 and shipment.amount_to_be_collected.amount == 0
@@ -310,8 +308,6 @@ class BoxNowService:
         # force ``"0.00"`` so a prepaid cart over €5000 still mints.
         # COD parcels carry the real amount and are pre-validated at
         # row creation time (carrier.create_shipment_row).
-        from shipping_boxnow.enum import BoxNowPaymentMode
-
         if shipment.payment_mode == BoxNowPaymentMode.PREPAID:
             amount_to_collect_str = "0.00"
         else:
@@ -891,8 +887,7 @@ class BoxNowService:
                 )
 
             # --- Map BoxNow event to Order status transition --------------
-            order: Order = shipment.order
-            cls._apply_order_status_transition(order, mapped_state)
+            cls._apply_order_status_transition(shipment, mapped_state)
 
             # --- Enqueue arrival notification for final-destination -------
             # Wrap ``.delay`` in ``transaction.on_commit`` so the Celery
@@ -1205,7 +1200,7 @@ class BoxNowService:
                     ]
                 )
 
-            cls._apply_order_status_transition(locked.order, mapped_state)
+            cls._apply_order_status_transition(locked, mapped_state)
 
             if mapped_state == BoxNowParcelState.FINAL_DESTINATION:
                 from shipping_boxnow.tasks import (  # noqa: PLC0415
@@ -1351,7 +1346,9 @@ class BoxNowService:
 
     @classmethod
     def _apply_order_status_transition(
-        cls, order: Order, mapped_state: BoxNowParcelState | str
+        cls,
+        shipment: BoxNowShipment,
+        mapped_state: BoxNowParcelState | str,
     ) -> None:
         """
         Advance the Order's status based on the BoxNow parcel event.
@@ -1371,7 +1368,8 @@ class BoxNowService:
           states (or states before the target).
 
         Args:
-            order:        The ``Order`` linked to the shipment.
+            shipment:     The ``BoxNowShipment`` whose parcel event fired
+                          (must have ``order`` loaded/loadable).
             mapped_state: The ``BoxNowParcelState`` (or raw string for
                           unknown events).
         """
@@ -1379,6 +1377,7 @@ class BoxNowService:
         from order.exceptions import InvalidStatusTransitionError
         from order.services import OrderService
 
+        order: Order = shipment.order
         current_status: str = order.status
 
         # Never touch a terminal order.
@@ -1462,17 +1461,51 @@ class BoxNowService:
             )
             return
 
-        # Mirror AcsService: auto-complete already-paid orders when the
+        # BoxNow COD is paid at the locker: the customer must pay at
+        # the APM terminal before the compartment opens, so a parcel
+        # can only reach ``delivered`` after the money was collected.
+        # (Unlike ACS, where the courier remits later and the nightly
+        # COD reconcile confirms the payout — BoxNow's API has no
+        # payout endpoint, and none is needed.)
+        #
+        # Then mirror AcsService: auto-complete paid orders when the
         # carrier hands them DELIVERED. ``silent_for_customer=True``
         # because the customer just got the DELIVERED notifications in
-        # this same transition. COD orders rely on the COD reconcile
-        # pass to flip payment_status before this advance is allowed —
-        # that path keeps ``silent_for_customer=False`` so the
-        # "loyalty points credited" message isn't suppressed.
+        # this same transition.
         if new_status == "DELIVERED":
+            if shipment.payment_mode == BoxNowPaymentMode.COD:
+                cls._mark_cod_order_paid_on_delivery(shipment)
             OrderService.maybe_advance_to_completed(
                 order, silent_for_customer=True
             )
+
+    @classmethod
+    def _mark_cod_order_paid_on_delivery(cls, shipment: BoxNowShipment) -> None:
+        """Flip a COD order's payment from PENDING to COMPLETED.
+
+        BoxNow collects COD at the locker terminal *before* the
+        compartment opens, so a ``delivered`` parcel event is proof of
+        payment — no later remittance-reconcile step exists (or is
+        offered by the BoxNow API). Mirrors
+        ``AcsService._mark_cod_order_paid_if_pending``: idempotent on
+        ``payment_status == PENDING`` and fires ``order_paid`` so the
+        Meta CAPI Purchase dispatch runs (COD orders are past the
+        PENDING → PROCESSING transition that normally emits it).
+        """
+        from order.enum.status import PaymentStatus
+        from order.signals import order_paid
+
+        order = shipment.order
+        if order.payment_status != PaymentStatus.PENDING:
+            return
+        order.mark_as_paid(payment_method="boxnow_cod")
+        logger.info(
+            "BoxNow COD delivered: order=%s payment_status PENDING -> "
+            "COMPLETED (parcel=%s)",
+            order.id,
+            shipment.parcel_id,
+        )
+        order_paid.send(sender=type(order), order=order)
 
     @classmethod
     def _advance_pending_order_to_processing(cls, order: Order) -> None:

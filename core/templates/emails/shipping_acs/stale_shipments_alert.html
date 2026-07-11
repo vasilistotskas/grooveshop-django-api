@@ -30,5 +30,5 @@
     </tbody>
 </table>
 
-<p class="mt-3">{% trans "Check each voucher with ACS (wrong address, parcel waiting at a station, or a voucher that was never handed over). If a voucher is dead, use the ACS shipments admin action “Retire selected shipments” to stop polling it." %}</p>
+<p class="mt-3">{% trans "Check each voucher with ACS (wrong address, parcel waiting at a station, or a voucher that was never handed over). A “Pending creation” row means the voucher mint failed — fix the order's address/destination and use the admin action “Issue ACS voucher now”. If a voucher is dead, use “Retire selected shipments” to stop polling it." %}</p>
 {% endblock %}

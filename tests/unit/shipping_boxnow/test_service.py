@@ -570,3 +570,89 @@ class TestSyncLockers:
         assert stats["created"] == 1  # 'b'
         assert stats["updated"] == 1  # 'a'
         assert stats["deactivated"] == 1  # 'c'
+
+
+# ---------------------------------------------------------------------------
+# COD paid-on-delivery
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestCodPaidOnDelivery:
+    """BoxNow COD is collected at the locker terminal before the
+    compartment opens — a ``delivered`` parcel event is proof of
+    payment (no payout-reconcile step exists in the BoxNow API)."""
+
+    def test_delivered_cod_parcel_marks_order_paid_and_completes(self):
+        from order.signals import order_paid
+
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = BoxNowShipmentFactory(
+            order=order, with_parcel=True, payment_mode="cod"
+        )
+
+        fired: list[int] = []
+
+        def _listener(sender, order, **kwargs):
+            fired.append(order.id)
+
+        order_paid.connect(_listener, dispatch_uid="test.boxnow_cod_paid")
+        try:
+            BoxNowService.apply_webhook_event(
+                _build_envelope(parcel_id=shipment.parcel_id, event="delivered")
+            )
+        finally:
+            order_paid.disconnect(dispatch_uid="test.boxnow_cod_paid")
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.COMPLETED
+        assert order.status == OrderStatus.COMPLETED
+        assert fired == [order.id]
+
+    def test_delivered_prepaid_parcel_does_not_touch_payment(self):
+        """An unpaid PREPAID (online) order delivered by BoxNow must
+        NOT be marked paid — only the payment webhook may do that."""
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = BoxNowShipmentFactory(
+            order=order, with_parcel=True, payment_mode="prepaid"
+        )
+
+        BoxNowService.apply_webhook_event(
+            _build_envelope(parcel_id=shipment.parcel_id, event="delivered")
+        )
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PENDING
+        assert order.status == OrderStatus.DELIVERED
+
+    def test_delivered_cod_parcel_idempotent_when_already_paid(self):
+        from order.signals import order_paid
+
+        order = OrderFactory(
+            status=OrderStatus.DELIVERED,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = BoxNowShipmentFactory(
+            order=order, with_parcel=True, payment_mode="cod"
+        )
+
+        fired: list[int] = []
+
+        def _listener(sender, order, **kwargs):
+            fired.append(order.id)
+
+        order_paid.connect(_listener, dispatch_uid="test.boxnow_no_refire")
+        try:
+            BoxNowService.apply_webhook_event(
+                _build_envelope(parcel_id=shipment.parcel_id, event="delivered")
+            )
+        finally:
+            order_paid.disconnect(dispatch_uid="test.boxnow_no_refire")
+
+        assert fired == []

@@ -1510,36 +1510,46 @@ def cancel_mydata_invoice(self, order_id: int) -> bool:
     retry_jitter=True,
 )
 def check_pending_orders() -> int:
-    try:
-        now = timezone.now()
-        one_day_ago = now - timedelta(days=1)
-        max_reminders = Setting.get(
-            "PENDING_ORDER_REMINDER_MAX_COUNT", default=3
+    now = timezone.now()
+    one_day_ago = now - timedelta(days=1)
+    max_reminders = Setting.get("PENDING_ORDER_REMINDER_MAX_COUNT", default=3)
+    reminder_intervals = [
+        Setting.get(
+            f"PENDING_ORDER_REMINDER_INTERVAL_DAYS_{i}",
+            default=d,
         )
-        reminder_intervals = [
-            Setting.get(
-                f"PENDING_ORDER_REMINDER_INTERVAL_DAYS_{i}",
-                default=d,
+        for i, d in [(1, 1), (2, 3), (3, 7)]
+    ]
+    # Online payments only: a PENDING online order means the customer
+    # abandoned checkout and can still come back and pay. Offline
+    # orders (COD) sit PENDING only when voucher creation failed — an
+    # ops problem the shipping alerts surface; mailing the customer
+    # "complete your order" for those is wrong-audience (prod orders
+    # 31/36/38/39 received exactly that in April 2026 while stuck on
+    # a failed ACS mint).
+    pending_orders = Order.objects.filter(
+        status=OrderStatus.PENDING,
+        created_at__lt=one_day_ago,
+        reminder_count__lt=max_reminders,
+        pay_way__is_online_payment=True,
+    )
+
+    count = 0
+    for order in pending_orders:
+        if order.last_reminder_sent_at:
+            interval_index = min(
+                order.reminder_count,
+                len(reminder_intervals) - 1,
             )
-            for i, d in [(1, 1), (2, 3), (3, 7)]
-        ]
-        pending_orders = Order.objects.filter(
-            status=OrderStatus.PENDING,
-            created_at__lt=one_day_ago,
-            reminder_count__lt=max_reminders,
-        )
+            cooldown = timedelta(days=reminder_intervals[interval_index])
+            if now - order.last_reminder_sent_at < cooldown:
+                continue
 
-        count = 0
-        for order in pending_orders:
-            if order.last_reminder_sent_at:
-                interval_index = min(
-                    order.reminder_count,
-                    len(reminder_intervals) - 1,
-                )
-                cooldown = timedelta(days=reminder_intervals[interval_index])
-                if now - order.last_reminder_sent_at < cooldown:
-                    continue
-
+        # Per-order isolation: one undeliverable address must not
+        # starve every later order's reminder (the old whole-loop
+        # try/except also swallowed setup errors, defeating the
+        # task-level autoretry).
+        try:
             context = {
                 "order": order,
                 "SITE_NAME": settings.SITE_NAME,
@@ -1588,15 +1598,14 @@ def check_pending_orders() -> int:
             )
 
             count += 1
+        except Exception:
+            logger.error(
+                "Pending-order reminder failed for order %s",
+                order.id,
+                exc_info=True,
+            )
 
-        return count
-
-    except Exception as e:
-        logger.error(
-            f"Error checking pending orders: {e!s}",
-            extra={"error": str(e)},
-        )
-        return 0
+    return count
 
 
 @shared_task(

@@ -1189,6 +1189,7 @@ class AcsService:
         *,
         cod_payment_date: date | None = None,
         user_locals: str = "GR",
+        silent_for_customer: bool = False,
     ) -> dict[str, int]:
         """Mirror ACS_COD_Beneficiary_Info into AcsCodPayout rows.
 
@@ -1197,13 +1198,31 @@ class AcsService:
         matching voucher number is found locally — accounting can then
         join through to the originating ``Order`` for reconciliation.
 
-        Returns a counters dict for the Celery task to log.
+        Per the ACS PDF ("ACS_COD_Beneficiary_Info" demo response) the
+        payout row carries the voucher number in ``POD`` — there is NO
+        ``Voucher_No`` column (the original implementation assumed one
+        and silently skipped every real payout row for 10 weeks; prod,
+        discovered 2026-07-11). ``Customer_RefNo_1`` /
+        ``Customer_RefNo_2`` echo the ``Reference_Key1/2`` we send at
+        voucher mint (``order.id`` / ``order.uuid``) and serve as
+        fallback match keys when ``POD`` is empty or unknown.
+
+        ``silent_for_customer=True`` suppresses the customer-facing
+        COMPLETED email/toast for orders flipped by this run — used by
+        the backfill management command so weeks-old orders don't
+        suddenly email customers. The nightly beat task keeps the
+        default (a next-day COMPLETED message is intended behaviour).
+
+        Returns a counters dict for the Celery task to log; ``skipped``
+        rows (no voucher and no reference match) additionally alert
+        ADMINS because unmatched payout money must be investigated.
         """
         # Lazy import — keeps service-module import cheap when COD is
         # not used and avoids forcing the full Money/decimal stack on
         # callers that only need shipment-related helpers.
         from decimal import Decimal
 
+        from django.core.exceptions import ValidationError
         from djmoney.money import Money
 
         from shipping_acs.models import AcsCodPayout
@@ -1218,10 +1237,50 @@ class AcsService:
 
         upserted = 0
         linked = 0
+        skipped = 0
         for row in rows:
-            voucher_no = row.get("Voucher_No") or row.get("voucher_no") or ""
-            voucher_no = str(voucher_no).strip()
+            # ``POD`` carries the voucher number on the wire (ACS PDF,
+            # ACS_COD_Beneficiary_Info Table_Data schema).
+            voucher_no = str(row.get("POD") or "").strip()
+
+            shipment = None
+            if voucher_no:
+                shipment = AcsShipment.objects.filter(
+                    voucher_no=voucher_no
+                ).first()
+            if shipment is None:
+                ref1 = str(row.get("Customer_RefNo_1") or "").strip()
+                if ref1.isdigit():
+                    shipment = AcsShipment.objects.filter(
+                        order_id=int(ref1)
+                    ).first()
+            if shipment is None:
+                ref2 = str(row.get("Customer_RefNo_2") or "").strip()
+                if ref2:
+                    try:
+                        shipment = AcsShipment.objects.filter(
+                            order__uuid=ref2
+                        ).first()
+                    except (ValidationError, ValueError):
+                        shipment = None
+            # When a shipment matched, its voucher number is canonical
+            # for the payout row — covers both an empty POD (Greek PDF
+            # demo shows one) and a POD value we failed to recognise.
+            if shipment is not None and shipment.voucher_no:
+                voucher_no = shipment.voucher_no
+
             if not voucher_no:
+                skipped += 1
+                logger.warning(
+                    "reconcile_cod_payouts: unmatched payout row — "
+                    "POD=%r Customer_RefNo_1=%r Customer_RefNo_2=%r "
+                    "Parcel_COD_Amount=%r Parcel_Delivery_Date=%r",
+                    row.get("POD"),
+                    row.get("Customer_RefNo_1"),
+                    row.get("Customer_RefNo_2"),
+                    row.get("Parcel_COD_Amount"),
+                    row.get("Parcel_Delivery_Date"),
+                )
                 continue
 
             payment_date = parse_datetime(row.get("COD_Payment_Date") or "")
@@ -1229,7 +1288,6 @@ class AcsService:
                 payment_date.date() if payment_date else cod_payment_date
             )
 
-            shipment = AcsShipment.objects.filter(voucher_no=voucher_no).first()
             if shipment is not None:
                 linked += 1
 
@@ -1280,12 +1338,65 @@ class AcsService:
             # PENDING; re-runs of a payout that's already been
             # reconciled are no-ops.
             if shipment is not None:
-                cls._mark_cod_order_paid_if_pending(shipment)
+                cls._mark_cod_order_paid_if_pending(
+                    shipment, silent_for_customer=silent_for_customer
+                )
 
-        return {"upserted": upserted, "linked": linked, "rows": len(rows)}
+        if skipped:
+            cls._alert_admins_unmatched_payouts(
+                skipped=skipped, cod_payment_date=cod_payment_date
+            )
+
+        return {
+            "upserted": upserted,
+            "linked": linked,
+            "skipped": skipped,
+            "rows": len(rows),
+        }
+
+    @staticmethod
+    def _alert_admins_unmatched_payouts(
+        *, skipped: int, cod_payment_date: date | None
+    ) -> None:
+        """Email ADMINS about payout rows we could not attribute.
+
+        Unmatched rows mean ACS remitted COD money we can't tie to an
+        order — silently dropping them is how the original Voucher_No
+        mapping bug went unnoticed for 10 weeks. Best-effort: an SMTP
+        failure must not fail the reconcile itself (the payout rows
+        that did match are already persisted).
+        """
+        from django.conf import settings
+        from django.core.mail import mail_admins
+
+        if not settings.ADMINS:
+            return
+        try:
+            mail_admins(
+                subject=(
+                    f"ACS COD reconcile: {skipped} unmatched payout row(s)"
+                ),
+                message=(
+                    f"{skipped} payout row(s) for COD_Payment_Date="
+                    f"{cod_payment_date or 'unspecified'} could not be "
+                    "matched to any AcsShipment (no POD voucher match and "
+                    "no Customer_RefNo_1/2 order match). See the "
+                    "celery-worker logs (reconcile_cod_payouts warnings) "
+                    "for the row details and reconcile manually against "
+                    "the ACS COD beneficiary report."
+                ),
+            )
+        except Exception as exc:
+            logger.error(
+                "reconcile_cod_payouts: failed to send unmatched-payout "
+                "admin alert: %s",
+                exc,
+            )
 
     @classmethod
-    def _mark_cod_order_paid_if_pending(cls, shipment: AcsShipment) -> None:
+    def _mark_cod_order_paid_if_pending(
+        cls, shipment: AcsShipment, *, silent_for_customer: bool = False
+    ) -> None:
         """Flip the linked order from PENDING payment to COMPLETED.
 
         Mirrors what ``Order.mark_as_paid`` does for online payments,
@@ -1324,7 +1435,9 @@ class AcsService:
         # double-fire (e.g. a payout being upserted twice) results in
         # one Meta event, not two.
         order_paid.send(sender=type(order), order=order)
-        OrderService.maybe_advance_to_completed(order)
+        OrderService.maybe_advance_to_completed(
+            order, silent_for_customer=silent_for_customer
+        )
 
     # ------------------------------------------------------------------
     # Private helpers — order status

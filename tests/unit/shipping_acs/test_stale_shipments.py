@@ -95,6 +95,26 @@ class TestCheckStaleAcsShipments:
         assert result == {"alerted": 0}
         assert not mock_mail.called
 
+    def test_alerts_stranded_mint_after_24h(self, admins_configured):
+        """A shipment stuck in ``pending_creation`` for over a day
+        means the voucher mint failed permanently (prod order 143
+        stranded 10 days) — it must appear in the digest even though
+        it has no voucher."""
+        shipment = AcsShipmentFactory(
+            shipment_state=AcsShipmentState.PENDING_CREATION
+        )
+        AcsShipment.objects.filter(pk=shipment.pk).update(
+            created_at=timezone.now() - timedelta(days=2)
+        )
+
+        with patch("django.core.mail.mail_admins") as mock_mail:
+            result = check_stale_acs_shipments.run()
+
+        assert result["alerted"] == 1
+        assert mock_mail.called
+        shipment.refresh_from_db()
+        assert shipment.stale_alert_sent is True
+
     def test_no_admins_releases_claim(self, settings):
         settings.ADMINS = []
         shipment = _stale_shipment()

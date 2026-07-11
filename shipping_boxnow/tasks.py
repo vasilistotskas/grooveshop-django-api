@@ -65,7 +65,10 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
     except BoxNowAPIError as exc:
         # P-coded business error from BoxNow (e.g. P402 invalid locker,
         # P410 order number conflict). Do not retry — manual intervention
-        # is required.
+        # is required, so tell a human immediately (prod order 143 sat
+        # invisible for 10 days on the equivalent ACS path).
+        from shipping.alerts import alert_admins_shipment_creation_failed
+
         logger.error(
             "BoxNow business error for order %s: %s",
             order_id,
@@ -75,6 +78,9 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
                 "boxnow_code": exc.code,
                 "boxnow_status": exc.status_code,
             },
+        )
+        alert_admins_shipment_creation_failed(
+            order_id=order_id, carrier="BoxNow", error=str(exc)
         )
         return {
             "status": "boxnow_api_error",

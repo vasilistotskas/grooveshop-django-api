@@ -17,7 +17,7 @@ from parler.admin import TranslatableAdmin
 from simple_history.admin import SimpleHistoryAdmin
 from unfold.admin import TabularInline
 
-from admin.base import BaseModelAdmin
+from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
@@ -26,12 +26,21 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
-from unfold.decorators import action
+from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
-from admin.export import ExportModelAdmin
+from admin.displays import (
+    REVIEW_STATUS_VARIANT,
+    choice_label,
+    format_dt,
+    header_two_line,
+    money,
+    relative_time,
+)
+from admin.export import ExportActionMixin
 from core.forms.measurement import MeasurementWidget
 from core.units import WeightUnits
+from product.enum.category import CategoryImageTypeEnum
 from product.enum.review import ReviewStatus
 from product.forms import ApplyDiscountForm
 from product.models.attribute import Attribute
@@ -46,6 +55,36 @@ from product.models.product_attribute import ProductAttribute
 from product.models.review import ProductReview
 from product.models.variant_group import ProductVariantGroup
 from tag.admin import TaggedItemInline
+
+# ── Local (single-app) TextChoices/synthetic-status variant maps ──────
+# Stock status and reservation status are derived states (not backed
+# by a TextChoices field), and category image type only appears in
+# this app — kept local rather than promoted to admin.displays.
+
+STOCK_STATUS_VARIANT: dict[str, str] = {
+    "out": "danger",
+    "critical": "warning",
+    "low": "warning",
+    "in_stock": "success",
+}
+
+STOCK_RESERVATION_STATUS_VARIANT: dict[str, str] = {
+    "consumed": "info",
+    "pending": "warning",
+}
+
+CATEGORY_IMAGE_TYPE_VARIANT: dict[str, str] = {
+    CategoryImageTypeEnum.MAIN: "primary",
+    CategoryImageTypeEnum.BANNER: "info",
+    CategoryImageTypeEnum.HERO: "info",
+    CategoryImageTypeEnum.FEATURE: "warning",
+    CategoryImageTypeEnum.PROMOTIONAL: "warning",
+    CategoryImageTypeEnum.SEASONAL: "success",
+    CategoryImageTypeEnum.ICON: "default",
+    CategoryImageTypeEnum.THUMBNAIL: "default",
+    CategoryImageTypeEnum.GALLERY: "default",
+    CategoryImageTypeEnum.BACKGROUND: "default",
+}
 
 
 class StockStatusFilter(DropdownFilter):
@@ -296,53 +335,28 @@ class AttributeValueInline(TabularInline):
 
     @admin.display(description=_("Value"))
     def value_display(self, obj):
-        """Display value with translation."""
         if not obj.pk:
             return "-"
-        value = (
-            obj.safe_translation_getter("value", any_language=True) or "Unnamed"
-        )
-        return format_html(
-            '<div class="text-sm">'
-            '<span class="{status_class}">{status_icon}</span> '
-            '<span class="font-medium text-base-900 dark:text-base-100">{value}</span>'
-            "</div>",
-            status_class=(
-                "text-green-600 dark:text-green-400"
-                if obj.active
-                else "text-red-600 dark:text-red-400"
-            ),
-            status_icon="✓" if obj.active else "✗",
-            value=value,
+        return obj.safe_translation_getter("value", any_language=True) or _(
+            "Unnamed"
         )
 
     @admin.display(description=_("Usage"))
     def usage_count_display(self, obj):
-        """Display count of products using this value."""
         if not obj.pk:
             return "-"
-        count = obj.product_attributes.count()
-        color_class = (
-            "text-blue-600 dark:text-blue-400"
-            if count > 0
-            else "text-base-600 dark:text-base-300"
-        )
-        return format_html(
-            '<span class="text-sm {color_class}">{count} products</span>',
-            color_class=color_class,
-            count=count,
-        )
+        return obj.product_attributes.count()
 
 
 @admin.register(Attribute)
-class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
+class AttributeAdmin(BaseTranslatableAdmin):
     """Admin interface for managing product attributes."""
 
     ordering_field = "sort_order"
     hide_ordering_field = True
     list_display = [
         "attribute_info",
-        "active_status_badge",
+        "active",
         "is_variant",
         "values_count_display",
         "usage_count_display",
@@ -367,9 +381,7 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
         "updated_at",
         "values_count_display",
         "usage_count_display",
-        "attribute_analytics",
     )
-    list_select_related = []
     actions = [
         "activate_attributes",
         "deactivate_attributes",
@@ -380,22 +392,14 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
         (
             _("Attribute Information"),
             {
-                "fields": (
-                    "name",
-                    "active",
-                    "is_variant",
-                ),
+                "fields": ("name", "active", "is_variant"),
                 "classes": ("wide",),
             },
         ),
         (
             _("Statistics"),
             {
-                "fields": (
-                    "values_count_display",
-                    "usage_count_display",
-                    "attribute_analytics",
-                ),
+                "fields": ("values_count_display", "usage_count_display"),
                 "classes": ("collapse",),
             },
         ),
@@ -424,129 +428,26 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
             .prefetch_related("translations", "values")
         )
 
-    @admin.display(description=_("Attribute"))
+    @admin.display(description=_("Attribute"), ordering="translations__name")
     def attribute_info(self, obj):
-        """Display attribute name with icon."""
-        name = (
-            obj.safe_translation_getter("name", any_language=True) or "Unnamed"
+        name = obj.safe_translation_getter("name", any_language=True) or _(
+            "Unnamed"
         )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">📋 {name}</div>'
-            '<div class="text-xs text-base-600 dark:text-base-300">ID: {id}</div>'
-            "</div>",
-            name=name,
-            id=obj.id,
-        )
+        return f"{name} (#{obj.id})"
 
-    @admin.display(description=_("Status"))
-    def active_status_badge(self, obj):
-        """Display active status with badge."""
-        if obj.active:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "✅ Active"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-            "❌ Inactive"
-            "</span>"
-        )
-
-    @admin.display(description=_("Values"))
+    @display(description=_("Values"), ordering="values_count")
     def values_count_display(self, obj):
-        """Display count of attribute values."""
-        count = getattr(obj, "values_count", 0)
-        color_class = (
-            "text-blue-600 dark:text-blue-400"
-            if count > 0
-            else "text-base-600 dark:text-base-300"
-        )
-        return format_html(
-            '<span class="text-sm {color_class}">{count} values</span>',
-            color_class=color_class,
-            count=count,
-        )
+        return getattr(obj, "values_count", 0)
 
-    @admin.display(description=_("Usage"))
+    @display(description=_("Usage"), ordering="usage_count")
     def usage_count_display(self, obj):
-        """Display count of products using this attribute."""
-        count = getattr(obj, "usage_count", 0)
+        return getattr(obj, "usage_count", 0)
 
-        if count > 10:
-            color_class = "text-green-600 dark:text-green-400"
-        elif count > 0:
-            color_class = "text-blue-600 dark:text-blue-400"
-        else:
-            color_class = "text-base-600 dark:text-base-300"
-
-        return format_html(
-            '<span class="text-sm {color_class}">{count} products</span>',
-            color_class=color_class,
-            count=count,
-        )
-
-    @admin.display(description=_("Created"))
+    @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
-        """Display creation date with relative time."""
-        now = timezone.now()
-        diff = now - obj.created_at
-
-        if diff < timedelta(days=1):
-            time_ago = "Today"
-            color = "text-green-600 dark:text-green-400"
-        elif diff < timedelta(days=7):
-            time_ago = f"{diff.days}d ago"
-            color = "text-blue-600 dark:text-blue-400"
-        else:
-            time_ago = obj.created_at.strftime("%Y-%m-%d")
-            color = "text-base-600 dark:text-base-400"
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{date}</div>'
-            '<div class="{color}">{time_ago}</div>'
-            "</div>",
-            date=obj.created_at.strftime("%Y-%m-%d"),
-            color=color,
-            time_ago=time_ago,
-        )
-
-    @admin.display(description=_("Analytics"))
-    def attribute_analytics(self, obj):
-        """Display detailed analytics for the attribute."""
-        if not obj.created_at:
-            return "Available after creation."
-
-        now = timezone.now()
-        age = now - obj.created_at
-        last_updated = now - obj.updated_at
-
-        values_count = getattr(obj, "values_count", 0)
-        usage_count = getattr(obj, "usage_count", 0)
-        active_values = obj.values.filter(active=True).count()
-        inactive_values = values_count - active_values
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Attribute Age:</strong></div><div>{age} days</div>"
-            "<div><strong>Last Updated:</strong></div><div>{updated} days ago</div>"
-            "<div><strong>Total Values:</strong></div><div>{values}</div>"
-            "<div><strong>Active Values:</strong></div><div>{active_values}</div>"
-            "<div><strong>Inactive Values:</strong></div><div>{inactive_values}</div>"
-            "<div><strong>Products Using:</strong></div><div>{usage}</div>"
-            "</div>"
-            "</div>",
-            age=age.days,
-            updated=last_updated.days,
-            values=values_count,
-            active_values=active_values,
-            inactive_values=inactive_values,
-            usage=usage_count,
+        return (
+            f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} "
+            f"({relative_time(obj.created_at)})"
         )
 
     @action(
@@ -589,7 +490,7 @@ class AttributeAdmin(TranslatableAdmin, BaseModelAdmin):
 
 
 @admin.register(AttributeValue)
-class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
+class AttributeValueAdmin(BaseTranslatableAdmin):
     """Admin interface for managing attribute values."""
 
     ordering_field = "sort_order"
@@ -597,7 +498,7 @@ class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
     list_display = [
         "value_info",
         "attribute_display",
-        "active_status_badge",
+        "active",
         "usage_count_display",
         "sort_order",
         "created_display",
@@ -619,7 +520,6 @@ class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
         "created_at",
         "updated_at",
         "usage_count_display",
-        "value_analytics",
     )
     list_select_related = ["attribute"]
     actions = [
@@ -632,21 +532,14 @@ class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
         (
             _("Value Information"),
             {
-                "fields": (
-                    "attribute",
-                    "value",
-                    "active",
-                ),
+                "fields": ("attribute", "value", "active"),
                 "classes": ("wide",),
             },
         ),
         (
             _("Statistics"),
             {
-                "fields": (
-                    "usage_count_display",
-                    "value_analytics",
-                ),
+                "fields": ("usage_count_display",),
                 "classes": ("collapse",),
             },
         ),
@@ -675,128 +568,30 @@ class AttributeValueAdmin(TranslatableAdmin, BaseModelAdmin):
             .prefetch_related("translations", "attribute__translations")
         )
 
-    @admin.display(description=_("Value"))
+    @admin.display(description=_("Value"), ordering="translations__value")
     def value_info(self, obj):
-        """Display value with icon."""
-        value = (
-            obj.safe_translation_getter("value", any_language=True) or "Unnamed"
+        value = obj.safe_translation_getter("value", any_language=True) or _(
+            "Unnamed"
         )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">🏷️ {value}</div>'
-            '<div class="text-xs text-base-600 dark:text-base-300">ID: {id}</div>'
-            "</div>",
-            value=value,
-            id=obj.id,
-        )
+        return f"{value} (#{obj.id})"
 
     @admin.display(description=_("Attribute"))
     def attribute_display(self, obj):
-        """Display parent attribute name."""
-        if obj.attribute:
-            attribute_name = (
-                obj.attribute.safe_translation_getter("name", any_language=True)
-                or "Unnamed"
-            )
-            return format_html(
-                '<span class="text-sm text-base-900 dark:text-base-100">{name}</span>',
-                name=attribute_name,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No Attribute</span>'
-        )
+        if not obj.attribute:
+            return _("No Attribute")
+        return obj.attribute.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed")
 
-    @admin.display(description=_("Status"))
-    def active_status_badge(self, obj):
-        """Display active status with badge."""
-        if obj.active:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "✅ Active"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-            "❌ Inactive"
-            "</span>"
-        )
-
-    @admin.display(description=_("Usage"))
+    @display(description=_("Usage"), ordering="usage_count")
     def usage_count_display(self, obj):
-        """Display count of products using this value."""
-        count = getattr(obj, "usage_count", 0)
+        return getattr(obj, "usage_count", 0)
 
-        if count > 10:
-            color_class = "text-green-600 dark:text-green-400"
-        elif count > 0:
-            color_class = "text-blue-600 dark:text-blue-400"
-        else:
-            color_class = "text-base-600 dark:text-base-300"
-
-        return format_html(
-            '<span class="text-sm {color_class}">{count} products</span>',
-            color_class=color_class,
-            count=count,
-        )
-
-    @admin.display(description=_("Created"))
+    @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
-        """Display creation date with relative time."""
-        now = timezone.now()
-        diff = now - obj.created_at
-
-        if diff < timedelta(days=1):
-            time_ago = "Today"
-            color = "text-green-600 dark:text-green-400"
-        elif diff < timedelta(days=7):
-            time_ago = f"{diff.days}d ago"
-            color = "text-blue-600 dark:text-blue-400"
-        else:
-            time_ago = obj.created_at.strftime("%Y-%m-%d")
-            color = "text-base-600 dark:text-base-400"
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{date}</div>'
-            '<div class="{color}">{time_ago}</div>'
-            "</div>",
-            date=obj.created_at.strftime("%Y-%m-%d"),
-            color=color,
-            time_ago=time_ago,
-        )
-
-    @admin.display(description=_("Analytics"))
-    def value_analytics(self, obj):
-        """Display detailed analytics for the value."""
-        if not obj.created_at:
-            return "Available after creation."
-
-        now = timezone.now()
-        age = now - obj.created_at
-        last_updated = now - obj.updated_at
-
-        usage_count = getattr(obj, "usage_count", 0)
-        attribute_name = (
-            obj.attribute.safe_translation_getter("name", any_language=True)
-            if obj.attribute
-            else "N/A"
-        )
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Value Age:</strong></div><div>{age} days</div>"
-            "<div><strong>Last Updated:</strong></div><div>{updated} days ago</div>"
-            "<div><strong>Parent Attribute:</strong></div><div>{attribute}</div>"
-            "<div><strong>Products Using:</strong></div><div>{usage}</div>"
-            "</div>"
-            "</div>",
-            age=age.days,
-            updated=last_updated.days,
-            attribute=attribute_name,
-            usage=usage_count,
+        return (
+            f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} "
+            f"({relative_time(obj.created_at)})"
         )
 
     @action(
@@ -863,23 +658,10 @@ class ProductAttributeInline(TabularInline):
 class ProductImageInline(TabularInline):
     model = ProductImage
     extra = 0
-    fields = ("image_preview", "image", "is_main")
-    readonly_fields = ("image_preview",)
+    fields = ("image_thumbnail", "image", "is_main")
 
     tab = True
     show_change_link = True
-
-    @admin.display(description=_("Preview"))
-    def image_preview(self, obj):
-        if obj.image:
-            return format_html(
-                '<img src="{url}" '
-                'style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
-                url=obj.image.url,
-            )
-        return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
-        )
 
 
 class StockReservationInline(TabularInline):
@@ -896,15 +678,9 @@ class StockReservationInline(TabularInline):
         "quantity",
         "session_info",
         "expires_display",
-        "status_badge",
+        "status_display",
     )
-    readonly_fields = (
-        "reservation_info",
-        "quantity",
-        "session_info",
-        "expires_display",
-        "status_badge",
-    )
+    readonly_fields = fields
 
     tab = True
     verbose_name = _("Active Stock Reservation")
@@ -925,80 +701,29 @@ class StockReservationInline(TabularInline):
 
     @admin.display(description=_("Reservation"))
     def reservation_info(self, obj):
-        """Display reservation ID and creation time."""
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">#{id}</div>'
-            '<div class="text-xs text-base-600 dark:text-base-300">{created}</div>'
-            "</div>",
-            id=obj.id,
-            created=obj.created_at.strftime("%Y-%m-%d %H:%M"),
-        )
+        return f"#{obj.id} — {format_dt(obj.created_at)}"
 
     @admin.display(description=_("Reserved By"))
     def session_info(self, obj):
-        """Display user or session information."""
         if obj.reserved_by:
-            user_display = obj.reserved_by.email or obj.reserved_by.username
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">👤 {user}</div>'
-                "</div>",
-                user=user_display,
-            )
+            return obj.reserved_by.email or obj.reserved_by.username
         session_short = (
             obj.session_id[:8] if len(obj.session_id) > 8 else obj.session_id
         )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="text-base-600 dark:text-base-400">🔒 Guest: {session}...</div>'
-            "</div>",
-            session=session_short,
-        )
+        return _("Guest: %(session)s…") % {"session": session_short}
 
     @admin.display(description=_("Expires In"))
     def expires_display(self, obj):
-        """Display expiration time with countdown."""
-        now = timezone.now()
-        time_left = obj.expires_at - now
-        minutes_left = int(time_left.total_seconds() / 60)
-
-        if minutes_left <= 2:
-            color_class = "text-red-600 dark:text-red-400"
-            icon = "🔴"
-        elif minutes_left <= 5:
-            color_class = "text-orange-600 dark:text-orange-400"
-            icon = "🟠"
-        else:
-            color_class = "text-green-600 dark:text-green-400"
-            icon = "🟢"
-
-        return format_html(
-            '<div class="text-sm {color_class}">'
-            "{icon} {minutes} min left"
-            "</div>",
-            color_class=color_class,
-            icon=icon,
-            minutes=minutes_left,
+        minutes_left = int(
+            (obj.expires_at - timezone.now()).total_seconds() / 60
         )
+        return _("%(minutes)s min") % {"minutes": minutes_left}
 
-    @admin.display(description=_("Status"))
-    def status_badge(self, obj):
-        """Display reservation status badge."""
-        if obj.order:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-                "📦 Order #{order_id}"
-                "</span>",
-                order_id=obj.order.id,
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
-            "⏳ Pending Checkout"
-            "</span>"
-        )
+    @display(description=_("Status"), label=STOCK_RESERVATION_STATUS_VARIANT)
+    def status_display(self, obj):
+        if obj.order_id:
+            return "consumed", _("Order #%(id)s") % {"id": obj.order_id}
+        return "pending", _("Pending checkout")
 
 
 class StockLogInline(TabularInline):
@@ -1019,14 +744,7 @@ class StockLogInline(TabularInline):
         "performed_by_display",
         "timestamp_display",
     )
-    readonly_fields = (
-        "operation_display",
-        "quantity_change",
-        "stock_levels",
-        "order_link",
-        "performed_by_display",
-        "timestamp_display",
-    )
+    readonly_fields = fields
 
     tab = True
     verbose_name = _("Stock Activity Log")
@@ -1044,120 +762,60 @@ class StockLogInline(TabularInline):
 
     @admin.display(description=_("Operation"))
     def operation_display(self, obj):
-        """Display operation type with icon."""
-        operation_icons = {
-            "RESERVE": "🔒",
-            "RELEASE": "🔓",
-            "DECREMENT": "📉",
-            "INCREMENT": "📈",
-        }
-        color_map = {
-            "RESERVE": "text-blue-600 dark:text-blue-400",
-            "RELEASE": "text-green-600 dark:text-green-400",
-            "DECREMENT": "text-red-600 dark:text-red-400",
-            "INCREMENT": "text-green-600 dark:text-green-400",
-        }
-        return format_html(
-            '<div class="text-sm {color_class} font-medium">'
-            "{icon} {label}"
-            "</div>",
-            color_class=color_map.get(
-                obj.operation_type, "text-base-600 dark:text-base-400"
-            ),
-            icon=operation_icons.get(obj.operation_type, "📝"),
-            label=obj.get_operation_type_display(),
-        )
+        return obj.get_operation_type_display()
 
     @admin.display(description=_("Change"))
     def quantity_change(self, obj):
-        """Display quantity delta with +/- indicator."""
-        delta = obj.quantity_delta
-
-        if delta > 0:
-            return format_html(
-                '<span class="text-sm font-medium text-green-600 dark:text-green-400">'
-                "+{delta}"
-                "</span>",
-                delta=delta,
-            )
-        if delta < 0:
-            return format_html(
-                '<span class="text-sm font-medium text-red-600 dark:text-red-400">'
-                "-{delta}"
-                "</span>",
-                delta=abs(delta),
-            )
-        return mark_safe(
-            '<span class="text-sm text-base-600 dark:text-base-300">0</span>'
-        )
+        return f"{obj.quantity_delta:+d}"
 
     @admin.display(description=_("Stock Level"))
     def stock_levels(self, obj):
-        """Display before/after stock levels."""
-        return format_html(
-            '<div class="text-sm text-base-600 dark:text-base-400">'
-            "{before} → {after}"
-            "</div>",
-            before=obj.stock_before,
-            after=obj.stock_after,
-        )
+        return f"{obj.stock_before} -> {obj.stock_after}"
 
     @admin.display(description=_("Related Order"))
     def order_link(self, obj):
-        """Display linked order if any."""
-        if obj.order:
+        if obj.order_id:
             return format_html(
-                '<a href="{url}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">'
-                "Order #{order_id}"
-                "</a>",
-                url=reverse_lazy(
-                    "admin:order_order_change", args=[obj.order.id]
-                ),
-                order_id=obj.order.id,
+                '<a href="{url}">Order #{id}</a>',
+                url=reverse("admin:order_order_change", args=[obj.order_id]),
+                id=obj.order_id,
             )
-
-        reason = (obj.reason or "N/A")[:45]
-        return format_html(
-            '<span class="text-sm text-base-600 dark:text-base-300">{reason}</span>',
-            reason=reason,
-        )
+        return (obj.reason or "—")[:45]
 
     @admin.display(description=_("By"))
     def performed_by_display(self, obj):
-        """Display who performed the operation."""
         if obj.performed_by:
-            user_display = (
-                obj.performed_by.email or obj.performed_by.username
-            )[:20]
-            return format_html(
-                '<span class="text-sm text-base-600 dark:text-base-400">{user}</span>',
-                user=user_display,
-            )
-        return mark_safe(
-            '<span class="text-sm text-base-600 dark:text-base-300">System</span>'
-        )
+            return (obj.performed_by.email or obj.performed_by.username)[:20]
+        return _("System")
 
     @admin.display(description=_("Time"))
     def timestamp_display(self, obj):
-        """Display operation timestamp."""
-        return format_html(
-            '<span class="text-sm text-base-600 dark:text-base-300">{ts}</span>',
-            ts=obj.created_at.strftime("%m/%d %H:%M"),
-        )
+        return format_dt(obj.created_at, fmt="%d/%m %H:%M")
 
 
 @admin.register(Product)
 class ProductAdmin(
-    TranslatableAdmin, ExportModelAdmin, SimpleHistoryAdmin, BaseModelAdmin
+    TranslatableAdmin, ExportActionMixin, SimpleHistoryAdmin, BaseModelAdmin
 ):
+    """Parler owns forms/urls (first in the MRO, matching
+    ``BaseTranslatableAdmin``'s contract). ``ExportActionMixin`` only
+    adds CSV/XML export actions (no cooperative-``super()`` methods
+    of its own) and ``SimpleHistoryAdmin`` adds the audit-history
+    view — neither redefines unfold's plumbing, so both sit between
+    parler and ``BaseModelAdmin`` without breaking either chain. This
+    is the same relative ordering the project used before the unfold
+    conversion; only ``ExportModelAdmin`` (which re-extends unfold's
+    ``ModelAdmin``, duplicating ``BaseModelAdmin``'s bases) was
+    swapped for the plain ``ExportActionMixin``.
+    """
+
     list_display = [
         "product_info",
         "category_display",
         "variant_group_display",
         "pricing_info",
-        "stock_info",
-        "performance_metrics",
-        "status_badges",
+        "stock_status",
+        "active",
         "created_display",
     ]
     search_fields = [
@@ -1204,9 +862,6 @@ class ProductAdmin(
         "updated_at",
         "view_count",
         "likes_count",
-        "product_analytics",
-        "pricing_summary",
-        "performance_summary",
         "stock_reservation_summary",
     )
     list_select_related = ["category", "vat", "brand", "changed_by"]
@@ -1254,7 +909,6 @@ class ProductAdmin(
                     "price",
                     "discount_percent",
                     "vat",
-                    "pricing_summary",
                     "stock",
                     "weight",
                     "low_stock_threshold",
@@ -1314,12 +968,7 @@ class ProductAdmin(
         (
             _("Performance"),
             {
-                "fields": (
-                    "view_count",
-                    "likes_count",
-                    "performance_summary",
-                    "product_analytics",
-                ),
+                "fields": ("view_count", "likes_count"),
                 "classes": ("tab",),
             },
         ),
@@ -1358,7 +1007,12 @@ class ProductAdmin(
         # ``Product.likes_count`` / ``review_average`` properties
         # already fall back to per-row queries when no annotation is
         # present, so removing the unconditional annotation just shifts
-        # the cost from "2.4s once" to "~1ms × 25 rows = ~25ms".
+        # the cost from "2.4s once" to "~1ms × 25 rows = ~25ms". These
+        # two properties are no longer rendered as a list_display column
+        # at all (dropped along with ``performance_metrics`` — see
+        # ``PopularityFilter``/the "Performance" fieldset for where
+        # views/likes/rating are still surfaced), but the conditional
+        # annotation stays for the filter/ordering paths above.
         qs = super().get_queryset(request)
 
         # Check if we need likes_count or review_average based on filters/ordering
@@ -1412,9 +1066,6 @@ class ProductAdmin(
                 active_reservations,
                 variant_siblings,
                 "variant_group__translations",
-                Prefetch(
-                    "category__parent", queryset=ProductCategory.objects.all()
-                ),
             )
             .only(
                 # Only load fields we actually display
@@ -1438,65 +1089,31 @@ class ProductAdmin(
     def get_prepopulated_fields(self, request, obj=None):
         return {"slug": ("name",)}
 
-    @admin.display(description=_("Product"))
+    @display(
+        description=_("Product"), header=True, ordering="translations__name"
+    )
     def product_info(self, obj):
-        name = (
-            obj.safe_translation_getter("name", any_language=True)
-            or "Untitled Product"
+        name = obj.safe_translation_getter("name", any_language=True) or _(
+            "Untitled Product"
         )
         main_images = getattr(obj, "main_images_list", [])
         main_image = main_images[0] if main_images else None
-
-        if main_image and main_image.image:
-            image_html = format_html(
-                '<img src="{url}" '
-                'style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb; margin-right: 12px;" />',
-                url=main_image.image.url,
-            )
-        else:
-            image_html = mark_safe(
-                '<div style="width: 50px; height: 50px; background: #f3f4f6; border-radius: 8px; border: 1px solid #e5e7eb; margin-right: 12px; display: flex; align-items: center; justify-content: center; color: #9ca3af; font-size: 20px;">📦</div>'
-            )
-
-        return format_html(
-            '<div style="display: flex; align-items: center;">'
-            "{image_html}"
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">#{sku}</div>'
-            "</div>"
-            "</div>",
-            image_html=image_html,
-            name=name,
-            sku=obj.sku[:8],
+        image_path = (
+            main_image.image.url if main_image and main_image.image else None
+        )
+        return header_two_line(
+            name, f"SKU {obj.sku[:8]}", image_path=image_path
         )
 
-    @admin.display(description=_("Category"))
+    @admin.display(
+        description=_("Category"), ordering="category__translations__name"
+    )
     def category_display(self, obj):
-        if obj.category:
-            category_name = (
-                obj.category.safe_translation_getter("name", any_language=True)
-                or "Unnamed"
-            )
-            category_path = " → ".join(
-                [
-                    cat.safe_translation_getter("name", any_language=True)
-                    or "Unnamed"
-                    for cat in obj.category.get_ancestors()
-                ]
-            )
-
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-                '<div class="text-xs text-base-600 dark:text-base-300">{path}</div>'
-                "</div>",
-                name=category_name,
-                path=category_path or "Root",
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No Category</span>'
-        )
+        if not obj.category:
+            return "—"
+        return obj.category.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed")
 
     @admin.display(description=_("Variants"))
     def variant_group_display(self, obj):
@@ -1504,9 +1121,7 @@ class ProductAdmin(
         group page, with the sibling count. Reads only prefetched data."""
         group = obj.variant_group
         if group is None:
-            return mark_safe(
-                '<span class="text-base-400 dark:text-base-500">—</span>'
-            )
+            return "—"
         name = (
             group.safe_translation_getter("name", any_language=True)
             or f"Group #{group.pk}"
@@ -1514,10 +1129,7 @@ class ProductAdmin(
         # len() over the prefetch cache — no per-row COUNT query.
         siblings = len(group.variants.all())
         return format_html(
-            '<div class="text-sm">'
-            '<a href="{url}" class="font-medium text-base-900 dark:text-base-100">🎨 {name}</a>'
-            '<div class="text-xs text-base-600 dark:text-base-300">{count} {label}</div>'
-            "</div>",
+            '<a href="{url}">{name}</a> ({count} {label})',
             url=reverse(
                 "admin:product_productvariantgroup_change", args=[group.pk]
             ),
@@ -1526,415 +1138,90 @@ class ProductAdmin(
             label=_("variants"),
         )
 
-    @admin.display(description=_("Pricing"))
+    @admin.display(description=_("Pricing"), ordering="price")
     def pricing_info(self, obj):
-        price = obj.price
-        final_price = obj.final_price
-        discount = obj.discount_percent
-
-        price_class = (
-            "text-base-600 dark:text-base-300 line-through"
-            if discount > 0
-            else "font-bold text-base-900 dark:text-base-100"
-        )
-
-        if discount > 0:
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="{price_class}">{price}</div>'
-                '<div class="font-bold text-green-600 dark:text-green-400">{final}</div>'
-                '<div class="text-xs text-red-600 dark:text-red-400">-{discount}%</div>'
-                "</div>",
-                price_class=price_class,
-                price=str(price),
-                final=str(final_price),
-                discount=discount,
-            )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="{price_class}">{price}</div>'
-            "</div>",
-            price_class=price_class,
-            price=str(price),
-        )
-
-    @admin.display(description=_("Stock"))
-    def stock_info(self, obj):
-        stock = obj.stock
-
-        reserved_qty = sum(
-            reservation.quantity
-            for reservation in getattr(obj, "active_reservations_list", [])
-        )
-        available_stock = stock - reserved_qty
-
-        if stock == 0:
-            stock_badge = mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "❌ Out of Stock"
-                "</span>"
-            )
-        elif stock <= 5:
-            stock_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "⚠️ Critical ({stock})"
-                "</span>",
-                stock=stock,
-            )
-        elif stock <= 10:
-            stock_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
-                "🔶 Low ({stock})"
-                "</span>",
-                stock=stock,
-            )
-        else:
-            stock_badge = format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "✅ In Stock ({stock})"
-                "</span>",
-                stock=stock,
-            )
-
-        if reserved_qty > 0:
-            reservation_info = format_html(
-                '<div class="text-xs text-blue-600 dark:text-blue-400 mt-1">'
-                "🔒 {reserved} reserved"
-                "</div>"
-                '<div class="text-xs text-green-600 dark:text-green-400">'
-                "✓ {available} available"
-                "</div>",
-                reserved=reserved_qty,
-                available=available_stock,
-            )
-        else:
-            reservation_info = ""
-
-        return format_html(
-            '<div class="text-sm">{badge}{info}</div>',
-            badge=stock_badge,
-            info=reservation_info,
-        )
-
-    @admin.display(description=_("Performance"))
-    def performance_metrics(self, obj):
-        views = obj.view_count
-        likes = obj.likes_count
-        rating = obj.review_average
-        rating_formatted = "{:.1f}".format(float(rating))
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="text-base-600 dark:text-base-400">👁️ {views}</div>'
-            '<div class="text-base-600 dark:text-base-400">❤️ {likes}</div>'
-            '<div class="text-base-600 dark:text-base-400">⭐ {rating}/10</div>'
-            "</div>",
-            views=views,
-            likes=likes,
-            rating=rating_formatted,
-        )
-
-    @admin.display(description=_("Status"))
-    def status_badges(self, obj):
-        badges = []
-
-        if obj.active:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full border border-green-200 dark:border-green-700" title="Product is active and visible to customers">'
-                    "✅ Active"
-                    "</span>"
-                )
-            )
-        else:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full border border-red-200 dark:border-red-700" title="Product is inactive and hidden from customers">'
-                    "❌ Inactive"
-                    "</span>"
-                )
-            )
-
-        if obj.stock <= 0:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-300 rounded-full border border-gray-200 dark:border-gray-700" title="Product is out of stock">'
-                    "📦 Out of Stock"
-                    "</span>"
-                )
-            )
-        elif obj.stock <= 10:
-            badges.append(
-                format_html(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full border border-yellow-200 dark:border-yellow-700" title="Low stock - only {stock} units remaining">'
-                    "⚠️ Low Stock"
-                    "</span>",
-                    stock=obj.stock,
-                )
-            )
-
         if obj.discount_percent > 0:
-            badges.append(
-                format_html(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full border border-orange-200 dark:border-orange-700" title="Product has {discount}% discount applied">'
-                    "🏷️ {discount}% OFF"
-                    "</span>",
-                    discount=obj.discount_percent,
-                )
-            )
+            return _("%(price)s -> %(final)s (-%(discount)s%%)") % {
+                "price": money(obj.price.amount),
+                "final": money(obj.final_price.amount),
+                "discount": obj.discount_percent,
+            }
+        return money(obj.price.amount)
 
-        thirty_days_ago = timezone.now() - timedelta(days=30)
-        if obj.created_at >= thirty_days_ago:
-            days_old = (timezone.now() - obj.created_at).days
-            badges.append(
-                format_html(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-700" title="Product added {days} days ago">'
-                    "🆕 New"
-                    "</span>",
-                    days=days_old,
-                )
-            )
+    @display(
+        description=_("Stock"), label=STOCK_STATUS_VARIANT, ordering="stock"
+    )
+    def stock_status(self, obj):
+        stock = obj.stock
+        if stock == 0:
+            return "out", _("Out of stock")
+        if stock <= 5:
+            return "critical", _("Critical (%(stock)s)") % {"stock": stock}
+        if stock <= 10:
+            return "low", _("Low (%(stock)s)") % {"stock": stock}
+        return "in_stock", _("In stock (%(stock)s)") % {"stock": stock}
 
-        if hasattr(obj, "is_featured") and obj.is_featured:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full border border-purple-200 dark:border-purple-700" title="This product is featured on the homepage">'
-                    "⭐ Featured"
-                    "</span>"
-                )
-            )
-
-        views = obj.view_count
-        if views > 100:
-            badges.append(
-                format_html(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full border border-indigo-200 dark:border-indigo-700" title="Product has {views} views - performing well">'
-                    "🔥 Popular"
-                    "</span>",
-                    views=views,
-                )
-            )
-
-        return format_html(
-            '<div class="flex flex-wrap gap-1">{badges}</div>',
-            badges=format_html_join("", "{}", ((b,) for b in badges)),
-        )
-
-    @admin.display(description=_("Created"))
+    @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
-        now = timezone.now()
-        diff = now - obj.created_at
-
-        if diff < timedelta(days=1):
-            time_ago = "Today"
-            color = "text-green-600 dark:text-green-400"
-        elif diff < timedelta(days=7):
-            time_ago = f"{diff.days}d ago"
-            color = "text-blue-600 dark:text-blue-400"
-        else:
-            time_ago = obj.created_at.strftime("%Y-%m-%d")
-            color = "text-base-600 dark:text-base-400"
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{date}</div>'
-            '<div class="{color}">{time_ago}</div>'
-            "</div>",
-            date=obj.created_at.strftime("%Y-%m-%d"),
-            color=color,
-            time_ago=time_ago,
-        )
-
-    @admin.display(description=_("Pricing Summary"))
-    def pricing_summary(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Base Price:</strong></div><div>{price}</div>"
-            "<div><strong>Discount %:</strong></div><div>{discount}%</div>"
-            "<div><strong>Discount Value:</strong></div><div>{discount_val}</div>"
-            "<div><strong>VAT %:</strong></div><div>{vat_pct}%</div>"
-            "<div><strong>VAT Value:</strong></div><div>{vat_val}</div>"
-            '<div><strong>Final Price:</strong></div><div class="font-bold">{final}</div>'
-            "</div>"
-            "</div>",
-            price=str(obj.price),
-            discount=obj.discount_percent,
-            discount_val=str(obj.discount_value),
-            vat_pct=obj.vat_percent,
-            vat_val=str(obj.vat_value),
-            final=str(obj.final_price),
-        )
-
-    @admin.display(description=_("Performance Summary"))
-    def performance_summary(self, obj):
-        views = obj.view_count
-        likes = obj.likes_count
-        rating = obj.review_average
-        review_count = obj.review_count
-        favorites_count = obj.favourited_by.count()
-
-        rating_formatted = "{:.1f}".format(float(rating))
-        engagement_formatted = "%.1f" % (
-            ((likes + favorites_count) / max(views, 1)) * 100
-        )
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Total Views:</strong></div><div>{views}</div>"
-            "<div><strong>Likes:</strong></div><div>{likes}</div>"
-            "<div><strong>Favorites:</strong></div><div>{favorites}</div>"
-            "<div><strong>Reviews:</strong></div><div>{reviews}</div>"
-            "<div><strong>Avg Rating:</strong></div><div>{rating}/10</div>"
-            "<div><strong>Engagement:</strong></div><div>{engagement}%</div>"
-            "</div>"
-            "</div>",
-            views=views,
-            likes=likes,
-            favorites=favorites_count,
-            reviews=review_count,
-            rating=rating_formatted,
-            engagement=engagement_formatted,
+        return (
+            f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} "
+            f"({relative_time(obj.created_at)})"
         )
 
     @admin.display(description=_("Stock Reservation Summary"))
     def stock_reservation_summary(self, obj):
-        """Display stock reservation statistics and recent activity."""
+        """Active reservations + last-7-days stock ops, with a link to
+        the full stock-history chart (``stock_history_view``)."""
         from order.models.stock_reservation import StockReservation
         from order.models.stock_log import StockLog
 
         now = timezone.now()
 
-        # Get active reservations count and total quantity
         active_reservations = StockReservation.objects.filter(
             product=obj, expires_at__gt=now, consumed=False
         )
-
         reservation_count = active_reservations.count()
         reserved_qty = (
             active_reservations.aggregate(total=Sum("quantity"))["total"] or 0
         )
         available_stock = obj.stock - reserved_qty
 
-        # Get recent stock operations count (last 7 days)
         seven_days_ago = now - timedelta(days=7)
-        recent_operations = StockLog.objects.filter(
-            product=obj, created_at__gte=seven_days_ago
+        ops_by_type = dict(
+            StockLog.objects.filter(product=obj, created_at__gte=seven_days_ago)
+            .values_list("operation_type")
+            .annotate(count=Count("id"))
         )
-
-        operations_count = recent_operations.count()
-        reserve_count = recent_operations.filter(
-            operation_type="RESERVE"
-        ).count()
-        release_count = recent_operations.filter(
-            operation_type="RELEASE"
-        ).count()
-        decrement_count = recent_operations.filter(
-            operation_type="DECREMENT"
-        ).count()
-        increment_count = recent_operations.filter(
-            operation_type="INCREMENT"
-        ).count()
-
-        # Calculate reservation percentage
-        reservation_pct = (
-            (reserved_qty / max(obj.stock, 1)) * 100 if obj.stock > 0 else 0
-        )
-
-        if reservation_pct > 50:
-            pct_color = "text-red-600 dark:text-red-400"
-        elif reservation_pct > 25:
-            pct_color = "text-orange-600 dark:text-orange-400"
-        else:
-            pct_color = "text-green-600 dark:text-green-400"
 
         history_url = reverse(
             "admin:product_product_stock_history", args=[obj.pk]
         )
 
         return format_html(
-            '<div class="text-sm">'
-            '<div class="mb-3">'
-            '<h4 class="font-semibold text-base-900 dark:text-base-100 mb-2">Current Stock Status</h4>'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Total Stock:</strong></div><div>{stock}</div>"
-            '<div><strong>Reserved:</strong></div><div class="text-blue-600 dark:text-blue-400">{reserved}</div>'
-            '<div><strong>Available:</strong></div><div class="text-green-600 dark:text-green-400">{available}</div>'
-            "<div><strong>Active Reservations:</strong></div><div>{res_count}</div>"
-            '<div><strong>Reserved %:</strong></div><div class="{pct_color} font-medium">{res_pct}%</div>'
-            "</div>"
-            "</div>"
-            "<div>"
-            '<h4 class="font-semibold text-base-900 dark:text-base-100 mb-2">Recent Activity (7 days)</h4>'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Total Operations:</strong></div><div>{ops_count}</div>"
-            "<div><strong>🔒 Reserves:</strong></div><div>{reserve}</div>"
-            "<div><strong>🔓 Releases:</strong></div><div>{release}</div>"
-            "<div><strong>📉 Decrements:</strong></div><div>{decrement}</div>"
-            "<div><strong>📈 Increments:</strong></div><div>{increment}</div>"
-            "</div>"
-            "</div>"
-            '<div class="mt-3"><a href="{history_url}" '
-            'class="inline-flex items-center gap-1 rounded-md border border-gray-300 '
-            "bg-white px-3 py-1.5 text-xs font-medium text-gray-700 "
-            "hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 "
-            'dark:text-gray-200 dark:hover:bg-gray-700">{history_label}</a></div>'
-            "</div>",
-            stock=obj.stock,
-            reserved=reserved_qty,
-            available=available_stock,
-            res_count=reservation_count,
-            pct_color=pct_color,
-            res_pct=f"{reservation_pct:.1f}",
-            ops_count=operations_count,
-            reserve=reserve_count,
-            release=release_count,
-            decrement=decrement_count,
-            increment=increment_count,
-            history_url=history_url,
-            history_label=str(_("Open full stock history chart →")),
-        )
-
-    @admin.display(description=_("Product Analytics"))
-    def product_analytics(self, obj):
-        if not obj.created_at:
-            return "Available after creation."
-
-        now = timezone.now()
-        age = now - obj.created_at
-        last_updated = now - obj.updated_at
-
-        views = obj.view_count
-        likes = obj.likes_count
-        engagement_rate = (likes / max(views, 1)) * 100
-        engagement_formatted = "{:.1f}".format(engagement_rate)
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Product Age:</strong></div><div>{age}d</div>"
-            "<div><strong>Last Updated:</strong></div><div>{updated}d ago</div>"
-            "<div><strong>Stock Value:</strong></div><div>{stock_value}</div>"
-            "<div><strong>Engagement Rate:</strong></div><div>{engagement}%</div>"
-            "<div><strong>Has Images:</strong></div><div>{has_images}</div>"
-            "<div><strong>Has Reviews:</strong></div><div>{has_reviews}</div>"
-            "<div><strong>In Category:</strong></div><div>{in_category}</div>"
-            "<div><strong>Changed By:</strong></div><div>{changed_by}</div>"
-            "</div>"
-            "</div>",
-            age=age.days,
-            updated=last_updated.days,
-            stock_value=str(obj.final_price.amount * obj.stock),
-            engagement=engagement_formatted,
-            has_images="Yes" if obj.images.exists() else "No",
-            has_reviews="Yes" if obj.reviews.exists() else "No",
-            in_category="Yes" if obj.category else "No",
-            changed_by=obj.changed_by.email if obj.changed_by else "System",
+            "<p>{stock_line}</p><p>{ops_line}</p>"
+            '<p><a href="{url}">{label}</a></p>',
+            stock_line=_(
+                "Stock %(stock)s — reserved %(reserved)s, available "
+                "%(available)s across %(count)s active reservation(s)."
+            )
+            % {
+                "stock": obj.stock,
+                "reserved": reserved_qty,
+                "available": available_stock,
+                "count": reservation_count,
+            },
+            ops_line=_(
+                "Last 7 days: %(reserve)s reserved, %(release)s released, "
+                "%(decrement)s decremented, %(increment)s incremented."
+            )
+            % {
+                "reserve": ops_by_type.get("RESERVE", 0),
+                "release": ops_by_type.get("RELEASE", 0),
+                "decrement": ops_by_type.get("DECREMENT", 0),
+                "increment": ops_by_type.get("INCREMENT", 0),
+            },
+            url=history_url,
+            label=_("Open full stock history chart"),
         )
 
     @action(
@@ -2172,7 +1459,7 @@ class ProductAdmin(
         messages.success(
             request,
             _(
-                "Cloned product #%(orig)s → draft #%(clone)s. Edit the copy "
+                "Cloned product #%(orig)s to draft #%(clone)s. Edit the copy "
                 "and re-activate when ready."
             )
             % {"orig": original.id, "clone": clone.id},
@@ -2289,33 +1576,24 @@ class ProductAdmin(
 class ProductCategoryImageInline(TabularInline):
     model = ProductCategoryImage
     extra = 0
-    fields = ("image_preview", "image", "image_type", "active")
-    readonly_fields = ("image_preview",)
+    fields = ("image_thumbnail", "image", "image_type", "active")
 
     tab = True
     show_change_link = True
 
-    @admin.display(description=_("Preview"))
-    def image_preview(self, obj):
-        if obj.image:
-            return format_html(
-                '<img src="{url}" '
-                'style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
-                url=obj.image.url,
-            )
-        return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
-        )
-
 
 @admin.register(ProductCategory)
-class ProductCategoryAdmin(BaseModelAdmin, TranslatableAdmin):
+class ProductCategoryAdmin(BaseTranslatableAdmin):
     ordering_field = "sort_order"
     hide_ordering_field = True
+    # ``Count()`` annotations below strip the model's default
+    # ``Meta.ordering`` (Django drops default ordering on GROUP BY
+    # queries) — explicit ordering survives the annotation.
+    ordering = ("sort_order",)
     list_display = (
         "category_info",
-        "category_stats",
-        "category_status",
+        "active",
+        "subcategories_display",
         "image_preview",
         "created_display",
         "products_count_display",
@@ -2334,7 +1612,6 @@ class ProductCategoryAdmin(BaseModelAdmin, TranslatableAdmin):
         "uuid",
         "created_at",
         "updated_at",
-        "category_analytics",
         "products_count_display",
         "recursive_products_display",
     ]
@@ -2365,7 +1642,6 @@ class ProductCategoryAdmin(BaseModelAdmin, TranslatableAdmin):
             _("Analytics"),
             {
                 "fields": (
-                    "category_analytics",
                     "products_count_display",
                     "recursive_products_display",
                 ),
@@ -2393,131 +1669,51 @@ class ProductCategoryAdmin(BaseModelAdmin, TranslatableAdmin):
         qs = ProductCategory.objects.add_related_count(
             qs, Product, "category", "products_count", cumulative=False
         )
-        return qs
+        # Direct child count via annotation instead of a per-row
+        # ``get_children().count()`` query.
+        return qs.annotate(children_count=Count("children", distinct=True))
 
     def get_prepopulated_fields(self, request, obj=None):
         return {"slug": ("name",)}
 
-    @admin.display(description=_("Category"))
+    @admin.display(description=_("Category"), ordering="translations__name")
     def category_info(self, instance):
-        name = (
-            instance.safe_translation_getter("name", any_language=True)
-            or "Unnamed Category"
+        name = instance.safe_translation_getter("name", any_language=True) or _(
+            "Unnamed Category"
         )
-        path = " → ".join(
-            [
-                cat.safe_translation_getter("name", any_language=True)
-                or "Unnamed"
-                for cat in instance.get_ancestors()
-            ]
-        )
+        return f"{name} (level {instance.level})"
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">Level: {level}</div>'
-            '<div class="text-xs text-base-600 dark:text-base-300">{path}</div>'
-            "</div>",
-            name=name,
-            level=instance.level,
-            path=path or "Root Category",
-        )
-
-    @admin.display(description=_("Product Stats"))
-    def category_stats(self, instance):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">Direct: {direct}</div>'
-            '<div class="text-base-700 dark:text-base-200">Total: {total}</div>'
-            '<div class="text-base-600 dark:text-base-300">Subcategories: {children}</div>'
-            "</div>",
-            direct=getattr(instance, "products_count", 0),
-            total=getattr(instance, "products_cumulative_count", 0),
-            children=instance.get_children().count(),
-        )
-
-    @admin.display(description=_("Status"))
-    def category_status(self, instance):
-        if instance.active:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "✅ Active"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-            "❌ Inactive"
-            "</span>"
-        )
+    @admin.display(description=_("Subcategories"), ordering="children_count")
+    def subcategories_display(self, instance):
+        return getattr(instance, "children_count", 0)
 
     @admin.display(description=_("Image"))
     def image_preview(self, instance):
         main_image = instance.main_image
         if main_image and main_image.image:
             return format_html(
-                '<img src="{url}" '
-                'style="width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb;" />',
+                '<img src="{url}" class="h-10 w-10 rounded object-cover" />',
                 url=main_image.image.url,
             )
-        return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">'
-            "🖼"
-            "</div>"
-        )
+        return "—"
 
-    @admin.display(description=_("Created"))
+    @admin.display(description=_("Created"), ordering="created_at")
     def created_display(self, instance):
-        return format_html(
-            '<div class="text-sm text-base-600 dark:text-base-400">{date}</div>',
-            date=instance.created_at.strftime("%Y-%m-%d"),
-        )
+        return format_dt(instance.created_at, fmt="%Y-%m-%d")
 
-    @admin.display(description=_("Category Analytics"))
-    def category_analytics(self, instance):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Level:</strong></div><div>{level}</div>"
-            "<div><strong>Ancestors:</strong></div><div>{ancestors}</div>"
-            "<div><strong>Descendants:</strong></div><div>{descendants}</div>"
-            "<div><strong>Siblings:</strong></div><div>{siblings}</div>"
-            "<div><strong>Direct Products:</strong></div><div>{direct}</div>"
-            "<div><strong>Total Products:</strong></div><div>{total}</div>"
-            "</div>"
-            "</div>",
-            level=instance.level,
-            ancestors=instance.get_ancestors().count(),
-            descendants=instance.get_descendants().count(),
-            siblings=instance.get_siblings().count(),
-            direct=getattr(instance, "products_count", 0),
-            total=getattr(instance, "products_cumulative_count", 0),
-        )
-
-    @admin.display(description=_("Direct Products"))
+    @admin.display(description=_("Direct Products"), ordering="products_count")
     def products_count_display(self, instance):
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-semibold '
-            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            "{count}"
-            "</span>",
-            count=getattr(instance, "products_count", 0),
-        )
+        return getattr(instance, "products_count", 0)
 
-    @admin.display(description=_("Total Products"))
+    @admin.display(
+        description=_("Total Products"), ordering="products_cumulative_count"
+    )
     def recursive_products_display(self, instance):
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">'
-            "{count}"
-            "</span>",
-            count=getattr(instance, "products_cumulative_count", 0),
-        )
+        return getattr(instance, "products_cumulative_count", 0)
 
 
 @admin.register(ProductReview)
-class ProductReviewAdmin(BaseModelAdmin, TranslatableAdmin):
+class ProductReviewAdmin(BaseTranslatableAdmin):
     show_full_result_count = False  # Disable expensive COUNT(*) query
 
     list_display = [
@@ -2525,7 +1721,7 @@ class ProductReviewAdmin(BaseModelAdmin, TranslatableAdmin):
         "product_link",
         "user_link",
         "rating_display",
-        "status_badge",
+        "status_label",
         "created_display",
     ]
     list_filter = [
@@ -2538,8 +1734,6 @@ class ProductReviewAdmin(BaseModelAdmin, TranslatableAdmin):
     actions = [
         "approve_reviews",
         "reject_reviews",
-        "make_published",
-        "make_unpublished",
     ]
     search_fields = [
         "user__email",
@@ -2554,21 +1748,26 @@ class ProductReviewAdmin(BaseModelAdmin, TranslatableAdmin):
     def get_queryset(self, request):
         qs = super().get_queryset(request)
 
-        # Optimize with minimal prefetching - only what's absolutely needed
-        # Avoid loading all translations upfront
-        return qs.select_related("product", "user").only(
-            # Review fields - minimal set
-            "id",
-            "product_id",
-            "user_id",
-            "rate",
-            "status",
-            "created_at",
-            # Product fields
-            "product__id",
-            # User fields
-            "user__id",
-            "user__email",
+        # Optimize with minimal prefetching - only what's absolutely needed.
+        # ``product__translations`` avoids a per-row translation query
+        # from ``product_link``'s ``safe_translation_getter`` call.
+        return (
+            qs.select_related("product", "user")
+            .prefetch_related("product__translations")
+            .only(
+                # Review fields - minimal set
+                "id",
+                "product_id",
+                "user_id",
+                "rate",
+                "status",
+                "created_at",
+                # Product fields
+                "product__id",
+                # User fields
+                "user__id",
+                "user__email",
+            )
         )
 
     fieldsets = (
@@ -2597,123 +1796,48 @@ class ProductReviewAdmin(BaseModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Review"))
     def review_info(self, obj):
-        comment = (
-            obj.safe_translation_getter("comment", any_language=True)
-            or "No comment"
-        )
+        comment = obj.safe_translation_getter(
+            "comment", any_language=True
+        ) or _("No comment")
         comment_preview = (
             comment[:100] + "..." if len(comment) > 100 else comment
         )
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">Review #{id}</div>'
-            '<div class="text-base-600 dark:text-base-400">{comment}</div>'
-            "</div>",
-            id=obj.id,
-            comment=comment_preview,
-        )
+        return f"Review #{obj.id}: {comment_preview}"
 
     @admin.display(description=_("Product"))
     def product_link(self, obj):
-        if obj.product:
-            name = obj.product.safe_translation_getter(
-                "name", any_language=True
-            ) or str(obj.product.id)
-            return format_html(
-                '<div class="text-sm">'
-                '<a href="{url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">{name}</a>'
-                '<div class="text-base-600 dark:text-base-300">#{id}</div>'
-                "</div>",
-                url=f"/admin/product/product/{obj.product.id}/change/",
-                name=name,
-                id=obj.product.id,
-            )
-        return "-"
+        if not obj.product:
+            return "-"
+        name = obj.product.safe_translation_getter(
+            "name", any_language=True
+        ) or str(obj.product.id)
+        return format_html(
+            '<a href="{url}">{name}</a>',
+            url=reverse("admin:product_product_change", args=[obj.product.id]),
+            name=name,
+        )
 
     @admin.display(description=_("User"))
     def user_link(self, obj):
-        if obj.user:
-            return format_html(
-                '<div class="text-sm">'
-                '<a href="{url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">{email}</a>'
-                '<div class="text-base-600 dark:text-base-300">ID: {id}</div>'
-                "</div>",
-                url=f"/admin/user/useraccount/{obj.user.id}/change/",
-                email=obj.user.email,
-                id=obj.user.id,
-            )
-        return "-"
+        if not obj.user:
+            return "-"
+        return format_html(
+            '<a href="{url}">{email}</a>',
+            url=reverse("admin:user_useraccount_change", args=[obj.user.id]),
+            email=obj.user.email,
+        )
 
     @admin.display(description=_("Rating"))
     def rating_display(self, obj):
-        rate = obj.rate
-        stars = "⭐" * rate + "☆" * (10 - rate)
+        return f"{obj.rate}/10"
 
-        if rate >= 8:
-            color = "text-green-600 dark:text-green-400"
-        elif rate >= 6:
-            color = "text-yellow-600 dark:text-yellow-400"
-        else:
-            color = "text-red-600 dark:text-red-400"
+    status_label = choice_label(
+        "status", variants=REVIEW_STATUS_VARIANT, description=_("Status")
+    )
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium {color}">{rate}/10</div>'
-            '<div class="text-xs">{stars}</div>'
-            "</div>",
-            color=color,
-            rate=rate,
-            stars=stars[:5],
-        )
-
-    @admin.display(description=_("Status"))
-    def status_badge(self, obj):
-        status_config = {
-            ReviewStatus.NEW: {
-                "bg": "bg-blue-50 dark:bg-blue-900",
-                "text": "text-blue-700 dark:text-blue-300",
-                "icon": "🆕",
-            },
-            ReviewStatus.TRUE: {
-                "bg": "bg-green-50 dark:bg-green-900",
-                "text": "text-green-700 dark:text-green-300",
-                "icon": "✅",
-            },
-            ReviewStatus.FALSE: {
-                "bg": "bg-red-50 dark:bg-red-900",
-                "text": "text-red-700 dark:text-red-300",
-                "icon": "❌",
-            },
-        }
-
-        config = status_config.get(
-            obj.status,
-            {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-300",
-                "icon": "❓",
-            },
-        )
-
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            '{bg} {text_class} rounded-full gap-1">'
-            "<span>{icon}</span>"
-            "<span>{label}</span>"
-            "</span>",
-            bg=config["bg"],
-            text_class=config["text"],
-            icon=config["icon"],
-            label=obj.get_status_display(),
-        )
-
-    @admin.display(description=_("Created"))
+    @admin.display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
-        return format_html(
-            '<div class="text-sm text-base-600 dark:text-base-400">{date}</div>',
-            date=obj.created_at.strftime("%Y-%m-%d %H:%M"),
-        )
+        return format_dt(obj.created_at)
 
     @action(
         description=str(_("Approve selected reviews")),
@@ -2751,32 +1875,6 @@ class ProductReviewAdmin(BaseModelAdmin, TranslatableAdmin):
             messages.SUCCESS,
         )
 
-    def make_published(self, request, queryset):
-        updated = queryset.update(status=ReviewStatus.TRUE)
-        self.message_user(
-            request,
-            ngettext(
-                "%(count)d comment was successfully marked as published.",
-                "%(count)d comments were successfully marked as published.",
-                updated,
-            )
-            % {"count": updated},
-            messages.SUCCESS,
-        )
-
-    def make_unpublished(self, request, queryset):
-        updated = queryset.update(status=ReviewStatus.FALSE)
-        self.message_user(
-            request,
-            ngettext(
-                "%(count)d comment was successfully marked as unpublished.",
-                "%(count)d comments were successfully marked as unpublished.",
-                updated,
-            )
-            % {"count": updated},
-            messages.SUCCESS,
-        )
-
 
 @admin.register(ProductFavourite)
 class ProductFavouriteAdmin(BaseModelAdmin):
@@ -2800,49 +1898,43 @@ class ProductFavouriteAdmin(BaseModelAdmin):
     list_select_related = ["user", "product"]
     readonly_fields = ("created_at", "updated_at", "uuid")
 
+    def get_queryset(self, request):
+        # ``product_display`` calls ``safe_translation_getter``, which
+        # fires one ``ProductTranslation`` query per row without
+        # prefetch.
+        return (
+            super()
+            .get_queryset(request)
+            .select_related("user", "product")
+            .prefetch_related("product__translations")
+        )
+
     @admin.display(description=_("User"))
     def user_display(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{email}</div>'
-            '<div class="text-base-600 dark:text-base-300">ID: {id}</div>'
-            "</div>",
-            email=obj.user.email,
-            id=obj.user.id,
-        )
+        return f"{obj.user.email} (#{obj.user.id})"
 
     @admin.display(description=_("Product"))
     def product_display(self, obj):
-        name = (
-            obj.product.safe_translation_getter("name", any_language=True)
-            or "Unnamed Product"
-        )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">#{sku}</div>'
-            "</div>",
-            name=name,
-            sku=obj.product.sku[:8],
-        )
+        name = obj.product.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed Product")
+        return f"{name} (#{obj.product.sku[:8]})"
 
-    @admin.display(description=_("Created"))
+    @admin.display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
-        return format_html(
-            '<div class="text-sm text-base-600 dark:text-base-400">{date}</div>',
-            date=obj.created_at.strftime("%Y-%m-%d %H:%M"),
-        )
+        return format_dt(obj.created_at)
 
 
 @admin.register(ProductCategoryImage)
-class ProductCategoryImageAdmin(BaseModelAdmin, TranslatableAdmin):
+@admin_thumbnails.thumbnail("image")
+class ProductCategoryImageAdmin(BaseTranslatableAdmin):
     ordering_field = "sort_order"
     hide_ordering_field = True
     list_display = [
-        "image_preview",
+        "image_thumbnail",
         "category_name",
-        "image_type_badge",
-        "status_badge",
+        "image_type_label",
+        "active",
         "sort_order",
         "created_at",
     ]
@@ -2892,95 +1984,38 @@ class ProductCategoryImageAdmin(BaseModelAdmin, TranslatableAdmin):
         ),
     )
 
-    @admin.display(description=_("Preview"))
-    def image_preview(self, obj):
-        if obj.image:
-            return format_html(
-                '<img src="{url}" '
-                'style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
-                url=obj.image.url,
-            )
-        return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
+    def get_queryset(self, request):
+        # ``category_name`` calls ``safe_translation_getter``, which
+        # fires one ``ProductCategoryTranslation`` query per row
+        # without prefetch.
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("category__translations")
         )
 
     @admin.display(description=_("Category"))
     def category_name(self, obj):
-        name = (
-            obj.category.safe_translation_getter("name", any_language=True)
-            or "Unnamed Category"
-        )
-        return format_html(
-            '<div class="text-sm font-medium text-base-900 dark:text-base-100">{name}</div>',
-            name=name,
-        )
+        return obj.category.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed Category")
 
-    @admin.display(description=_("Type"))
-    def image_type_badge(self, obj):
-        type_config = {
-            "MAIN": {
-                "bg": "bg-blue-50 dark:bg-blue-900",
-                "text": "text-blue-700 dark:text-blue-200",
-                "icon": "🖼️",
-            },
-            "BANNER": {
-                "bg": "bg-purple-50 dark:bg-purple-900",
-                "text": "text-purple-700 dark:text-purple-200",
-                "icon": "🖼️",
-            },
-            "ICON": {
-                "bg": "bg-green-50 dark:bg-green-900",
-                "text": "text-green-700 dark:text-green-200",
-                "icon": "🎯",
-            },
-        }
-
-        config = type_config.get(
-            obj.image_type,
-            {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-700",
-                "icon": "📸",
-            },
-        )
-
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            '{bg} {text_class} rounded-full gap-1">'
-            "<span>{icon}</span>"
-            "<span>{label}</span>"
-            "</span>",
-            bg=config["bg"],
-            text_class=config["text"],
-            icon=config["icon"],
-            label=obj.get_image_type_display(),
-        )
-
-    @admin.display(description=_("Status"))
-    def status_badge(self, obj):
-        if obj.active:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "✅ Active"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-            "❌ Inactive"
-            "</span>"
-        )
+    image_type_label = choice_label(
+        "image_type",
+        variants=CATEGORY_IMAGE_TYPE_VARIANT,
+        description=_("Type"),
+    )
 
 
 @admin.register(ProductImage)
-class ProductImageAdmin(BaseModelAdmin, TranslatableAdmin):
+@admin_thumbnails.thumbnail("image")
+class ProductImageAdmin(BaseTranslatableAdmin):
     ordering_field = "sort_order"
     hide_ordering_field = True
     list_display = [
-        "image_preview",
+        "image_thumbnail",
         "product_name",
-        "main_badge",
+        "is_main",
         "sort_order",
         "created_at",
     ]
@@ -3029,52 +2064,26 @@ class ProductImageAdmin(BaseModelAdmin, TranslatableAdmin):
         ),
     )
 
-    @admin.display(description=_("Preview"))
-    def image_preview(self, obj):
-        if obj.image:
-            return format_html(
-                '<img src="{url}" '
-                'style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;" />',
-                url=obj.image.url,
-            )
-        return mark_safe(
-            '<div class="bg-gray-100 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 flex items-center justify-center text-base-600 dark:text-base-300 text-xs">No Image</div>'
+    def get_queryset(self, request):
+        # ``product_name`` calls ``safe_translation_getter``, which
+        # fires one ``ProductTranslation`` query per row without
+        # prefetch.
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("product__translations")
         )
 
     @admin.display(description=_("Product"))
     def product_name(self, obj):
-        name = (
-            obj.product.safe_translation_getter("name", any_language=True)
-            or "Unnamed Product"
-        )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">#{sku}</div>'
-            "</div>",
-            name=name,
-            sku=obj.product.sku[:8],
-        )
-
-    @admin.display(description=_("Type"))
-    def main_badge(self, obj):
-        if obj.is_main:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full">'
-                "⭐ Main"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-gray-50 dark:bg-gray-900 text-base-700 dark:text-base-700 rounded-full">'
-            "📷 Gallery"
-            "</span>"
-        )
+        name = obj.product.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed Product")
+        return f"{name} (#{obj.product.sku[:8]})"
 
 
 @admin.register(ProductVariantGroup)
-class ProductVariantGroupAdmin(TranslatableAdmin, BaseModelAdmin):
+class ProductVariantGroupAdmin(BaseTranslatableAdmin):
     """Admin for variant groups that link sibling product variations.
 
     Products are assigned to a group from the Product page (the
@@ -3155,19 +2164,12 @@ class ProductVariantGroupAdmin(TranslatableAdmin, BaseModelAdmin):
             .annotate(members_count=Count("variants", distinct=True))
         )
 
-    @admin.display(description=_("Group"))
+    @admin.display(description=_("Group"), ordering="translations__name")
     def group_info(self, obj):
-        name = (
-            obj.safe_translation_getter("name", any_language=True) or "Unnamed"
+        name = obj.safe_translation_getter("name", any_language=True) or _(
+            "Unnamed"
         )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">🎨 {name}</div>'
-            '<div class="text-xs text-base-600 dark:text-base-300">ID: {id}</div>'
-            "</div>",
-            name=name,
-            id=obj.id,
-        )
+        return f"{name} (#{obj.id})"
 
     @admin.display(description=_("Members"), ordering="members_count")
     def members_count_display(self, obj):

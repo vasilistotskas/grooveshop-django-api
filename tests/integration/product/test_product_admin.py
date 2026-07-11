@@ -6,7 +6,6 @@ from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.utils import translation
-from django.utils.html import conditional_escape
 
 from product.admin import (
     ProductCategoryAdmin,
@@ -32,6 +31,7 @@ from product.factories import (
     ProductImageFactory,
     ProductCategoryImageFactory,
 )
+from product.enum.category import CategoryImageTypeEnum
 from product.models import (
     Product,
     ProductCategory,
@@ -251,15 +251,15 @@ class TestProductImageInline:
 
         assert inline.model == ProductImage
         assert inline.extra == 0
-        assert "image_preview" in inline.fields
-        assert "image_preview" in inline.readonly_fields
+        assert "image_thumbnail" in inline.fields
+        assert "image_thumbnail" in inline.readonly_fields
 
-    def test_image_preview_with_image(self, admin_request):
+    def test_image_thumbnail_with_image(self, admin_request):
         product = ProductFactory()
         product_image = ProductImageFactory(product=product)
         inline = ProductImageInline(Product, AdminSite())
 
-        result = inline.image_preview(product_image)
+        result = inline.image_thumbnail(product_image)
 
         assert len(result) > 0
 
@@ -282,8 +282,8 @@ class TestProductCategoryImageInline:
 
         assert inline.model == ProductCategoryImage
         assert inline.extra == 0
-        assert "image_preview" in inline.fields
-        assert "image_preview" in inline.readonly_fields
+        assert "image_thumbnail" in inline.fields
+        assert "image_thumbnail" in inline.readonly_fields
 
 
 @pytest.mark.django_db
@@ -299,36 +299,20 @@ class TestCategoryAdmin:
         category_name = category.safe_translation_getter(
             "name", any_language=True
         )
-        escaped_name = conditional_escape(category_name)
 
-        assert escaped_name in result
-        assert "Level:" in result
-        assert "font-medium" in result
+        assert category_name in result
+        assert f"level {category.level}" in result
 
-    def test_category_stats_display(self, category_admin):
-        category = ProductCategoryFactory()
+    def test_subcategories_display(self, category_admin, admin_request):
+        parent = ProductCategoryFactory()
+        ProductCategoryFactory(parent=parent)
+        ProductCategoryFactory(parent=parent)
 
-        result = category_admin.category_stats(category)
+        queryset = category_admin.get_queryset(admin_request)
+        refreshed = queryset.get(pk=parent.pk)
+        result = category_admin.subcategories_display(refreshed)
 
-        assert "Direct:" in result
-        assert "Total:" in result
-        assert "Subcategories:" in result
-
-    def test_category_status_active(self, category_admin):
-        category = ProductCategoryFactory(active=True)
-
-        result = category_admin.category_status(category)
-
-        assert "✅" in result
-        assert "Active" in result
-
-    def test_category_status_inactive(self, category_admin):
-        category = ProductCategoryFactory(active=False)
-
-        result = category_admin.category_status(category)
-
-        assert "❌" in result
-        assert "Inactive" in result
+        assert result == 2
 
     def test_image_preview_with_image(self, category_admin):
         category = ProductCategoryFactory()
@@ -344,17 +328,8 @@ class TestCategoryAdmin:
 
         result = category_admin.created_display(category)
 
-        assert len(result) > 10
+        assert len(result) >= 10
         assert str(timezone.now().year) in result
-
-    def test_category_analytics(self, category_admin):
-        category = ProductCategoryFactory()
-
-        result = category_admin.category_analytics(category)
-
-        assert "Level:" in result
-        assert "Direct Products:" in result
-        assert "Total Products:" in result
 
 
 @pytest.mark.django_db
@@ -364,10 +339,9 @@ class TestProductAdmin:
 
         result = product_admin.product_info(product)
 
-        assert (
-            product.safe_translation_getter("name", any_language=True) in result
-        )
-        assert product.sku[:8] in result
+        name = product.safe_translation_getter("name", any_language=True)
+        assert result[0] == name
+        assert product.sku[:8] in result[1]
 
     def test_category_display(self, product_admin):
         category = ProductCategoryFactory()
@@ -378,9 +352,7 @@ class TestProductAdmin:
             "name", any_language=True
         )
 
-        escaped_name = conditional_escape(category_name)
-
-        assert escaped_name in result
+        assert category_name in result
 
     def test_pricing_info_display(self, product_admin):
         product = ProductFactory(price=Decimal("99.99"), discount_percent=20)
@@ -391,37 +363,20 @@ class TestProductAdmin:
         assert "€" in result
         assert "20%" in result
 
-    def test_stock_info_display(self, product_admin):
+    def test_stock_status_in_stock(self, product_admin):
         product = ProductFactory(stock=25)
 
-        result = product_admin.stock_info(product)
+        result = product_admin.stock_status(product)
 
-        assert "25" in result
-        assert "In Stock" in result
+        assert result[0] == "in_stock"
+        assert "25" in result[1]
 
-    def test_performance_metrics_display(self, product_admin):
-        product = ProductFactory(view_count=150)
+    def test_stock_status_out_of_stock(self, product_admin):
+        product = ProductFactory(stock=0)
 
-        result = product_admin.performance_metrics(product)
+        result = product_admin.stock_status(product)
 
-        assert "150" in result
-        assert "👁️" in result
-
-    def test_status_badges_active(self, product_admin):
-        product = ProductFactory(active=True)
-
-        result = product_admin.status_badges(product)
-
-        assert "✅" in result
-        assert "Active" in result
-
-    def test_status_badges_inactive(self, product_admin):
-        product = ProductFactory(active=False)
-
-        result = product_admin.status_badges(product)
-
-        assert "❌" in result
-        assert "Inactive" in result
+        assert result[0] == "out"
 
     def test_created_display(self, product_admin):
         from django.utils import timezone
@@ -433,29 +388,14 @@ class TestProductAdmin:
         assert len(result) > 10
         assert str(timezone.now().year) in result
 
-    def test_pricing_summary(self, product_admin):
-        product = ProductFactory(price=Decimal("100.00"), discount_percent=10)
+    def test_stock_reservation_summary(self, product_admin):
+        product = ProductFactory(stock=25)
 
-        result = product_admin.pricing_summary(product)
+        with translation.override("en"):
+            result = product_admin.stock_reservation_summary(product)
 
-        assert "Base Price" in result
-        assert "100,00" in result
-
-    def test_performance_summary(self, product_admin):
-        product = ProductFactory(view_count=100)
-
-        result = product_admin.performance_summary(product)
-
-        assert "Total Views" in result
-        assert "100" in result
-
-    def test_product_analytics(self, product_admin):
-        product = ProductFactory()
-
-        result = product_admin.product_analytics(product)
-
-        assert "Product Age" in result
-        assert "Engagement" in result
+        assert "25" in result
+        assert "stock history chart" in result
 
     @patch.object(ProductAdmin, "message_user")
     def test_make_active_action(
@@ -511,7 +451,6 @@ class TestReviewAdmin:
         result = review_admin.review_info(review)
 
         assert str(review.id) in result
-        assert "font-medium" in result
 
     def test_product_link_display(self, review_admin):
         product = ProductFactory()
@@ -536,26 +475,25 @@ class TestReviewAdmin:
 
         result = review_admin.rating_display(review)
 
-        assert "8" in result
-        assert "⭐" in result
+        assert result == "8/10"
 
-    def test_status_badge_approved(self, review_admin):
+    def test_status_label_approved(self, review_admin):
         review = ProductReviewFactory(status="TRUE")
 
         with translation.override("en"):
-            result = review_admin.status_badge(review)
+            result = review_admin.status_label(review)
 
-        assert "✅" in result
-        assert "True" in result
+        assert result[0] == "TRUE"
+        assert result[1] == "True"
 
-    def test_status_badge_pending(self, review_admin):
+    def test_status_label_pending(self, review_admin):
         review = ProductReviewFactory(status="NEW")
 
         with translation.override("en"):
-            result = review_admin.status_badge(review)
+            result = review_admin.status_label(review)
 
-        assert "🆕" in result
-        assert "New" in result
+        assert result[0] == "NEW"
+        assert result[1] == "New"
 
     def test_created_display(self, review_admin):
         from django.utils import timezone
@@ -631,11 +569,11 @@ class TestFavouriteAdmin:
 
 @pytest.mark.django_db
 class TestProductCategoryImageAdmin:
-    def test_image_preview(self, category_image_admin):
+    def test_image_thumbnail(self, category_image_admin):
         category = ProductCategoryFactory()
         category_image = ProductCategoryImageFactory(category=category)
 
-        result = category_image_admin.image_preview(category_image)
+        result = category_image_admin.image_thumbnail(category_image)
 
         assert len(result) >= 0
 
@@ -648,41 +586,28 @@ class TestProductCategoryImageAdmin:
         category_name = category.safe_translation_getter(
             "name", any_language=True
         )
-        escaped_name = conditional_escape(category_name)
 
-        assert escaped_name in result
+        assert category_name in result
 
-    def test_image_type_badge(self, category_image_admin):
-        category_image = ProductCategoryImageFactory(image_type="hero")
+    def test_image_type_label(self, category_image_admin):
+        category_image = ProductCategoryImageFactory(
+            image_type=CategoryImageTypeEnum.HERO
+        )
 
-        result = category_image_admin.image_type_badge(category_image)
+        with translation.override("en"):
+            result = category_image_admin.image_type_label(category_image)
 
-        assert "hero" in result.lower()
-
-    def test_status_badge_active(self, category_image_admin):
-        category_image = ProductCategoryImageFactory(active=True)
-
-        result = category_image_admin.status_badge(category_image)
-
-        assert "✅" in result
-        assert "Active" in result
-
-    def test_status_badge_inactive(self, category_image_admin):
-        category_image = ProductCategoryImageFactory(active=False)
-
-        result = category_image_admin.status_badge(category_image)
-
-        assert "❌" in result
-        assert "Inactive" in result
+        assert result[0] == CategoryImageTypeEnum.HERO
+        assert result[1] == "Hero Image"
 
 
 @pytest.mark.django_db
 class TestProductImageAdmin:
-    def test_image_preview(self, product_image_admin):
+    def test_image_thumbnail(self, product_image_admin):
         product = ProductFactory()
         product_image = ProductImageFactory(product=product)
 
-        result = product_image_admin.image_preview(product_image)
+        result = product_image_admin.image_thumbnail(product_image)
 
         assert len(result) >= 0
 
@@ -696,21 +621,6 @@ class TestProductImageAdmin:
             product.safe_translation_getter("name", any_language=True) in result
         )
 
-    def test_main_badge_is_main(self, product_image_admin):
-        product_image = ProductImageFactory(is_main=True)
-
-        result = product_image_admin.main_badge(product_image)
-
-        assert "⭐" in result
-        assert "Main" in result
-
-    def test_main_badge_not_main(self, product_image_admin):
-        product_image = ProductImageFactory(is_main=False)
-
-        result = product_image_admin.main_badge(product_image)
-
-        assert "Gallery" in result
-
 
 @pytest.mark.django_db
 class TestProductAdminIntegration:
@@ -718,7 +628,7 @@ class TestProductAdminIntegration:
         assert product_admin.list_per_page == 25
         assert "product_info" in product_admin.list_display
         assert "pricing_info" in product_admin.list_display
-        assert "stock_info" in product_admin.list_display
+        assert "stock_status" in product_admin.list_display
 
         action_names = []
         for action in product_admin.actions:
@@ -733,7 +643,7 @@ class TestProductAdminIntegration:
     def test_category_admin_configuration(self, category_admin):
         assert category_admin.list_per_page == 25
         assert "category_info" in category_admin.list_display
-        assert "category_stats" in category_admin.list_display
+        assert "subcategories_display" in category_admin.list_display
 
     def test_get_queryset_optimization(self, product_admin, admin_request):
         queryset = product_admin.get_queryset(admin_request)

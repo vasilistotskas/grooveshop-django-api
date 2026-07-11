@@ -1,0 +1,12 @@
+{% load i18n %}{% trans "STALE ACS SHIPMENT ALERT" %}
+
+{% blocktrans count counter=shipments|length %}The following {{ counter }} shipment has shown no tracking movement for {{ threshold_days }}+ days:{% plural %}The following {{ counter }} shipments have shown no tracking movement for {{ threshold_days }}+ days:{% endblocktrans %}
+
+{% for s in shipments %}- {% trans "Voucher" %} {{ s.voucher_no }} — {% trans "order" %} #{{ s.order_id }} — {{ s.shipment_state }} — {% trans "last movement" %}: {{ s.last_movement_at|date:"Y-m-d H:i" }} ({{ s.days_stale }} {% trans "days ago" %})
+{% endfor %}
+
+{% trans "Check each voucher with ACS (wrong address, parcel waiting at a station, or a voucher that was never handed over). If a voucher is dead, use the ACS shipments admin action “Retire selected shipments” to stop polling it." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

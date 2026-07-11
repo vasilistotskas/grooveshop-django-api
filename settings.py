@@ -793,6 +793,16 @@ def get_celery_beat_schedule():
             "schedule": crontab(minute="*/15"),
             "options": {"queue": "celery", "expires": 300},
         },
+        # Surface non-terminal ACS shipments with no tracking movement
+        # for ACS_STALE_SHIPMENT_DAYS days (stuck parcels, dead
+        # vouchers) to ADMINS. Daily at 09:00 Athens so the digest
+        # lands at the start of the working day; the claim flag inside
+        # the task dedupes re-alerts.
+        "check-stale-acs-shipments": {
+            "task": "shipping_acs.tasks.check_stale_acs_shipments",
+            "schedule": crontab(hour="9", minute="0"),
+            "options": {"queue": "celery", "expires": 3600},
+        },
         # Reconcile yesterday's COD payouts daily at 02:30 Athens —
         # safely after midnight so ACS's books for the prior day are
         # finalised.  The service method is idempotent on
@@ -3145,6 +3155,9 @@ ACS_API_BASE_URL = getenv(
     "https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest",
 )
 ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
+# Days without a tracking event before a non-terminal shipment is
+# reported to ADMINS by check_stale_acs_shipments.
+ACS_STALE_SHIPMENT_DAYS = int(getenv("ACS_STALE_SHIPMENT_DAYS", "3"))
 ACS_LIVE_MODE = getenv("ACS_LIVE_MODE", "False").lower() == "true"
 ACS_PICKUP_LIST_TIMEZONE = getenv("ACS_PICKUP_LIST_TIMEZONE", "Europe/Athens")
 ACS_SUPPORTED_COUNTRIES = [

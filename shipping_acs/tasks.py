@@ -268,6 +268,135 @@ def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:
     }
 
 
+@shared_task(bind=True)
+def check_stale_acs_shipments(self) -> dict[str, Any]:
+    """Alert admins about non-terminal shipments with no tracking movement.
+
+    A shipment is *stale* when its voucher exists, its state is
+    non-terminal, and no tracking event has arrived for
+    ``settings.ACS_STALE_SHIPMENT_DAYS`` days (falling back to
+    ``created_at`` when no event was ever recorded). Real prod cases
+    this catches (2026-07-11): a parcel stuck at the destination
+    station after a failed delivery with a wrong address, and a
+    voucher that sat in ``new`` for 50 days because the parcel was
+    never handed over — both polled forever with nobody notified.
+
+    Mirrors ``product.tasks.check_low_stock_products``: rows are
+    claimed atomically (``stale_alert_sent=True``) before the email so
+    concurrent runs can't double-send, and the claim is released when
+    the email cannot be sent. The flag is re-armed by
+    ``AcsService.poll_shipment_tracking`` when a new event arrives, so
+    a shipment that moves and stalls again alerts afresh.
+
+    Alerted shipments keep polling — the alert asks a human to either
+    chase the parcel with ACS or retire the row via the admin action
+    ("Retire selected shipments"), which sets a terminal state and
+    thereby stops the poller.
+    """
+    from django.core.mail import mail_admins
+    from django.db.models import Q
+    from django.template.loader import render_to_string
+
+    from shipping_acs.enum.shipment_state import AcsShipmentState
+    from shipping_acs.models import AcsShipment
+
+    threshold_days = getattr(settings, "ACS_STALE_SHIPMENT_DAYS", 3)
+    cutoff = timezone.now() - timedelta(days=threshold_days)
+
+    with transaction.atomic():
+        shipment_ids = list(
+            AcsShipment.objects.select_for_update(skip_locked=True)
+            .filter(voucher_no__isnull=False, stale_alert_sent=False)
+            .exclude(
+                shipment_state__in=[
+                    AcsShipmentState.PENDING_CREATION,
+                    AcsShipmentState.DELIVERED,
+                    AcsShipmentState.RETURNED,
+                    AcsShipmentState.CANCELED,
+                    AcsShipmentState.LOST,
+                ]
+            )
+            .filter(
+                Q(last_event_at__lt=cutoff)
+                | (Q(last_event_at__isnull=True) & Q(created_at__lt=cutoff))
+            )
+            .values_list("id", flat=True)
+        )
+        if not shipment_ids:
+            return {"alerted": 0}
+        AcsShipment.objects.filter(id__in=shipment_ids).update(
+            stale_alert_sent=True
+        )
+
+    if not settings.ADMINS:
+        logger.warning(
+            "check_stale_acs_shipments: no ADMINS configured — "
+            "rolling back claim"
+        )
+        AcsShipment.objects.filter(id__in=shipment_ids).update(
+            stale_alert_sent=False
+        )
+        return {"alerted": 0, "reason": "no_admins"}
+
+    now = timezone.now()
+    shipments = AcsShipment.objects.filter(id__in=shipment_ids).select_related(
+        "order"
+    )
+    rows = [
+        {
+            "voucher_no": s.voucher_no,
+            "order_id": s.order_id,
+            "shipment_state": s.get_shipment_state_display(),
+            "last_movement_at": s.last_event_at or s.created_at,
+            "days_stale": (now - (s.last_event_at or s.created_at)).days,
+        }
+        for s in shipments
+    ]
+
+    context = {
+        "shipments": rows,
+        "threshold_days": threshold_days,
+        "SITE_NAME": settings.SITE_NAME,
+        "INFO_EMAIL": settings.INFO_EMAIL,
+        "SITE_URL": settings.NUXT_BASE_URL,
+        "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+    }
+    from django.utils.translation import gettext as _
+
+    subject = _("Stale ACS shipment alert — {n} shipment(s)").format(
+        n=len(rows)
+    )
+    try:
+        text_content = render_to_string(
+            "emails/shipping_acs/stale_shipments_alert.txt", context
+        )
+        html_content = render_to_string(
+            "emails/shipping_acs/stale_shipments_alert.html", context
+        )
+        mail_admins(
+            subject=subject,
+            message=text_content,
+            html_message=html_content,
+        )
+    except Exception as exc:
+        logger.error(
+            "check_stale_acs_shipments: failed to send alert email: %s",
+            exc,
+            exc_info=True,
+        )
+        AcsShipment.objects.filter(id__in=shipment_ids).update(
+            stale_alert_sent=False
+        )
+        return {"alerted": 0, "error": str(exc)}
+
+    logger.info(
+        "Stale ACS shipment alert sent for %s shipment(s): %s",
+        len(shipment_ids),
+        shipment_ids,
+    )
+    return {"alerted": len(shipment_ids), "ids": shipment_ids}
+
+
 @shared_task(
     bind=True,
     autoretry_for=(AcsRetryableError,),

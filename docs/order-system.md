@@ -200,6 +200,17 @@ Each carrier implements `ShippingCarrierInterface` in
 - COD: `reconcile_cod_payouts` runs daily, upserts `AcsCodPayout`
   rows from the ACS COD beneficiary endpoint, and flips
   `Order.payment_status` for matched vouchers.
+- HTTP 403/406 (`AcsAuthError`) is **retryable**: prod ACS returns
+  sporadic transient 406s (~2% of tracking polls, self-healing —
+  verified 2026-07-11); only a persistent rejection means a bad
+  key/IP.
+- Staleness watch: `check_stale_acs_shipments` (daily 09:00 Athens)
+  emails ADMINS about non-terminal shipments with no tracking event
+  for `ACS_STALE_SHIPMENT_DAYS` (default 3) days. Dedup via the
+  `stale_alert_sent` claim flag, re-armed by the poller when a new
+  event arrives. Dead vouchers are retired by a human via the admin
+  action "Retire selected shipments" (local CANCELED — stops the
+  poller; does not call `ACS_Delete_Voucher`).
 
 ### 5.2 BoxNow (`shipping_boxnow/`)
 

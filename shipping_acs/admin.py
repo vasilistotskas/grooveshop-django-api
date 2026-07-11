@@ -161,6 +161,7 @@ class AcsShipmentAdmin(ModelAdmin):
         "shipment_state",
         "last_polled_at",
         "last_event_at",
+        "stale_alert_sent",
         "delivery_date",
         "delivery_flag",
         "returned_flag",
@@ -171,7 +172,7 @@ class AcsShipmentAdmin(ModelAdmin):
     )
     inlines = [AcsTrackingEventInline]
     actions_row = ["repoll_tracking", "issue_voucher_now"]
-    actions = ["bulk_repoll_tracking"]
+    actions = ["bulk_repoll_tracking", "retire_shipments"]
 
     @action(
         description=str(_("Re-poll tracking for selected shipments")),
@@ -197,6 +198,43 @@ class AcsShipmentAdmin(ModelAdmin):
             _("Dispatched tracking poll for %(count)d shipment(s).")
             % {"count": count},
             messages.INFO,
+        )
+
+    @action(
+        description=str(
+            _("Retire selected shipments (mark CANCELED, stop polling)")
+        ),
+        icon="block",
+        variant=ActionVariant.DANGER,
+    )
+    def retire_shipments(self, request, queryset):
+        """Locally mark dead shipments CANCELED so the poller skips them.
+
+        For vouchers ACS will never advance again (never handed over,
+        or stuck with no resolution) — the target of the stale-shipment
+        alert email. Local bookkeeping only: it does NOT call
+        ``ACS_Delete_Voucher`` and does NOT touch the order. Already-
+        terminal rows are skipped. Per-object ``save()`` (not
+        ``.update()``) so simple-history records who retired what.
+        """
+        retired = 0
+        for shipment in queryset.exclude(
+            shipment_state__in=[
+                AcsShipmentState.DELIVERED,
+                AcsShipmentState.RETURNED,
+                AcsShipmentState.CANCELED,
+                AcsShipmentState.LOST,
+            ]
+        ):
+            shipment.shipment_state = AcsShipmentState.CANCELED
+            shipment._change_reason = "Retired via admin action"
+            shipment.save(update_fields=["shipment_state"])
+            retired += 1
+        self.message_user(
+            request,
+            _("Retired %(count)d shipment(s) — polling stops for them.")
+            % {"count": retired},
+            messages.WARNING,
         )
 
     @admin.display(description=_("Order"))

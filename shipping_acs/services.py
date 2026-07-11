@@ -986,6 +986,11 @@ class AcsService:
             if latest_event_at and latest_event_at != shipment.last_event_at:
                 shipment.last_event_at = latest_event_at
                 update_fields.append("last_event_at")
+                # Tracking is moving again — re-arm the staleness
+                # alert so a future stall alerts admins afresh.
+                if shipment.stale_alert_sent:
+                    shipment.stale_alert_sent = False
+                    update_fields.append("stale_alert_sent")
             if delivery_date and shipment.delivery_date != delivery_date:
                 shipment.delivery_date = delivery_date
                 update_fields.append("delivery_date")

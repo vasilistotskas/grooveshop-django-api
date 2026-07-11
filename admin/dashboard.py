@@ -511,7 +511,17 @@ def _zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus) -> dict:
                 "type": "linear",
                 "position": "right",
                 "beginAtZero": True,
-                "ticks": {"color": _CHART_TICK_COLOR},
+                # ``format`` is Chart.js's JSON-safe Intl.NumberFormat
+                # passthrough — restores € axis labels without a JS
+                # callback (options must survive json.dumps).
+                "ticks": {
+                    "color": _CHART_TICK_COLOR,
+                    "format": {
+                        "style": "currency",
+                        "currency": "EUR",
+                        "maximumFractionDigits": 0,
+                    },
+                },
                 "grid": {"drawOnChartArea": False},
             },
         },

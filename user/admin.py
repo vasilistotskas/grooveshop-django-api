@@ -1,18 +1,22 @@
 from django.contrib import admin, messages
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import Group
-from django.db import models, transaction
+from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import format_html, format_html_join
-from django.utils.safestring import mark_safe
+from django.utils.html import format_html_join
 from django.utils.translation import gettext_lazy as _
-from parler.admin import TranslatableAdmin
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import TabularInline
 
-from admin.base import BaseModelAdmin
+from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.displays import (
+    choice_label,
+    format_dt,
+    header_two_line,
+    relative_time,
+)
 from admin.export import ExportActionMixin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
@@ -21,8 +25,7 @@ from unfold.contrib.filters.admin import (
     RangeNumericListFilter,
     RelatedDropdownFilter,
 )
-from unfold.contrib.forms.widgets import WysiwygWidget
-from unfold.decorators import action
+from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 from unfold.forms import (
     AdminPasswordChangeForm,
@@ -40,6 +43,25 @@ from user.models.data_export import UserDataExport
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
 admin.site.unregister(Group)
+
+# ── Local (single-app) TextChoices variant maps ────────────────────────
+
+SUBSCRIPTION_TOPIC_CATEGORY_VARIANT: dict[str, str] = {
+    SubscriptionTopic.TopicCategory.MARKETING: "warning",
+    SubscriptionTopic.TopicCategory.PRODUCT: "info",
+    SubscriptionTopic.TopicCategory.ACCOUNT: "success",
+    SubscriptionTopic.TopicCategory.SYSTEM: "danger",
+    SubscriptionTopic.TopicCategory.NEWSLETTER: "primary",
+    SubscriptionTopic.TopicCategory.PROMOTIONAL: "warning",
+    SubscriptionTopic.TopicCategory.OTHER: "default",
+}
+
+USER_SUBSCRIPTION_STATUS_VARIANT: dict[str, str] = {
+    UserSubscription.SubscriptionStatus.ACTIVE: "success",
+    UserSubscription.SubscriptionStatus.PENDING: "warning",
+    UserSubscription.SubscriptionStatus.UNSUBSCRIBED: "danger",
+    UserSubscription.SubscriptionStatus.BOUNCED: "primary",
+}
 
 
 class SubscriptionCountFilter(RangeNumericListFilter):
@@ -169,6 +191,7 @@ class TopicCategoryFilter(DropdownFilter):
 class UserAddressInline(TabularInline):
     model = UserAddress
     extra = 0
+    per_page = 15
     fields = (
         "title",
         "first_name",
@@ -186,6 +209,7 @@ class UserAddressInline(TabularInline):
 class UserSubscriptionInline(TabularInline):
     model = UserSubscription
     extra = 0
+    per_page = 15
     fields = ("topic", "status", "subscribed_at", "unsubscribed_at")
     readonly_fields = ("subscribed_at", "unsubscribed_at")
     show_change_link = True
@@ -193,7 +217,7 @@ class UserSubscriptionInline(TabularInline):
 
 
 @admin.register(Group)
-class GroupAdmin(BaseGroupAdmin, ModelAdmin):
+class GroupAdmin(BaseGroupAdmin, BaseModelAdmin):
     pass
 
 
@@ -205,13 +229,13 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
     add_form = UserCreationForm
     change_password_form = AdminPasswordChangeForm
 
-    formfield_overrides = {models.TextField: {"widget": WysiwygWidget}}
-
     list_display = [
-        "user_profile_display",
+        "identity",
         "contact_info_display",
         "location_display",
-        "user_status_badges",
+        "is_active",
+        "is_staff",
+        "is_superuser",
         "social_links_display",
         "engagement_metrics",
         "last_activity",
@@ -254,8 +278,6 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         "updated_at",
         "engagement_metrics",
         "social_links_summary",
-        "subscription_summary",
-        "address_summary",
         "loyalty_points_balance",
         "loyalty_total_xp",
         "loyalty_level",
@@ -294,7 +316,6 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
                     "place",
                     "country",
                     "region",
-                    "address_summary",
                 ),
                 "classes": ("wide",),
             },
@@ -331,7 +352,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         (
             _("Subscriptions & Engagement"),
             {
-                "fields": ("subscription_summary", "engagement_metrics"),
+                "fields": ("engagement_metrics",),
                 "classes": ("collapse",),
             },
         ),
@@ -367,6 +388,19 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
     )
     inlines = [UserAddressInline, UserSubscriptionInline]
 
+    def get_form(self, request, obj=None, change=False, **kwargs):
+        # Unfold's ``ModelAdmin.get_fieldsets`` swaps in ``add_fieldsets``
+        # (password1/password2) when adding, but the base ``get_form``
+        # never swaps ``self.form`` for ``self.add_form`` — so the add
+        # view built its ModelForm off ``UserChangeForm``
+        # (``Meta.fields = "__all__"``) while the computed ``fields``
+        # list already included password1/password2, which aren't
+        # model fields -> ``FieldError``. Mirrors
+        # ``django.contrib.auth.admin.UserAdmin.get_form``.
+        if obj is None:
+            kwargs.setdefault("form", self.add_form)
+        return super().get_form(request, obj, change=change, **kwargs)
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.annotate(
@@ -383,156 +417,54 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
             ),
         ).prefetch_related("subscriptions__topic", "addresses")
 
-    @admin.display(description=_("Profile"))
-    def user_profile_display(self, obj):
-        if obj.image:
-            avatar = format_html(
-                '<img src="{url}" class="rounded-full object-cover" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb" />',
-                url=obj.image.url,
-            )
-        else:
-            initials = "".join(
-                [n[0].upper() for n in [obj.first_name, obj.last_name] if n]
-            )[:2] or (obj.email[0].upper() if obj.email else "U")
-            avatar = format_html(
-                '<div class="rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-300 font-medium text-sm" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb">{init}</div>',
-                init=initials,
-            )
-        return format_html(
-            '<div class="flex items-center gap-3">{avatar}'
-            '<div><div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-            '<div class="text-sm text-base-600 dark:text-base-300">{email}</div></div></div>',
-            avatar=avatar,
-            name=obj.full_name or obj.username or "Anonymous",
-            email=obj.email or "",
+    @display(description=_("User"), header=True, ordering="last_name")
+    def identity(self, obj):
+        image_path = obj.image.url if obj.image else None
+        return header_two_line(
+            obj.full_name or obj.username or str(_("Anonymous")),
+            obj.email,
+            image_path=image_path,
         )
 
-    @admin.display(description=_("Contact"))
+    @display(description=_("Contact"))
     def contact_info_display(self, obj):
-        parts = []
-        if obj.phone:
-            parts.append(
-                format_html(
-                    '<span class="flex items-center gap-1"><span>📞</span><span>{phone}</span></span>',
-                    phone=obj.phone,
-                )
-            )
-        if obj.username:
-            parts.append(
-                format_html(
-                    '<span class="flex items-center gap-1"><span>👤</span><span>{user}</span></span>',
-                    user=obj.username,
-                )
-            )
-        if parts:
-            return format_html(
-                '<div class="text-sm text-base-700 dark:text-base-300 space-y-1">{parts}</div>',
-                parts=format_html_join("", "{}", ((p,) for p in parts)),
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No contact info</span>'
-        )
+        parts = [str(p) for p in (obj.phone, obj.username) if p]
+        return " · ".join(parts) if parts else _("No contact info")
 
-    @admin.display(description=_("Location"))
+    @display(description=_("Location"))
     def location_display(self, obj):
-        loc_parts = []
-        if obj.city:
-            loc_parts.append(obj.city)
-        if obj.country:
-            loc_parts.append(str(obj.country))
-        if loc_parts:
-            return format_html(
-                '<div class="text-sm text-base-700 dark:text-base-300">'
-                '<span class="flex items-center gap-1"><span>📍</span><span>{text}</span></span>'
-                "</div>",
-                text=", ".join(loc_parts),
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No location</span>'
-        )
+        parts = [
+            p for p in (obj.city, str(obj.country) if obj.country else "") if p
+        ]
+        return ", ".join(parts) if parts else _("No location")
 
-    @admin.display(description=_("Status"))
-    def user_status_badges(self, obj):
-        badges = []
-        if obj.is_superuser:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1"><span>👑</span><span>Super</span></span>'
-                )
-            )
-        elif obj.is_staff:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full gap-1"><span>⚡</span><span>Staff</span></span>'
-                )
-            )
-        if obj.is_active:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1"><span>✓</span><span>Active</span></span>'
-                )
-            )
-        else:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1"><span>✗</span><span>Inactive</span></span>'
-                )
-            )
-        return format_html(
-            '<div class="flex flex-wrap gap-1">{badges}</div>',
-            badges=format_html_join("", "{}", ((b,) for b in badges)),
-        )
-
-    @admin.display(description=_("Social"))
+    @display(description=_("Social"))
     def social_links_display(self, obj):
-        icons = []
-        for field, (icon, _icon_name) in {
-            "website": ("🌐", "Website"),
-            "linkedin": ("💼", "LinkedIn"),
-            "github": ("💻", "GitHub"),
-            "twitter": ("🐦", "Twitter"),
-        }.items():
-            if getattr(obj, field):
-                icons.append(icon)
-        if icons:
-            return format_html(
-                '<div class="flex gap-1">{icons}</div>',
-                icons=format_html_join("", "{}", ((i,) for i in icons)),
+        platforms = [
+            name
+            for field, name in (
+                ("website", _("Website")),
+                ("linkedin", "LinkedIn"),
+                ("github", "GitHub"),
+                ("twitter", "Twitter"),
             )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">-</span>'
-        )
+            if getattr(obj, field)
+        ]
+        return ", ".join(str(p) for p in platforms) if platforms else "—"
 
-    @admin.display(description=_("Engagement"))
+    @display(description=_("Engagement"))
     def engagement_metrics(self, obj):
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300 flex items-center gap-3">'
-            '<span class="flex items-center gap-1 text-blue-600 dark:text-blue-400"><span>📧</span><span>{active}/{subs}</span></span>'
-            '<span class="flex items-center gap-1 text-green-600 dark:text-green-400"><span>📍</span><span>{addrs}</span></span>'
-            "</div>",
-            active=getattr(obj, "active_subscription_count", 0),
-            subs=getattr(obj, "subscription_count", 0),
-            addrs=getattr(obj, "address_count", 0),
-        )
+        return _("%(active)d/%(subs)d subscriptions · %(addrs)d addresses") % {
+            "active": getattr(obj, "active_subscription_count", 0),
+            "subs": getattr(obj, "subscription_count", 0),
+            "addrs": getattr(obj, "address_count", 0),
+        }
 
-    @admin.display(description=_("Last Activity"), ordering="updated_at")
+    @display(description=_("Last Activity"), ordering="updated_at")
     def last_activity(self, obj):
-        # The column header already says "Last Activity"; the
-        # "Updated:" prefix was redundant and made the timestamp
-        # twice as wide as the actual data.
-        if not obj.updated_at:
-            return format_html(
-                '<span class="text-base-500 dark:text-base-400 italic">'
-                "{}</span>",
-                _("Never"),
-            )
-        return format_html(
-            '<span class="text-sm text-base-700 dark:text-base-300 '
-            'tabular-nums">{}</span>',
-            obj.updated_at.strftime("%Y-%m-%d %H:%M"),
-        )
+        return f"{format_dt(obj.updated_at)} ({relative_time(obj.updated_at)})"
 
-    @admin.display(description=_("Social Links Summary"))
+    @display(description=_("Social Links Summary"))
     def social_links_summary(self, obj):
         fields = {
             "website": "Website",
@@ -543,107 +475,39 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
             "instagram": "Instagram",
             "youtube": "YouTube",
         }
-        links = []
-        for fld, name in fields.items():
-            url = getattr(obj, fld)
-            if url:
-                links.append(
-                    format_html(
-                        '<a href="{url}" target="_blank" class="text-blue-600 dark:text-blue-400 hover:underline">{name}</a>',
-                        url=url,
-                        name=name,
-                    )
-                )
-        if links:
-            return format_html(
-                '<div class="space-y-1">{links}</div>',
-                links=format_html_join(
-                    "<br>", "{}", ((link,) for link in links)
-                ),
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300 italic">No social media links</span>'
+        links = [
+            (getattr(obj, field), name)
+            for field, name in fields.items()
+            if getattr(obj, field)
+        ]
+        if not links:
+            return _("No social media links")
+        return format_html_join(
+            ", ",
+            '<a href="{}" target="_blank" rel="noopener">{}</a>',
+            links,
         )
 
-    @admin.display(description=_("Subscription Summary"))
-    def subscription_summary(self, obj):
-        subs = list(obj.subscriptions.select_related("topic").all())
-        if not subs:
-            return mark_safe(
-                '<span class="text-base-600 dark:text-base-300 italic">No subscriptions</span>'
-            )
-        active = sum(
-            1
-            for s in subs
-            if s.status == UserSubscription.SubscriptionStatus.ACTIVE
-        )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-700 dark:text-base-300">Active: {active}/{total}</div>'
-            "</div>",
-            active=active,
-            total=len(subs),
-        )
-
-    @admin.display(description=_("Address Summary"))
-    def address_summary(self, obj):
-        addrs = list(obj.addresses.all())
-        if not addrs:
-            return mark_safe(
-                '<span class="text-base-600 dark:text-base-300 italic">No addresses</span>'
-            )
-        main = next((a for a in addrs if a.is_main), None)
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-700 dark:text-base-300">Total: {total}</div>'
-            '<div class="text-base-600 dark:text-base-300">Main: {main}</div>'
-            "</div>",
-            total=len(addrs),
-            main=str(main) if main else "No main address",
-        )
-
-    @admin.display(description=_("Points Balance"))
+    @display(description=_("Points Balance"))
     def loyalty_points_balance(self, obj):
-        balance = LoyaltyService.get_user_balance(obj)
-        return format_html(
-            '<span class="inline-flex items-center px-3 py-1 text-sm font-semibold'
-            " bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300"
-            ' rounded-full gap-1"><span>🪙</span><span>{balance} pts</span></span>',
-            balance=balance,
-        )
+        return _("%(balance)d points") % {
+            "balance": LoyaltyService.get_user_balance(obj)
+        }
 
-    @admin.display(description=_("Total XP"))
+    @display(description=_("Total XP"))
     def loyalty_total_xp(self, obj):
-        return format_html(
-            '<span class="inline-flex items-center px-3 py-1 text-sm font-semibold'
-            " bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300"
-            ' rounded-full gap-1"><span>⭐</span><span>{xp} XP</span></span>',
-            xp=obj.total_xp,
-        )
+        return _("%(xp)d XP") % {"xp": obj.total_xp}
 
-    @admin.display(description=_("Level"))
+    @display(description=_("Level"))
     def loyalty_level(self, obj):
-        level = LoyaltyService.get_user_level(obj)
-        return format_html(
-            '<span class="inline-flex items-center px-3 py-1 text-sm font-semibold'
-            " bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300"
-            ' rounded-full gap-1"><span>📊</span><span>Level {level}</span></span>',
-            level=level,
-        )
+        return _("Level %(level)d") % {
+            "level": LoyaltyService.get_user_level(obj)
+        }
 
-    @admin.display(description=_("Tier"))
+    @display(description=_("Tier"))
     def loyalty_tier_name(self, obj):
         tier = LoyaltyService.get_user_tier(obj)
-        if tier:
-            return format_html(
-                '<span class="inline-flex items-center px-3 py-1 text-sm font-semibold'
-                " bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300"
-                ' rounded-full gap-1"><span>🏆</span><span>{name}</span></span>',
-                name=str(tier),
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300 italic">No tier</span>'
-        )
+        return str(tier) if tier else _("No tier")
 
     @action(
         description=str(_("Adjust loyalty points for this user")),
@@ -739,8 +603,8 @@ class UserAddressAdmin(BaseModelAdmin):
         "address_display",
         "contact_person",
         "location_info",
-        "main_address_badge",
-        "contact_numbers",
+        "is_main",
+        "phone",
         "created_at",
     ]
 
@@ -809,74 +673,36 @@ class UserAddressAdmin(BaseModelAdmin):
         ),
     )
 
-    @admin.display(description=_("Address"))
+    @display(description=_("Address"))
     def address_display(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{title}</div>'
-            '<div class="text-base-600 dark:text-base-300">{addr}</div>'
-            "</div>",
-            title=obj.title,
-            addr=f"{obj.street} {obj.street_number}, {obj.city}",
-        )
+        return f"{obj.title} — {obj.street} {obj.street_number}, {obj.city}"
 
-    @admin.display(description=_("Contact Person"))
+    @display(description=_("Contact Person"))
     def contact_person(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-700 dark:text-base-300">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">{email}</div>'
-            "</div>",
-            name=f"{obj.first_name} {obj.last_name}",
-            email=obj.user.email,
-        )
+        return f"{obj.first_name} {obj.last_name} ({obj.user.email})"
 
-    @admin.display(description=_("Location"))
+    @display(description=_("Location"))
     def location_info(self, obj):
         parts = [obj.city]
         if obj.country:
             parts.append(str(obj.country))
         if obj.zipcode:
             parts.append(obj.zipcode)
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300">{text}</div>',
-            text=", ".join(parts),
-        )
-
-    @admin.display(description=_("Main"))
-    def main_address_badge(self, obj):
-        if obj.is_main:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1"><span>⭐</span><span>Main</span></span>'
-            )
-        return ""
-
-    @admin.display(description=_("Contact Numbers"))
-    def contact_numbers(self, obj):
-        if obj.phone:
-            return format_html(
-                '<div class="text-sm text-base-700 dark:text-base-300 space-y-1">'
-                '<span class="flex items-center gap-1"><span>📞</span><span>{phone}</span></span>'
-                "</div>",
-                phone=obj.phone,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No phone</span>'
-        )
+        return ", ".join(parts)
 
 
 @admin.register(SubscriptionTopic)
-class SubscriptionTopicAdmin(BaseModelAdmin, TranslatableAdmin):
+class SubscriptionTopicAdmin(BaseTranslatableAdmin):
     # Override: this admin's list is intentionally narrow (fixed-width
     # for scanning of the small ~10-row topic catalogue).
     list_fullwidth = False
 
     list_display = [
         "name_display",
-        "category_badge",
-        "active_status",
+        "category_label",
         "is_active",
-        "settings_badges",
+        "is_default",
+        "requires_confirmation",
         "subscriber_metrics",
         "created_at",
     ]
@@ -889,6 +715,9 @@ class SubscriptionTopicAdmin(BaseModelAdmin, TranslatableAdmin):
     ]
     search_fields = ["translations__name", "slug", "translations__description"]
     readonly_fields = ["uuid", "created_at", "updated_at", "subscriber_metrics"]
+    # ``get_queryset`` annotates ``Count`` aggregates, which otherwise
+    # strips the model's default ``Meta.ordering`` from the query.
+    ordering = ("-created_at",)
 
     fieldsets = (
         (
@@ -919,6 +748,12 @@ class SubscriptionTopicAdmin(BaseModelAdmin, TranslatableAdmin):
         ),
     )
 
+    category_label = choice_label(
+        "category",
+        variants=SUBSCRIPTION_TOPIC_CATEGORY_VARIANT,
+        description=_("Category"),
+    )
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.annotate(
@@ -931,78 +766,19 @@ class SubscriptionTopicAdmin(BaseModelAdmin, TranslatableAdmin):
             total_subscribers=Count("subscribers"),
         )
 
-    @admin.display(description=_("Topic"))
+    @display(description=_("Topic"), ordering="slug")
     def name_display(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">{slug}</div>'
-            "</div>",
-            name=(
-                obj.safe_translation_getter("name", any_language=True)
-                or "Unnamed Topic"
-            ),
-            slug=obj.slug,
+        name = obj.safe_translation_getter("name", any_language=True) or _(
+            "Unnamed Topic"
         )
+        return f"{name} ({obj.slug})"
 
-    @admin.display(description=_("Category"))
-    def category_badge(self, obj):
-        colors = {
-            "MARKETING": "bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300",
-            "PRODUCT": "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300",
-            "ACCOUNT": "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300",
-            "SYSTEM": "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300",
-            "NEWSLETTER": "bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300",
-            "OTHER": "bg-base-50 dark:bg-base-900 text-base-700 dark:text-base-300",
-        }
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {cls} rounded-full">{disp}</span>',
-            cls=colors.get(obj.category, colors["OTHER"]),
-            disp=obj.get_category_display(),
-        )
-
-    @admin.display(description=_("Status"))
-    def active_status(self, obj):
-        if obj.is_active:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1"><span>✓</span><span>Active</span></span>'
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1"><span>✗</span><span>Inactive</span></span>'
-        )
-
-    @admin.display(description=_("Settings"))
-    def settings_badges(self, obj):
-        badges = []
-        if obj.is_default:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1"><span>⭐</span><span>Default</span></span>'
-                )
-            )
-        if obj.requires_confirmation:
-            badges.append(
-                mark_safe(
-                    '<span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full gap-1"><span>✉️</span><span>Confirm</span></span>'
-                )
-            )
-        if not badges:
-            return ""
-        return format_html(
-            '<div class="flex flex-wrap gap-1">{badges}</div>',
-            badges=format_html_join("", "{}", ((b,) for b in badges)),
-        )
-
-    @admin.display(description=_("Subscribers"))
+    @display(description=_("Subscribers"))
     def subscriber_metrics(self, obj):
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300 flex items-center gap-3">'
-            '<span class="flex items-center gap-1 text-green-600 dark:text-green-400"><span>✓</span><span>{active}</span></span>'
-            '<span class="flex items-center gap-1 text-blue-600 dark:text-blue-400"><span>👥</span><span>{total}</span></span>'
-            "</div>",
-            active=getattr(obj, "active_subscribers", 0),
-            total=getattr(obj, "total_subscribers", 0),
-        )
+        return _("%(active)d/%(total)d active") % {
+            "active": getattr(obj, "active_subscribers", 0),
+            "total": getattr(obj, "total_subscribers", 0),
+        }
 
 
 @admin.register(UserSubscription)
@@ -1011,8 +787,7 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         "subscription_info",
         "user_info",
         "topic_info",
-        "status_display",
-        "status",
+        "status_label",
         "subscription_dates",
         "created_at",
     ]
@@ -1070,84 +845,36 @@ class UserSubscriptionAdmin(BaseModelAdmin):
         ),
     )
 
-    @admin.display(description=_("Subscription"))
+    status_label = choice_label(
+        "status",
+        variants=USER_SUBSCRIPTION_STATUS_VARIANT,
+        description=_("Status"),
+    )
+
+    @display(description=_("Subscription"), ordering="created_at")
     def subscription_info(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">Subscription #{id}</div>'
-            '<div class="text-base-600 dark:text-base-300">{date}</div>'
-            "</div>",
-            id=obj.id,
-            date=obj.created_at.strftime("%Y-%m-%d"),
-        )
+        return f"#{obj.id} — {format_dt(obj.created_at, fmt='%d/%m/%Y')}"
 
-    @admin.display(description=_("User"))
+    @display(description=_("User"))
     def user_info(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-700 dark:text-base-300">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">{email}</div>'
-            "</div>",
-            name=obj.user.full_name or obj.user.username or "Anonymous",
-            email=obj.user.email,
-        )
+        name = obj.user.full_name or obj.user.username or _("Anonymous")
+        return f"{name} ({obj.user.email})"
 
-    @admin.display(description=_("Topic"))
+    @display(description=_("Topic"))
     def topic_info(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-700 dark:text-base-300">{topic}</div>'
-            '<div class="text-base-600 dark:text-base-300">{cat}</div>'
-            "</div>",
-            topic=(
-                obj.topic.safe_translation_getter("name", any_language=True)
-                or "Unnamed Topic"
-            ),
-            cat=obj.topic.get_category_display(),
-        )
+        name = obj.topic.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed Topic")
+        return f"{name} ({obj.topic.get_category_display()})"
 
-    @admin.display(description=_("Status"))
-    def status_display(self, obj):
-        colors = {
-            UserSubscription.SubscriptionStatus.ACTIVE: "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300",
-            UserSubscription.SubscriptionStatus.PENDING: "bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300",
-            UserSubscription.SubscriptionStatus.UNSUBSCRIBED: "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300",
-            UserSubscription.SubscriptionStatus.BOUNCED: "bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300",
-        }
-        icons = {
-            UserSubscription.SubscriptionStatus.ACTIVE: "✓",
-            UserSubscription.SubscriptionStatus.PENDING: "⏳",
-            UserSubscription.SubscriptionStatus.UNSUBSCRIBED: "✗",
-            UserSubscription.SubscriptionStatus.BOUNCED: "⚠️",
-        }
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {cls} rounded-full gap-1">'
-            "<span>{icon}</span><span>{label}</span>"
-            "</span>",
-            cls=colors.get(
-                obj.status, colors[UserSubscription.SubscriptionStatus.ACTIVE]
-            ),
-            icon=icons.get(obj.status, "?"),
-            label=obj.get_status_display(),
-        )
-
-    @admin.display(description=_("Dates"))
+    @display(description=_("Dates"))
     def subscription_dates(self, obj):
         if obj.unsubscribed_at:
-            return format_html(
-                '<div class="text-sm text-base-600 dark:text-base-400">'
-                "<div>Subscribed: {sub}</div>"
-                "<div>Unsubscribed: {unsub}</div>"
-                "</div>",
-                sub=obj.subscribed_at.strftime("%Y-%m-%d %H:%M"),
-                unsub=obj.unsubscribed_at.strftime("%Y-%m-%d %H:%M"),
-            )
-        return format_html(
-            '<div class="text-sm text-base-600 dark:text-base-400">'
-            "<div>Subscribed: {sub}</div>"
-            "</div>",
-            sub=obj.subscribed_at.strftime("%Y-%m-%d %H:%M"),
-        )
+            return _("Subscribed %(sub)s · Unsubscribed %(unsub)s") % {
+                "sub": format_dt(obj.subscribed_at),
+                "unsub": format_dt(obj.unsubscribed_at),
+            }
+        return _("Subscribed %(sub)s") % {"sub": format_dt(obj.subscribed_at)}
 
     @action(
         description=str(_("Activate selected subscriptions")),

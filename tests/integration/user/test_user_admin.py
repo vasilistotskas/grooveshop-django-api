@@ -257,6 +257,7 @@ class TestInlineClasses:
 
         assert inline.model == UserAddress
         assert inline.extra == 0
+        assert inline.per_page == 15
         assert "title" in inline.fields
         assert "first_name" in inline.fields
         assert "is_main" in inline.fields
@@ -269,6 +270,7 @@ class TestInlineClasses:
 
         assert inline.model == UserSubscription
         assert inline.extra == 0
+        assert inline.per_page == 15
         assert "topic" in inline.fields
         assert "status" in inline.fields
         assert "subscribed_at" in inline.readonly_fields
@@ -308,10 +310,12 @@ class TestUserAdmin:
     def test_list_display(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
         expected_fields = [
-            "user_profile_display",
+            "identity",
             "contact_info_display",
             "location_display",
-            "user_status_badges",
+            "is_active",
+            "is_staff",
+            "is_superuser",
             "social_links_display",
             "engagement_metrics",
             "last_activity",
@@ -319,7 +323,28 @@ class TestUserAdmin:
         ]
         assert admin.list_display == expected_fields
 
-    def test_user_profile_display(self, admin_request):
+    def test_get_form_add_view_includes_password_fields(self, admin_request):
+        # Regression test: ``add_fieldsets`` references password1/
+        # password2, but the base ``get_form`` never swapped in
+        # ``self.add_form`` for the add view -> ``FieldError``. This
+        # confirms ``UserAdmin.get_form`` performs that swap.
+        admin = UserAdmin(UserAccount, AdminSite())
+
+        form_class = admin.get_form(admin_request, obj=None)
+
+        assert "password1" in form_class.base_fields
+        assert "password2" in form_class.base_fields
+
+    def test_get_form_change_view_uses_change_form(self, admin_request):
+        admin = UserAdmin(UserAccount, AdminSite())
+        user = UserAccountFactory()
+
+        form_class = admin.get_form(admin_request, obj=user, change=True)
+
+        assert "password1" not in form_class.base_fields
+        assert "password2" not in form_class.base_fields
+
+    def test_identity(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
         user = UserAccountFactory(
             first_name="John",
@@ -328,10 +353,10 @@ class TestUserAdmin:
             username="johndoe",
         )
 
-        result = admin.user_profile_display(user)
+        result = admin.identity(user)
 
-        assert "John Doe" in result
-        assert "john@example.com" in result
+        assert result[0] == "John Doe"
+        assert result[1] == "john@example.com"
 
     def test_contact_info_display(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
@@ -339,8 +364,7 @@ class TestUserAdmin:
 
         result = admin.contact_info_display(user)
 
-        assert "+1234567890" in result
-        assert "📞" in result
+        assert "1234567890" in result
 
     def test_location_display(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
@@ -353,22 +377,8 @@ class TestUserAdmin:
         result = admin.location_display(user)
 
         assert "New York" in result
-        assert "📍" in result or "map-pin" in result
 
-    def test_user_status_badges(self, admin_request):
-        admin = UserAdmin(UserAccount, AdminSite())
-
-        staff_user = UserAccountFactory(
-            is_active=True, is_staff=True, is_superuser=False
-        )
-        result = admin.user_status_badges(staff_user)
-        assert "Active" in result
-        assert "Staff" in result
-
-        super_user = UserAccountFactory(is_active=True, is_superuser=True)
-        result = admin.user_status_badges(super_user)
-        assert "Super" in result
-
+    @pytest.mark.assert_english
     def test_social_links_display(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
         user = UserAccountFactory(
@@ -379,9 +389,9 @@ class TestUserAdmin:
 
         result = admin.social_links_display(user)
 
-        assert "🌐" in result
-        assert "🐦" in result
-        assert "💻" in result
+        assert "Website" in result
+        assert "Twitter" in result
+        assert "GitHub" in result
 
     def test_engagement_metrics(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
@@ -389,9 +399,8 @@ class TestUserAdmin:
 
         result = admin.engagement_metrics(user)
 
-        assert (
-            "Subscriptions" in result or "Addresses" in result or "0" in result
-        )
+        assert "subscriptions" in result
+        assert "addresses" in result
 
     def test_last_activity(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
@@ -399,8 +408,7 @@ class TestUserAdmin:
 
         result = admin.last_activity(user)
 
-        assert user.updated_at.strftime("%Y-%m-%d %H:%M") in result
-        assert "tabular-nums" in result
+        assert user.updated_at.strftime("%d/%m/%Y %H:%M") in result
 
     @pytest.mark.assert_english
     def test_last_activity_never(self, admin_request):
@@ -410,8 +418,7 @@ class TestUserAdmin:
 
         result = admin.last_activity(user)
 
-        assert "Never" in result
-        assert "italic" in result
+        assert "—" in result
 
     def test_social_links_summary(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
@@ -427,27 +434,48 @@ class TestUserAdmin:
         assert "LinkedIn" in result
         assert "Twitter" in result
 
-    def test_subscription_summary(self, admin_request):
+    @pytest.mark.assert_english
+    def test_social_links_summary_empty(self, admin_request):
+        admin = UserAdmin(UserAccount, AdminSite())
+        user = UserAccountFactory(
+            website="",
+            linkedin="",
+            twitter="",
+            facebook="",
+            instagram="",
+            youtube="",
+            github="",
+        )
+
+        result = admin.social_links_summary(user)
+
+        assert result == "No social media links"
+
+    def test_loyalty_points_balance(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
         user = UserAccountFactory()
 
-        topic = SubscriptionTopicFactory()
-        UserSubscriptionFactory(user=user, topic=topic)
+        result = admin.loyalty_points_balance(user)
 
-        result = admin.subscription_summary(user)
+        assert "points" in result
 
-        assert "Active:" in result
-
-    def test_address_summary(self, admin_request):
+    def test_loyalty_total_xp(self, admin_request):
         admin = UserAdmin(UserAccount, AdminSite())
-        user = UserAccountFactory()
-        country = CountryFactory()
+        user = UserAccountFactory(total_xp=250)
 
-        UserAddressFactory(user=user, country=country)
+        result = admin.loyalty_total_xp(user)
 
-        result = admin.address_summary(user)
+        assert "250" in result
+        assert "XP" in result
 
-        assert "total" in result.lower()
+    @pytest.mark.assert_english
+    def test_loyalty_tier_name_none(self, admin_request):
+        admin = UserAdmin(UserAccount, AdminSite())
+        user = UserAccountFactory(loyalty_tier=None)
+
+        result = admin.loyalty_tier_name(user)
+
+        assert result == "No tier"
 
 
 @pytest.mark.django_db
@@ -463,8 +491,8 @@ class TestUserAddressAdmin:
             "address_display",
             "contact_person",
             "location_info",
-            "main_address_badge",
-            "contact_numbers",
+            "is_main",
+            "phone",
             "created_at",
         ]
         assert admin.list_display == expected_fields
@@ -502,30 +530,6 @@ class TestUserAddressAdmin:
 
         assert "New York" in result
 
-    def test_main_address_badge(self):
-        admin = UserAddressAdmin(UserAddress, AdminSite())
-
-        main_address = UserAddressFactory(
-            is_main=True, title="Main Test Address"
-        )
-        result = admin.main_address_badge(main_address)
-        assert "Main" in result
-
-        regular_address = UserAddressFactory(
-            is_main=False, title="Regular Test Address"
-        )
-        result = admin.main_address_badge(regular_address)
-
-        assert result == ""
-
-    def test_contact_numbers(self):
-        admin = UserAddressAdmin(UserAddress, AdminSite())
-        address = UserAddressFactory(phone="+1234567890")
-
-        result = admin.contact_numbers(address)
-
-        assert "+1234567890" in result or "+9876543210" in result
-
 
 @pytest.mark.django_db
 class TestSubscriptionTopicAdmin:
@@ -535,13 +539,14 @@ class TestSubscriptionTopicAdmin:
         assert admin.compressed_fields is True
         assert admin.warn_unsaved_form is True
         assert admin.list_filter_submit is True
+        assert admin.ordering == ("-created_at",)
 
         expected_fields = [
             "name_display",
-            "category_badge",
-            "active_status",
+            "category_label",
             "is_active",
-            "settings_badges",
+            "is_default",
+            "requires_confirmation",
             "subscriber_metrics",
             "created_at",
         ]
@@ -558,37 +563,19 @@ class TestSubscriptionTopicAdmin:
 
         assert "Newsletter" in result
 
-    def test_category_badge(self):
+    @pytest.mark.assert_english
+    def test_category_label(self):
         admin = SubscriptionTopicAdmin(SubscriptionTopic, AdminSite())
         topic = SubscriptionTopicFactory(
             category=SubscriptionTopic.TopicCategory.NEWSLETTER
         )
 
-        result = admin.category_badge(topic)
+        result = admin.category_label(topic)
 
-        assert "Newsletter" in result or "NEWSLETTER" in result
-
-    def test_active_status(self):
-        admin = SubscriptionTopicAdmin(SubscriptionTopic, AdminSite())
-
-        active_topic = SubscriptionTopicFactory(is_active=True)
-        result = admin.active_status(active_topic)
-        assert "Active" in result
-
-        inactive_topic = SubscriptionTopicFactory(is_active=False)
-        result = admin.active_status(inactive_topic)
-        assert "Inactive" in result
-
-    def test_settings_badges(self):
-        admin = SubscriptionTopicAdmin(SubscriptionTopic, AdminSite())
-        topic = SubscriptionTopicFactory(
-            is_default=True, requires_confirmation=True
+        assert result == (
+            SubscriptionTopic.TopicCategory.NEWSLETTER,
+            "Newsletter",
         )
-
-        result = admin.settings_badges(topic)
-
-        assert "Default" in result
-        assert "Confirm" in result
 
     def test_subscriber_metrics(self):
         admin = SubscriptionTopicAdmin(SubscriptionTopic, AdminSite())
@@ -599,9 +586,12 @@ class TestSubscriptionTopicAdmin:
         UserSubscriptionFactory(topic=topic, user=user1)
         UserSubscriptionFactory(topic=topic, user=user2)
 
+        queryset = admin.get_queryset(RequestFactory().get("/"))
+        topic = queryset.get(pk=topic.pk)
+
         result = admin.subscriber_metrics(topic)
 
-        assert "\u2713" in result or "\U0001f465" in result
+        assert "2/2" in result
 
 
 @pytest.mark.django_db(transaction=True)
@@ -617,8 +607,7 @@ class TestUserSubscriptionAdmin:
             "subscription_info",
             "user_info",
             "topic_info",
-            "status_display",
-            "status",
+            "status_label",
             "subscription_dates",
             "created_at",
         ]
@@ -632,9 +621,7 @@ class TestUserSubscriptionAdmin:
 
         result = admin.subscription_info(subscription)
 
-        assert (
-            "subscription" in result.lower() or str(subscription.id) in result
-        )
+        assert str(subscription.id) in result
 
     def test_user_info(self):
         admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
@@ -659,14 +646,10 @@ class TestUserSubscriptionAdmin:
 
         assert "Weekly Newsletter" in result or "Newsletter" in result
 
-    def test_status_display(self):
-        # ``status_display`` renders user-facing labels via
+    @pytest.mark.assert_english
+    def test_status_label(self):
+        # ``choice_label`` renders user-facing labels via
         # ``get_status_display()`` which respects the active locale.
-        # Force English so the assertion stays portable across
-        # machines with the Greek ``.mo`` compiled (LANGUAGE_CODE
-        # default) vs un-compiled.
-        from django.utils import translation
-
         admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
         user = UserAccountFactory()
         topic1 = SubscriptionTopicFactory()
@@ -677,18 +660,19 @@ class TestUserSubscriptionAdmin:
             topic=topic1,
             status=UserSubscription.SubscriptionStatus.ACTIVE,
         )
-        with translation.override("en"):
-            result = admin.status_display(active_sub)
-        assert "Active" in result
+        result = admin.status_label(active_sub)
+        assert result == (UserSubscription.SubscriptionStatus.ACTIVE, "Active")
 
         unsubscribed_sub = UserSubscriptionFactory(
             user=user,
             topic=topic2,
             status=UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
         )
-        with translation.override("en"):
-            result = admin.status_display(unsubscribed_sub)
-        assert "Unsubscribed" in result
+        result = admin.status_label(unsubscribed_sub)
+        assert result == (
+            UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
+            "Unsubscribed",
+        )
 
     def test_subscription_dates(self):
         admin = UserSubscriptionAdmin(UserSubscription, AdminSite())
@@ -702,7 +686,7 @@ class TestUserSubscriptionAdmin:
 
         result = admin.subscription_dates(subscription)
 
-        assert "Subscribed" in result or "ago" in result
+        assert "Subscribed" in result
 
     @patch.object(UserSubscriptionAdmin, "message_user")
     def test_activate_subscriptions_action(

@@ -1,12 +1,12 @@
 from django.contrib import admin
-from unfold.admin import ModelAdmin
 
+from admin.base import BaseModelAdmin
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from meta_capi.models import MetaCapiEventLog
 
 
 @admin.register(MetaCapiEventLog)
-class MetaCapiEventLogAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+class MetaCapiEventLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     list_display = (
         "event_name",
         "status",

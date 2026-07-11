@@ -5,6 +5,7 @@ from django.contrib.admin.sites import AdminSite
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
 
+from admin.base import BaseTranslatableAdmin
 from country.admin import CountryAdmin, CountryStatusFilter
 from country.models import Country
 
@@ -191,17 +192,12 @@ class CountryAdminTestCase(TestCase):
 
         self.assertIn("Germany", result)
         self.assertIn("DE", result)
-        self.assertIn("✅", result)
-        self.assertIn("Sort: 10", result)
-        self.assertIn("text-green-600", result)
 
     def test_country_info_without_iso(self):
         result = self.admin.country_info(self.incomplete_country)
 
         self.assertIn("Test Country", result)
         self.assertIn("ZZ", result)
-        self.assertIn("⚠️", result)
-        self.assertIn("text-orange-600", result)
 
     def test_flag_display_with_flag(self):
         self.country.image_flag = Mock()
@@ -210,60 +206,35 @@ class CountryAdminTestCase(TestCase):
         result = self.admin.flag_display(self.country)
 
         self.assertIn('<img src="/media/flags/de.png"', result)
-        self.assertIn("width: 48px", result)
-        self.assertIn("height: 32px", result)
 
     def test_flag_display_without_flag(self):
         result = self.admin.flag_display(self.country_no_flag)
 
-        self.assertIn("🏳️", result)
-        self.assertIn("background: linear-gradient", result)
+        self.assertIsNone(result)
 
     def test_codes_display(self):
         result = self.admin.codes_display(self.country)
 
         self.assertIn("DE", result)
         self.assertIn("DEU", result)
-        self.assertIn("ISO: 276", result)
-        self.assertIn("bg-blue-50", result)
-        self.assertIn("bg-green-50", result)
+        self.assertIn("ISO 276", result)
 
     def test_codes_display_without_iso(self):
         result = self.admin.codes_display(self.incomplete_country)
 
         self.assertIn("ZZ", result)
         self.assertIn("ZZZ", result)
-        self.assertIn("ISO: —", result)
+        self.assertIn("ISO —", result)
 
     def test_contact_info_with_phone(self):
         result = self.admin.contact_info(self.country)
 
-        self.assertIn("📞 +49", result)
-        self.assertIn("bg-blue-50", result)
-
-    def test_contact_info_single_digit_phone(self):
-        self.country.phone_code = 1
-        self.country.save()
-
-        result = self.admin.contact_info(self.country)
-
-        self.assertIn("📞 +1", result)
-        self.assertIn("bg-green-50", result)
-
-    def test_contact_info_three_digit_phone(self):
-        self.country.phone_code = 123
-        self.country.save()
-
-        result = self.admin.contact_info(self.country)
-
-        self.assertIn("📞 +123", result)
-        self.assertIn("bg-orange-50", result)
+        self.assertEqual(result, "+49")
 
     def test_contact_info_no_phone(self):
         result = self.admin.contact_info(self.incomplete_country)
 
-        self.assertIn("📞 No Code", result)
-        self.assertIn("bg-gray-50", result)
+        self.assertEqual(result, "No phone code")
 
     def test_completeness_badge_complete(self):
         self.country.image_flag = SimpleUploadedFile(
@@ -274,17 +245,13 @@ class CountryAdminTestCase(TestCase):
         result = self.admin.completeness_badge(self.country)
 
         self.assertIn("100%", result)
-        self.assertIn("✅", result)
         self.assertIn("Complete", result)
-        self.assertIn("bg-green-50", result)
 
     def test_completeness_badge_good(self):
         result = self.admin.completeness_badge(self.country)
 
         self.assertIn("75%", result)
-        self.assertIn("🔷", result)
         self.assertIn("Good", result)
-        self.assertIn("bg-blue-50", result)
 
     def test_completeness_badge_partial(self):
         self.country.phone_code = None
@@ -293,26 +260,19 @@ class CountryAdminTestCase(TestCase):
         result = self.admin.completeness_badge(self.country)
 
         self.assertIn("50%", result)
-        self.assertIn("⚠️", result)
         self.assertIn("Partial", result)
-        self.assertIn("bg-yellow-50", result)
 
     def test_completeness_badge_incomplete(self):
         result = self.admin.completeness_badge(self.incomplete_country)
 
         self.assertIn("25%", result)
-        self.assertIn("❌", result)
         self.assertIn("Incomplete", result)
-        self.assertIn("bg-red-50", result)
 
     def test_created_display(self):
         result = self.admin.created_display(self.country)
 
-        date_str = self.country.created_at.strftime("%Y-%m-%d")
-        time_str = self.country.created_at.strftime("%H:%M")
-
+        date_str = self.country.created_at.strftime("%d/%m/%Y")
         self.assertIn(date_str, result)
-        self.assertIn(time_str, result)
 
     def test_update_sort_order_action(self):
         request = self.factory.post("/admin/country/country/")
@@ -375,7 +335,7 @@ class CountryAdminIntegrationTestCase(TestCase):
                 created_display = self.admin.created_display(country)
 
                 self.assertIsInstance(country_info, str)
-                self.assertIsInstance(flag_display, str)
+                self.assertIsNone(flag_display)
                 self.assertIsInstance(codes_display, str)
                 self.assertIsInstance(contact_info, str)
                 self.assertIsInstance(completeness_badge, str)
@@ -383,8 +343,6 @@ class CountryAdminIntegrationTestCase(TestCase):
 
                 self.assertIn(country.name, country_info)
                 self.assertIn(country.alpha_2, codes_display)
-                self.assertTrue(len(flag_display) > 0)
-                self.assertIn("📞", contact_info)
                 self.assertIn("%", completeness_badge)
 
     def test_filter_functionality(self):
@@ -409,6 +367,7 @@ class CountryAdminIntegrationTestCase(TestCase):
         self.assertEqual(self.admin.ordering, ["sort_order", "alpha_2"])
         self.assertTrue(self.admin.list_fullwidth)
         self.assertTrue(self.admin.list_filter_submit)
+        self.assertIsInstance(self.admin, BaseTranslatableAdmin)
 
         expected_display = [
             "country_info",

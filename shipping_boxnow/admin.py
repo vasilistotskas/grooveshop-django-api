@@ -4,14 +4,16 @@ from django.contrib import admin, messages
 from django.urls import reverse
 from django.utils.html import conditional_escape, format_html
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import ModelAdmin, StackedInline, TabularInline
+from unfold.admin import StackedInline, TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
 )
-from unfold.decorators import action
+from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from admin.base import BaseModelAdmin
+from admin.displays import SHIPMENT_STATE_VARIANT, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from shipping_boxnow.enum.parcel_state import BoxNowParcelState
 from shipping_boxnow.models import (
@@ -30,6 +32,7 @@ class BoxNowParcelEventInline(TabularInline):
     model = BoxNowParcelEvent
     extra = 0
     can_delete = False
+    per_page = 15
     fields = (
         "event_time",
         "event_type",
@@ -181,111 +184,14 @@ class BoxNowParcelStateBadgeFilter(DropdownFilter):
         return queryset.filter(**filter_kwargs)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────
-
-_STATE_BADGE_CONFIG: dict[str, dict[str, str]] = {
-    BoxNowParcelState.PENDING_CREATION: {
-        "bg": "bg-gray-50 dark:bg-gray-900",
-        "text": "text-gray-600 dark:text-gray-300",
-        "icon": "⏳",
-    },
-    BoxNowParcelState.NEW: {
-        "bg": "bg-blue-50 dark:bg-blue-900",
-        "text": "text-blue-700 dark:text-blue-300",
-        "icon": "🆕",
-    },
-    BoxNowParcelState.IN_DEPOT: {
-        "bg": "bg-cyan-50 dark:bg-cyan-900",
-        "text": "text-cyan-700 dark:text-cyan-300",
-        "icon": "📦",
-    },
-    BoxNowParcelState.ACCEPTED_TO_LOCKER: {
-        "bg": "bg-cyan-50 dark:bg-cyan-900",
-        "text": "text-cyan-700 dark:text-cyan-300",
-        "icon": "🔒",
-    },
-    BoxNowParcelState.ACCEPTED_FOR_RETURN: {
-        "bg": "bg-yellow-50 dark:bg-yellow-900",
-        "text": "text-yellow-700 dark:text-yellow-300",
-        "icon": "↩️",
-    },
-    BoxNowParcelState.FINAL_DESTINATION: {
-        "bg": "bg-amber-50 dark:bg-amber-900",
-        "text": "text-amber-700 dark:text-amber-300",
-        "icon": "🏁",
-    },
-    BoxNowParcelState.DELIVERED: {
-        "bg": "bg-green-50 dark:bg-green-900",
-        "text": "text-green-700 dark:text-green-300",
-        "icon": "✅",
-    },
-    BoxNowParcelState.RETURNED: {
-        "bg": "bg-red-50 dark:bg-red-900",
-        "text": "text-red-700 dark:text-red-300",
-        "icon": "↩️",
-    },
-    BoxNowParcelState.EXPIRED: {
-        "bg": "bg-red-50 dark:bg-red-900",
-        "text": "text-red-700 dark:text-red-300",
-        "icon": "🕐",
-    },
-    BoxNowParcelState.CANCELED: {
-        "bg": "bg-red-50 dark:bg-red-900",
-        "text": "text-red-700 dark:text-red-300",
-        "icon": "❌",
-    },
-    BoxNowParcelState.LOST: {
-        "bg": "bg-red-50 dark:bg-red-900",
-        "text": "text-red-700 dark:text-red-300",
-        "icon": "❓",
-    },
-    BoxNowParcelState.MISSING: {
-        "bg": "bg-red-50 dark:bg-red-900",
-        "text": "text-red-700 dark:text-red-300",
-        "icon": "🔍",
-    },
-}
-
-_FALLBACK_BADGE = {
-    "bg": "bg-gray-50 dark:bg-gray-900",
-    "text": "text-gray-600 dark:text-gray-300",
-    "icon": "❓",
-}
-
-
-def _render_state_badge(state: str, display: str) -> str:
-    config = _STATE_BADGE_CONFIG.get(state, _FALLBACK_BADGE)
-    # `config["bg"]`, `config["text"]`, and `config["icon"]` come from
-    # the static `_STATE_BADGE_CONFIG` dict above (no user input);
-    # `display` is the only externally-derived value and goes through
-    # format_html's auto-escaping.
-    return format_html(
-        '<span class="inline-flex items-center justify-center px-2 py-1 '
-        'text-xs font-medium {bg} {text_class} rounded-full gap-1">'
-        "<span>{icon}</span>"
-        "<span>{display}</span>"
-        "</span>",
-        bg=config["bg"],
-        text_class=config["text"],
-        icon=config["icon"],
-        display=display,
-    )
-
-
 # ── BoxNowShipment admin ────────────────────────────────────────────────────
 
 
 @admin.register(BoxNowShipment)
-class BoxNowShipmentAdmin(ModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
+class BoxNowShipmentAdmin(BaseModelAdmin):
     list_display = (
         "parcel_id_display",
-        "parcel_state_badge",
+        "parcel_state_label",
         "locker_external_id",
         "order_link",
         "compartment_size",
@@ -383,19 +289,19 @@ class BoxNowShipmentAdmin(ModelAdmin):
     actions = ["cancel_parcels", "resync_label", "download_labels_zip"]
     actions_detail = ["download_voucher_action", "cancel_parcel_action"]
     list_select_related = ["order", "locker"]
-    save_on_top = True
     date_hierarchy = "created_at"
+
+    parcel_state_label = choice_label(
+        "parcel_state",
+        variants=SHIPMENT_STATE_VARIANT,
+        description=_("State"),
+    )
 
     # ── List display helpers ────────────────────────────────────────
 
     @admin.display(description=_("Voucher"))
     def parcel_id_display(self, obj):
         return obj.parcel_id or "—"
-
-    @admin.display(description=_("State"))
-    def parcel_state_badge(self, obj):
-        display = obj.get_parcel_state_display()
-        return _render_state_badge(obj.parcel_state, display)
 
     @admin.display(description=_("Order"))
     def order_link(self, obj):
@@ -726,11 +632,7 @@ class BoxNowShipmentAdmin(ModelAdmin):
 
 
 @admin.register(BoxNowLocker)
-class BoxNowLockerAdmin(ModelAdmin):
-    compressed_fields = True
-    list_fullwidth = True
-    list_filter_submit = True
-
+class BoxNowLockerAdmin(BaseModelAdmin):
     list_display = (
         "external_id",
         "name",
@@ -801,7 +703,6 @@ class BoxNowLockerAdmin(ModelAdmin):
         ),
     )
     actions = ["sync_from_boxnow"]
-    save_on_top = True
 
     @action(
         description=str(_("Sync lockers from BoxNow API")),
@@ -843,15 +744,11 @@ class BoxNowLockerAdmin(ModelAdmin):
 
 
 @admin.register(BoxNowParcelEvent)
-class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
-    compressed_fields = True
-    list_fullwidth = True
-    list_filter_submit = True
-
+class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     list_display = (
         "shipment_voucher",
         "event_type",
-        "parcel_state_badge",
+        "parcel_state_label",
         "event_time",
         "display_name",
         "received_at",
@@ -931,12 +828,12 @@ class BoxNowParcelEventAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
         parcel_id = obj.shipment.parcel_id if obj.shipment_id else "—"
         return parcel_id or "—"
 
-    @admin.display(description=_("Parcel State"))
-    def parcel_state_badge(self, obj):
-        if not obj.parcel_state:
-            return "—"
-        # parcel_state on the event is the raw BoxNow vocabulary string,
-        # not necessarily a BoxNowParcelState enum value.  We try to map
-        # it for the colour config; fall back gracefully.
-        display = obj.parcel_state
-        return _render_state_badge(obj.parcel_state, display)
+    # ``parcel_state`` on the event is the raw BoxNow vocabulary string
+    # (see ``BoxNowParcelEvent`` docstring) — the field has no
+    # ``choices=``, so ``get_parcel_state_display()`` doesn't exist and
+    # ``admin.displays.choice_label`` can't be used here. This mirrors
+    # its behaviour directly: render the raw value through the shared
+    # variant map, falling back to unfold's default "-" for empty rows.
+    @display(description=_("Parcel State"), label=SHIPMENT_STATE_VARIANT)
+    def parcel_state_label(self, obj):
+        return obj.parcel_state or None

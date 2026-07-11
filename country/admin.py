@@ -1,18 +1,17 @@
 from django.contrib import admin, messages
 from django.db import models
 from django.utils.html import format_html
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from parler.admin import TranslatableAdmin
-from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericFilter,
 )
-from unfold.decorators import action
+from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from admin.base import BaseTranslatableAdmin
+from admin.displays import format_dt
 from country.models import Country
 from region.admin import RegionInline
 
@@ -53,10 +52,7 @@ class CountryStatusFilter(DropdownFilter):
 
 
 @admin.register(Country)
-class CountryAdmin(ModelAdmin, TranslatableAdmin):
-    list_fullwidth = True
-    list_filter_submit = True
-
+class CountryAdmin(BaseTranslatableAdmin):
     list_display = [
         "country_info",
         "flag_display",
@@ -130,176 +126,58 @@ class CountryAdmin(ModelAdmin, TranslatableAdmin):
         ),
     )
 
-    @admin.display(description=_("Country"))
+    @display(description=_("Country"), ordering="alpha_2")
     def country_info(self, obj):
-        name = (
-            obj.safe_translation_getter("name", any_language=True)
-            or "Unnamed Country"
+        name = obj.safe_translation_getter("name", any_language=True) or _(
+            "Unnamed Country"
         )
-        has_iso = obj.iso_cc is not None
-        status_icon = "✅" if has_iso else "⚠️"
-        status_color = (
-            "text-green-600 dark:text-green-400"
-            if has_iso
-            else "text-orange-600 dark:text-orange-400"
-        )
+        return f"{name} ({obj.alpha_2})"
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100 flex items-center gap-2">'
-            '<span class="{color}">{icon}</span>'
-            "<span>{name}</span>"
-            "</div>"
-            '<div class="text-base-600 dark:text-base-400">{alpha_2}</div>'
-            '<div class="text-xs text-base-600 dark:text-base-300">Sort: {sort_order}</div>'
-            "</div>",
-            color=status_color,
-            icon=status_icon,
-            name=name,
-            alpha_2=obj.alpha_2,
-            sort_order=str(obj.sort_order or "No order"),
-        )
-
-    @admin.display(description=_("Flag"))
+    @admin.display(description=_("Flag"), empty_value="—")
     def flag_display(self, obj):
-        if obj.image_flag:
-            return format_html(
-                '<div class="flex items-center justify-center">'
-                '<img src="{url}" style="width: 48px; height: 32px;'
-                " object-fit: cover; border-radius: 4px; border: 1px"
-                " solid #e5e7eb; box-shadow: 0 1px 3px"
-                ' rgba(0,0,0,0.1);" /></div>',
-                url=obj.image_flag.url,
-            )
-        return mark_safe(
-            '<div style="width: 48px; height: 32px; '
-            "background: linear-gradient(45deg, #f3f4f6 25%, transparent 25%), "
-            "linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), "
-            "linear-gradient(45deg, transparent 75%, #f3f4f6 75%), "
-            "linear-gradient(-45deg, transparent 75%, #f3f4f6 75%); "
-            "background-size: 8px 8px; background-position: 0 0, 0 4px, 4px -4px, -4px 0px; "
-            "border-radius: 4px; border: 1px solid #e5e7eb; display: flex; align-items: center; "
-            'justify-content: center; color: #9ca3af; font-size: 12px;">'
-            "🏳️"
-            "</div>"
+        if not obj.image_flag:
+            return None
+        return format_html(
+            '<img src="{url}" width="32" height="22" alt="" />',
+            url=obj.image_flag.url,
         )
 
-    @admin.display(description=_("Codes"))
+    @display(description=_("Codes"))
     def codes_display(self, obj):
-        iso_display = str(obj.iso_cc) if obj.iso_cc else "—"
-        iso_color = (
-            "text-base-900 dark:text-base-100"
-            if obj.iso_cc
-            else "text-base-600 dark:text-base-300"
-        )
-        return format_html(
-            '<div class="text-sm space-y-1">'
-            '<div class="flex gap-1">'
-            '<span class="inline-flex items-center px-2 py-1 text-xs'
-            " font-medium bg-blue-50 dark:bg-blue-900 text-blue-700"
-            " dark:text-blue-200 rounded border border-blue-200"
-            ' dark:border-blue-700">{a2}</span> '
-            '<span class="inline-flex items-center px-2 py-1 text-xs'
-            " font-medium bg-green-50 dark:bg-green-900 text-green-700"
-            " dark:text-green-200 rounded border border-green-200"
-            ' dark:border-green-700">{a3}</span>'
-            "</div>"
-            '<div class="{iso_color}">ISO: {iso_display}</div>'
-            "</div>",
-            a2=obj.alpha_2,
-            a3=obj.alpha_3,
-            iso_color=iso_color,
-            iso_display=iso_display,
-        )
+        iso = obj.iso_cc if obj.iso_cc is not None else "—"
+        return f"{obj.alpha_2} / {obj.alpha_3} — ISO {iso}"
 
-    @admin.display(description=_("Contact"))
+    @display(description=_("Contact"))
     def contact_info(self, obj):
-        if obj.phone_code:
-            code_str = str(obj.phone_code)
-            if len(code_str) == 1:
-                badge_class = "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 border-green-200 dark:border-green-700"
-            elif len(code_str) == 2:
-                badge_class = "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 border-blue-200 dark:border-blue-700"
-            elif len(code_str) == 3:
-                badge_class = "bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-200 border-orange-200 dark:border-orange-700"
-            else:
-                badge_class = "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 border-red-200 dark:border-red-700"
+        if obj.phone_code is None:
+            return str(_("No phone code"))
+        return f"+{obj.phone_code}"
 
-            return format_html(
-                '<div class="text-sm"><div>'
-                '<span class="inline-flex items-center px-2 py-1 text-xs'
-                ' font-medium {badge_class} rounded border">📞 +{code}</span>'
-                "</div></div>",
-                badge_class=badge_class,
-                code=code_str,
-            )
-        return mark_safe(
-            '<div class="text-sm"><div>'
-            '<span class="inline-flex items-center px-2 py-1 text-xs'
-            " font-medium bg-gray-50 dark:bg-gray-900 text-base-600"
-            " dark:text-base-300 rounded border border-gray-200"
-            ' dark:border-gray-700">📞 No Code</span>'
-            "</div></div>"
-        )
-
-    @admin.display(description=_("Completeness"))
+    @display(description=_("Completeness"))
     def completeness_badge(self, obj):
-        total_fields = 4
-        completed_fields = 0
-
-        if obj.safe_translation_getter("name", any_language=True):
-            completed_fields += 1
-        if obj.iso_cc is not None:
-            completed_fields += 1
-        if obj.phone_code is not None:
-            completed_fields += 1
-        if obj.image_flag:
-            completed_fields += 1
-
-        percentage = (completed_fields / total_fields) * 100
-
-        if percentage == 100:
-            badge_class = "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 border-green-200 dark:border-green-700"
-            icon = "✅"
-            label = "Complete"
-        elif percentage >= 75:
-            badge_class = "bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 border-blue-200 dark:border-blue-700"
-            icon = "🔷"
-            label = "Good"
-        elif percentage >= 50:
-            badge_class = "bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-200 border-yellow-200 dark:border-yellow-700"
-            icon = "⚠️"
-            label = "Partial"
+        total = 4
+        done = sum(
+            [
+                bool(obj.safe_translation_getter("name", any_language=True)),
+                obj.iso_cc is not None,
+                obj.phone_code is not None,
+                bool(obj.image_flag),
+            ]
+        )
+        pct = done * 100 // total
+        if pct == 100:
+            label = _("Complete")
+        elif pct >= 75:
+            label = _("Good")
+        elif pct >= 50:
+            label = _("Partial")
         else:
-            badge_class = "bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 border-red-200 dark:border-red-700"
-            icon = "❌"
-            label = "Incomplete"
+            label = _("Incomplete")
+        return f"{pct}% ({label})"
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{pct}%</div>'
-            '<span class="inline-flex items-center px-2 py-1 text-xs'
-            ' font-medium {badge_class} rounded border gap-1">'
-            "<span>{icon}</span>"
-            "<span>{label}</span>"
-            "</span>"
-            "</div>",
-            pct=int(percentage),
-            badge_class=badge_class,
-            icon=icon,
-            label=label,
-        )
-
-    @admin.display(description=_("Created"))
+    @display(description=_("Created"), ordering="created_at")
     def created_display(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{date}</div>'
-            '<div class="text-base-600 dark:text-base-400">{time}</div>'
-            "</div>",
-            date=obj.created_at.strftime("%Y-%m-%d"),
-            time=obj.created_at.strftime("%H:%M"),
-        )
+        return format_dt(obj.created_at)
 
     @action(
         description=str(_("Update sort order")),

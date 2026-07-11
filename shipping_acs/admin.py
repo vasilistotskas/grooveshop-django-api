@@ -9,8 +9,10 @@ from __future__ import annotations
 import logging
 
 from django.contrib import admin, messages
+from django.urls import reverse
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import ModelAdmin, StackedInline, TabularInline
+from unfold.admin import StackedInline, TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateFilter,
@@ -19,6 +21,8 @@ from unfold.contrib.filters.admin import (
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
+from admin.base import BaseModelAdmin
+from admin.displays import SHIPMENT_STATE_VARIANT, choice_label
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from shipping_acs.enum.shipment_state import AcsShipmentState
 from shipping_acs.models import (
@@ -41,6 +45,7 @@ class AcsTrackingEventInline(TabularInline):
     model = AcsTrackingEvent
     extra = 0
     can_delete = False
+    per_page = 15
     fields = (
         "event_time",
         "checkpoint_action",
@@ -141,11 +146,11 @@ class AcsShipmentStateFilter(DropdownFilter):
 
 
 @admin.register(AcsShipment)
-class AcsShipmentAdmin(ModelAdmin):
+class AcsShipmentAdmin(BaseModelAdmin):
     list_display = (
         "voucher_no",
         "order_link",
-        "shipment_state",
+        "shipment_state_label",
         "delivery_kind",
         "pickup_list",
         "last_polled_at",
@@ -173,6 +178,13 @@ class AcsShipmentAdmin(ModelAdmin):
     inlines = [AcsTrackingEventInline]
     actions_row = ["repoll_tracking", "issue_voucher_now"]
     actions = ["bulk_repoll_tracking", "retire_shipments"]
+    list_select_related = ("order", "pickup_list")
+
+    shipment_state_label = choice_label(
+        "shipment_state",
+        variants=SHIPMENT_STATE_VARIANT,
+        description=_("State"),
+    )
 
     @action(
         description=str(_("Re-poll tracking for selected shipments")),
@@ -239,7 +251,11 @@ class AcsShipmentAdmin(ModelAdmin):
 
     @admin.display(description=_("Order"))
     def order_link(self, obj: AcsShipment) -> str:
-        return f"#{obj.order_id}"
+        return format_html(
+            '<a href="{url}">#{id}</a>',
+            url=reverse("admin:order_order_change", args=[obj.order_id]),
+            id=obj.order_id,
+        )
 
     @action(
         description=str(_("Re-poll ACS tracking")),
@@ -269,7 +285,7 @@ class AcsShipmentAdmin(ModelAdmin):
 
 
 @admin.register(AcsStation)
-class AcsStationAdmin(ModelAdmin):
+class AcsStationAdmin(BaseModelAdmin):
     list_display = (
         "external_id",
         "name",
@@ -285,7 +301,7 @@ class AcsStationAdmin(ModelAdmin):
 
 
 @admin.register(AcsPickupList)
-class AcsPickupListAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+class AcsPickupListAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     list_display = (
         "pickup_list_no",
         "issued_at",
@@ -306,7 +322,7 @@ class AcsPickupListAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
 
 
 @admin.register(AcsCodPayout)
-class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     """Read-only ledger of ACS COD payouts (Phase 4c).
 
     Populated by the daily ``reconcile_acs_cod_payouts`` Celery task.
@@ -365,12 +381,8 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
 
 
 @admin.register(AcsTrackingEvent)
-class AcsTrackingEventAdmin(IsSuperuserOnlyModelAdmin, ModelAdmin):
+class AcsTrackingEventAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     """Read-only audit trail of ACS tracking webhook deliveries."""
-
-    compressed_fields = True
-    list_fullwidth = True
-    list_filter_sheet = True
 
     list_display = (
         "shipment",

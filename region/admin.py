@@ -57,14 +57,14 @@ class RegionInline(BaseTranslatableTabularInline):
 
 @admin.register(Region)
 class RegionAdmin(BaseTranslatableAdmin):
-    list_display = [
+    list_display = (
         "region_info",
         "country_display",
         "region_stats",
         "sort_display",
         "completeness_badge",
         "created_display",
-    ]
+    )
     list_filter = [
         RegionStatusFilter,
         ("country", RelatedDropdownFilter),

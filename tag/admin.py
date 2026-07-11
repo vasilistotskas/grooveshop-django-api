@@ -120,13 +120,13 @@ class TagInLine(GenericTabularInline):
 
 @admin.register(Tag)
 class TagAdmin(BaseTranslatableAdmin):
-    list_display = [
+    list_display = (
         "label_display",
         "active",
         "usage_count_display",
         "sort_order",
         "created_display",
-    ]
+    )
     list_filter = [
         TagStatusFilter,
         TagUsageFilter,
@@ -263,12 +263,12 @@ class TagAdmin(BaseTranslatableAdmin):
 
 @admin.register(TaggedItem)
 class TaggedItemAdmin(BaseModelAdmin):
-    list_display = [
+    list_display = (
         "tag_display",
         "content_object_display",
         "content_type_display",
         "created_at",
-    ]
+    )
     list_filter = [
         ("tag", RelatedDropdownFilter),
         ("content_type", RelatedDropdownFilter),

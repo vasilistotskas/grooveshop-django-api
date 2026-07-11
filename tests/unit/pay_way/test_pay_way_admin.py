@@ -332,7 +332,11 @@ class PayWayAdminTestCase(TestCase):
         self.assertTrue(self.admin.list_filter_sheet)
 
     def test_list_display(self):
-        expected_fields = [
+        # Tuple, not list: unfold appends ``ordering_field`` to a
+        # list-typed list_display IN PLACE on changelist render,
+        # mutating the shared class attribute (test-order flakiness).
+        # A tuple makes unfold build a fresh copy per request.
+        expected_fields = (
             "name_display",
             "provider_code_display",
             "payment_type_display",
@@ -340,7 +344,7 @@ class PayWayAdminTestCase(TestCase):
             "free_threshold_display",
             "icon_preview",
             "sort_order_display",
-        ]
+        )
         self.assertEqual(self.admin.list_display, expected_fields)
 
     def test_list_filter(self):

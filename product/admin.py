@@ -354,7 +354,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
 
     ordering_field = "sort_order"
     hide_ordering_field = True
-    list_display = [
+    list_display = (
         "attribute_info",
         "active",
         "is_variant",
@@ -362,7 +362,7 @@ class AttributeAdmin(BaseTranslatableAdmin):
         "usage_count_display",
         "sort_order",
         "created_display",
-    ]
+    )
     search_fields = [
         "id",
         "translations__name",
@@ -495,14 +495,14 @@ class AttributeValueAdmin(BaseTranslatableAdmin):
 
     ordering_field = "sort_order"
     hide_ordering_field = True
-    list_display = [
+    list_display = (
         "value_info",
         "attribute_display",
         "active",
         "usage_count_display",
         "sort_order",
         "created_display",
-    ]
+    )
     search_fields = [
         "id",
         "translations__value",
@@ -809,7 +809,7 @@ class ProductAdmin(
     swapped for the plain ``ExportActionMixin``.
     """
 
-    list_display = [
+    list_display = (
         "product_info",
         "category_display",
         "variant_group_display",
@@ -817,7 +817,7 @@ class ProductAdmin(
         "stock_status",
         "active",
         "created_display",
-    ]
+    )
     search_fields = [
         "id",
         "sku",
@@ -1716,14 +1716,14 @@ class ProductCategoryAdmin(BaseTranslatableAdmin):
 class ProductReviewAdmin(BaseTranslatableAdmin):
     show_full_result_count = False  # Disable expensive COUNT(*) query
 
-    list_display = [
+    list_display = (
         "review_info",
         "product_link",
         "user_link",
         "rating_display",
         "status_label",
         "created_display",
-    ]
+    )
     list_filter = [
         "status",
         ("rate", SliderNumericFilter),
@@ -1878,11 +1878,11 @@ class ProductReviewAdmin(BaseTranslatableAdmin):
 
 @admin.register(ProductFavourite)
 class ProductFavouriteAdmin(BaseModelAdmin):
-    list_display = [
+    list_display = (
         "user_display",
         "product_display",
         "created_display",
-    ]
+    )
     list_filter = [
         ("created_at", RangeDateTimeFilter),
         ("user", RelatedDropdownFilter),
@@ -1930,14 +1930,14 @@ class ProductFavouriteAdmin(BaseModelAdmin):
 class ProductCategoryImageAdmin(BaseTranslatableAdmin):
     ordering_field = "sort_order"
     hide_ordering_field = True
-    list_display = [
+    list_display = (
         "image_thumbnail",
         "category_name",
         "image_type_label",
         "active",
         "sort_order",
         "created_at",
-    ]
+    )
     list_filter = [
         "image_type",
         "active",
@@ -2012,13 +2012,13 @@ class ProductCategoryImageAdmin(BaseTranslatableAdmin):
 class ProductImageAdmin(BaseTranslatableAdmin):
     ordering_field = "sort_order"
     hide_ordering_field = True
-    list_display = [
+    list_display = (
         "image_thumbnail",
         "product_name",
         "is_main",
         "sort_order",
         "created_at",
-    ]
+    )
     list_filter = [
         "is_main",
         ("product", RelatedDropdownFilter),
@@ -2091,12 +2091,12 @@ class ProductVariantGroupAdmin(BaseTranslatableAdmin):
     at-a-glance view of their members.
     """
 
-    list_display = [
+    list_display = (
         "group_info",
         "active",
         "members_count_display",
         "created_at",
-    ]
+    )
     search_fields = [
         "id",
         "translations__name",
@@ -2203,11 +2203,11 @@ class BrandAdmin(BaseModelAdmin):
     autocomplete); this page manages the canonical brand names.
     """
 
-    list_display = [
+    list_display = (
         "name",
         "products_count_display",
         "created_at",
-    ]
+    )
     search_fields = ["name"]
     list_filter = [
         ("created_at", RangeDateTimeFilter),

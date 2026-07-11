@@ -140,7 +140,7 @@ class ConfigurationStatusFilter(DropdownFilter):
 
 @admin.register(PayWay)
 class PayWayAdmin(BaseTranslatableAdmin):
-    list_display = [
+    list_display = (
         "name_display",
         "provider_code_display",
         "payment_type_display",
@@ -148,7 +148,7 @@ class PayWayAdmin(BaseTranslatableAdmin):
         "free_threshold_display",
         "icon_preview",
         "sort_order_display",
-    ]
+    )
 
     list_filter = [
         "active",

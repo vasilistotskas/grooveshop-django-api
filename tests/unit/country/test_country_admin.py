@@ -369,14 +369,17 @@ class CountryAdminIntegrationTestCase(TestCase):
         self.assertTrue(self.admin.list_filter_submit)
         self.assertIsInstance(self.admin, BaseTranslatableAdmin)
 
-        expected_display = [
+        # Tuple, not list: unfold appends ``ordering_field`` to a
+        # list-typed list_display IN PLACE on changelist render,
+        # mutating the shared class attribute (test-order flakiness).
+        expected_display = (
             "country_info",
             "flag_display",
             "codes_display",
             "contact_info",
             "completeness_badge",
             "created_display",
-        ]
+        )
         self.assertEqual(self.admin.list_display, expected_display)
 
         expected_search = [

@@ -53,14 +53,14 @@ class CountryStatusFilter(DropdownFilter):
 
 @admin.register(Country)
 class CountryAdmin(BaseTranslatableAdmin):
-    list_display = [
+    list_display = (
         "country_info",
         "flag_display",
         "codes_display",
         "contact_info",
         "completeness_badge",
         "created_display",
-    ]
+    )
     list_filter = [
         CountryStatusFilter,
         ("iso_cc", RangeNumericFilter),

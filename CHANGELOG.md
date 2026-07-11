@@ -3,6 +3,186 @@
 
 
 
+## v1.156.0 (2026-07-11)
+
+### Bug fixes
+
+* fix(admin): tuple list_display on ordering_field admins
+
+unfold appends ordering_field to a list-typed list_display IN PLACE
+on changelist render, mutating the shared class attribute — CI test
+order (smoke test rendering changelists before the config assertions)
+exposed what local ordering hid. Tuples make unfold build a fresh
+copy per request; converted every list_display in the ordering_field
+admin files and aligned the two config assertions.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`95bf1e4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/95bf1e4604e0c73080bb34efce643c2c362014a7))
+
+* fix(i18n): complete the Greek admin/domain translation catalog
+
+makemessages regen + full fill: 1119 previously-empty entries
+translated, 219 fuzzy auto-matches corrected and defuzzed (fuzzy
+entries are ignored at runtime — ACS/BoxNow shipment states, review
+statuses and the new admin strings rendered English in the unfold
+label pills). Placeholders preserved; two false-positive
+python-format flags overridden; courier loanwords (Voucher, Locker,
+Smartpoint) kept per existing convention. Verified via
+compilemessages + runtime label rendering for every status enum.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`9446e1c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9446e1c1730770ede34014e02c01a59828c39bf3))
+
+* fix(admin): restore euro formatting on dashboard revenue axis
+
+Chart.js accepts an Intl.NumberFormat spec via ticks.format — a pure
+JSON option that survives json.dumps, unlike the old JS callback the
+unfold component migration had to drop.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`40b5e6d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40b5e6d4dcbab9b0d32d0ab054d8ed4258e003d2))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.155.0 [skip ci] ([`de35358`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de353589302f2d016e7faa3c4eb98ad96f1350c1))
+
+### Features
+
+* feat(admin): shared display vocabulary, parler bases, smoke net
+
+- admin/displays.py: unfold-native variant maps (order/payment/review/
+  shipment) + choice_label() factory producing @display(label=...)
+  columns that return (value, get_display()) tuples — the one true
+  status-pill mechanism replacing hand-rolled format_html badges
+- admin/base.py: BaseTranslatableAdmin (canonical parler-first MRO)
+  and BaseTranslatableTabularInline (unfold-styled parler inline)
+- admin/export.py: ExportActionMixin/ExportModelAdmin relocated
+  verbatim from core/admin.py; six import sites updated, no aliases
+- tests/unit/admin/test_smoke.py: every registered admin changelist +
+  add form GET as superuser (111 admins; 3 documented pre-existing
+  add-form bugs skipped pending their app phases)
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`5c2bd8d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c2bd8daf0728bce3e02dd6870ff513597cebfd0))
+
+* feat(admin): command palette, badge variants, env title prefix
+
+- COMMAND {search_models, show_history}: Ctrl+K cross-model search
+- badge_variant on all 7 sidebar badges (danger/warning/info triage
+  colours instead of a uniform red pill)
+- ENVIRONMENT_TITLE_PREFIX callback ([PROD]/[STAGE]/[CI]/[DEV] in the
+  browser tab title)
+- LANGUAGE_FLAGS for el/en/de in the language switcher
+- wrap django_celery_results/account/usersessions/sites admins with
+  the unfold base so every sidebar-linked form renders themed
+- email-template management view gets admin each_context (sidebar,
+  env badge and theme state were missing)
+- drop never-wired awaiting_fulfillment_badge; dedupe SITE_DROPDOWN
+  link filter
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`59bf18a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/59bf18ad0b58e0c5431709e25f54c8e225b274ab))
+
+### Refactoring
+
+* refactor(admin): dashboard on unfold native components
+
+index.html rebuilt with unfold card/title/text/progress/label
+components and chart canvases driven by unfold's bundled chart.js —
+the jsDelivr CDN script and the MutationObserver dark-mode hack are
+gone (unfold re-themes charts itself). dashboard.py sheds all
+HTML-in-Python: queue rows are plain dicts rendered in-template with
+ORDER_STATUS_VARIANT labels. Data layer, caching (key v3->v4) and
+signals untouched. Six dead partial templates deleted.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`01cff03`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01cff033c9e9dba2764d274970f7c6da9e596d35))
+
+* refactor(admin): unfold-native geo, shipping, loyalty admins
+
+250-line continent map and per-detail analytics deleted; RegionInline
+now renders styled via BaseTranslatableTabularInline; carrier state
+pills -> shared SHIPMENT_STATE_VARIANT labels (BoxNow raw webhook
+vocabulary documented on a manual label display); ACS order column is
+a real change-form link and the changelist gains list_select_related;
+event inlines paginate.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`8ae1181`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ae1181dc4b4504d2dbc216d1779a2bb767afa38))
+
+* refactor(admin): unfold-native cart/contact/vat/pay_way admins
+
+Contact SimpleListFilters -> unfold dropdowns and the word-count/
+sentiment/season analytics deleted (also fixes the add-form crash);
+VAT keeps one filter per field; PayWay list 10->7 and
+PayWay.instructions becomes a tinymce HTMLField (state-only AlterField
+migration, same TEXT column, email |safe render path untouched);
+CartItemInline paginates.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`0c79818`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c798181d8b45f5489ee27692dfdae1b4f97eeaa))
+
+* refactor(admin): unfold-native user and notification admins
+
+Emoji category/priority maps -> choice_label variants; identity cell
+is a two-line header display; blanket TextField->Wysiwyg override
+removed (rich text is HTMLField-only policy); SubscriptionTopic gets
+explicit ordering under its Count annotation. Fixes two pre-existing
+add-form crashes: unfold ModelAdmin never swaps form->add_form (added
+UserAdmin.get_form) and unsaved-obj readonly callables now guard
+obj.pk.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`a3eef28`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3eef2892437660a6cb6cd3d73962fb559c68541))
+
+* refactor(admin): unfold-native blog and tag admins
+
+Generic inlines now extend unfold GenericTabularInline (styled on the
+Product form too); BlogPost list 10->7 columns with a derived publish-
+status label; BlogComment drops DraggableMPTTAdmin (indentation via
+tree fields, counts annotated); tag analytics busywork deleted;
+RelatedOnlyFieldListFilter -> RelatedDropdownFilter.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`252b235`](https://github.com/vasilistotskas/grooveshop-django-api/commit/252b235707be2c4b66cb1d49ca2c03a34e3963fb))
+
+* refactor(admin): unfold-native product admin
+
+Pills/emoji -> labels + boolean displays; list_display trimmed;
+category column no longer walks MPTT ancestors per row; child counts
+annotated; translations prefetched on favourites/reviews/images;
+thumbnails unified on @admin_thumbnails; decorative analytics fields
+removed. 113KB -> 72KB, behavior preserved.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`339c8da`](https://github.com/vasilistotskas/grooveshop-django-api/commit/339c8dade7a029a42af678539e8f7c372be38d34))
+
+* refactor(admin): convert order admin to unfold-native displays
+
+Pilot for the admin-wide overhaul: every hand-rolled format_html/emoji
+pill becomes an unfold @display(label=...) column via the shared
+choice_label factory and variant maps; customer cell is a two-line
+header display; list_display trimmed to <=7 columns per admin;
+OrderItemAdmin gains translations prefetch (changelist N+1 fix);
+inlines paginate (per_page=15, collapsible); ~940 lines of decorative
+summary/analytics HTML deleted. -40% file size, behavior unchanged
+(actions, filters, invoice download, state machine untouched).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`054e4b9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/054e4b98575080739c87643a2cafcd82f1d9450b))
+
+### Testing
+
+* test(admin): UI vocabulary guards + final sweep
+
+test_ui_guards.py bans emoji, inline styles, raw gray tokens and pill
+markup in every admin module; SettingAdmin previews converted to
+plain text; header_two_line accepts lazy translation proxies; smoke-
+test skips for the fixed add-form bugs removed.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`ab68202`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ab682026a060b9185cfc1bfec518336bf1c8de6c))
+
 ## v1.155.0 (2026-07-11)
 
 ### Bug fixes

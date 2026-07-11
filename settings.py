@@ -1792,6 +1792,11 @@ UNFOLD = {
     "SHOW_BACK_BUTTON": True,
     "BORDER_RADIUS": "0.625rem",
     "ENVIRONMENT": "admin.environment.environment_callback",
+    # Prefixes the browser-tab title (e.g. "[PROD]") so staff never
+    # edit the wrong environment by mistake.
+    "ENVIRONMENT_TITLE_PREFIX": (
+        "admin.environment.environment_title_prefix_callback"
+    ),
     "COLORS": {
         "base": {
             "50": "oklch(98.5% 0.002 247.839)",
@@ -1829,6 +1834,16 @@ UNFOLD = {
         },
     },
     "SHOW_LANGUAGES": True,
+    "LANGUAGE_FLAGS": {
+        "el": "🇬🇷",
+        "en": "🇬🇧",
+        "de": "🇩🇪",
+    },
+    # ⌘K / Ctrl+K command palette: cross-model record search + history.
+    "COMMAND": {
+        "search_models": True,
+        "show_history": True,
+    },
     "LOGIN": {
         "redirect_after": lambda request: reverse_lazy("admin:index"),
     },
@@ -1878,6 +1893,7 @@ UNFOLD = {
                             "admin:product_product_changelist"
                         ),
                         "badge": "admin.badges.low_stock_badge",
+                        "badge_variant": "danger",
                     },
                     {
                         "title": _("Categories"),
@@ -1893,6 +1909,7 @@ UNFOLD = {
                             "admin:product_productreview_changelist"
                         ),
                         "badge": "admin.badges.pending_reviews_badge",
+                        "badge_variant": "info",
                     },
                     {
                         "title": _("Tags"),
@@ -1933,6 +1950,7 @@ UNFOLD = {
                         "icon": "article",
                         "link": reverse_lazy("admin:blog_blogpost_changelist"),
                         "badge": "admin.badges.draft_blog_posts_badge",
+                        "badge_variant": "warning",
                     },
                     {
                         "title": _("Blog Categories"),
@@ -1955,6 +1973,7 @@ UNFOLD = {
                             "admin:blog_blogcomment_changelist"
                         ),
                         "badge": "admin.badges.pending_comments_badge",
+                        "badge_variant": "info",
                     },
                     {
                         "title": _("Blog Tags"),
@@ -1974,12 +1993,14 @@ UNFOLD = {
                         "icon": "receipt_long",
                         "link": reverse_lazy("admin:order_order_changelist"),
                         "badge": "admin.badges.pending_orders_badge",
+                        "badge_variant": "danger",
                     },
                     {
                         "title": _("Carts"),
                         "icon": "shopping_cart",
                         "link": reverse_lazy("admin:cart_cart_changelist"),
                         "badge": "admin.badges.abandoned_carts_badge",
+                        "badge_variant": "warning",
                     },
                     {
                         "title": _("Invoices"),
@@ -2010,6 +2031,7 @@ UNFOLD = {
                             "admin:contact_contact_changelist"
                         ),
                         "badge": "admin.badges.unread_messages_badge",
+                        "badge_variant": "info",
                     },
                 ],
             },
@@ -2658,7 +2680,6 @@ UNFOLD = {
                     "link": getenv("ADMIN_RABBITMQ_URL", "").strip(),
                 },
             ]
-            if entry["link"]
             if entry["link"]
         ],
     ],

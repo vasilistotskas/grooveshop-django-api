@@ -74,19 +74,6 @@ def low_stock_badge(request):
     )
 
 
-def awaiting_fulfillment_badge(request):
-    """Orders sitting in PROCESSING — paid, awaiting carrier handoff."""
-
-    from order.enum.status import OrderStatus
-
-    return _cached_count(
-        "admin:badge:awaiting_fulfillment",
-        "order",
-        "Order",
-        status=OrderStatus.PROCESSING,
-    )
-
-
 def abandoned_carts_badge(request):
     """Carts inactive 24h-30d (older = stale, ignored).
 

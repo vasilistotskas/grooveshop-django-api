@@ -3,11 +3,8 @@ from django.db import transaction
 from django.db.models import Count
 from django.utils import timezone
 from django.utils.html import format_html
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from mptt.admin import DraggableMPTTAdmin
-from parler.admin import TranslatableAdmin
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
@@ -15,10 +12,11 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
-from unfold.decorators import action
+from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
-from admin.base import BaseModelAdmin
+from admin.base import BaseTranslatableAdmin
+from admin.displays import header_two_line
 from admin.export import ExportActionMixin
 
 from blog.models.author import BlogAuthor
@@ -26,6 +24,23 @@ from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost, BlogPostTranslation
 from blog.models.tag import BlogTag
+
+# ── Local (single-app) variant maps ────────────────────────────────────
+# These states are derived (not backed by a TextChoices field), so they
+# can't use ``admin.displays.choice_label`` — each gets a small
+# ``@display(label=...)`` method instead.
+
+PUBLISH_STATUS_VARIANT: dict[str, str] = {
+    "draft": "warning",
+    "scheduled": "info",
+    "published": "success",
+}
+
+SEO_SCORE_VARIANT: dict[str, str] = {
+    "poor": "danger",
+    "fair": "warning",
+    "good": "success",
+}
 
 
 class LikesCountFilter(RangeNumericListFilter):
@@ -196,18 +211,16 @@ class BlogCommentInline(TabularInline):
 
 
 @admin.register(BlogAuthor)
-class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
+class BlogAuthorAdmin(BaseTranslatableAdmin):
+    # Narrower than the base default — this admin's list_display is
+    # only 5 plain columns, no benefit from the full-width layout.
     list_fullwidth = False
-    list_filter_submit = True
-    list_filter_sheet = True
 
     list_display = (
-        "user_display",
+        "author_header",
         "bio_preview",
         "posts_count",
-        "total_likes_display",
+        "total_likes_received",
         "website_link",
     )
     search_fields = (
@@ -218,7 +231,7 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
         "translations__bio",
     )
     list_select_related = ["user"]
-    readonly_fields = ["id", "total_likes_display", "posts_count"]
+    readonly_fields = ["id", "total_likes_received", "posts_count"]
 
     fieldsets = (
         (
@@ -238,28 +251,23 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
         (
             _("Statistics"),
             {
-                "fields": ("posts_count", "total_likes_display"),
+                "fields": ("posts_count", "total_likes_received"),
                 "classes": ("collapse",),
             },
         ),
     )
-
-    @admin.display(description=_("User"))
-    def user_display(self, obj):
-        return format_html(
-            '<div class="flex items-center gap-2">'
-            '<strong class="text-base-900 dark:text-base-100">{name}</strong>'
-            '<span class="text-base-600 dark:text-base-300">({email}</span>'
-            "</div>",
-            name=obj.user.full_name or obj.user.username,
-            email=obj.user.email,
-        )
 
     def get_queryset(self, request):
         return (
             super()
             .get_queryset(request)
             .annotate(posts_count_ann=Count("blog_posts", distinct=True))
+        )
+
+    @display(description=_("User"), header=True, ordering="user__last_name")
+    def author_header(self, obj):
+        return header_two_line(
+            obj.user.full_name or obj.user.username, obj.user.email
         )
 
     @admin.display(description=_("Bio"))
@@ -271,52 +279,27 @@ class BlogAuthorAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Posts"))
     def posts_count(self, obj):
-        count = getattr(obj, "posts_count_ann", obj.blog_posts.count())
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            "{count}"
-            "</span>",
-            count=count,
-        )
-
-    @admin.display(description=_("Total Likes"))
-    def total_likes_display(self, obj):
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-            "<span>❤️</span>"
-            "<span>{total}</span>"
-            "</span>",
-            total=obj.total_likes_received,
-        )
+        return getattr(obj, "posts_count_ann", obj.blog_posts.count())
 
     @admin.display(description=_("Website"))
     def website_link(self, obj):
-        if obj.website:
-            return format_html(
-                '<a href="{url}" target="_blank" '
-                'class="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">'
-                "<span>🔗</span><span>Website</span>"
-                "</a>",
-                url=obj.website,
-            )
-        return "-"
+        if not obj.website:
+            return "—"
+        return format_html(
+            '<a href="{url}" target="_blank" rel="noopener">{url}</a>',
+            url=obj.website,
+        )
 
 
 @admin.register(BlogTag)
-class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
+class BlogTagAdmin(BaseTranslatableAdmin):
+    # Narrower than the base default — 4 plain columns.
     list_fullwidth = False
-    list_filter_submit = True
-    list_filter_sheet = True
 
     list_display = (
         "name_display",
-        "active_badge",
         "active",
-        "posts_count_badge",
+        "posts_count",
         "sort_order",
     )
     list_filter = ("active", PostsCountFilter)
@@ -350,52 +333,19 @@ class BlogTagAdmin(ModelAdmin, TranslatableAdmin):
             .annotate(posts_count_ann=Count("blog_posts", distinct=True))
         )
 
-    @admin.display(description=_("Name"))
+    @admin.display(description=_("Name"), ordering="translations__name")
     def name_display(self, obj):
-        return format_html(
-            '<strong class="text-base-900 dark:text-base-100">{name}</strong>',
-            name=(
-                obj.safe_translation_getter("name", any_language=True)
-                or "Unnamed Tag"
-            ),
-        )
-
-    @admin.display(description=_("Status"))
-    def active_badge(self, obj):
-        if obj.active:
-            return mark_safe(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
-                "<span>✓</span>"
-                "<span>Active</span>"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-            "<span>✗</span>"
-            "<span>Inactive</span>"
-            "</span>"
+        return obj.safe_translation_getter("name", any_language=True) or _(
+            "Unnamed Tag"
         )
 
     @admin.display(description=_("Posts"))
-    def posts_count_badge(self, obj):
-        count = getattr(obj, "posts_count_ann", obj.blog_posts.count())
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            "{count}"
-            "</span>",
-            count=count,
-        )
+    def posts_count(self, obj):
+        return getattr(obj, "posts_count_ann", obj.blog_posts.count())
 
 
 @admin.register(BlogCategory)
-class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
+class BlogCategoryAdmin(BaseTranslatableAdmin):
     list_filter_sheet = False
 
     ordering_field = "sort_order"
@@ -404,7 +354,6 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin):
     list_display = (
         "category_name",
         "parent_display",
-        "category_image",
         "posts_count_display",
         "recursive_posts_display",
     )
@@ -479,70 +428,34 @@ class BlogCategoryAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Parent"))
     def parent_display(self, obj):
-        if obj.parent_id:
-            return (
-                obj.parent.safe_translation_getter("name", any_language=True)
-                or f"#{obj.parent_id}"
-            )
-        return mark_safe(
-            '<span class="text-base-500 dark:text-base-400">—</span>'
-        )
-
-    @admin.display(description=_("Image"))
-    def category_image(self, obj):
-        if obj.image:
-            return format_html(
-                '<img src="{url}" '
-                'style="max-height: 40px; max-width: 80px; border-radius: 4px;" />',
-                url=obj.image.url,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No image</span>'
+        if not obj.parent_id:
+            return "—"
+        return (
+            obj.parent.safe_translation_getter("name", any_language=True)
+            or f"#{obj.parent_id}"
         )
 
     @admin.display(description=_("Direct Posts"))
-    def posts_count_display(self, instance):
-        count = getattr(instance, "posts_count", 0)
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-semibold '
-            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            "{count}"
-            "</span>",
-            count=count,
-        )
+    def posts_count_display(self, obj):
+        return getattr(obj, "posts_count", 0)
 
     @admin.display(description=_("Total Posts (Tree)"))
-    def recursive_posts_display(self, instance):
-        count = getattr(instance, "posts_cumulative_count", 0)
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full">'
-            "{count}"
-            "</span>",
-            count=count,
-        )
+    def recursive_posts_display(self, obj):
+        return getattr(obj, "posts_cumulative_count", 0)
 
 
 @admin.register(BlogPost)
-class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
+class BlogPostAdmin(ExportActionMixin, BaseTranslatableAdmin):
     list_horizontal_scrollbar_top = False
 
     list_display = (
         "title_display",
-        "category_badge",
-        "author_display",
-        "featured_badge",
+        "category_display",
+        "author_header",
         "featured",
-        "is_published",
-        "publish_status_badge",
-        "engagement_metrics",
+        "publish_status_label",
+        "engagement_display",
         "published_at",
-        "image_preview",
     )
     list_filter = (
         "featured",
@@ -557,10 +470,7 @@ class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
         CommentsCountFilter,
         TagsCountFilter,
     )
-    list_editable = (
-        "featured",
-        "is_published",
-    )
+    list_editable = ("featured",)
     search_fields = (
         "translations__title",
         "translations__subtitle",
@@ -578,7 +488,7 @@ class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
         "view_count",
         "created_at",
         "updated_at",
-        "engagement_metrics",
+        "engagement_display",
         "seo_score",
     ]
     filter_horizontal = ["tags"]
@@ -593,8 +503,6 @@ class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
         "export_xml",
     ]
     date_hierarchy = "published_at"
-    save_on_top = True
-    list_per_page = 25
     list_select_related = ["category", "author", "author__user"]
 
     fieldsets = (
@@ -634,7 +542,7 @@ class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
         (
             _("Engagement"),
             {
-                "fields": ("view_count", "engagement_metrics"),
+                "fields": ("view_count", "engagement_display"),
                 "classes": ("collapse",),
             },
         ),
@@ -670,105 +578,45 @@ class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
             .with_tags_count()
         )
 
-    @admin.display(description=_("Title"))
+    @admin.display(description=_("Title"), ordering="translations__title")
     def title_display(self, obj):
-        title = (
-            obj.safe_translation_getter("title", any_language=True)
-            or "Untitled"
-        )
-        return format_html(
-            '<strong class="text-base-900 dark:text-base-100">{title}</strong>',
-            title=title[:50],
+        return obj.safe_translation_getter("title", any_language=True) or _(
+            "Untitled"
         )
 
     @admin.display(description=_("Category"))
-    def category_badge(self, obj):
-        if obj.category:
-            category_name = (
-                obj.category.safe_translation_getter("name", any_language=True)
-                or "Unnamed"
-            )
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full">'
-                "{name}"
-                "</span>",
-                name=category_name,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No category</span>'
+    def category_display(self, obj):
+        if not obj.category:
+            return "—"
+        return (
+            obj.category.safe_translation_getter("name", any_language=True)
+            or "—"
         )
 
-    @admin.display(description=_("Author"))
-    def author_display(self, obj):
-        if obj.author:
-            author_name = obj.author.user.full_name or obj.author.user.username
-            return format_html(
-                '<span class="font-medium text-base-700 dark:text-base-300">{name}</span>',
-                name=author_name,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No author</span>'
-        )
+    @display(description=_("Author"), header=True)
+    def author_header(self, obj):
+        if not obj.author:
+            return header_two_line(str(_("No author")))
+        user = obj.author.user
+        return header_two_line(user.full_name or user.username, user.email)
 
-    @admin.display(description=_("Featured"))
-    def featured_badge(self, obj):
-        if obj.featured:
-            return mark_safe(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full gap-1">'
-                "<span>⭐</span>"
-                "<span>Featured</span>"
-                "</span>"
-            )
-        return ""
-
-    @admin.display(description=_("Status"))
-    def publish_status_badge(self, obj):
-        if obj.is_published and obj.published_at:
-            if obj.published_at <= timezone.now():
-                return mark_safe(
-                    '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                    'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
-                    "<span>✓</span>"
-                    "<span>Published</span>"
-                    "</span>"
-                )
-            return mark_safe(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1">'
-                "<span>📅</span>"
-                "<span>Scheduled</span>"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full gap-1">'
-            "<span>📝</span>"
-            "<span>Draft</span>"
-            "</span>"
-        )
+    @display(description=_("Status"), label=PUBLISH_STATUS_VARIANT)
+    def publish_status_label(self, obj):
+        if not obj.is_published:
+            return "draft", _("Draft")
+        if obj.published_at and obj.published_at > timezone.now():
+            return "scheduled", _("Scheduled")
+        return "published", _("Published")
 
     @admin.display(description=_("Engagement"))
-    def engagement_metrics(self, obj):
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300 flex items-center gap-3">'
-            '<span class="flex items-center gap-1 text-red-600 dark:text-red-400">'
-            "<span>❤️</span><span>{likes}</span>"
-            "</span>"
-            '<span class="flex items-center gap-1 text-blue-600 dark:text-blue-400">'
-            "<span>💬</span><span>{comments}</span>"
-            "</span>"
-            '<span class="flex items-center gap-1 text-green-600 dark:text-green-400">'
-            "<span>👀</span><span>{views}</span>"
-            "</span>"
-            "</div>",
-            likes=obj.likes_count,
-            comments=obj.comments_count,
-            views=obj.view_count,
-        )
+    def engagement_display(self, obj):
+        return _("%(likes)d likes, %(comments)d comments, %(views)d views") % {
+            "likes": obj.likes_count,
+            "comments": obj.comments_count,
+            "views": obj.view_count,
+        }
 
-    @admin.display(description=_("SEO Score"))
+    @display(description=_("SEO Score"), label=SEO_SCORE_VARIANT)
     def seo_score(self, obj):
         score = 0
         title = obj.safe_translation_getter("title", any_language=True) or ""
@@ -776,7 +624,7 @@ class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
             obj.safe_translation_getter("subtitle", any_language=True) or ""
         )
 
-        if len(title) > 10 and len(title) < 60:
+        if 10 < len(title) < 60:
             score += 25
         if subtitle:
             score += 25
@@ -786,36 +634,10 @@ class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
             score += 25
 
         if score >= 75:
-            bg_class = "bg-green-50 dark:bg-green-900"
-            text_class = "text-green-700 dark:text-green-300"
-        elif score >= 50:
-            bg_class = "bg-yellow-50 dark:bg-yellow-900"
-            text_class = "text-yellow-700 dark:text-yellow-300"
-        else:
-            bg_class = "bg-red-50 dark:bg-red-900"
-            text_class = "text-red-700 dark:text-red-300"
-
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            '{bg_class} {text_class} rounded-full">'
-            "{score}%"
-            "</span>",
-            bg_class=bg_class,
-            text_class=text_class,
-            score=score,
-        )
-
-    @admin.display(description="")
-    def image_preview(self, obj):
-        if obj.image:
-            return format_html(
-                '<img src="{url}" '
-                'style="max-height: 100px; max-width: 80px; border-radius: 4px; object-fit: cover;" />',
-                url=obj.image.url,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No image</span>'
-        )
+            return "good", f"{score}%"
+        if score >= 50:
+            return "fair", f"{score}%"
+        return "poor", f"{score}%"
 
     def get_prepopulated_fields(self, request, obj=None):
         return {
@@ -911,26 +733,17 @@ class BlogPostAdmin(ExportActionMixin, BaseModelAdmin, TranslatableAdmin):
 
 
 @admin.register(BlogComment)
-class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
-    mptt_indent_field = "user"
+class BlogCommentAdmin(BaseTranslatableAdmin):
     list_per_page = 30
     list_display = (
-        "tree_actions",
-        "indented_title",
-        "user_display",
+        "content_preview",
+        "user_header",
         "post_link",
-        "approval_badge",
         "approved",
         "engagement_display",
         "created_at",
     )
-    list_display_links = ("indented_title",)
+    list_display_links = ("content_preview",)
     date_hierarchy = "created_at"
     search_fields = (
         "user__email",
@@ -949,6 +762,9 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
     )
     list_select_related = ["post", "user", "parent"]
     list_editable = ("approved",)
+    # Nested comments read top-to-bottom in tree order so the
+    # indentation in ``content_preview`` reflects the reply structure.
+    ordering = ("tree_id", "lft")
     actions = [
         "approve_comments",
         "unapprove_comments",
@@ -1006,74 +822,44 @@ class BlogCommentAdmin(ModelAdmin, TranslatableAdmin, DraggableMPTTAdmin):
             .select_related("post", "user", "parent")
         )
 
-    @admin.display(description=_("User"))
-    def user_display(self, obj):
-        if obj.user:
-            display_name = obj.user.full_name or obj.user.username
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-                '<div class="text-base-600 dark:text-base-300">{email}</div>'
-                "</div>",
-                name=display_name,
-                email=obj.user.email,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300 italic">Anonymous</span>'
+    @admin.display(description=_("Content"))
+    def content_preview(self, obj):
+        content = (
+            obj.safe_translation_getter("content", any_language=True) or ""
+        )
+        preview = content[:50] + "..." if len(content) > 50 else content
+        indent = " " * (obj.level * 4)
+        return f"{indent}{preview}"
+
+    @display(description=_("User"), header=True)
+    def user_header(self, obj):
+        if not obj.user:
+            return header_two_line(str(_("Anonymous")))
+        return header_two_line(
+            obj.user.full_name or obj.user.username, obj.user.email
         )
 
     @admin.display(description=_("Post"))
     def post_link(self, obj):
-        if obj.post:
-            title = (
-                obj.post.safe_translation_getter("title", any_language=True)
-                or f"Post {obj.post.id}"
-            )
-            title_display = title[:30] + "..." if len(title) > 30 else title
-            return format_html(
-                '<a href="{url}" '
-                'class="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">'
-                "{title}"
-                "</a>",
-                url=f"/admin/blog/blogpost/{obj.post.id}/change/",
-                title=title_display,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No post</span>'
+        if not obj.post:
+            return "—"
+        title = (
+            obj.post.safe_translation_getter("title", any_language=True)
+            or f"Post {obj.post.id}"
         )
-
-    @admin.display(description=_("Status"))
-    def approval_badge(self, obj):
-        if obj.approved:
-            return mark_safe(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
-                "<span>✓</span>"
-                "<span>Approved</span>"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-            "<span>⏳</span>"
-            "<span>Pending</span>"
-            "</span>"
+        title_display = title[:30] + "..." if len(title) > 30 else title
+        return format_html(
+            '<a href="{url}">{title}</a>',
+            url=f"/admin/blog/blogpost/{obj.post.id}/change/",
+            title=title_display,
         )
 
     @admin.display(description=_("Engagement"))
     def engagement_display(self, obj):
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300 flex items-center gap-3">'
-            '<span class="flex items-center gap-1 text-red-600 dark:text-red-400">'
-            "<span>❤️</span><span>{likes}</span>"
-            "</span>"
-            '<span class="flex items-center gap-1 text-blue-600 dark:text-blue-400">'
-            "<span>💬</span><span>{replies}</span>"
-            "</span>"
-            "</div>",
-            likes=obj.likes_count,
-            replies=obj.replies_count,
-        )
+        return _("%(likes)d likes, %(replies)d replies") % {
+            "likes": obj.likes_count,
+            "replies": obj.replies_count,
+        }
 
     @action(
         description=str(_("Approve selected comments")),

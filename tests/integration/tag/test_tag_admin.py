@@ -156,99 +156,34 @@ class TestContentTypeFilter:
 
 @pytest.mark.django_db
 class TestTagAdmin:
-    def test_tag_info_display(self, tag_admin):
+    def test_label_display(self, tag_admin):
         tag = TagFactory()
 
-        result = tag_admin.tag_info(tag)
+        result = tag_admin.label_display(tag)
 
-        assert str(tag.id) in result
-        assert tag.label in result
-        assert "font-medium" in result
+        assert result == tag.label
 
-    def test_status_badge_active(self, tag_admin):
-        tag = TagFactory(active=True)
-
-        result = tag_admin.status_badge(tag)
-
-        assert "Active" in result
-        assert "bg-green-50" in result
-
-    def test_status_badge_inactive(self, tag_admin):
-        tag = TagFactory(active=False)
-
-        result = tag_admin.status_badge(tag)
-
-        assert "Inactive" in result
-        assert "bg-red-50" in result
-
-    def test_usage_stats(self, tag_admin):
+    def test_usage_count_display_zero(self, tag_admin):
         tag = TagFactory()
 
-        for _ in range(5):
-            product = ProductFactory()
-            TaggedProductFactory(tag=tag, content_object=product)
+        result = tag_admin.usage_count_display(tag)
 
-        result = tag_admin.usage_stats(tag)
+        assert result == 0
 
-        assert "5" in result
-        assert "uses" in result
-
-    def test_content_distribution(self, tag_admin):
+    def test_usage_count_display_from_annotation(self, tag_admin):
         tag = TagFactory()
+        tag.usage_count = 5
 
-        for _ in range(3):
-            product = ProductFactory()
-            TaggedProductFactory(tag=tag, content_object=product)
+        result = tag_admin.usage_count_display(tag)
 
-        result = tag_admin.content_distribution(tag)
-
-        assert "types" in result
-        assert "Product" in result
-
-    def test_sort_display(self, tag_admin):
-        tag = TagFactory()
-        Tag.objects.filter(id=tag.id).update(sort_order=100)
-        tag.refresh_from_db()
-
-        result = tag_admin.sort_display(tag)
-
-        assert "100" in result
-        assert "#100" in result
+        assert result == 5
 
     def test_created_display(self, tag_admin):
-        from django.utils import timezone
-
         tag = TagFactory()
 
         result = tag_admin.created_display(tag)
 
-        assert len(result) > 10
-        assert str(timezone.now().year) in result
-
-    def test_tag_analytics(self, tag_admin):
-        tag = TagFactory()
-
-        result = tag_admin.tag_analytics(tag)
-
-        assert "Label Length" in result
-        assert "Word Count" in result
-        assert "Active Status" in result
-
-    def test_usage_analytics(self, tag_admin):
-        tag = TagFactory()
-
-        result = tag_admin.usage_analytics(tag)
-
-        assert "Total Usage" in result
-        assert "Recent Usage" in result
-
-    def test_content_analytics(self, tag_admin):
-        tag = TagFactory()
-
-        result = tag_admin.content_analytics(tag)
-
-        assert "Diversity Score" in result
-        assert "Most Used Type" in result
+        assert result == tag.created_at.strftime("%d/%m/%Y %H:%M")
 
     @patch.object(TagAdmin, "message_user")
     def test_activate_tags_action(
@@ -309,33 +244,14 @@ class TestTagAdmin:
 
 @pytest.mark.django_db
 class TestTaggedItemAdmin:
-    def test_tagged_item_info_display(self, tagged_item_admin):
-        tag = TagFactory()
-        product = ProductFactory()
-        tagged_item = TaggedProductFactory(tag=tag, content_object=product)
-
-        result = tagged_item_admin.tagged_item_info(tagged_item)
-
-        assert str(tagged_item.id) in result
-        assert "font-medium" in result
-
     def test_tag_display(self, tagged_item_admin):
-        tag = TagFactory(active=True)
+        tag = TagFactory()
         product = ProductFactory()
         tagged_item = TaggedProductFactory(tag=tag, content_object=product)
 
         result = tagged_item_admin.tag_display(tagged_item)
 
-        assert tag.label in result
-        assert any(
-            color in result
-            for color in [
-                "bg-blue-50",
-                "bg-green-50",
-                "text-blue-600",
-                "text-green-600",
-            ]
-        )
+        assert result == tag.label
 
     def test_content_object_display(self, tagged_item_admin):
         tag = TagFactory()
@@ -344,30 +260,16 @@ class TestTaggedItemAdmin:
 
         result = tagged_item_admin.content_object_display(tagged_item)
 
-        assert str(product) in result
-        assert "ID:" in result
+        assert result == str(product)
 
-    def test_content_type_badge(self, tagged_item_admin):
+    def test_content_type_display(self, tagged_item_admin):
         tag = TagFactory()
         product = ProductFactory()
         tagged_item = TaggedProductFactory(tag=tag, content_object=product)
 
-        result = tagged_item_admin.content_type_badge(tagged_item)
+        result = tagged_item_admin.content_type_display(tagged_item)
 
-        assert "Product" in result
-        assert "bg-green-50" in result
-
-    def test_created_display(self, tagged_item_admin):
-        from django.utils import timezone
-
-        tag = TagFactory()
-        product = ProductFactory()
-        tagged_item = TaggedProductFactory(tag=tag, content_object=product)
-
-        result = tagged_item_admin.created_display(tagged_item)
-
-        assert len(result) > 10
-        assert str(timezone.now().year) in result
+        assert result == "Product"
 
 
 @pytest.mark.django_db
@@ -396,14 +298,11 @@ class TestTagAdminIntegration:
         assert hasattr(tag_obj, "usage_count")
         assert tag_obj.usage_count == 1
 
-        assert hasattr(tag_obj, "content_types_count")
-        assert tag_obj.content_types_count == 1
-
     def test_admin_configuration(self, tag_admin):
         assert tag_admin.list_per_page == 50
-        assert "tag_info" in tag_admin.list_display
-        assert "status_badge" in tag_admin.list_display
-        assert "usage_stats" in tag_admin.list_display
+        assert "label_display" in tag_admin.list_display
+        assert "active" in tag_admin.list_display
+        assert "usage_count_display" in tag_admin.list_display
 
         action_names = []
         for action in tag_admin.actions:

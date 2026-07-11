@@ -188,8 +188,8 @@ def relative_time(dt: datetime | None, now: datetime | None = None) -> str:
 
 
 def header_two_line(
-    primary: str,
-    secondary: str | None = None,
+    primary: Any,
+    secondary: Any | None = None,
     initials: str | None = None,
     *,
     image_path: str | None = None,

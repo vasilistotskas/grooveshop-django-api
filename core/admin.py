@@ -145,13 +145,9 @@ class SettingAdmin(ModelAdmin):
 
         return [base_fieldset, value_fieldset, validator_fieldset]
 
-    @admin.display(description=_("Name"))
+    @admin.display(description=_("Name"), ordering="name")
     def name_display(self, obj):
-        from django.utils.html import format_html  # noqa: PLC0415
-
-        return format_html(
-            '<strong style="font-weight: 600;">{}</strong>', obj.name
-        )
+        return obj.name
 
     @admin.display(description=_("Type"))
     def value_type_badge(self, obj):
@@ -164,41 +160,18 @@ class SettingAdmin(ModelAdmin):
 
     @admin.display(description=_("Current Value"))
     def value_preview(self, obj):
-        from django.utils.html import format_html  # noqa: PLC0415
-
         try:
             value = str(obj.value)
-            if len(value) > 50:
-                value = value[:50] + "..."
-            return format_html(
-                '<code style="font-size: 0.875rem; padding: 0.125rem 0.25rem;'
-                " background-color: rgba(0,0,0,0.05); border-radius:"
-                ' 0.25rem;">{}</code>',
-                value,
-            )
         except Exception:
-            from django.utils.safestring import mark_safe  # noqa: PLC0415
-
-            return mark_safe(
-                '<span style="font-style: italic; opacity: 0.6;">-</span>'
-            )
+            return "—"
+        return value[:50] + "…" if len(value) > 50 else value
 
     @admin.display(description=_("Description"))
     def description_preview(self, obj):
-        from django.utils.html import format_html  # noqa: PLC0415
-        from django.utils.safestring import mark_safe  # noqa: PLC0415
-
-        if obj.description:
-            desc = obj.description
-            if len(desc) > 60:
-                desc = desc[:60] + "..."
-            return format_html(
-                '<span style="font-size: 0.875rem; opacity: 0.8;">{}</span>',
-                desc,
-            )
-        return mark_safe(
-            '<span style="font-style: italic; opacity: 0.6;">-</span>'
-        )
+        if not obj.description:
+            return "—"
+        desc = obj.description
+        return desc[:60] + "…" if len(desc) > 60 else desc
 
 
 @admin.register(PeriodicTask)

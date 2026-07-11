@@ -50,24 +50,7 @@ _REGISTRY_ENTRIES = _registry_entries()
 # assertion below is skipped for these — the changelist assertion
 # still runs (and passes) for every one of them. Tracked for a later
 # phase of the admin overhaul; remove an entry once its bug is fixed.
-_KNOWN_ADD_FORM_BUGS = {
-    "contact.contact": (
-        "ContactAdmin.timing_info does `now - obj.created_at`, which "
-        "is None on the unsaved instance rendered for the add form's "
-        "readonly 'Timing Information' fieldset -> TypeError."
-    ),
-    "notification.notification": (
-        "NotificationAdmin.timing_summary does `now - obj.created_at` "
-        "/ `obj.created_at.hour`, which is None on the unsaved "
-        "instance rendered for the add form's readonly field -> "
-        "TypeError."
-    ),
-    "user.useraccount": (
-        "UserAdmin.add_fieldsets references password1/password2, "
-        "which UserCreationForm's Meta.fields does not declare -> "
-        "FieldError on GET of the add form."
-    ),
-}
+_KNOWN_ADD_FORM_BUGS = {}
 
 
 def _changelist_url(model) -> str:

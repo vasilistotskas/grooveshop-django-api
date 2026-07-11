@@ -8,8 +8,7 @@ from django.http import FileResponse, Http404
 from django.shortcuts import redirect
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html, format_html_join
-from django.utils.safestring import mark_safe
+from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 
@@ -23,15 +22,25 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
-from unfold.decorators import action
+from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from admin.displays import (
+    ORDER_STATUS_VARIANT,
+    PAYMENT_STATUS_VARIANT,
+    SHIPMENT_STATE_VARIANT,
+    choice_label,
+    format_dt,
+    header_two_line,
+    money,
+    relative_time,
+)
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.invoicing import generate_invoice
 from order.models.history import OrderHistory, OrderItemHistory
-from order.models.invoice import Invoice, InvoiceCounter
+from order.models.invoice import Invoice, InvoiceCounter, MyDataStatus
 from order.models.item import OrderItem
 from order.models.order import Order
 from order.models.stock_log import StockLog
@@ -39,6 +48,38 @@ from order.models.viva_webhook_event import VivaWebhookEvent
 from order.services import OrderService
 
 logger = logging.getLogger(__name__)
+
+# ── Local (single-app) TextChoices variant maps ────────────────────────
+# ``OrderHistoryChangeType``/``OrderItemHistoryChangeType``/
+# ``MyDataStatus`` only exist in this app, so their colour maps live
+# here rather than in the shared ``admin.displays`` vocabulary.
+
+ORDER_HISTORY_CHANGE_TYPE_VARIANT: dict[str, str] = {
+    OrderHistory.OrderHistoryChangeType.STATUS: "info",
+    OrderHistory.OrderHistoryChangeType.PAYMENT: "success",
+    OrderHistory.OrderHistoryChangeType.SHIPPING: "primary",
+    OrderHistory.OrderHistoryChangeType.CUSTOMER: "warning",
+    OrderHistory.OrderHistoryChangeType.ITEMS: "danger",
+    OrderHistory.OrderHistoryChangeType.ADDRESS: "warning",
+    OrderHistory.OrderHistoryChangeType.NOTE: "default",
+    OrderHistory.OrderHistoryChangeType.REFUND: "default",
+}
+
+ORDER_ITEM_HISTORY_CHANGE_TYPE_VARIANT: dict[str, str] = {
+    OrderItemHistory.OrderItemHistoryChangeType.QUANTITY: "info",
+    OrderItemHistory.OrderItemHistoryChangeType.PRICE: "success",
+    OrderItemHistory.OrderItemHistoryChangeType.REFUND: "danger",
+    OrderItemHistory.OrderItemHistoryChangeType.OTHER: "default",
+}
+
+MYDATA_STATUS_VARIANT: dict[str, str] = {
+    MyDataStatus.NOT_SENT: "default",
+    MyDataStatus.PENDING: "info",
+    MyDataStatus.SUBMITTED: "primary",
+    MyDataStatus.CONFIRMED: "success",
+    MyDataStatus.REJECTED: "danger",
+    MyDataStatus.CANCELED: "warning",
+}
 
 
 class OrderStatusGroupFilter(DropdownFilter):
@@ -219,6 +260,8 @@ class RecentOrdersFilter(DropdownFilter):
 class OrderItemInline(TabularInline):
     model = OrderItem
     extra = 0
+    per_page = 15
+    collapsible = True
     fields = (
         "product_display",
         "quantity",
@@ -238,52 +281,27 @@ class OrderItemInline(TabularInline):
 
     @admin.display(description=_("Product"))
     def product_display(self, obj):
-        if obj.product:
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-                '<div class="text-base-600 dark:text-base-300">ID: {id}</div>'
-                "</div>",
-                name=(
-                    obj.product.safe_translation_getter(
-                        "name", any_language=True
-                    )
-                    or "Unnamed Product"
-                ),
-                id=obj.product.id,
-            )
-        return "-"
+        if not obj.product:
+            return "-"
+        name = obj.product.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed Product")
+        return f"{name} (ID: {obj.product.id})"
 
     @admin.display(description=_("Unit Price"))
     def price_display(self, obj):
-        return format_html(
-            '<div class="text-sm font-medium text-base-900 dark:text-base-100">{price}</div>',
-            price=str(obj.price),
-        )
+        return money(obj.price.amount)
 
     @admin.display(description=_("Total"))
     def total_display(self, obj):
-        return format_html(
-            '<div class="text-sm font-bold text-base-900 dark:text-base-100">{total}</div>',
-            total=str(obj.total_price),
-        )
+        return money(obj.total_price.amount)
 
     @admin.display(description=_("Refund Status"))
     def refund_status(self, obj):
         if obj.is_refunded:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "↩️ Refunded"
-                "</span>"
-            )
+            return _("Refunded")
         if obj.refunded_quantity > 0:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "⚠️ Partial"
-                "</span>"
-            )
+            return _("Partial")
         return ""
 
 
@@ -291,6 +309,8 @@ class OrderHistoryInline(TabularInline):
     model = OrderHistory
     extra = 0
     max_num = 20
+    per_page = 15
+    collapsible = True
     fields = (
         "change_type",
         "description_display",
@@ -318,28 +338,18 @@ class OrderHistoryInline(TabularInline):
 
     @admin.display(description=_("Description"))
     def description_display(self, obj):
-        description = (
-            obj.safe_translation_getter("description", any_language=True)
-            or "No description"
-        )
-        desc_display = (
+        description = obj.safe_translation_getter(
+            "description", any_language=True
+        ) or _("No description")
+        return (
             description[:100] + "..." if len(description) > 100 else description
-        )
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300">{desc}</div>',
-            desc=desc_display,
         )
 
     @admin.display(description=_("Changed By"))
     def user_display(self, obj):
         if obj.user:
-            return format_html(
-                '<div class="text-sm text-base-700 dark:text-base-300">{name}</div>',
-                name=obj.user.full_name or obj.user.username,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">System</span>'
-        )
+            return obj.user.full_name or obj.user.username
+        return _("System")
 
 
 def _invoice_download_url(invoice: Invoice) -> str | None:
@@ -363,18 +373,20 @@ class InvoiceInline(TabularInline):
     can_delete = False
     show_change_link = True
     tab = True
+    per_page = 15
+    collapsible = True
 
     fields = (
         "invoice_number",
         "issue_date",
-        "total",
+        "total_display",
         "currency",
         "document_status",
     )
     readonly_fields = (
         "invoice_number",
         "issue_date",
-        "total",
+        "total_display",
         "currency",
         "document_status",
     )
@@ -382,42 +394,33 @@ class InvoiceInline(TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
+    @admin.display(description=_("Total"))
+    def total_display(self, obj):
+        return money(obj.total.amount)
+
     @admin.display(description=_("Document"))
     def document_status(self, obj):
         if not obj or not obj.pk:
-            return mark_safe(
-                '<span class="text-base-600 dark:text-base-300 italic">—</span>'
-            )
+            return "—"
         if not obj.has_document():
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "⏳ Pending render"
-                "</span>"
-            )
+            return _("Pending render")
         return format_html(
-            '<a href="{url}" target="_blank" rel="noopener" '
-            'class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 "
-            'rounded-full hover:underline">'
-            "📄 Download PDF"
-            "</a>",
+            '<a href="{url}" target="_blank" rel="noopener">{label}</a>',
             url=_invoice_download_url(obj) or "",
+            label=_("Download PDF"),
         )
 
 
 @admin.register(Order)
 class OrderAdmin(BaseModelAdmin):
     list_display = [
-        "status_badge",
-        "customer_info",
+        "status_label",
+        "customer",
         "order_summary",
-        "payment_info",
-        "shipment_status_badge",
-        "order_status_age",
+        "payment_status_label",
+        "shipment_state",
         "shipping_info",
-        "created_display",
-        "urgency_indicator",
+        "created",
     ]
     list_filter = [
         OrderStatusGroupFilter,
@@ -468,16 +471,6 @@ class OrderAdmin(BaseModelAdmin):
         "created_at",
         "updated_at",
         "status_updated_at",
-        "order_analytics",
-        "financial_summary",
-        "customer_summary",
-        "shipping_summary",
-        # Carrier-aware shipment summary rendered inline in the
-        # Shipping fieldset so admins don't have to scroll to the
-        # per-carrier inline below. Branches on
-        # ``obj.shipping_provider.code`` to render either the ACS
-        # voucher state or the BoxNow parcel state.
-        "carrier_shipment_summary",
     )
 
     fieldsets = (
@@ -504,7 +497,6 @@ class OrderAdmin(BaseModelAdmin):
                     "last_name",
                     "email",
                     "phone",
-                    "customer_summary",
                 ),
                 "classes": ("tab",),
             },
@@ -522,7 +514,6 @@ class OrderAdmin(BaseModelAdmin):
                     "floor",
                     "location_type",
                     "place",
-                    "shipping_summary",
                 ),
                 "classes": ("tab",),
             },
@@ -536,11 +527,11 @@ class OrderAdmin(BaseModelAdmin):
                     "payment_method",
                     "payment_id",
                     "paid_amount",
-                    "financial_summary",
                 ),
                 "classes": ("tab",),
                 "description": _(
-                    "⚠️ Note: Ensure all money fields use the same currency (EUR preferred) to avoid calculation errors."
+                    "Note: Ensure all money fields use the same currency "
+                    "(EUR preferred) to avoid calculation errors."
                 ),
             },
         ),
@@ -553,21 +544,20 @@ class OrderAdmin(BaseModelAdmin):
                     "shipping_price",
                     "tracking_number",
                     "shipping_carrier",
-                    "carrier_shipment_summary",
                 ),
                 "classes": ("tab",),
                 "description": _(
-                    "💡 Shipping price currency should match item currencies to avoid total calculation errors."
+                    "Shipping price currency should match item currencies "
+                    "to avoid total calculation errors. Carrier-specific "
+                    "voucher/tracking details are on the ACS/BoxNow "
+                    "shipment tab below."
                 ),
             },
         ),
         (
             _("Additional Information"),
             {
-                "fields": (
-                    "customer_notes",
-                    "order_analytics",
-                ),
+                "fields": ("customer_notes",),
                 "classes": ("tab",),
             },
         ),
@@ -666,744 +656,69 @@ class OrderAdmin(BaseModelAdmin):
             )
         )
 
-    @admin.display(description=_("Customer"))
-    def customer_info(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">{email}</div>'
-            '<div class="text-base-600 dark:text-base-300">{phone}</div>'
-            "</div>",
-            name=f"{obj.first_name} {obj.last_name}",
-            email=obj.email,
-            phone=obj.phone or "No phone",
-        )
+    status_label = choice_label(
+        "status", variants=ORDER_STATUS_VARIANT, description=_("Status")
+    )
+    payment_status_label = choice_label(
+        "payment_status",
+        variants=PAYMENT_STATUS_VARIANT,
+        description=_("Payment"),
+    )
 
-    @admin.display(description=_("Order Summary"))
+    @display(description=_("Customer"), header=True, ordering="last_name")
+    def customer(self, obj):
+        return header_two_line(obj.customer_full_name, obj.email)
+
+    @display(description=_("Order"), ordering="created_at")
     def order_summary(self, obj):
         item_count = getattr(obj, "item_count", 0)
-        total_qty = getattr(obj, "total_items_quantity", 0)
+        total_qty = getattr(obj, "total_items_quantity", 0) or 0
 
         try:
-            price_display = format_html("{}", str(obj.total_price))
-        except ValueError as e:
-            price_display = format_html(
-                '<span class="text-red-600 dark:text-red-400" title="Currency mismatch: {error}">'
-                "Items: {items} + Ship: {shipping}"
-                "</span>",
-                error=str(e),
-                items=str(obj.total_price_items),
-                shipping=str(obj.total_price_extra),
-            )
+            total = money(obj.total_price.amount)
+        except ValueError:
+            total = _(
+                "items %(items)s + shipping %(shipping)s (currency mismatch)"
+            ) % {
+                "items": money(obj.total_price_items.amount),
+                "shipping": money(obj.total_price_extra.amount),
+            }
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{count} items</div>'
-            '<div class="text-base-600 dark:text-base-300">Qty: {qty}</div>'
-            '<div class="font-bold text-base-900 dark:text-base-100">{price}</div>'
-            "</div>",
-            count=item_count,
-            qty=total_qty or 0,
-            price=price_display,
-        )
+        return f"{item_count} items, qty {total_qty} — {total}"
 
-    @admin.display(description=_("Payment"))
-    def payment_info(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            "<div>{badge}</div>"
-            '<div class="font-medium text-base-900 dark:text-base-100">{amount}</div>'
-            '<div class="text-base-600 dark:text-base-300">{method}</div>'
-            "</div>",
-            badge=self.payment_status_badge(obj),
-            amount=str(obj.paid_amount or obj.total_price),
-            method=obj.payment_method or "Not set",
-        )
-
-    @admin.display(description=_("Shipment Summary"))
-    def carrier_shipment_summary(self, obj):
-        """Compact summary of the carrier shipment, shown inline in
-        the Shipping & Tracking fieldset.
-
-        Branches on ``obj.shipping_provider.code`` — ACS orders get
-        the ACS state + voucher; BoxNow orders get the BoxNow badge
-        + locker rendering. Adding a new carrier means adding one
-        ``elif`` here that calls a per-carrier helper.
+    @display(description=_("Shipment"), label=SHIPMENT_STATE_VARIANT)
+    def shipment_state(self, obj):
+        """Carrier-agnostic shipment state, branching on the registry
+        FK's ``code`` — mirrors ``get_inlines`` provider routing.
         """
         provider_code = (
             obj.shipping_provider.code if obj.shipping_provider_id else None
         )
-        is_acs = provider_code == "acs"
-        is_boxnow = provider_code == "boxnow"
-
-        if is_acs:
-            return self._acs_summary_html(obj)
-        if not is_boxnow:
-            return format_html(
-                '<span class="text-sm text-base-500">{}</span>',
-                _("No carrier-specific shipment for this order."),
-            )
-
-        shipment = getattr(obj, "boxnow_shipment", None)
-        if shipment is None:
-            return format_html(
-                '<span class="text-sm text-orange-600">{}</span>',
-                _(
-                    "shipping_provider=boxnow but no BoxNowShipment "
-                    "row — order created before the BoxNow integration "
-                    "shipped, or a service-layer bug. Inspect "
-                    "order.history for clues."
-                ),
-            )
-
-        # Map parcel_state → Tailwind colour for the badge.
-        state_color = {
-            "pending_creation": "bg-base-200 text-base-700",
-            "new": "bg-blue-100 text-blue-700",
-            "in_depot": "bg-cyan-100 text-cyan-700",
-            "final_destination": "bg-amber-100 text-amber-700",
-            "delivered": "bg-green-100 text-green-700",
-            "returned": "bg-red-100 text-red-700",
-            "expired": "bg-red-100 text-red-700",
-            "canceled": "bg-red-100 text-red-700",
-            "missing": "bg-red-100 text-red-700",
-            "lost": "bg-red-100 text-red-700",
-            "accepted_for_return": "bg-cyan-100 text-cyan-700",
-            "accepted_to_locker": "bg-blue-100 text-blue-700",
-        }.get(shipment.parcel_state, "bg-base-200 text-base-700")
-
-        if shipment.parcel_id:
-            voucher = format_html(
-                '<div class="font-mono text-sm">{}</div>',
-                shipment.parcel_id,
-            )
-        else:
-            voucher = format_html(
-                '<div class="text-sm text-orange-600">{}</div>',
-                _("Voucher pending — fires after payment"),
-            )
-
-        if shipment.locker is not None:
-            locker_name = format_html(" &middot; {}", shipment.locker.name)
-        else:
-            locker_name = ""
-
-        return format_html(
-            '<div class="space-y-1 text-sm">'
-            '<div><span class="rounded px-2 py-0.5 text-xs font-medium {color}">{label}</span></div>'
-            "<div><strong>{voucher_label}:</strong> {voucher}</div>"
-            "<div><strong>{locker_label}:</strong> "
-            '<span class="font-mono">{locker_id}</span>{locker_name}</div>'
-            "</div>",
-            color=state_color,
-            label=shipment.get_parcel_state_display(),
-            voucher_label=_("Voucher"),
-            voucher=voucher,
-            locker_label=_("Locker"),
-            locker_id=shipment.locker_external_id or "—",
-            locker_name=locker_name,
-        )
-
-    def _acs_summary_html(self, obj):
-        """ACS shipment summary helper used by ``carrier_shipment_summary``.
-
-        Kept as a private helper rather than its own admin display so
-        the existing fieldset doesn't need a second column added — the
-        single ``carrier_shipment_summary`` field renders whichever
-        carrier is attached. Mirrors the BoxNow rendering for visual
-        consistency.
-        """
-        shipment = getattr(obj, "acs_shipment", None)
-        if shipment is None:
-            return format_html(
-                '<span class="text-sm text-orange-600">{}</span>',
-                _(
-                    "ACS order without an AcsShipment row — likely a "
-                    "race during order creation or an upgrade-time "
-                    "data gap. Inspect order.history for clues."
-                ),
-            )
-
-        state_color = {
-            "pending_creation": "bg-base-200 text-base-700",
-            "new": "bg-blue-100 text-blue-700",
-            "in_transit": "bg-cyan-100 text-cyan-700",
-            "at_destination": "bg-amber-100 text-amber-700",
-            "out_for_delivery": "bg-amber-100 text-amber-700",
-            "delivered": "bg-green-100 text-green-700",
-            "attempted": "bg-orange-100 text-orange-700",
-            "returned": "bg-red-100 text-red-700",
-            "canceled": "bg-red-100 text-red-700",
-            "lost": "bg-red-100 text-red-700",
-        }.get(shipment.shipment_state, "bg-base-200 text-base-700")
-
-        if shipment.voucher_no:
-            voucher_html = format_html(
-                '<div class="font-mono text-sm">{}</div>',
-                shipment.voucher_no,
-            )
-        else:
-            voucher_html = format_html(
-                '<div class="text-sm text-orange-600">{}</div>',
-                _("Voucher pending — fires after order creation"),
-            )
-
-        rows = [
-            format_html(
-                '<div><span class="rounded px-2 py-0.5 text-xs font-medium {color}">{label}</span></div>',
-                color=state_color,
-                label=shipment.get_shipment_state_display(),
-            ),
-            format_html(
-                "<div><strong>{lbl}:</strong> {voucher}</div>",
-                lbl=_("Voucher"),
-                voucher=voucher_html,
-            ),
-            format_html(
-                "<div><strong>{lbl}:</strong> {kind}</div>",
-                lbl=_("Kind"),
-                kind=shipment.get_delivery_kind_display(),
-            ),
-        ]
-
-        if shipment.charge_type == 2 and shipment.cod_amount:  # COD
-            rows.append(
-                format_html(
-                    "<div><strong>{lbl}:</strong> "
-                    '<span class="font-mono">{amount}</span></div>',
-                    lbl=_("COD"),
-                    amount=str(shipment.cod_amount),
-                )
-            )
-
-        if shipment.station_destination_external_id:
-            rows.append(
-                format_html(
-                    "<div><strong>{lbl}:</strong> "
-                    '<span class="font-mono">{station}</span></div>',
-                    lbl=_("Smartpoint"),
-                    station=shipment.station_destination_external_id,
-                )
-            )
-
-        return format_html(
-            '<div class="space-y-1 text-sm">{rows}</div>',
-            rows=format_html_join("", "{}", ((r,) for r in rows)),
-        )
-
-    @admin.display(description=_("Shipping"))
-    def shipping_info(self, obj):
-        if obj.tracking_number:
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-blue-600 dark:text-blue-400">{tracking}</div>'
-                '<div class="text-base-600 dark:text-base-300">{carrier}</div>'
-                '<div class="text-base-600 dark:text-base-300">{city}</div>'
-                "</div>",
-                tracking=obj.tracking_number,
-                carrier=obj.shipping_carrier or "Unknown carrier",
-                city=obj.city,
-            )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="text-base-600 dark:text-base-300">No tracking</div>'
-            '<div class="text-base-600 dark:text-base-300">{city}</div>'
-            "</div>",
-            city=obj.city,
-        )
-
-    @admin.display(description=_("Created"))
-    def created_display(self, obj):
-        now = timezone.now()
-        diff = now - obj.created_at
-
-        if diff < timedelta(hours=1):
-            time_ago = f"{diff.seconds // 60}m ago"
-            color = "text-green-600 dark:text-green-400"
-        elif diff < timedelta(days=1):
-            time_ago = f"{diff.seconds // 3600}h ago"
-            color = "text-blue-600 dark:text-blue-400"
-        else:
-            time_ago = f"{diff.days}d ago"
-            color = "text-base-600 dark:text-base-400"
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{date}</div>'
-            '<div class="{color}">{time}</div>'
-            "</div>",
-            date=obj.created_at.strftime("%Y-%m-%d %H:%M"),
-            color=color,
-            time=time_ago,
-        )
-
-    @admin.display(description=_("Priority"))
-    def urgency_indicator(self, obj):
-        if not obj.created_at:
-            return "Available after creation."
-
-        now = timezone.now()
-        age = now - obj.created_at
-
-        if obj.status == OrderStatus.PENDING and age > timedelta(hours=24):
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "🚨 Urgent"
-                "</span>"
-            )
-        if obj.status == OrderStatus.PROCESSING and age > timedelta(days=3):
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "⚠️ Delayed"
-                "</span>"
-            )
-        if obj.status == OrderStatus.SHIPPED and age > timedelta(days=7):
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full">'
-                "📦 Follow up"
-                "</span>"
-            )
-        return ""
-
-    @admin.display(description=_("Status"))
-    def status_badge(self, obj):
-        status_config = {
-            OrderStatus.PENDING: {
-                "bg": "bg-orange-50 dark:bg-orange-900",
-                "text": "text-orange-700 dark:text-orange-300",
-                "icon": "⏳",
-            },
-            OrderStatus.PROCESSING: {
-                "bg": "bg-blue-50 dark:bg-blue-900",
-                "text": "text-blue-700 dark:text-blue-300",
-                "icon": "⚙️",
-            },
-            OrderStatus.SHIPPED: {
-                "bg": "bg-purple-50 dark:bg-purple-900",
-                "text": "text-purple-700 dark:text-purple-300",
-                "icon": "🚚",
-            },
-            OrderStatus.DELIVERED: {
-                "bg": "bg-green-50 dark:bg-green-900",
-                "text": "text-green-700 dark:text-green-300",
-                "icon": "📦",
-            },
-            OrderStatus.COMPLETED: {
-                "bg": "bg-emerald-50 dark:bg-emerald-900",
-                "text": "text-emerald-700 dark:text-emerald-300",
-                "icon": "✅",
-            },
-            OrderStatus.CANCELED: {
-                "bg": "bg-red-50 dark:bg-red-900",
-                "text": "text-red-700 dark:text-red-300",
-                "icon": "❌",
-            },
-            OrderStatus.RETURNED: {
-                "bg": "bg-yellow-50 dark:bg-yellow-900",
-                "text": "text-yellow-700 dark:text-yellow-300",
-                "icon": "↩️",
-            },
-            OrderStatus.REFUNDED: {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-300",
-                "icon": "💰",
-            },
-        }
-
-        config = status_config.get(
-            obj.status,
-            {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-300",
-                "icon": "❓",
-            },
-        )
-
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            '{bg} {text_class} rounded-full gap-1">'
-            "<span>{icon}</span>"
-            "<span>{label}</span>"
-            "</span>",
-            bg=config["bg"],
-            text_class=config["text"],
-            icon=config["icon"],
-            label=obj.get_status_display(),
-        )
-
-    def payment_status_badge(self, obj):
-        payment_config = {
-            PaymentStatus.COMPLETED: {
-                "bg": "bg-green-50 dark:bg-green-900",
-                "text": "text-green-700 dark:text-green-300",
-                "icon": "✅",
-            },
-            PaymentStatus.PENDING: {
-                "bg": "bg-orange-50 dark:bg-orange-900",
-                "text": "text-orange-700 dark:text-orange-300",
-                "icon": "⏳",
-            },
-            PaymentStatus.PROCESSING: {
-                "bg": "bg-blue-50 dark:bg-blue-900",
-                "text": "text-blue-700 dark:text-blue-300",
-                "icon": "⚙️",
-            },
-            PaymentStatus.FAILED: {
-                "bg": "bg-red-50 dark:bg-red-900",
-                "text": "text-red-700 dark:text-red-300",
-                "icon": "❌",
-            },
-            PaymentStatus.REFUNDED: {
-                "bg": "bg-purple-50 dark:bg-purple-900",
-                "text": "text-purple-700 dark:text-purple-300",
-                "icon": "↩️",
-            },
-            PaymentStatus.PARTIALLY_REFUNDED: {
-                "bg": "bg-yellow-50 dark:bg-yellow-900",
-                "text": "text-yellow-700 dark:text-yellow-300",
-                "icon": "⚠️",
-            },
-            PaymentStatus.CANCELED: {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-700",
-                "icon": "🚫",
-            },
-        }
-
-        config = payment_config.get(
-            obj.payment_status,
-            {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-700",
-                "icon": "❓",
-            },
-        )
-
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            '{bg} {text_class} rounded-full gap-1">'
-            "<span>{icon}</span>"
-            "<span>{label}</span>"
-            "</span>",
-            bg=config["bg"],
-            text_class=config["text"],
-            icon=config["icon"],
-            label=obj.get_payment_status_display(),
-        )
-
-    _SHIPMENT_STATE_CONFIG = {
-        "acs": {
-            "pending_creation": (
-                "bg-base-50 dark:bg-base-900",
-                "text-base-700 dark:text-base-300",
-                "🕓",
-            ),
-            "new": (
-                "bg-blue-50 dark:bg-blue-900",
-                "text-blue-700 dark:text-blue-300",
-                "🆕",
-            ),
-            "in_transit": (
-                "bg-cyan-50 dark:bg-cyan-900",
-                "text-cyan-700 dark:text-cyan-300",
-                "🚚",
-            ),
-            "at_destination": (
-                "bg-amber-50 dark:bg-amber-900",
-                "text-amber-700 dark:text-amber-300",
-                "🏬",
-            ),
-            "out_for_delivery": (
-                "bg-amber-50 dark:bg-amber-900",
-                "text-amber-700 dark:text-amber-300",
-                "🛵",
-            ),
-            "delivered": (
-                "bg-green-50 dark:bg-green-900",
-                "text-green-700 dark:text-green-300",
-                "📦",
-            ),
-            "attempted": (
-                "bg-orange-50 dark:bg-orange-900",
-                "text-orange-700 dark:text-orange-300",
-                "⚠️",
-            ),
-            "returned": (
-                "bg-red-50 dark:bg-red-900",
-                "text-red-700 dark:text-red-300",
-                "↩️",
-            ),
-            "canceled": (
-                "bg-gray-50 dark:bg-gray-900",
-                "text-base-700 dark:text-base-300",
-                "🚫",
-            ),
-            "lost": (
-                "bg-red-50 dark:bg-red-900",
-                "text-red-700 dark:text-red-300",
-                "❓",
-            ),
-        },
-        "boxnow": {
-            "pending_creation": (
-                "bg-base-50 dark:bg-base-900",
-                "text-base-700 dark:text-base-300",
-                "🕓",
-            ),
-            "new": (
-                "bg-blue-50 dark:bg-blue-900",
-                "text-blue-700 dark:text-blue-300",
-                "🆕",
-            ),
-            "in_depot": (
-                "bg-cyan-50 dark:bg-cyan-900",
-                "text-cyan-700 dark:text-cyan-300",
-                "🏢",
-            ),
-            "final_destination": (
-                "bg-amber-50 dark:bg-amber-900",
-                "text-amber-700 dark:text-amber-300",
-                "🏪",
-            ),
-            "delivered": (
-                "bg-green-50 dark:bg-green-900",
-                "text-green-700 dark:text-green-300",
-                "📦",
-            ),
-            "returned": (
-                "bg-red-50 dark:bg-red-900",
-                "text-red-700 dark:text-red-300",
-                "↩️",
-            ),
-            "expired": (
-                "bg-red-50 dark:bg-red-900",
-                "text-red-700 dark:text-red-300",
-                "⌛",
-            ),
-            "canceled": (
-                "bg-gray-50 dark:bg-gray-900",
-                "text-base-700 dark:text-base-300",
-                "🚫",
-            ),
-            "missing": (
-                "bg-red-50 dark:bg-red-900",
-                "text-red-700 dark:text-red-300",
-                "❓",
-            ),
-            "lost": (
-                "bg-red-50 dark:bg-red-900",
-                "text-red-700 dark:text-red-300",
-                "❓",
-            ),
-        },
-    }
-
-    @admin.display(description=_("Shipment"))
-    def shipment_status_badge(self, obj):
-        provider_code = (
-            obj.shipping_provider.code if obj.shipping_provider_id else None
-        )
-
         if provider_code == "acs":
             shipment = getattr(obj, "acs_shipment", None)
-            state = getattr(shipment, "shipment_state", None)
-            label = shipment.get_shipment_state_display() if shipment else None
-        elif provider_code == "boxnow":
+            if shipment is None:
+                return None
+            return (
+                shipment.shipment_state,
+                shipment.get_shipment_state_display(),
+            )
+        if provider_code == "boxnow":
             shipment = getattr(obj, "boxnow_shipment", None)
-            state = getattr(shipment, "parcel_state", None)
-            label = shipment.get_parcel_state_display() if shipment else None
-        else:
-            return mark_safe('<span class="text-xs text-base-500">—</span>')
+            if shipment is None:
+                return None
+            return shipment.parcel_state, shipment.get_parcel_state_display()
+        return None
 
-        if shipment is None or state is None:
-            return format_html(
-                '<span class="text-xs text-orange-600 dark:text-orange-400">{}</span>',
-                _("No shipment"),
-            )
+    @display(description=_("Shipping"), ordering="tracking_number")
+    def shipping_info(self, obj):
+        if obj.tracking_number:
+            carrier = obj.shipping_carrier or _("Unknown carrier")
+            return f"{obj.tracking_number} · {carrier} · {obj.city}"
+        return f"{_('No tracking')} · {obj.city}"
 
-        bg, text_class, icon = self._SHIPMENT_STATE_CONFIG[provider_code].get(
-            state,
-            (
-                "bg-gray-50 dark:bg-gray-900",
-                "text-base-700 dark:text-base-300",
-                "❓",
-            ),
-        )
-
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            '{bg} {text_class} rounded-full gap-1">'
-            "<span>{icon}</span>"
-            "<span>{label}</span>"
-            "</span>",
-            bg=bg,
-            text_class=text_class,
-            icon=icon,
-            label=label,
-        )
-
-    @admin.display(description=_("Status Age"), ordering="status_updated_at")
-    def order_status_age(self, obj):
-        if not obj.status_updated_at:
-            return mark_safe('<span class="text-xs text-base-500">—</span>')
-
-        diff = timezone.now() - obj.status_updated_at
-
-        if diff < timedelta(hours=1):
-            age = f"{max(diff.seconds // 60, 1)}m"
-            color = "text-green-600 dark:text-green-400"
-        elif diff < timedelta(days=1):
-            age = f"{diff.seconds // 3600}h"
-            color = "text-blue-600 dark:text-blue-400"
-        elif diff < timedelta(days=7):
-            age = f"{diff.days}d"
-            color = "text-blue-600 dark:text-blue-400"
-        else:
-            age = f"{diff.days}d"
-            color = "text-orange-600 dark:text-orange-400"
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="{color} font-medium">{age}</div>'
-            '<div class="text-base-500 dark:text-base-400 text-xs">{ts}</div>'
-            "</div>",
-            color=color,
-            age=age,
-            ts=obj.status_updated_at.strftime("%Y-%m-%d %H:%M"),
-        )
-
-    @admin.display(description=_("Customer Summary"))
-    def customer_summary(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Full Name:</strong></div><div>{name}</div>"
-            "<div><strong>Email:</strong></div><div>{email}</div>"
-            "<div><strong>Phone:</strong></div><div>{phone}</div>"
-            "<div><strong>Account:</strong></div><div>{account}</div>"
-            "</div>"
-            "</div>",
-            name=obj.customer_full_name,
-            email=obj.email,
-            phone=obj.phone or "Not provided",
-            account="Registered User" if obj.user else "Guest",
-        )
-
-    @admin.display(description=_("Financial Summary"))
-    def financial_summary(self, obj):
-        try:
-            total_display = format_html("{}", str(obj.total_price))
-            currency_warning = mark_safe("")
-        except ValueError as e:
-            total_display = mark_safe(
-                '<span class="text-red-600 dark:text-red-400">Currency Mismatch</span>'
-            )
-            currency_warning = format_html(
-                "<div><strong>Currency Issue:</strong></div>"
-                '<div class="text-red-600 dark:text-red-400 text-xs">{err}</div>',
-                err=str(e),
-            )
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Items Total:</strong></div><div>{items}</div>"
-            "<div><strong>Shipping:</strong></div><div>{shipping}</div>"
-            '<div><strong>Grand Total:</strong></div><div class="font-bold">{total}</div>'
-            "<div><strong>Paid Amount:</strong></div><div>{paid}</div>"
-            "<div><strong>Payment Status:</strong></div><div>{pstatus}</div>"
-            "<div><strong>Payment Method:</strong></div><div>{pmethod}</div>"
-            "<div><strong>Document Type:</strong></div><div>{doc}</div>"
-            "{warning}"
-            "</div>"
-            "</div>",
-            items=str(obj.total_price_items),
-            shipping=str(obj.shipping_price),
-            total=total_display,
-            paid=str(obj.paid_amount or "Not paid"),
-            pstatus=obj.get_payment_status_display(),
-            pmethod=obj.payment_method or "Not specified",
-            doc=obj.get_document_type_display(),
-            warning=currency_warning,
-        )
-
-    @admin.display(description=_("Shipping Summary"))
-    def shipping_summary(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Full Address:</strong></div><div>{address}</div>"
-            "<div><strong>Tracking:</strong></div><div>{tracking}</div>"
-            "<div><strong>Carrier:</strong></div><div>{carrier}</div>"
-            "<div><strong>Shipping Cost:</strong></div><div>{price}</div>"
-            "</div>"
-            "</div>",
-            address=obj.full_address,
-            tracking=obj.tracking_number or "Not assigned",
-            carrier=obj.shipping_carrier or "Not assigned",
-            price=str(obj.shipping_price),
-        )
-
-    @admin.display(description=_("Order Analytics"))
-    def order_analytics(self, obj):
-        if not obj.created_at:
-            return "Available after creation."
-
-        now = timezone.now()
-        age = now - obj.created_at
-
-        processing_time = ""
-        if obj.status_updated_at:
-            status_age = now - obj.status_updated_at
-            processing_time = (
-                f"{status_age.days}d {status_age.seconds // 3600}h"
-            )
-
-        available_docs = OrderDocumentTypeEnum.get_document_types_for_status(
-            obj.status
-        )
-        doc_types = ", ".join([str(doc.label) for doc in available_docs])
-
-        currency_status = "OK"
-        try:
-            items_currency = obj.total_price_items.currency
-            shipping_currency = obj.shipping_price.currency
-            if items_currency != shipping_currency:
-                currency_status = f"Mixed: {items_currency}/{shipping_currency}"
-        except ValueError:
-            currency_status = "Mismatch Error"
-
-        currency_class = (
-            "text-red-600 dark:text-red-400"
-            if "Mismatch" in currency_status or "Mixed" in currency_status
-            else ""
-        )
-
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Order Age:</strong></div><div>{days}d {hours}h</div>"
-            "<div><strong>Status Age:</strong></div><div>{processing}</div>"
-            "<div><strong>Items Count:</strong></div><div>{count}</div>"
-            "<div><strong>Can Cancel:</strong></div><div>{can_cancel}</div>"
-            "<div><strong>Is Paid:</strong></div><div>{is_paid}</div>"
-            '<div><strong>Currency Status:</strong></div><div class="{cls}">{currency}</div>'
-            '<div><strong>Available Docs:</strong></div><div class="text-xs">{docs}</div>'
-            "</div>"
-            "</div>",
-            days=age.days,
-            hours=age.seconds // 3600,
-            processing=processing_time or "N/A",
-            count=getattr(obj, "item_count", 0),
-            can_cancel="Yes" if obj.can_be_canceled else "No",
-            is_paid="Yes" if obj.is_paid else "No",
-            cls=currency_class,
-            currency=currency_status,
-            docs=doc_types,
-        )
+    @display(description=_("Created"), ordering="created_at")
+    def created(self, obj):
+        return f"{format_dt(obj.created_at)} ({relative_time(obj.created_at)})"
 
     @action(
         description=str(_("Mark selected orders as processing")),
@@ -1912,6 +1227,7 @@ class OrderAdmin(BaseModelAdmin):
 class OrderItemAdmin(BaseModelAdmin):
     list_display = [
         "order_link",
+        "order_status",
         "product_display",
         "quantity_display",
         "pricing_info",
@@ -1942,7 +1258,6 @@ class OrderItemAdmin(BaseModelAdmin):
         "total_price",
         "refunded_amount",
         "net_price",
-        "item_analytics",
     ]
     list_select_related = ["order", "order__user", "product"]
 
@@ -1975,7 +1290,7 @@ class OrderItemAdmin(BaseModelAdmin):
         (
             _("Additional Information"),
             {
-                "fields": ("notes", "item_analytics"),
+                "fields": ("notes",),
                 "classes": ("collapse",),
             },
         ),
@@ -1988,138 +1303,74 @@ class OrderItemAdmin(BaseModelAdmin):
         ),
     )
 
+    def get_queryset(self, request):
+        # ``product_display`` calls ``safe_translation_getter``, which
+        # fires one ``ProductTranslation`` query per row without
+        # prefetch.
+        return (
+            super()
+            .get_queryset(request)
+            .prefetch_related("product__translations")
+        )
+
     @admin.display(description=_("Order"))
     def order_link(self, obj):
         return format_html(
-            '<div class="text-sm">'
-            '<a href="{url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Order #{id}</a>'
-            "<div>{badge}</div>"
-            "</div>",
+            '<a href="{url}">Order #{id}</a>',
             url=f"/admin/order/order/{obj.order.id}/change/",
             id=obj.order.id,
-            badge=self.order_status_mini(obj.order),
         )
 
-    def order_status_mini(self, order):
-        status_colors = {
-            OrderStatus.PENDING: "text-orange-600 dark:text-orange-400",
-            OrderStatus.PROCESSING: "text-blue-600 dark:text-blue-400",
-            OrderStatus.SHIPPED: "text-purple-600 dark:text-purple-400",
-            OrderStatus.DELIVERED: "text-green-600 dark:text-green-400",
-            OrderStatus.COMPLETED: "text-emerald-600 dark:text-emerald-400",
-            OrderStatus.CANCELED: "text-red-600 dark:text-red-400",
-            OrderStatus.RETURNED: "text-yellow-600 dark:text-yellow-400",
-            OrderStatus.REFUNDED: "text-base-600 dark:text-base-400",
-        }
-        color = status_colors.get(
-            order.status, "text-base-600 dark:text-base-400"
-        )
-        return format_html(
-            '<span class="{color}">{status}</span>',
-            color=color,
-            status=order.get_status_display(),
-        )
+    @display(
+        description=_("Order Status"),
+        label=ORDER_STATUS_VARIANT,
+        ordering="order__status",
+    )
+    def order_status(self, obj):
+        return obj.order.status, obj.order.get_status_display()
 
     @admin.display(description=_("Product"))
     def product_display(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">ID: {id}</div>'
-            "</div>",
-            name=(
-                obj.product.safe_translation_getter("name", any_language=True)
-                or "Unnamed Product"
-            ),
-            id=obj.product.id,
-        )
+        name = obj.product.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed Product")
+        return f"{name} (ID: {obj.product.id})"
 
     @admin.display(description=_("Quantity"))
     def quantity_display(self, obj):
         if obj.refunded_quantity > 0:
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">Total: {qty}</div>'
-                '<div class="text-red-600 dark:text-red-400">Refunded: {refunded}</div>'
-                '<div class="text-green-600 dark:text-green-400">Net: {net}</div>'
-                "</div>",
-                qty=obj.quantity,
-                refunded=obj.refunded_quantity,
-                net=obj.net_quantity,
-            )
-        return format_html(
-            '<span class="inline-flex items-center px-3 py-1 text-sm font-medium '
-            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            "x{qty}"
-            "</span>",
-            qty=obj.quantity,
-        )
+            return _("total %(qty)s, refunded %(refunded)s, net %(net)s") % {
+                "qty": obj.quantity,
+                "refunded": obj.refunded_quantity,
+                "net": obj.net_quantity,
+            }
+        return f"x{obj.quantity}"
 
     @admin.display(description=_("Pricing"))
     def pricing_info(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{price} each</div>'
-            '<div class="font-bold text-base-900 dark:text-base-100">Total: {total}</div>'
-            '<div class="text-green-600 dark:text-green-400">Net: {net}</div>'
-            "</div>",
-            price=str(obj.price),
-            total=str(obj.total_price),
-            net=str(obj.net_price),
-        )
+        return _("%(price)s each — total %(total)s (net %(net)s)") % {
+            "price": money(obj.price.amount),
+            "total": money(obj.total_price.amount),
+            "net": money(obj.net_price.amount),
+        }
 
     @admin.display(description=_("Refund Status"))
     def refund_status_display(self, obj):
         if obj.is_refunded:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "↩️ Fully Refunded"
-                "</span>"
-            )
+            return _("Fully Refunded")
         if obj.refunded_quantity > 0:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "⚠️ Partial ({refunded}/{qty})"
-                "</span>",
-                refunded=obj.refunded_quantity,
-                qty=obj.quantity,
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-            "✅ Active"
-            "</span>"
-        )
-
-    @admin.display(description=_("Item Analytics"))
-    def item_analytics(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div><strong>Original Qty:</strong></div><div>{orig}</div>"
-            "<div><strong>Current Qty:</strong></div><div>{current}</div>"
-            "<div><strong>Refunded Qty:</strong></div><div>{refunded}</div>"
-            "<div><strong>Net Qty:</strong></div><div>{net_qty}</div>"
-            "<div><strong>Refunded Amount:</strong></div><div>{refunded_amt}</div>"
-            "<div><strong>Net Amount:</strong></div><div>{net_price}</div>"
-            "</div>"
-            "</div>",
-            orig=str(obj.original_quantity or obj.quantity),
-            current=obj.quantity,
-            refunded=obj.refunded_quantity,
-            net_qty=obj.net_quantity,
-            refunded_amt=str(obj.refunded_amount),
-            net_price=str(obj.net_price),
-        )
+            return _("Partial (%(refunded)s/%(qty)s)") % {
+                "refunded": obj.refunded_quantity,
+                "qty": obj.quantity,
+            }
+        return _("Active")
 
 
 @admin.register(OrderHistory)
 class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     list_display = [
         "order_link",
-        "change_type_badge",
+        "change_type_label",
         "description_display",
         "user_display",
         "ip_address",
@@ -2151,115 +1402,41 @@ class OrderHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     ]
     list_select_related = ["order", "user"]
 
+    change_type_label = choice_label(
+        "change_type",
+        variants=ORDER_HISTORY_CHANGE_TYPE_VARIANT,
+        description=_("Change Type"),
+    )
+
     @admin.display(description=_("Order"))
     def order_link(self, obj):
         return format_html(
-            '<a href="{url}" class="font-medium text-blue-600 dark:text-blue-400 '
-            'hover:text-blue-800 dark:hover:text-blue-300">Order #{id}</a>',
+            '<a href="{url}">Order #{id}</a>',
             url=f"/admin/order/order/{obj.order.id}/change/",
             id=obj.order.id,
         )
 
-    @admin.display(description=_("Change Type"))
-    def change_type_badge(self, obj):
-        type_config = {
-            "STATUS": {
-                "bg": "bg-blue-50 dark:bg-blue-900",
-                "text": "text-blue-700 dark:text-blue-300",
-                "icon": "📊",
-            },
-            "PAYMENT": {
-                "bg": "bg-green-50 dark:bg-green-900",
-                "text": "text-green-700 dark:text-green-300",
-                "icon": "💳",
-            },
-            "SHIPPING": {
-                "bg": "bg-purple-50 dark:bg-purple-900",
-                "text": "text-purple-700 dark:text-purple-300",
-                "icon": "🚚",
-            },
-            "CUSTOMER": {
-                "bg": "bg-orange-50 dark:bg-orange-900",
-                "text": "text-orange-700 dark:text-orange-300",
-                "icon": "👤",
-            },
-            "ITEMS": {
-                "bg": "bg-red-50 dark:bg-red-900",
-                "text": "text-red-700 dark:text-red-300",
-                "icon": "📦",
-            },
-            "ADDRESS": {
-                "bg": "bg-yellow-50 dark:bg-yellow-900",
-                "text": "text-yellow-700 dark:text-yellow-300",
-                "icon": "📍",
-            },
-            "NOTE": {
-                "bg": "bg-indigo-50 dark:bg-indigo-900",
-                "text": "text-indigo-700 dark:text-indigo-300",
-                "icon": "📝",
-            },
-            "REFUND": {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-700",
-                "icon": "💰",
-            },
-        }
-
-        config = type_config.get(
-            obj.change_type,
-            {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-700",
-                "icon": "📋",
-            },
-        )
-
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            '{bg} {text_class} rounded-full gap-1">'
-            "<span>{icon}</span>"
-            "<span>{label}</span>"
-            "</span>",
-            bg=config["bg"],
-            text_class=config["text"],
-            icon=config["icon"],
-            label=obj.get_change_type_display(),
-        )
-
     @admin.display(description=_("Description"))
     def description_display(self, obj):
-        description = (
-            obj.safe_translation_getter("description", any_language=True)
-            or "No description"
-        )
-        desc_display = (
+        description = obj.safe_translation_getter(
+            "description", any_language=True
+        ) or _("No description")
+        return (
             description[:80] + "..." if len(description) > 80 else description
-        )
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300" title="{title}">'
-            "{display}"
-            "</div>",
-            title=description,
-            display=desc_display,
         )
 
     @admin.display(description=_("Changed By"))
     def user_display(self, obj):
         if obj.user:
-            return format_html(
-                '<div class="text-sm text-base-700 dark:text-base-300">{name}</div>',
-                name=obj.user.full_name or obj.user.username,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300 italic">System</span>'
-        )
+            return obj.user.full_name or obj.user.username
+        return _("System")
 
 
 @admin.register(OrderItemHistory)
 class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     list_display = [
         "order_item_link",
-        "change_type_badge",
+        "change_type_label",
         "description_display",
         "user_display",
         "created_at",
@@ -2295,6 +1472,12 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     ]
     list_select_related = ["order_item", "order_item__order", "user"]
 
+    change_type_label = choice_label(
+        "change_type",
+        variants=ORDER_ITEM_HISTORY_CHANGE_TYPE_VARIANT,
+        description=_("Change Type"),
+    )
+
     def get_queryset(self, request):
         # ``description_display`` calls ``safe_translation_getter``,
         # which fires one ``OrderItemHistoryTranslation`` query per
@@ -2306,77 +1489,26 @@ class OrderItemHistoryAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     @admin.display(description=_("Order Item"))
     def order_item_link(self, obj):
         return format_html(
-            '<div class="text-sm">'
-            '<a href="{url}" class="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">Item #{item_id}</a>'
-            '<div class="text-base-600 dark:text-base-300">Order #{order_id}</div>'
-            "</div>",
+            '<a href="{url}">Item #{item_id}</a> (Order #{order_id})',
             url=f"/admin/order/orderitem/{obj.order_item.id}/change/",
             item_id=obj.order_item.id,
             order_id=obj.order_item.order.id,
         )
 
-    @admin.display(description=_("Change Type"))
-    def change_type_badge(self, obj):
-        type_config = {
-            "QUANTITY": {
-                "bg": "bg-blue-50 dark:bg-blue-900",
-                "text": "text-blue-700 dark:text-blue-300",
-                "icon": "🔢",
-            },
-            "PRICE": {
-                "bg": "bg-green-50 dark:bg-green-900",
-                "text": "text-green-700 dark:text-green-300",
-                "icon": "💲",
-            },
-            "REFUND": {
-                "bg": "bg-red-50 dark:bg-red-900",
-                "text": "text-red-700 dark:text-red-300",
-                "icon": "↩️",
-            },
-            "OTHER": {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-base-700 dark:text-base-700",
-                "icon": "📋",
-            },
-        }
-
-        config = type_config.get(obj.change_type, type_config["OTHER"])
-        return format_html(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            '{bg} {text_class} rounded-full gap-1">'
-            "<span>{icon}</span>"
-            "<span>{label}</span>"
-            "</span>",
-            bg=config["bg"],
-            text_class=config["text"],
-            icon=config["icon"],
-            label=obj.get_change_type_display(),
-        )
-
     @admin.display(description=_("Description"))
     def description_display(self, obj):
-        description = (
-            obj.safe_translation_getter("description", any_language=True)
-            or "No description"
-        )
-        desc_display = (
+        description = obj.safe_translation_getter(
+            "description", any_language=True
+        ) or _("No description")
+        return (
             description[:60] + "..." if len(description) > 60 else description
-        )
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300">{desc}</div>',
-            desc=desc_display,
         )
 
     @admin.display(description=_("Changed By"))
     def user_display(self, obj):
         if obj.user:
-            return format_html(
-                '<div class="text-sm text-base-700 dark:text-base-300">{name}</div>',
-                name=obj.user.full_name or obj.user.username,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300 italic">System</span>'
-        )
+            return obj.user.full_name or obj.user.username
+        return _("System")
 
 
 @admin.register(StockLog)
@@ -2384,12 +1516,10 @@ class StockLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     list_display = (
         "product",
         "operation_type",
-        "quantity_delta",
-        "stock_before",
-        "stock_after",
+        "stock_change",
         "order",
-        "created_at",
         "performed_by",
+        "created_at",
     )
     list_filter = (
         "operation_type",
@@ -2415,6 +1545,12 @@ class StockLogAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
     )
     date_hierarchy = "created_at"
     list_select_related = ("product", "order", "performed_by")
+
+    @display(description=_("Stock Change"), ordering="stock_after")
+    def stock_change(self, obj):
+        return (
+            f"{obj.stock_before} → {obj.stock_after} ({obj.quantity_delta:+d})"
+        )
 
 
 class HasDocumentFilter(DropdownFilter):
@@ -2459,7 +1595,7 @@ class InvoiceAdmin(BaseModelAdmin):
         "total_display",
         "currency",
         "document_badge",
-        "mydata_status_badge",
+        "mydata_status_label",
     )
     list_filter = (
         # ``Invoice.issue_date`` is a ``DateField`` (no time
@@ -2589,107 +1725,35 @@ class InvoiceAdmin(BaseModelAdmin):
         if not obj.order_id:
             return "—"
         return format_html(
-            '<a href="{url}" class="underline">#{id}</a>',
+            '<a href="{url}">#{id}</a>',
             url=reverse("admin:order_order_change", args=[obj.order_id]),
             id=obj.order_id,
         )
 
     @admin.display(description=_("Total"))
     def total_display(self, obj):
-        return format_html(
-            '<div class="text-sm font-bold">{total}</div>',
-            total=str(obj.total),
-        )
+        return money(obj.total.amount)
 
     @admin.display(description=_("Document"))
     def document_badge(self, obj):
         if not obj.has_document():
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "⏳ Pending"
-                "</span>"
-            )
+            return _("Pending")
         return format_html(
-            '<a href="{url}" target="_blank" rel="noopener" '
-            'class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            "bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 "
-            'rounded-full hover:underline">'
-            "📄 Download"
-            "</a>",
+            '<a href="{url}" target="_blank" rel="noopener">{label}</a>',
             url=_invoice_download_url(obj) or "",
+            label=_("Download"),
         )
 
-    @admin.display(description=_("myDATA"))
-    def mydata_status_badge(self, obj):
-        """One-glance myDATA lifecycle state — colour-coded."""
-        # Each state maps to a distinct colour so ops can scan the
-        # changelist and spot REJECTED rows instantly. Strings kept
-        # inline (not via a helper) so the HTML is auditable in one
-        # place.
-        from order.models.invoice import MyDataStatus
-
-        state_config = {
-            MyDataStatus.NOT_SENT: {
-                "bg": "bg-gray-50 dark:bg-gray-900",
-                "text": "text-gray-700 dark:text-gray-300",
-                "icon": "—",
-                "label": "—",
-            },
-            MyDataStatus.PENDING: {
-                "bg": "bg-blue-50 dark:bg-blue-900",
-                "text": "text-blue-700 dark:text-blue-300",
-                "icon": "⏳",
-                "label": "Queued",
-            },
-            MyDataStatus.SUBMITTED: {
-                "bg": "bg-indigo-50 dark:bg-indigo-900",
-                "text": "text-indigo-700 dark:text-indigo-300",
-                "icon": "↗",
-                "label": "Submitted",
-            },
-            MyDataStatus.CONFIRMED: {
-                "bg": "bg-green-50 dark:bg-green-900",
-                "text": "text-green-700 dark:text-green-300",
-                "icon": "✓",
-                "label": "Confirmed",
-            },
-            MyDataStatus.REJECTED: {
-                "bg": "bg-red-50 dark:bg-red-900",
-                "text": "text-red-700 dark:text-red-300",
-                "icon": "✗",
-                "label": "Rejected",
-            },
-            MyDataStatus.CANCELED: {
-                "bg": "bg-yellow-50 dark:bg-yellow-900",
-                "text": "text-yellow-700 dark:text-yellow-300",
-                "icon": "🚫",
-                "label": "Canceled",
-            },
-        }
-        cfg = state_config.get(
-            obj.mydata_status, state_config[MyDataStatus.NOT_SENT]
-        )
+    @display(
+        description=_("myDATA"),
+        label=MYDATA_STATUS_VARIANT,
+        ordering="mydata_status",
+    )
+    def mydata_status_label(self, obj):
+        label = obj.get_mydata_status_display()
         if obj.mydata_mark:
-            mark_suffix = format_html(
-                ' <span class="ml-1 text-[10px] opacity-75">#{mark}</span>',
-                mark=obj.mydata_mark,
-            )
-        else:
-            mark_suffix = mark_safe("")
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            '{bg} {text_class} rounded-full gap-1">'
-            "<span>{icon}</span>"
-            "<span>{label}</span>"
-            "{mark_suffix}"
-            "</span>",
-            bg=cfg["bg"],
-            text_class=cfg["text"],
-            icon=cfg["icon"],
-            label=cfg["label"],
-            mark_suffix=mark_suffix,
-        )
+            label = f"{label} (#{obj.mydata_mark})"
+        return obj.mydata_status, label
 
 
 @admin.register(InvoiceCounter)

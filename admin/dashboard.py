@@ -1,23 +1,30 @@
 """Webside admin dashboard data layer.
 
 Builds the data dict consumed by ``core/templates/admin/index.html``
-in four zones:
+in five zones:
 
 A. Hero KPIs (4 cards)
-B. Operations charts (revenue+orders bar/line, status doughnut)
-C. Action queues (recent orders, pending reviews, contact messages)
+B. Operations charts (revenue+orders bar/line, status doughnut) — chart
+   payloads are pre-serialized to JSON strings so the template can feed
+   them straight into unfold's ``{% component "unfold/components/chart/*.html" %}``
+   ``data``/``options`` attributes (and the hand-rolled doughnut canvas).
+C. Action queues (recent orders, pending reviews, contact messages) —
+   plain dicts of raw field values; all HTML (links, status/rating
+   pills) is rendered in the template via unfold components.
 D. System warnings (superuser-only — seller config, MyDATA, low stock,
    failed Celery tasks)
+E. Growth (conversion funnel, repeat-customer rate, top products)
 
-Zones A/B/C are request-independent and are cached in Redis for 5 min.
-Zone D is computed fresh per request because operational alerts must
-reflect the latest state. All visible strings are wrapped with
+Zones A/B/C/E are request-independent and are cached in Redis for 5
+min. Zone D is computed fresh per request because operational alerts
+must reflect the latest state. All visible strings are wrapped with
 ``gettext_lazy`` so the dashboard renders fully in Greek when the
 admin is browsed under ``django_language=el``.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
 
 from django.apps import apps
@@ -26,10 +33,9 @@ from django.db.models import Avg, Count, Sum
 from django.db.models.functions import TruncDay
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.html import escape, format_html
 from django.utils.translation import gettext_lazy as _
 
-DASHBOARD_CACHE_KEY = "admin:dashboard:data:v3"
+DASHBOARD_CACHE_KEY = "admin:dashboard:data:v4"
 DASHBOARD_CACHE_TTL = 300  # 5 minutes
 
 # Stock-mandatory seller fields surfaced as Zone D banners.
@@ -39,17 +45,21 @@ _REQUIRED_SELLER_SETTINGS = (
     ("INVOICE_SELLER_TAX_OFFICE", _("Tax office (ΔΟΥ)")),
 )
 
+# Neutral gray that reads fine on both light and dark admin themes —
+# matches the tick color unfold's own bundled chart defaults use.
+_CHART_TICK_COLOR = "#9ca3af"
+
 
 def dashboard_callback(request, context):
-    """Populate ``context`` with the four-zone dashboard payload.
+    """Populate ``context`` with the five-zone dashboard payload.
 
-    Zones A/B/C are served from the Redis cache (busted on writes via
+    Zones A/B/C/E are served from the Redis cache (busted on writes via
     ``admin/signals.py``); Zone D is recomputed on every request so
     fixing a missing setting reflects on the next page load.
     """
 
     payload = cache.get_or_set(
-        DASHBOARD_CACHE_KEY, _build_zones_a_b_c, DASHBOARD_CACHE_TTL
+        DASHBOARD_CACHE_KEY, _build_cached_zones, DASHBOARD_CACHE_TTL
     )
     context.update(payload)
     context["is_superuser"] = bool(
@@ -182,10 +192,10 @@ def _check_failed_celery() -> int:
     ).count()
 
 
-# ── Zones A/B/C — cached payload ───────────────────────────────────────
+# ── Zones A/B/C/E — cached payload ─────────────────────────────────────
 
 
-def _build_zones_a_b_c() -> dict:
+def _build_cached_zones() -> dict:
     User = apps.get_model("user", "UserAccount")
     Order = apps.get_model("order", "Order")
     ProductReview = apps.get_model("product", "ProductReview")
@@ -377,7 +387,19 @@ def _zone_a_hero_kpis(
 
 
 def _zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus) -> dict:
-    """Two charts: 14-day combined orders+revenue, status doughnut."""
+    """Two charts: 14-day combined orders+revenue, status doughnut.
+
+    Both chart payloads and their Chart.js options are pre-serialized
+    to JSON strings here — unfold's chart components (and the
+    hand-rolled doughnut canvas, see the template) read them straight
+    into ``data-value``/``data-options`` attributes that its bundled
+    ``chart.js`` parses client-side. Because unfold replaces its
+    built-in option defaults entirely whenever ``data-options`` is
+    present (no deep merge), only JSON-representable option values are
+    used here — no tooltip/tick callback functions, so currency
+    formatting on the revenue axis falls back to Chart.js's plain
+    number rendering instead of a "€"-prefixed callback.
+    """
 
     days = 14
     period_start = now - timedelta(days=days - 1)
@@ -455,6 +477,45 @@ def _zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus) -> dict:
             },
         ],
     }
+    performance_chart_options = {
+        "responsive": True,
+        "maintainAspectRatio": False,
+        "interaction": {"mode": "index", "intersect": False},
+        "plugins": {
+            "legend": {
+                "display": True,
+                "position": "top",
+                "align": "end",
+                "labels": {
+                    "boxWidth": 14,
+                    "boxHeight": 10,
+                    "padding": 14,
+                    "usePointStyle": True,
+                },
+            },
+            "tooltip": {"enabled": True, "padding": 10},
+        },
+        "scales": {
+            "x": {
+                "grid": {"display": False},
+                "ticks": {"color": _CHART_TICK_COLOR, "maxRotation": 0},
+            },
+            "y": {
+                "type": "linear",
+                "position": "left",
+                "beginAtZero": True,
+                "ticks": {"color": _CHART_TICK_COLOR, "precision": 0},
+                "grid": {"color": "rgba(148, 163, 184, 0.2)"},
+            },
+            "y1": {
+                "type": "linear",
+                "position": "right",
+                "beginAtZero": True,
+                "ticks": {"color": _CHART_TICK_COLOR},
+                "grid": {"drawOnChartArea": False},
+            },
+        },
+    }
 
     # ── Order status distribution doughnut ──
     status_palette = {
@@ -506,10 +567,31 @@ def _zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus) -> dict:
             }
         ],
     }
+    status_chart_options = {
+        "responsive": True,
+        "maintainAspectRatio": False,
+        "cutout": "64%",
+        "plugins": {
+            "legend": {
+                "display": True,
+                "position": "bottom",
+                "labels": {
+                    "boxWidth": 12,
+                    "boxHeight": 12,
+                    "padding": 12,
+                    "usePointStyle": True,
+                    "font": {"size": 11},
+                },
+            },
+            "tooltip": {"enabled": True},
+        },
+    }
 
     return {
-        "performance_chart": performance_chart,
-        "status_chart": status_chart,
+        "performance_chart_data": json.dumps(performance_chart),
+        "performance_chart_options": json.dumps(performance_chart_options),
+        "status_chart_data": json.dumps(status_chart),
+        "status_chart_options": json.dumps(status_chart_options),
     }
 
 
@@ -517,7 +599,15 @@ def _zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus) -> dict:
 
 
 def _zone_c_queues(Order, ProductReview, Contact, ReviewStatus) -> dict:
-    """Three compact action queues for staff to triage right from /admin/."""
+    """Three compact action queues for staff to triage right from /admin/.
+
+    Rows are plain dicts of raw field values — no HTML is built here.
+    Links, status/rating pills and date formatting all render in the
+    template via unfold components (``link.html``, ``label.html``) and
+    template filters.
+    """
+
+    from admin.displays import ORDER_STATUS_VARIANT
 
     # Recent orders (top 6) — focus on action items, drop noise rows.
     # Don't use .only() with paid_amount: djmoney's MoneyField needs the
@@ -525,41 +615,25 @@ def _zone_c_queues(Order, ProductReview, Contact, ReviewStatus) -> dict:
     recent_orders = Order.objects.select_related("user").order_by(
         "-created_at"
     )[:6]
-    orders_table_rows = []
+    orders_queue = []
     for order in recent_orders:
-        status_badge = _status_badge(order.status)
         # `paid_amount` is a djmoney Money instance — `.amount` is the
         # Decimal; `float(Money(...))` raises.
         paid = getattr(order.paid_amount, "amount", order.paid_amount) or 0
-        amount = format_html(
-            '<span class="font-semibold tabular-nums">€{}</span>',
-            f"{float(paid):.2f}",
-        )
-        orders_table_rows.append(
-            [
-                format_html(
-                    '<a href="{}" class="text-primary-600 dark:text-primary-400'
-                    ' font-medium hover:underline">#{}</a>',
-                    reverse("admin:order_order_change", args=[order.id]),
-                    order.id,
+        orders_queue.append(
+            {
+                "id": order.id,
+                "url": reverse("admin:order_order_change", args=[order.id]),
+                "email": order.email or "—",
+                "status_value": order.status,
+                "status_label": order.get_status_display(),
+                "status_variant": ORDER_STATUS_VARIANT.get(
+                    order.status, "default"
                 ),
-                escape(order.email or "—"),
-                status_badge,
-                amount,
-                order.created_at.strftime("%d/%m %H:%M"),
-            ]
+                "amount": float(paid),
+                "created_at": order.created_at,
+            }
         )
-
-    orders_table = {
-        "headers": [
-            _("Order #"),
-            _("Customer"),
-            _("Status"),
-            _("Total"),
-            _("Date"),
-        ],
-        "rows": orders_table_rows,
-    }
 
     # Pending reviews — only NEW, max 5
     pending_reviews = (
@@ -568,102 +642,46 @@ def _zone_c_queues(Order, ProductReview, Contact, ReviewStatus) -> dict:
         .prefetch_related("product__translations")
         .order_by("-created_at")[:5]
     )
-    reviews_table_rows = []
+    reviews_queue = []
     for review in pending_reviews:
         product_name = (
             review.product.safe_translation_getter("name", any_language=True)
             or "—"
         )
-        reviews_table_rows.append(
-            [
-                format_html(
-                    '<a href="{}" class="text-primary-600 dark:text-primary-400'
-                    ' font-medium hover:underline">{}</a>',
-                    reverse(
-                        "admin:product_productreview_change", args=[review.id]
-                    ),
-                    escape(product_name[:30]),
+        reviews_queue.append(
+            {
+                "id": review.id,
+                "url": reverse(
+                    "admin:product_productreview_change", args=[review.id]
                 ),
-                escape(
-                    (review.user.email if review.user else _("Anonymous"))[:25]
-                ),
-                _rating_stars(review.rate),
-                review.created_at.strftime("%d/%m"),
-            ]
+                "product_name": product_name[:30],
+                "user_label": (
+                    review.user.email if review.user else str(_("Anonymous"))
+                )[:25],
+                "rate": max(0, min(10, int(round(float(review.rate or 0))))),
+                "created_at": review.created_at,
+            }
         )
-    reviews_table = {
-        "headers": [_("Product"), _("User"), _("Rating"), _("Date")],
-        "rows": reviews_table_rows,
-    }
 
     # Recent messages — last 5
     recent_messages = Contact.objects.order_by("-created_at")[:5]
-    messages_table_rows = []
+    messages_queue = []
     for msg in recent_messages:
-        messages_table_rows.append(
-            [
-                format_html(
-                    '<a href="{}" class="text-primary-600 dark:text-primary-400'
-                    ' font-medium hover:underline">{}</a>',
-                    reverse("admin:contact_contact_change", args=[msg.id]),
-                    escape(msg.name or msg.email or "—"),
-                ),
-                escape(msg.email or "—"),
-                escape(
-                    (msg.message or "")[:60]
-                    + ("…" if len(msg.message or "") > 60 else "")
-                ),
-                msg.created_at.strftime("%d/%m"),
-            ]
+        body = msg.message or ""
+        excerpt = body[:60] + ("…" if len(body) > 60 else "")
+        messages_queue.append(
+            {
+                "id": msg.id,
+                "url": reverse("admin:contact_contact_change", args=[msg.id]),
+                "name": msg.name or msg.email or "—",
+                "email": msg.email or "—",
+                "excerpt": excerpt,
+                "created_at": msg.created_at,
+            }
         )
-    messages_table = {
-        "headers": [_("From"), _("Email"), _("Message"), _("Date")],
-        "rows": messages_table_rows,
-    }
 
     return {
-        "orders_table": orders_table,
-        "reviews_table": reviews_table,
-        "messages_table": messages_table,
+        "orders_queue": orders_queue,
+        "reviews_queue": reviews_queue,
+        "messages_queue": messages_queue,
     }
-
-
-# ── Display helpers ────────────────────────────────────────────────────
-
-
-def _status_badge(status: str):
-    """Render a coloured pill for an order status code."""
-
-    palette = {
-        "PENDING": ("amber", _("Pending")),
-        "PROCESSING": ("sky", _("Processing")),
-        "SHIPPED": ("cyan", _("Shipped")),
-        "DELIVERED": ("emerald", _("Delivered")),
-        "COMPLETED": ("emerald", _("Completed")),
-        "CANCELED": ("rose", _("Canceled")),
-        "RETURNED": ("orange", _("Returned")),
-        "REFUNDED": ("violet", _("Refunded")),
-    }
-    tone, label = palette.get(
-        status, ("base", status.replace("_", " ").title())
-    )
-    return format_html(
-        '<span class="inline-flex items-center rounded-full px-2 py-0.5 '
-        "text-xs font-medium bg-{tone}-100 text-{tone}-700 "
-        'dark:bg-{tone}-900/40 dark:text-{tone}-300">{label}</span>',
-        tone=tone,
-        label=label,
-    )
-
-
-def _rating_stars(rate) -> str:
-    """Render the ``rate`` (1-10 in this project) as a compact pill."""
-
-    rate = max(0, min(10, int(round(float(rate or 0)))))
-    return format_html(
-        '<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5'
-        " text-xs font-medium bg-amber-100 text-amber-700"
-        ' dark:bg-amber-900/40 dark:text-amber-300 tabular-nums">'
-        "★ {rate}/10</span>",
-        rate=rate,
-    )

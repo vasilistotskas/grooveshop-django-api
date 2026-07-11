@@ -41,7 +41,7 @@ class DashboardCallbackCachingTests(TestCase):
         )
         return request
 
-    def test_callback_populates_zones_a_b_c(self):
+    def test_callback_populates_zones_a_b_c_e(self):
         request = self._make_request(superuser=True)
         ctx: dict = {}
 
@@ -49,15 +49,20 @@ class DashboardCallbackCachingTests(TestCase):
 
         for key in (
             "hero",
-            "performance_chart",
-            "status_chart",
-            "orders_table",
-            "reviews_table",
-            "messages_table",
+            "performance_chart_data",
+            "performance_chart_options",
+            "status_chart_data",
+            "status_chart_options",
+            "orders_queue",
+            "reviews_queue",
+            "messages_queue",
+            "funnel",
+            "retention",
+            "top_products",
         ):
             self.assertIn(key, result, f"missing zone key {key!r}")
 
-    def test_callback_caches_zones_a_b_c(self):
+    def test_callback_caches_zones(self):
         # Patch ``admin.dashboard.cache`` directly rather than seeding
         # the real ``cache`` proxy. The proxy resolves through the
         # production Redis backend on CI (conftest's ``settings.CACHES``
@@ -73,7 +78,7 @@ class DashboardCallbackCachingTests(TestCase):
         request = self._make_request(superuser=True)
         with (
             patch("admin.dashboard.cache") as cache_mock,
-            patch("admin.dashboard._build_zones_a_b_c") as builder,
+            patch("admin.dashboard._build_cached_zones") as builder,
         ):
             cache_mock.get_or_set.return_value = {"hero": {"_test": True}}
             ctx: dict = {}

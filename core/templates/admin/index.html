@@ -1,5 +1,5 @@
 {% extends "admin/base.html" %}
-{% load i18n static %}
+{% load i18n unfold %}
 
 {% block title %}{% trans "Dashboard" %} | {{ site_title }}{% endblock %}
 
@@ -9,42 +9,25 @@
 </h1>
 {% endblock %}
 
-{% block extrahead %}
-{{ block.super }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-{% endblock %}
-
 {% block content %}
 <div class="flex flex-col gap-6">
 
     {# ────────────────────────────────────────────────────────────── #}
     {# Header                                                          #}
     {# ────────────────────────────────────────────────────────────── #}
+    {% url 'admin:product_product_add' as new_product_url %}
+    {% url 'admin:order_order_changelist' as order_changelist_url %}
+    {% url 'admin:user_useraccount_changelist' as customers_url %}
+    {% capture as pending_orders_href silent %}{{ order_changelist_url }}?status__exact=PENDING{% endcapture %}
     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-base-900 dark:text-base-50">
-                {% trans "Dashboard" %}
-            </h1>
-            <p class="text-base-600 dark:text-base-300 mt-1 text-sm">
-                {% trans "Overview of revenue, orders, and customer activity." %}
-            </p>
+            {% component "unfold/components/title.html" %}{% trans "Dashboard" %}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Overview of revenue, orders, and customer activity." %}{% endcomponent %}
         </div>
         <div class="flex flex-wrap gap-2">
-            <a href="{% url 'admin:product_product_add' %}"
-                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-base-200 dark:border-base-700 bg-white dark:bg-base-900 text-base-700 dark:text-base-200 hover:border-primary-400 dark:hover:border-primary-600 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-medium transition-colors">
-                <span class="material-symbols-outlined text-base!">add_circle</span>
-                {% trans "New Product" %}
-            </a>
-            <a href="{% url 'admin:order_order_changelist' %}?status__exact=PENDING"
-                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-base-200 dark:border-base-700 bg-white dark:bg-base-900 text-base-700 dark:text-base-200 hover:border-primary-400 dark:hover:border-primary-600 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-medium transition-colors">
-                <span class="material-symbols-outlined text-base!">pending_actions</span>
-                {% trans "Pending Orders" %}
-            </a>
-            <a href="{% url 'admin:user_useraccount_changelist' %}"
-                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-base-200 dark:border-base-700 bg-white dark:bg-base-900 text-base-700 dark:text-base-200 hover:border-primary-400 dark:hover:border-primary-600 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-medium transition-colors">
-                <span class="material-symbols-outlined text-base!">group</span>
-                {% trans "Customers" %}
-            </a>
+            {% component "unfold/components/button.html" with href=new_product_url icon="add_circle" variant="default" %}{% trans "New Product" %}{% endcomponent %}
+            {% component "unfold/components/button.html" with href=pending_orders_href icon="pending_actions" variant="default" %}{% trans "Pending Orders" %}{% endcomponent %}
+            {% component "unfold/components/button.html" with href=customers_url icon="group" variant="default" %}{% trans "Customers" %}{% endcomponent %}
         </div>
     </div>
 
@@ -55,29 +38,23 @@
 
     {# Seller-config alert: empty required INVOICE_SELLER_* settings #}
     {% if seller_config_warnings %}
-    <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
+    <div class="rounded-default px-4 py-3 bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
         <div class="flex items-start gap-3">
-            <span class="material-symbols-outlined text-red-600 dark:text-red-300 flex-shrink-0">warning</span>
+            {% component "unfold/components/icon.html" with class="shrink-0" %}warning{% endcomponent %}
             <div class="flex-1">
-                <h3 class="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
-                    {% trans "Invoice seller details are incomplete" %}
-                </h3>
-                <p class="text-sm text-red-800 dark:text-red-200 mb-2">
-                    {% trans "The following required fields are empty. Invoices issued now will render without a legal identity and will not pass a tax audit." %}
-                </p>
-                <ul class="text-sm text-red-800 dark:text-red-200 list-disc ml-5 mb-3">
+                <h3 class="text-sm font-semibold mb-1">{% trans "Invoice seller details are incomplete" %}</h3>
+                {% component "unfold/components/text.html" with class="mb-2" %}{% trans "The following required fields are empty. Invoices issued now will render without a legal identity and will not pass a tax audit." %}{% endcomponent %}
+                <ul class="text-sm list-disc ml-5 mb-3">
                     {% for w in seller_config_warnings %}
                     <li>
                         <span class="font-medium">{{ w.label }}</span>
-                        <code class="text-xs ml-1 px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/60">{{ w.key }}</code>
+                        <code class="text-xs ml-1 px-1 py-0.5 rounded bg-red-200/60 dark:bg-red-900/60">{{ w.key }}</code>
                     </li>
                     {% endfor %}
                 </ul>
-                <a href="{% url 'admin:extra_settings_setting_changelist' %}?q=INVOICE_SELLER_"
-                    class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:underline">
-                    {% trans "Fix in Settings" %}
-                    <span class="material-symbols-outlined text-sm">arrow_forward</span>
-                </a>
+                {% url 'admin:extra_settings_setting_changelist' as settings_url %}
+                {% capture as seller_fix_href silent %}{{ settings_url }}?q=INVOICE_SELLER_{% endcapture %}
+                {% component "unfold/components/link.html" with href=seller_fix_href icon="arrow_forward" class="text-sm font-medium" %}{% trans "Fix in Settings" %}{% endcomponent %}
             </div>
         </div>
     </div>
@@ -86,51 +63,43 @@
     {# myDATA alerts #}
     {% if mydata_warnings.enabled %}
         {% if mydata_warnings.missing_creds %}
-        <div class="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
+        <div class="rounded-default px-4 py-3 bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
             <div class="flex items-start gap-3">
-                <span class="material-symbols-outlined text-red-600 dark:text-red-300 flex-shrink-0">cloud_off</span>
+                {% component "unfold/components/icon.html" with class="shrink-0" %}cloud_off{% endcomponent %}
                 <div class="flex-1">
-                    <h3 class="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">
-                        {% trans "myDATA integration is enabled but credentials are missing" %}
-                    </h3>
-                    <p class="text-sm text-red-800 dark:text-red-200 mb-2">
-                        {% trans "Every submission to AADE will fail until these are filled in via Settings." %}
-                    </p>
-                    <ul class="text-sm text-red-800 dark:text-red-200 list-disc ml-5 mb-3">
+                    <h3 class="text-sm font-semibold mb-1">{% trans "myDATA integration is enabled but credentials are missing" %}</h3>
+                    {% component "unfold/components/text.html" with class="mb-2" %}{% trans "Every submission to AADE will fail until these are filled in via Settings." %}{% endcomponent %}
+                    <ul class="text-sm list-disc ml-5 mb-3">
                         {% for key in mydata_warnings.missing_creds %}
-                        <li><code class="text-xs px-1 py-0.5 rounded bg-red-100 dark:bg-red-900/60">{{ key }}</code></li>
+                        <li><code class="text-xs px-1 py-0.5 rounded bg-red-200/60 dark:bg-red-900/60">{{ key }}</code></li>
                         {% endfor %}
                     </ul>
-                    <a href="{% url 'admin:extra_settings_setting_changelist' %}?q=MYDATA_"
-                        class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 dark:text-red-300 hover:underline">
-                        {% trans "Fix in Settings" %}
-                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
-                    </a>
+                    {% url 'admin:extra_settings_setting_changelist' as settings_url %}
+                    {% capture as mydata_fix_href silent %}{{ settings_url }}?q=MYDATA_{% endcapture %}
+                    {% component "unfold/components/link.html" with href=mydata_fix_href icon="arrow_forward" class="text-sm font-medium" %}{% trans "Fix in Settings" %}{% endcomponent %}
                 </div>
             </div>
         </div>
         {% endif %}
         {% if mydata_warnings.recent_rejected %}
-        <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4">
+        <div class="rounded-default px-4 py-3 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">
             <div class="flex items-start gap-3">
-                <span class="material-symbols-outlined text-amber-600 dark:text-amber-300 flex-shrink-0">warning</span>
+                {% component "unfold/components/icon.html" with class="shrink-0" %}warning{% endcomponent %}
                 <div class="flex-1">
-                    <h3 class="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                    <h3 class="text-sm font-semibold mb-1">
                         {% blocktrans count counter=mydata_warnings.recent_rejected %}{{ counter }} invoice rejected by myDATA in the last 7 days{% plural %}{{ counter }} invoices rejected by myDATA in the last 7 days{% endblocktrans %}
                     </h3>
-                    <a href="{% url 'admin:order_invoice_changelist' %}?mydata_status__exact=REJECTED"
-                        class="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 hover:underline">
-                        {% trans "Review rejected invoices" %}
-                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
-                    </a>
+                    {% url 'admin:order_invoice_changelist' as invoice_changelist_url %}
+                    {% capture as mydata_review_href silent %}{{ invoice_changelist_url }}?mydata_status__exact=REJECTED{% endcapture %}
+                    {% component "unfold/components/link.html" with href=mydata_review_href icon="arrow_forward" class="text-sm font-medium" %}{% trans "Review rejected invoices" %}{% endcomponent %}
                 </div>
             </div>
         </div>
         {% endif %}
         {% if mydata_warnings.environment == 'dev' and not mydata_warnings.missing_creds %}
-        <div class="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-3">
-            <div class="flex items-center gap-2 text-sm text-blue-800 dark:text-blue-200">
-                <span class="material-symbols-outlined text-blue-600 dark:text-blue-300 text-base!">science</span>
+        <div class="rounded-default px-3 py-2.5 bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
+            <div class="flex items-center gap-2 text-sm">
+                {% component "unfold/components/icon.html" with class="text-base!" %}science{% endcomponent %}
                 <span>{% trans "myDATA is pointing at the AADE sandbox (dev). Switch MYDATA_ENVIRONMENT to 'prod' when ready." %}</span>
             </div>
         </div>
@@ -139,16 +108,15 @@
 
     {# Failed Celery tasks last 24h #}
     {% if failed_celery_count %}
-    <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3">
-        <div class="flex items-center justify-between gap-2 text-sm text-amber-800 dark:text-amber-200">
+    <div class="rounded-default px-3 py-2.5 bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400">
+        <div class="flex items-center justify-between gap-2 text-sm">
             <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-amber-600 dark:text-amber-300 text-base!">error</span>
+                {% component "unfold/components/icon.html" with class="text-base!" %}error{% endcomponent %}
                 <span>
                     {% blocktrans count counter=failed_celery_count %}{{ counter }} background task failed in the last 24h{% plural %}{{ counter }} background tasks failed in the last 24h{% endblocktrans %}
                 </span>
             </div>
-            <a href="/admin/django_celery_results/taskresult/?status__exact=FAILURE"
-                class="font-medium underline">{% trans "Review" %}</a>
+            {% component "unfold/components/link.html" with href="/admin/django_celery_results/taskresult/?status__exact=FAILURE" class="font-medium underline" %}{% trans "Review" %}{% endcomponent %}
         </div>
     </div>
     {% endif %}
@@ -159,82 +127,63 @@
     {# ────────────────────────────────────────────────────────────── #}
     {# ZONE A — 4 Hero KPI cards                                       #}
     {# ────────────────────────────────────────────────────────────── #}
+    {% trans "Last 30 days" as last_30d_label %}
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
         {# Revenue 7d with trend #}
-        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
+        {% trans "vs. prior 7 days" as vs_prior_label %}
+        {% component "unfold/components/card.html" with footer=vs_prior_label %}
             <div class="flex items-start justify-between">
                 <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
-                    <span class="material-symbols-outlined">payments</span>
+                    {% component "unfold/components/icon.html" %}payments{% endcomponent %}
                 </div>
                 {% if hero.revenue_trend_pct is not None %}
+                    {% capture as revenue_trend_text silent %}{% if hero.revenue_trend_pct >= 0 %}+{% endif %}{{ hero.revenue_trend_pct }}%{% endcapture %}
                     {% if hero.revenue_trend_pct >= 0 %}
-                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-medium tabular-nums">
-                        <span class="material-symbols-outlined text-sm!">trending_up</span>
-                        +{{ hero.revenue_trend_pct }}%
-                    </span>
+                        {% include "unfold/helpers/label.html" with variant="success" icon="trending_up" text=revenue_trend_text %}
                     {% else %}
-                    <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 px-2 py-0.5 text-[11px] font-medium tabular-nums">
-                        <span class="material-symbols-outlined text-sm!">trending_down</span>
-                        {{ hero.revenue_trend_pct }}%
-                    </span>
+                        {% include "unfold/helpers/label.html" with variant="danger" icon="trending_down" text=revenue_trend_text %}
                     {% endif %}
                 {% endif %}
             </div>
-            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">
-                €{{ hero.revenue_7d|floatformat:2 }}
-            </p>
-            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Revenue (7d)" %}</p>
-            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">
-                {% trans "vs. prior 7 days" %}
-            </p>
-        </div>
+            {% component "unfold/components/title.html" with class="mt-4!" %}€{{ hero.revenue_7d|floatformat:2 }}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1 font-medium" %}{% trans "Revenue (7d)" %}{% endcomponent %}
+        {% endcomponent %}
 
         {# Pending orders #}
-        <a href="{% url 'admin:order_order_changelist' %}?status__exact=PENDING"
-            class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md hover:border-primary-300 dark:hover:border-primary-700 transition-all">
-            <div class="flex items-start justify-between">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-300">
-                    <span class="material-symbols-outlined">pending_actions</span>
-                </div>
+        {% capture as tap_triage_footer silent %}{% trans "Tap to triage" %} →{% endcapture %}
+        {% component "unfold/components/card.html" with href=pending_orders_href footer=tap_triage_footer %}
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-300">
+                {% component "unfold/components/icon.html" %}pending_actions{% endcomponent %}
             </div>
-            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ hero.pending_orders }}</p>
-            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Pending Orders" %}</p>
-            <p class="mt-0.5 text-xs text-primary-600 dark:text-primary-400">
-                {% trans "Tap to triage" %} →
-            </p>
-        </a>
+            {% component "unfold/components/title.html" with class="mt-4!" %}{{ hero.pending_orders }}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1 font-medium" %}{% trans "Pending Orders" %}{% endcomponent %}
+        {% endcomponent %}
 
         {# New customers (30d) with sub-line of today #}
-        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
+        {% component "unfold/components/card.html" with footer=last_30d_label %}
             <div class="flex items-start justify-between">
                 <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-50 dark:bg-sky-950 text-sky-600 dark:text-sky-300">
-                    <span class="material-symbols-outlined">person_add</span>
+                    {% component "unfold/components/icon.html" %}person_add{% endcomponent %}
                 </div>
                 {% if hero.new_customers_today %}
-                <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 px-2 py-0.5 text-[11px] font-medium tabular-nums">
-                    +{{ hero.new_customers_today }} {% trans "today" %}
-                </span>
+                    {% trans "today" as today_label %}
+                    {% capture as new_today_text silent %}+{{ hero.new_customers_today }} {{ today_label }}{% endcapture %}
+                    {% include "unfold/helpers/label.html" with variant="info" text=new_today_text %}
                 {% endif %}
             </div>
-            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ hero.new_customers_30d }}</p>
-            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "New Customers (30d)" %}</p>
-            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">{% trans "Last 30 days" %}</p>
-        </div>
+            {% component "unfold/components/title.html" with class="mt-4!" %}{{ hero.new_customers_30d }}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1 font-medium" %}{% trans "New Customers (30d)" %}{% endcomponent %}
+        {% endcomponent %}
 
         {# Average order value #}
-        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800 hover:shadow-md transition-shadow">
-            <div class="flex items-start justify-between">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-300">
-                    <span class="material-symbols-outlined">receipt</span>
-                </div>
+        {% component "unfold/components/card.html" with footer=last_30d_label %}
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 dark:bg-violet-950 text-violet-600 dark:text-violet-300">
+                {% component "unfold/components/icon.html" %}receipt{% endcomponent %}
             </div>
-            <p class="mt-4 text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">
-                €{{ hero.avg_order_value|floatformat:2 }}
-            </p>
-            <p class="mt-1 text-sm font-medium text-base-700 dark:text-base-200">{% trans "Average Order Value" %}</p>
-            <p class="mt-0.5 text-xs text-base-500 dark:text-base-400">{% trans "Last 30 days" %}</p>
-        </div>
+            {% component "unfold/components/title.html" with class="mt-4!" %}€{{ hero.avg_order_value|floatformat:2 }}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1 font-medium" %}{% trans "Average Order Value" %}{% endcomponent %}
+        {% endcomponent %}
 
     </div>
 
@@ -244,28 +193,19 @@
     {# ────────────────────────────────────────────────────────────── #}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        <div class="lg:col-span-2 rounded-xl bg-white dark:bg-base-900 p-6 border border-base-200 dark:border-base-800">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">
-                    {% trans "Revenue & Orders" %}
-                </h3>
-                <span class="text-xs text-base-600 dark:text-base-300 bg-base-100 dark:bg-base-800 px-2 py-1 rounded">
-                    {% trans "Last 14 days" %}
-                </span>
-            </div>
-            <div style="position: relative; height: 320px;"><canvas id="performanceChart"></canvas></div>
-        </div>
+        {% trans "Revenue & Orders" as performance_title %}
+        {% trans "Last 14 days" as last_14d_label %}
+        {% capture as performance_action silent %}{% include "unfold/helpers/label.html" with text=last_14d_label %}{% endcapture %}
+        {% component "unfold/components/card.html" with title=performance_title action=performance_action class="lg:col-span-2" %}
+            {% component "unfold/components/chart/bar.html" with data=performance_chart_data options=performance_chart_options class="h-[320px]" %}{% endcomponent %}
+        {% endcomponent %}
 
-        <div class="rounded-xl bg-white dark:bg-base-900 p-6 border border-base-200 dark:border-base-800">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-base-900 dark:text-base-50">
-                    {% trans "Order Status" %}
-                </h3>
+        {% trans "Order Status" as status_title %}
+        {% component "unfold/components/card.html" with title=status_title %}
+            <div class="h-[320px] flex items-center justify-center">
+                <canvas class="chart" data-type="doughnut" data-value="{{ status_chart_data }}" data-options="{{ status_chart_options }}"></canvas>
             </div>
-            <div style="position: relative; height: 320px;" class="flex items-center justify-center">
-                <canvas id="statusChart"></canvas>
-            </div>
-        </div>
+        {% endcomponent %}
 
     </div>
 
@@ -278,37 +218,35 @@
     <div class="grid grid-cols-1 2xl:grid-cols-3 gap-6">
 
         {# Recent orders #}
-        <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-primary-500">receipt_long</span>
-                    {% trans "Recent Orders" %}
-                </h3>
-                <a href="{% url 'admin:order_order_changelist' %}"
-                    class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View all" %} →
-                </a>
-            </div>
+        {% trans "Recent Orders" as orders_title %}
+        {% url 'admin:order_order_changelist' as orders_view_all_url %}
+        {% capture as orders_view_all silent %}{% component "unfold/components/link.html" with href=orders_view_all_url class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
+        {% component "unfold/components/card.html" with title=orders_title action=orders_view_all size="md" %}
             <div class="overflow-x-auto">
                 <table class="w-full text-xs">
                     <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
                         <tr>
-                            {% for header in orders_table.headers %}
-                            <th class="px-3 py-2 text-left font-medium">{{ header }}</th>
-                            {% endfor %}
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Order #" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Customer" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Status" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Total" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Date" %}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-base-200 dark:divide-base-800">
-                        {% for row in orders_table.rows %}
+                        {% for row in orders_queue %}
                         <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
-                            {% for cell in row %}
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
-                            {% endfor %}
+                            <td class="px-3 py-2">
+                                {% component "unfold/components/link.html" with href=row.url class="text-primary-600 dark:text-primary-400 font-medium hover:underline" %}#{{ row.id }}{% endcomponent %}
+                            </td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.email }}</td>
+                            <td class="px-3 py-2">{% include "unfold/helpers/label.html" with variant=row.status_variant text=row.status_label %}</td>
+                            <td class="px-3 py-2 font-semibold tabular-nums text-base-700 dark:text-base-200">€{{ row.amount|floatformat:2 }}</td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.created_at|date:"d/m H:i" }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="{{ orders_table.headers|length }}"
-                                class="px-3 py-6 text-center text-base-600 dark:text-base-300">
+                            <td colspan="5" class="px-3 py-6 text-center text-base-600 dark:text-base-300">
                                 {% trans "No orders yet" %}
                             </td>
                         </tr>
@@ -316,41 +254,41 @@
                     </tbody>
                 </table>
             </div>
-        </div>
+        {% endcomponent %}
 
         {# Pending reviews #}
-        <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-amber-500">star_rate</span>
-                    {% trans "Pending Reviews" %}
-                </h3>
-                <a href="{% url 'admin:product_productreview_changelist' %}?status__exact=NEW"
-                    class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View all" %} →
-                </a>
-            </div>
+        {% trans "Pending Reviews" as reviews_title %}
+        {% url 'admin:product_productreview_changelist' as reviews_changelist_url %}
+        {% capture as reviews_view_all_href silent %}{{ reviews_changelist_url }}?status__exact=NEW{% endcapture %}
+        {% capture as reviews_view_all silent %}{% component "unfold/components/link.html" with href=reviews_view_all_href class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
+        {% component "unfold/components/card.html" with title=reviews_title action=reviews_view_all size="md" %}
             <div class="overflow-x-auto">
                 <table class="w-full text-xs">
                     <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
                         <tr>
-                            {% for header in reviews_table.headers %}
-                            <th class="px-3 py-2 text-left font-medium">{{ header }}</th>
-                            {% endfor %}
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Product" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "User" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Rating" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Date" %}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-base-200 dark:divide-base-800">
-                        {% for row in reviews_table.rows %}
+                        {% for row in reviews_queue %}
                         <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
-                            {% for cell in row %}
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
-                            {% endfor %}
+                            <td class="px-3 py-2">
+                                {% component "unfold/components/link.html" with href=row.url class="text-primary-600 dark:text-primary-400 font-medium hover:underline" %}{{ row.product_name }}{% endcomponent %}
+                            </td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.user_label }}</td>
+                            <td class="px-3 py-2">
+                                {% capture as rating_text silent %}★ {{ row.rate }}/10{% endcapture %}
+                                {% include "unfold/helpers/label.html" with variant="warning" text=rating_text %}
+                            </td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.created_at|date:"d/m" }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="{{ reviews_table.headers|length }}"
-                                class="px-3 py-6 text-center text-emerald-600 dark:text-emerald-400">
-                                <span class="material-symbols-outlined align-middle mr-1">check_circle</span>
+                            <td colspan="4" class="px-3 py-6 text-center text-emerald-600 dark:text-emerald-400">
+                                {% component "unfold/components/icon.html" with class="align-middle mr-1" %}check_circle{% endcomponent %}
                                 {% trans "No pending reviews" %}
                             </td>
                         </tr>
@@ -358,40 +296,36 @@
                     </tbody>
                 </table>
             </div>
-        </div>
+        {% endcomponent %}
 
         {# Recent contact messages #}
-        <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-emerald-500">contact_mail</span>
-                    {% trans "Contact Messages" %}
-                </h3>
-                <a href="{% url 'admin:contact_contact_changelist' %}"
-                    class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View all" %} →
-                </a>
-            </div>
+        {% trans "Contact Messages" as messages_title %}
+        {% url 'admin:contact_contact_changelist' as messages_changelist_url %}
+        {% capture as messages_view_all silent %}{% component "unfold/components/link.html" with href=messages_changelist_url class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
+        {% component "unfold/components/card.html" with title=messages_title action=messages_view_all size="md" %}
             <div class="overflow-x-auto">
                 <table class="w-full text-xs">
                     <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
                         <tr>
-                            {% for header in messages_table.headers %}
-                            <th class="px-3 py-2 text-left font-medium">{{ header }}</th>
-                            {% endfor %}
+                            <th class="px-3 py-2 text-left font-medium">{% trans "From" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Email" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Message" %}</th>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Date" %}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-base-200 dark:divide-base-800">
-                        {% for row in messages_table.rows %}
+                        {% for row in messages_queue %}
                         <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
-                            {% for cell in row %}
-                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ cell|safe }}</td>
-                            {% endfor %}
+                            <td class="px-3 py-2">
+                                {% component "unfold/components/link.html" with href=row.url class="text-primary-600 dark:text-primary-400 font-medium hover:underline" %}{{ row.name }}{% endcomponent %}
+                            </td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.email }}</td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.excerpt }}</td>
+                            <td class="px-3 py-2 text-base-700 dark:text-base-200">{{ row.created_at|date:"d/m" }}</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="{{ messages_table.headers|length }}"
-                                class="px-3 py-6 text-center text-base-600 dark:text-base-300">
+                            <td colspan="4" class="px-3 py-6 text-center text-base-600 dark:text-base-300">
                                 {% trans "No messages yet" %}
                             </td>
                         </tr>
@@ -399,7 +333,7 @@
                     </tbody>
                 </table>
             </div>
-        </div>
+        {% endcomponent %}
 
     </div>
 
@@ -410,86 +344,54 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {# Funnel: Carts → Orders → Paid #}
-        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-primary-500">filter_alt</span>
-                    {% trans "Conversion Funnel" %}
-                </h3>
-                <span class="text-[11px] text-base-500 dark:text-base-400">{% trans "Last 30 days" %}</span>
+        {% trans "Conversion Funnel" as funnel_title %}
+        {% trans "Carts" as carts_label %}
+        {% trans "Orders" as orders_label %}
+        {% trans "Paid" as paid_label %}
+        {% component "unfold/components/card.html" with title=funnel_title action=last_30d_label %}
+            <div class="flex flex-col gap-3">
+                {% component "unfold/components/progress.html" with title=carts_label description=funnel.carts value=100 %}{% endcomponent %}
+                {% component "unfold/components/progress.html" with title=orders_label description=funnel.orders value=funnel.cart_to_order_pct %}{% endcomponent %}
+                {% component "unfold/components/progress.html" with title=paid_label description=funnel.paid value=funnel.overall_pct %}{% endcomponent %}
             </div>
-            <ul class="flex flex-col gap-2 text-sm">
-                <li class="flex items-center justify-between">
-                    <span class="text-base-700 dark:text-base-200">{% trans "Carts" %}</span>
-                    <span class="font-semibold tabular-nums">{{ funnel.carts }}</span>
-                </li>
-                <li class="flex items-center justify-between">
-                    <span class="text-base-700 dark:text-base-200">{% trans "Orders" %}</span>
-                    <span class="font-semibold tabular-nums">
-                        {{ funnel.orders }}
-                        <span class="ml-2 text-[11px] text-emerald-600 dark:text-emerald-400">{{ funnel.cart_to_order_pct }}%</span>
-                    </span>
-                </li>
-                <li class="flex items-center justify-between">
-                    <span class="text-base-700 dark:text-base-200">{% trans "Paid" %}</span>
-                    <span class="font-semibold tabular-nums">
-                        {{ funnel.paid }}
-                        <span class="ml-2 text-[11px] text-emerald-600 dark:text-emerald-400">{{ funnel.order_to_paid_pct }}%</span>
-                    </span>
-                </li>
-                <li class="flex items-center justify-between border-t border-base-200 dark:border-base-800 pt-2 mt-1">
-                    <span class="text-base-900 dark:text-base-50 font-semibold">{% trans "End-to-end" %}</span>
-                    <span class="font-semibold tabular-nums text-primary-600 dark:text-primary-400">{{ funnel.overall_pct }}%</span>
-                </li>
-            </ul>
-        </div>
+            {% component "unfold/components/separator.html" with class="my-3" %}{% endcomponent %}
+            <div class="flex items-center justify-between">
+                {% component "unfold/components/text.html" with class="font-semibold" %}{% trans "End-to-end" %}{% endcomponent %}
+                {% capture as funnel_overall_text silent %}{{ funnel.overall_pct }}%{% endcapture %}
+                {% include "unfold/helpers/label.html" with variant="primary" text=funnel_overall_text %}
+            </div>
+        {% endcomponent %}
 
         {# Retention #}
-        <div class="rounded-xl bg-white dark:bg-base-900 p-5 border border-base-200 dark:border-base-800">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-emerald-500">replay</span>
-                    {% trans "Repeat Customers" %}
-                </h3>
-                <span class="text-[11px] text-base-500 dark:text-base-400">{% trans "Last 30 days" %}</span>
-            </div>
-            <p class="text-3xl font-semibold text-base-900 dark:text-base-50 tabular-nums">{{ retention.repeat_rate_pct }}%</p>
-            <p class="mt-2 text-sm text-base-600 dark:text-base-300">
+        {% trans "Repeat Customers" as retention_title %}
+        {% component "unfold/components/card.html" with title=retention_title action=last_30d_label %}
+            {% component "unfold/components/title.html" %}{{ retention.repeat_rate_pct }}%{% endcomponent %}
+            <div class="mt-2 text-sm text-base-600 dark:text-base-300">
                 {{ retention.repeat_customers }} / {{ retention.paying_customers }}
-                <span class="text-base-500 dark:text-base-400">{% trans "made a 2nd purchase" %}</span>
-            </p>
-        </div>
+                {% trans "made a 2nd purchase" %}
+            </div>
+        {% endcomponent %}
 
         {# Top Products by views #}
-        <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
-            <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                    <span class="material-symbols-outlined text-violet-500">trending_up</span>
-                    {% trans "Top Products" %}
-                </h3>
-                <a href="{% url 'admin:product_product_changelist' %}?o=-7"
-                    class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                    {% trans "View all" %} →
-                </a>
-            </div>
+        {% trans "Top Products" as top_products_title %}
+        {% url 'admin:product_product_changelist' as products_changelist_url %}
+        {% capture as top_products_href silent %}{{ products_changelist_url }}?o=-7{% endcapture %}
+        {% capture as top_products_view_all silent %}{% component "unfold/components/link.html" with href=top_products_href class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
+        {% component "unfold/components/card.html" with title=top_products_title action=top_products_view_all size="md" %}
             <ul class="divide-y divide-base-200 dark:divide-base-800">
                 {% for p in top_products %}
-                <li class="px-4 py-2 flex items-center justify-between gap-3">
-                    <a href="{{ p.url }}" class="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate">
-                        {{ p.name }}
-                    </a>
-                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 tabular-nums">
-                        <span class="material-symbols-outlined text-[12px]!">visibility</span>
-                        {{ p.views }}
-                    </span>
+                <li class="py-2 flex items-center justify-between gap-3">
+                    {% component "unfold/components/link.html" with href=p.url class="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate" %}{{ p.name }}{% endcomponent %}
+                    {% capture as product_views_text silent %}{{ p.views }}{% endcapture %}
+                    {% include "unfold/helpers/label.html" with variant="primary" icon="visibility" text=product_views_text %}
                 </li>
                 {% empty %}
-                <li class="px-4 py-6 text-center text-base-600 dark:text-base-300 text-sm">
+                <li class="py-6 text-center text-base-600 dark:text-base-300 text-sm">
                     {% trans "No products yet" %}
                 </li>
                 {% endfor %}
             </ul>
-        </div>
+        {% endcomponent %}
 
     </div>
 
@@ -498,183 +400,22 @@
     {# ZONE D — Low stock list (superuser-only, only when present)    #}
     {# ────────────────────────────────────────────────────────────── #}
     {% if is_superuser and low_stock_products %}
-    <div class="rounded-xl bg-white dark:bg-base-900 border border-base-200 dark:border-base-800 overflow-hidden">
-        <div class="p-4 border-b border-base-200 dark:border-base-800 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-base-900 dark:text-base-50 flex items-center gap-2">
-                <span class="material-symbols-outlined text-rose-500">inventory</span>
-                {% trans "Low Stock — replenish soon" %}
-            </h3>
-            <a href="{% url 'admin:product_product_changelist' %}?stock__lt=10"
-                class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                {% trans "View all" %} →
-            </a>
-        </div>
+    {% trans "Low Stock — replenish soon" as low_stock_title %}
+    {% url 'admin:product_product_changelist' as low_stock_changelist_url %}
+    {% capture as low_stock_href silent %}{{ low_stock_changelist_url }}?stock__lt=10{% endcapture %}
+    {% capture as low_stock_view_all silent %}{% component "unfold/components/link.html" with href=low_stock_href class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium" %}{% trans "View all" %} →{% endcomponent %}{% endcapture %}
+    {% component "unfold/components/card.html" with title=low_stock_title action=low_stock_view_all size="md" %}
         <ul class="divide-y divide-base-200 dark:divide-base-800">
             {% for p in low_stock_products %}
-            <li class="px-4 py-2 flex items-center justify-between gap-3">
-                <a href="{{ p.url }}" class="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate">
-                    {{ p.name }}
-                </a>
-                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 tabular-nums">
-                    {{ p.stock }}
-                </span>
+            <li class="py-2 flex items-center justify-between gap-3">
+                {% component "unfold/components/link.html" with href=p.url class="text-sm text-primary-600 dark:text-primary-400 hover:underline truncate" %}{{ p.name }}{% endcomponent %}
+                {% capture as low_stock_count_text silent %}{{ p.stock }}{% endcapture %}
+                {% include "unfold/helpers/label.html" with variant="danger" text=low_stock_count_text %}
             </li>
             {% endfor %}
         </ul>
-    </div>
+    {% endcomponent %}
     {% endif %}
 
 </div>
-
-
-{# ───────────────────── Chart data injection ──────────────────────── #}
-{{ performance_chart|json_script:"performance-data" }}
-{{ status_chart|json_script:"status-data" }}
-
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const isDark = document.documentElement.classList.contains('dark');
-        const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-        const textColor = isDark ? '#e5e5e5' : '#525252';
-        Chart.defaults.color = textColor;
-        Chart.defaults.borderColor = gridColor;
-
-        function getData(id) {
-            try {
-                const el = document.getElementById(id);
-                if (!el) return null;
-                return JSON.parse(el.textContent);
-            } catch (e) {
-                console.error('Failed to parse data for', id, e);
-                return null;
-            }
-        }
-
-        // ── Performance combined chart (bar + line on dual y-axis) ──
-        const perfData = getData('performance-data');
-        const perfCtx = document.getElementById('performanceChart');
-        if (perfCtx && perfData && perfData.datasets) {
-            new Chart(perfCtx, {
-                type: 'bar',
-                data: perfData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                            align: 'end',
-                            labels: { boxWidth: 14, boxHeight: 10, padding: 14, usePointStyle: true }
-                        },
-                        tooltip: {
-                            backgroundColor: isDark ? '#0a0a0a' : '#ffffff',
-                            titleColor: textColor,
-                            bodyColor: textColor,
-                            borderColor: gridColor,
-                            borderWidth: 1,
-                            padding: 10,
-                            displayColors: true,
-                            callbacks: {
-                                label: function(ctx) {
-                                    const lbl = ctx.dataset.label || '';
-                                    const val = ctx.parsed.y;
-                                    if (ctx.dataset.yAxisID === 'y1') return `${lbl}: €${val.toLocaleString('el-GR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                                    return `${lbl}: ${val}`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            border: { display: false },
-                            ticks: { color: textColor, font: { size: 11 }, maxRotation: 0 }
-                        },
-                        y: {
-                            type: 'linear',
-                            position: 'left',
-                            beginAtZero: true,
-                            ticks: { precision: 0, color: textColor, font: { size: 11 } },
-                            grid: { color: gridColor },
-                            border: { display: false }
-                        },
-                        y1: {
-                            type: 'linear',
-                            position: 'right',
-                            beginAtZero: true,
-                            ticks: {
-                                color: textColor,
-                                font: { size: 11 },
-                                callback: function(v) { return '€' + v.toLocaleString('el-GR'); }
-                            },
-                            grid: { drawOnChartArea: false },
-                            border: { display: false }
-                        }
-                    }
-                }
-            });
-        }
-
-        // ── Order status doughnut ──
-        const statusData = getData('status-data');
-        const statusCtx = document.getElementById('statusChart');
-        if (statusCtx && statusData) {
-            new Chart(statusCtx, {
-                type: 'doughnut',
-                data: statusData,
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: { boxWidth: 12, boxHeight: 12, padding: 12, usePointStyle: true, font: { size: 11 } }
-                        },
-                        tooltip: {
-                            backgroundColor: isDark ? '#0a0a0a' : '#ffffff',
-                            titleColor: textColor,
-                            bodyColor: textColor,
-                            borderColor: gridColor,
-                            borderWidth: 1,
-                            padding: 10,
-                            callbacks: {
-                                label: function(ctx) {
-                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                                    const pct = total ? Math.round(ctx.parsed / total * 100) : 0;
-                                    return `${ctx.label}: ${ctx.parsed} (${pct}%)`;
-                                }
-                            }
-                        }
-                    },
-                    cutout: '64%',
-                    layout: { padding: 8 }
-                }
-            });
-        }
-    });
-
-    // ── Theme-change observer keeps tick/grid colours in sync ──
-    const observer = new MutationObserver(function (mutations) {
-        mutations.forEach(function (m) {
-            if (m.attributeName !== 'class') return;
-            const isDark = document.documentElement.classList.contains('dark');
-            const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
-            const textColor = isDark ? '#e5e5e5' : '#525252';
-            Chart.defaults.color = textColor;
-            Chart.defaults.borderColor = gridColor;
-            Object.values(Chart.instances).forEach(c => {
-                if (c.options.scales) {
-                    Object.values(c.options.scales).forEach(s => {
-                        if (s.grid) s.grid.color = gridColor;
-                        if (s.ticks) s.ticks.color = textColor;
-                    });
-                }
-                c.update();
-            });
-        });
-    });
-    observer.observe(document.documentElement, { attributes: true });
-</script>
 {% endblock %}

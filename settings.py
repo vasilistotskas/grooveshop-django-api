@@ -355,7 +355,7 @@ if ENABLE_DEBUG_TOOLBAR:
         "debug_toolbar.panels.templates.TemplatesPanel",
         # Cache panel reveals get/set/hit/miss on Redis — critical for
         # validating that the admin dashboard cache (5 min TTL on
-        # ``admin:dashboard:data:v3``) is actually warm under load.
+        # ``admin:dashboard:data:v4``) is actually warm under load.
         "debug_toolbar.panels.cache.CachePanel",
         "debug_toolbar.panels.signals.SignalsPanel",
         "debug_toolbar.panels.redirects.RedirectsPanel",

@@ -1,6 +1,7 @@
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
+import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -15,6 +16,8 @@ from pay_way.admin import (
     PaymentTypeFilter,
 )
 from pay_way.models import PayWay
+
+pytestmark = pytest.mark.assert_english
 
 User = get_user_model()
 
@@ -331,13 +334,10 @@ class PayWayAdminTestCase(TestCase):
     def test_list_display(self):
         expected_fields = [
             "name_display",
-            "provider_code_badge",
-            "active_status",
-            "active",
+            "provider_code_display",
             "payment_type_display",
             "cost_display",
             "free_threshold_display",
-            "configuration_status",
             "icon_preview",
             "sort_order_display",
         ]
@@ -392,99 +392,70 @@ class PayWayAdminTestCase(TestCase):
     def test_name_display(self):
         result = self.admin.name_display(self.payway)
 
-        self.assertIn("PayPal Payment", result)
-        self.assertIn("<strong", result)
+        self.assertEqual(result, "PayPal Payment")
 
-    def test_provider_code_badge(self):
-        result = self.admin.provider_code_badge(self.payway)
+    def test_provider_code_display(self):
+        result = self.admin.provider_code_display(self.payway)
 
-        self.assertIn("PAYPAL", result)
-        self.assertIn("inline-flex", result)
-        self.assertIn("px-2", result)
+        self.assertEqual(result, "PAYPAL")
 
-    def test_active_status(self):
-        result = self.admin.active_status(self.payway)
+    def test_provider_code_display_empty(self):
+        self.payway.provider_code = ""
+        result = self.admin.provider_code_display(self.payway)
 
-        self.assertIn("✓", result)
-        self.assertIn("Active", result)
-        self.assertIn("bg-green-50", result)
+        self.assertEqual(result, "No provider")
 
-    def test_active_status_inactive(self):
-        self.payway.active = False
-        result = self.admin.active_status(self.payway)
+    def test_payment_type_display_online(self):
+        value, label = self.admin.payment_type_display(self.payway)
 
-        self.assertIn("✗", result)
-        self.assertIn("Inactive", result)
+        self.assertEqual(value, "online")
+        self.assertEqual(label, "Online")
 
-    def test_payment_type_display(self):
-        result = self.admin.payment_type_display(self.payway)
-
-        self.assertIn("Online", result)
-        self.assertIn("<span", result)
-
-    def test_payment_type_display_offline(self):
+    def test_payment_type_display_offline_simple(self):
         self.payway.is_online_payment = False
-        result = self.admin.payment_type_display(self.payway)
+        value, label = self.admin.payment_type_display(self.payway)
 
-        self.assertIn("Offline", result)
-        self.assertIn("<span", result)
+        self.assertEqual(value, "offline_simple")
+        self.assertEqual(label, "Offline")
+
+    def test_payment_type_display_offline_confirmation(self):
+        self.payway.is_online_payment = False
+        self.payway.requires_confirmation = True
+        value, label = self.admin.payment_type_display(self.payway)
+
+        self.assertEqual(value, "offline_confirmation")
+        self.assertEqual(label, "Offline (Confirm)")
 
     def test_cost_display(self):
         result = self.admin.cost_display(self.payway)
 
         self.assertIn("5.00 EUR", result)
-        self.assertIn("bg-orange-50", result)
 
     def test_cost_display_free(self):
         self.payway.cost = Decimal("0.00")
         result = self.admin.cost_display(self.payway)
 
-        self.assertIn("Free", result)
-        self.assertIn("bg-green-50", result)
+        self.assertEqual(result, "Free")
 
     def test_free_threshold_display(self):
         result = self.admin.free_threshold_display(self.payway)
 
         self.assertIn("50.00 EUR", result)
-        self.assertTrue(len(result) > 0)
 
     def test_free_threshold_display_no_threshold(self):
         self.payway.free_threshold = Decimal("0.00")
         result = self.admin.free_threshold_display(self.payway)
 
-        self.assertTrue(len(result) > 0)
-
-    def test_configuration_status(self):
-        result = self.admin.configuration_status(self.payway)
-
-        self.assertIn("✓", result)
-        self.assertIn("Configured", result)
-        self.assertIn("bg-green-50", result)
-
-    def test_configuration_status_not_configured(self):
-        self.payway.configuration = {}
-        result = self.admin.configuration_status(self.payway)
-
-        self.assertIn("Missing Config", result)
-        self.assertIn("⚠️", result)
-        self.assertIn("bg-red-50", result)
-
-    def test_configuration_status_offline(self):
-        self.payway.is_online_payment = False
-        result = self.admin.configuration_status(self.payway)
-
-        self.assertIn("N/A", result)
-        self.assertTrue(len(result) > 0)
+        self.assertEqual(result, "No threshold")
 
     def test_sort_order_display(self):
         result = self.admin.sort_order_display(self.payway)
 
         self.assertIn("#0", result)
-        self.assertIn("inline-flex", result)
 
     def test_icon_preview(self):
         result = self.admin.icon_preview(self.payway)
-        self.assertIn("No icon", result)
+        self.assertEqual(result, "No icon")
 
     def test_icon_preview_with_icon(self):
         self.payway.icon = SimpleUploadedFile(
@@ -495,39 +466,34 @@ class PayWayAdminTestCase(TestCase):
         result = self.admin.icon_preview(self.payway)
         self.assertIn("<img", result)
         self.assertIn("src=", result)
-        self.assertTrue(len(result) > 0)
 
     def test_configuration_preview(self):
         result = self.admin.configuration_preview(self.payway)
 
         self.assertIn("api_key", result)
-        self.assertIn("Configuration Keys:", result)
-        self.assertIn("text-sm", result)
+        self.assertIn("Configuration keys:", result)
 
     def test_configuration_preview_empty(self):
         self.payway.configuration = {}
         result = self.admin.configuration_preview(self.payway)
 
-        self.assertIn("No configuration", result)
+        self.assertEqual(result, "No configuration")
 
     def test_effective_cost_display(self):
         result = self.admin.effective_cost_display(self.payway)
 
-        self.assertTrue(len(result) > 0)
-        self.assertIn("<span", result)
+        self.assertIn("EUR", result)
 
     def test_is_configured_status(self):
         result = self.admin.is_configured_status(self.payway)
 
-        self.assertIn("✓", result)
-        self.assertTrue(len(result) > 0)
+        self.assertEqual(result, "Ready to use")
 
     def test_is_configured_status_not_configured(self):
         self.payway.configuration = {}
         result = self.admin.is_configured_status(self.payway)
 
-        self.assertTrue(len(result) > 0)
-        self.assertIn("<span", result)
+        self.assertEqual(result, "Requires setup")
 
     def test_activate_payment_methods_action(self):
         inactive_payway = PayWay.objects.create(active=False)
@@ -644,12 +610,10 @@ class PayWayAdminIntegrationTestCase(TestCase):
     def test_admin_display_methods_integration(self):
         display_methods = [
             "name_display",
-            "provider_code_badge",
-            "active_status",
+            "provider_code_display",
             "payment_type_display",
             "cost_display",
             "free_threshold_display",
-            "configuration_status",
             "sort_order_display",
             "icon_preview",
             "configuration_preview",

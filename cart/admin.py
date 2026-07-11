@@ -4,10 +4,8 @@ from django.contrib import admin
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
-from django.utils.html import format_html
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
     DropdownFilter,
@@ -16,10 +14,24 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
-from unfold.decorators import action
+from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from admin.base import BaseModelAdmin
+from admin.displays import format_dt, header_two_line, money
 from cart.models import Cart, CartItem
+
+CART_TYPE_VARIANT: dict[str, str] = {
+    "user": "success",
+    "guest": "default",
+}
+
+ACTIVITY_STATE_VARIANT: dict[str, str] = {
+    "active": "success",
+    "recent": "info",
+    "idle": "warning",
+    "abandoned": "danger",
+}
 
 
 class CartTypeFilter(DropdownFilter):
@@ -96,6 +108,7 @@ class ActivityStatusFilter(DropdownFilter):
 class CartItemInline(TabularInline):
     model = CartItem
     extra = 0
+    per_page = 15
     fields = (
         "product_display",
         "quantity",
@@ -114,77 +127,43 @@ class CartItemInline(TabularInline):
 
     @admin.display(description=_("Product"))
     def product_display(self, obj):
-        if obj.product:
-            product_name = (
-                obj.product.safe_translation_getter("name", any_language=True)
-                or "Unnamed Product"
-            )
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-                '<div class="text-base-600 dark:text-base-300">ID: {id}</div>'
-                "</div>",
-                name=product_name,
-                id=obj.product.id,
-            )
-        return "-"
+        if not obj.product:
+            return "-"
+        name = obj.product.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed Product")
+        return f"{name} (ID: {obj.product.id})"
 
     @admin.display(description=_("Unit Price"))
     def unit_price_display(self, obj):
-        if hasattr(obj, "price") and hasattr(obj, "final_price"):
-            if obj.price != obj.final_price:
-                return format_html(
-                    '<div class="text-sm">'
-                    '<div class="line-through text-base-600 dark:text-base-300">{price}</div>'
-                    '<div class="font-medium text-green-600 dark:text-green-400">{final}</div>'
-                    "</div>",
-                    price=str(obj.price),
-                    final=str(obj.final_price),
-                )
-            return format_html(
-                '<div class="text-sm font-medium text-base-900 dark:text-base-100">'
-                "{final}"
-                "</div>",
-                final=str(obj.final_price),
-            )
-        return "-"
+        if not (hasattr(obj, "price") and hasattr(obj, "final_price")):
+            return "-"
+        if obj.price != obj.final_price:
+            return _("%(price)s → %(final)s") % {
+                "price": money(obj.price.amount),
+                "final": money(obj.final_price.amount),
+            }
+        return money(obj.final_price.amount)
 
     @admin.display(description=_("Total"))
     def total_price_display(self, obj):
-        if hasattr(obj, "total_price"):
-            return format_html(
-                '<div class="text-sm font-bold text-base-900 dark:text-base-100">'
-                "{total}"
-                "</div>",
-                total=str(obj.total_price),
-            )
-        return "-"
+        if not hasattr(obj, "total_price"):
+            return "-"
+        return money(obj.total_price.amount)
 
     @admin.display(description=_("Discount"))
     def discount_info(self, obj):
         if hasattr(obj, "discount_percent") and obj.discount_percent > 0:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "-{percent}%"
-                "</span>",
-                percent=obj.discount_percent,
-            )
+            return f"-{obj.discount_percent}%"
         return ""
 
 
 @admin.register(Cart)
-class CartAdmin(ModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
+class CartAdmin(BaseModelAdmin):
     list_display = (
         "cart_owner_display",
-        "cart_type_badge",
-        "activity_status_badge",
+        "cart_type",
+        "activity_state",
         "items_summary",
         "price_summary",
         "last_activity",
@@ -255,135 +234,63 @@ class CartAdmin(ModelAdmin):
             .prefetch_related("items__product__vat")
         )
 
-    @admin.display(description=_("Cart Owner"))
+    @display(description=_("Owner"), header=True)
     def cart_owner_display(self, obj):
         if obj.user:
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-                '<div class="text-base-600 dark:text-base-300">{email}</div>'
-                "</div>",
-                name=obj.user.full_name or obj.user.username,
-                email=obj.user.email,
+            return header_two_line(
+                obj.user.full_name or obj.user.username, obj.user.email
             )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-700 dark:text-base-300">Guest User</div>'
-            '<div class="text-base-600 dark:text-base-300">Cart #{id}</div>'
-            "</div>",
-            id=obj.id,
-        )
+        return header_two_line(str(_("Guest")), f"Cart #{obj.id}")
 
-    @admin.display(description=_("Type"))
-    def cart_type_badge(self, obj):
+    @display(description=_("Type"), label=CART_TYPE_VARIANT)
+    def cart_type(self, obj):
         if obj.user:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-                "👤 User"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            "🛒 Guest"
-            "</span>"
-        )
+            return "user", _("User")
+        return "guest", _("Guest")
 
-    @admin.display(description=_("Activity"))
-    def activity_status_badge(self, obj):
-        now = timezone.now()
-        delta = now - obj.last_activity
+    @display(description=_("Activity"), label=ACTIVITY_STATE_VARIANT)
+    def activity_state(self, obj):
+        delta = timezone.now() - obj.last_activity
         if delta < timedelta(hours=1):
-            label, emoji = "Active", "🟢"
-            bg, text = (
-                "bg-green-50 dark:bg-green-900",
-                "text-green-700 dark:text-green-300",
-            )
-        elif delta < timedelta(hours=24):
-            label, emoji = "Recent", "🟡"
-            bg, text = (
-                "bg-yellow-50 dark:bg-yellow-900",
-                "text-yellow-700 dark:text-yellow-300",
-            )
-        elif delta < timedelta(days=7):
-            label, emoji = "Idle", "🟠"
-            bg, text = (
-                "bg-orange-50 dark:bg-orange-900",
-                "text-orange-700 dark:text-orange-300",
-            )
-        else:
-            label, emoji = "Abandoned", "🔴"
-            bg, text = (
-                "bg-red-50 dark:bg-red-900",
-                "text-red-700 dark:text-red-300",
-            )
-
-        return format_html(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium {bg} {text_class} rounded-full">'
-            "{emoji} {label}"
-            "</span>",
-            bg=bg,
-            text_class=text,
-            emoji=emoji,
-            label=label,
-        )
+            return "active", _("Active")
+        if delta < timedelta(hours=24):
+            return "recent", _("Recent")
+        if delta < timedelta(days=7):
+            return "idle", _("Idle")
+        return "abandoned", _("Abandoned")
 
     @admin.display(description=_("Items"))
     def items_summary(self, obj):
-        return format_html(
-            '<div class="text-sm text-base-700 dark:text-base-300">'
-            '<div class="font-medium">{total} items</div>'
-            '<div class="text-base-600 dark:text-base-300">{unique} unique</div>'
-            "</div>",
-            total=obj.total_items,
-            unique=obj.total_items_unique,
-        )
+        return _("%(total)d items, %(unique)d unique") % {
+            "total": obj.total_items,
+            "unique": obj.total_items_unique,
+        }
 
     @admin.display(description=_("Total"))
     def price_summary(self, obj):
-        total_price = obj.total_price
         total_discount = obj.total_discount_value
-
         if getattr(total_discount, "amount", 0) > 0:
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-bold text-base-900 dark:text-base-100">{price}</div>'
-                '<div class="text-red-600 dark:text-red-400 text-xs">-{disc} saved</div>'
-                "</div>",
-                price=str(total_price),
-                disc=str(total_discount),
-            )
-        return format_html(
-            '<div class="text-sm font-bold text-base-900 dark:text-base-100">'
-            "{price}"
-            "</div>",
-            price=str(total_price),
-        )
+            return _("%(total)s (-%(discount)s saved)") % {
+                "total": money(obj.total_price.amount),
+                "discount": money(total_discount.amount),
+            }
+        return money(obj.total_price.amount)
 
     @admin.display(description=_("Cart Summary"))
     def cart_summary(self, obj):
-        return format_html(
-            '<div class="grid grid-cols-2 gap-4 text-sm">'
-            "<div>"
-            "<strong>Items:</strong> {items} total, {unique} unique<br>"
-            "<strong>Total Price:</strong> {price}<br>"
-            "<strong>Total Discount:</strong> {disc}"
-            "</div>"
-            "<div>"
-            "<strong>VAT:</strong> {vat}<br>"
-            "<strong>Activity:</strong> {last}<br>"
-            "<strong>Created:</strong> {created}"
-            "</div>"
-            "</div>",
-            items=obj.total_items,
-            unique=obj.total_items_unique,
-            price=str(obj.total_price),
-            disc=str(obj.total_discount_value),
-            vat=str(obj.total_vat_value),
-            last=obj.last_activity.strftime("%Y-%m-%d %H:%M"),
-            created=obj.created_at.strftime("%Y-%m-%d %H:%M"),
-        )
+        return _(
+            "Items: %(items)d total, %(unique)d unique. Total price: "
+            "%(price)s. Total discount: %(disc)s. VAT: %(vat)s. "
+            "Last activity: %(last)s. Created: %(created)s."
+        ) % {
+            "items": obj.total_items,
+            "unique": obj.total_items_unique,
+            "price": money(obj.total_price.amount),
+            "disc": money(obj.total_discount_value.amount),
+            "vat": money(obj.total_vat_value.amount),
+            "last": format_dt(obj.last_activity),
+            "created": format_dt(obj.created_at),
+        }
 
     @admin.display(description=_("Financial Summary"))
     def financial_summary(self, obj):
@@ -395,30 +302,19 @@ class CartAdmin(ModelAdmin):
             original = obj.total_price.amount + obj.total_discount_value.amount
             savings_percent = (obj.total_discount_value.amount / original) * 100
 
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="mb-2"><strong>Financial Breakdown:</strong></div>'
-            '<div class="grid grid-cols-2 gap-2">'
-            '<div>Final Total:</div><div class="font-bold">{final}</div>'
-            '<div>Total Discounts:</div><div class="text-red-600 dark:text-red-400">-{disc}</div>'
-            "<div>Total VAT:</div><div>{vat}</div>"
-            '<div>Savings:</div><div class="text-green-600 dark:text-green-400">{savings}</div>'
-            "</div>"
-            "</div>",
-            final=str(obj.total_price),
-            disc=str(obj.total_discount_value),
-            vat=str(obj.total_vat_value),
-            savings=f"{savings_percent:.1f}%",
-        )
+        return _(
+            "Final total: %(final)s. Discounts: -%(disc)s. VAT: "
+            "%(vat)s. Savings: %(savings).1f%%."
+        ) % {
+            "final": money(obj.total_price.amount),
+            "disc": money(obj.total_discount_value.amount),
+            "vat": money(obj.total_vat_value.amount),
+            "savings": savings_percent,
+        }
 
 
 @admin.register(CartItem)
-class CartItemAdmin(ModelAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
+class CartItemAdmin(BaseModelAdmin):
     date_hierarchy = "created_at"
 
     list_display = (
@@ -426,7 +322,7 @@ class CartItemAdmin(ModelAdmin):
         "product_display",
         "quantity_display",
         "pricing_info",
-        "discount_badge",
+        "discount_display",
         "created_at",
     )
     list_filter = (
@@ -510,117 +406,72 @@ class CartItemAdmin(ModelAdmin):
     @admin.display(description=_("Cart"))
     def cart_info(self, obj):
         owner = (
-            "Guest"
+            _("Guest")
             if not obj.cart.user
             else obj.cart.user.full_name or obj.cart.user.username
         )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">Cart #{cart}</div>'
-            '<div class="text-base-600 dark:text-base-300">{owner}</div>'
-            "</div>",
-            cart=obj.cart.id,
-            owner=owner,
-        )
+        return f"Cart #{obj.cart.id} — {owner}"
 
     @admin.display(description=_("Product"))
     def product_display(self, obj):
-        product_name = (
-            obj.product.safe_translation_getter("name", any_language=True)
-            or "Unnamed Product"
-        )
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-900 dark:text-base-100">{name}</div>'
-            '<div class="text-base-600 dark:text-base-300">ID: {id}</div>'
-            "</div>",
-            name=product_name,
-            id=obj.product.id,
-        )
+        name = obj.product.safe_translation_getter(
+            "name", any_language=True
+        ) or _("Unnamed Product")
+        return f"{name} (ID: {obj.product.id})"
 
     @admin.display(description=_("Qty"))
     def quantity_display(self, obj):
-        return format_html(
-            '<span class="inline-flex items-center px-3 py-1 text-sm font-medium '
-            'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">'
-            "x{qty}"
-            "</span>",
-            qty=obj.quantity,
-        )
+        return f"x{obj.quantity}"
 
     @admin.display(description=_("Pricing"))
     def pricing_info(self, obj):
-        if (
+        if not (
             hasattr(obj, "price")
             and hasattr(obj, "final_price")
             and hasattr(obj, "total_price")
         ):
-            if obj.price != obj.final_price:
-                return format_html(
-                    '<div class="text-sm">'
-                    '<div class="text-base-600 dark:text-base-300 line-through">{price} each</div>'
-                    '<div class="font-medium text-green-600 dark:text-green-400">{final} each</div>'
-                    '<div class="font-bold text-base-900 dark:text-base-100">Total: {total}</div>'
-                    "</div>",
-                    price=str(obj.price),
-                    final=str(obj.final_price),
-                    total=str(obj.total_price),
-                )
-            return format_html(
-                '<div class="text-sm">'
-                '<div class="font-medium text-base-900 dark:text-base-100">{final} each</div>'
-                '<div class="font-bold text-base-900 dark:text-base-100">Total: {total}</div>'
-                "</div>",
-                final=str(obj.final_price),
-                total=str(obj.total_price),
-            )
-        return "-"
+            return "-"
+        if obj.price != obj.final_price:
+            return _("%(price)s → %(final)s each — total %(total)s") % {
+                "price": money(obj.price.amount),
+                "final": money(obj.final_price.amount),
+                "total": money(obj.total_price.amount),
+            }
+        return _("%(final)s each — total %(total)s") % {
+            "final": money(obj.final_price.amount),
+            "total": money(obj.total_price.amount),
+        }
 
     @admin.display(description=_("Discount"))
-    def discount_badge(self, obj):
+    def discount_display(self, obj):
         if hasattr(obj, "discount_percent") and obj.discount_percent > 0:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full">'
-                "🏷️ -{percent}%"
-                "</span>",
-                percent=obj.discount_percent,
-            )
+            return f"-{obj.discount_percent}%"
         return ""
 
     @admin.display(description=_("Pricing Breakdown"))
     def pricing_breakdown(self, obj):
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="grid grid-cols-2 gap-2">'
-            "<div>Unit Price:</div><div>{price}</div>"
-            '<div>Final Price:</div><div class="font-medium">{final}</div>'
-            "<div>Quantity:</div><div>{qty}</div>"
-            '<div>Total:</div><div class="font-bold">{total}</div>'
-            "</div>"
-            "</div>",
-            price=str(getattr(obj, "price", "N/A")),
-            final=str(getattr(obj, "final_price", "N/A")),
-            qty=obj.quantity,
-            total=str(getattr(obj, "total_price", "N/A")),
-        )
+        return _(
+            "Unit price: %(price)s. Final price: %(final)s. "
+            "Quantity: %(qty)s. Total: %(total)s."
+        ) % {
+            "price": money(obj.price.amount),
+            "final": money(obj.final_price.amount),
+            "qty": obj.quantity,
+            "total": money(obj.total_price.amount),
+        }
 
     @admin.display(description=_("Savings"))
     def savings_info(self, obj):
-        if hasattr(obj, "discount_percent") and obj.discount_percent > 0:
-            return format_html(
-                '<div class="text-sm text-green-600 dark:text-green-400">'
-                "<div>Discount: {percent}%</div>"
-                "<div>You save: {value} per item</div>"
-                "<div>Total savings: {total}</div>"
-                "</div>",
-                percent=getattr(obj, "discount_percent", 0),
-                value=str(getattr(obj, "discount_value", "N/A")),
-                total=str(getattr(obj, "total_discount_value", "N/A")),
-            )
-        return mark_safe(
-            '<div class="text-sm text-base-600 dark:text-base-300">No discounts applied</div>'
-        )
+        if obj.discount_percent > 0:
+            return _(
+                "Discount: %(percent)s%%. You save %(value)s per item "
+                "(%(total)s total)."
+            ) % {
+                "percent": obj.discount_percent,
+                "value": money(obj.discount_value.amount),
+                "total": money(obj.total_discount_value.amount),
+            }
+        return _("No discounts applied")
 
     @action(
         description=str(_("Increase quantity by 1")),

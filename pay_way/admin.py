@@ -1,21 +1,24 @@
 from django.contrib import admin
-from django.db import models
 from django.db.models import Q
 from django.utils.html import format_html
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from parler.admin import TranslatableAdmin
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import TabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
     RangeNumericListFilter,
 )
-from unfold.contrib.forms.widgets import WysiwygWidget
-from unfold.decorators import action
+from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from admin.base import BaseTranslatableAdmin
 from pay_way.models import PayWay, PayWayShippingExclusion
+
+PAYMENT_TYPE_VARIANT: dict[str, str] = {
+    "online": "info",
+    "offline_confirmation": "warning",
+    "offline_simple": "default",
+}
 
 
 class PayWayShippingExclusionInline(TabularInline):
@@ -136,26 +139,13 @@ class ConfigurationStatusFilter(DropdownFilter):
 
 
 @admin.register(PayWay)
-class PayWayAdmin(ModelAdmin, TranslatableAdmin):
-    compressed_fields = True
-    warn_unsaved_form = True
-    list_fullwidth = True
-    list_filter_submit = True
-    list_filter_sheet = True
-
-    formfield_overrides = {
-        models.TextField: {"widget": WysiwygWidget},
-    }
-
+class PayWayAdmin(BaseTranslatableAdmin):
     list_display = [
         "name_display",
-        "provider_code_badge",
-        "active_status",
-        "active",
+        "provider_code_display",
         "payment_type_display",
         "cost_display",
         "free_threshold_display",
-        "configuration_status",
         "icon_preview",
         "sort_order_display",
     ]
@@ -171,8 +161,6 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
         ("created_at", RangeDateTimeFilter),
         ("updated_at", RangeDateTimeFilter),
     ]
-
-    list_editable = ["active"]
 
     search_fields = [
         "translations__name",
@@ -265,197 +253,72 @@ class PayWayAdmin(ModelAdmin, TranslatableAdmin):
 
     @admin.display(description=_("Name"))
     def name_display(self, obj):
-        return format_html(
-            '<strong class="text-base-900 dark:text-base-100">{name}</strong>',
-            name=(
-                obj.safe_translation_getter("name", any_language=True)
-                or "Unnamed Payment Method"
-            ),
+        return obj.safe_translation_getter("name", any_language=True) or _(
+            "Unnamed Payment Method"
         )
 
     @admin.display(description=_("Provider"))
-    def provider_code_badge(self, obj):
-        if obj.provider_code:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-indigo-50 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-full">'
-                "{code}"
-                "</span>",
-                code=obj.provider_code,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300 italic">'
-            "No provider"
-            "</span>"
-        )
+    def provider_code_display(self, obj):
+        return obj.provider_code or _("No provider")
 
-    @admin.display(description=_("Status"))
-    def active_status(self, obj):
-        if obj.active:
-            return mark_safe(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
-                "<span>✓</span><span>Active</span>"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-            "<span>✗</span><span>Inactive</span>"
-            "</span>"
-        )
-
-    @admin.display(description=_("Type"))
+    @display(description=_("Type"), label=PAYMENT_TYPE_VARIANT)
     def payment_type_display(self, obj):
         if obj.is_online_payment:
-            return mark_safe(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full gap-1">'
-                "<span>🌐</span><span>Online</span>"
-                "</span>"
-            )
+            return "online", _("Online")
         if obj.requires_confirmation:
-            return mark_safe(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-yellow-50 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 rounded-full gap-1">'
-                "<span>⏱️</span><span>Offline (Confirm)</span>"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            'bg-purple-50 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-full gap-1">'
-            "<span>📝</span><span>Offline</span>"
-            "</span>"
-        )
+            return "offline_confirmation", _("Offline (Confirm)")
+        return "offline_simple", _("Offline")
 
     @admin.display(description=_("Cost"))
     def cost_display(self, obj):
         if obj.cost and obj.cost.amount > 0:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-orange-50 dark:bg-orange-900 text-orange-700 dark:text-orange-300 rounded-full">'
-                "{amount} {currency}"
-                "</span>",
-                amount=str(obj.cost.amount),
-                currency=str(obj.cost.currency),
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-            'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full">'
-            "Free"
-            "</span>"
-        )
+            return f"{obj.cost.amount} {obj.cost.currency}"
+        return _("Free")
 
     @admin.display(description=_("Free Threshold"))
     def free_threshold_display(self, obj):
         if obj.free_threshold and obj.free_threshold.amount > 0:
-            return format_html(
-                '<span class="text-sm text-base-700 dark:text-base-300">'
-                "Free above {amount} {currency}"
-                "</span>",
-                amount=str(obj.free_threshold.amount),
-                currency=str(obj.free_threshold.currency),
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No threshold</span>'
-        )
-
-    @admin.display(description=_("Configuration"))
-    def configuration_status(self, obj):
-        if not obj.is_online_payment:
-            return mark_safe(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-base-50 dark:bg-base-900 text-base-700 dark:text-base-300 rounded-full">'
-                "N/A"
-                "</span>"
-            )
-        if obj.is_configured:
-            return mark_safe(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
-                "<span>✓</span><span>Configured</span>"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-            "<span>⚠️</span><span>Missing Config</span>"
-            "</span>"
-        )
-
-    @admin.display(description=_("Order"))
-    def sort_order_display(self, obj):
-        if obj.sort_order is not None:
-            return format_html(
-                '<span class="inline-flex items-center px-2 py-1 text-xs font-medium '
-                'bg-base-50 dark:bg-base-900 text-base-700 dark:text-base-300 rounded-full">'
-                "#{order}"
-                "</span>",
-                order=obj.sort_order,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">-</span>'
-        )
+            return _("Free above %(amount)s %(currency)s") % {
+                "amount": obj.free_threshold.amount,
+                "currency": obj.free_threshold.currency,
+            }
+        return _("No threshold")
 
     @admin.display(description=_("Icon"))
     def icon_preview(self, obj):
         if obj.icon:
             return format_html(
-                '<img src="{url}" style="max-height: 32px; max-width: 64px; '
-                'border-radius: 4px; object-fit: contain;" />',
+                '<img src="{url}" class="h-8 max-w-16 object-contain" />',
                 url=obj.icon.url,
             )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No icon</span>'
-        )
+        return _("No icon")
 
     @admin.display(description=_("Configuration Preview"))
     def configuration_preview(self, obj):
         if not obj.configuration:
-            return mark_safe(
-                '<span class="text-base-600 dark:text-base-300 italic">No configuration</span>'
-            )
+            return _("No configuration")
         keys = list(obj.configuration.keys())
         if len(keys) > 3:
-            display = keys[:3] + [f"... and {len(keys) - 3} more"]
+            shown = [*keys[:3], _("... and %(n)d more") % {"n": len(keys) - 3}]
         else:
-            display = keys
-        return format_html(
-            '<div class="text-sm">'
-            '<div class="font-medium text-base-700 dark:text-base-300">Configuration Keys:</div>'
-            '<div class="text-base-600 dark:text-base-300">{keys}</div>'
-            "</div>",
-            keys=", ".join(display),
-        )
+            shown = keys
+        return _("Configuration keys: %(keys)s") % {"keys": ", ".join(shown)}
 
     @admin.display(description=_("Effective Cost"))
     def effective_cost_display(self, obj):
         if obj.cost:
-            formatted = f"{obj.effective_cost} {obj.cost.currency}"
-        else:
-            formatted = "0"
-        return format_html(
-            '<span class="text-sm font-medium text-base-700 dark:text-base-300">'
-            "{fmt}"
-            "</span>",
-            fmt=formatted,
-        )
+            return f"{obj.effective_cost} {obj.cost.currency}"
+        return "0"
 
     @admin.display(description=_("Ready Status"))
     def is_configured_status(self, obj):
-        if obj.is_configured:
-            return mark_safe(
-                '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-                'bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-full gap-1">'
-                "<span>✓</span><span>Ready to use</span>"
-                "</span>"
-            )
-        return mark_safe(
-            '<span class="inline-flex items-center justify-center px-2 py-1 text-xs font-medium '
-            'bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-full gap-1">'
-            "<span>⚠️</span><span>Requires setup</span>"
-            "</span>"
-        )
+        return _("Ready to use") if obj.is_configured else _("Requires setup")
+
+    @admin.display(description=_("Order"))
+    def sort_order_display(self, obj):
+        if obj.sort_order is not None:
+            return f"#{obj.sort_order}"
+        return "-"
 
     @action(
         description=str(_("Activate selected payment methods")),

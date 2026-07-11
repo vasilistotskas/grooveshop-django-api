@@ -3,6 +3,97 @@
 
 
 
+## v1.155.0 (2026-07-11)
+
+### Bug fixes
+
+* fix(cod): silence customer emails from reconcile
+
+Site-owner decision: the COD reconcile must never notify customers —
+the shopper paid the courier in person and already received the
+DELIVERED notification, so the payment flip and DELIVERED → COMPLETED
+advance are internal bookkeeping. The nightly beat task now passes
+silent_for_customer=True (the backfill command already did); the
+suppression covers both the status-update email and the WS toast.
+Verified no other customer-facing sends exist on this path: the
+order_completed invoice email only fires for document_type=INVOICE
+(all 56 currently-stuck COD orders are RECEIPT, and B2B invoices are
+legally required so they stay), loyalty listeners are in-app only,
+and order_paid feeds Meta CAPI, not email.
+
+Also drop the return annotation on the test factory helper in
+test_stale_shipments.py — CI runs ty over the whole repo (local
+checks only covered app dirs) and flagged invalid-return-type,
+failing the previous two CI runs.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`c45a27f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c45a27fe269b545455e7c6e27335843b208aa3a8))
+
+* fix(cod): match ACS payouts via POD wire column
+
+The nightly reconcile_cod_payouts read row["Voucher_No"], but per the
+official ACS REST docs the ACS_COD_Beneficiary_Info response carries
+the voucher number in POD — no Voucher_No column exists. Every payout
+row was skipped for 10 weeks (72 runs, upserted=0, AcsCodPayout
+empty), so no delivered COD order ever advanced past
+payment_status=PENDING. The tests encoded the invented key and passed.
+
+- Match by POD; fall back to Customer_RefNo_1/2, which officially echo
+  Reference_Key1/2 (order.id / order.uuid) from voucher mint. A
+  matched shipment's voucher_no is canonical for the payout row.
+- Count unmatched rows as "skipped" and mail ADMINS — unattributed
+  payout money must be investigated, never silently dropped.
+- Add manage.py reconcile_acs_cod --days N [--silent] to replay missed
+  payout dates (COD_Payment_Date filters per exact day). --silent
+  threads silent_for_customer through _mark_cod_order_paid_if_pending
+  so a backfill doesn't email customers COMPLETED for weeks-old
+  orders.
+- BoxNow COD: mark orders paid on the delivered parcel event — BoxNow
+  collects payment at the locker before the compartment opens and has
+  no payout API, so the "COD reconcile pass" the code referenced never
+  existed. _apply_order_status_transition now takes the shipment.
+- Alert ADMINS immediately when a carrier permanently rejects voucher
+  creation (shipping/alerts.py, both carriers) and include day-old
+  pending_creation shipments in the stale digest — prod order 143
+  stranded 10 days on a rejected address with only a logger.error.
+- check_pending_orders: only online-payment orders get "complete your
+  order" reminders (COD stuck in PENDING is an ops failure, not a
+  customer action — prod orders 31/36/38/39 were mis-mailed), isolate
+  per-order send failures, and let setup errors reach autoretry.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`fb5bada`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fb5bada7013daab241e206946b9d8ed604e15cc6))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.154.0 [skip ci] ([`476e0ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/476e0ffe355d0d4fb88444d67173da2c02c9f7ad))
+
+### Features
+
+* feat(shipping-acs): stale shipment admin alerts
+
+Prod 2026-07-11: a parcel sat 3 days at the destination station after
+a wrong-address delivery failure and a voucher stayed "new" for 50
+days — both polled forever with nobody notified.
+
+- check_stale_acs_shipments (beat, daily 09:00 Athens) emails ADMINS
+  a digest of non-terminal shipments with no tracking event for
+  ACS_STALE_SHIPMENT_DAYS (default 3) days; claim/release dedup via
+  the new AcsShipment.stale_alert_sent flag, mirroring the low-stock
+  alert task. The poller re-arms the flag when tracking moves again.
+- admin bulk action "Retire selected shipments" marks dead vouchers
+  CANCELED locally (per-object save for history) so the poller skips
+  them — shipment_state is readonly, so no path existed before.
+- AcsAuthError (HTTP 403/406) now subclasses AcsRetryableError:
+  prod ACS returns sporadic transient 406s (~2% of tracking polls,
+  self-healing on retry — same key/IP succeeded for sibling vouchers
+  in the same second). Previously a transient 406 during voucher
+  mint permanently marooned the order. Error message no longer
+  asserts key/IP as the only causes.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`4cd2987`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4cd2987fc0ee8bd2d0e5422058e13cd75356c7a5))
+
 ## v1.154.0 (2026-07-11)
 
 ### Chores

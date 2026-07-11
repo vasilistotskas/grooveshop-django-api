@@ -1,19 +1,27 @@
-"""Reusable display helpers for ModelAdmin classes.
+"""Reusable display helpers + the shared status-variant vocabulary.
 
-Centralises display logic that was duplicated across 15+ admin files —
-status badges, money formatting, datetime formatting, two-line
-"header" cells with avatar/initials. Always uses ``format_html`` so
-every interpolated value is auto-escaped (no more
-``mark_safe(conditional_escape(...))`` boilerplate that's easy to
-forget on one field and ship an XSS hole).
+Every status/state column in the admin renders through unfold's native
+``@display(label=...)`` pills — no hand-rolled ``format_html`` badge
+markup anywhere outside this module. Variant names are unfold's fixed
+palette: ``success`` (green), ``info`` (blue), ``warning`` (orange),
+``danger`` (red), ``primary`` (brand), ``default`` (neutral).
 
-Usage in a ModelAdmin:
+Usage in a ModelAdmin::
 
-    from admin.displays import status_badge, money
+    from admin.displays import ORDER_STATUS_VARIANT, choice_label
 
-    @admin.display(description=_("Status"), ordering="status")
-    def status_display(self, obj):
-        return status_badge(obj.status, obj.get_status_display())
+    class OrderAdmin(BaseModelAdmin):
+        list_display = ("status_display", ...)
+        status_display = choice_label(
+            "status",
+            variants=ORDER_STATUS_VARIANT,
+            description=_("Status"),
+        )
+
+The factory's display method returns ``(value, get_FOO_display())`` —
+unfold's ``display_for_label`` unpacks the tuple, so the pill colour is
+keyed off the stable enum value while the visible text stays
+gettext-translated.
 """
 
 from __future__ import annotations
@@ -22,95 +30,98 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from django.utils.html import format_html
-from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
+from unfold.decorators import display
 
-# ── Status colour palette ─────────────────────────────────────────────
-# Single source of truth for status → tone mapping. Tones map to
-# Tailwind colour names (amber, sky, emerald, rose, violet, cyan).
-# Keys are the lowercase status code; admin code passes the model
-# enum value through ``str.lower()`` before lookup.
+from order.enum.status import OrderStatus, PaymentStatus
+from product.enum.review import ReviewStatus
+from shipping_acs.enum.shipment_state import AcsShipmentState
+from shipping_boxnow.enum import BoxNowParcelState
 
-_STATUS_TONE: dict[str, str] = {
-    # Order lifecycle
-    "pending": "amber",
-    "processing": "sky",
-    "shipped": "cyan",
-    "delivered": "emerald",
-    "completed": "emerald",
-    "canceled": "rose",
-    "cancelled": "rose",
-    "returned": "orange",
-    "refunded": "violet",
-    "partially_refunded": "violet",
-    "failed": "rose",
-    # Generic
-    "active": "emerald",
-    "inactive": "base",
-    "draft": "base",
-    "published": "emerald",
-    "approved": "emerald",
-    "rejected": "rose",
-    "new": "sky",
-    "ready": "emerald",
-    "expired": "base",
+# ── Shared variant maps (single source of truth) ──────────────────────
+# Keyed by the TextChoices *values*; used by order/, shipping_*/ admins
+# and the dashboard. Single-app enums (e.g. notification kinds) keep
+# their maps local to that app's admin module.
+
+ORDER_STATUS_VARIANT: dict[str, str] = {
+    OrderStatus.PENDING: "warning",
+    OrderStatus.PROCESSING: "info",
+    OrderStatus.SHIPPED: "info",
+    OrderStatus.DELIVERED: "success",
+    OrderStatus.COMPLETED: "success",
+    OrderStatus.CANCELED: "danger",
+    OrderStatus.RETURNED: "warning",
+    OrderStatus.REFUNDED: "primary",
+}
+
+PAYMENT_STATUS_VARIANT: dict[str, str] = {
+    PaymentStatus.PENDING: "warning",
+    PaymentStatus.PROCESSING: "info",
+    PaymentStatus.COMPLETED: "success",
+    PaymentStatus.FAILED: "danger",
+    PaymentStatus.REFUNDED: "primary",
+    PaymentStatus.PARTIALLY_REFUNDED: "primary",
+    PaymentStatus.CANCELED: "danger",
+}
+
+REVIEW_STATUS_VARIANT: dict[str, str] = {
+    ReviewStatus.NEW: "info",
+    ReviewStatus.TRUE: "success",
+    ReviewStatus.FALSE: "danger",
+}
+
+# One map covers both carriers: ACS and BoxNow state values are
+# distinct strings, and the semantics align (terminal-good → success,
+# terminal-bad → danger, in-flight → info, needs-attention → warning).
+SHIPMENT_STATE_VARIANT: dict[str, str] = {
+    # ACS
+    AcsShipmentState.PENDING_CREATION: "default",
+    AcsShipmentState.NEW: "info",
+    AcsShipmentState.IN_TRANSIT: "info",
+    AcsShipmentState.AT_DESTINATION: "info",
+    AcsShipmentState.OUT_FOR_DELIVERY: "info",
+    AcsShipmentState.DELIVERED: "success",
+    AcsShipmentState.ATTEMPTED: "warning",
+    AcsShipmentState.RETURNED: "warning",
+    AcsShipmentState.CANCELED: "danger",
+    AcsShipmentState.LOST: "danger",
+    # BoxNow (values that differ from ACS)
+    BoxNowParcelState.IN_DEPOT: "info",
+    BoxNowParcelState.FINAL_DESTINATION: "info",
+    BoxNowParcelState.EXPIRED: "warning",
+    BoxNowParcelState.ACCEPTED_FOR_RETURN: "warning",
+    BoxNowParcelState.ACCEPTED_TO_LOCKER: "info",
+    BoxNowParcelState.MISSING: "danger",
 }
 
 
-def status_badge(code: str, label: str | None = None) -> SafeString:
-    """Render a coloured pill for a status code.
+def choice_label(
+    field: str,
+    *,
+    variants: dict[str, str],
+    description=None,
+    ordering: str | None = None,
+):
+    """Build an unfold label column for a ``TextChoices`` model field.
 
-    Args
-    ----
-    code
-        The status enum value (e.g. ``"PENDING"`` or ``OrderStatus.PENDING``).
-    label
-        Optional override for the visible text. When ``None``, the
-        code is title-cased (``"PENDING"`` → ``"Pending"``).
-
-    Returns the safe HTML for a Tailwind pill that respects the global
-    palette in ``_STATUS_TONE``.
+    Returns a method suitable for direct assignment as a ModelAdmin
+    class attribute and reference from ``list_display``. Sorting is
+    preserved via ``ordering`` (defaults to the field itself).
     """
 
-    code_norm = str(code).lower()
-    tone = _STATUS_TONE.get(code_norm, "base")
-    label = label or str(code).replace("_", " ").title()
-    return format_html(
-        '<span class="inline-flex items-center rounded-full px-2 py-0.5 '
-        "text-xs font-medium bg-{tone}-100 text-{tone}-700 "
-        'dark:bg-{tone}-900/40 dark:text-{tone}-300">{label}</span>',
-        tone=tone,
-        label=label,
+    @display(
+        description=description or _(field.replace("_", " ").title()),
+        ordering=ordering or field,
+        label=variants,
     )
+    def _col(self, obj):
+        value = getattr(obj, field)
+        if not value:
+            return None
+        return value, getattr(obj, f"get_{field}_display")()
 
-
-def boolean_badge(
-    value: bool, label_true: str = "", label_false: str = ""
-) -> SafeString:
-    """Render a green ✓ / grey × pill for a boolean flag.
-
-    Used for ``is_active``, ``approved``, ``featured``, etc. Without
-    explicit labels, the pill shows just the icon.
-    """
-
-    if value:
-        return format_html(
-            '<span class="inline-flex items-center gap-1 rounded-full '
-            "px-2 py-0.5 text-xs font-medium bg-emerald-100 "
-            'text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">'
-            '<span class="material-symbols-outlined text-sm!">check</span>'
-            "{}</span>",
-            label_true or "",
-        )
-    return format_html(
-        '<span class="inline-flex items-center gap-1 rounded-full '
-        "px-2 py-0.5 text-xs font-medium bg-base-100 text-base-600 "
-        'dark:bg-base-800 dark:text-base-400">'
-        '<span class="material-symbols-outlined text-sm!">close</span>'
-        "{}</span>",
-        label_false or "",
-    )
+    _col.__name__ = f"{field}_label"
+    return _col
 
 
 # ── Money + date formatting ───────────────────────────────────────────

@@ -17,9 +17,11 @@ Example:
 
 from __future__ import annotations
 
+from parler.admin import TranslatableAdmin, TranslatableTabularInline
 from tinymce.models import HTMLField
 from tinymce.widgets import AdminTinyMCE
-from unfold.admin import ModelAdmin
+from unfold.admin import BaseInlineMixin, ModelAdmin
+from unfold.mixins import FormFieldModelAdminMixin
 
 
 class BaseModelAdmin(ModelAdmin):
@@ -79,3 +81,30 @@ class BaseModelAdmin(ModelAdmin):
     formfield_overrides = {
         HTMLField: {"widget": AdminTinyMCE},
     }
+
+
+class BaseTranslatableAdmin(TranslatableAdmin, BaseModelAdmin):
+    """Canonical base for django-parler translated admins.
+
+    MRO puts parler FIRST: parler owns the view/URL/form machinery
+    (``get_urls``, ``get_form``, language tabs, delete-translation
+    views) while unfold only contributes ``formfield_for_dbfield`` and
+    templates — which parler does not define, so both cooperate
+    cleanly. Every translated admin in the project must extend this
+    class instead of hand-mixing the two bases (the codebase previously
+    carried three different orderings).
+    """
+
+
+class BaseTranslatableTabularInline(
+    BaseInlineMixin, FormFieldModelAdminMixin, TranslatableTabularInline
+):
+    """Unfold-styled tabular inline for parler-translated child rows.
+
+    Mirrors ``unfold.admin.TabularInline``'s composition
+    (``BaseInlineMixin`` for the unfold inline options such as
+    ``per_page``/``collapsible``/``show_count``, plus
+    ``FormFieldModelAdminMixin`` for unfold form widgets) on top of
+    parler's ``TranslatableTabularInline`` so translated inlines render
+    with the same chrome as every other inline.
+    """

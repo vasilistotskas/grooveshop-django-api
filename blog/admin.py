@@ -19,7 +19,7 @@ from unfold.decorators import action
 from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin
-from core.admin import ExportActionMixin
+from admin.export import ExportActionMixin
 
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory

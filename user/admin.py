@@ -13,7 +13,7 @@ from parler.admin import TranslatableAdmin
 from unfold.admin import ModelAdmin, TabularInline
 
 from admin.base import BaseModelAdmin
-from core.admin import ExportActionMixin
+from admin.export import ExportActionMixin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateFilter,

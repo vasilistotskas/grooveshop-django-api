@@ -29,7 +29,7 @@ from unfold.contrib.filters.admin import (
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
-from core.admin import ExportModelAdmin
+from admin.export import ExportModelAdmin
 from core.forms.measurement import MeasurementWidget
 from core.units import WeightUnits
 from product.enum.review import ReviewStatus

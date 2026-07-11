@@ -12,8 +12,8 @@ from unfold.contrib.filters.admin import (
     RangeDateTimeFilter,
 )
 
+from admin.export import ExportModelAdmin
 from contact.models import Contact
-from core.admin import ExportModelAdmin
 
 
 class MessageLengthFilter(admin.SimpleListFilter):

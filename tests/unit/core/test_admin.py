@@ -12,7 +12,7 @@ from django.test import TestCase, override_settings
 from djmoney.models.fields import Money
 from parler.models import TranslatableModel
 
-from core.admin import ExportActionMixin
+from admin.export import ExportActionMixin
 
 
 class MockAdminModel(models.Model):

@@ -8,7 +8,7 @@ from unfold.contrib.filters.admin import (
     RelatedDropdownFilter,
 )
 
-from core.admin import ExportActionMixin
+from admin.export import ExportActionMixin
 from loyalty.models.tier import LoyaltyTier
 from loyalty.models.transaction import PointsTransaction
 

@@ -3,6 +3,35 @@
 
 
 
+## v1.154.0 (2026-07-11)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.153.2 [skip ci] ([`6b05df0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6b05df048c08cfa0329070d3371b9327336e7d18))
+
+### Features
+
+* feat: Bump Versions ([`f86eee5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f86eee5f5ac5fcd65068a3bfa7bfe52334e5eac5))
+
+### Testing
+
+* test(shipping-boxnow): isolate client cache from the shared backend
+
+test_authenticate_success asserted the token landed in the cache, but
+the conftest LocMem CACHES override is inert for cache connections that
+materialised at app-load — in CI the default proxy is the shared Redis,
+where another xdist worker running its autouse cache.clear() teardown
+could wipe the token between the client cache.set and the test
+cache.get (flaked on run 28741325085; passes in isolation).
+
+Patch django.core.cache.cache with a private per-test LocMemCache via
+an autouse fixture — it covers both the client call-time import and the
+tests own local imports, and the unique LOCATION prevents state leaking
+between tests in the same worker.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CkotUsqBoPCBtUXwtjLePP ([`29ccfe9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/29ccfe916d533016b9575c4df6abc2e0ddec565e))
+
 ## v1.153.2 (2026-07-05)
 
 ### Bug fixes

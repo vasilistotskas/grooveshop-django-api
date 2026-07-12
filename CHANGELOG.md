@@ -3,6 +3,28 @@
 
 
 
+## v1.156.3 (2026-07-12)
+
+### Bug fixes
+
+* fix(admin): image dict belongs at index 3 in header displays
+
+unfold display_header.html is positional: value.2 is the initials
+circle (rendered as raw text), value.3 is the image dict. The
+header_two_line helper put the image at index 2, printing
+"{'"'"'path'"'"': ...}" in the avatar slot — broken product images on the
+prod changelist. Initials now always ride along as the fallback and a
+contract test pins the shape. Also make three user-admin assertions
+locale-agnostic — the completed Greek catalog translated the labels
+they asserted in English.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`0cf3a65`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0cf3a65f89dacd79290091227f98937eca81bc5c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.156.2 [skip ci] ([`533e544`](https://github.com/vasilistotskas/grooveshop-django-api/commit/533e5443f990ce5f436da29aa14f04cac12da557))
+
 ## v1.156.2 (2026-07-12)
 
 ### Bug fixes

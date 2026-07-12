@@ -194,20 +194,21 @@ def header_two_line(
     *,
     image_path: str | None = None,
 ) -> list[Any]:
-    """Build the 3-element list that ``@display(header=True)`` expects.
+    """Build the list that ``@display(header=True)`` expects.
 
-    See the unfold docs for `display(header=True)`. Returns
-    ``[primary, secondary, initials | image_dict]``. Keeps the call
-    sites symmetrical across User, Author, Order admins.
+    Unfold's ``display_header.html`` contract is positional:
+    ``[title, subtitle, initials, image_dict]`` — the image dict MUST
+    sit at index 3 (index 2 is the initials circle, rendered as raw
+    text). Placing the dict at index 2 prints ``{'path': ...}`` inside
+    the avatar circle — the "broken product images" bug on the prod
+    changelist, 2026-07-12. Initials are always included as the
+    template-level fallback when the image is absent.
     """
 
+    row = [primary, secondary or "", initials or _initials_from(primary)]
     if image_path:
-        return [
-            primary,
-            secondary or "",
-            {"path": image_path, "squared": False},
-        ]
-    return [primary, secondary or "", initials or _initials_from(primary)]
+        row.append({"path": image_path, "squared": False})
+    return row
 
 
 def _initials_from(name: str | None) -> str:

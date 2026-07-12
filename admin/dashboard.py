@@ -516,9 +516,15 @@ def _zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus) -> dict:
                 # callback (options must survive json.dumps).
                 "ticks": {
                     "color": _CHART_TICK_COLOR,
+                    # Both min AND max fraction digits: Chart.js merges
+                    # its own minimumFractionDigits into the Intl spec,
+                    # and min > max makes Intl.NumberFormat throw a
+                    # RangeError that aborts renderCharts for EVERY
+                    # chart on the page.
                     "format": {
                         "style": "currency",
                         "currency": "EUR",
+                        "minimumFractionDigits": 0,
                         "maximumFractionDigits": 0,
                     },
                 },

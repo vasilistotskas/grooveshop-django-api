@@ -3,6 +3,16 @@
 
 
 
+## v1.156.2 (2026-07-12)
+
+### Bug fixes
+
+* fix: Update schema.yml ([`4c46db5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c46db51793f9ce1a6ae186c61680c1c494909fd))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.156.1 [skip ci] ([`c05a595`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c05a595d80ace660671f712aac32a5cda8cbb325))
+
 ## v1.156.1 (2026-07-12)
 
 ### Bug fixes

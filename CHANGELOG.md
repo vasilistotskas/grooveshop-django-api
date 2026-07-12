@@ -3,6 +3,25 @@
 
 
 
+## v1.156.1 (2026-07-12)
+
+### Bug fixes
+
+* fix(admin): pin min fraction digits on euro axis format
+
+Chart.js merges its own minimumFractionDigits into the Intl spec;
+min > max throws a RangeError inside Intl.NumberFormat that aborts
+renderCharts for every canvas on the dashboard (both charts went
+blank). Caught in the Chrome walkthrough; min=max=0 renders whole-euro
+ticks correctly.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01HRjzoBb1aU2WC26ZPqJFPu ([`1b2d00e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b2d00e35f9d7906b2445ee581466044f204e093))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.156.0 [skip ci] ([`76a669a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/76a669ace10faf712ece9a12d277b2fe0aae6dca))
+
 ## v1.156.0 (2026-07-11)
 
 ### Bug fixes

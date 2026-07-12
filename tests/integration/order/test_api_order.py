@@ -1,4 +1,5 @@
 import json
+import uuid
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -492,7 +493,10 @@ class GuestOrderTestCase(APITestCase):
             user=None, email="guest@example.com", status=OrderStatus.PENDING
         )
 
-        cancel_url = reverse("order-cancel", kwargs={"pk": guest_order.pk})
+        cancel_url = (
+            reverse("order-cancel", kwargs={"pk": guest_order.pk})
+            + f"?uuid={guest_order.uuid}"
+        )
 
         self.client.force_authenticate(user=None)
         response = self.client.post(
@@ -505,6 +509,39 @@ class GuestOrderTestCase(APITestCase):
 
         guest_order.refresh_from_db()
         self.assertEqual(guest_order.status, OrderStatus.CANCELED)
+
+    def test_guest_cannot_cancel_order_without_uuid(self):
+        """A guest order must not be cancelable by integer pk alone.
+
+        Regression for the guest-order IDOR: the cancel/payment actions
+        are keyed by sequential integer pk, so access must require the
+        order's unguessable UUID (via ?uuid=). Missing or wrong UUID -> 403.
+        """
+        guest_order = OrderFactory(
+            user=None, email="guest@example.com", status=OrderStatus.PENDING
+        )
+        cancel_url = reverse("order-cancel", kwargs={"pk": guest_order.pk})
+
+        self.client.force_authenticate(user=None)
+
+        # No uuid at all.
+        response = self.client.post(
+            cancel_url,
+            data=json.dumps({"reason": "IDOR attempt"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Wrong uuid.
+        response = self.client.post(
+            cancel_url + f"?uuid={uuid.uuid4()}",
+            data=json.dumps({"reason": "IDOR attempt"}),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        guest_order.refresh_from_db()
+        self.assertEqual(guest_order.status, OrderStatus.PENDING)
 
     def test_guest_cannot_cancel_authenticated_user_order(self):
         """Test that a guest cannot cancel an order that belongs to a registered user."""
@@ -575,8 +612,11 @@ class GuestOrderTestCase(APITestCase):
 
         guest_order.refresh_from_db()
 
-        payment_intent_url = reverse(
-            "order-create-payment-intent", kwargs={"pk": guest_order.pk}
+        payment_intent_url = (
+            reverse(
+                "order-create-payment-intent", kwargs={"pk": guest_order.pk}
+            )
+            + f"?uuid={guest_order.uuid}"
         )
 
         self.client.force_authenticate(user=None)

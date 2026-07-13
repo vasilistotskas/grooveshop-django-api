@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Sum
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from extra_settings.models import Setting
@@ -108,6 +108,15 @@ class LoyaltyService:
         if not order.user_id:
             return 0
 
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        # Lock the user row so concurrent award/reverse/redeem/expire for this
+        # user serialize. Under task_acks_late a task can be redelivered and
+        # run twice in parallel; without the lock both pass the idempotency
+        # check below before either commits, double-awarding points.
+        User.objects.select_for_update().get(pk=order.user_id)
+
         # Idempotency check — skip if EARN transactions already exist for this order
         if PointsTransaction.objects.get_earn_transactions_for_order(
             order
@@ -146,14 +155,17 @@ class LoyaltyService:
 
         # Race-safe XP increment: F() expression prevents a
         # lost-update when two concurrent award calls run in parallel.
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
         User.objects.filter(pk=user.pk).update(
             total_xp=F("total_xp") + total_points
         )
-        # Refresh so subsequent code in the same request sees the new value.
+        # Refresh so subsequent code (and the tier recalc below) sees the new
+        # value on this instance.
         user.refresh_from_db(fields=["total_xp"])
+
+        # Recalculate the tier from the just-updated XP. Done here (not in the
+        # calling task) so it reads the fresh value rather than a stale user
+        # instance loaded before the award.
+        cls.recalculate_tier(user)
 
         return total_points
 
@@ -179,12 +191,23 @@ class LoyaltyService:
         if not order.user_id:
             return 0
 
-        user = order.user
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        # Lock the user row so the reversal serializes against concurrent
+        # award/redeem/expire (the balance math and XP update below are
+        # otherwise racy read-modify-writes).
+        user = User.objects.select_for_update().get(pk=order.user_id)
+
         earn_transactions = (
             PointsTransaction.objects.get_earn_transactions_for_order(order)
         )
+        redeem_transactions = PointsTransaction.objects.filter(
+            reference_order=order,
+            transaction_type=TransactionType.REDEEM,
+        )
 
-        if not earn_transactions.exists():
+        if not earn_transactions.exists() and not redeem_transactions.exists():
             return 0
 
         # Check if already reversed — skip if ADJUST transactions exist for this order
@@ -197,6 +220,27 @@ class LoyaltyService:
                 "Points already reversed for order %s, skipping", order_id
             )
             return 0
+
+        # Restore points the customer spent on this order FIRST, before the
+        # earn reversal clamps against the balance. A cancellation or refund
+        # means the redemption discount no longer applies, so the redeemed
+        # points must be credited back — otherwise the customer permanently
+        # loses them. REDEEM points are stored negative, so the restore is the
+        # absolute amount. This does not touch XP (redemption never affected
+        # XP). Restoring first ensures a full earn reversal is not blocked by a
+        # balance the redemption temporarily lowered.
+        redeemed_total = (
+            redeem_transactions.aggregate(total=Sum("points"))["total"] or 0
+        )
+        restored = -redeemed_total
+        if restored > 0:
+            PointsTransaction.objects.create(
+                user=user,
+                points=restored,
+                transaction_type=TransactionType.ADJUST,
+                reference_order=order,
+                description=f"Redeemed points restored for order #{order.id}",
+            )
 
         total_reversed = 0
         current_balance = cls.get_user_balance(user)
@@ -224,9 +268,13 @@ class LoyaltyService:
                 current_balance -= reversal_amount
                 total_reversed += reversal_amount
 
-        # Subtract XP, clamped to 0
+        # Subtract XP, clamped to 0. Safe read-modify-write: the user row is
+        # locked above, so this cannot race the award path's increment.
         user.total_xp = max(0, user.total_xp - total_reversed)
         user.save(update_fields=["total_xp"])
+
+        # Recalculate the tier from the just-updated XP on this fresh instance.
+        cls.recalculate_tier(user)
 
         return total_reversed
 
@@ -361,19 +409,44 @@ class LoyaltyService:
             return 0
 
         cutoff_date = timezone.now() - timedelta(days=expiration_days)
-        expirable = PointsTransaction.objects.get_expirable_transactions(
-            cutoff_date
+        expirable = list(
+            PointsTransaction.objects.get_expirable_transactions(cutoff_date)
         )
 
-        count = 0
+        # Group by user so each user's running balance is tracked (and its row
+        # locked) while its expirations are written.
+        from collections import defaultdict
+
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        by_user: dict[int, list] = defaultdict(list)
         for earn_tx in expirable:
-            PointsTransaction.objects.create(
-                user=earn_tx.user,
-                points=-earn_tx.points,
-                transaction_type=TransactionType.EXPIRE,
-                description=f"Points expired from transaction {earn_tx.id}",
-            )
-            count += 1
+            by_user[earn_tx.user_id].append(earn_tx)
+
+        count = 0
+        for user_id, earns in by_user.items():
+            with transaction.atomic():
+                user = User.objects.select_for_update().get(pk=user_id)
+                balance = cls.get_user_balance(user)
+                for earn_tx in earns:
+                    # Never expire more than the user currently holds. Points
+                    # already spent (redeemed) must not drive the balance
+                    # negative — expiring the full original EARN amount when it
+                    # was partially spent is the bug. Still record a (possibly
+                    # zero) EXPIRE marker so the earn is not reconsidered next
+                    # run.
+                    expire_amount = min(earn_tx.points, max(0, balance))
+                    PointsTransaction.objects.create(
+                        user=user,
+                        points=-expire_amount,
+                        transaction_type=TransactionType.EXPIRE,
+                        description=(
+                            f"Points expired from transaction {earn_tx.id}"
+                        ),
+                    )
+                    balance -= expire_amount
+                    count += 1
 
         return count
 
@@ -395,6 +468,7 @@ class LoyaltyService:
         )
 
     @classmethod
+    @transaction.atomic
     def check_new_customer_bonus(cls, user, order) -> int:
         """Award new customer bonus if applicable.
 
@@ -404,6 +478,13 @@ class LoyaltyService:
         """
         if not Setting.get("LOYALTY_NEW_CUSTOMER_BONUS_ENABLED", default=False):
             return 0
+
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        # Lock the user row so two concurrent first orders can't both pass the
+        # "no prior EARN" check and each award the bonus.
+        User.objects.select_for_update().get(pk=user.pk)
 
         # Check if user has any prior EARN transactions (excluding current order)
         if (

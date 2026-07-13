@@ -35,13 +35,23 @@ logger = logging.getLogger(__name__)
 class ExportActionMixin:
     model = None
 
+    # Field names never written to CSV/XML exports: secrets and private data
+    # that must not leak into a downloadable file (e.g. the User password
+    # hash, ``private_metadata`` from MetaDataModel). Subclasses may extend
+    # this to redact model-specific sensitive fields.
+    export_exclude_fields: frozenset[str] = frozenset(
+        {"password", "private_metadata"}
+    )
+
     def _get_exportable_fields(self, opts: Options) -> list:
+        excluded = set(self.export_exclude_fields)
         return [
             field
             for field in opts.get_fields()
             if not field.many_to_many
             and not field.one_to_many
             and not field.one_to_one
+            and field.name not in excluded
         ]
 
     def export_csv(self, request: HttpRequest, queryset: QuerySet):

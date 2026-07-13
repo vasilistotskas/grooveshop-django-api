@@ -132,14 +132,20 @@ class UserAccountViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_partial_update_invalid(self):
-        payload = {
-            "email": "invalid_email",
-        }
-
+    def test_partial_update_cannot_change_email(self):
+        # Email is read-only on the profile serializer: changing it must go
+        # through allauth's verification flow, so a supplied email is ignored
+        # (not honoured and not a 400 for a malformed value).
+        original_email = self.user.email
         url = self.get_user_account_detail_url(self.user.pk)
-        response = self.client.patch(url, data=payload, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.patch(
+            url, data={"email": "attacker@evil.com"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.email, original_email)
 
     def test_destroy_valid(self):
         url = self.get_user_account_detail_url(self.user.pk)

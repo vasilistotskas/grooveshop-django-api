@@ -126,6 +126,16 @@ class OrderItemViewSet(BaseModelViewSet):
         else:
             serializer.save()
 
+    def perform_update(self, serializer):
+        # `order` is a writable FK, so an update could reassign the item to a
+        # different order. get_object() only validated the item's CURRENT
+        # order — the TARGET order must be owned too, or an owner could move an
+        # item into a foreign order. `order` may be absent on a PATCH.
+        target_order = serializer.validated_data.get("order")
+        if target_order is not None:
+            self.check_order_permission(target_order)
+        serializer.save()
+
     @action(detail=True, methods=["POST"])
     def refund(self, request, pk=None):
         # Refunding restocks merchant inventory and flips refund state; it is a

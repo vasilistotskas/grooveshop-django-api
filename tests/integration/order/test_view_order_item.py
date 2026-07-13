@@ -160,6 +160,27 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
             ).exists()
         )
 
+    def test_update_cannot_reassign_to_foreign_order(self):
+        # The item's owner must not be able to move it into another user's
+        # order via update — `order` is a writable FK, and get_object only
+        # validates the item's CURRENT order.
+        self.client.force_authenticate(user=self.user)
+
+        payload = {
+            "order": self.other_order.id,
+            "product": self.product.id,
+            "quantity": 1,
+        }
+        response = self.client.put(
+            self.get_order_item_detail_url(self.order_item.id),
+            payload,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.order_item.refresh_from_db()
+        self.assertEqual(self.order_item.order_id, self.order.id)
+
     def test_update_valid(self):
         # self.user owns self.order, so owns self.order_item — expect 200
         self.client.force_authenticate(user=self.user)

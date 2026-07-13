@@ -327,6 +327,21 @@ class LoyaltyService:
                 % {"balance": balance, "amount": points_amount}
             )
 
+        # Idempotency: at most one redemption per order. Enforced here under
+        # the user-row lock (not only in the view) so two concurrent requests
+        # for the same order serialize — the second sees the first's committed
+        # REDEEM and is rejected instead of both draining the balance.
+        if (
+            order is not None
+            and PointsTransaction.objects.filter(
+                reference_order=order,
+                transaction_type=TransactionType.REDEEM,
+            ).exists()
+        ):
+            raise ValidationError(
+                _("Points have already been redeemed for this order.")
+            )
+
         ratio_key = f"LOYALTY_REDEMPTION_RATIO_{currency}"
         ratio = Decimal(str(Setting.get(ratio_key, default=100.0)))
         discount = Decimal(str(points_amount)) / ratio

@@ -306,6 +306,66 @@ class TestPaymentConfirmationConvertsReservations:
             session_id=str(cart.uuid), consumed=False
         ).exists()
 
+    def test_expired_reservation_falls_back_to_decrement(
+        self, mock_payment_validation, country
+    ):
+        """An expired (unconsumed) reservation must not fail checkout.
+
+        Regression: convert_reservation_to_sale rejects expired reservations,
+        so routing an expired hold to the convert branch hard-failed the whole
+        order. The expired hold must instead be released and the stock
+        decremented directly when it is available.
+        """
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from order.models import StockReservation
+
+        product = ProductFactory(stock=100, active=True)
+        user = UserAccountFactory()
+        cart = CartFactory(user=user)
+        CartItemFactory(cart=cart, product=product, quantity=5)
+
+        reservation = StockManager.reserve_stock(
+            product_id=product.id,
+            quantity=5,
+            session_id=str(cart.uuid),
+            user_id=user.id,
+        )
+        # Force the reservation past its TTL.
+        StockReservation.objects.filter(pk=reservation.id).update(
+            expires_at=timezone.now() - timedelta(minutes=1)
+        )
+        reservation.refresh_from_db()
+        assert reservation.is_expired
+
+        pay_way = PayWayFactory(provider_code="stripe")
+        shipping_address = {
+            "first_name": "Test",
+            "last_name": "User",
+            "email": "test@example.com",
+            "street": "123 Test St",
+            "street_number": "1",
+            "city": "Test City",
+            "zipcode": "12345",
+            "country_id": country.alpha_2,
+            "phone": "+1234567890",
+        }
+
+        order = OrderService.create_order_from_cart(
+            cart=cart,
+            shipping_address=shipping_address,
+            payment_intent_id="pi_expired_reservation",
+            pay_way=pay_way,
+            user=user,
+        )
+
+        assert order is not None
+        product.refresh_from_db()
+        # Decremented by the cart quantity despite the expired reservation.
+        assert product.stock == 95
+
     def test_reservation_conversion_is_atomic(
         self, mock_payment_validation, country
     ):

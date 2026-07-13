@@ -259,6 +259,13 @@ class OrderService:
                 if covered >= quantity:
                     # Surplus hold (e.g. a duplicate reserve call) — free it.
                     _release(reservation)
+                elif reservation.is_expired:
+                    # An expired hold cannot be converted (convert_reservation_
+                    # to_sale rejects expired reservations). Release it and let
+                    # the shortfall decrement below take the amount still owed
+                    # from physical stock — a lapsed TTL must not fail an
+                    # otherwise-fulfillable checkout.
+                    _release(reservation)
                 elif covered + reservation.quantity <= quantity:
                     # Reservation fits within what is still owed — convert it.
                     StockManager.convert_reservation_to_sale(

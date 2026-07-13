@@ -18,6 +18,9 @@ from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
 
+pytestmark = pytest.mark.assert_english
+
+
 @pytest.mark.django_db
 class OrderServiceTestCase(TestCase):
     def setUp(self):

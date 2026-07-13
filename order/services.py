@@ -700,7 +700,7 @@ class OrderService:
             )
 
             # Store reservation IDs in order metadata
-            order.metadata["stock_reservation_ids"] = reservation_ids  # type: ignore[invalid-assignment]  # ty: ignore[invalid-assignment]
+            order.metadata["stock_reservation_ids"] = reservation_ids
 
             # Step 7.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
@@ -1074,7 +1074,7 @@ class OrderService:
             )
 
             # Store reservation IDs in order metadata
-            order.metadata["stock_reservation_ids"] = reservation_ids  # type: ignore[invalid-assignment]  # ty: ignore[invalid-assignment]
+            order.metadata["stock_reservation_ids"] = reservation_ids
 
             # Step 6.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)

@@ -8,6 +8,9 @@ from contact.models import Contact
 from contact.serializers import ContactWriteSerializer
 
 
+pytestmark = pytest.mark.assert_english
+
+
 class TestContactWriteSerializer(TestCase):
     def setUp(self):
         self.valid_data = {

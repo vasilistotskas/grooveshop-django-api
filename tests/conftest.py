@@ -187,13 +187,24 @@ def _assert_english_locale_if_marked(request):
     rely on ``LANGUAGE_CODE='el'`` to read translated content), and
     keeps the override explicit so a future reader knows why the test
     runs in English.
-    """
-    if request.node.get_closest_marker("assert_english"):
-        from django.utils import translation
 
-        with translation.override("en"):
-            yield
-    else:
+    Every other test is pinned to the project default language for the
+    duration of the test. Django's testing docs recommend resetting the
+    active language between tests; without this, the active gettext language
+    depended on whatever a prior test left active (LocaleMiddleware requests,
+    an un-restored ``translation.activate``, …), so a test asserting English
+    message text passed or failed non-deterministically with execution order.
+    Pinning the default makes unmarked tests deterministic and surfaces any
+    English-asserting test that is missing the ``assert_english`` marker.
+    """
+    from django.utils import translation
+
+    language = (
+        "en"
+        if request.node.get_closest_marker("assert_english")
+        else settings.LANGUAGE_CODE
+    )
+    with translation.override(language):
         yield
 
 

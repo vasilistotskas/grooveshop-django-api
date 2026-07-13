@@ -1,3 +1,4 @@
+import pytest
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory
@@ -11,6 +12,9 @@ from user.serializers.subscription import (
 )
 
 User = get_user_model()
+
+
+pytestmark = pytest.mark.assert_english
 
 
 class SubscriptionTopicSerializerTest(TestCase):

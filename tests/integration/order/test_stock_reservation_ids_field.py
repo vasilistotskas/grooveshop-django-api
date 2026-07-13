@@ -6,6 +6,9 @@ from order.factories import OrderFactory
 from order.models.order import Order
 
 
+pytestmark = pytest.mark.assert_english
+
+
 @pytest.mark.django_db
 class TestStockReservationIdsField:
     """Test the stock_reservation_ids JSONField on Order model."""

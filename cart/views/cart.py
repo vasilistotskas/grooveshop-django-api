@@ -43,6 +43,7 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from order.exceptions import InsufficientStockError, StockReservationError
+from order.models import StockReservation
 from order.services import OrderService
 from order.stock import StockManager
 
@@ -403,11 +404,35 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Release each reservation
+        # Scope releases to the caller's own cart session. The reservation
+        # ids come straight from the request body, so without this any
+        # anonymous caller could enumerate ids and free other customers'
+        # stock holds (IDOR).
+        cart = self.cart_service.get_or_create_cart()
+        owned_ids = set(
+            StockReservation.objects.filter(
+                id__in=reservation_ids, session_id=str(cart.uuid)
+            ).values_list("id", flat=True)
+        )
+
         released_count = 0
         failed_releases = []
 
         for reservation_id in reservation_ids:
+            try:
+                owned = int(reservation_id) in owned_ids
+            except (TypeError, ValueError):
+                owned = False
+
+            if not owned:
+                failed_releases.append(
+                    {
+                        "reservation_id": reservation_id,
+                        "error": "Reservation not found for this cart",
+                    }
+                )
+                continue
+
             try:
                 StockManager.release_reservation(reservation_id)
                 released_count += 1

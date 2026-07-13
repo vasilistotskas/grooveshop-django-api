@@ -15,6 +15,11 @@ class CartWriteSerializer(serializers.ModelSerializer[Cart]):
     class Meta:
         model = Cart
         fields = ("user",)
+        # ``user`` is intrinsic to the cart (set from the request at
+        # creation; guest carts merge on login automatically). It must never
+        # be client-writable, or an anonymous caller could attach a guest
+        # cart to any account via update (mass-assignment IDOR).
+        read_only_fields = ("user",)
 
 
 class CartSerializer(serializers.ModelSerializer[Cart]):

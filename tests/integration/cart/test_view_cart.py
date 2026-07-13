@@ -122,15 +122,15 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
             >= datetime.datetime(2023, 7, 26, 12, 0, tzinfo=datetime.UTC)
         )
 
-    def test_update_invalid(self):
-        invalid_update_data = {
-            "user": 9999,
-        }
+    def test_update_ignores_user_field(self):
+        # user is read-only: a client cannot reassign the cart to another
+        # account via update (mass-assignment IDOR).
         response = self.client.put(
-            self.detail_url, invalid_update_data, format="json"
+            self.detail_url, {"user": self.other_user.pk}, format="json"
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("user", response.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.cart.refresh_from_db()
+        self.assertEqual(self.cart.user, self.user)
 
     def test_partial_update_valid(self):
         partial_data = {"user": self.user.pk}
@@ -158,14 +158,14 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.cart.refresh_from_db()
         self.assertEqual(response.data["user"], self.user.pk)
 
-    def test_partial_update_invalid(self):
-        invalid_partial_data = {
-            "user": "invalid_user_id",
-        }
+    def test_partial_update_ignores_user_field(self):
+        # user is read-only; reassignment attempts are ignored, not honoured.
         response = self.client.patch(
-            self.detail_url, invalid_partial_data, format="json"
+            self.detail_url, {"user": self.other_user.pk}, format="json"
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.cart.refresh_from_db()
+        self.assertEqual(self.cart.user, self.user)
 
     def test_destroy_valid(self):
         response = self.client.delete(self.detail_url)
@@ -229,14 +229,15 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
             expected_detail_fields.issubset(set(response.data.keys()))
         )
 
-    def test_validation_errors_consistent(self):
-        invalid_data = {
-            "user": "not_a_number",
-        }
-        response = self.client.put(self.detail_url, invalid_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        self.assertIn("user", response.data)
+    def test_update_user_payload_is_ignored_not_validated(self):
+        # user is read-only, so even a malformed user value is ignored
+        # rather than surfacing a validation error — the cart keeps its owner.
+        response = self.client.put(
+            self.detail_url, {"user": "not_a_number"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.cart.refresh_from_db()
+        self.assertEqual(self.cart.user, self.user)
 
     def test_retrieve_cart_as_anonymous_user_with_headers(self):
         self.client.force_authenticate(user=None)
@@ -300,15 +301,15 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.data["user"], self.user.pk)
         self.assertFalse(Cart.objects.filter(id=guest_cart.id).exists())
 
-    def test_update_cart_with_invalid_data(self):
-        invalid_update_data = {
-            "user": 9999,
-        }
+    def test_update_cart_cannot_reassign_user(self):
+        # Reassigning the cart to a non-existent/foreign user id is ignored
+        # (user is read-only), guarding against mass-assignment.
         response = self.client.patch(
-            self.detail_url, data=invalid_update_data, format="json"
+            self.detail_url, data={"user": 9999}, format="json"
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("user", response.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.cart.refresh_from_db()
+        self.assertEqual(self.cart.user, self.user)
 
     def test_partial_update_cart_with_extra_fields(self):
         extra_data = {

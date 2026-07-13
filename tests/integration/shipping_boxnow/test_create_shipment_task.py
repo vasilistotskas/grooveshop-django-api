@@ -103,3 +103,43 @@ class TestCreateBoxNowShipmentTask:
         assert result["status"] == "boxnow_api_error"
         assert result["code"] == "P402"
         assert result["order_id"] == order.id
+
+    def test_task_retries_on_retryable_error(self):
+        """A transient BoxNowRetryableError must propagate to Celery's
+        autoretry rather than being swallowed as a permanent business error
+        (it subclasses BoxNowAPIError, so the business-error handler used to
+        catch it and the retry policy was dead code)."""
+        from celery.exceptions import Retry
+
+        from shipping_boxnow.exceptions import BoxNowRetryableError
+
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        BoxNowShipmentFactory(order=order)
+
+        retry_count = [0]
+
+        def fake_retry(*_args, **_kwargs):
+            retry_count[0] += 1
+            raise Retry()
+
+        with patch(
+            "shipping_boxnow.services.BoxNowService.create_shipment_for_order",
+            side_effect=BoxNowRetryableError(503, message="upstream 5xx"),
+        ):
+            with patch.object(
+                create_boxnow_shipment_for_order,
+                "retry",
+                side_effect=fake_retry,
+            ):
+                create_boxnow_shipment_for_order.push_request(retries=0)
+                try:
+                    with pytest.raises(Retry):
+                        create_boxnow_shipment_for_order(order.id)
+                finally:
+                    create_boxnow_shipment_for_order.pop_request()
+
+        # autoretry was triggered (not swallowed into a returned dict).
+        assert retry_count[0] == 1

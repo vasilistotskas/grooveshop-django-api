@@ -67,6 +67,12 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         shipment = AcsService.create_voucher_for_order(order)
+    except AcsRetryableError:
+        # Transient (HTTP 5xx / 403 / 406 / connection). Re-raise so Celery's
+        # autoretry_for handles it — AcsRetryableError subclasses AcsAPIError,
+        # so the broader handler below would otherwise swallow it as a
+        # permanent business error and the retry policy would be dead code.
+        raise
     except AcsAPIError as exc:
         # Business error (bad address, unacceptable destination
         # station, …) — permanent, no retry. Tell a human immediately:
@@ -258,6 +264,11 @@ def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:
 
     try:
         shipment = AcsService.poll_shipment_tracking(shipment)
+    except AcsRetryableError:
+        # Transient — re-raise so autoretry_for retries. AcsRetryableError
+        # subclasses AcsAPIError, so the handler below would otherwise treat a
+        # retryable 5xx/406 as a permanent poll failure.
+        raise
     except AcsAPIError as exc:
         logger.warning(
             "ACS tracking poll failed for shipment=%s: %s",

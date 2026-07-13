@@ -7308,17 +7308,6 @@ paths:
           cart sessions.
       tags:
       - Cart
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/CartWriteRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/CartWriteRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CartWriteRequest'
       security:
       - cookieAuth: []
       - {}
@@ -7376,17 +7365,6 @@ paths:
           cart sessions.
       tags:
       - Cart
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedCartWriteRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedCartWriteRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedCartWriteRequest'
       security:
       - cookieAuth: []
       - {}
@@ -10460,74 +10438,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedNotificationUserList'
           description: ''
-    post:
-      operationId: createNotificationUser
-      description: Δημιουργία νέου Παραλήπτης Ειδοποίησης. Απαιτεί ταυτοποίηση.
-      summary: Δημιουργία Παραλήπτης Ειδοποίησης
-      parameters:
-      - in: query
-        name: languageCode
-        schema:
-          type: string
-          enum:
-          - de
-          - el
-          - en
-          default: el
-        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
-      tags:
-      - Notification Users
-      requestBody:
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/NotificationUserWriteRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/NotificationUserWriteRequest'
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NotificationUserWriteRequest'
-        required: true
-      security:
-      - cookieAuth: []
-      responses:
-        '400':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '500':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '201':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotificationUserDetail'
-          description: ''
   /api/v1/notification/user/{id}:
     get:
       operationId: retrieveNotificationUser
@@ -10617,7 +10527,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/NotificationUserWriteRequest'
-        required: true
       security:
       - cookieAuth: []
       responses:
@@ -32178,12 +32087,6 @@ components:
       - clientSecret
       - currency
       - paymentIntentId
-    CartWriteRequest:
-      type: object
-      properties:
-        user:
-          type: integer
-          nullable: true
     CompartmentSizeEnum:
       enum:
       - 1
@@ -33373,13 +33276,9 @@ components:
     NotificationUserWriteRequest:
       type: object
       properties:
-        notification:
-          type: integer
         seen:
           type: boolean
           title: Ορατό
-      required:
-      - notification
     Order:
       type: object
       properties:
@@ -36007,12 +35906,6 @@ components:
           maximum: 2147483647
           minimum: 0
           title: Ποσότητα
-    PatchedCartWriteRequest:
-      type: object
-      properties:
-        user:
-          type: integer
-          nullable: true
     PatchedCountryWriteRequest:
       type: object
       description: Serializer that saves :class:`TranslatedFieldsField` automatically.
@@ -36062,8 +35955,6 @@ components:
     PatchedNotificationUserWriteRequest:
       type: object
       properties:
-        notification:
-          type: integer
         seen:
           type: boolean
           title: Ορατό

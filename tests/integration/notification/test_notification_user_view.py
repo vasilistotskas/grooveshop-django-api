@@ -66,21 +66,25 @@ class NotificationUserViewSetTestCase(TestURLFixerMixin, APITestCase):
         actual_fields = set(response.data.keys())
         self.assertEqual(expected_fields, actual_fields)
 
-    def test_create_uses_correct_serializer(self):
+    def test_create_is_disabled(self):
+        # NotificationUser rows are created server-side when a notification is
+        # delivered. A client create endpoint let any user attach themselves
+        # to an arbitrary notification and read its content (IDOR), so POST is
+        # not allowed.
         data = {
-            "user": self.user.id,
             "notification": self.notification.id,
             "seen": False,
         }
         response = self.client.post(self.list_url, data)
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-        created_obj = NotificationUser.objects.get(id=response.data["id"])
-        serializer = NotificationUserDetailSerializer(instance=created_obj)
-        expected_fields = set(serializer.data.keys())
-        actual_fields = set(response.data.keys())
-        self.assertEqual(expected_fields, actual_fields)
+        self.assertEqual(
+            response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+        self.assertFalse(
+            NotificationUser.objects.filter(
+                user=self.user, notification=self.notification
+            ).exists()
+        )
 
     def test_update_uses_correct_serializer(self):
         notification_user = NotificationUserFactory(
@@ -111,35 +115,6 @@ class NotificationUserViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["seen"], True)
-
-    def test_create_notification_user(self):
-        initial_count = NotificationUser.objects.count()
-        data = {
-            "user": self.user.id,
-            "notification": self.notification.id,
-            "seen": False,
-        }
-        response = self.client.post(self.list_url, data)
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(NotificationUser.objects.count(), initial_count + 1)
-        self.assertTrue(
-            NotificationUser.objects.filter(
-                user=self.user, notification=self.notification
-            ).exists()
-        )
-
-    def test_create_duplicate_notification_user_fails(self):
-        NotificationUserFactory(user=self.user, notification=self.notification)
-
-        data = {
-            "user": self.user.id,
-            "notification": self.notification.id,
-            "seen": False,
-        }
-        response = self.client.post(self.list_url, data)
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_list_notification_users(self):
         NotificationUserFactory(user=self.user, notification=self.notification)
@@ -514,14 +489,16 @@ class NotificationUserViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_validation_errors(self):
-        response = self.client.post(self.list_url, {})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        data = {
-            "user": self.user.id,
-            "notification": 999999,
-            "seen": False,
-        }
-        response = self.client.post(self.list_url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+    def test_create_rejected_regardless_of_payload(self):
+        # POST is disabled for any payload (create is server-side only).
+        self.assertEqual(
+            self.client.post(self.list_url, {}).status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+        self.assertEqual(
+            self.client.post(
+                self.list_url,
+                {"notification": 999999, "seen": False},
+            ).status_code,
+            status.HTTP_405_METHOD_NOT_ALLOWED,
+        )

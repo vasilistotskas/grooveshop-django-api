@@ -42,8 +42,11 @@ urlpatterns = [
         name="notification-user-mark-as-unseen",
     ),
     path(
+        # No POST/create: NotificationUser rows are created server-side when
+        # a notification is delivered. A client-facing create let any user
+        # attach themselves to an arbitrary notification and read it (IDOR).
         "notification/user",
-        NotificationUserViewSet.as_view({"get": "list", "post": "create"}),
+        NotificationUserViewSet.as_view({"get": "list"}),
         name="notification-user-list",
     ),
     path(

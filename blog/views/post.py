@@ -207,8 +207,19 @@ class BlogPostViewSet(BaseModelViewSet):
         BlogPost.objects.for_detail() for detail views to avoid N+1 queries.
         """
         if self.action == "list":
-            return BlogPost.objects.for_list()
-        return BlogPost.objects.for_detail()
+            queryset = BlogPost.objects.for_list()
+        else:
+            queryset = BlogPost.objects.for_detail()
+
+        # Drafts (unpublished posts) must never be exposed to the public;
+        # only staff may see them (e.g. admin preview). The read actions are
+        # AllowAny, so without this filter anonymous callers can enumerate
+        # unpublished posts by id.
+        user = self.request.user
+        if not (user and user.is_authenticated and user.is_staff):
+            queryset = queryset.published()
+
+        return queryset
 
     def get_filterset_class(self):
         if self.action == "comments":

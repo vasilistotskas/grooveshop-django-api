@@ -116,6 +116,10 @@ class OrderItemViewSet(BaseModelViewSet):
             )
 
     def perform_create(self, serializer):
+        # Attaching an item to an order is only allowed for the order's owner
+        # (or staff); otherwise any authenticated user could add items to
+        # arbitrary orders by posting a foreign order id.
+        self.check_order_permission(serializer.validated_data["order"])
         product = serializer.validated_data["product"]
         if not serializer.validated_data.get("price"):
             serializer.save(price=product.price)
@@ -124,6 +128,13 @@ class OrderItemViewSet(BaseModelViewSet):
 
     @action(detail=True, methods=["POST"])
     def refund(self, request, pk=None):
+        # Refunding restocks merchant inventory and flips refund state; it is a
+        # staff/merchant operation, never customer self-service (which would
+        # otherwise let an order owner restock stock and mark items refunded
+        # with no payment refund).
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied(_("Only staff can process refunds."))
+
         order_item = self.get_object()
 
         if order_item.order.status not in [

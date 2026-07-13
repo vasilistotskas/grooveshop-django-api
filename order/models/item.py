@@ -106,37 +106,55 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
         super().save(*args, **kwargs)
 
     def refund(self, quantity=None):
-        refund_qty = quantity if quantity is not None else self.quantity
+        from django.db import transaction
 
-        if refund_qty <= 0:
-            raise ValidationError(
-                _(
-                    "Invalid refund quantity. Please enter a quantity greater than 0."
+        from order.stock import StockManager
+
+        with transaction.atomic():
+            # Lock this item so concurrent refunds serialize on
+            # refunded_quantity — otherwise both read a stale value, both pass
+            # the over-refund guard, and stock is restocked twice.
+            item = type(self).objects.select_for_update().get(pk=self.pk)
+
+            refund_qty = quantity if quantity is not None else item.quantity
+
+            if refund_qty <= 0:
+                raise ValidationError(
+                    _(
+                        "Invalid refund quantity. Please enter a quantity greater than 0."
+                    )
                 )
-            )
 
-        if self.refunded_quantity + refund_qty > self.quantity:
-            raise ValidationError(
-                _(
-                    "Cannot refund more than the ordered quantity. "
-                    f"Ordered quantity: {self.quantity}, "
-                    f"Refunded quantity: {self.refunded_quantity}, "
-                    f"Refund quantity: {refund_qty}"
+            if item.refunded_quantity + refund_qty > item.quantity:
+                raise ValidationError(
+                    _(
+                        "Cannot refund more than the ordered quantity. "
+                        f"Ordered quantity: {item.quantity}, "
+                        f"Refunded quantity: {item.refunded_quantity}, "
+                        f"Refund quantity: {refund_qty}"
+                    )
                 )
-            )
 
-        if hasattr(self.product, "stock"):
-            from django.db.models import F
+            if hasattr(item.product, "stock"):
+                # Restock through StockManager so the product row is locked
+                # and a StockLog audit row is written (the previous raw F()
+                # update did neither).
+                StockManager.increment_stock(
+                    product_id=item.product_id,
+                    quantity=refund_qty,
+                    order_id=item.order_id,
+                    reason=f"Refund of {refund_qty} unit(s) for order item {item.pk}",
+                )
 
-            type(self.product).objects.filter(pk=self.product.pk).update(
-                stock=F("stock") + refund_qty
-            )
+            item.refunded_quantity += refund_qty
+            if item.refunded_quantity == item.quantity:
+                item.is_refunded = True
 
-        self.refunded_quantity += refund_qty
-        if self.refunded_quantity == self.quantity:
-            self.is_refunded = True
+            item.save(update_fields=["refunded_quantity", "is_refunded"])
 
-        self.save(update_fields=["refunded_quantity", "is_refunded"])
+            # Keep the in-memory instance consistent with the locked row.
+            self.refunded_quantity = item.refunded_quantity
+            self.is_refunded = item.is_refunded
 
         return Money(
             amount=self.price.amount * Decimal(refund_qty),

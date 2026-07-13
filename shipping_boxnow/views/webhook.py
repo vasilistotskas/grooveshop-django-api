@@ -161,6 +161,23 @@ class BoxNowWebhookView(APIView):
         logger.info("BoxNow webhook: signature verified | id=%s", message_id)
 
         # ------------------------------------------------------------------ #
+        # 6b. Process exactly the bytes that were signed.                      #
+        # ------------------------------------------------------------------ #
+        # The signature was verified over the FIRST top-level "data" object
+        # (extract_data_substring), but json.loads(raw_body) above takes the
+        # LAST "data" on a duplicate-key body. Reparse "data" from the verified
+        # bytes so an attacker cannot append a second, unsigned "data" object
+        # and have the worker act on it (signature/parse divergence forgery).
+        try:
+            envelope["data"] = json.loads(raw_data)
+        except json.JSONDecodeError:
+            logger.warning(
+                "BoxNow webhook: verified data is not valid JSON | id=%s",
+                message_id,
+            )
+            return Response(status=400)
+
+        # ------------------------------------------------------------------ #
         # 7. Dispatch to Celery and acknowledge.                               #
         # ------------------------------------------------------------------ #
         # Signature verification is sync (it has to be — we can't queue

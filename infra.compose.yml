@@ -22,7 +22,7 @@ services:
 
   redis:
     container_name: redis
-    image: redis
+    image: redis:8-alpine
     restart: no
     ports:
       - "6379:6379"
@@ -54,7 +54,7 @@ services:
 
   rabbitmq:
     container_name: rabbitmq
-    image: rabbitmq:management
+    image: rabbitmq:4-management
     restart: no
     environment:
       - RABBITMQ_DEFAULT_USER=guest
@@ -73,7 +73,7 @@ services:
 
   meilisearch:
     container_name: meilisearch
-    image: getmeili/meilisearch:v1.42.1
+    image: getmeili/meilisearch:v1.49.0
     env_file:
       - ./docker/meilisearch/.env
     volumes:

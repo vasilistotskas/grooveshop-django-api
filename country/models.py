@@ -39,7 +39,12 @@ class Country(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
         _("ISO Country Code"), blank=True, null=True, unique=True
     )
     phone_code = models.PositiveSmallIntegerField(
-        _("Phone Code"), blank=True, null=True, unique=True
+        # NOT unique: calling codes are shared across countries (+1 US/CA,
+        # +7 RU/KZ), so a unique constraint made those countries
+        # unrepresentable (G0118).
+        _("Phone Code"),
+        blank=True,
+        null=True,
     )
     image_flag = models.ImageField(
         _("Image Flag"), blank=True, null=True, upload_to="uploads/country/"

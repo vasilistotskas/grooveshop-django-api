@@ -47,6 +47,20 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
                 fields=["is_refunded"], name="order_item_is_refunded_ix"
             ),
         ]
+        constraints = [
+            # DB-level invariants — application code should already uphold
+            # these, but the constraints stop a bad path (or manual SQL)
+            # from writing an oversold/over-refunded line item (G0247).
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=1),
+                name="order_item_quantity_gte_1",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(refunded_quantity__gte=0)
+                & models.Q(refunded_quantity__lte=models.F("quantity")),
+                name="order_item_refunded_within_quantity",
+            ),
+        ]
 
     def __str__(self):
         product_name = self.product.safe_translation_getter(

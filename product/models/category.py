@@ -68,9 +68,11 @@ class ProductCategory(
         super().save(*args, **kwargs)
 
     def get_ordering_queryset(self):
-        return ProductCategory.objects.filter(
-            parent=self.parent
-        ).get_descendants(include_self=True)
+        # SortableModel orders items WITHIN a scope; for a tree that scope is
+        # the direct siblings (same parent). Spanning descendants too made
+        # move_up/move_down and SortableModel.delete() renumber unrelated
+        # subtree nodes, corrupting sort_order (G0310).
+        return ProductCategory.objects.filter(parent=self.parent)
 
     @property
     def recursive_product_count(self) -> int:

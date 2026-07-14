@@ -1401,6 +1401,18 @@ class OrderService:
             if not new_status:
                 raise ValueError("New status cannot be empty")
 
+            # Lock + re-read the CURRENT status so concurrent transitions
+            # serialize and validate against the committed row, not the
+            # caller's stale snapshot (G0285). Sync the caller's object to
+            # the committed status so callers that read ``order`` after this
+            # (rather than the returned instance) stay consistent.
+            current_status = (
+                Order.objects.select_for_update()
+                .values_list("status", flat=True)
+                .get(pk=order.pk)
+            )
+            order.status = current_status
+
             if order.status == new_status:
                 logger.info(
                     "Order %s status is already %s", order.id, new_status

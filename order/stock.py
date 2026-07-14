@@ -190,11 +190,15 @@ class StockManager:
             >>> StockManager.release_reservation(reservation_id=123)
             # Reservation marked as consumed, audit log created
         """
-        # Fetch the reservation with related product for logging
+        # Lock the reservation row so a concurrent release / convert-to-sale
+        # can't both pass the already-consumed check below and double-process
+        # it (G0289).
         try:
-            reservation = StockReservation.objects.select_related(
-                "product"
-            ).get(id=reservation_id)
+            reservation = (
+                StockReservation.objects.select_for_update()
+                .select_related("product")
+                .get(id=reservation_id)
+            )
         except StockReservation.DoesNotExist:
             raise StockReservationError(
                 f"Reservation {reservation_id} not found"
@@ -268,12 +272,15 @@ class StockManager:
             ... )
             # Reservation marked as consumed, stock decremented, audit log created
         """
-        # Fetch the reservation with related product
-        # We need select_related to avoid an extra query when accessing product
+        # Lock the reservation row (then the product below) so a concurrent
+        # release / convert can't both pass the consumed/expired checks and
+        # double-decrement stock (G0289).
         try:
-            reservation = StockReservation.objects.select_related(
-                "product"
-            ).get(id=reservation_id)
+            reservation = (
+                StockReservation.objects.select_for_update()
+                .select_related("product")
+                .get(id=reservation_id)
+            )
         except StockReservation.DoesNotExist:
             raise StockReservationError(
                 f"Reservation {reservation_id} not found"

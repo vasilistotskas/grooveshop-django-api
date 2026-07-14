@@ -285,6 +285,9 @@ REST_FRAMEWORK = {
         "cart_mutation_anon": None if DEBUG else "30/minute",
         "search": None if DEBUG else "120/minute",
         "view_count": None if DEBUG else "60/hour",
+        # Public proxies to rate-limited carrier partner APIs.
+        "acs_address": None if DEBUG else "30/minute",
+        "boxnow_nearest": None if DEBUG else "10/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",

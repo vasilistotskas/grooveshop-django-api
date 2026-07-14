@@ -21,9 +21,17 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         cls.tagged_item = TaggedProductFactory(
             tag=cls.tag, content_object=cls.product
         )
+        # TaggedItem writes are admin-only (G0391), so the default test user
+        # is staff; the non-admin forbidden path is covered separately below.
         cls.user = User.objects.create_user(
             email="taggeditemtest@example.com",
             username="taggeditemtester",
+            password="testpass123",
+            is_staff=True,
+        )
+        cls.regular_user = User.objects.create_user(
+            email="taggeditem-regular@example.com",
+            username="taggeditemregular",
             password="testpass123",
         )
 
@@ -118,6 +126,24 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
             "uuid",
         }
         self.assertTrue(expected_fields.issubset(set(response.data.keys())))
+
+    def test_create_forbidden_for_non_admin(self):
+        """Non-admin authenticated users must not be able to attach tags to
+        arbitrary objects (G0391)."""
+        self.client.force_authenticate(user=self.regular_user)
+        new_product = ProductFactory()
+        content_type = ContentType.objects.get_for_model(new_product)
+
+        response = self.client.post(
+            self.get_tagged_item_list_url(),
+            {
+                "tag_id": self.tag.id,
+                "content_type": content_type.id,
+                "object_id": new_product.id,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_create_invalid_tag(self):
         new_product = ProductFactory()

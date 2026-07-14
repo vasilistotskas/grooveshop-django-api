@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
@@ -172,8 +173,10 @@ class NotificationUserViewSet(BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        # Bulk .update() bypasses Model.save(), so set seen_at explicitly to
+        # keep the seen⇒seen_at invariant (G0210).
         self.get_queryset().filter(user=request.user, seen=False).update(
-            seen=True
+            seen=True, seen_at=timezone.now()
         )
 
         response_data = {"success": True}
@@ -193,8 +196,9 @@ class NotificationUserViewSet(BaseModelViewSet):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        # Clear seen_at when marking unseen so the invariant holds both ways.
         self.get_queryset().filter(user=request.user, seen=True).update(
-            seen=False
+            seen=False, seen_at=None
         )
 
         response_data = {"success": True}
@@ -232,7 +236,7 @@ class NotificationUserViewSet(BaseModelViewSet):
 
         self.get_queryset().filter(
             id__in=notification_user_ids, user=request.user
-        ).update(seen=True)
+        ).update(seen=True, seen_at=timezone.now())
 
         response_data = {"success": True}
 
@@ -269,7 +273,7 @@ class NotificationUserViewSet(BaseModelViewSet):
 
         self.get_queryset().filter(
             id__in=notification_user_ids, user=request.user
-        ).update(seen=False)
+        ).update(seen=False, seen_at=None)
 
         response_data = {"success": True}
 

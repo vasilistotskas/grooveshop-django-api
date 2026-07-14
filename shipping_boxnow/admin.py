@@ -215,6 +215,11 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         "uuid",
         "delivery_request_id",
         "parcel_id",
+        # parcel_state is carrier-managed via the webhook state machine
+        # (which also syncs Order status + writes history). Editing it
+        # directly in admin would desync those, so it is read-only here —
+        # matching the inline (G0057).
+        "parcel_state",
         "label_url",
         "metadata",
         "created_at",

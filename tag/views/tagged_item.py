@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
+from rest_framework.permissions import AllowAny, IsAdminUser
 
 from tag.filters.tagged_item import TaggedItemFilter
 from tag.models.tagged_item import TaggedItem
@@ -44,6 +45,21 @@ class TaggedItemViewSet(BaseModelViewSet):
     queryset = TaggedItem.objects.all()
     serializers_config = serializers_config
     filterset_class = TaggedItemFilter
+
+    def get_permissions(self):
+        # Attaching/detaching tags to arbitrary objects is a staff operation;
+        # the default IsAuthenticatedOrReadOnly let ANY authenticated user
+        # write TaggedItems (G0391). Mirror TagViewSet: admin-only writes,
+        # public reads.
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+        ):
+            return [IsAdminUser()]
+        return [AllowAny()]
+
     ordering_fields = [
         "id",
         "created_at",

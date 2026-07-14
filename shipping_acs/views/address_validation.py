@@ -26,6 +26,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.api.throttling import AcsAddressValidationThrottle
 from shipping_acs.exceptions import AcsAPIError, AcsConfigError
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,10 @@ class AcsAddressValidationView(APIView):
     """POST /api/v1/shipping/acs/address-validation."""
 
     permission_classes = [AllowAny]
+    # Per-IP scoped throttle on top of the global anon cap — this public
+    # proxy forwards to the rate-limited ACS partner API, and the Redis cache
+    # only absorbs identical inputs (G0016).
+    throttle_classes = [AcsAddressValidationThrottle]
     serializer_class = AcsAddressValidationRequestSerializer
 
     @extend_schema(

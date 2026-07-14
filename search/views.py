@@ -638,11 +638,14 @@ def federated_search(request):
     product_map = {}
     blog_map = {}
     if product_ids:
+        # Hydrate through the optimized search queryset so the serializer's
+        # per-hit master.{likes_count, review_average, main_image_path, …}
+        # access doesn't N+1 (G0351).
         product_map = {
             obj.pk: obj
-            for obj in ProductTranslation.objects.filter(
+            for obj in ProductTranslation.get_search_result_queryset().filter(
                 pk__in=product_ids
-            ).select_related("master__category", "master__vat")
+            )
         }
     if blog_ids:
         blog_map = {

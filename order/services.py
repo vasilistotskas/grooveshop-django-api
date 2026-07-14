@@ -1839,6 +1839,12 @@ class OrderService:
         reason: str = "",
         refunded_by: int | None = None,
     ) -> tuple[bool, dict[str, Any]]:
+        # Lock + re-fetch so the already-refunded guard below runs against
+        # the current row, not the caller's stale snapshot — otherwise two
+        # concurrent refund requests both pass the guard and issue duplicate
+        # provider refunds (G0280). Mirrors cancel_order.
+        order = Order.objects.select_for_update().get(pk=order.pk)
+
         if not order.payment_id:
             raise PaymentError(_("This order has no payment ID to refund."))
 
@@ -2343,6 +2349,29 @@ class OrderService:
         order.mark_as_paid(
             payment_id=payment_intent_id, payment_method="stripe"
         )
+
+        if order.status == OrderStatus.CANCELED:
+            # Payment landed for an order that was already CANCELED (the
+            # customer cancelled before the webhook, or the two raced).
+            # Marking the money received above is intentional bookkeeping,
+            # but we must NOT mint a courier shipment for a cancelled order
+            # (G0281). Record the receipt for reconciliation and alert staff
+            # (ERROR is the monitored channel) so a manual refund is issued.
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata["payment_after_cancel"] = {
+                "payment_id": payment_intent_id,
+                "recorded_at": timezone.now().isoformat(),
+            }
+            order.save(update_fields=["metadata"])
+            logger.error(
+                "Payment %s received for CANCELED order %s — manual refund "
+                "required; NOT dispatching shipment creation",
+                payment_intent_id,
+                order.id,
+            )
+            publish_payment_status(order)
+            return order
 
         if order.status == OrderStatus.PENDING:
             # The Stripe webhook handler dispatches

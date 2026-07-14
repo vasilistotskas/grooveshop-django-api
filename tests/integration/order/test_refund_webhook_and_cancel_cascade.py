@@ -12,7 +12,9 @@ import pytest
 from djstripe.models import Event
 
 from order.enum.status import OrderStatus, PaymentStatus
+from order.exceptions import PaymentError
 from order.factories import OrderFactory
+from order.models.order import Order
 from order.services import OrderService
 from order.signals.handlers import handle_stripe_charge_refunded
 
@@ -237,3 +239,35 @@ class TestCancelOrderCascadesToShipment:
         shipment_cancel = cancellation.get("shipment_cancel", {})
         assert shipment_cancel.get("attempted") is True
         assert shipment_cancel.get("dispatched") is False
+
+
+@pytest.mark.django_db
+class TestRefundOrderConcurrencyGuard:
+    """refund_order must re-check the LOCKED row so a concurrent refund
+    that already committed can't be double-issued (G0280)."""
+
+    def test_refund_rechecks_locked_row_and_skips_provider(self):
+        from djmoney.money import Money
+        from pay_way.factories import PayWayFactory
+
+        order = OrderFactory(
+            status=OrderStatus.COMPLETED,
+            payment_status=PaymentStatus.COMPLETED,
+            payment_id="pi_refund_race",
+            pay_way=PayWayFactory(),
+            paid_amount=Money("50.00", "EUR"),
+            num_order_items=0,
+        )
+
+        # Simulate a concurrent refund that already committed REFUNDED,
+        # WITHOUT touching the caller's stale in-memory ``order``.
+        Order.objects.filter(pk=order.pk).update(
+            payment_status=PaymentStatus.REFUNDED
+        )
+
+        with patch("order.payment.get_payment_provider") as mock_provider:
+            with pytest.raises(PaymentError):
+                OrderService.refund_order(order, reason="dup")
+
+            # The re-fetched guard blocked it — no second provider refund.
+            mock_provider.assert_not_called()

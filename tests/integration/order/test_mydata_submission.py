@@ -248,6 +248,28 @@ class GenerateOrderInvoiceChainTestCase(TestCase):
 class SendInvoiceToMydataTestCase(TestCase):
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")
+    def test_already_confirmed_invoice_short_circuits(
+        self, mock_send, _mock_render
+    ):
+        """An invoice that already has a MARK must NOT be re-submitted —
+        a re-submit could fail and flip CONFIRMED→REJECTED. submit_invoice
+        returns a synthetic Success without calling AADE (G0262)."""
+        from order.mydata.service import submit_invoice
+
+        _enable_mydata(self)
+        _order, invoice = _make_invoice()
+        invoice.mydata_mark = 800000165789545
+        invoice.mydata_uid = "ffeeddccbbaa99887766554433221100ffeeddcc"
+        invoice.save(update_fields=["mydata_mark", "mydata_uid"])
+
+        row = submit_invoice(invoice)
+
+        self.assertTrue(row.is_success)
+        self.assertEqual(row.invoice_mark, 800000165789545)
+        mock_send.assert_not_called()
+
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch("order.mydata.client.MyDataClient.send_invoices")
     @patch("order.tasks.send_invoice_email.delay")
     def test_success_persists_mark_and_chains_email(
         self, mock_email, mock_send, _mock_render

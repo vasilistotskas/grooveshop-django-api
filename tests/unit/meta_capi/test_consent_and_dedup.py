@@ -15,8 +15,45 @@ from django.test import RequestFactory
 
 from meta_capi.services import build_purchase_event
 from meta_capi.signals import _on_user_signed_up
+from meta_capi.tasks import _serialize_event_payload
 from order.factories.order import OrderFactory
 from user.factories.account import UserAccountFactory
+
+
+class _FakeUserData:
+    def normalize(self):
+        # Meta hashes em/ph but sends IP/UA/fbp/fbc in the clear.
+        return {
+            "em": "hashed-email",
+            "client_ip_address": "203.0.113.9",
+            "client_user_agent": "Mozilla/5.0",
+            "fbp": "fb.1.123",
+            "fbc": "fb.1.456",
+        }
+
+
+class _FakeEvent:
+    def normalize(self):
+        return {
+            "event_name": "Purchase",
+            "user_data": _FakeUserData().normalize(),
+        }
+
+
+def test_audit_payload_strips_unhashed_pii():
+    """The persisted audit payload must not retain the raw client IP / user
+    agent / _fbp / _fbc — CAPI does not hash those (G0200)."""
+    payload = _serialize_event_payload(_FakeEvent())
+
+    user_data = payload["user_data"]
+    assert "em" in user_data  # hashed identifier retained
+    for stripped in (
+        "client_ip_address",
+        "client_user_agent",
+        "fbp",
+        "fbc",
+    ):
+        assert stripped not in user_data
 
 
 @pytest.mark.django_db

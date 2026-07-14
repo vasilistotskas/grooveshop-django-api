@@ -686,78 +686,89 @@ def handle_order_returned(
 
 @djstripe_receiver("payment_intent.succeeded")
 def handle_stripe_payment_succeeded(sender, **kwargs):
-    """Handle Stripe payment success webhook."""
+    """Handle Stripe payment success webhook.
+
+    This receiver runs inside dj-stripe's webhook ``transaction.atomic``
+    block, so a failure here rolls back BOTH our idempotency mark and
+    dj-stripe's ``Event`` row — Stripe then redelivers and we reprocess
+    cleanly. We therefore must let processing errors PROPAGATE (G0231):
+    swallowing them would commit the ``webhook_processed`` mark against a
+    charged-but-unrecorded order that Stripe never retries (a redelivery
+    early-returns on the existing Event id), stranding it at PENDING until
+    ``auto_cancel_stuck_pending_orders`` cancels it 24h later with no
+    refund and no alert.
+    """
     logger.debug("Processing payment_intent.succeeded webhook")
 
     try:
         event: Event = kwargs["event"]
         payment_intent_id = event.data["object"]["id"]
         event_id = event.id
-
-        logger.info("Stripe payment succeeded: %s", payment_intent_id)
-
-        # Atomic idempotency check-and-mark with row lock to prevent
-        # duplicate processing from parallel webhook deliveries.
-        already_processed = False
-        with transaction.atomic():
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
-            )
-            if order:
-                if order.metadata and order.metadata.get(
-                    f"webhook_processed_{event_id}"
-                ):
-                    logger.info(
-                        "Webhook %s already processed for order %s, skipping",
-                        event_id,
-                        order.id,
-                    )
-                    already_processed = True
-                else:
-                    if not order.metadata:
-                        order.metadata = {}
-                    order.metadata[f"webhook_processed_{event_id}"] = True
-                    order.save(update_fields=["metadata"])
-
-        if already_processed:
-            return
-
-        order = OrderService.handle_payment_succeeded(payment_intent_id)
-
-        if order:
-            OrderHistory.log_payment_update(
-                order=order,
-                previous_value={"payment_status": "pending"},
-                new_value={
-                    "payment_status": "completed",
-                    "payment_id": payment_intent_id,
-                },
-            )
-            # Payment is confirmed — now the customer gets the
-            # confirmation email. The task itself is idempotent via a
-            # metadata reservation, so parallel webhook deliveries or a
-            # subsequent checkout.session.completed event cannot cause
-            # a duplicate send.
-            # Direct .delay(): handle_payment_succeeded() has already
-            # returned and committed its own @transaction.atomic block;
-            # there is no outer transaction here so on_commit would be
-            # a no-op wrapper.  Both task dispatches use the same pattern.
-            send_order_confirmation_email.delay(order.id)
-
-            # Live notification for the same event. The event-level
-            # idempotency guard above (webhook_processed_{event_id})
-            # already prevents duplicate dispatches from Stripe
-            # redeliveries; the task itself is a single INSERT, so this
-            # is safe at-most-once per event.
-            if order.user_id:
-                notify_payment_confirmed_live.delay(order.id)
-
-    except Exception as e:
+    except (KeyError, TypeError) as e:
+        # Malformed event payload — a redelivery carries the same bad body,
+        # so log and drop rather than 500-looping Stripe. Nothing has been
+        # committed at this point.
         logger.error(
-            "Error handling payment_intent.succeeded: %s", e, exc_info=True
+            "Malformed payment_intent.succeeded event: %s", e, exc_info=True
         )
+        return
+
+    logger.info("Stripe payment succeeded: %s", payment_intent_id)
+
+    # Atomic idempotency check-and-mark with row lock to prevent
+    # duplicate processing from parallel webhook deliveries.
+    already_processed = False
+    with transaction.atomic():
+        order = (
+            Order.objects.select_for_update()
+            .filter(payment_id=payment_intent_id)
+            .first()
+        )
+        if order:
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                already_processed = True
+            else:
+                if not order.metadata:
+                    order.metadata = {}
+                order.metadata[f"webhook_processed_{event_id}"] = True
+                order.save(update_fields=["metadata"])
+
+    if already_processed:
+        return
+
+    # NO try/except around the processing section: any error must
+    # propagate so dj-stripe's outer atomic rolls back the mark + Event
+    # row and Stripe redelivers (G0231).
+    order = OrderService.handle_payment_succeeded(payment_intent_id)
+
+    if order:
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={"payment_status": "pending"},
+            new_value={
+                "payment_status": "completed",
+                "payment_id": payment_intent_id,
+            },
+        )
+        # Payment is confirmed — dispatch the confirmation email and live
+        # toast on commit (G0230). Both fire only if dj-stripe's outer
+        # transaction commits, so a later rollback discards them; the
+        # worker also sees the committed row. Each task is independently
+        # idempotent (metadata reservation / event-level guard).
+        transaction.on_commit(
+            lambda oid=order.id: send_order_confirmation_email.delay(oid)
+        )
+        if order.user_id:
+            transaction.on_commit(
+                lambda oid=order.id: notify_payment_confirmed_live.delay(oid)
+            )
 
 
 @djstripe_receiver("payment_intent.payment_failed")
@@ -1058,6 +1069,12 @@ def handle_stripe_dispute_created(sender, **kwargs):
     try:
         event: Event = kwargs["event"]
         dispute_data = event.data["object"]
+        # Look up by ``payment_intent`` (pi_…), NOT ``charge`` (ch_…):
+        # every write to ``Order.payment_id`` in this codebase stores a
+        # PaymentIntent id, so matching on the charge id never hits and
+        # the whole dispute flow was silently dead (G0232). ``charge`` is
+        # retained for the audit note / logs only.
+        payment_intent_id = dispute_data.get("payment_intent") or ""
         charge_id = dispute_data.get("charge", "")
         dispute_id = dispute_data.get("id", "")
         reason = dispute_data.get("reason", "")
@@ -1065,15 +1082,16 @@ def handle_stripe_dispute_created(sender, **kwargs):
         logger.warning(
             "Stripe dispute created",
             extra={
+                "payment_intent_id": payment_intent_id,
                 "charge_id": charge_id,
                 "dispute_id": dispute_id,
                 "reason": reason,
             },
         )
 
-        if not charge_id:
+        if not payment_intent_id:
             logger.error(
-                "charge.dispute.created event missing charge id: %s",
+                "charge.dispute.created event missing payment_intent: %s",
                 event.id,
             )
             return
@@ -1086,12 +1104,14 @@ def handle_stripe_dispute_created(sender, **kwargs):
         with transaction.atomic():
             order = (
                 Order.objects.select_for_update()
-                .filter(payment_id=charge_id)
+                .filter(payment_id=payment_intent_id)
                 .first()
             )
             if order is None:
                 logger.warning(
-                    "No order found for disputed charge %s (dispute=%s)",
+                    "No order found for disputed payment_intent %s "
+                    "(charge=%s, dispute=%s)",
+                    payment_intent_id,
                     charge_id,
                     dispute_id,
                 )

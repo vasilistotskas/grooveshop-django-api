@@ -247,6 +247,65 @@ def _verify_transaction(transaction_id):
         return None, {}
 
 
+def _verify_viva_terminal_transaction(
+    order, transaction_id, expected_statuses, event_label
+):
+    """Verify a reversal (1797) / failed (1798) Viva event against the
+    Retrieve Transaction API before mutating ``payment_status`` (G0275).
+
+    The webhook endpoint is unauthenticated — there is no HMAC and the
+    source-IP check is non-blocking — so the event body must not be trusted
+    to flip financial state. A spoofed 1797 could otherwise mark any order
+    REFUNDED and fire the refund email + live toast + Meta CAPI Refund;
+    a spoofed 1798 could mark it FAILED. Mirroring the 1796 path, we confirm
+    with Viva that the transaction genuinely reached the expected terminal
+    state.
+
+    Returns ``True`` to proceed. Returns ``False`` (skip, no mutation) when
+    the event carries no ``TransactionId`` or the verified status is not one
+    we expect. Raises ``RuntimeError`` (→ 500, Viva retries) when
+    verification is UNAVAILABLE — including any Retrieve-Transaction error
+    such as a 404 for a forged id or a transient network fault — so an
+    unverifiable event can never mutate state on a trusted-by-default basis.
+    """
+    if not transaction_id:
+        logger.error(
+            "Viva %s event for order %s carries no TransactionId — refusing "
+            "to mutate payment state without verification",
+            event_label,
+            order.id,
+        )
+        return False
+
+    verified_status, verified_data = _verify_transaction(transaction_id)
+    verify_errored = isinstance(verified_data, dict) and (
+        verified_data.get("error") or verified_data.get("viva_error")
+    )
+    if verified_status is None or verify_errored:
+        # Verification infrastructure failed, or Viva could not cleanly
+        # retrieve the transaction (a forged/unknown id returns an error row,
+        # and get_payment_status maps errors to FAILED — which would
+        # otherwise auto-satisfy the failed check). Roll back and retry
+        # rather than trust the unverified event.
+        raise RuntimeError(
+            f"Viva transaction verification unavailable for {transaction_id}"
+        )
+
+    if verified_status not in expected_statuses:
+        logger.warning(
+            "Viva %s event for order %s: transaction %s verified status is "
+            "%s, not in %s — skipping (event unverified or premature)",
+            event_label,
+            order.id,
+            transaction_id,
+            verified_status,
+            sorted(expected_statuses),
+        )
+        return False
+
+    return True
+
+
 def _handle_webhook_event(request):
     from django.db import transaction
 
@@ -664,6 +723,16 @@ def _handle_payment_failed(order, event_data, transaction_id):
         )
         return
 
+    # Never trust the unauthenticated event body: confirm with Viva that the
+    # transaction actually failed before flipping state (G0275).
+    if not _verify_viva_terminal_transaction(
+        order,
+        transaction_id,
+        {PaymentStatus.FAILED, PaymentStatus.CANCELED},
+        "payment_failed",
+    ):
+        return
+
     previous_payment_status = order.payment_status
     order.payment_status = PaymentStatus.FAILED
     order.save(update_fields=["payment_status"])
@@ -704,6 +773,17 @@ def _handle_reversal_created(order, event_data, transaction_id):
         "Viva Wallet reversal created for order %s",
         order.id,
     )
+
+    # Never trust the unauthenticated event body: confirm with Viva that the
+    # transaction was actually reversed/refunded before marking the order
+    # REFUNDED and firing the refund email + toast + Meta CAPI Refund (G0275).
+    if not _verify_viva_terminal_transaction(
+        order,
+        transaction_id,
+        {PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED},
+        "reversal",
+    ):
+        return
 
     previous_payment_status = order.payment_status
 

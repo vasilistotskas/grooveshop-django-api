@@ -178,6 +178,16 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
         _persist_failure(invoice, code=code, message=message)
         raise MyDataInactiveCounterpartError(message, code=code)
 
+    if row.status_code == "TechnicalError":
+        # AADE gateway fault — includes the empty-200 body the parser
+        # synthesises into a TechnicalError row (auth/routing hiccups).
+        # This is a TRANSPORT fault, not a terminal document rejection:
+        # do NOT ``_persist_failure`` (which would flip the invoice to
+        # REJECTED and skip all retries). Leave ``mydata_status=SUBMITTED``
+        # and raise the retryable transport error so the Celery task's
+        # backoff and the manual-resubmit path keep working (G0260).
+        raise MyDataTransportError(message or "AADE TechnicalError", code=code)
+
     _persist_failure(invoice, code=code, message=message)
     raise MyDataValidationError(message, code=code)
 
@@ -211,6 +221,12 @@ def cancel_invoice(invoice: Any) -> ResponseRow | None:
     first_error = row.errors[0] if row.errors else None
     code = first_error.code if first_error else ""
     message = first_error.message if first_error else row.status_code
+
+    if row.status_code == "TechnicalError":
+        # Transient AADE gateway fault — retryable, not a terminal
+        # rejection. See ``submit_invoice`` for the full rationale (G0260).
+        raise MyDataTransportError(message or "AADE TechnicalError", code=code)
+
     _persist_failure(invoice, code=code, message=message)
     raise MyDataValidationError(message, code=code)
 

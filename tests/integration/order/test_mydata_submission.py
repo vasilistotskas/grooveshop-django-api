@@ -161,6 +161,19 @@ _VALIDATION_ERROR_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 </ResponseDoc>
 """
 
+_TECHNICAL_ERROR_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
+<ResponseDoc>
+    <response>
+        <index>1</index>
+        <statusCode>TechnicalError</statusCode>
+        <errors>
+            <code>500</code>
+            <message>AADE gateway temporarily unavailable</message>
+        </errors>
+    </response>
+</ResponseDoc>
+"""
+
 
 @override_settings(
     SITE_NAME="GrooveShop",
@@ -305,6 +318,32 @@ class SendInvoiceToMydataTestCase(TestCase):
         # resubmission via the admin action.
         invoice.refresh_from_db()
         self.assertEqual(invoice.mydata_status, MyDataStatus.SUBMITTED)
+
+    @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
+    @patch("order.mydata.client.MyDataClient.send_invoices")
+    @patch("order.tasks.send_invoice_email.delay")
+    def test_technical_error_is_retryable_not_terminal(
+        self, mock_email, mock_send, _mock_render
+    ):
+        """An AADE ``TechnicalError`` row (gateway fault, incl. the
+        empty-200 body the parser synthesises) is a transport fault, not a
+        terminal rejection: the invoice must stay SUBMITTED and remain
+        eligible for retry/manual resubmit — never flipped to REJECTED
+        (G0260)."""
+        _enable_mydata(self)
+        order, invoice = _make_invoice()
+        mock_send.return_value = _TECHNICAL_ERROR_XML
+
+        # Force the last-retry state so the task reaches the transport
+        # fallback branch rather than scheduling another retry.
+        with patch("order.tasks.send_invoice_to_mydata.max_retries", 0):
+            result = send_invoice_to_mydata(order.id)
+
+        self.assertFalse(result)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.mydata_status, MyDataStatus.SUBMITTED)
+        self.assertNotEqual(invoice.mydata_status, MyDataStatus.REJECTED)
+        mock_email.assert_called_once_with(order.id)
 
     @patch("order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 test")
     @patch("order.mydata.client.MyDataClient.send_invoices")

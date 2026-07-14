@@ -334,9 +334,12 @@ def build_purchase_event(order: Order) -> tuple[Event, str]:
     success page can fire the matching pixel call with
     ``{eventID}`` for dedup.
     """
-    import uuid as uuid_lib
-
-    event_id = _event_id_for(order, "purchase") or uuid_lib.uuid4().hex
+    # Fall back to a DETERMINISTIC per-order id (not a random uuid) so two
+    # server dispatches of the same order's Purchase — e.g. a COD order with
+    # no browser-minted id, or a retry — collide on Meta's dedup instead of
+    # being counted twice (G0198). A browser-minted id still wins when
+    # present, preserving server↔pixel dedup.
+    event_id = _event_id_for(order, "purchase") or f"purchase-{order.uuid}"
     event = _new_event(
         name=StandardEvent.PURCHASE,
         event_id=event_id,

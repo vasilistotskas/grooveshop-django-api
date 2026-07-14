@@ -25,11 +25,13 @@ class CartItemQuerySet(OptimizedQuerySet):
         """Select related cart."""
         return self.select_related("cart")
 
-    def _with_enriched_product(self, *, full_images: bool) -> Self:
+    def _with_enriched_product(self) -> Self:
         """Prefetch ``product`` with everything the embedded
         ``ProductSerializer`` renders — translations, category/vat/brand,
-        review/likes counts, the main image (or all images) and attributes —
-        so serializing N cart items stays O(1) queries (G0088).
+        review/likes counts, the main image and attributes — so serializing N
+        cart items stays O(1) queries (G0088). The serializer exposes
+        ``main_image_path`` (not a full image list), so ``with_main_image()``
+        is exactly what feeds it.
 
         The Product optimizers are composed directly rather than via
         ``Product.objects.for_list()`` because that filters to active
@@ -42,12 +44,8 @@ class CartItemQuerySet(OptimizedQuerySet):
             Product.objects.with_translations()
             .with_category()
             .with_counts()
+            .with_main_image()
             .with_product_attributes()
-        )
-        product_qs = (
-            product_qs.with_images()
-            if full_images
-            else product_qs.with_main_image()
         )
         return self.prefetch_related(
             models.Prefetch("product", queryset=product_qs)
@@ -55,12 +53,11 @@ class CartItemQuerySet(OptimizedQuerySet):
 
     def for_list(self) -> Self:
         """Optimized queryset for list views: cart + fully enriched product."""
-        return self.with_cart()._with_enriched_product(full_images=False)
+        return self.with_cart()._with_enriched_product()
 
     def for_detail(self) -> Self:
-        """Optimized queryset for detail views: as ``for_list`` plus the full
-        product image set."""
-        return self.with_cart()._with_enriched_product(full_images=True)
+        """Optimized queryset for detail views (same enrichment as list)."""
+        return self.with_cart()._with_enriched_product()
 
     def for_cart(self, cart):
         return self.filter(cart=cart)

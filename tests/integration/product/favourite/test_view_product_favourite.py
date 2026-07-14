@@ -11,6 +11,7 @@ from product.serializers.favourite import (
     ProductFavouriteDetailSerializer,
     ProductFavouriteSerializer,
 )
+from tests.utils import count_queries
 from user.factories.account import UserAccountFactory
 
 pytestmark = pytest.mark.assert_english
@@ -44,6 +45,27 @@ class ProductFavouriteViewSetTestCase(APITestCase):
 
         self.assertEqual(response.data["results"], serializer.data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_list_no_n_plus_one(self):
+        """Query count must not grow with the number of favourites (G0301)."""
+        url = self.get_product_favourite_list_url()
+
+        with count_queries() as small:
+            self.client.get(url)
+
+        for _ in range(3):
+            product = ProductFactory(num_images=1, num_reviews=2)
+            ProductFavouriteFactory(product=product, user=self.user)
+
+        with count_queries() as large:
+            self.client.get(url)
+
+        self.assertEqual(
+            small.count,
+            large.count,
+            f"Query count grew from {small.count} to {large.count} when "
+            f"favourites grew — N+1 regression.",
+        )
 
     def test_create_valid(self):
         product_2 = ProductFactory(num_images=0, num_reviews=0)

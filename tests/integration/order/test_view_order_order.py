@@ -22,6 +22,7 @@ from order.serializers.order import (
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils import count_queries
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -199,6 +200,41 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
         self.assertEqual(len(response.data["results"]), 2)
+
+    def test_list_no_n_plus_one(self):
+        """Order-list query count must not grow with the number of orders or
+        their line items (G0226)."""
+        self.client.force_authenticate(user=self.admin_user)
+
+        with count_queries() as small:
+            self.client.get(self.list_url)
+
+        for _ in range(2):
+            order = OrderFactory(
+                user=self.user,
+                status=OrderStatus.PENDING.value,
+                pay_way=self.pay_way,
+                country=self.country,
+                region=self.region,
+            )
+            for product in ProductFactory.create_batch(
+                2, active=True, num_images=1, num_reviews=2, stock=20
+            ):
+                order.items.create(
+                    product=product,
+                    price=Money("10.00", settings.DEFAULT_CURRENCY),
+                    quantity=1,
+                )
+
+        with count_queries() as large:
+            self.client.get(self.list_url)
+
+        self.assertEqual(
+            small.count,
+            large.count,
+            f"Query count grew from {small.count} to {large.count} when "
+            f"orders/items grew — N+1 regression.",
+        )
 
     def test_create_order(self):
         self.client.force_authenticate(user=self.admin_user)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import re
 from typing import TYPE_CHECKING, Any
 
 import defusedxml.ElementTree as ET
@@ -123,6 +124,16 @@ class ImageAndSvgField(ImageField):
                         code="svg_script_not_allowed",
                     )
 
+                # <foreignObject> can embed arbitrary HTML (incl. scripts),
+                # bypassing the SVG-only checks (G0098).
+                if tag_name.lower() == "foreignobject":
+                    raise ValidationError(
+                        _(
+                            "SVG files containing foreignObject are not allowed for security reasons."
+                        ),
+                        code="svg_foreign_object_not_allowed",
+                    )
+
                 for attr in elem.attrib:
                     if attr.lower().startswith("on"):
                         raise ValidationError(
@@ -131,6 +142,29 @@ class ImageAndSvgField(ImageField):
                             ),
                             code="svg_event_handler_not_allowed",
                         )
+
+                    # href / xlink:href / src carrying a javascript: or
+                    # script-capable data: URL is an XSS vector the script /
+                    # on* checks miss (G0098). Strip whitespace first so
+                    # "java\nscript:" can't evade the prefix check.
+                    attr_local = attr.split("}")[-1].lower()
+                    if attr_local in {"href", "src"}:
+                        value = re.sub(
+                            r"\s+", "", (elem.attrib[attr] or "")
+                        ).lower()
+                        if value.startswith(
+                            (
+                                "javascript:",
+                                "data:text/html",
+                                "data:image/svg",
+                            )
+                        ):
+                            raise ValidationError(
+                                _(
+                                    "SVG files with javascript: or data: URLs are not allowed for security reasons."
+                                ),
+                                code="svg_dangerous_url_not_allowed",
+                            )
 
             return True
 

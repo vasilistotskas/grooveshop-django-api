@@ -284,6 +284,9 @@ class OrderService:
                     quantity=quantity - covered,
                     order_id=order.id,
                     reason=f"Order {order.id} created from cart {cart.uuid}",
+                    # Checkout path: don't oversell the shortfall against
+                    # inventory other sessions have actively reserved (G0284).
+                    respect_reservations=True,
                 )
 
         # Release reservations for products no longer in the cart.

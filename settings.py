@@ -680,6 +680,19 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "anonymize-old-search-queries": {
+            "task": "search.tasks.anonymize_old_search_queries",
+            "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "kwargs": {"days": 90},
+        },
+        "cleanup-expired-data-exports": {
+            "task": "user.tasks.cleanup_expired_data_exports",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "send-inactive-user-notifications": {
             "task": "core.tasks.send_inactive_user_notifications",
             "schedule": SCHEDULE_PRESETS["monthly_first_6am"]

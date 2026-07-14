@@ -66,6 +66,38 @@ class ImageAndSvgFieldTest(TestCase):
             self.field.to_python(svg_file)
         self.assertEqual(cm.exception.code, "svg_script_not_allowed")
 
+    def test_svg_with_javascript_href_rejected(self):
+        """xlink:href with a javascript: URL is an XSS vector the script/on*
+        checks miss (G0098)."""
+        malicious_svg = """<?xml version="1.0" encoding="UTF-8"?>
+        <svg xmlns="http://www.w3.org/2000/svg"
+             xmlns:xlink="http://www.w3.org/1999/xlink" width="100" height="100">
+            <a xlink:href="javascript:alert('XSS')">
+                <circle cx="50" cy="50" r="40" fill="red" />
+            </a>
+        </svg>"""
+        svg_file = self.create_test_file(
+            malicious_svg, "jshref.svg", "image/svg+xml"
+        )
+        with self.assertRaises(ValidationError) as cm:
+            self.field.to_python(svg_file)
+        self.assertEqual(cm.exception.code, "svg_dangerous_url_not_allowed")
+
+    def test_svg_with_foreign_object_rejected(self):
+        """<foreignObject> can embed arbitrary HTML/scripts (G0098)."""
+        malicious_svg = """<?xml version="1.0" encoding="UTF-8"?>
+        <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+            <foreignObject width="100" height="100">
+                <body xmlns="http://www.w3.org/1999/xhtml">x</body>
+            </foreignObject>
+        </svg>"""
+        svg_file = self.create_test_file(
+            malicious_svg, "foreign.svg", "image/svg+xml"
+        )
+        with self.assertRaises(ValidationError) as cm:
+            self.field.to_python(svg_file)
+        self.assertEqual(cm.exception.code, "svg_foreign_object_not_allowed")
+
     def test_svg_with_event_handlers_rejected(self):
         malicious_svg = """<?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">

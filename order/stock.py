@@ -353,6 +353,8 @@ class StockManager:
         quantity: int,
         order_id: int,
         reason: str = "order_created",
+        *,
+        respect_reservations: bool = False,
     ) -> None:
         """
         Directly decrement stock (for admin operations or direct orders).
@@ -405,12 +407,26 @@ class StockManager:
         except Product.DoesNotExist:
             raise ProductNotFoundError(product_id=product_id)
 
-        # Validate sufficient stock
-        # This check is critical to prevent overselling
-        if product.stock < quantity:
+        # Validate sufficient stock. Admin / direct paths check raw physical
+        # stock; the no-reservation checkout fallback opts in to also subtract
+        # OTHER sessions' active reservations so it can't oversell inventory
+        # another shopper has already reserved (G0284).
+        available = product.stock
+        if respect_reservations:
+            now = timezone.now()
+            active_reservations = (
+                StockReservation.objects.select_for_update().filter(
+                    product=product, consumed=False, expires_at__gt=now
+                )
+            )
+            available = product.stock - sum(
+                r.quantity for r in active_reservations
+            )
+
+        if available < quantity:
             raise InsufficientStockError(
                 product_id=product_id,
-                available=product.stock,
+                available=available,
                 requested=quantity,
             )
 

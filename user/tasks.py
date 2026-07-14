@@ -252,3 +252,57 @@ def delete_user_account_task(self, user_id: int) -> dict:
 
     counts = anonymise_and_delete_user(user)
     return {"status": "success", "counts": counts}
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=300)
+def cleanup_expired_data_exports(self) -> dict:
+    """Delete the PII bundle files of expired GDPR exports and mark them
+    EXPIRED.
+
+    Right-of-access exports are written to the private media PVC and are only
+    valid for ``EXPORT_TTL``. Without this cleanup the exported personal data
+    lingered on disk indefinitely past its expiry (G0435). Registered as a
+    periodic beat task.
+    """
+    import os
+
+    from django.utils import timezone
+
+    from user.models.data_export import UserDataExport
+    from user.services.gdpr import get_export_location
+
+    now = timezone.now()
+    location = get_export_location()
+
+    stale = UserDataExport.objects.filter(expires_at__lt=now).exclude(
+        status=UserDataExport.Status.EXPIRED
+    )
+
+    expired = 0
+    for export in stale:
+        if export.file_path:
+            abs_path = os.path.join(location, export.file_path)
+            try:
+                if os.path.exists(abs_path):
+                    os.remove(abs_path)
+            except OSError:
+                logger.warning(
+                    "cleanup_expired_data_exports: could not remove %s",
+                    abs_path,
+                    exc_info=True,
+                )
+        export.status = UserDataExport.Status.EXPIRED
+        export.file_path = ""
+        export.file_size = 0
+        export.save(
+            update_fields=[
+                "status",
+                "file_path",
+                "file_size",
+                "updated_at",
+            ]
+        )
+        expired += 1
+
+    logger.info("cleanup_expired_data_exports: expired %s export(s)", expired)
+    return {"status": "success", "expired": expired}

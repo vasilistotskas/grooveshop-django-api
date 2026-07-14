@@ -8,13 +8,11 @@ from datetime import timedelta
 from extra_settings.models import Setting
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.tokens import default_token_generator
+from django.core import signing
 from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
 from django.utils.translation import gettext as _
 
 from core.utils.i18n import get_user_language
@@ -22,6 +20,16 @@ from core.utils.i18n import get_user_language
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
 logger = logging.getLogger(__name__)
+
+# Unsubscribe links are signed with ``django.core.signing`` under a
+# dedicated salt (NOT the password-reset generator) so the token is
+# purpose-scoped, tamper-proof, and — crucially — does NOT invalidate when
+# the user logs in or changes their password. ``UNSUBSCRIBE_MAX_AGE`` gives
+# the link a long life so a newsletter that sits in an inbox for months
+# still honours one-click unsubscribe (RFC 8058), while still bounding the
+# validity of a leaked token.
+UNSUBSCRIBE_SALT = "user.unsubscribe"
+UNSUBSCRIBE_MAX_AGE = timedelta(days=365)
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser
@@ -114,16 +122,15 @@ def check_subscription_before_send(user: "User", topic_slug: str) -> bool:
     ).exists()
 
 
+def _make_unsubscribe_token(user: "AbstractBaseUser") -> str:
+    """Sign the user's pk into a self-contained, tamper-proof token."""
+    return signing.dumps(user.pk, salt=UNSUBSCRIBE_SALT)
+
+
 def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
-    token = default_token_generator.make_token(user)
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
-
+    token = _make_unsubscribe_token(user)
     base_url = settings.API_BASE_URL.rstrip("/")
-    unsubscribe_url = (
-        f"{base_url}/api/v1/user/unsubscribe/{uid}/{token}/{topic.slug}"
-    )
-
-    return unsubscribe_url
+    return f"{base_url}/api/v1/user/unsubscribe/{token}/{topic.slug}"
 
 
 def generate_blanket_unsubscribe_link(
@@ -140,14 +147,12 @@ def generate_blanket_unsubscribe_link(
     carries an RFC 8058-compliant ``List-Unsubscribe`` header.
 
     Accepts ``AbstractBaseUser`` so callers with a generic FK
-    (e.g. ``ProductAlert.user``) can pass it directly — only ``pk`` and
-    ``default_token_generator`` compatibility are required.
+    (e.g. ``ProductAlert.user``) can pass it directly — only ``pk`` is
+    required.
     """
-    token = default_token_generator.make_token(user)
-    uid = urlsafe_base64_encode(force_bytes(user.pk))
-
+    token = _make_unsubscribe_token(user)
     base_url = settings.API_BASE_URL.rstrip("/")
-    return f"{base_url}/api/v1/user/unsubscribe/{uid}/{token}"
+    return f"{base_url}/api/v1/user/unsubscribe/{token}"
 
 
 def build_list_unsubscribe_headers(

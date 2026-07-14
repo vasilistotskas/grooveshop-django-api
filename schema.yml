@@ -25161,44 +25161,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserDetails'
           description: ''
-    delete:
-      operationId: destroyUserAccount
-      description: Διαγραφή Λογαριασμός Χρήστη. Απαιτεί ταυτοποίηση.
-      summary: Διαγραφή Λογαριασμός Χρήστη
-      parameters:
-      - in: path
-        name: id
-        schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        required: true
-      tags:
-      - User Accounts
-      security:
-      - cookieAuth: []
-      responses:
-        '204':
-          description: No response body
-        '401':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '403':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: ''
   /api/v1/user/account/{id}/addresses:
     get:
       operationId: getUserAccountAddresses
@@ -28482,11 +28444,11 @@ paths:
                     items:
                       $ref: '#/components/schemas/SubscriptionTopic'
           description: ''
-  /api/v1/user/unsubscribe/{uidb64}/{token}:
+  /api/v1/user/unsubscribe/{token}:
     get:
       operationId: unsubscribeFromAllViaLink
       description: |-
-        Non-topic unsubscribe: `/unsubscribe/<uid>/<token>`.
+        Non-topic unsubscribe: `/unsubscribe/<token>`.
 
         Unsubscribes from ALL active subscriptions — used by emails without a
         topic binding such as re-engagement and abandoned-cart.
@@ -28494,11 +28456,6 @@ paths:
       parameters:
       - in: path
         name: token
-        schema:
-          type: string
-        required: true
-      - in: path
-        name: uidb64
         schema:
           type: string
         required: true
@@ -28529,21 +28486,16 @@ paths:
         schema:
           type: string
         required: true
-      - in: path
-        name: uidb64
-        schema:
-          type: string
-        required: true
       tags:
       - User Subscriptions
       responses:
         '200':
           description: No response body
-  /api/v1/user/unsubscribe/{uidb64}/{token}/{topic_slug}:
+  /api/v1/user/unsubscribe/{token}/{topic_slug}:
     get:
       operationId: unsubscribeFromTopicViaLink
       description: |-
-        Topic-scoped unsubscribe: `/unsubscribe/<uid>/<token>/<topic_slug>`.
+        Topic-scoped unsubscribe: `/unsubscribe/<token>/<topic_slug>`.
 
         Used by marketing emails with a specific List-ID (newsletter etc.).
       summary: Διαγραφή από θέμα μέσω συνδέσμου email (GET)
@@ -28555,11 +28507,6 @@ paths:
         required: true
       - in: path
         name: topicSlug
-        schema:
-          type: string
-        required: true
-      - in: path
-        name: uidb64
         schema:
           type: string
         required: true
@@ -28592,11 +28539,6 @@ paths:
         required: true
       - in: path
         name: topicSlug
-        schema:
-          type: string
-        required: true
-      - in: path
-        name: uidb64
         schema:
           type: string
         required: true
@@ -28893,36 +28835,17 @@ components:
           nullable: true
           description: Σχετικό URL για λήψη του PDF voucher μέσω του proxy Django.
           readOnly: true
-        deliveryFlag:
-          type: string
-          readOnly: true
-          title: Ένδειξη παράδοσης
-          description: Ακατέργαστη τιμή delivery_flag από το ACS_Trackingsummary.
-        returnedFlag:
-          type: string
-          readOnly: true
-          title: Ένδειξη επιστροφής
-        rawShipmentStatus:
-          type: string
-          readOnly: true
-          title: Ακατέργαστη κατάσταση αποστολής
         cancelRequestedAt:
           type: string
           format: date-time
           readOnly: true
           nullable: true
           title: Αίτημα ακύρωσης στις
-        metadata:
-          readOnly: true
-          title: Μεταδεδομένα
-          description: Αριθμοί θυγατρικών vouchers πολλαπλών δεμάτων, τελευταία απόκριση
-            δημιουργίας voucher, τελευταίος φάκελος σφάλματος, URL POD σε cache.
       required:
       - cancelRequestedAt
       - chargeType
       - createdAt
       - deliveryDate
-      - deliveryFlag
       - deliveryKind
       - deliveryProducts
       - events
@@ -28931,9 +28854,6 @@ components:
       - labelUrl
       - lastEventAt
       - lastPolledAt
-      - metadata
-      - rawShipmentStatus
-      - returnedFlag
       - shipmentState
       - shipmentStateDisplay
       - station
@@ -31343,11 +31263,6 @@ components:
           readOnly: true
           nullable: true
           title: Ημερομηνία αιτήματος ακύρωσης
-        metadata:
-          readOnly: true
-          title: Μεταδεδομένα
-          description: Πλήρης απόκριση αιτήματος παράδοσης και διαγνωστικά από το
-            BoxNow
       required:
       - allowReturn
       - amountToBeCollected
@@ -31361,7 +31276,6 @@ components:
       - lastEventAt
       - locker
       - lockerExternalId
-      - metadata
       - parcelId
       - parcelState
       - parcelStateDisplay

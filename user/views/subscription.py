@@ -1,10 +1,9 @@
 import logging
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.tokens import default_token_generator
+from django.core import signing
 from django.db import transaction
 from django.utils.crypto import get_random_string
-from django.utils.http import urlsafe_base64_decode
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers, status
@@ -37,7 +36,11 @@ from user.serializers.subscription import (
     UserSubscriptionSerializer,
     UserSubscriptionWriteSerializer,
 )
-from user.utils.subscription import send_subscription_confirmation
+from user.utils.subscription import (
+    UNSUBSCRIBE_MAX_AGE,
+    UNSUBSCRIBE_SALT,
+    send_subscription_confirmation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -496,27 +499,37 @@ class UnsubscribeResponseSerializer(serializers.Serializer):
     error = serializers.CharField(required=False)
 
 
-def _validate_unsubscribe_token(uidb64: str, token: str):
+def _validate_unsubscribe_token(token: str):
+    # The token is a ``django.core.signing`` value carrying the user's pk
+    # (see ``user.utils.subscription._make_unsubscribe_token``). It is
+    # tamper-proof and does not depend on the user's password/last_login,
+    # so the link keeps working after logins/password changes — unlike the
+    # old password-reset generator.
     try:
-        uid = urlsafe_base64_decode(uidb64).decode()
-        user = User.objects.get(pk=uid)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user_pk = signing.loads(
+            token, salt=UNSUBSCRIBE_SALT, max_age=UNSUBSCRIBE_MAX_AGE
+        )
+    except signing.SignatureExpired:
+        logger.warning(
+            "unsubscribe: token expired (older than %s) — link stale",
+            UNSUBSCRIBE_MAX_AGE,
+        )
+        return None, _("Invalid or expired unsubscribe link")
+    except signing.BadSignature:
         # Log so broken/forged links surface in observability without
         # leaking detail to the caller (POST replies are silent 200 per
         # RFC 8058; GET replies still 400 with a generic error message).
         logger.warning(
-            "unsubscribe: could not resolve user from uidb64 %r — "
-            "link is malformed or the user was deleted",
-            uidb64,
+            "unsubscribe: bad signature — link is malformed or tampered"
         )
         return None, _("Invalid unsubscribe link")
-    if not default_token_generator.check_token(user, token):
+    try:
+        user = User.objects.get(pk=user_pk)
+    except User.DoesNotExist:
         logger.warning(
-            "unsubscribe: token check failed for user_id=%s — link "
-            "expired (default_token_generator timeout) or tampered",
-            user.pk,
+            "unsubscribe: signed user_id=%s no longer exists", user_pk
         )
-        return None, _("Invalid or expired unsubscribe link")
+        return None, _("Invalid unsubscribe link")
     return user, None
 
 
@@ -536,8 +549,8 @@ def _apply_unsubscribe(user, topic_slug: str | None):
     return count, topic_name
 
 
-def _unsubscribe_get_response(uidb64: str, token: str, topic_slug: str | None):
-    user, error = _validate_unsubscribe_token(uidb64, token)
+def _unsubscribe_get_response(token: str, topic_slug: str | None):
+    user, error = _validate_unsubscribe_token(token)
     if error is not None:
         return Response(
             {"error": str(error)}, status=status.HTTP_400_BAD_REQUEST
@@ -560,8 +573,8 @@ def _unsubscribe_get_response(uidb64: str, token: str, topic_slug: str | None):
     )
 
 
-def _unsubscribe_post_response(uidb64: str, token: str, topic_slug: str | None):
-    user, _err = _validate_unsubscribe_token(uidb64, token)
+def _unsubscribe_post_response(token: str, topic_slug: str | None):
+    user, _err = _validate_unsubscribe_token(token)
     if user is not None:
         _apply_unsubscribe(user, topic_slug)
     # RFC 8058: always 200 to avoid leaking token validity to scanners.
@@ -569,7 +582,7 @@ def _unsubscribe_post_response(uidb64: str, token: str, topic_slug: str | None):
 
 
 class UnsubscribeTopicView(APIView):
-    """Topic-scoped unsubscribe: `/unsubscribe/<uid>/<token>/<topic_slug>`.
+    """Topic-scoped unsubscribe: `/unsubscribe/<token>/<topic_slug>`.
 
     Used by marketing emails with a specific List-ID (newsletter etc.).
     """
@@ -587,8 +600,8 @@ class UnsubscribeTopicView(APIView):
             400: ErrorResponseSerializer,
         },
     )
-    def get(self, request, uidb64: str, token: str, topic_slug: str):
-        return _unsubscribe_get_response(uidb64, token, topic_slug)
+    def get(self, request, token: str, topic_slug: str):
+        return _unsubscribe_get_response(token, topic_slug)
 
     @extend_schema(
         operation_id="unsubscribeFromTopicOneClick",
@@ -601,12 +614,12 @@ class UnsubscribeTopicView(APIView):
         request=None,
         responses={200: None},
     )
-    def post(self, request, uidb64: str, token: str, topic_slug: str):
-        return _unsubscribe_post_response(uidb64, token, topic_slug)
+    def post(self, request, token: str, topic_slug: str):
+        return _unsubscribe_post_response(token, topic_slug)
 
 
 class UnsubscribeAllView(APIView):
-    """Non-topic unsubscribe: `/unsubscribe/<uid>/<token>`.
+    """Non-topic unsubscribe: `/unsubscribe/<token>`.
 
     Unsubscribes from ALL active subscriptions — used by emails without a
     topic binding such as re-engagement and abandoned-cart.
@@ -625,8 +638,8 @@ class UnsubscribeAllView(APIView):
             400: ErrorResponseSerializer,
         },
     )
-    def get(self, request, uidb64: str, token: str):
-        return _unsubscribe_get_response(uidb64, token, None)
+    def get(self, request, token: str):
+        return _unsubscribe_get_response(token, None)
 
     @extend_schema(
         operation_id="unsubscribeFromAllOneClick",
@@ -639,5 +652,5 @@ class UnsubscribeAllView(APIView):
         request=None,
         responses={200: None},
     )
-    def post(self, request, uidb64: str, token: str):
-        return _unsubscribe_post_response(uidb64, token, None)
+    def post(self, request, token: str):
+        return _unsubscribe_post_response(token, None)

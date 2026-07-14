@@ -1839,11 +1839,21 @@ class OrderService:
         reason: str = "",
         refunded_by: int | None = None,
     ) -> tuple[bool, dict[str, Any]]:
-        # Lock + re-fetch so the already-refunded guard below runs against
-        # the current row, not the caller's stale snapshot — otherwise two
-        # concurrent refund requests both pass the guard and issue duplicate
-        # provider refunds (G0280). Mirrors cancel_order.
-        order = Order.objects.select_for_update().get(pk=order.pk)
+        # Lock the row and re-read the CURRENT payment_status so a refund
+        # another request already committed is detected here — otherwise two
+        # concurrent refunds both pass the stale in-memory guard and issue
+        # duplicate provider refunds (G0280). We keep mutating the caller's
+        # ``order`` object below so callers still observe the result.
+        current_payment_status = (
+            Order.objects.select_for_update()
+            .values_list("payment_status", flat=True)
+            .get(pk=order.pk)
+        )
+        if current_payment_status in (
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+        ):
+            raise PaymentError(_("This order has already been refunded."))
 
         if not order.payment_id:
             raise PaymentError(_("This order has no payment ID to refund."))

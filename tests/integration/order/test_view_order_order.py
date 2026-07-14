@@ -180,6 +180,50 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         actual_fields = set(response.data.keys())
         self.assertEqual(actual_fields, expected_fields)
 
+    def test_update_does_not_mutate_line_items(self):
+        """Order line items must NOT be delete+recreated by an order update —
+        that bypassed stock accounting and total recomputation (G0222). The
+        original items (with their committed stock) stay intact."""
+        self.client.force_authenticate(user=self.admin_user)
+
+        original_item_ids = sorted(
+            self.order.items.values_list("id", flat=True)
+        )
+        original_qtys = dict(self.order.items.values_list("id", "quantity"))
+
+        payload = {
+            "user": self.user.id,
+            "pay_way": self.pay_way.id,
+            "country": self.country.alpha_2,
+            "region": self.region.alpha,
+            "email": f"noitem-{uuid.uuid4().hex[:8]}@example.com",
+            "first_name": "Updated",
+            "last_name": "Name",
+            "street": "456 New St",
+            "street_number": "Unit 1",
+            "city": "Boston",
+            "zipcode": "02101",
+            "phone": "+12345678902",
+            "shipping_price": Decimal("15.00"),
+            # Attempt to replace the two items with a single (valid) one.
+            "items": [
+                {"product": self.order_items[0].product.id, "quantity": 1}
+            ],
+        }
+
+        response = self.client.put(
+            self.get_order_detail_url(self.order.id), payload, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Scalar field updated, but the line items are untouched.
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.city, "Boston")
+        current_items = list(self.order.items.all())
+        self.assertEqual(sorted(i.id for i in current_items), original_item_ids)
+        for item in current_items:
+            self.assertEqual(item.quantity, original_qtys[item.id])
+
     def test_partial_update_uses_correct_serializer(self):
         self.client.force_authenticate(user=self.admin_user)
 

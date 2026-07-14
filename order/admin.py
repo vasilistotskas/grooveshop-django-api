@@ -2,7 +2,6 @@ import logging
 from datetime import timedelta
 
 from django.contrib import admin, messages
-from django.db import transaction
 from django.db.models import Count, Sum
 from django.http import FileResponse, Http404
 from django.shortcuts import redirect
@@ -726,19 +725,12 @@ class OrderAdmin(BaseModelAdmin):
         icon="play_arrow",
     )
     def mark_as_processing(self, request, queryset):
-        with transaction.atomic():
-            for order in queryset:
-                try:
-                    OrderService.update_order_status(
-                        order, OrderStatus.PROCESSING
-                    )
-                    self.message_user(
-                        request,
-                        _("Order %(order_id)s marked as processing")
-                        % {"order_id": order.id},
-                    )
-                except ValueError as e:
-                    self.message_user(request, f"Error: {e!s}", level="error")
+        self._bulk_update_status(
+            request,
+            queryset,
+            OrderStatus.PROCESSING,
+            _("Order %(order_id)s marked as processing"),
+        )
 
     @action(
         description=str(_("Mark selected orders as shipped")),
@@ -746,17 +738,12 @@ class OrderAdmin(BaseModelAdmin):
         icon="local_shipping",
     )
     def mark_as_shipped(self, request, queryset):
-        with transaction.atomic():
-            for order in queryset:
-                try:
-                    OrderService.update_order_status(order, OrderStatus.SHIPPED)
-                    self.message_user(
-                        request,
-                        _("Order %(order_id)s marked as shipped")
-                        % {"order_id": order.id},
-                    )
-                except ValueError as e:
-                    self.message_user(request, f"Error: {e!s}", level="error")
+        self._bulk_update_status(
+            request,
+            queryset,
+            OrderStatus.SHIPPED,
+            _("Order %(order_id)s marked as shipped"),
+        )
 
     @action(
         description=str(_("Mark selected orders as delivered")),
@@ -764,19 +751,12 @@ class OrderAdmin(BaseModelAdmin):
         icon="check_circle",
     )
     def mark_as_delivered(self, request, queryset):
-        with transaction.atomic():
-            for order in queryset:
-                try:
-                    OrderService.update_order_status(
-                        order, OrderStatus.DELIVERED
-                    )
-                    self.message_user(
-                        request,
-                        _("Order %(order_id)s marked as delivered")
-                        % {"order_id": order.id},
-                    )
-                except ValueError as e:
-                    self.message_user(request, f"Error: {e!s}", level="error")
+        self._bulk_update_status(
+            request,
+            queryset,
+            OrderStatus.DELIVERED,
+            _("Order %(order_id)s marked as delivered"),
+        )
 
     @action(
         description=str(_("Mark selected orders as completed")),
@@ -784,19 +764,39 @@ class OrderAdmin(BaseModelAdmin):
         icon="task_alt",
     )
     def mark_as_completed(self, request, queryset):
-        with transaction.atomic():
-            for order in queryset:
-                try:
-                    OrderService.update_order_status(
-                        order, OrderStatus.COMPLETED
-                    )
-                    self.message_user(
-                        request,
-                        _("Order %(order_id)s marked as completed")
-                        % {"order_id": order.id},
-                    )
-                except ValueError as e:
-                    self.message_user(request, f"Error: {e!s}", level="error")
+        self._bulk_update_status(
+            request,
+            queryset,
+            OrderStatus.COMPLETED,
+            _("Order %(order_id)s marked as completed"),
+        )
+
+    def _bulk_update_status(
+        self, request, queryset, target_status, success_message
+    ):
+        # No outer ``transaction.atomic``: ``update_order_status`` is atomic
+        # per row, so a batch-wide rollback would undo successful updates
+        # just because one selected row is in a terminal/invalid state.
+        # ``update_order_status`` raises ``InvalidStatusTransitionError`` (an
+        # ``OrderServiceError``, NOT a ``ValueError``) for an illegal
+        # transition — catching only ``ValueError`` let that bubble to a 500
+        # and roll back the whole batch (G0245). Mirrors ``mark_as_canceled``.
+        from order.exceptions import OrderServiceError
+
+        for order in queryset:
+            try:
+                OrderService.update_order_status(order, target_status)
+                self.message_user(
+                    request,
+                    success_message % {"order_id": order.id},
+                )
+            except (ValueError, OrderServiceError) as e:
+                self.message_user(
+                    request,
+                    _("Order %(order_id)s skipped: %(reason)s")
+                    % {"order_id": order.id, "reason": str(e)},
+                    level="warning",
+                )
 
     @action(
         description=str(_("Cancel selected orders and restore stock")),

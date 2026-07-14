@@ -256,6 +256,11 @@ class CartViewSet(BaseModelViewSet):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        # Re-load through for_detail() so the items are prefetched and the
+        # totals are annotated: the cart_service returns a bare row whose
+        # total_* properties would otherwise re-run get_items() several
+        # times and the nested items serializer would N+1 per line (G0081).
+        cart = Cart.objects.for_detail().get(pk=cart.pk)
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(cart)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
@@ -271,6 +276,10 @@ class CartViewSet(BaseModelViewSet):
         request_serializer.is_valid(raise_exception=True)
         self.perform_update(request_serializer)
 
+        # Re-load optimized so the response serialization reads prefetched
+        # items + annotated totals rather than re-querying per property/line
+        # (G0081).
+        cart = Cart.objects.for_detail().get(pk=cart.pk)
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(
             cart, context=self.get_serializer_context()

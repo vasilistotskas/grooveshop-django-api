@@ -55,13 +55,14 @@ class CartQuerySet(OptimizedQuerySet):
         return self.select_related("user")
 
     def with_items_prefetch(self) -> Self:
-        """Prefetch cart items with product data."""
+        """Prefetch cart items through the CartItem optimizer so each item's
+        embedded product carries the counts / main image / attributes the
+        serializer renders — otherwise serializing the cart N+1s per line
+        (G0081)."""
+        from cart.models.item import CartItem
+
         return self.prefetch_related(
-            "items",
-            "items__product",
-            "items__product__translations",
-            "items__product__category",
-            "items__product__vat",
+            models.Prefetch("items", queryset=CartItem.objects.for_list())
         )
 
     def with_totals(self) -> Self:

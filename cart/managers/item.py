@@ -21,37 +21,46 @@ class CartItemQuerySet(OptimizedQuerySet):
     standardized `for_list()` and `for_detail()` methods.
     """
 
-    def with_product(self) -> Self:
-        """Select related product."""
-        return self.select_related("product")
-
-    def with_product_translations(self) -> Self:
-        """Prefetch product translations."""
-        return self.prefetch_related("product__translations")
-
-    def with_product_images(self) -> Self:
-        """Prefetch product images."""
-        return self.prefetch_related("product__images__translations")
-
     def with_cart(self) -> Self:
         """Select related cart."""
         return self.select_related("cart")
 
-    def for_list(self) -> Self:
-        """
-        Optimized queryset for list views.
+    def _with_enriched_product(self, *, full_images: bool) -> Self:
+        """Prefetch ``product`` with everything the embedded
+        ``ProductSerializer`` renders — translations, category/vat/brand,
+        review/likes counts, the main image (or all images) and attributes —
+        so serializing N cart items stays O(1) queries (G0088).
 
-        Includes product with translations and cart.
+        The Product optimizers are composed directly rather than via
+        ``Product.objects.for_list()`` because that filters to active
+        products only: a cart may legitimately hold a product that was later
+        deactivated, and dropping it from the prefetch would blank the line.
         """
-        return self.with_product().with_product_translations().with_cart()
+        from product.models.product import Product
+
+        product_qs = (
+            Product.objects.with_translations()
+            .with_category()
+            .with_counts()
+            .with_product_attributes()
+        )
+        product_qs = (
+            product_qs.with_images()
+            if full_images
+            else product_qs.with_main_image()
+        )
+        return self.prefetch_related(
+            models.Prefetch("product", queryset=product_qs)
+        )
+
+    def for_list(self) -> Self:
+        """Optimized queryset for list views: cart + fully enriched product."""
+        return self.with_cart()._with_enriched_product(full_images=False)
 
     def for_detail(self) -> Self:
-        """
-        Optimized queryset for detail views.
-
-        Includes everything from for_list() plus product images.
-        """
-        return self.for_list().with_product_images()
+        """Optimized queryset for detail views: as ``for_list`` plus the full
+        product image set."""
+        return self.with_cart()._with_enriched_product(full_images=True)
 
     def for_cart(self, cart):
         return self.filter(cart=cart)

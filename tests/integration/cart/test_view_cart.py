@@ -6,8 +6,11 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from cart.factories.cart import CartFactory
+from cart.factories.item import CartItemFactory
 from cart.models import Cart
 from core.utils.testing import TestURLFixerMixin
+from product.factories.product import ProductFactory
+from tests.utils import count_queries
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -35,6 +38,28 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
     def test_cart_only_supports_detail_operations(self):
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_no_n_plus_one(self):
+        """Cart-detail query count must not grow with the number of items
+        nor re-run the total_* property queries per line (G0081)."""
+        with count_queries() as small:
+            self.client.get(self.detail_url)
+
+        for _ in range(3):
+            product = ProductFactory(
+                active=True, num_images=0, num_reviews=0, stock=10
+            )
+            CartItemFactory(cart=self.cart, product=product, quantity=1)
+
+        with count_queries() as large:
+            self.client.get(self.detail_url)
+
+        self.assertEqual(
+            small.count,
+            large.count,
+            f"Query count grew from {small.count} to {large.count} when "
+            f"cart items grew — N+1 regression.",
+        )
 
     def test_retrieve_cart(self):
         response = self.client.get(self.detail_url)

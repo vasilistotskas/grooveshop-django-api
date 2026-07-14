@@ -10,7 +10,6 @@ from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
 from meili._client import client as meili_client
-from meili.dataclasses import MeiliIndexSettings
 from product.models.product import ProductTranslation
 
 
@@ -86,32 +85,33 @@ class Command(BaseCommand):
         # Display action
         self.stdout.write(f"\nUpdating {index_name} settings...")
 
-        # Build settings update
-        settings_kwargs = {}
-
-        if max_total_hits is not None:
-            settings_kwargs["pagination"] = {"maxTotalHits": max_total_hits}
-            self.stdout.write(f"  - maxTotalHits: {max_total_hits}")
-
-        if search_cutoff_ms is not None:
-            settings_kwargs["search_cutoff_ms"] = search_cutoff_ms
-            self.stdout.write(f"  - searchCutoffMs: {search_cutoff_ms}ms")
-
-        if max_values_per_facet is not None:
-            settings_kwargs["faceting"] = {
-                "maxValuesPerFacet": max_values_per_facet
-            }
-            self.stdout.write(f"  - maxValuesPerFacet: {max_values_per_facet}")
-
         try:
-            # Create settings object
-            index_settings = MeiliIndexSettings(**settings_kwargs)
-
-            # Get index name from model
             meili_index_name = model_class._meilisearch["index_name"]
+            index = meili_client.client.index(meili_index_name)
 
-            # Apply settings
-            meili_client.with_settings(meili_index_name, index_settings)
+            # Apply ONLY the settings provided, each via its dedicated
+            # endpoint. Routing through ``with_settings()`` would resend the
+            # FULL settings payload and wipe filterableAttributes /
+            # sortableAttributes / searchableAttributes / synonyms back to
+            # their empty defaults — breaking faceted search until the next
+            # full reindex (G0172).
+            if max_total_hits is not None:
+                index.update_pagination_settings(
+                    {"maxTotalHits": max_total_hits}
+                )
+                self.stdout.write(f"  - maxTotalHits: {max_total_hits}")
+
+            if search_cutoff_ms is not None:
+                index.update_search_cutoff_ms(search_cutoff_ms)
+                self.stdout.write(f"  - searchCutoffMs: {search_cutoff_ms}ms")
+
+            if max_values_per_facet is not None:
+                index.update_faceting_settings(
+                    {"maxValuesPerFacet": max_values_per_facet}
+                )
+                self.stdout.write(
+                    f"  - maxValuesPerFacet: {max_values_per_facet}"
+                )
 
             self.stdout.write(
                 self.style.SUCCESS(

@@ -10,7 +10,6 @@ from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
 from meili._client import client as meili_client
-from meili.dataclasses import MeiliIndexSettings
 from product.models.product import ProductTranslation
 
 
@@ -100,14 +99,15 @@ class Command(BaseCommand):
             self.stdout.write(f"  {i}. {rule}")
 
         try:
-            # Create settings object with ranking rules
-            index_settings = MeiliIndexSettings(ranking_rules=rules)
-
-            # Get index name from model
             meili_index_name = model_class._meilisearch["index_name"]
 
-            # Apply settings
-            meili_client.with_settings(meili_index_name, index_settings)
+            # Update ONLY the ranking rules via the dedicated endpoint.
+            # Routing through ``with_settings()`` would resend the full
+            # settings payload and wipe filterable / sortable / searchable /
+            # synonyms back to their empty defaults (G0172).
+            meili_client.client.index(meili_index_name).update_ranking_rules(
+                rules
+            )
 
             self.stdout.write(
                 self.style.SUCCESS(

@@ -10,6 +10,7 @@ Inspired by the gr.advisable.solr.analysis.agl implementation.
 from __future__ import annotations
 
 import logging
+import re
 from typing import List
 
 logger = logging.getLogger(__name__)
@@ -247,43 +248,45 @@ class GreeklishConverter:
                     greeklish_pattern, placeholder
                 )
 
-        # Step 2: Build variants character by character (like Java addCharacter method)
-        current_variants = []
+        # Step 2: Build variants token by token. Placeholders (``§…§``) are
+        # ATOMIC tokens; every other character is mapped through
+        # CHARACTER_MAPPINGS. Tokenising the string explicitly — rather than
+        # iterating single chars and testing for a stray ``§`` in the
+        # accumulated variants — is what stops a word containing a digraph
+        # from emitting mixed Greek/Latin garbage: the old code appended
+        # every character literally once any variant held a ``§`` (G0335).
+        tokens = re.findall(r"§[^§]*§|.", processed_text, re.DOTALL)
+        current_variants: List[str] = []
 
-        for char in processed_text:
-            if char.startswith("§") or (
-                current_variants and any("§" in v for v in current_variants)
-            ):
-                # Handle placeholders - just append them
+        for token in tokens:
+            is_placeholder = len(token) > 1 and token.startswith("§")
+
+            if is_placeholder:
+                # Append the whole placeholder atomically; Step 3 swaps it
+                # for the real Greek digraph.
                 if not current_variants:
-                    current_variants = [char]
+                    current_variants = [token]
                 else:
-                    current_variants = [v + char for v in current_variants]
-            elif char in self.CHARACTER_MAPPINGS:
-                greek_options = self.CHARACTER_MAPPINGS[char]
+                    current_variants = [v + token for v in current_variants]
+            elif token in self.CHARACTER_MAPPINGS:
+                greek_options = self.CHARACTER_MAPPINGS[token]
 
                 if not current_variants:
                     # First character - create initial variants
                     for option in greek_options:
                         if len(current_variants) >= max_variants:
-                            logger.debug(
-                                f"Hit max_expansions limit at first char for: {text}"
-                            )
                             break
                         current_variants.append(option)
                 else:
                     # Subsequent characters - expand existing variants
                     new_variants = []
                     for existing_variant in current_variants:
-                        # First option appends to existing variant (like Java)
+                        # First option appends to existing variant
                         new_variants.append(existing_variant + greek_options[0])
 
                         # Additional options create new branches
                         for option in greek_options[1:]:
                             if len(new_variants) >= max_variants:
-                                logger.debug(
-                                    f"Hit max_expansions limit for: {text}"
-                                )
                                 break
                             new_variants.append(existing_variant + option)
 
@@ -292,11 +295,11 @@ class GreeklishConverter:
 
                     current_variants = new_variants
             else:
-                # Non-Greek character (number, punctuation, etc.) - just append
+                # Non-Greek character (number, punctuation, etc.) - append
                 if not current_variants:
-                    current_variants = [char]
+                    current_variants = [token]
                 else:
-                    current_variants = [v + char for v in current_variants]
+                    current_variants = [v + token for v in current_variants]
 
         # Step 3: Replace placeholders with actual Greek digraphs
         final_variants = []

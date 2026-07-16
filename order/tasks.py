@@ -4,16 +4,13 @@ from html import unescape
 
 from celery import shared_task
 from django.conf import settings
-from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives, mail_admins
 from django.db import transaction
 from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.encoding import force_bytes
 from django.utils.html import strip_tags
-from django.utils.http import urlsafe_base64_encode
 from django.utils.translation import gettext as _
 from django.utils import translation
 
@@ -1821,10 +1818,16 @@ def send_checkout_abandonment_emails() -> int:
         if not cart.user or not cart.user.email:
             continue
         try:
-            uid = urlsafe_base64_encode(force_bytes(cart.user.pk))
-            token = default_token_generator.make_token(cart.user)
+            # Use the shared signing-based helper — the old
+            # uidb64/default_token_generator scheme was removed with the
+            # unsubscribe URL migration, so a hand-rolled link now resolves
+            # to the wrong view and always fails BadSignature (regression).
+            from user.utils.subscription import (
+                generate_blanket_unsubscribe_link,
+            )
+
             unsubscribe_url = (
-                f"{settings.API_BASE_URL.rstrip('/')}/api/v1/user/unsubscribe/{uid}/{token}"
+                generate_blanket_unsubscribe_link(cart.user)
                 if getattr(settings, "API_BASE_URL", None)
                 else ""
             )

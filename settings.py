@@ -3122,11 +3122,14 @@ if not DJSTRIPE_WEBHOOK_SECRET or DJSTRIPE_WEBHOOK_SECRET == "whsec_...":
         )
     DJSTRIPE_WEBHOOK_SECRET = "whsec_dev_placeholder_not_used_for_verification"
 
-# Pin the Stripe API version so library upgrades can't silently shift
-# webhook payload shapes or idempotency keys. Update this in lockstep
-# with the version configured in the Stripe Dashboard. The dj-stripe
-# docs name this setting STRIPE_API_VERSION (not DJSTRIPE_-prefixed).
-STRIPE_API_VERSION = getenv("STRIPE_API_VERSION", "2024-04-10")
+# STRIPE_API_VERSION is intentionally NOT set. dj-stripe pins its own
+# DEFAULT_STRIPE_API_VERSION to match its Django model schema and uses that
+# for ALL Stripe communication, including webhook processing; the dj-stripe
+# docs state the value "should not be changed" (api_versions.md). Overriding
+# it forces dj-stripe to parse payloads shaped for one API version against
+# models built for another, silently corrupting the local Stripe mirror.
+# Ops: any manually-created Stripe Dashboard webhook endpoint should use the
+# account's current API version so its events match dj-stripe's schema.
 STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 
 # Viva Wallet Configuration

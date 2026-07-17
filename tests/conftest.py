@@ -3,7 +3,7 @@ import os
 import pytest
 from django.conf import settings
 from django.contrib.sites.models import Site
-from django.core.cache import cache
+from django.core.cache import caches
 from django.db import connection, connections, reset_queries
 from hypothesis import HealthCheck
 from hypothesis import settings as hypothesis_settings
@@ -48,11 +48,14 @@ settings.MIDDLEWARE = [
     }
 ]
 
-# Use process-local in-memory cache instead of Redis for test isolation.
-# With pytest-xdist (-n auto), each worker is a separate process with its own
-# LocMemCache. This prevents cache.clear() in one worker from doing FLUSHDB
-# on shared Redis and wiping keys that other workers depend on (e.g.
-# django-extra-settings cached values).
+# The ``default`` cache proxy materialised as the production RedisCache at
+# app-load, before this module runs. We intentionally do NOT reset
+# ``django.core.cache.caches``: the Channels middleware tests
+# (``tests/unit/core/middleware/test_channels.py``) patch
+# ``cache._cache.get_client`` directly and require the real Redis backend.
+# Because the registry is not reset, the ``settings.CACHES`` LocMem patch
+# below is inert against that live instance — it only affects code that
+# reads ``settings.CACHES`` directly.
 settings.CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -60,17 +63,17 @@ settings.CACHES = {
     },
 }
 
-# Note: we intentionally do NOT reset ``django.core.cache.caches``
-# here, even though the ``settings.CACHES`` patch above is technically
-# inert against connections that materialised before this point. The
-# Channels middleware tests (``tests/unit/core/middleware/test_channels.py``)
-# patch ``cache._cache.get_client`` directly and assume the default
-# alias is the production Redis backend. Resetting the registry would
-# break those tests. The downstream consequence is that any test
-# caching a non-picklable value (e.g. a ``MagicMock``) via the real
-# ``cache.*`` proxy can crash with ``PicklingError`` — those tests
-# should patch ``cache`` at the module they're testing instead of
-# relying on the proxy (see ``test_dashboard.py``).
+# Every pytest-xdist worker shares that single Redis instance. Isolate them
+# by namespacing every default-cache key with the worker id. Without this,
+# constant keys (e.g. loyalty's ``_TIER_LEVEL_CACHE_KEY`` map) and PK-keyed
+# values (e.g. the parler translation cache, whose PKs collide across the
+# per-worker test databases) leak between workers and produce
+# order-dependent flakes. The teardown clear below deletes only this
+# worker's namespace so it never FLUSHDBs another worker's live keys.
+CACHE_WORKER_PREFIX = "test_%s" % os.environ.get(
+    "PYTEST_XDIST_WORKER", "master"
+)
+caches["default"].key_prefix = CACHE_WORKER_PREFIX
 
 
 # Route django-extra-settings through a DummyCache so every ``Setting.get``
@@ -162,10 +165,30 @@ requires_meilisearch = pytest.mark.skipif(
 )
 
 
+def _reset_worker_cache():
+    """Clear only THIS worker's cache namespace after each test.
+
+    A blanket ``cache.clear()`` is a Redis ``FLUSHDB``; on the shared test
+    Redis that wipes other workers' live keys mid-test, turning their
+    ``assertNumQueries`` cache-hit assertions into flaky misses. Deleting
+    only the worker-prefixed keys keeps each worker's teardown local. Falls
+    back to a plain ``clear()`` for non-Redis backends (e.g. LocMem).
+    """
+    backend = caches["default"]
+    get_client = getattr(getattr(backend, "_cache", None), "get_client", None)
+    if get_client is None:
+        backend.clear()
+        return
+    client = get_client(None, write=True)
+    keys = list(client.scan_iter(match=f"{backend.key_prefix}:*", count=1000))
+    if keys:
+        client.delete(*keys)
+
+
 @pytest.fixture(autouse=True)
 def clear_caches():
     yield
-    cache.clear()
+    _reset_worker_cache()
 
 
 @pytest.fixture(autouse=True)
@@ -311,13 +334,14 @@ def debug_query_count():
 
 @pytest.fixture(autouse=True)
 def _django_clear_cache(request):
-    """Clear default cache before tests that use the DB.
+    """Clear this worker's cache namespace before tests that use the DB.
 
-    Safe in parallel execution because tests use LocMemCache (process-local).
+    Uses the worker-scoped clear (not a global FLUSHDB) so a before-test
+    clear on one worker cannot evict another worker's live keys.
     """
     if request.node.get_closest_marker("django_db"):
         try:
-            cache.clear()
+            _reset_worker_cache()
         except Exception:
             pass
 

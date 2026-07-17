@@ -246,6 +246,7 @@ class Command(BaseCommand):
         tasks = []
         total_count = 0
         batch_count = 0
+        synced_pks: set[str] = set()
 
         try:
             if connection.connection and connection.in_atomic_block:
@@ -267,6 +268,9 @@ class Command(BaseCommand):
 
             if total_records == 0:
                 self.stdout.write("  ├─ No records to sync")
+                # Converge: an empty source set means every remaining
+                # document in the index is stale and must be removed.
+                self._prune_stale_documents(Model, synced_pks)
                 return 0
 
             total_batches = (total_records + batch_size - 1) // batch_size
@@ -285,6 +289,7 @@ class Command(BaseCommand):
                     documents = [
                         self._serialize(m) for m in qs if m.meili_filter()
                     ]
+                    synced_pks.update(doc["pk"] for doc in documents)
                     total_count += len(documents)
 
                     if documents:
@@ -428,10 +433,66 @@ class Command(BaseCommand):
                     f"  ├─ All tasks completed in {task_time:.2f}s"
                 )
 
+            # Converge: remove documents left in the index that are no longer
+            # in the source set (deleted rows, or rows that now fail
+            # meili_filter). Without this the resync is upsert-only and stale
+            # documents (e.g. a deactivated product) linger forever.
+            self._prune_stale_documents(Model, synced_pks)
+
             return total_count
         except Exception as e:
             close_old_connections()
             raise Exception(f"Failed to sync model: {e}")
+
+    def _prune_stale_documents(self, Model, synced_pks: set[str]) -> None:
+        """Delete index documents whose primary key was not synced this run.
+
+        Fetches the primary keys currently in the index (IDs only, paginated)
+        and deletes the set difference against ``synced_pks``. This keeps the
+        index convergent with the database without an empty-index window: live
+        documents are untouched, only orphans are removed.
+        """
+        meili = Model._meilisearch
+        index_name = meili["index_name"]
+        pk_field = meili.get("primary_key", "pk")
+        index = _client.get_index(index_name)
+
+        page_size = 1000
+        offset = 0
+        index_pks: set[str] = set()
+        while True:
+            page = index.get_documents(
+                {"limit": page_size, "offset": offset, "fields": [pk_field]}
+            )
+            hits = page.results
+            if not hits:
+                break
+            for doc in hits:
+                # SDK returns Document objects (attr access); tolerate dicts.
+                value = getattr(doc, pk_field, None)
+                if value is None and isinstance(doc, dict):
+                    value = doc.get(pk_field)
+                if value is not None:
+                    index_pks.add(str(value))
+            if len(hits) < page_size:
+                break
+            offset += page_size
+
+        stale = index_pks - synced_pks
+        if not stale:
+            return
+
+        self.stdout.write(
+            f"  ├─ Pruning {len(stale):,} stale document(s) from {index_name}"
+        )
+        task = index.delete_documents(list(stale))
+        finished = _client.wait_for_task(task.task_uid)
+        if finished.status == "failed":
+            self.stdout.write(
+                self.style.WARNING(
+                    f"  ├─ Warning: prune task failed: {finished.error}"
+                )
+            )
 
     def _update_settings(self, Model):
         """Update settings for a single model's index using the model's method."""

@@ -3,6 +3,64 @@
 
 
 
+## v1.156.5 (2026-07-17)
+
+### Bug fixes
+
+* fix(cart): address guest carts by UUID to close the IDOR (G0079)
+
+Guest carts were looked up by the sequential integer PK carried in the
+X-Cart-Id header, so any anonymous caller could read or mutate another
+guest's cart by incrementing the integer. Parse X-Cart-Id as a UUID and
+filter guest carts by their unguessable uuid instead (mirroring the
+IsOwnerOrAdminOrGuest guest pattern); reject non-UUID headers. CartItem's
+cart_id now exposes the cart uuid rather than the PK, and the OpenAPI
+X-Cart-Id parameter is typed as a UUID. Schema regenerated.
+
+NOTE: requires the coordinated storefront change (send cart.uuid in
+X-Cart-Id) to deploy together — the backend no longer accepts integer ids.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`4a58385`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4a58385ab869ff241f1688fb78d228cc2e09074e))
+
+* fix(meili): make full resync convergent by pruning stale documents
+
+meilisearch_sync_all_indexes was upsert-only: rows deleted from the DB or
+that no longer pass meili_filter (e.g. a deactivated product) kept their
+documents in the index forever, so a full resync never removed them. Track
+the primary keys synced this run and, after the upsert pass, delete index
+documents whose PK is not in that set (paginating IDs only). This converges
+the index to the DB without an empty-index window — live documents are
+untouched, only orphans are removed. The empty-source case prunes all.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`8f131bb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8f131bbafe390bc2f7f23cfa852b75d92303a266))
+
+* fix(meili): serve public search with a read-only key, not the master key
+
+The module-level Meilisearch client authenticated every operation with the
+master key, including the public product/blog/federated search paths. The
+master key can manage keys, indexes and documents, so it must never serve
+untrusted query traffic. Add a second read-only search client (keyed by
+MEILI_SEARCH_KEY, falling back to the master key when unprovisioned) and
+route IndexQuerySet.search/raw_search and the federated multi_search through
+it; index administration and stats stay on the master key.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`3321fca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3321fcae72b9a2b0b70ccda889d47968ac5f5f52))
+
+* fix(payments): stop pinning the stale Stripe API version
+
+STRIPE_API_VERSION was pinned to 2024-04-10 while dj-stripe 2.11's models
+target the 2026 .dahlia schema. dj-stripe uses this version for ALL Stripe
+communication including webhook parsing, so the override forced it to parse
+2024-shaped payloads against 2026 models, silently corrupting the local
+Stripe mirror. Per dj-stripe docs the value "should not be changed" — remove
+the override so it uses the installed SDK's schema-matched api_version.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`2c9199c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2c9199cab483409c171725f76218067f7445eee0))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.156.4 [skip ci] ([`44dce71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/44dce719c4d86ac8337dc25f88e46530a511ee44))
+
 ## v1.156.4 (2026-07-17)
 
 ### Bug fixes

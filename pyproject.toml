@@ -1,5 +1,5 @@
 [project]
-version = "1.156.4"
+version = "1.156.5"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }

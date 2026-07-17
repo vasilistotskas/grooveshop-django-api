@@ -190,7 +190,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -218,7 +218,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -237,7 +237,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
             self.create_url,
             data,
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -270,7 +270,7 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
                 self.create_url,
                 data,
                 format="json",
-                HTTP_X_CART_ID=str(self.cart.id),
+                HTTP_X_CART_ID=str(self.cart.uuid),
             )
 
         # 201 means the payload was accepted and routed correctly

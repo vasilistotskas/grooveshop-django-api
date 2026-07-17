@@ -135,7 +135,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
             self.create_url,
             self._build_payload(pay_way_id=self.online_pay_way.id),
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         assert response.status_code == status.HTTP_201_CREATED, (
@@ -181,7 +181,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
             self.create_url,
             self._build_payload(pay_way_id=self.cod_pay_way.id),
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         assert response.status_code == status.HTTP_201_CREATED, (
@@ -219,7 +219,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
                 pay_way_id=self.online_pay_way.id, include_locker_id=False
             ),
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
@@ -257,7 +257,7 @@ class TestOrderCreateWithBoxNow(APITestCase):
             self.create_url,
             self._build_payload(pay_way_id=self.online_pay_way.id),
             format="json",
-            HTTP_X_CART_ID=str(self.cart.id),
+            HTTP_X_CART_ID=str(self.cart.uuid),
         )
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST

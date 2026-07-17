@@ -25,7 +25,7 @@ class CartServiceTest(TestCase):
 
         self.request = self._create_request_with_headers(
             user=self.user,
-            cart_id=self.cart.id,
+            cart_id=self.cart.uuid,
         )
 
     def _create_request_with_headers(self, user=None, cart_id=None):
@@ -71,7 +71,7 @@ class CartServiceTest(TestCase):
 
         request = self._create_request_with_headers(
             user=self.user,
-            cart_id=guest_cart.id,
+            cart_id=guest_cart.uuid,
         )
 
         CartService(request=request)
@@ -181,7 +181,7 @@ class GuestCartServiceTest(TestCase):
     def test_get_or_create_cart_for_guest_with_existing_cart(self):
         guest_cart = CartFactory(user=None)
 
-        request = self._create_guest_request(cart_id=guest_cart.id)
+        request = self._create_guest_request(cart_id=guest_cart.uuid)
 
         cart_service = CartService(request=request)
         cart = cart_service.get_or_create_cart()
@@ -191,7 +191,7 @@ class GuestCartServiceTest(TestCase):
 
     def test_create_cart_item_for_guest(self):
         guest_cart = CartFactory(user=None)
-        request = self._create_guest_request(cart_id=guest_cart.id)
+        request = self._create_guest_request(cart_id=guest_cart.uuid)
 
         cart_service = CartService(request=request)
         cart_item = cart_service.create_cart_item(self.product, 3)
@@ -209,15 +209,36 @@ class GuestCartServiceTest(TestCase):
 
     def test_guest_cart_with_specific_cart_id(self):
         guest_cart = CartFactory(user=None)
-        cart_id = guest_cart.id
 
-        request = self._create_guest_request(cart_id=cart_id)
+        request = self._create_guest_request(cart_id=guest_cart.uuid)
 
         cart_service = CartService(request=request)
         cart = cart_service.get_or_create_cart()
 
-        self.assertEqual(cart.id, cart_id)
+        self.assertEqual(cart.id, guest_cart.id)
         self.assertIsNone(cart.user)
+
+    def test_guest_cannot_access_cart_via_integer_pk(self):
+        """IDOR guard: the sequential PK must never resolve a guest cart."""
+        victim_cart = CartFactory(user=None)
+        CartItemFactory(cart=victim_cart, product=self.product, quantity=2)
+
+        # Attacker sends the victim's integer PK in X-Cart-Id. It is not a
+        # valid UUID, so it is ignored and the attacker never reaches the
+        # victim's cart.
+        request = self._create_guest_request(cart_id=victim_cart.id)
+        service = CartService(request=request)
+
+        assert service.cart is None or service.cart.id != victim_cart.id
+
+    def test_guest_reaches_own_cart_via_uuid(self):
+        own_cart = CartFactory(user=None)
+
+        request = self._create_guest_request(cart_id=own_cart.uuid)
+        service = CartService(request=request)
+
+        assert service.cart is not None
+        assert service.cart.id == own_cart.id
 
     def test_guest_cart_no_headers_creates_new(self):
         request = self._create_guest_request()
@@ -235,12 +256,12 @@ class GuestCartServiceTest(TestCase):
 
         user = UserAccountFactory(num_addresses=0)
 
-        guest_request = self._create_guest_request(cart_id=guest_cart.id)
+        guest_request = self._create_guest_request(cart_id=guest_cart.uuid)
         guest_service = CartService(request=guest_request)
         self.assertEqual(guest_service.cart.items.count(), 1)
 
         user_request = self._create_request_with_headers(
-            user=user, cart_id=guest_cart.id
+            user=user, cart_id=guest_cart.uuid
         )
 
         user_service = CartService(request=user_request)

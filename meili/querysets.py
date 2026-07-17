@@ -463,8 +463,16 @@ class IndexQuerySet[T: Model]:
             *[When(pk=pk, then=pos) for pos, pk in enumerate(pk_list)]
         )
 
+        # Hydrate via the model's optimized search queryset when it provides
+        # one, so the result serializer doesn't N+1 per hit (e.g. product
+        # master counts / main image). Falls back to the plain manager.
+        get_search_qs = getattr(self.model, "get_search_result_queryset", None)
+        base_qs = (
+            get_search_qs() if callable(get_search_qs) else self.model.objects
+        )
+
         # Fetch Django objects
-        filtered_objects = self.model.objects.filter(pk__in=pk_list).order_by(
+        filtered_objects = base_qs.filter(pk__in=pk_list).order_by(
             preserved_order
         )
 

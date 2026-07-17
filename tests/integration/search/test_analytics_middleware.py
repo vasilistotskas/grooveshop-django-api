@@ -233,6 +233,27 @@ class TestSearchAnalyticsMiddleware:
         # No SearchQuery should be created
         assert SearchQuery.objects.count() == initial_count
 
+    def test_ignores_search_trending_and_analytics(self, request_factory):
+        """The /search/trending and /search/analytics endpoints live under
+        /search/ but are NOT queries — they must not create SearchQuery rows
+        (G0338)."""
+
+        def get_response(request):
+            return HttpResponse("OK", status=200)
+
+        middleware = SearchAnalyticsMiddleware(get_response)
+
+        for path in ("/api/search/trending", "/api/search/analytics"):
+            request = request_factory.get(path, {"query": "laptop"})
+            request.user = Mock(is_authenticated=False)
+            request.session = Mock(session_key="s")
+
+            initial_count = SearchQuery.objects.count()
+            middleware(request)
+            assert SearchQuery.objects.count() == initial_count, (
+                f"{path} should not be tracked as a search"
+            )
+
     def test_ignores_non_200_responses(self, request_factory):
         """Test that failed requests (non-200) are not tracked."""
 

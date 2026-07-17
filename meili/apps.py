@@ -29,11 +29,14 @@ class MeiliConfig(AppConfig):
             celery_available = False
 
         def add_model(**kwargs):
-            """Signal handler for indexing documents on save."""
-            model: IndexMixin = kwargs["instance"]
+            """Signal handler for indexing documents on save.
 
-            if not model.meili_filter():
-                return
+            A save that leaves the instance non-indexable (deactivated,
+            soft-deleted, unpublished, …) removes any existing document so
+            stale data does not linger in the index — previously such a save
+            returned early and the document stayed searchable forever.
+            """
+            model: IndexMixin = kwargs["instance"]
 
             if settings.MEILISEARCH.get("OFFLINE", False):
                 return
@@ -47,7 +50,9 @@ class MeiliConfig(AppConfig):
             if use_async:
 
                 def _dispatch_index():
-                    logger.debug("Indexing Document Async")
+                    logger.debug("Indexing/removing document async")
+                    # index_document_task indexes qualifying instances and
+                    # deletes ones that no longer match meili_filter().
                     index_document_task.delay(
                         app_label=model._meta.app_label,
                         model_name=model._meta.model_name,
@@ -96,7 +101,26 @@ class MeiliConfig(AppConfig):
                     if settings.DEBUG:
                         raise
 
-            transaction.on_commit(_do_sync_index)
+            def _do_sync_remove():
+                try:
+                    logger.debug("Removing filtered-out document sync")
+                    _client.get_index(
+                        model._meilisearch["index_name"]
+                    ).delete_document(_get_document_pk(model))
+                except Exception as e:
+                    logger.error(
+                        f"Error removing filtered-out {model._meta.label} "
+                        f"pk={model.pk}: {e}"
+                    )
+                    if settings.DEBUG:
+                        raise
+
+            # Index if the instance qualifies, otherwise remove any existing
+            # document so it stops being searchable.
+            if model.meili_filter():
+                transaction.on_commit(_do_sync_index)
+            else:
+                transaction.on_commit(_do_sync_remove)
 
         def delete_model(**kwargs):
             """Signal handler for removing documents on delete."""
@@ -242,15 +266,22 @@ class MeiliConfig(AppConfig):
         indexable_models = _discover_indexable_models()
 
         for model in indexable_models:
+            # weak=False is required: add_model/delete_model are closures
+            # defined inside ready(), so with Django's default weak references
+            # they would be garbage-collected once ready() returns, silently
+            # disconnecting the receivers and stopping all signal-driven
+            # indexing/deletion.
             post_save.connect(
                 add_model,
                 sender=model,
                 dispatch_uid=f"meili_save_{model._meta.label}",
+                weak=False,
             )
             post_delete.connect(
                 delete_model,
                 sender=model,
                 dispatch_uid=f"meili_delete_{model._meta.label}",
+                weak=False,
             )
 
         if settings.DEBUG:

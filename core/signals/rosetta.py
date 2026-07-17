@@ -102,8 +102,10 @@ def bump_translation_version_on_save(sender, language_code, request, **kwargs):
     """
     cache.set(TRANSLATION_VERSION_CACHE_KEY, time.time(), timeout=None)
     try:
-        apply_db_overlay(language_code=language_code)
+        # Reload (rebuild base catalogs) BEFORE applying the DB overlay, else
+        # the reload discards the just-applied overlay (G0105).
         _reload_translations()
+        apply_db_overlay(language_code=language_code)
     except Exception:
         logger.exception(
             "Local overlay refresh failed after Rosetta save for %s",

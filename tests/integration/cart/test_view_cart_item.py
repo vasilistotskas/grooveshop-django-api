@@ -8,6 +8,7 @@ from cart.factories.item import CartItemFactory
 from cart.models import CartItem
 from core.utils.testing import TestURLFixerMixin
 from product.factories.product import ProductFactory
+from tests.utils import count_queries
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -71,6 +72,27 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
             "updated_at",
         }
         self.assertTrue(expected_fields.issubset(set(item_data.keys())))
+
+    def test_list_no_n_plus_one(self):
+        """Query count must not grow with the number of cart items (G0088)."""
+        with count_queries() as small:
+            self.client.get(self.list_url)
+
+        for _ in range(3):
+            product = ProductFactory(
+                active=True, num_images=0, num_reviews=0, stock=10
+            )
+            CartItemFactory(cart=self.cart, product=product, quantity=1)
+
+        with count_queries() as large:
+            self.client.get(self.list_url)
+
+        self.assertEqual(
+            small.count,
+            large.count,
+            f"Query count grew from {small.count} to {large.count} when "
+            f"cart items grew — N+1 regression.",
+        )
 
     def test_retrieve_uses_correct_serializer(self):
         response = self.client.get(self.detail_url)

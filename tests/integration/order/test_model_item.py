@@ -137,6 +137,7 @@ class TestOrderItemModel:
     def test_refund_invalid_quantity(self, test_order_item):
         test_order_item.quantity = 5
         test_order_item.refunded_quantity = 0
+        test_order_item.save(update_fields=["quantity", "refunded_quantity"])
 
         with pytest.raises(ValidationError):
             OrderItem.refund(test_order_item, -1)
@@ -146,6 +147,7 @@ class TestOrderItemModel:
     def test_refund_too_much(self, test_order_item):
         test_order_item.quantity = 5
         test_order_item.refunded_quantity = 0
+        test_order_item.save(update_fields=["quantity", "refunded_quantity"])
 
         with pytest.raises(ValidationError):
             OrderItem.refund(test_order_item, 6)
@@ -155,6 +157,7 @@ class TestOrderItemModel:
     def test_refund_partial(self, test_order_item):
         test_order_item.quantity = 5
         test_order_item.refunded_quantity = 0
+        test_order_item.save(update_fields=["quantity", "refunded_quantity"])
 
         result = OrderItem.refund(test_order_item, 2)
 
@@ -164,6 +167,7 @@ class TestOrderItemModel:
     def test_refund_full(self, test_order_item):
         test_order_item.quantity = 5
         test_order_item.refunded_quantity = 0
+        test_order_item.save(update_fields=["quantity", "refunded_quantity"])
 
         result = OrderItem.refund(test_order_item, 5)
 

@@ -27,12 +27,14 @@ def process_order_points(self, order_id: int) -> dict:
 
     total_points = LoyaltyService.award_order_points(order_id)
 
+    # Tier is recalculated inside award_order_points (from the freshly
+    # updated XP); the new-customer bonus does not affect XP, so no further
+    # recalculation is needed here.
     bonus_points = 0
     if total_points > 0 and order.user_id:
         bonus_points = LoyaltyService.check_new_customer_bonus(
             order.user, order
         )
-        LoyaltyService.recalculate_tier(order.user)
 
     return {
         "status": "success",
@@ -55,16 +57,13 @@ def reverse_order_points(self, order_id: int) -> dict:
     from loyalty.services import LoyaltyService
     from order.models.order import Order
 
-    try:
-        order = Order.objects.select_related("user").get(id=order_id)
-    except Order.DoesNotExist:
+    if not Order.objects.filter(id=order_id).exists():
         logger.error("Order %s not found for loyalty reversal", order_id)
         return {"status": "error", "reason": "order_not_found"}
 
+    # Tier is recalculated inside reverse_order_points (from the freshly
+    # updated XP on the locked user row).
     total_reversed = LoyaltyService.reverse_order_points(order_id)
-
-    if order.user_id:
-        LoyaltyService.recalculate_tier(order.user)
 
     return {
         "status": "success",

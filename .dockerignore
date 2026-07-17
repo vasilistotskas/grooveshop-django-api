@@ -16,6 +16,13 @@ infra.compose.yml
 dev.Dockerfile
 Dockerfile
 
+# Secrets / local state that must never be baked into the image (G0205)
+.auth-token
+backups/
+mediafiles_private/
+docker/meilisearch/config.yml
+docker/pg/servers.json
+
 # Distribution / packaging files
 *.egg-info/
 *.egg

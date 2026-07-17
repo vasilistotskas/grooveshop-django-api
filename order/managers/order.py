@@ -29,16 +29,45 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         """Select related payment and location info."""
         return self.select_related("pay_way", "country", "region")
 
-    def with_items(self) -> Self:
-        """Prefetch order items with product data."""
-        return self.prefetch_related(
-            "items__product__translations",
-            "items__product__images__translations",
+    def _enriched_items_prefetch(self) -> Prefetch:
+        """Prefetch ``items`` with each item's product enriched for the
+        embedded ``ProductSerializer`` — translations, category/vat/brand,
+        review/likes counts, main image and attributes — so serializing the
+        order's line items stays O(1) queries (G0226).
+
+        Both the list (``OrderSerializer``) and detail
+        (``OrderDetailSerializer``) responses embed
+        ``OrderItemDetailSerializer`` → the full ``ProductSerializer``, so
+        both tiers need the same enrichment. The Product optimizers are
+        composed directly rather than via ``Product.objects.for_list()`` to
+        avoid its active-only filter — an order legitimately references a
+        product that may later be deactivated.
+        """
+        from order.models.item import OrderItem
+        from product.models.product import Product
+
+        product_qs = (
+            Product.objects.with_translations()
+            .with_category()
+            .with_counts()
+            .with_main_image()
+            .with_product_attributes()
+        )
+        return Prefetch(
+            "items",
+            queryset=OrderItem.objects.prefetch_related(
+                Prefetch("product", queryset=product_qs)
+            ),
         )
 
+    def with_items(self) -> Self:
+        """Prefetch order items with fully enriched product data."""
+        return self.prefetch_related(self._enriched_items_prefetch())
+
     def with_items_basic(self) -> Self:
-        """Prefetch order items without deep product data (for list views)."""
-        return self.prefetch_related("items", "items__product__translations")
+        """Prefetch order items for list views (same enrichment as
+        ``with_items`` — both tiers embed the full product serializer)."""
+        return self.prefetch_related(self._enriched_items_prefetch())
 
     def with_counts(self) -> Self:
         """Annotate with item counts for efficient property access."""
@@ -132,6 +161,24 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
     def refunded(self) -> Self:
         return self.filter(status=OrderStatus.REFUNDED)
 
+    def delete(self) -> tuple[int, dict[str, int]]:
+        """Bulk SOFT-delete, mirroring the per-instance
+        ``SoftDeleteModel.delete()`` contract: ``Order.objects.filter(...)
+        .delete()`` must mark rows deleted, not hard-delete them (G0246).
+        Use ``hard_delete()`` for a real DELETE."""
+        from django.utils import timezone
+
+        count = super().update(is_deleted=True, deleted_at=timezone.now())
+        return count, {self.model._meta.label: count}
+
+    def hard_delete(self) -> tuple[int, dict[str, int]]:
+        """Permanently DELETE the rows, bypassing soft-delete."""
+        return super().delete()
+
+    def restore(self) -> int:
+        """Un-delete previously soft-deleted rows."""
+        return super().update(is_deleted=False, deleted_at=None)
+
 
 class OrderManager(OptimizedManager):
     """
@@ -157,3 +204,13 @@ class OrderManager(OptimizedManager):
     def for_detail(self) -> OrderQuerySet:
         """Return optimized queryset for detail views."""
         return OrderQuerySet(self.model, using=self._db).for_detail()
+
+    def all_with_deleted(self) -> OrderQuerySet:
+        """Base queryset INCLUDING soft-deleted orders — the default
+        ``get_queryset`` applies ``exclude_deleted()``, so deleted rows are
+        otherwise unreachable for admin / audit / reconciliation (G0246)."""
+        return OrderQuerySet(self.model, using=self._db)
+
+    def deleted_only(self) -> OrderQuerySet:
+        """Only the soft-deleted orders."""
+        return OrderQuerySet(self.model, using=self._db).deleted_only()

@@ -257,6 +257,12 @@ class Command(BaseCommand):
             else:
                 queryset = Model.objects.all()
 
+            # Stable ordering is REQUIRED: batch_qs paginates with
+            # LIMIT/OFFSET slices, and without a deterministic ORDER BY
+            # Postgres may return rows in a different order per slice, so
+            # documents get skipped or indexed twice (G0174).
+            queryset = queryset.order_by("pk")
+
             total_records = queryset.count()
 
             if total_records == 0:

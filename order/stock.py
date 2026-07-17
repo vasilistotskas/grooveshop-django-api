@@ -190,11 +190,15 @@ class StockManager:
             >>> StockManager.release_reservation(reservation_id=123)
             # Reservation marked as consumed, audit log created
         """
-        # Fetch the reservation with related product for logging
+        # Lock the reservation row so a concurrent release / convert-to-sale
+        # can't both pass the already-consumed check below and double-process
+        # it (G0289).
         try:
-            reservation = StockReservation.objects.select_related(
-                "product"
-            ).get(id=reservation_id)
+            reservation = (
+                StockReservation.objects.select_for_update()
+                .select_related("product")
+                .get(id=reservation_id)
+            )
         except StockReservation.DoesNotExist:
             raise StockReservationError(
                 f"Reservation {reservation_id} not found"
@@ -268,12 +272,15 @@ class StockManager:
             ... )
             # Reservation marked as consumed, stock decremented, audit log created
         """
-        # Fetch the reservation with related product
-        # We need select_related to avoid an extra query when accessing product
+        # Lock the reservation row (then the product below) so a concurrent
+        # release / convert can't both pass the consumed/expired checks and
+        # double-decrement stock (G0289).
         try:
-            reservation = StockReservation.objects.select_related(
-                "product"
-            ).get(id=reservation_id)
+            reservation = (
+                StockReservation.objects.select_for_update()
+                .select_related("product")
+                .get(id=reservation_id)
+            )
         except StockReservation.DoesNotExist:
             raise StockReservationError(
                 f"Reservation {reservation_id} not found"
@@ -346,6 +353,8 @@ class StockManager:
         quantity: int,
         order_id: int,
         reason: str = "order_created",
+        *,
+        respect_reservations: bool = False,
     ) -> None:
         """
         Directly decrement stock (for admin operations or direct orders).
@@ -398,12 +407,26 @@ class StockManager:
         except Product.DoesNotExist:
             raise ProductNotFoundError(product_id=product_id)
 
-        # Validate sufficient stock
-        # This check is critical to prevent overselling
-        if product.stock < quantity:
+        # Validate sufficient stock. Admin / direct paths check raw physical
+        # stock; the no-reservation checkout fallback opts in to also subtract
+        # OTHER sessions' active reservations so it can't oversell inventory
+        # another shopper has already reserved (G0284).
+        available = product.stock
+        if respect_reservations:
+            now = timezone.now()
+            active_reservations = (
+                StockReservation.objects.select_for_update().filter(
+                    product=product, consumed=False, expires_at__gt=now
+                )
+            )
+            available = product.stock - sum(
+                r.quantity for r in active_reservations
+            )
+
+        if available < quantity:
             raise InsufficientStockError(
                 product_id=product_id,
-                available=product.stock,
+                available=available,
                 requested=quantity,
             )
 

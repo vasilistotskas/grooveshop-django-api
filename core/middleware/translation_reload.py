@@ -79,8 +79,10 @@ class TranslationReloadMiddleware(MiddlewareMixin):
 
         if _local_translation_version != remote_version:
             try:
-                apply_db_overlay()
+                # Reload (rebuild base catalogs) BEFORE applying the DB
+                # overlay, else the reload discards the overlay (G0105).
                 _reload_translations()
+                apply_db_overlay()
             except Exception:
                 logger.exception(
                     "Failed to refresh translations after version tick %s",

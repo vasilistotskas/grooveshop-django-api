@@ -1,5 +1,6 @@
 """C5/C6 — validate_cart_for_checkout rejects deactivated products."""
 
+import pytest
 from django.conf import settings
 from django.test import TestCase
 from djmoney.money import Money
@@ -8,6 +9,9 @@ from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from order.services import OrderService
 from product.factories.product import ProductFactory
+
+
+pytestmark = pytest.mark.assert_english
 
 
 class ValidateCartInactiveProductTestCase(TestCase):

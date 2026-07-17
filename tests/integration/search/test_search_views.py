@@ -1299,78 +1299,59 @@ class TestManagementCommandsExecution:
                 os.unlink(tmp_path)
 
     def test_meilisearch_update_index_settings_command(self):
-        """
-        Test that meilisearch_update_index_settings command executes.
-
-        Validates: Requirements 9.1
+        """The command must update ONLY the provided settings via their
+        dedicated endpoints — never the full-payload update_settings, which
+        would wipe filterable/sortable/searchable/synonyms (G0172).
         """
         from io import StringIO
         from django.core.management import call_command
 
-        # Mock the Meilisearch client
         with patch("meili._client.client.client.index") as mock_index:
             mock_index_obj = Mock()
-            mock_index_obj.update_settings.return_value = {"taskUid": 123}
             mock_index.return_value = mock_index_obj
 
-            # Capture command output
             out = StringIO()
+            call_command(
+                "meilisearch_update_index_settings",
+                "--index",
+                "ProductTranslation",
+                "--max-total-hits",
+                "50000",
+                "--search-cutoff-ms",
+                "1500",
+                stdout=out,
+            )
 
-            # Execute command
-            try:
-                call_command(
-                    "meilisearch_update_index_settings",
-                    "--index",
-                    "ProductTranslation",
-                    "--max-total-hits",
-                    "50000",
-                    "--search-cutoff-ms",
-                    "1500",
-                    stdout=out,
-                )
-
-                # Verify command executed
-                output = out.getvalue()
-                assert len(output) > 0, "Command should produce output"
-
-            except Exception:
-                # Command might fail if index doesn't exist, which is OK for this test
-                # We're just verifying it can be executed
-                pass
+            mock_index_obj.update_pagination_settings.assert_called_once_with(
+                {"maxTotalHits": 50000}
+            )
+            mock_index_obj.update_search_cutoff_ms.assert_called_once_with(1500)
+            # A facet limit was NOT passed, so its endpoint must not fire.
+            mock_index_obj.update_faceting_settings.assert_not_called()
+            # The full-payload wipe path must never be used.
+            mock_index_obj.update_settings.assert_not_called()
 
     def test_meilisearch_update_ranking_command(self):
-        """
-        Test that meilisearch_update_ranking command executes.
-
-        Validates: Requirements 9.2
-        """
+        """The command must update ONLY the ranking rules via the dedicated
+        endpoint — never the full-payload update_settings (G0172)."""
         from io import StringIO
         from django.core.management import call_command
 
-        # Mock the Meilisearch client
         with patch("meili._client.client.client.index") as mock_index:
             mock_index_obj = Mock()
-            mock_index_obj.update_ranking_rules.return_value = {"taskUid": 123}
             mock_index.return_value = mock_index_obj
 
-            # Capture command output
             out = StringIO()
+            call_command(
+                "meilisearch_update_ranking",
+                "--index",
+                "ProductTranslation",
+                "--rules",
+                "words,typo,proximity,attribute,sort,exactness",
+                stdout=out,
+            )
 
-            # Execute command
-            try:
-                call_command(
-                    "meilisearch_update_ranking",
-                    "--index",
-                    "ProductTranslation",
-                    "--rules",
-                    "words,typo,proximity,attribute,sort,exactness",
-                    stdout=out,
-                )
-
-                # Verify command executed
-                output = out.getvalue()
-                assert len(output) > 0, "Command should produce output"
-
-            except Exception:
-                # Command might fail if index doesn't exist, which is OK for this test
-                pass
+            mock_index_obj.update_ranking_rules.assert_called_once_with(
+                ["words", "typo", "proximity", "attribute", "sort", "exactness"]
+            )
+            mock_index_obj.update_settings.assert_not_called()

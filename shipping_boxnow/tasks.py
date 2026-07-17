@@ -62,6 +62,12 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         shipment = BoxNowService.create_shipment_for_order(order)
+    except BoxNowRetryableError:
+        # Transient (HTTP 5xx / connection). Re-raise so Celery's autoretry_for
+        # handles it — BoxNowRetryableError subclasses BoxNowAPIError, so the
+        # handler below would otherwise swallow it as a permanent business
+        # error and the retry policy would be dead code.
+        raise
     except BoxNowAPIError as exc:
         # P-coded business error from BoxNow (e.g. P402 invalid locker,
         # P410 order number conflict). Do not retry — manual intervention
@@ -421,6 +427,10 @@ def poll_boxnow_tracking_one(self, shipment_id: int) -> dict[str, Any]:
 
     try:
         result = BoxNowService.sync_shipment_state(shipment)
+    except BoxNowRetryableError:
+        # Transient — re-raise so autoretry_for retries rather than the
+        # handler below swallowing it as a permanent poll failure.
+        raise
     except BoxNowAPIError as exc:
         logger.warning(
             "BoxNow poll failed for shipment=%s: %s", shipment_id, exc

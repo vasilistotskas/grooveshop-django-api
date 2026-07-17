@@ -48,18 +48,22 @@ _VALID_LANGUAGE_CODES = frozenset(
 # Allowlists for sort fields and facets accepted from external callers.
 # Reject anything not in these sets to prevent filter-injection into
 # the Meilisearch query DSL.
-_ALLOWED_PRODUCT_SORT_FIELDS: frozenset[str] = frozenset(
-    {
-        "finalPrice",
-        "-finalPrice",
-        "likesCount",
-        "-likesCount",
-        "viewCount",
-        "-viewCount",
-        "createdAt",
-        "-createdAt",
-    }
-)
+# Map the camelCase sort values accepted from external callers (the API
+# convention) to the snake_case field names the Meilisearch index actually
+# exposes as sortableAttributes. Anything not in this map is rejected to
+# prevent filter-injection into the query DSL. Previously the allowlist held
+# the camelCase names and they were passed straight to order_by, so sorting
+# silently did nothing — the index only knows the snake_case names.
+_PRODUCT_SORT_FIELD_MAP: dict[str, str] = {
+    "finalPrice": "final_price",
+    "-finalPrice": "-final_price",
+    "likesCount": "likes_count",
+    "-likesCount": "-likes_count",
+    "viewCount": "view_count",
+    "-viewCount": "-view_count",
+    "createdAt": "created_at",
+    "-createdAt": "-created_at",
+}
 _ALLOWED_PRODUCT_FACETS: frozenset[str] = frozenset(
     {
         "category",
@@ -85,6 +89,38 @@ def _parse_int(value: str | None, default: int, name: str) -> int:
         return max(0, int(value))
     except (ValueError, TypeError):
         raise ValidationError({name: _("Must be a valid integer.")})
+
+
+def _parse_optional_int(value: str | None, name: str) -> int | None:
+    """Parse an optional integer filter, raising a 400 (not a 500) on garbage."""
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        raise ValidationError({name: _("Must be a valid integer.")})
+
+
+def _parse_optional_float(value: str | None, name: str) -> float | None:
+    """Parse an optional numeric filter, raising a 400 (not a 500) on garbage."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        raise ValidationError({name: _("Must be a valid number.")})
+
+
+def _parse_int_csv(value: str | None, name: str) -> list[int]:
+    """Parse a comma-separated list of integers, 400 (not 500) on garbage."""
+    if not value:
+        return []
+    try:
+        return [int(v.strip()) for v in value.split(",") if v.strip()]
+    except (ValueError, TypeError):
+        raise ValidationError(
+            {name: _("Must be a comma-separated list of integers.")}
+        )
 
 
 def _validate_language_code(language_code: str | None) -> str | None:
@@ -320,13 +356,30 @@ def product_meili_search(request):
         request.query_params.get("language_code")
     )
 
-    # Parse filter parameters
-    price_min = request.query_params.get("price_min")
-    price_max = request.query_params.get("price_max")
-    likes_min = request.query_params.get("likes_min")
-    views_min = request.query_params.get("views_min")
-    categories_param = request.query_params.get("categories", "")
-    attribute_value_param = request.query_params.get("attributeValues", "")
+    # Parse filter parameters. These come from external callers, so parse
+    # them defensively — invalid numbers must return 400, not raise an
+    # unhandled ValueError (a 500 on the public search endpoint). Note the
+    # keys are snake_case here: the CamelCaseMiddleWare has already
+    # underscoreized the incoming camelCase query-string keys (e.g. the
+    # client sends ``attributeValues``, which arrives as ``attribute_values``).
+    price_min = _parse_optional_float(
+        request.query_params.get("price_min"), "price_min"
+    )
+    price_max = _parse_optional_float(
+        request.query_params.get("price_max"), "price_max"
+    )
+    likes_min = _parse_optional_int(
+        request.query_params.get("likes_min"), "likes_min"
+    )
+    views_min = _parse_optional_int(
+        request.query_params.get("views_min"), "views_min"
+    )
+    category_ids = _parse_int_csv(
+        request.query_params.get("categories"), "categories"
+    )
+    attribute_value_ids = _parse_int_csv(
+        request.query_params.get("attribute_values"), "attribute_values"
+    )
     sort_param = request.query_params.get("sort")
 
     # Parse facets parameter — restrict to known-safe facet fields.
@@ -336,9 +389,6 @@ def product_meili_search(request):
         for f in (fs.strip() for fs in facets_param.split(","))
         if f and f in _ALLOWED_PRODUCT_FACETS
     ]
-
-    # Parse categories (comma-separated)
-    categories = [c.strip() for c in categories_param.split(",") if c.strip()]
 
     # Decode and expand query for Greek language
     decoded_query = unquote(query)
@@ -357,36 +407,29 @@ def product_meili_search(request):
         search_qs = search_qs.locales(language_code)
 
     # Apply price range filters
-    if price_min:
-        search_qs = search_qs.filter(final_price__gte=float(price_min))
-    if price_max:
-        search_qs = search_qs.filter(final_price__lte=float(price_max))
+    if price_min is not None:
+        search_qs = search_qs.filter(final_price__gte=price_min)
+    if price_max is not None:
+        search_qs = search_qs.filter(final_price__lte=price_max)
 
     # Apply popularity filters
-    if likes_min:
-        search_qs = search_qs.filter(likes_count__gte=int(likes_min))
-    if views_min:
-        search_qs = search_qs.filter(view_count__gte=int(views_min))
+    if likes_min is not None:
+        search_qs = search_qs.filter(likes_count__gte=likes_min)
+    if views_min is not None:
+        search_qs = search_qs.filter(view_count__gte=views_min)
 
     # Apply category filter (multi-select with IN operator)
-    if categories:
-        category_ids = [int(c) for c in categories]
+    if category_ids:
         search_qs = search_qs.filter(category__in=category_ids)
 
     # Apply attribute value filter (multi-select with IN operator)
-    if attribute_value_param:
-        attribute_values = [
-            av.strip() for av in attribute_value_param.split(",") if av.strip()
-        ]
-        if attribute_values:
-            attribute_value_ids = [int(av) for av in attribute_values]
-            search_qs = search_qs.filter(
-                attribute_values__in=attribute_value_ids
-            )
+    if attribute_value_ids:
+        search_qs = search_qs.filter(attribute_values__in=attribute_value_ids)
 
-    # Apply sort — silently drop unknown sort fields to prevent DSL injection.
-    if sort_param and sort_param in _ALLOWED_PRODUCT_SORT_FIELDS:
-        search_qs = search_qs.order_by(sort_param)
+    # Apply sort — map the camelCase value to the snake_case field the index
+    # exposes; unknown fields are dropped to prevent DSL injection.
+    if sort_param and sort_param in _PRODUCT_SORT_FIELD_MAP:
+        search_qs = search_qs.order_by(_PRODUCT_SORT_FIELD_MAP[sort_param])
 
     # Add facets for dynamic filter counts and stats
     if facets:
@@ -595,11 +638,14 @@ def federated_search(request):
     product_map = {}
     blog_map = {}
     if product_ids:
+        # Hydrate through the optimized search queryset so the serializer's
+        # per-hit master.{likes_count, review_average, main_image_path, …}
+        # access doesn't N+1 (G0351).
         product_map = {
             obj.pk: obj
-            for obj in ProductTranslation.objects.filter(
+            for obj in ProductTranslation.get_search_result_queryset().filter(
                 pk__in=product_ids
-            ).select_related("master__category", "master__vat")
+            )
         }
     if blog_ids:
         blog_map = {

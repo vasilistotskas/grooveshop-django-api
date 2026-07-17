@@ -124,7 +124,7 @@ jobs:
     timeout-minutes: 20
     services:
       db:
-        image: postgres:17
+        image: postgres:17.10
         env:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
@@ -142,7 +142,7 @@ jobs:
         ports:
           - 6379:6379
       meilisearch:
-        image: getmeili/meilisearch:v1.42.1
+        image: getmeili/meilisearch:v1.49.0
         ports:
           - 7700:7700
         env:

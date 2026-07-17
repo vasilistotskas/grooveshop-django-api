@@ -3,6 +3,9 @@ from django.core.exceptions import ValidationError
 from order.services import OrderService
 
 
+pytestmark = pytest.mark.assert_english
+
+
 @pytest.mark.django_db
 class TestFieldSpecificErrors:
     """

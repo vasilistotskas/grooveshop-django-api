@@ -66,6 +66,21 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
     Raises one of the :class:`MyDataError` subclasses when the
     submission definitively failed.
     """
+    if invoice.mydata_mark:
+        # Already transmitted (it has a MARK) — re-submitting risks AADE 228
+        # and, worse, a failure would ``_persist_failure`` and flip the
+        # invoice from CONFIRMED to REJECTED. Return the existing identifiers
+        # as a synthetic Success so the caller treats it as already-done
+        # (idempotent), mirroring the 228-recovery path (G0262).
+        from order.mydata.parser import ResponseRow as _ResponseRow
+
+        return _ResponseRow(
+            index=0,
+            status_code="Success",
+            invoice_uid=invoice.mydata_uid or "",
+            invoice_mark=invoice.mydata_mark,
+        )
+
     config = load_config()
     if not config.is_ready():
         logger.debug(
@@ -178,6 +193,16 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
         _persist_failure(invoice, code=code, message=message)
         raise MyDataInactiveCounterpartError(message, code=code)
 
+    if row.status_code == "TechnicalError":
+        # AADE gateway fault — includes the empty-200 body the parser
+        # synthesises into a TechnicalError row (auth/routing hiccups).
+        # This is a TRANSPORT fault, not a terminal document rejection:
+        # do NOT ``_persist_failure`` (which would flip the invoice to
+        # REJECTED and skip all retries). Leave ``mydata_status=SUBMITTED``
+        # and raise the retryable transport error so the Celery task's
+        # backoff and the manual-resubmit path keep working (G0260).
+        raise MyDataTransportError(message or "AADE TechnicalError", code=code)
+
     _persist_failure(invoice, code=code, message=message)
     raise MyDataValidationError(message, code=code)
 
@@ -211,7 +236,16 @@ def cancel_invoice(invoice: Any) -> ResponseRow | None:
     first_error = row.errors[0] if row.errors else None
     code = first_error.code if first_error else ""
     message = first_error.message if first_error else row.status_code
-    _persist_failure(invoice, code=code, message=message)
+
+    if row.status_code == "TechnicalError":
+        # Transient AADE gateway fault — retryable, not a terminal
+        # rejection. See ``submit_invoice`` for the full rationale (G0260).
+        raise MyDataTransportError(message or "AADE TechnicalError", code=code)
+
+    # A FAILED cancellation must NOT flip the invoice from CONFIRMED to
+    # REJECTED — it is still validly transmitted at AADE; only the cancel
+    # attempt failed. Record the error without touching mydata_status (G0262).
+    _persist_error_only(invoice, code=code, message=message)
     raise MyDataValidationError(message, code=code)
 
 
@@ -511,6 +545,30 @@ def _persist_failure(invoice: Any, *, code: str, message: str) -> None:
             ]
         )
     invoice.mydata_status = MyDataStatus.REJECTED
+    invoice.mydata_error_code = code[:10]
+    invoice.mydata_error_message = message or ""
+
+
+def _persist_error_only(invoice: Any, *, code: str, message: str) -> None:
+    """Record an error on the invoice WITHOUT changing ``mydata_status``.
+
+    Used when a CONFIRMED invoice's cancellation fails: the document is still
+    validly transmitted at AADE, so it must not be flipped to REJECTED
+    (G0262).
+    """
+    from order.models.invoice import Invoice
+
+    with transaction.atomic():
+        locked = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        locked.mydata_error_code = code[:10]
+        locked.mydata_error_message = message or ""
+        locked.save(
+            update_fields=[
+                "mydata_error_code",
+                "mydata_error_message",
+                "updated_at",
+            ]
+        )
     invoice.mydata_error_code = code[:10]
     invoice.mydata_error_message = message or ""
 

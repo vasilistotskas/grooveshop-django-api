@@ -75,40 +75,42 @@ def _on_user_signed_up(
     enough that the event is barely useful — so we read them here
     rather than letting the Celery task figure it out cold.
     """
-    fbp = ""
-    fbc = ""
-    ip_addr = ""
-    ua = ""
-    event_source_url = ""
+    # Gate on ad-storage consent: without an explicit "granted" signal from
+    # the signup request we must NOT send the registrant's PII to Meta
+    # (G0199). Mirrors the order path (``should_dispatch_for_order`` →
+    # ``_consent_granted``) and the browser pixel, which both gate on the
+    # storefront's ``ad_storage`` consent (Google Consent Mode v2). Fail
+    # closed: no request (e.g. programmatic signup) means no consent signal,
+    # so we skip the dispatch entirely.
+    if request is None:
+        return
 
-    if request is not None:
-        cookies = getattr(request, "COOKIES", {}) or {}
-        fbp = cookies.get("_fbp", "") or ""
-        fbc = cookies.get("_fbc", "") or ""
+    cookies = getattr(request, "COOKIES", {}) or {}
+    if (cookies.get("ad_storage") or "").strip().lower() != "granted":
+        return
 
-        meta = getattr(request, "META", {}) or {}
-        # Production: Cloudflare → Traefik → Nuxt → Django. The Nuxt
-        # ``createHeaders`` helper resolves the real client IP from
-        # ``CF-Connecting-IP`` and forwards it on ``X-Real-IP`` (the
-        # same header allauth uses via ``ALLAUTH_TRUSTED_CLIENT_IP_
-        # HEADER``). Trusting X-Real-IP from any other path would be
-        # spoofable, but the Nuxt internal cluster call is the only
-        # ingress that reaches Django at this stage of the signup
-        # flow, and ``USE_X_FORWARDED_HOST`` already pins the trust
-        # boundary at the proxy.
-        # Trust X-Real-IP only — set by the Nuxt proxy via
-        # ``CF-Connecting-IP``. The leftmost ``X-Forwarded-For`` entry
-        # is client-supplied and trivially spoofable to poison Meta's
-        # match quality or attribute the registration to a victim's IP.
-        # If no proxy header is present we fall back to ``REMOTE_ADDR``
-        # so dev/CI still get something usable.
-        ip_addr = (meta.get("HTTP_X_REAL_IP") or "").strip()
-        if not ip_addr:
-            ip_addr = meta.get("REMOTE_ADDR", "") or ""
-        ua = meta.get("HTTP_USER_AGENT", "") or ""
-        # ``HTTP_REFERER`` is the storefront page that submitted the
-        # signup form — Meta uses it for content matching.
-        event_source_url = meta.get("HTTP_REFERER", "") or ""
+    fbp = cookies.get("_fbp", "") or ""
+    fbc = cookies.get("_fbc", "") or ""
+
+    meta = getattr(request, "META", {}) or {}
+    # Production: Cloudflare → Traefik → Nuxt → Django. The Nuxt
+    # ``createHeaders`` helper resolves the real client IP from
+    # ``CF-Connecting-IP`` and forwards it on ``X-Real-IP`` (the same header
+    # allauth uses via ``ALLAUTH_TRUSTED_CLIENT_IP_HEADER``). Trusting
+    # X-Real-IP from any other path would be spoofable, but the Nuxt internal
+    # cluster call is the only ingress that reaches Django at this stage of
+    # the signup flow, and ``USE_X_FORWARDED_HOST`` already pins the trust
+    # boundary at the proxy. The leftmost ``X-Forwarded-For`` entry is
+    # client-supplied and trivially spoofable to poison Meta's match quality
+    # or attribute the registration to a victim's IP. If no proxy header is
+    # present we fall back to ``REMOTE_ADDR`` so dev/CI still get something.
+    ip_addr = (meta.get("HTTP_X_REAL_IP") or "").strip()
+    if not ip_addr:
+        ip_addr = meta.get("REMOTE_ADDR", "") or ""
+    ua = meta.get("HTTP_USER_AGENT", "") or ""
+    # ``HTTP_REFERER`` is the storefront page that submitted the signup
+    # form — Meta uses it for content matching.
+    event_source_url = meta.get("HTTP_REFERER", "") or ""
 
     # Wrapped in on_commit so the worker sees the committed user row.
     # The allauth signup flow runs inside an atomic block; dispatching

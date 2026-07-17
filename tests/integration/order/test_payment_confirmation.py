@@ -190,6 +190,36 @@ class TestPaymentConfirmationActualTransition:
                 f"Order status should remain {initial_order_status}, got {order.status}"
             )
 
+    def test_payment_on_canceled_order_records_receipt_without_shipment(self):
+        """A late payment on a CANCELED order records the money and flags it
+        for manual refund, but must NOT dispatch courier shipment creation
+        (G0281)."""
+        from unittest.mock import patch
+
+        payment_id = "pi_test_canceled_late_payment"
+        order = OrderFactory(
+            status=OrderStatus.CANCELED,
+            payment_status=PaymentStatus.PENDING,
+            payment_id=payment_id,
+            num_order_items=0,
+        )
+
+        with patch(
+            "order.services.OrderService._dispatch_shipment_creation_task"
+        ) as mock_dispatch:
+            result = OrderService.handle_payment_succeeded(payment_id)
+
+        assert result is not None
+        mock_dispatch.assert_not_called()
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+        assert order.payment_status == PaymentStatus.COMPLETED
+        assert "payment_after_cancel" in (order.metadata or {})
+        assert order.metadata["payment_after_cancel"]["payment_id"] == (
+            payment_id
+        )
+
     @pytest.mark.parametrize(
         "order_scenario",
         [

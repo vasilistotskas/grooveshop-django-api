@@ -448,6 +448,27 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             )
         )
 
+    @classmethod
+    def get_search_result_queryset(cls):
+        """Optimized queryset for hydrating Meilisearch product hits.
+
+        The search-result serializer reads ``obj.master.{slug, price,
+        final_price, vat.value, likes_count, review_average, main_image_path}``
+        per hit, so the master is prefetched through the Product optimizers
+        that annotate ``likes_count`` / ``review_average`` (matching the
+        property names — NOT the ``_``-prefixed indexing annotations) and
+        prefetch its main image. Without this the enrichment loop runs ~4 DB
+        queries per hit on the hottest public endpoint (G0336/G0351).
+        """
+        from django.db.models import Prefetch
+
+        master_qs = (
+            Product.objects.with_category().with_counts().with_main_image()
+        )
+        return cls.objects.prefetch_related(
+            Prefetch("master", queryset=master_qs)
+        )
+
     def meili_filter(self) -> bool:
         """
         Determine if this translation should be indexed.

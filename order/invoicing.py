@@ -389,8 +389,21 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
         invoice_number = InvoiceCounter.allocate(issue_date.year)
         invoice = Invoice(order=order)
 
-    vat_breakdown = _compute_vat_breakdown(order)
-    totals = _order_totals(order, vat_breakdown)
+    if existing and force and existing.mydata_mark:
+        # Once transmitted to AADE (has a MARK) the invoice's financial
+        # values are LEGALLY frozen. A corrective PDF regen must reuse the
+        # persisted breakdown/totals rather than recompute from the
+        # possibly-changed order, or the PDF would disagree with the
+        # AADE-registered invoice (G0263).
+        vat_breakdown = existing.vat_breakdown
+        totals = {
+            "subtotal": existing.subtotal,
+            "total_vat": existing.total_vat,
+            "total": existing.total,
+        }
+    else:
+        vat_breakdown = _compute_vat_breakdown(order)
+        totals = _order_totals(order, vat_breakdown)
     currency = (
         order.paid_amount.currency.code
         if order.paid_amount

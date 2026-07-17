@@ -22,6 +22,7 @@ from order.serializers.order import (
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
+from tests.utils import count_queries
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -179,6 +180,50 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         actual_fields = set(response.data.keys())
         self.assertEqual(actual_fields, expected_fields)
 
+    def test_update_does_not_mutate_line_items(self):
+        """Order line items must NOT be delete+recreated by an order update —
+        that bypassed stock accounting and total recomputation (G0222). The
+        original items (with their committed stock) stay intact."""
+        self.client.force_authenticate(user=self.admin_user)
+
+        original_item_ids = sorted(
+            self.order.items.values_list("id", flat=True)
+        )
+        original_qtys = dict(self.order.items.values_list("id", "quantity"))
+
+        payload = {
+            "user": self.user.id,
+            "pay_way": self.pay_way.id,
+            "country": self.country.alpha_2,
+            "region": self.region.alpha,
+            "email": f"noitem-{uuid.uuid4().hex[:8]}@example.com",
+            "first_name": "Updated",
+            "last_name": "Name",
+            "street": "456 New St",
+            "street_number": "Unit 1",
+            "city": "Boston",
+            "zipcode": "02101",
+            "phone": "+12345678902",
+            "shipping_price": Decimal("15.00"),
+            # Attempt to replace the two items with a single (valid) one.
+            "items": [
+                {"product": self.order_items[0].product.id, "quantity": 1}
+            ],
+        }
+
+        response = self.client.put(
+            self.get_order_detail_url(self.order.id), payload, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Scalar field updated, but the line items are untouched.
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.city, "Boston")
+        current_items = list(self.order.items.all())
+        self.assertEqual(sorted(i.id for i in current_items), original_item_ids)
+        for item in current_items:
+            self.assertEqual(item.quantity, original_qtys[item.id])
+
     def test_partial_update_uses_correct_serializer(self):
         self.client.force_authenticate(user=self.admin_user)
 
@@ -199,6 +244,41 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
         self.assertEqual(len(response.data["results"]), 2)
+
+    def test_list_no_n_plus_one(self):
+        """Order-list query count must not grow with the number of orders or
+        their line items (G0226)."""
+        self.client.force_authenticate(user=self.admin_user)
+
+        with count_queries() as small:
+            self.client.get(self.list_url)
+
+        for _ in range(2):
+            order = OrderFactory(
+                user=self.user,
+                status=OrderStatus.PENDING.value,
+                pay_way=self.pay_way,
+                country=self.country,
+                region=self.region,
+            )
+            for product in ProductFactory.create_batch(
+                2, active=True, num_images=1, num_reviews=2, stock=20
+            ):
+                order.items.create(
+                    product=product,
+                    price=Money("10.00", settings.DEFAULT_CURRENCY),
+                    quantity=1,
+                )
+
+        with count_queries() as large:
+            self.client.get(self.list_url)
+
+        self.assertEqual(
+            small.count,
+            large.count,
+            f"Query count grew from {small.count} to {large.count} when "
+            f"orders/items grew — N+1 regression.",
+        )
 
     def test_create_order(self):
         self.client.force_authenticate(user=self.admin_user)

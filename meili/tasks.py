@@ -74,10 +74,29 @@ def index_document_task(
             )
             return {"status": "skipped", "reason": "instance_not_found"}
 
-        # Check if it should be indexed
+        # Check if it should be indexed. If it no longer qualifies (e.g. the
+        # product was deactivated or soft-deleted), REMOVE any existing
+        # document instead of leaving stale, still-searchable data behind.
+        # This is the update path: post_save fires this task, and a save that
+        # flips meili_filter() to False must delete the document.
         if not instance.meili_filter():
-            logger.debug(f"Model {app_label}.{model_name} pk={pk} filtered out")
-            return {"status": "skipped", "reason": "filtered_out"}
+            index_name = instance._meilisearch["index_name"]
+            document_pk = _get_document_pk(instance)
+            logger.debug(
+                f"Model {app_label}.{model_name} pk={pk} filtered out; "
+                f"removing document {document_pk} from {index_name}"
+            )
+            try:
+                task = _client.get_index(index_name).delete_document(
+                    document_pk
+                )
+                _client.wait_for_task(task.task_uid, timeout_in_ms=5000)
+            except Exception as exc:
+                logger.warning(
+                    f"Failed to remove filtered-out document {document_pk} "
+                    f"from {index_name}: {exc}"
+                )
+            return {"status": "removed", "reason": "filtered_out"}
 
         # Serialize and index
         serialized = instance.meili_serialize()

@@ -1,3 +1,4 @@
+import pytest
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -20,6 +21,9 @@ languages = [
 ]
 default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 User = get_user_model()
+
+
+pytestmark = pytest.mark.assert_english
 
 
 class ProductReviewViewSetTestCase(APITestCase):

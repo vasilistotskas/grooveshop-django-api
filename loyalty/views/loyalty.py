@@ -160,6 +160,7 @@ class LoyaltyViewSet(BaseModelViewSet):
         currency = serializer.validated_data["currency"]
         order_id = serializer.validated_data["order_id"]
 
+        from order.enum.status import OrderStatus
         from order.models.order import Order
 
         try:
@@ -168,6 +169,36 @@ class LoyaltyViewSet(BaseModelViewSet):
             return Response(
                 {"detail": _("Order not found or does not belong to you.")},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # A redemption only reduces what the customer pays while the order is
+        # still pending; redeeming against an already-settled order would just
+        # burn points for nothing.
+        if order.status != OrderStatus.PENDING:
+            return Response(
+                {
+                    "detail": _(
+                        "Points can only be redeemed on a pending order."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # One redemption per order — otherwise repeated calls drain the
+        # balance while only the last discount is recorded on the order.
+        from loyalty.enum import TransactionType
+
+        if PointsTransaction.objects.filter(
+            reference_order=order,
+            transaction_type=TransactionType.REDEEM,
+        ).exists():
+            return Response(
+                {
+                    "detail": _(
+                        "Points have already been redeemed for this order."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Cap discount to the products total (excluding shipping/fees)

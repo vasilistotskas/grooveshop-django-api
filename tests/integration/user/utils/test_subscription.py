@@ -160,35 +160,43 @@ class TestSubscriptionUtils:
         assert result is False
 
     @override_settings(API_BASE_URL="https://api.test-site.com")
-    @patch("user.utils.subscription.default_token_generator")
-    @patch("user.utils.subscription.urlsafe_base64_encode")
-    def test_generate_unsubscribe_link(self, mock_encode, mock_token_gen):
-        mock_token_gen.make_token.return_value = "test-token"
-        mock_encode.return_value = "encoded-uid"
+    @patch("user.utils.subscription._make_unsubscribe_token")
+    def test_generate_unsubscribe_link(self, mock_token):
+        mock_token.return_value = "signed-token"
 
         result = generate_unsubscribe_link(self.user, self.topic)
 
         # Points directly at the Django API so List-Unsubscribe headers work
-        # without a Nuxt frontend page.
-        expected_url = "https://api.test-site.com/api/v1/user/unsubscribe/encoded-uid/test-token/test-newsletter"
+        # without a Nuxt frontend page. The signed token is a single path
+        # segment (no uidb64 — the token already carries the user pk).
+        expected_url = "https://api.test-site.com/api/v1/user/unsubscribe/signed-token/test-newsletter"
         assert result == expected_url
-        mock_token_gen.make_token.assert_called_once_with(self.user)
-        mock_encode.assert_called_once()
+        mock_token.assert_called_once_with(self.user)
 
     @override_settings(API_BASE_URL="https://api.test-site.com/")
-    @patch("user.utils.subscription.default_token_generator")
-    @patch("user.utils.subscription.urlsafe_base64_encode")
-    def test_generate_unsubscribe_link_strips_trailing_slash(
-        self, mock_encode, mock_token_gen
-    ):
+    @patch("user.utils.subscription._make_unsubscribe_token")
+    def test_generate_unsubscribe_link_strips_trailing_slash(self, mock_token):
         """Trailing slash on API_BASE_URL must not produce a double slash."""
-        mock_token_gen.make_token.return_value = "test-token"
-        mock_encode.return_value = "encoded-uid"
+        mock_token.return_value = "signed-token"
 
         result = generate_unsubscribe_link(self.user, self.topic)
 
-        expected_url = "https://api.test-site.com/api/v1/user/unsubscribe/encoded-uid/test-token/test-newsletter"
+        expected_url = "https://api.test-site.com/api/v1/user/unsubscribe/signed-token/test-newsletter"
         assert result == expected_url
+
+    @override_settings(API_BASE_URL="https://api.test-site.com")
+    def test_unsubscribe_token_round_trips_to_user_pk(self):
+        """The generated token is a signing value that decodes back to the
+        user's pk under the dedicated salt — independent of the user's
+        password/last_login (unlike the old password-reset token)."""
+        from django.core import signing
+
+        from user.utils.subscription import UNSUBSCRIBE_SALT
+
+        url = generate_unsubscribe_link(self.user, self.topic)
+        token = url.rsplit("/", 2)[1]
+
+        assert signing.loads(token, salt=UNSUBSCRIBE_SALT) == self.user.pk
 
     @override_settings(
         DEFAULT_FROM_EMAIL="noreply@test.com",

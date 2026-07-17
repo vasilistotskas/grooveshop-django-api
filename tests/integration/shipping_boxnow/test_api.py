@@ -85,20 +85,26 @@ class TestLockerNearestEndpoint:
         return reverse("shipping-boxnow-locker-nearest")
 
     def test_nearest_calls_boxnow_api_and_returns_locker(self):
-        """Happy path: mocked BoxNow client returns a locker dict."""
+        """Happy path: mocked BoxNow client returns a locker dict.
+
+        The mock uses BoxNow's REAL camelCase keys (imageUrl / postalCode /
+        addressLine1 / addressLine2), and the response must surface the
+        address fields — the serializer previously declared snake_case names
+        with no source, silently dropping them (G0056).
+        """
         mock_locker = {
             "id": "4",
             "type": "apm",
-            "image": "",
+            "imageUrl": "https://cdn.boxnow.gr/apm-4.png",
             "lat": "38.0",
             "lng": "23.7",
             "title": "Test Locker",
             "name": "Chalandri Locker",
-            "postal_code": "15232",
+            "postalCode": "15232",
             "country": "GR",
             "note": "",
-            "address_line_1": "Leoforos 125",
-            "address_line_2": "",
+            "addressLine1": "Leoforos 125",
+            "addressLine2": "Building B",
             "region": "el-GR",
             "distance": 0.5,
         }
@@ -121,6 +127,13 @@ class TestLockerNearestEndpoint:
         data = response.json()
         assert data["id"] == "4"
         assert data["name"] == "Chalandri Locker"
+        # The address fields must be mapped from BoxNow's camelCase source
+        # keys; the API re-camelCases them on output (postal_code →
+        # postalCode etc. via djangorestframework-camel-case).
+        assert data["postalCode"] == "15232"
+        assert data["addressLine1"] == "Leoforos 125"
+        assert data["addressLine2"] == "Building B"
+        assert data["image"] == "https://cdn.boxnow.gr/apm-4.png"
 
     def test_nearest_missing_required_fields_returns_400(self):
         """Missing required body fields returns 400."""

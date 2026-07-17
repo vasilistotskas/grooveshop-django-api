@@ -1204,20 +1204,19 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         return order
 
     def update(self, instance, validated_data):
-        items_data = validated_data.pop("items", None)
+        # Order line items are immutable after creation: each carries a
+        # committed stock reservation/deduction and a price snapshot.
+        # Deleting + recreating them here (owner-reachable via PUT/PATCH)
+        # bypassed ALL stock accounting and total recomputation, letting a
+        # customer silently corrupt inventory and order totals (G0222). We
+        # drop any ``items`` from the payload and update only the editable
+        # scalar fields; changing what was ordered goes through the
+        # dedicated refund/cancel service flows, not a raw serializer write.
+        validated_data.pop("items", None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-
-        if items_data is not None:
-            instance.items.all().delete()
-
-            for item_data in items_data:
-                product = item_data.get("product")
-                item_to_create = item_data.copy()
-                item_to_create["price"] = product.final_price
-                OrderItem.objects.create(order=instance, **item_to_create)
 
         return instance
 

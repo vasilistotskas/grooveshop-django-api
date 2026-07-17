@@ -19,6 +19,8 @@ from blog.serializers.comment import (
 from blog.serializers.post import (
     BlogPostDetailSerializer,
 )
+from rest_framework.permissions import IsAuthenticated
+
 from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
@@ -147,11 +149,16 @@ class BlogCommentViewSet(BaseModelViewSet):
             "update",
             "partial_update",
             "destroy",
-            "update_likes",
             "liked_comments",
             "my_comments",
         ]:
             permission_classes.append(IsOwnerOrAdmin)
+        elif self.action == "update_likes":
+            # Liking is meant for OTHER users' comments, so it must not
+            # require comment ownership — any authenticated user may toggle
+            # a like on any comment (IsOwnerOrAdmin here made likes
+            # owner-only, i.e. nobody could like another user's comment).
+            permission_classes.append(IsAuthenticated)
         return [permission() for permission in permission_classes]
 
     @action(detail=True, methods=["GET"])

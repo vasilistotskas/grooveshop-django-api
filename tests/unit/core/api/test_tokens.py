@@ -20,6 +20,9 @@ from core.api.tokens import (
 User = get_user_model()
 
 
+pytestmark = pytest.mark.assert_english
+
+
 class TestSessionTokenStrategy:
     @pytest.fixture(autouse=True)
     def _disable_knox_token_limit(self, monkeypatch):

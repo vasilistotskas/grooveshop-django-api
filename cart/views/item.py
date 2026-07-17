@@ -174,13 +174,22 @@ class CartItemViewSet(BaseModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
+        # Route through the optimizers so the nested ProductSerializer in the
+        # item list doesn't N+1 per line (G0088): for_list() prefetches the
+        # product + translations, for_detail() adds product images.
+        base = (
+            CartItem.objects.for_list()
+            if self.action == "list"
+            else CartItem.objects.for_detail()
+        )
+
         if user.is_staff:
-            return CartItem.objects.all()
+            return base
 
         if not self.cart_service.cart:
             return CartItem.objects.none()
 
-        return CartItem.objects.filter(cart=self.cart_service.cart)
+        return base.filter(cart=self.cart_service.cart)
 
     def get_object(self):
         pk = self.kwargs.get("pk")

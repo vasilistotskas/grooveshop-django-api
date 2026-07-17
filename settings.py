@@ -77,8 +77,9 @@ _default_allowed_hosts = "localhost,127.0.0.1,0.0.0.0" if DEBUG else ""
 additional_hosts = getenv("ALLOWED_HOSTS", _default_allowed_hosts).split(",")
 ALLOWED_HOSTS.extend(filter(None, additional_hosts))
 
-if "testserver" not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append("testserver")
+# 'testserver' is NOT appended here — Django's setup_test_environment()
+# (invoked by pytest-django) adds it for the duration of test runs, so
+# hard-coding it also leaked it into the production ALLOWED_HOSTS (G0357).
 
 USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "True") == "True"
 if SYSTEM_ENV == "production" and not USE_X_FORWARDED_HOST:
@@ -133,7 +134,9 @@ LOCAL_APPS = [
 THIRD_PARTY_APPS = [
     "channels",
     "rest_framework",
-    "rest_framework.authtoken",
+    # rest_framework.authtoken is intentionally NOT installed — auth is
+    # Knox (BoundedTokenAuthentication) + session; the DRF token app was
+    # unused and only widened the schema-endpoint auth surface (G0358).
     "corsheaders",
     "mptt",
     "tinymce",
@@ -285,6 +288,9 @@ REST_FRAMEWORK = {
         "cart_mutation_anon": None if DEBUG else "30/minute",
         "search": None if DEBUG else "120/minute",
         "view_count": None if DEBUG else "60/hour",
+        # Public proxies to rate-limited carrier partner APIs.
+        "acs_address": None if DEBUG else "30/minute",
+        "boxnow_nearest": None if DEBUG else "10/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -674,6 +680,19 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "anonymize-old-search-queries": {
+            "task": "search.tasks.anonymize_old_search_queries",
+            "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "kwargs": {"days": 90},
+        },
+        "cleanup-expired-data-exports": {
+            "task": "user.tasks.cleanup_expired_data_exports",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "send-inactive-user-notifications": {
             "task": "core.tasks.send_inactive_user_notifications",
             "schedule": SCHEDULE_PRESETS["monthly_first_6am"]
@@ -971,7 +990,13 @@ DB_POOL_TIMEOUT = float(getenv("DB_POOL_TIMEOUT", "10"))
 _db_options: dict = {
     "connect_timeout": 5,
     "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
-    "sslmode": getenv("DB_SSLMODE", "prefer"),
+    # Enforce TLS to Postgres in production ('require' rejects an
+    # unencrypted connection); dev/ci default to 'prefer' since local
+    # Postgres usually has no server cert (G0362).
+    "sslmode": getenv(
+        "DB_SSLMODE",
+        "require" if SYSTEM_ENV == "production" else "prefer",
+    ),
 }
 if DB_POOL_ENABLED:
     _db_options["pool"] = {
@@ -2718,14 +2743,10 @@ SPECTACULAR_SETTINGS = {
     "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
     "AUTHENTICATION_WHITELIST": [
         "knox.auth.TokenAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "SERVE_AUTHENTICATION": [
         "knox.auth.TokenAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "POSTPROCESSING_HOOKS": [

@@ -206,6 +206,97 @@ class OrderService:
             ) from e
 
     @classmethod
+    def _consume_stock_for_order(cls, *, order, cart, cart_items, reservations):
+        """Reconcile session reservations against the cart, then decrement
+        physical stock exactly once per product.
+
+        The cart is the source of truth for how much stock each product owes.
+        For each product the session's reservations are converted to sale
+        decrements up to the cart quantity (linking them to the order and
+        keeping the audit trail); any surplus reservation is released, and any
+        shortfall is decremented directly. This guards against duplicate
+        reserve calls (double decrement), missing/expired reservations
+        (skipped decrement), a reservation that now overshoots a reduced cart
+        quantity, and oversell — none of which the previous
+        convert-every-reservation loop caught.
+
+        Must run inside the order-creation ``transaction.atomic`` block;
+        ``convert_reservation_to_sale``/``decrement_stock`` lock each product
+        row, so an insufficient-stock product raises ``InsufficientStockError``
+        and rolls the order back.
+
+        Returns the list of converted reservation ids (stored on the order for
+        parity with the cancel path).
+        """
+        needed: dict[int, int] = {}
+        for cart_item in cart_items:
+            needed[cart_item.product_id] = (
+                needed.get(cart_item.product_id, 0) + cart_item.quantity
+            )
+
+        reservations_by_product: dict[int, list] = {}
+        for reservation in reservations:
+            reservations_by_product.setdefault(
+                reservation.product_id, []
+            ).append(reservation)
+
+        converted_ids: list[int] = []
+
+        def _release(reservation):
+            try:
+                StockManager.release_reservation(reservation.id)
+            except StockReservationError as exc:
+                # Already consumed/released — nothing physical to undo.
+                logger.debug(
+                    "Reservation %s not released during checkout: %s",
+                    reservation.id,
+                    exc,
+                )
+
+        for product_id, quantity in needed.items():
+            covered = 0
+            for reservation in reservations_by_product.pop(product_id, []):
+                if covered >= quantity:
+                    # Surplus hold (e.g. a duplicate reserve call) — free it.
+                    _release(reservation)
+                elif reservation.is_expired:
+                    # An expired hold cannot be converted (convert_reservation_
+                    # to_sale rejects expired reservations). Release it and let
+                    # the shortfall decrement below take the amount still owed
+                    # from physical stock — a lapsed TTL must not fail an
+                    # otherwise-fulfillable checkout.
+                    _release(reservation)
+                elif covered + reservation.quantity <= quantity:
+                    # Reservation fits within what is still owed — convert it.
+                    StockManager.convert_reservation_to_sale(
+                        reservation_id=reservation.id, order_id=order.id
+                    )
+                    converted_ids.append(reservation.id)
+                    covered += reservation.quantity
+                else:
+                    # Reservation overshoots the remaining need — release it
+                    # and let the shortfall decrement below take the exact
+                    # amount still owed.
+                    _release(reservation)
+            if covered < quantity:
+                StockManager.decrement_stock(
+                    product_id=product_id,
+                    quantity=quantity - covered,
+                    order_id=order.id,
+                    reason=f"Order {order.id} created from cart {cart.uuid}",
+                    # Checkout path: don't oversell the shortfall against
+                    # inventory other sessions have actively reserved (G0284).
+                    respect_reservations=True,
+                )
+
+        # Release reservations for products no longer in the cart.
+        for leftovers in reservations_by_product.values():
+            for reservation in leftovers:
+                _release(reservation)
+
+        return converted_ids
+
+    @classmethod
     @transaction.atomic
     def create_order_from_cart(
         cls,
@@ -436,61 +527,12 @@ class OrderService:
                 cart.items.select_for_update().select_related("product")
             )
 
-            # Check if any reservations have expired
-            expired_reservations = [r for r in reservations if r.is_expired]
-            active_reservations = [r for r in reservations if not r.is_expired]
-
-            if expired_reservations:
-                logger.warning(
-                    "Found %d expired reservations for cart %s. Recreating them.",
-                    len(expired_reservations),
-                    cart.uuid,
-                )
-                # Release expired reservations
-                for expired_res in expired_reservations:
-                    try:
-                        StockManager.release_reservation(expired_res.id)
-                    except Exception as e:
-                        logger.warning(
-                            "Failed to release expired reservation %s: %s",
-                            expired_res.id,
-                            e,
-                        )
-
-                # Recreate reservations for cart items
-                active_reservations = []
-                for cart_item in cart_items:
-                    try:
-                        new_reservation = StockManager.reserve_stock(
-                            product_id=cart_item.product.id,
-                            quantity=cart_item.quantity,
-                            session_id=str(cart.uuid),
-                            user_id=cart.user.id if cart.user else None,
-                        )
-                        active_reservations.append(new_reservation)
-                        logger.info(
-                            "Created new reservation %s for product %s",
-                            new_reservation.id,
-                            cart_item.product.id,
-                        )
-                    except InsufficientStockError as e:
-                        logger.error(
-                            "Insufficient stock for product %s: %s",
-                            cart_item.product.id,
-                            e,
-                        )
-                        raise
-
-                reservations = active_reservations
-
-            if not reservations and cart_items:
-                logger.warning(
-                    "No stock reservations found for cart %s. "
-                    "This may indicate the reservation expired or was never created.",
-                    cart.uuid,
-                )
-                # We'll proceed without reservations and use direct stock decrement
-                # This handles cases where reservations expired or weren't created
+            # Reservations (active, expired, or duplicated) are reconciled
+            # against the cart in Step 7 via _consume_stock_for_order, which
+            # releases every hold and decrements physical stock by the cart
+            # quantity. Expired holds therefore need no special handling here:
+            # a lapsed hold whose stock was taken by another session simply
+            # fails the decrement below and rolls the whole checkout back.
 
             # Step 5: Create Order with payment_id field populated
             # Determine target currency from shipping address or default
@@ -604,9 +646,6 @@ class OrderService:
             if sanitised_meta:
                 order.metadata["meta"] = sanitised_meta
 
-            # Track reservation IDs for this order
-            reservation_ids = []
-
             # Step 6: Create OrderItems from CartItems
             for cart_item in cart_items:
                 product = cart_item.product
@@ -652,60 +691,19 @@ class OrderService:
                     price=item_price,
                 )
 
-            # Step 7: Convert stock reservations to decrements via StockManager
-            if reservations:
-                # We have reservations - convert them to stock decrements
-                for reservation in reservations:
-                    try:
-                        StockManager.convert_reservation_to_sale(
-                            reservation_id=reservation.id, order_id=order.id
-                        )
-                        reservation_ids.append(reservation.id)
-                        logger.info(
-                            "Converted reservation %s to sale for order %s",
-                            reservation.id,
-                            order.id,
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Failed to convert reservation %s: %s",
-                            reservation.id,
-                            e,
-                            exc_info=True,
-                        )
-                        # Rollback will happen due to @transaction.atomic
-                        raise
-            else:
-                # No reservations - use direct stock decrement
-                # This handles cases where reservations expired or weren't created
-                logger.info(
-                    "No reservations found for cart %s, using direct stock decrement",
-                    cart.uuid,
-                )
-                for order_item in order.items.select_related("product").all():
-                    try:
-                        StockManager.decrement_stock(
-                            product_id=order_item.product.id,
-                            quantity=order_item.quantity,
-                            order_id=order.id,
-                            reason=f"Order {order.id} created from cart {cart.uuid}",
-                        )
-                        logger.info(
-                            "Decremented stock for product %s by %s units",
-                            order_item.product.id,
-                            order_item.quantity,
-                        )
-                    except InsufficientStockError as e:
-                        logger.error(
-                            "Insufficient stock for product %s: %s",
-                            order_item.product.id,
-                            e,
-                        )
-                        # Rollback will happen due to @transaction.atomic
-                        raise
+            # Step 7: Reconcile reservations against the cart and decrement
+            # physical stock exactly once per product (guards against
+            # duplicate/missing/expired reservations double-decrementing,
+            # over-selling, or skipping the decrement).
+            reservation_ids = cls._consume_stock_for_order(
+                order=order,
+                cart=cart,
+                cart_items=cart_items,
+                reservations=reservations,
+            )
 
             # Store reservation IDs in order metadata
-            order.metadata["stock_reservation_ids"] = reservation_ids  # type: ignore[invalid-assignment]  # ty: ignore[invalid-assignment]
+            order.metadata["stock_reservation_ids"] = reservation_ids
 
             # Step 7.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
@@ -905,60 +903,9 @@ class OrderService:
                 cart.items.select_for_update().select_related("product")
             )
 
-            # Check if any reservations have expired
-            expired_reservations = [r for r in reservations if r.is_expired]
-            active_reservations = [r for r in reservations if not r.is_expired]
-
-            if expired_reservations:
-                logger.warning(
-                    "Found %d expired reservations for cart %s. Recreating them.",
-                    len(expired_reservations),
-                    cart.uuid,
-                )
-                # Release expired reservations
-                for expired_res in expired_reservations:
-                    try:
-                        StockManager.release_reservation(expired_res.id)
-                    except Exception as e:
-                        logger.warning(
-                            "Failed to release expired reservation %s: %s",
-                            expired_res.id,
-                            e,
-                        )
-
-                # Recreate reservations for cart items
-                active_reservations = []
-                for cart_item in cart_items:
-                    try:
-                        new_reservation = StockManager.reserve_stock(
-                            product_id=cart_item.product.id,
-                            quantity=cart_item.quantity,
-                            session_id=str(cart.uuid),
-                            user_id=cart.user.id if cart.user else None,
-                        )
-                        active_reservations.append(new_reservation)
-                        logger.info(
-                            "Created new reservation %s for product %s",
-                            new_reservation.id,
-                            cart_item.product.id,
-                        )
-                    except InsufficientStockError as e:
-                        logger.error(
-                            "Insufficient stock for product %s: %s",
-                            cart_item.product.id,
-                            e,
-                        )
-                        raise
-
-                reservations = active_reservations
-
-            if not reservations and cart_items:
-                logger.warning(
-                    "No stock reservations found for cart %s. "
-                    "This may indicate the reservation expired or was never created.",
-                    cart.uuid,
-                )
-                # We'll proceed without reservations and use direct stock decrement
+            # Reservations (active, expired, or duplicated) are reconciled
+            # against the cart in Step 7 via _consume_stock_for_order. Expired
+            # holds need no special handling here (see the payment-first path).
 
             # Step 4: Create Order with PENDING status
             # Determine target currency from shipping address or default
@@ -1073,9 +1020,6 @@ class OrderService:
             if sanitised_meta:
                 order.metadata["meta"] = sanitised_meta
 
-            # Track reservation IDs for this order
-            reservation_ids = []
-
             # Step 5: Create OrderItems from CartItems
             for cart_item in cart_items:
                 product = cart_item.product
@@ -1121,59 +1065,19 @@ class OrderService:
                     price=item_price,
                 )
 
-            # Step 6: Convert stock reservations to decrements via StockManager
-            if reservations:
-                # We have reservations - convert them to stock decrements
-                for reservation in reservations:
-                    try:
-                        StockManager.convert_reservation_to_sale(
-                            reservation_id=reservation.id, order_id=order.id
-                        )
-                        reservation_ids.append(reservation.id)
-                        logger.info(
-                            "Converted reservation %s to sale for order %s",
-                            reservation.id,
-                            order.id,
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Failed to convert reservation %s: %s",
-                            reservation.id,
-                            e,
-                            exc_info=True,
-                        )
-                        # Rollback will happen due to @transaction.atomic
-                        raise
-            else:
-                # No reservations - use direct stock decrement
-                logger.info(
-                    "No reservations found for cart %s, using direct stock decrement",
-                    cart.uuid,
-                )
-                for order_item in order.items.select_related("product").all():
-                    try:
-                        StockManager.decrement_stock(
-                            product_id=order_item.product.id,
-                            quantity=order_item.quantity,
-                            order_id=order.id,
-                            reason=f"Order {order.id} created from cart {cart.uuid}",
-                        )
-                        logger.info(
-                            "Decremented stock for product %s by %s units",
-                            order_item.product.id,
-                            order_item.quantity,
-                        )
-                    except InsufficientStockError as e:
-                        logger.error(
-                            "Insufficient stock for product %s: %s",
-                            order_item.product.id,
-                            e,
-                        )
-                        # Rollback will happen due to @transaction.atomic
-                        raise
+            # Step 6: Reconcile reservations against the cart and decrement
+            # physical stock exactly once per product (guards against
+            # duplicate/missing/expired reservations double-decrementing,
+            # over-selling, or skipping the decrement).
+            reservation_ids = cls._consume_stock_for_order(
+                order=order,
+                cart=cart,
+                cart_items=cart_items,
+                reservations=reservations,
+            )
 
             # Store reservation IDs in order metadata
-            order.metadata["stock_reservation_ids"] = reservation_ids  # type: ignore[invalid-assignment]  # ty: ignore[invalid-assignment]
+            order.metadata["stock_reservation_ids"] = reservation_ids
 
             # Step 6.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
@@ -1499,6 +1403,18 @@ class OrderService:
         try:
             if not new_status:
                 raise ValueError("New status cannot be empty")
+
+            # Lock + re-read the CURRENT status so concurrent transitions
+            # serialize and validate against the committed row, not the
+            # caller's stale snapshot (G0285). Sync the caller's object to
+            # the committed status so callers that read ``order`` after this
+            # (rather than the returned instance) stay consistent.
+            current_status = (
+                Order.objects.select_for_update()
+                .values_list("status", flat=True)
+                .get(pk=order.pk)
+            )
+            order.status = current_status
 
             if order.status == new_status:
                 logger.info(
@@ -1938,6 +1854,22 @@ class OrderService:
         reason: str = "",
         refunded_by: int | None = None,
     ) -> tuple[bool, dict[str, Any]]:
+        # Lock the row and re-read the CURRENT payment_status so a refund
+        # another request already committed is detected here — otherwise two
+        # concurrent refunds both pass the stale in-memory guard and issue
+        # duplicate provider refunds (G0280). We keep mutating the caller's
+        # ``order`` object below so callers still observe the result.
+        current_payment_status = (
+            Order.objects.select_for_update()
+            .values_list("payment_status", flat=True)
+            .get(pk=order.pk)
+        )
+        if current_payment_status in (
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+        ):
+            raise PaymentError(_("This order has already been refunded."))
+
         if not order.payment_id:
             raise PaymentError(_("This order has no payment ID to refund."))
 
@@ -2442,6 +2374,29 @@ class OrderService:
         order.mark_as_paid(
             payment_id=payment_intent_id, payment_method="stripe"
         )
+
+        if order.status == OrderStatus.CANCELED:
+            # Payment landed for an order that was already CANCELED (the
+            # customer cancelled before the webhook, or the two raced).
+            # Marking the money received above is intentional bookkeeping,
+            # but we must NOT mint a courier shipment for a cancelled order
+            # (G0281). Record the receipt for reconciliation and alert staff
+            # (ERROR is the monitored channel) so a manual refund is issued.
+            if not order.metadata:
+                order.metadata = {}
+            order.metadata["payment_after_cancel"] = {
+                "payment_id": payment_intent_id,
+                "recorded_at": timezone.now().isoformat(),
+            }
+            order.save(update_fields=["metadata"])
+            logger.error(
+                "Payment %s received for CANCELED order %s — manual refund "
+                "required; NOT dispatching shipment creation",
+                payment_intent_id,
+                order.id,
+            )
+            publish_payment_status(order)
+            return order
 
         if order.status == OrderStatus.PENDING:
             # The Stripe webhook handler dispatches

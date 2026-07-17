@@ -135,6 +135,71 @@ class TestWebhookEndpoint:
             webhook_message_id=message_id
         ).exists()
 
+    def test_duplicate_data_key_processes_signed_object_only(self, settings):
+        """A smuggled second "data" object must not be acted on.
+
+        The HMAC covers the FIRST top-level "data"; json.loads takes the LAST
+        on a duplicate-key body. The worker must process the signed (first)
+        object, not the attacker's unsigned second one (forgery).
+        """
+        settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET
+
+        from shipping_boxnow.models import BoxNowParcelEvent
+
+        shipment = BoxNowShipmentFactory(with_parcel=True)
+        message_id = f"forge-msg-{shipment.parcel_id}"
+
+        signed_data = {
+            "parcelId": shipment.parcel_id,
+            "parcelState": "in-depot",
+            "event": "in-depot",
+            "time": "2025-01-15T10:30:00Z",
+            "orderNumber": "ORD-TEST",
+            "eventLocation": {
+                "displayName": "Test Locker",
+                "postalCode": "11521",
+            },
+            "customer": {
+                "name": "T",
+                "email": "c@test.com",
+                "phone": "+302100000000",
+            },
+        }
+        signed_str = json.dumps(signed_data, separators=(",", ":"))
+        datasignature = _sign(signed_str.encode())
+
+        # Attacker appends a second, unsigned "data" claiming a different state.
+        forged_str = json.dumps(
+            {**signed_data, "parcelState": "delivered", "event": "delivered"},
+            separators=(",", ":"),
+        )
+
+        body = (
+            '{"specversion":"1.0",'
+            '"type":"gr.boxnow.parcel_event_change",'
+            '"source":"boxnow-stage",'
+            f'"subject":"{shipment.parcel_id}",'
+            f'"id":"{message_id}",'
+            '"time":"2025-01-15T10:30:00Z",'
+            '"datacontenttype":"application/json",'
+            f'"datasignature":"{datasignature}",'
+            f'"data":{signed_str},'
+            f'"data":{forged_str}'
+            "}"
+        ).encode()
+
+        with patch(
+            "shipping_boxnow.tasks.boxnow_send_arrival_notification.delay"
+        ):
+            response = self.client.post(
+                _webhook_url(), data=body, content_type="application/json"
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        event = BoxNowParcelEvent.objects.get(webhook_message_id=message_id)
+        # The signed "in-depot" state was recorded, not the forged "delivered".
+        assert event.parcel_state == "in-depot"
+
     def test_duplicate_message_id_returns_200_no_duplicate_event(
         self, settings
     ):

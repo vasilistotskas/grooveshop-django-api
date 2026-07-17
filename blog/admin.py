@@ -895,8 +895,16 @@ class BlogCommentAdmin(BaseTranslatableAdmin):
         icon="report",
     )
     def mark_as_spam(self, request, queryset):
+        # BlogComment is an MPTT tree: a bulk queryset.delete() removes rows
+        # but leaves lft/rght gaps, corrupting the tree. Capture the affected
+        # tree ids first, delete (CASCADE removes each spam node's subtree),
+        # then rebuild each affected tree's bookkeeping from the surviving
+        # parent pointers (G0049).
+        tree_ids = list(queryset.values_list("tree_id", flat=True).distinct())
         count = queryset.count()
         queryset.delete()
+        for tree_id in tree_ids:
+            BlogComment.objects.partial_rebuild(tree_id)
         self.message_user(
             request,
             _("%(count)d comments were marked as spam and deleted.")

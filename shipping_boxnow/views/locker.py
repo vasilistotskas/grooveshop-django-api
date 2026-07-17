@@ -16,6 +16,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from core.api.serializers import ErrorResponseSerializer
+from core.api.throttling import BoxNowNearestThrottle
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,
@@ -93,6 +94,7 @@ class BoxNowLockerViewSet(BaseModelViewSet):
         detail=False,
         methods=["post"],
         permission_classes=[AllowAny],
+        throttle_classes=[BoxNowNearestThrottle],
         url_path="nearest",
     )
     def nearest(self, request):

@@ -18,6 +18,9 @@ from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
 
+pytestmark = pytest.mark.assert_english
+
+
 @pytest.mark.django_db
 class OrderServiceTestCase(TestCase):
     def setUp(self):
@@ -114,13 +117,18 @@ class OrderServiceTestCase(TestCase):
         mock_signal.assert_called_once()
 
     def test_update_order_status_invalid(self):
-        self.order.status = OrderStatus.PENDING
+        # A real order is required: update_order_status now re-reads the row
+        # under select_for_update (G0285), so a Mock order can't be used.
+        order = OrderService.create_order(
+            self.order_data, self.items_data, user=self.user
+        )
+        self.assertEqual(order.status, OrderStatus.PENDING)
 
         with self.assertRaises(InvalidStatusTransitionError) as context:
-            OrderService.update_order_status(self.order, OrderStatus.DELIVERED)
+            OrderService.update_order_status(order, OrderStatus.DELIVERED)
 
-        self.assertEqual(self.order.status, OrderStatus.PENDING)
-
+        order.refresh_from_db()
+        self.assertEqual(order.status, OrderStatus.PENDING)
         self.assertIn("Cannot transition from", str(context.exception))
 
     def test_get_user_orders(self):

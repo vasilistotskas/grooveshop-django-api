@@ -116,3 +116,14 @@ class TestBoxNowShipmentDetailSerializer:
         shipment = BoxNowShipmentFactory(parcel_id="")
         data = BoxNowShipmentDetailSerializer(shipment).data
         assert data["label_url"] is None
+
+    def test_metadata_not_exposed_to_customer(self):
+        """Internal metadata (which can carry a failed-creation error envelope
+        with recipient PII) must not be exposed on the customer-facing
+        detail serializer."""
+        shipment = BoxNowShipmentFactory(
+            with_parcel=True,
+            metadata={"last_error": {"recipient": "Jane Doe", "phone": "123"}},
+        )
+        data = BoxNowShipmentDetailSerializer(shipment).data
+        assert "metadata" not in data

@@ -3,6 +3,752 @@
 
 
 
+## v1.156.4 (2026-07-17)
+
+### Bug fixes
+
+* fix(order): use signing-based unsubscribe link in abandoned-cart email
+
+Adversarial re-review of the audit branch surfaced a regression: the
+unsubscribe URL migration (G0434) removed the old uidb64/
+default_token_generator route, but send_checkout_abandonment_emails still
+hand-rolled that dead format — so every abandoned-cart unsubscribe link
+failed BadSignature (400 on GET, silent 200 no-op on one-click POST). Point
+it at the shared generate_blanket_unsubscribe_link helper (as core/product
+tasks already do) and add a regression test asserting the emitted token
+round-trips under the unsubscribe salt.
+
+Also convert test_update_order_status_invalid to a real order: G0285 made
+update_order_status re-read the row under select_for_update, which a
+Mock(spec=Order) can't satisfy.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`49724be`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49724bea0d26dcaca3781e908f91cd5c66b4fffa))
+
+* fix: SVG XSS, stock availability, idempotency reservation, PII retention
+
+- G0098 SVG validator also rejects javascript:/data: URLs on href/xlink:href/
+  src and <foreignObject> — the script/on* blocklist missed these XSS vectors.
+- G0284 decrement_stock gains an opt-in respect_reservations flag; the
+  no-reservation checkout fallback uses it so it can't oversell inventory
+  another session has actively reserved (admin/direct paths keep the raw
+  physical check).
+- G0103 IdempotencyMiddleware atomically reserves the key (cache.add) on
+  first-seen and returns 409 to a concurrent duplicate instead of both
+  executing; the reservation is released when the response isn't cacheable so
+  retries after a 5xx aren't blocked.
+- G0342 new anonymize_old_search_queries beat task nulls SearchQuery IP /
+  user agent / session key / user FK after a 90-day retention window.
+- G0435 new cleanup_expired_data_exports beat task deletes expired GDPR export
+  PII bundles from private storage and marks them EXPIRED.
+- G0400 add HTTP-level tests for the Viva payment webhook money path (1796),
+  which previously had zero coverage.
+
+Deferred: G0192 (convergent Meilisearch resync needs a blue/green index-swap
+to avoid a rebuild window) and G0178 (a read-only search key must be
+provisioned in Meilisearch first) — both are ops/architecture changes.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`06563c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/06563c5d4d21f46a39a7aba1c193e8fdb201e307))
+
+* fix(model): DB constraints on order items, non-unique phone code, sibling sort
+
+- G0247 add CheckConstraints on OrderItem: quantity >= 1 and
+  0 <= refunded_quantity <= quantity, so a bad path or manual SQL can't
+  persist an oversold / over-refunded line item (additive migration; valid
+  data already satisfies both).
+- G0118 drop unique=True from Country.phone_code — calling codes are shared
+  across countries (+1 US/CA, +7 RU/KZ), which the unique constraint made
+  unrepresentable.
+- G0310 ProductCategory.get_ordering_queryset returns direct siblings only;
+  spanning descendants made SortableModel move/delete renumber unrelated
+  subtree nodes and corrupt sort_order.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`c04f0df`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c04f0dfae31e28f5aaeb835f3683978fc3bd7b7a))
+
+* fix: myDATA idempotency/immutability + strip audit-log PII
+
+- G0200 meta_capi audit log strips the raw client_ip_address / client_user_agent
+  / _fbp / _fbc from the persisted event payload (CAPI does not hash those), so
+  MetaCapiEventLog.payload holds no plaintext PII as its docstring claimed.
+- G0262 submit_invoice short-circuits to a synthetic Success when the invoice
+  already has a MARK (idempotent — a re-submit could fail and flip
+  CONFIRMED→REJECTED); cancel_invoice records a failed-cancel error WITHOUT
+  moving mydata_status away from CONFIRMED (the document is still valid at AADE).
+- G0265 build_invoice_xml reuses the persisted mydata_series on resubmission
+  (mirroring the mydata_aa reuse) so an edited series_prefix can't change the
+  uid and defeat AADE's 228 duplicate dedup.
+- G0263 generate_invoice(force=True) reuses the persisted vat_breakdown/totals
+  once an invoice has a MARK — the figures are legally frozen at issue time, so
+  a corrective PDF regen must not recompute from a possibly-changed order.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`bfd79f4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bfd79f4e59bdfadeb5153098315c8dd9e05e6b9d))
+
+* fix(config): version pins, TLS-to-DB, drop testserver/DRF-token, dockerignore
+
+- G0205 .dockerignore excludes .auth-token, backups/, mediafiles_private/ and
+  the dev meilisearch/pg config secrets so COPY . . never bakes them in.
+- G0132 pin Postgres 17 → 17.10 (ci.yml + infra.compose.yml) — verified as the
+  current 17 minor (2026-05).
+- G0126 bump Python 3.14.2 → 3.14.6 (Dockerfile, dev.Dockerfile,
+  .python-version, .pre-commit-config.yaml) — verified as the current 3.14
+  patch (2026-06).
+- G0123 pin the CI Meilisearch service to v1.49.0 (out of the
+  CVE-2026-57823/57824 auth-bypass range), matching infra.compose.yml.
+- G0362 DB sslmode defaults to 'require' in production (rejects an
+  unencrypted Postgres connection); dev/ci keep 'prefer'.
+- G0357 stop hard-appending 'testserver' to ALLOWED_HOSTS — pytest-django's
+  setup_test_environment() adds it for tests, so this only leaked it into
+  production.
+- G0358 trim the drf-spectacular schema auth to Knox + Session (drop
+  BasicAuthentication and the unused DRF TokenAuthentication) and remove the
+  unused rest_framework.authtoken app.
+
+Deferred: G0356 (drop the stale STRIPE_API_VERSION pin) — changing the Stripe
+API version must be coordinated with the Stripe Dashboard webhook endpoint
+version, so it is left for a deliberate ops change rather than flipped blind.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`5ca9db6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ca9db6ffbb2cc16e9faf2884f1edb5d16117f55))
+
+* fix: P2 hardening across notifications, search, tags, stock, carriers, cart
+
+- G0210 notification mark-(all-)as-seen/unseen bulk .update() now sets/clears
+  seen_at, honouring the seen⇒seen_at invariant that Model.save() enforced.
+- G0110 seed_all: split the "sitescontenttypes" typo into "sites" +
+  "contenttypes" so --reset no longer cascade-deletes Permissions/ContentTypes.
+- G0338 search analytics middleware no longer records /search/trending and
+  /search/analytics as SearchQuery rows.
+- G0057 BoxNowShipmentAdmin.parcel_state is read-only (carrier-managed).
+- G0391 TaggedItem writes are admin-only (were open to any authenticated user).
+- G0303 a review's product is immutable after creation (verified-purchase gate
+  can't be bypassed by re-pointing an existing review).
+- G0289 release_reservation / convert_reservation_to_sale lock the reservation
+  row (select_for_update) so concurrent release/convert can't double-process.
+- G0285 update_order_status re-reads the current status under lock so
+  concurrent transitions validate against the committed row.
+- G0049 blog mark_as_spam rebuilds affected MPTT trees after the bulk delete.
+- G0016/G0059 scoped per-IP throttles on the public ACS address-validation and
+  BoxNow nearest-locker proxies to the rate-limited partner APIs.
+- G0091 add-to-cart uses an atomic get_or_create + F() increment instead of a
+  check-then-act that raced the (cart, product) unique constraint into a 500.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`2a548d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2a548d0c48cc30d4ce36778587b122df5f709d5e))
+
+* fix(meta_capi): deterministic Purchase dedup + registration consent gate
+
+Purchase double-count (G0198): build_purchase_event fell back to a random
+uuid4 when no browser-minted purchase id existed (e.g. COD orders), so two
+server dispatches of the same order's Purchase got different event_ids and
+Meta counted them twice. The fallback is now a deterministic
+`purchase-{order.uuid}`, so re-dispatches/retries dedup at Meta; a
+browser-minted id still wins when present.
+
+Registration consent (G0199): _on_user_signed_up dispatched
+CompleteRegistration — sending the registrant's email/name/IP/UA to Meta —
+with no consent check, unlike the order path's _consent_granted. It now gates
+on the storefront's `ad_storage` consent cookie (Google Consent Mode v2, the
+same signal the browser pixel checks) and fails closed: no request or no
+explicit "granted" consent means no dispatch.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`179646d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/179646d2b6aae37252dd353f8013e22a22a2a971))
+
+* fix: surface BoxNow locker address fields and fix translation overlay order
+
+Nearest-locker address fields (G0056): BoxNowNearestLockerResponseSerializer
+declared snake_case field names but serializes BoxNow's raw camelCase
+checkAddressDelivery dict, so image / postal_code / address_line_1 /
+address_line_2 silently dropped from the response. Added source mappings
+(imageUrl / postalCode / addressLine1 / addressLine2) — matching the keys
+sync_lockers already parses — and updated the test mock to the real camelCase
+shape, asserting the address fields now flow through.
+
+Translation overlay order (G0105): refresh sites called apply_db_overlay()
+then _reload_translations(), but the reload evicts and rebuilds the base
+gettext catalogs from disk, discarding the overlay just applied — so DB
+translation edits never took effect on workers/requests. Swapped to reload
+first, then overlay, at all three sites (core/celery.py, the translation
+middleware, and the Rosetta save signal).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`b5fe7ea`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b5fe7ea96a06c00c8b503d5313a62a5750013867))
+
+* fix(order): soft-delete bulk, immutable line items, resilient bulk admin
+
+Bulk soft-delete (G0246): OrderQuerySet used SoftDeleteQuerySetMixin (read
+filters only) but never overrode delete(), so Order.objects.filter(...)
+.delete() HARD-deleted rows — contradicting the per-instance
+SoftDeleteModel.delete() contract — and soft-deleted orders were unreachable
+via the manager. delete() now soft-deletes, with hard_delete()/restore() and
+manager all_with_deleted()/deleted_only() accessors.
+
+Immutable line items (G0222): OrderWriteSerializer.update() (owner-reachable
+PUT/PATCH) delete+recreated items with no stock accounting or total
+recomputation, letting a customer corrupt inventory/totals. update() now
+drops the items payload and touches only editable scalar fields.
+
+Resilient bulk admin actions (G0245): the four mark_as_* actions wrapped the
+batch in transaction.atomic and caught only ValueError, but
+update_order_status raises InvalidStatusTransitionError (an OrderServiceError)
+— one ineligible row 500'd and rolled back the whole batch. Extracted a
+shared _bulk_update_status helper that drops the outer atomic and catches
+(ValueError, OrderServiceError), mirroring mark_as_canceled.
+
+Also refines refund_order's G0280 lock to re-read only the current
+payment_status under select_for_update (keeping the caller's order object
+mutated) so the concurrency guard works without changing the return contract.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`6192f7e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6192f7e6bf33f1af8ecb45a6f40604e34ce55b88))
+
+* fix(order): lock refund_order row and stop shipping cancelled paid orders
+
+refund_order (G0280): the method was @transaction.atomic but never locked
+the order row, so its already-refunded guard ran against the caller's stale
+snapshot — two concurrent refunds both passed and issued duplicate provider
+refunds. It now select_for_update().get() re-fetches the current row first
+(mirroring cancel_order).
+
+handle_payment_succeeded (G0281): a late payment landing on a CANCELED order
+still called _dispatch_shipment_creation_task, minting a courier shipment for
+a cancelled order. It now records the receipt on metadata, logs an ERROR
+(monitored channel) so staff issue a manual refund, and returns WITHOUT
+dispatching shipment creation — while still marking the money received
+(intentional bookkeeping, unchanged).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`a3630d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a3630d9511eda125ba1520262ada774893ff01c7))
+
+* fix(meili): stable sync ordering, non-destructive settings, greeklish tokenizer
+
+Full-sync ordering (G0174): meilisearch_sync_all_indexes and
+meilisearch_sync_index paginate with LIMIT/OFFSET over an unordered
+queryset, so Postgres could return rows in a different order per slice and
+skip or duplicate documents in the index. Both now .order_by("pk").
+
+Index settings wipe (G0172): meilisearch_update_index_settings and
+meilisearch_update_ranking routed sparse updates (maxTotalHits, searchCutoffMs,
+maxValuesPerFacet, ranking rules) through with_settings(), which resends the
+FULL settings payload and wipes filterable/sortable/searchable/synonyms back
+to empty — breaking faceted search until the next reindex. They now call the
+dedicated update_pagination_settings / update_search_cutoff_ms /
+update_faceting_settings / update_ranking_rules endpoints for exactly the
+flags provided. Tests now assert the full-payload path is never used.
+
+Greeklish expansion (G0335): convert_to_greek_variants iterated the string
+char-by-char, which broke multi-char §…§ digraph placeholders and — once any
+variant held a § — appended every subsequent character literally, emitting
+mixed Greek/Latin garbage (e.g. "θalassa"). It now tokenizes placeholders
+atomically so the rest of the word maps through CHARACTER_MAPPINGS; "thalassa"
+→ "θαλασσα". New regression test pins a fully-Greek variant.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`e82c36c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e82c36c8c2195554a51325068d955f82442d4d28))
+
+* fix(payments): harden Stripe/Viva webhooks and myDATA error handling
+
+Stripe payment_intent.succeeded (G0230/G0231): the receiver runs inside
+dj-stripe's webhook atomic block, so swallowing a processing error
+committed the "processed" mark against a charged-but-unrecorded order that
+Stripe never retries — stranding it at PENDING until auto-cancel with no
+refund. Processing errors now PROPAGATE (roll back mark + Event row → Stripe
+redelivers); the two dispatches move to transaction.on_commit. Malformed
+event payloads are still logged-and-dropped (redelivery can't fix them).
+
+Stripe charge.dispute.created (G0232): looked up the order by charge id
+(ch_…) against payment_id, which stores a PaymentIntent id (pi_…), so no
+dispute ever matched and the whole dispute flow was dead. Look up by the
+dispute's payment_intent instead.
+
+myDATA (G0260): an AADE TechnicalError row (incl. the empty-200 gateway
+fault the parser synthesises) was classified as a terminal
+MyDataValidationError, permanently REJECTing the invoice with no retry. It
+now raises the retryable MyDataTransportError without persisting a failure,
+so the Celery backoff and manual-resubmit paths work.
+
+Viva reversal/failed webhooks (G0275): _handle_reversal_created (1797) and
+_handle_payment_failed (1798) flipped payment_status with no verification on
+a public unauthenticated endpoint — a spoofed 1797 could mark any order
+REFUNDED and fire the refund email + Meta CAPI Refund. Both now verify the
+transaction against Viva's Retrieve Transaction API (mirroring the 1796
+path), treating any retrieval error as unavailable (→500 retry) so a
+forged/unknown transaction id cannot mutate financial state.
+
+Adds regression tests for all five paths (disputes and Viva reversal/failure
+had zero coverage).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`d233c85`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d233c85ef2ad64a46f59df783eaefaf4d82f5732))
+
+* fix(gdpr): close PII gaps in erasure, export, and unsubscribe tokens
+
+Carrier PII (G0002/G0014): stop leaking the failed-mint `last_error`
+envelope (recipient name/address/phone) — it is dropped from the
+customer-facing ACS/BoxNow detail serializers and scrubbed from linked
+shipments during right-to-erasure.
+
+Erasure bypass (G0433): remove the raw DELETE on the account-detail route.
+A hard-delete severed Order.user (SET_NULL) while leaving the customer's
+name/email/address on the order and PII in carrier metadata; deletion now
+only goes through the GDPR-compliant `delete_account` action.
+
+Unsubscribe token (G0434): replace the password-reset generator with a
+purpose-scoped `django.core.signing` token carrying the user pk. The link
+no longer breaks on login/password change and lasts a year (RFC 8058),
+dropping the now-redundant uidb64 URL segment.
+
+Export completeness (G0426): include the user's search history and current
+cart in the right-of-access export.
+
+Regenerate schema.yml for the dropped account DELETE op and the simplified
+unsubscribe paths. Adds the first unit tests for user/services/gdpr.py and
+the token-based unsubscribe endpoints.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`20a03ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/20a03bad732e31eab226babb84e55b3488938d4e))
+
+* fix: address adversarial review findings on the audit fixes
+
+Final-review pass over the 14 fix commits surfaced two real bugs I
+introduced plus gaps; this closes them:
+
+- order reservation reconciliation (blocker): an expired-but-unconsumed
+  reservation was routed to convert_reservation_to_sale, which rejects
+  expired holds, hard-failing checkout even when stock was available.
+  Release expired holds and take the shortfall from physical stock.
+- order-item update (high): the ownership gate covered create but not
+  update — `order` is a writable FK, so a PUT/PATCH could move an item into
+  a foreign order. Add perform_update to check the target order's owner.
+- loyalty redeem race (medium): the one-redemption-per-order guard lived
+  only in the view (autocommit) before the lock; add the check inside
+  redeem_points under the user-row lock so concurrent requests serialize.
+- meili blog unpublish (medium): unpublishing a BlogPost never removed its
+  BlogPostTranslation documents (the indexed model). Add a BlogPost post_save
+  signal that re-dispatches indexing for its translations, mirroring product.
+- blog related-posts (draft leak): the three related-posts strategies queried
+  BlogPost with no publish filter, so drafts could surface in the public
+  related list. Apply .published().
+
+Add regression tests: expired-reservation checkout succeeds via decrement;
+non-owner order reassignment on update -> 403.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`bd6dfbf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd6dfbf629323b69832b3f77411d8e46cc663543))
+
+* fix(infra): remove committed master key, authenticate Flower, pin images
+
+- Delete docker/meilisearch/config.yml: an orphaned, git-tracked file that
+  hardcoded a Meilisearch master key (and was baked into images via COPY).
+  Nothing references it (G0124).
+- Flower ran with --address=0.0.0.0 and no auth, exposing every Celery
+  task's args and revoke/terminate controls. Add --basic-auth
+  (FLOWER_BASIC_AUTH, documented in .env.example) (G0130).
+- Pin the Meilisearch image v1.42.1 -> v1.49.0 (out of the
+  CVE-2026-57823/57824 auth-bypass range) (G0123).
+- Pin the floating redis (latest) and rabbitmq (management) dev images to
+  redis:8-alpine and rabbitmq:4-management.
+
+Audit: G0124 G0130 G0123 (dev compose; production runs on K8s manifests
+in the infrastructure repo).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`ead69f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ead69f522fcead76ef0137cb0816dea3e7e5d06a))
+
+* fix(meili): keep signal receivers alive and remove stale documents
+
+Two defects meant the live search index silently drifted from the DB:
+
+- The post_save/post_delete receivers are closures defined inside
+  AppConfig.ready(); connected with Django's default weak references they
+  were garbage-collected once ready() returned, so signal-driven indexing
+  never fired at all. Connect with weak=False (G0171).
+- When an instance stopped matching meili_filter() (product deactivated /
+  soft-deleted, blog post unpublished) nothing removed its document, so it
+  stayed searchable with stale data. index_document_task now deletes the
+  document for a filtered-out instance, and add_model routes a save that
+  leaves the instance non-indexable to deletion instead of returning early
+  (G0173).
+
+Add a task test: a deactivated product's document is deleted, not skipped.
+
+Audit: G0171, G0173 (P1)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`a5ccc0a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a5ccc0ada23a4aad2acf3a20a72d05481a3902b2))
+
+* fix(user): make email read-only on profile update (allauth bypass)
+
+UserWriteSerializer exposed email as writable, so an authenticated owner
+could change their primary email via a plain profile PUT/PATCH — bypassing
+allauth's mandatory email-verification flow and desyncing the EmailAddress
+source-of-truth. Since the same serializer handles registration, make email
+writable only on create and read-only once an instance exists.
+
+Replace the email-validation update test with a regression asserting a
+profile update cannot change the email.
+
+Audit: G0414 (P1, security)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`4dfadf7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4dfadf715a14d362a23b5ef6a1dac9952266be6d))
+
+* fix(search): validate params, fix product sort and attributeValues filter
+
+Three defects on the public product search endpoint:
+
+- Numeric filters (price_min/max, likes_min, views_min, categories,
+  attributeValues) were parsed with bare float()/int(), so any non-numeric
+  value raised an unhandled ValueError -> 500. Parse them defensively and
+  return 400 (G0332).
+- Sort was dead: the allowlist held camelCase values (finalPrice, ...) that
+  were passed straight to order_by, but the Meilisearch index only exposes
+  snake_case sortableAttributes (final_price, ...), so sorting silently did
+  nothing. Map the accepted camelCase value to the snake_case field (G0333).
+- The attributeValues filter never applied: CamelCaseMiddleWare underscoreizes
+  the incoming query-string key to attribute_values, but the view read the
+  camelCase key. Read attribute_values (G0334).
+
+Add a validation regression test (invalid numeric params -> 400, no
+Meilisearch required).
+
+Audit: G0332 G0333 G0334 (P1)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`d647094`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d6470947d90a245c5225388bd148febbfd34e11f))
+
+* fix(shipping_boxnow): process the signed webhook data, not a duplicate
+
+The webhook HMAC is verified over the FIRST top-level "data" object
+(extract_data_substring), but json.loads(raw_body) takes the LAST "data" on
+a duplicate-key body, and that parsed envelope was dispatched to the worker.
+An attacker replaying one validly-signed event could append a second,
+unsigned "data" object and have the worker act on the forged content
+(signature/parse divergence).
+
+Reparse envelope["data"] from the verified bytes after the signature check
+so the worker only ever sees the signed object.
+
+Add a duplicate-key forgery regression test asserting the signed state is
+recorded, not the appended one.
+
+Audit: G0052 (P1, security)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`1bf472e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1bf472e82f02f1e2bd2bc10e7f4eb0795ebb461d))
+
+* fix(shipping): let carrier retryable errors reach Celery autoretry
+
+Both carriers declared autoretry_for=(…RetryableError, …) but then caught
+the broader …APIError base class first. Because …RetryableError (and
+AcsAuthError) subclass …APIError, every transient 5xx / 403 / 406 / timeout
+was caught by the business-error handler, alerted to admins as permanent,
+and returned — so the documented retry policy was dead code and transient
+failures permanently stranded voucher mints and tracking polls.
+
+Re-raise the retryable subclass first in the affected tasks:
+- shipping_acs: create_acs_voucher_for_order, poll_acs_tracking_one
+- shipping_boxnow: create_boxnow_shipment_for_order, sync/poll task
+(BoxNow's poll_one already had the guard.)
+
+Add a regression test asserting a BoxNowRetryableError propagates to
+autoretry instead of returning a business-error dict.
+
+Audit: G0001 (P1, cross-carrier)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`f625873`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f625873487b79fd4d45ac86a68d35502861f6f0d))
+
+* fix(loyalty): serialize points mutations, fix expiry/reversal/redeem correctness
+
+The loyalty ledger had several data-integrity defects:
+
+- Concurrency: award/reverse/expire/new-customer-bonus guarded idempotency
+  with unlocked exists() checks and did non-atomic XP read-modify-writes, so
+  under task_acks_late a redelivered task could double-award points/XP and
+  reverse/expire could race the award path. Lock the user row (select_for_update)
+  in each so a user's mutations serialize (G0148, G0165, G0147).
+- Expiration expired the full original EARN amount even when those points
+  were already spent, driving the balance negative. Clamp each expiry to the
+  available balance, per user under lock (G0143).
+- Cancelling/refunding an order reversed EARN points but never restored the
+  points the customer had REDEEMED on it, so they were lost. Credit them
+  back (before the earn reversal, so its clamp doesn't block a full reversal)
+  (G0145).
+- Tier was recalculated in the task from a stale user instance loaded before
+  the award; move the recalc into the service so it reads the fresh XP (G0146).
+- The redeem endpoint burned points with no order-state or idempotency guard,
+  so it could redeem against a settled order or repeatedly drain the balance.
+  Require a PENDING order and reject a second redemption per order (G0144, G0168).
+
+Add regression tests (expiry clamp, redeem clawback, redeem guards). Force
+the English locale on the lifecycle tests (assert_english) so their message
+assertions no longer depend on test-order locale leakage.
+
+Audit: G0143 G0144 G0145 G0146 G0147 G0148 G0165 G0168 (P1/P2)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`b095b99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b095b99fdd8ec06331894e49aa451845ac59be3f))
+
+* fix(admin): exclude secrets from CSV/XML exports
+
+The export actions walked every concrete field, so exporting Users dumped
+the password hash and any model's private_metadata into a downloadable
+file. Add an export_exclude_fields denylist (password, private_metadata by
+default; subclasses may extend) and skip those fields (G0034).
+
+Audit: G0034 (P2)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`2df8fec`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2df8fec238ea42e218b25afbbe28328b1c40612e))
+
+* fix(notification): remove NotificationUser create, lock notification FK (IDOR)
+
+NotificationUser rows are created server-side when a notification is
+delivered. The client-facing create endpoint (and a writable notification
+FK on update) let any authenticated user attach themselves to an arbitrary
+notification id and read its content via the detail serializer (G0212).
+
+- Drop the POST/create route on /notification/user (read + mark_* actions
+  remain; those cover the real UX).
+- Make `notification` read-only on the write serializer so an existing row
+  can't be re-pointed on update either. Only `seen` stays client-writable.
+
+Replace the create tests with create-disabled assertions.
+
+Audit: G0212 (P1)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`bcc2d16`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bcc2d163762bc1402affdc59ee5f23bfff944366))
+
+* fix(blog): hide unpublished posts from public and allow liking others' comments
+
+- BlogPost list/detail managers applied no publish filter and the read
+  actions are AllowAny, so anonymous callers could enumerate drafts and
+  future-dated posts by id. Add BlogPostQuerySet.published() and filter the
+  view queryset to published posts for non-staff (G0039/G0045).
+- Comment update_likes was in the IsOwnerOrAdmin permission group, so only
+  a comment's own author could like it — nobody could like another user's
+  comment. Require IsAuthenticated instead (G0038).
+
+Add regression tests: anonymous cannot list/retrieve drafts; a non-owner
+can like a comment. Filter tests now run as staff to exercise the full set.
+
+Audit: G0039, G0045, G0038 (P1)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`7c25817`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c25817d59be2222affbe47ad0ad4245dcf6ed1c))
+
+* fix(cart): scope reservation release to caller and lock down user field
+
+- release-reservations: only release reservations whose session_id matches
+  the caller's own cart; ids came straight from the request body, so any
+  anonymous caller could enumerate ids and free other customers' stock
+  holds (G0282 IDOR). Non-owned ids are reported as failed, not released.
+- CartWriteSerializer: make `user` read-only. It was the only writable
+  field, letting a cart update reassign the cart to any account
+  (mass-assignment IDOR); guest carts already merge on login automatically
+  (G0080).
+
+Add regression tests (foreign-cart release rejected; user reassignment
+ignored); update cart-update tests that pinned the vulnerable validation.
+
+Audit: G0282, G0080 (P1/P2). G0079 (guest-cart IDOR via sequential
+X-Cart-Id) deferred: closing it requires switching the guest-cart key to
+uuid end-to-end, a coordinated change with the Nuxt storefront's X-Cart-Id
+header contract.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`28349ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/28349ced6379de77456d5d8b47b457a24c670bad))
+
+* fix(order): gate order-item create/refund and make refund restock safe
+
+- create: verify the target order belongs to the requester (or staff);
+  previously any authenticated user could attach items to arbitrary orders
+  by posting a foreign order id (G0227).
+- refund action: restrict to staff. It restocks merchant inventory and
+  flips refund state with no payment refund, so it must never be customer
+  self-service reachable by the order owner (G0223/G0244).
+- OrderItem.refund(): lock the row (select_for_update) and restock through
+  StockManager.increment_stock instead of a raw F() update, so concurrent
+  refunds can't both pass the over-refund guard and double-restock, and the
+  restock is audited via StockLog (G0243).
+
+Add regression tests: non-owner create -> 403, non-staff refund -> 403;
+switch refund API tests to a staff user; persist quantity in model refund
+tests so they exercise the locked re-fetch.
+
+Audit: G0227, G0223, G0244, G0243 (P1)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`132e47c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/132e47c563bd6158065c0d5c519690a68391897b))
+
+* fix(order): reconcile stock reservations against cart at checkout
+
+Both checkout paths converted every unconsumed session reservation to a
+stock decrement, trusting they mirrored the cart. Nothing enforced that, so
+duplicate reserve calls double-decremented stock, missing/expired
+reservations skipped the decrement, and a reservation left over from a
+reduced cart over-decremented. The expired-reservation "recreation" path
+also re-reserved every cart item on top of still-active holds, self-blocking
+with InsufficientStockError and orphaning phantom holds.
+
+Replace both with a shared _consume_stock_for_order helper: the cart is the
+source of truth; per product, convert reservations up to the cart quantity
+(preserving order linkage + audit trail), release surplus, and decrement any
+shortfall directly. Drop the buggy expired-recreation block — Step 7 now
+reconciles regardless of hold state.
+
+Add test_duplicate_reservations_decrement_stock_only_once.
+
+Audit: G0278 (P0), G0279 (P1)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`d23a124`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d23a124464c2ec4e79560c3995e849f90aaa5316))
+
+* fix(order): require UUID for guest order actions (IDOR)
+
+check_object_permissions short-circuited on the guest branch, authorizing
+cancel/payment_status/create_payment_intent/create_checkout_session/
+retry_payment for any order with user_id=None on action name alone. Because
+those routes are keyed by sequential integer pk, an anonymous caller could
+enumerate and act on arbitrary guest orders (cancel defaults to issuing a
+refund and releasing stock). Restore the documented UUID gate
+(IsOwnerOrAdminOrGuest.has_object_permission) in the guest branch.
+
+Update test_guest_can_cancel_their_order / test_guest_order_with_payment_intent
+to pass ?uuid=, and add test_guest_cannot_cancel_order_without_uuid regression.
+
+Audit: G0220 (P0)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`fee759d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fee759d39352dd137936f86113d146f329b9cff3))
+
+### Chores
+
+* chore(schema): regenerate OpenAPI schema for the audit fixes
+
+Reflects the API-contract changes from the fix branch: the NotificationUser
+create operation is removed, and email (profile), user (cart), and
+notification (notification-user) are now read-only, so they drop out of the
+request bodies. Regenerated with `manage.py spectacular`; validates clean.
+
+(schema.json is left untouched — it is a stale, unreferenced artifact not in
+the CI/release regen workflow; removing it needs the frontend contract
+verified first.)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`5869248`](https://github.com/vasilistotskas/grooveshop-django-api/commit/58692485863db657d2ee4f76fdbe6f707b23657c))
+
+* chore(deps): sync uv.lock to 1.156.3 [skip ci] ([`722b040`](https://github.com/vasilistotskas/grooveshop-django-api/commit/722b04026b830bad10cc8a28248018bfaba87ee2))
+
+### Performance improvements
+
+* perf: eliminate search-result hydration N+1 (G0336/G0351)
+
+The federated search view and meili's IndexQuerySet._enrich_results hydrated
+Meilisearch hits with a plain manager fetch, so the per-hit serializer's
+master.{likes_count, review_average, main_image_path, vat, …} access ran ~4
+DB queries per hit on the hottest public endpoint.
+
+Adds ProductTranslation.get_search_result_queryset(), which prefetches the
+master through the Product optimizers that annotate likes_count/review_average
+(matching the property names — the indexing queryset's _-prefixed annotations
+do NOT populate the properties) and prefetch its main image. _enrich_results
+now uses this via a getattr hook (models without it fall back to the plain
+manager), and the federated view's bulk-fetch uses it directly.
+
+Verified O(1) by testing the DB hydration path directly, so no live
+Meilisearch is required.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`8d6f819`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8d6f8197bcc5765deacfba473e6647ea6b2757ad))
+
+* perf: eliminate order-list and favourites N+1s
+
+Favourites list (G0301): ProductFavouriteSerializer embeds the detail-tier
+ProductSerializer, but the manager only prefetched product + translations,
+so review/likes counts, main image and attributes N+1'd per favourite. The
+optimizer now prefetches the product through a composed enrichment.
+
+Order list + detail (G0226): OrderSerializer/OrderDetailSerializer both embed
+OrderItemDetailSerializer → the full ProductSerializer, but with_items_basic
+/with_items prefetched only translations (and, for detail, an image list the
+serializer doesn't even render). Both now prefetch each item's product with
+the full enrichment via a shared helper.
+
+Also corrects the cart optimizer from the previous commit: it used
+with_images() for the detail tier, but ProductSerializer renders
+main_image_path (fed by with_main_image()'s prefetch), not an image list —
+so with_images() left main_image_path querying per line. All three
+subsystems now use with_main_image(). New count_queries regression tests pin
+constant query counts for the favourites and order lists.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`340deda`](https://github.com/vasilistotskas/grooveshop-django-api/commit/340deda1c7ec8c12e83da0aab973b2f0dd080fc8))
+
+* perf: eliminate cart/product N+1s on hot paths
+
+Cart detail (G0081): retrieve()/update() served the cart straight from
+CartService — a bare row whose total_* properties re-ran get_items() per
+call and whose nested items serializer N+1'd per line. They now re-load
+through Cart.objects.for_detail().
+
+Cart-item list (G0088): CartItemViewSet.get_queryset ignored the
+for_list()/for_detail() optimizers. It now routes through them.
+
+Both optimizers under-prefetched what the embedded ProductSerializer
+renders (review/likes counts, main image, attributes, vat/brand), so
+routing alone still N+1'd. The CartItem optimizer now prefetches the product
+through a composed enrichment (Product optimizers minus the active() filter,
+so a later-deactivated product in a cart still resolves), and the Cart
+optimizer prefetches its items through CartItem.objects.for_list(). Cart
+detail and cart-item list are now constant-query regardless of line count
+(new count_queries regression tests prove it).
+
+Product save signal (G0307): reindex_product_translations and the attribute
+signal collected translation PKs via get_meilisearch_queryset(), running its
+favourites×reviews aggregate JOIN on every Product.save() just to gather
+PKs. The async path now uses a plain values_list; the sync (DEBUG) path
+keeps the optimized queryset since it serializes documents inline.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Emov7GsaJgHGSJ4JE1zxww ([`410b606`](https://github.com/vasilistotskas/grooveshop-django-api/commit/410b60611975d7a55057be85639296f269063d14))
+
+### Testing
+
+* test: isolate per-worker cache to fix intermittent xdist flakes
+
+The test "default" cache is the shared production Redis: it materialises
+before conftest's settings patch and the registry is deliberately never
+reset (the Channels tests need the real backend), so every xdist worker
+hits one Redis. Constant keys (loyalty's tier-level map) and PK-keyed
+values (the parler translation cache, whose PKs collide across the
+per-worker test DBs) leaked between workers, and each test's global
+cache.clear() (a Redis FLUSHDB) evicted other workers' live keys
+mid-assertion, breaking their assertNumQueries cache-hit checks.
+
+Namespace every default-cache key with the xdist worker id and replace the
+before/after-test FLUSHDB with a worker-scoped delete of only that worker's
+keys. Fixes the intermittent test_resolves_product_name_and_sku (parler)
+and test_tier_save_invalidates_cache (tier map) failures.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`afb5bd5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/afb5bd5c576acbdd7810fdfd49249bd1ab7200f4))
+
+* test: make the suite deterministically green (locale + factory isolation)
+
+The suite passed/failed non-deterministically depending on execution order.
+Root causes, all fixed:
+
+- Active gettext language leaked between tests. Django's testing docs
+  recommend resetting the active language per test; the conftest now pins
+  every test to the project default (el) unless marked assert_english, so a
+test that asserts English message text no longer depends on a locale a
+  prior test left active. This surfaced the tests that were relying on leaked
+  English — 10 files that assert English validation/help-text/error strings
+  now opt in via `pytestmark = pytest.mark.assert_english` (the mechanism the
+  conftest already documents).
+- BlogPostFactory defaulted is_published to a random 80%. Combined with the
+  new public draft filter, any test that created a post and expected it to be
+  listable/retrievable flaked ~20% of runs. Default to is_published=True
+  (deterministic); tests that want drafts already set it explicitly.
+
+Also drop two now-redundant type-ignore suppressions in order/services.py:
+the reconciliation helper returns a typed list[int], so ty accepts the
+metadata assignment with no suppression.
+
+Full suite now green twice consecutively (4849 passed); ruff check, ruff
+format, and ty check all clean.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`5d931d1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5d931d13bb7e0e3c3e8d8afe8bef70c53cb5c48b))
+
 ## v1.156.3 (2026-07-12)
 
 ### Bug fixes

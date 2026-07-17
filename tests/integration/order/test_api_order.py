@@ -79,7 +79,7 @@ class CheckoutAPITestCase(APITestCase):
             self.checkout_url,
             data=json.dumps(checkout_data),
             content_type="application/json",
-            HTTP_X_CART_ID=str(cart.id),
+            HTTP_X_CART_ID=str(cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -116,7 +116,7 @@ class CheckoutAPITestCase(APITestCase):
             self.checkout_url,
             data=json.dumps(data),
             content_type="application/json",
-            HTTP_X_CART_ID=str(cart.id),
+            HTTP_X_CART_ID=str(cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -157,7 +157,7 @@ class CheckoutAPITestCase(APITestCase):
             self.checkout_url,
             data=json.dumps(checkout_data),
             content_type="application/json",
-            HTTP_X_CART_ID=str(cart.id),
+            HTTP_X_CART_ID=str(cart.uuid),
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -180,7 +180,7 @@ class CheckoutAPITestCase(APITestCase):
             self.checkout_url,
             data=json.dumps(invalid_data),
             content_type="application/json",
-            HTTP_X_CART_ID=str(cart.id),
+            HTTP_X_CART_ID=str(cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -447,7 +447,7 @@ class GuestOrderTestCase(APITestCase):
             self.checkout_url,
             data=json.dumps(checkout_data),
             content_type="application/json",
-            HTTP_X_CART_ID=str(cart.id),
+            HTTP_X_CART_ID=str(cart.uuid),
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

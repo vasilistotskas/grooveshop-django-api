@@ -30,8 +30,10 @@ class CartItemSerializer(serializers.ModelSerializer[CartItem]):
         max_digits=11, decimal_places=2, read_only=True
     )
 
-    def get_cart_id(self, obj: CartItem) -> int:
-        return obj.cart.id
+    def get_cart_id(self, obj: CartItem) -> str:
+        # Expose the guest-addressable UUID, not the sequential PK, so clients
+        # persist an unguessable cart identifier (mirrors the X-Cart-Id flow).
+        return str(obj.cart.uuid)
 
     @extend_schema_field(
         {

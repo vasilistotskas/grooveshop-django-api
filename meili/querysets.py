@@ -101,8 +101,13 @@ class IndexQuerySet[T: Model]:
 
     @property
     def index(self):
-        """Return the Meilisearch index for this model."""
+        """Master-key index handle for admin/stats operations."""
         return client.get_index(self._model._meilisearch["index_name"])
+
+    @property
+    def search_index(self):
+        """Read-only index handle for public search queries."""
+        return client.get_search_index(self._model._meilisearch["index_name"])
 
     @property
     def filters(self) -> list[str]:
@@ -388,7 +393,7 @@ class IndexQuerySet[T: Model]:
         - facetStats: Facet statistics (if facets requested)
         """
         search_params = self._build_search_params()
-        results = self.index.search(q, search_params)
+        results = self.search_index.search(q, search_params)
         enriched_results = self._enrich_results(results)
 
         response_data = {
@@ -424,7 +429,7 @@ class IndexQuerySet[T: Model]:
         if self._state.locales:
             search_params["locales"] = self._state.locales
 
-        return self.index.search(q, search_params)
+        return self.search_index.search(q, search_params)
 
     def _build_search_params(self) -> dict:
         """Build the search parameters dictionary."""

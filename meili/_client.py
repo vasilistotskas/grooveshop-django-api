@@ -11,9 +11,23 @@ from meili.dataclasses import MeiliIndexSettings
 class Client:
     def __init__(self, settings: _MeiliSettings):
         self.settings = settings  # Store settings for management commands
+        base_url = (
+            f"http{'s' if settings.https else ''}://"
+            f"{settings.host}:{settings.port}"
+        )
+        # Master-key client: index/key/document administration and indexing.
         self.client = _Client(
-            f"http{'s' if settings.https else ''}://{settings.host}:{settings.port}",
+            base_url,
             settings.master_key,
+            timeout=settings.timeout,
+            client_agents=settings.client_agents,
+        )
+        # Read-only client for public search traffic. Authenticated with the
+        # search key (falls back to the master key when none is provisioned)
+        # so the master key never serves untrusted query paths.
+        self.search_client = _Client(
+            base_url,
+            settings.search_key,
             timeout=settings.timeout,
             client_agents=settings.client_agents,
         )
@@ -82,6 +96,10 @@ class Client:
 
     def get_index(self, index_name: str):
         return self.client.index(index_name)
+
+    def get_search_index(self, index_name: str):
+        """Return an index handle bound to the read-only search client."""
+        return self.search_client.index(index_name)
 
     def wait_for_task(
         self,

@@ -7249,12 +7249,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       tags:
       - Cart
       security:
@@ -7300,12 +7297,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       tags:
       - Cart
       security:
@@ -7357,12 +7351,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       tags:
       - Cart
       security:
@@ -7414,12 +7405,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       tags:
       - Cart
       security:
@@ -7457,12 +7445,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       tags:
       - Cart
       requestBody:
@@ -7528,12 +7513,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       - in: query
         name: cart
         schema:
@@ -7957,12 +7939,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       tags:
       - Cart Items
       requestBody:
@@ -8028,12 +8007,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       - in: path
         name: id
         schema:
@@ -8098,12 +8074,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       - in: path
         name: id
         schema:
@@ -8175,12 +8148,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       - in: path
         name: id
         schema:
@@ -8261,12 +8231,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       - in: path
         name: id
         schema:
@@ -8309,12 +8276,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       - in: query
         name: cartType
         schema:
@@ -8719,12 +8683,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       tags:
       - Cart
       requestBody:
@@ -8790,12 +8751,9 @@ paths:
       - in: header
         name: X-Cart-Id
         schema:
-          oneOf:
-          - type: string
-            pattern: ^-?\d+$
-          - type: integer
-        description: Cart ID for guest users. Used to identify and maintain guest
-          cart sessions.
+          type: string
+          format: uuid
+        description: Guest cart UUID. Used to identify and maintain guest cart sessions.
       tags:
       - Cart
       security:
@@ -31705,7 +31663,7 @@ components:
           type: integer
           readOnly: true
         cartId:
-          type: integer
+          type: string
           readOnly: true
         product:
           allOf:
@@ -31841,7 +31799,7 @@ components:
           type: integer
           readOnly: true
         cartId:
-          type: integer
+          type: string
           readOnly: true
         product:
           allOf:

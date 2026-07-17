@@ -1055,10 +1055,24 @@ if _meili_master_key == "changeme" and SYSTEM_ENV == "production":
         "MEILI_MASTER_KEY must be set in production "
         "(current value is the insecure default 'changeme')."
     )
+# Read-only search key used for the public query paths (product/blog/federated
+# search). The master key must never serve untrusted search traffic (it can
+# manage keys, indexes and documents). Set MEILI_SEARCH_KEY to Meilisearch's
+# "Default Search API Key" (or a custom search-only key). When unset, the
+# search client falls back to the master key so local/dev still works.
+_meili_search_key = getenv("MEILI_SEARCH_KEY", "")
+if not _meili_search_key and SYSTEM_ENV == "production":
+    import logging as _logging
+
+    _logging.getLogger("meili").warning(
+        "MEILI_SEARCH_KEY is not set; public search falls back to the master "
+        "key. Provision a read-only search key for production."
+    )
 MEILISEARCH = {
     "HTTPS": getenv("MEILI_HTTPS", "False") == "True",
     "HOST": getenv("MEILI_HOST", "localhost"),
     "MASTER_KEY": _meili_master_key,
+    "SEARCH_KEY": _meili_search_key,
     "PORT": int(getenv("MEILI_PORT", "7700")),
     "TIMEOUT": int(getenv("MEILI_TIMEOUT", "30")),
     "CLIENT_AGENTS": None,
@@ -3122,11 +3136,14 @@ if not DJSTRIPE_WEBHOOK_SECRET or DJSTRIPE_WEBHOOK_SECRET == "whsec_...":
         )
     DJSTRIPE_WEBHOOK_SECRET = "whsec_dev_placeholder_not_used_for_verification"
 
-# Pin the Stripe API version so library upgrades can't silently shift
-# webhook payload shapes or idempotency keys. Update this in lockstep
-# with the version configured in the Stripe Dashboard. The dj-stripe
-# docs name this setting STRIPE_API_VERSION (not DJSTRIPE_-prefixed).
-STRIPE_API_VERSION = getenv("STRIPE_API_VERSION", "2024-04-10")
+# STRIPE_API_VERSION is intentionally NOT set. dj-stripe pins its own
+# DEFAULT_STRIPE_API_VERSION to match its Django model schema and uses that
+# for ALL Stripe communication, including webhook processing; the dj-stripe
+# docs state the value "should not be changed" (api_versions.md). Overriding
+# it forces dj-stripe to parse payloads shaped for one API version against
+# models built for another, silently corrupting the local Stripe mirror.
+# Ops: any manually-created Stripe Dashboard webhook endpoint should use the
+# account's current API version so its events match dj-stripe's schema.
 STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 
 # Viva Wallet Configuration

@@ -597,8 +597,8 @@ def federated_search(request):
             ],
         }
 
-        # Execute multi_search with federation
-        results = meili_client.client.multi_search(
+        # Execute multi_search with federation via the read-only search client
+        results = meili_client.search_client.multi_search(
             queries=multi_search_params["queries"],
             federation=multi_search_params["federation"],
         )

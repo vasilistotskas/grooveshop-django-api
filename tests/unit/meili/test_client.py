@@ -15,6 +15,7 @@ class TestMeiliClient:
             port=7700,
             https=False,
             master_key="test_key",
+            search_key="test_key",
             timeout=10,
             sync=False,
             client_agents=("test-agent",),
@@ -31,10 +32,13 @@ class TestMeiliClient:
         client = Client(self.settings)
 
         assert client.client == mock_client_instance
+        assert client.search_client == mock_client_instance
         assert client.is_sync == self.settings.sync
         assert client.tasks == []
 
-        mock_client_class.assert_called_once_with(
+        # Two clients are built: master-key (admin/indexing) and search-key.
+        assert mock_client_class.call_count == 2
+        mock_client_class.assert_any_call(
             "http://localhost:7700",
             "test_key",
             timeout=10,
@@ -48,6 +52,7 @@ class TestMeiliClient:
             port=443,
             https=True,
             master_key="https_key",
+            search_key="https_search_key",
             timeout=30,
             sync=True,
             client_agents=None,
@@ -58,9 +63,17 @@ class TestMeiliClient:
 
         client = Client(https_settings)
 
-        mock_client_class.assert_called_once_with(
+        # Master-key client and read-only search-key client.
+        assert mock_client_class.call_count == 2
+        mock_client_class.assert_any_call(
             "https://example.com:443",
             "https_key",
+            timeout=30,
+            client_agents=None,
+        )
+        mock_client_class.assert_any_call(
+            "https://example.com:443",
+            "https_search_key",
             timeout=30,
             client_agents=None,
         )
@@ -293,6 +306,53 @@ class TestMeiliClient:
         mock_client_instance.index.assert_called_once_with("test_index")
 
     @patch("meili._client._Client")
+    def test_search_client_uses_search_key(self, mock_client_class):
+        """The read-only client is authenticated with the search key."""
+        master_mock = MagicMock(name="master")
+        search_mock = MagicMock(name="search")
+        mock_client_class.side_effect = [master_mock, search_mock]
+
+        distinct = _MeiliSettings(
+            host="localhost",
+            port=7700,
+            https=False,
+            master_key="master_key",
+            search_key="readonly_search_key",
+            timeout=10,
+            sync=False,
+            client_agents=None,
+            debug=False,
+            offline=False,
+            batch_size=1000,
+        )
+
+        client = Client(distinct)
+
+        assert client.client is master_mock
+        assert client.search_client is search_mock
+        # First construction is the master client, second the search client.
+        first_call, second_call = mock_client_class.call_args_list
+        assert first_call.args[1] == "master_key"
+        assert second_call.args[1] == "readonly_search_key"
+
+    @patch("meili._client._Client")
+    def test_get_search_index_uses_search_client(self, mock_client_class):
+        """get_search_index resolves through the read-only search client."""
+        master_mock = MagicMock(name="master")
+        search_mock = MagicMock(name="search")
+        search_index = MagicMock(name="search_index")
+        search_mock.index.return_value = search_index
+        mock_client_class.side_effect = [master_mock, search_mock]
+
+        client = Client(self.settings)
+
+        result = client.get_search_index("test_index")
+
+        assert result is search_index
+        search_mock.index.assert_called_once_with("test_index")
+        master_mock.index.assert_not_called()
+
+    @patch("meili._client._Client")
     def test_wait_for_task(self, mock_client_class):
         mock_client_instance = MagicMock()
         mock_task = MagicMock()
@@ -430,6 +490,7 @@ class TestMeiliClient:
             port=7700,
             https=False,
             master_key="test_key",
+            search_key="test_key",
             sync=True,
             timeout=None,
             client_agents=None,
@@ -463,6 +524,7 @@ class TestMeiliClient:
             port=7700,
             https=False,
             master_key="test_key",
+            search_key="test_key",
             sync=True,
             timeout=None,
             client_agents=None,
@@ -501,6 +563,7 @@ class TestMeiliClient:
             port=7700,
             https=False,
             master_key="test_key",
+            search_key="test_key",
             sync=True,
             timeout=None,
             client_agents=None,
@@ -537,6 +600,7 @@ class TestMeiliClient:
             port=7700,
             https=False,
             master_key="test_key",
+            search_key="test_key",
             sync=True,
             timeout=None,
             client_agents=None,
@@ -570,3 +634,36 @@ class TestMeiliClient:
         self, mock_client_class, mock_from_settings
     ):
         assert isinstance(global_client, Client)
+
+
+class TestMeiliSettingsSearchKey:
+    """_MeiliSettings resolves the read-only search key from settings."""
+
+    _BASE = {
+        "HTTPS": False,
+        "HOST": "localhost",
+        "MASTER_KEY": "the_master_key",
+        "PORT": 7700,
+        "TIMEOUT": 10,
+        "CLIENT_AGENTS": None,
+        "DEBUG": False,
+        "SYNC": False,
+        "OFFLINE": False,
+        "DEFAULT_BATCH_SIZE": 1000,
+    }
+
+    def test_search_key_read_from_settings(self, settings):
+        settings.MEILISEARCH = {**self._BASE, "SEARCH_KEY": "readonly_key"}
+        resolved = _MeiliSettings.from_settings()
+        assert resolved.search_key == "readonly_key"
+        assert resolved.master_key == "the_master_key"
+
+    def test_search_key_falls_back_to_master(self, settings):
+        settings.MEILISEARCH = {**self._BASE, "SEARCH_KEY": ""}
+        resolved = _MeiliSettings.from_settings()
+        assert resolved.search_key == "the_master_key"
+
+    def test_search_key_absent_falls_back_to_master(self, settings):
+        settings.MEILISEARCH = dict(self._BASE)  # no SEARCH_KEY key at all
+        resolved = _MeiliSettings.from_settings()
+        assert resolved.search_key == "the_master_key"

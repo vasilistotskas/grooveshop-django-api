@@ -38,7 +38,7 @@ def mock_models():
 def mock_meili_client():
     """Fixture to mock meili_client."""
     with patch("search.views.meili_client") as mock_client:
-        mock_client.client.multi_search.return_value = {
+        mock_client.search_client.multi_search.return_value = {
             "hits": [],
             "estimatedTotalHits": 0,
         }
@@ -78,9 +78,9 @@ class TestFederatedSearchProperties:
         request = self.factory.get("/api/search/federated", params)
         federated_search(request)
 
-        assert mock_meili_client.client.multi_search.called
+        assert mock_meili_client.search_client.multi_search.called
 
-        call_args = mock_meili_client.client.multi_search.call_args
+        call_args = mock_meili_client.search_client.multi_search.call_args
         assert "federation" in call_args.kwargs or "federation" in call_args[1]
 
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
@@ -100,7 +100,7 @@ class TestFederatedSearchProperties:
         request = self.factory.get("/api/search/federated", {"query": query})
         federated_search(request)
 
-        call_args = mock_meili_client.client.multi_search.call_args
+        call_args = mock_meili_client.search_client.multi_search.call_args
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
 
         product_query = next(
@@ -132,7 +132,7 @@ class TestFederatedSearchProperties:
                 "_rankingScore": 0.95,
             }
         ]
-        mock_meili_client.client.multi_search.return_value = {
+        mock_meili_client.search_client.multi_search.return_value = {
             "hits": mock_hits,
             "estimatedTotalHits": 1,
         }
@@ -162,7 +162,7 @@ class TestFederatedSearchProperties:
         )
         federated_search(request)
 
-        call_args = mock_meili_client.client.multi_search.call_args
+        call_args = mock_meili_client.search_client.multi_search.call_args
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
 
         expected_filter = f"language_code = '{language_code}'"
@@ -192,7 +192,7 @@ class TestFederatedSearchProperties:
 
         mock_expand_greeklish.assert_called_once()
 
-        call_args = mock_meili_client.client.multi_search.call_args
+        call_args = mock_meili_client.search_client.multi_search.call_args
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
         for query in queries:
             assert query["q"] == expanded_query
@@ -214,7 +214,7 @@ class TestFederatedSearchProperties:
         )
         federated_search(request)
 
-        call_args = mock_meili_client.client.multi_search.call_args
+        call_args = mock_meili_client.search_client.multi_search.call_args
         federation = call_args.kwargs.get("federation") or call_args[1].get(
             "federation"
         )
@@ -250,7 +250,7 @@ class TestFederatedSearchEdgeCases:
 
         assert response.data["offset"] == 10
 
-        call_args = mock_meili_client.client.multi_search.call_args
+        call_args = mock_meili_client.search_client.multi_search.call_args
         federation = call_args.kwargs.get("federation") or call_args[1].get(
             "federation"
         )
@@ -260,10 +260,12 @@ class TestFederatedSearchEdgeCases:
         self, mock_models, mock_meili_client
     ):
         """Test federated search when Meilisearch returns error."""
-        mock_meili_client.client.multi_search.side_effect = Exception(
+        mock_meili_client.search_client.multi_search.side_effect = Exception(
             "Meilisearch connection failed"
         )
-        assert mock_meili_client.client.multi_search.side_effect is not None
+        assert (
+            mock_meili_client.search_client.multi_search.side_effect is not None
+        )
 
     def test_federated_search_object_not_found(
         self, mock_models, mock_meili_client
@@ -271,7 +273,7 @@ class TestFederatedSearchEdgeCases:
         """Test federated search when Django object not found in database."""
         mock_product, _ = mock_models
 
-        mock_meili_client.client.multi_search.return_value = {
+        mock_meili_client.search_client.multi_search.return_value = {
             "hits": [
                 {
                     "id": "999",
@@ -319,7 +321,7 @@ class TestFederatedSearchEdgeCases:
         )
         federated_search(request)
 
-        call_args = mock_meili_client.client.multi_search.call_args
+        call_args = mock_meili_client.search_client.multi_search.call_args
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
         assert queries[0]["q"] == "laptop computer"
 
@@ -330,7 +332,7 @@ class TestFederatedSearchEdgeCases:
         request = self.factory.get("/api/search/federated", {"query": "test"})
         federated_search(request)
 
-        call_args = mock_meili_client.client.multi_search.call_args
+        call_args = mock_meili_client.search_client.multi_search.call_args
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
 
         product_query = next(

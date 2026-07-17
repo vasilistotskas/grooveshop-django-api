@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from enum import Enum, unique
 from typing import TYPE_CHECKING
 
@@ -53,14 +54,19 @@ class CartService:
 
     def _extract_cart_info(self):
         if hasattr(self.request, "META"):
-            self.cart_id = self.request.META.get("HTTP_X_CART_ID")
+            raw_cart_id = self.request.META.get("HTTP_X_CART_ID")
         else:
-            self.cart_id = self.request.headers.get("X-Cart-Id")
+            raw_cart_id = self.request.headers.get("X-Cart-Id")
 
-        if self.cart_id:
+        # Guest carts are addressed by their unguessable UUID, never the
+        # sequential PK — otherwise any anonymous caller can enumerate other
+        # guests' carts by incrementing an integer header (IDOR). Reject
+        # anything that is not a valid UUID.
+        self.cart_id: uuid.UUID | None = None
+        if raw_cart_id:
             try:
-                self.cart_id = int(self.cart_id)
-            except (ValueError, TypeError):
+                self.cart_id = uuid.UUID(str(raw_cart_id))
+            except (ValueError, TypeError, AttributeError):
                 self.cart_id = None
 
     def __str__(self):
@@ -76,7 +82,7 @@ class CartService:
     def _initialize_cart(self):
         if self.request.user.is_authenticated and self.cart_id:
             guest_cart = (
-                Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
             )
             if guest_cart:
                 self.cart = self.get_or_create_cart()
@@ -97,7 +103,7 @@ class CartService:
 
             if cart and self.cart_id:
                 guest_cart = (
-                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                    Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
 
                 if guest_cart:
@@ -107,7 +113,7 @@ class CartService:
         else:
             if self.cart_id:
                 return (
-                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                    Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
 
             return None
@@ -120,7 +126,7 @@ class CartService:
 
             if self.cart_id:
                 guest_cart = (
-                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                    Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
 
                 if guest_cart:
@@ -130,7 +136,7 @@ class CartService:
         else:
             if self.cart_id:
                 cart = (
-                    Cart.objects.guest_carts().filter(id=self.cart_id).first()
+                    Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
                 if cart:
                     return cart

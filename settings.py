@@ -1055,10 +1055,24 @@ if _meili_master_key == "changeme" and SYSTEM_ENV == "production":
         "MEILI_MASTER_KEY must be set in production "
         "(current value is the insecure default 'changeme')."
     )
+# Read-only search key used for the public query paths (product/blog/federated
+# search). The master key must never serve untrusted search traffic (it can
+# manage keys, indexes and documents). Set MEILI_SEARCH_KEY to Meilisearch's
+# "Default Search API Key" (or a custom search-only key). When unset, the
+# search client falls back to the master key so local/dev still works.
+_meili_search_key = getenv("MEILI_SEARCH_KEY", "")
+if not _meili_search_key and SYSTEM_ENV == "production":
+    import logging as _logging
+
+    _logging.getLogger("meili").warning(
+        "MEILI_SEARCH_KEY is not set; public search falls back to the master "
+        "key. Provision a read-only search key for production."
+    )
 MEILISEARCH = {
     "HTTPS": getenv("MEILI_HTTPS", "False") == "True",
     "HOST": getenv("MEILI_HOST", "localhost"),
     "MASTER_KEY": _meili_master_key,
+    "SEARCH_KEY": _meili_search_key,
     "PORT": int(getenv("MEILI_PORT", "7700")),
     "TIMEOUT": int(getenv("MEILI_TIMEOUT", "30")),
     "CLIENT_AGENTS": None,

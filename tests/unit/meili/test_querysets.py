@@ -40,6 +40,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_queryset_initialization(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
@@ -69,6 +70,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_queryset_repr_and_str(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
@@ -78,6 +80,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_queryset_getitem_slice(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset[10:50]
@@ -89,6 +92,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_queryset_getitem_invalid_index(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
@@ -100,6 +104,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_count(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
         mock_stats = MagicMock()
         mock_stats.number_of_documents = 42
         self.mock_index.get_stats.return_value = mock_stats
@@ -113,6 +118,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_paginate(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.paginate(limit=100, offset=25)
@@ -124,6 +130,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_order_by_ascending(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.order_by("title", "created_at")
@@ -134,6 +141,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_order_by_descending(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.order_by("-title", "-created_at")
@@ -144,6 +152,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_order_by_mixed(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.order_by("title", "-created_at", "priority")
@@ -158,6 +167,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_order_by_geopoint(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.order_by("geoPoint", "-geoPoint")
@@ -168,6 +178,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_matching_strategy(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.matching_strategy("all")
@@ -178,6 +189,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_attributes_to_search_on(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
@@ -195,6 +207,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_regular_exact_string(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(title="Test Title")
@@ -205,6 +218,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_regular_exact_number(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(price=100)
@@ -215,6 +229,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_regular_empty_values(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         queryset.filter(empty_string="", empty_list=[], empty_dict={})
@@ -226,6 +241,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_regular_null_value(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         queryset.filter(nullable_field=None)
@@ -235,6 +251,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_gte(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(price__gte=100)
@@ -245,6 +262,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_gte_invalid_type(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
@@ -256,6 +274,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_gt(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(price__gt=100.5)
@@ -266,6 +285,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_lte(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(price__lte=200)
@@ -276,6 +296,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_lt(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(price__lt=50.25)
@@ -286,6 +307,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_in(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(category__in=["electronics", "books"])
@@ -296,6 +318,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_in_invalid_type(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
@@ -307,6 +330,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_range_list(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(price__range=[10, 100])
@@ -317,6 +341,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_range_tuple(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(price__range=(5, 50))
@@ -327,6 +352,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_range_range_object(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(price__range=range(1, 10))
@@ -337,6 +363,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_range_invalid_type(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
@@ -349,6 +376,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_exists_true(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(field__exists=True)
@@ -359,6 +387,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_exists_false(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(field__exists=False)
@@ -369,6 +398,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_exists_invalid_type(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
@@ -380,6 +410,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_isnull_true(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(field__isnull=True)
@@ -390,6 +421,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_isnull_false(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.filter(field__isnull=False)
@@ -400,6 +432,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_isnull_invalid_type(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
 
@@ -411,6 +444,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_geo_radius(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockGeoModel)
         radius = Radius(lat=48.8566, lng=2.3522, radius=1000)
@@ -422,6 +456,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_geo_bounding_box(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockGeoModel)
         bbox = BoundingBox(top_right=(48.9, 2.4), bottom_left=(48.8, 2.3))
@@ -433,6 +468,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_geo_unsupported_model(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         radius = Radius(lat=48.8566, lng=2.3522, radius=1000)
@@ -445,6 +481,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_filter_geo_invalid_type(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockGeoModel)
 
@@ -457,6 +494,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_search_basic(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [
@@ -514,6 +552,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_search_empty_query(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {"hits": [], "estimatedTotalHits": 0}
         self.mock_index.search.return_value = mock_search_results
@@ -530,8 +569,32 @@ class TestIndexQuerySet:
         assert call_args[0][0] == ""
 
     @patch("meili.querysets.client")
+    def test_search_uses_read_only_search_index(self, mock_client):
+        """Public search must run on the search-key index, never the master.
+
+        Routing untrusted query traffic through the master-key client would
+        expose index/document/key administration to the public search path.
+        """
+        master_index = MagicMock(name="master_index")
+        search_index = MagicMock(name="search_index")
+        search_index.search.return_value = {"hits": [], "estimatedTotalHits": 0}
+        mock_client.get_index.return_value = master_index
+        mock_client.get_search_index.return_value = search_index
+
+        MockModel.objects.filter.return_value.order_by.return_value = []
+
+        queryset = IndexQuerySet(MockModel)
+        queryset.search("q")
+        queryset.raw_search("q")
+
+        assert search_index.search.call_count == 2
+        master_index.search.assert_not_called()
+        mock_client.get_search_index.assert_called_with("test_index")
+
+    @patch("meili.querysets.client")
     def test_search_with_filters_and_options(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [
@@ -576,6 +639,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_facets(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         queryset = IndexQuerySet(MockModel)
         result = queryset.set_facets("category", "price", "brand")
@@ -586,6 +650,7 @@ class TestIndexQuerySet:
     @patch("meili.querysets.client")
     def test_search_with_facets(self, mock_client):
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [{"id": 1, "title": "Test Item"}],

@@ -568,7 +568,7 @@ class TestAnalyticsLoggingFailuresDontBreakSearch:
 
             # Mock multi_search for federated
             with patch(
-                "meili._client.client.client.multi_search"
+                "meili._client.client.search_client.multi_search"
             ) as mock_multi_search:
                 mock_multi_search.return_value = {
                     "hits": [
@@ -726,7 +726,7 @@ class TestFederatedSearchEndToEnd:
         # Mock Meilisearch multi_search to return federated results
         # Use the correct import path from search.views
         with patch(
-            "search.views.meili_client.client.multi_search"
+            "search.views.meili_client.search_client.multi_search"
         ) as mock_multi_search:
             # Simulate federated search response from Meilisearch
             mock_multi_search.return_value = {
@@ -863,7 +863,7 @@ class TestFederatedSearchEndToEnd:
         Validates: Requirements 1.6
         """
         with patch(
-            "meili._client.client.client.multi_search"
+            "meili._client.client.search_client.multi_search"
         ) as mock_multi_search:
             mock_multi_search.return_value = {
                 "hits": [],
@@ -908,7 +908,7 @@ class TestFederatedSearchEndToEnd:
         Validates: Requirements 1.7
         """
         with patch(
-            "meili._client.client.client.multi_search"
+            "meili._client.client.search_client.multi_search"
         ) as mock_multi_search:
             mock_multi_search.return_value = {
                 "hits": [],

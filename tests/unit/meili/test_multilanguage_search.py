@@ -34,6 +34,7 @@ class TestMultilanguageSearch:
     def test_search_with_language_filter(self, mock_client):
         """Test search with language_code filter."""
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [
@@ -72,6 +73,7 @@ class TestMultilanguageSearch:
     def test_search_with_locale_setting(self, mock_client):
         """Test search with locale configuration."""
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [{"id": 1, "title": "Ελληνικό Κείμενο"}],
@@ -97,6 +99,7 @@ class TestMultilanguageSearch:
     def test_search_with_multiple_locales(self, mock_client):
         """Test search with multiple locales."""
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {"hits": [], "estimatedTotalHits": 0}
         self.mock_index.search.return_value = mock_search_results
@@ -116,6 +119,7 @@ class TestMultilanguageSearch:
     def test_search_without_language_filter(self, mock_client):
         """Test search without language filter returns all languages."""
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [
@@ -147,6 +151,7 @@ class TestMultilanguageSearch:
     def test_combined_language_filter_and_locale(self, mock_client):
         """Test combined use of language filter and locale setting."""
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [{"id": 1, "language_code": "el"}],
@@ -173,6 +178,7 @@ class TestMultilanguageSearch:
     def test_language_filter_with_other_filters(self, mock_client):
         """Test language filter combined with other filters."""
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [{"id": 1, "language_code": "en", "active": True}],
@@ -200,6 +206,7 @@ class TestMultilanguageSearch:
     def test_search_greek_characters(self, mock_client):
         """Test search with Greek characters."""
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [
@@ -232,6 +239,7 @@ class TestMultilanguageSearch:
     def test_search_german_characters(self, mock_client):
         """Test search with German characters (umlauts)."""
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [
@@ -264,6 +272,7 @@ class TestMultilanguageSearch:
     def test_empty_query_with_language_filter(self, mock_client):
         """Test empty query with language filter still filters by language."""
         mock_client.get_index.return_value = self.mock_index
+        mock_client.get_search_index.return_value = self.mock_index
 
         mock_search_results = {
             "hits": [{"id": 1, "language_code": "en"}],

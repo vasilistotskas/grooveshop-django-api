@@ -25,6 +25,7 @@ class TestMeiliIndexSettings:
             port=7700,
             https=False,
             master_key="test_key",
+            search_key="test_key",
             timeout=10,
             sync=False,
             client_agents=("test-agent",),

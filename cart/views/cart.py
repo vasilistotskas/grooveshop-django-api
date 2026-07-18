@@ -345,7 +345,16 @@ class CartViewSet(BaseModelViewSet):
                 )
                 reservation_ids.append(reservation.id)
             except InsufficientStockError as e:
-                # Track which items failed to reserve
+                # Track which items failed to reserve — and log it, or the
+                # resulting 409 is unanswerable from server logs alone.
+                logger.info(
+                    "Stock reservation rejected: cart=%s product=%s "
+                    "available=%s requested=%s",
+                    cart.uuid,
+                    e.product_id,
+                    e.available,
+                    e.requested,
+                )
                 failed_items.append(
                     {
                         "product_id": e.product_id,
@@ -364,9 +373,16 @@ class CartViewSet(BaseModelViewSet):
             for reservation_id in reservation_ids:
                 try:
                     StockManager.release_reservation(reservation_id)
-                except StockReservationError:
-                    # Log but don't fail if release fails
-                    pass
+                except StockReservationError as release_error:
+                    # Don't fail the rollback, but leave a trace — a stuck
+                    # reservation holds stock until its TTL expiry.
+                    logger.warning(
+                        "Failed to release reservation %s during "
+                        "reserve_stock rollback for cart %s: %s",
+                        reservation_id,
+                        cart.uuid,
+                        release_error,
+                    )
 
             return Response(
                 {

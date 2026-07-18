@@ -3,6 +3,51 @@
 
 
 
+## v1.156.6 (2026-07-18)
+
+### Bug fixes
+
+* fix(cart,order,shipping): resolve 2026-07 cart & order flow audit findings
+
+Deep audit of cart/order flows (guest + registered) across COD, Viva
+Wallet, Stripe, ACS and BoxNow. Full writeup in CART_ORDER_AUDIT.md.
+Every fix has a regression test that fails without it.
+
+P0 (live prod bug):
+- handle_order_shipped no longer re-raises an illegal DELIVERED->SHIPPED
+  on a carrier same-poll PROCESSING->DELIVERED bridge, which had aborted
+  the commit hooks and dropped the customer's DELIVERED email.
+
+HIGH:
+- destroy is admin-only (owner could soft-delete an order, skipping
+  stock restore / refund / voucher cancel).
+- OrderWriteSerializer user/pay_way/document_type read-only (mass-assign
+  let an owner reassign their order); schema + Nuxt types regenerated.
+- Stripe checkout.session.completed now dispatches shipment + has the
+  settled-state guard.
+- Viva accumulates all issued order codes so a payment on an earlier
+  session still resolves (was silently lost).
+- BoxNow COD collects paid_amount (post loyalty discount), not
+  total_price.
+
+MEDIUM/LOW:
+- order-create now validates pay-way active + carrier compatibility,
+  provider is_active (all carriers), and requires a provider code for
+  pickup_point.
+- cart hygiene: cumulative add-to-cart stock check, non-empty guest cart
+  cleanup, removed cleanup_expired foot-gun, merge_carts stock cap.
+- ACS cancel dead-end fixed (reset_shipment_for_remint + admin action),
+  pickup-list single-flight mutex.
+- BoxNow webhook: alert admins on silent-drop, replay-dedup via SHA-256
+  of the signed data (migration 0005).
+- PayWayFactory.active defaults True; debug logging at key decisions.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com> ([`6da2064`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6da2064de4013e449b146dc918f12d89c584c002))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.156.5 [skip ci] ([`4c4d068`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c4d0683e0199d49319b787ee98f8a2f8230c641))
+
 ## v1.156.5 (2026-07-17)
 
 ### Bug fixes

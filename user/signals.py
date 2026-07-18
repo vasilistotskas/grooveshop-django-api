@@ -3,10 +3,16 @@ from __future__ import annotations
 import logging
 
 from allauth.account.signals import (
+    authentication_step_completed,
     email_changed,
     password_changed,
     password_reset,
     user_signed_up,
+)
+from django.contrib.auth.signals import (
+    user_logged_in,
+    user_logged_out,
+    user_login_failed,
 )
 from django.dispatch import receiver
 
@@ -27,6 +33,72 @@ User = get_user_model()
 
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Auth-event logging.
+#
+# django.request only logs "Unauthorized: /_allauth/..." for auth traffic,
+# which cannot distinguish a wrong password from a pending-2FA step from a
+# code request — that ambiguity made the 2026-07 login incidents hard to
+# debug. These receivers give each auth event one structured INFO line.
+# django.contrib.auth signals fire for every login path (password, code,
+# social, 2FA completion) because allauth funnels through auth_login();
+# allauth's authentication_step_completed adds the per-step granularity
+# (e.g. password accepted but 2FA still pending). Never log credentials.
+# ---------------------------------------------------------------------------
+
+
+@receiver(user_logged_in, dispatch_uid="user.log_auth_login")
+def log_auth_login(sender, request, user, **kwargs):
+    logger.info(
+        "Auth: login completed",
+        extra={
+            "user_id": user.pk,
+            "path": getattr(request, "path", None),
+        },
+    )
+
+
+@receiver(
+    authentication_step_completed, dispatch_uid="user.log_auth_step_completed"
+)
+def log_auth_step_completed(sender, request, user, method, **kwargs):
+    # Fires per completed step; NOT full sign-in (2FA may still be pending).
+    logger.info(
+        "Auth: step completed",
+        extra={
+            "user_id": getattr(user, "pk", None),
+            "method": str(method),
+            "path": getattr(request, "path", None),
+        },
+    )
+
+
+@receiver(user_login_failed, dispatch_uid="user.log_auth_login_failed")
+def log_auth_login_failed(sender, credentials, request=None, **kwargs):
+    # `credentials` may contain the password — extract identifiers only.
+    identifier = None
+    if isinstance(credentials, dict):
+        identifier = credentials.get("email") or credentials.get("username")
+    logger.warning(
+        "Auth: login failed",
+        extra={
+            "identifier": identifier,
+            "path": getattr(request, "path", None),
+        },
+    )
+
+
+@receiver(user_logged_out, dispatch_uid="user.log_auth_logout")
+def log_auth_logout(sender, request, user, **kwargs):
+    logger.info(
+        "Auth: logout",
+        extra={
+            "user_id": getattr(user, "pk", None),
+            "path": getattr(request, "path", None),
+        },
+    )
 
 
 def _revoke_knox_tokens(user) -> int:

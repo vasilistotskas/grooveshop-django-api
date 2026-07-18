@@ -11,7 +11,6 @@ from core.utils.email import is_disposable_domain
 from country.models import Country
 from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus
-from order.models.item import OrderItem
 from order.models.order import Order
 from order.serializers.item import (
     OrderItemCreateSerializer,
@@ -1118,116 +1117,6 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                 )
 
         return attrs
-
-    def create(self, validated_data):
-        from django.conf import settings
-        from djmoney.money import Money
-        from extra_settings.models import Setting
-
-        items_data = validated_data.pop("items")
-
-        # Calculate items total and shipping
-        items_total = Money(0, settings.DEFAULT_CURRENCY)
-        for item_data in items_data:
-            product = item_data.get("product")
-            quantity = item_data.get("quantity", 1)
-            items_total += product.final_price * quantity
-
-        base_shipping_cost = Setting.get(
-            "CHECKOUT_SHIPPING_PRICE", default=3.00
-        )
-        free_shipping_threshold = Setting.get(
-            "FREE_SHIPPING_THRESHOLD", default=50.00
-        )
-
-        if items_total.amount >= float(free_shipping_threshold):
-            shipping_price = Money(0, items_total.currency)
-        else:
-            shipping_price = Money(
-                float(base_shipping_cost), items_total.currency
-            )
-
-        validated_data["shipping_price"] = shipping_price
-
-        # Store cart_id in order metadata for guest cart clearing
-        request = self.context.get("request")
-        if request and not validated_data.get("user"):
-            cart_id = None
-            if hasattr(request, "META"):
-                cart_id = request.META.get("HTTP_X_CART_ID")
-            elif hasattr(request, "headers"):
-                cart_id = request.headers.get("X-Cart-Id")
-
-            if cart_id:
-                try:
-                    cart_id = int(cart_id)
-                    if "metadata" not in validated_data:
-                        validated_data["metadata"] = {}
-                    validated_data["metadata"]["cart_id"] = cart_id
-                except (ValueError, TypeError):
-                    pass
-
-        # Validate and lock stock BEFORE creating order. Locking all
-        # products in one ``SELECT … FOR UPDATE WHERE pk IN (…)`` is
-        # one round-trip regardless of cart size — the previous
-        # per-item loop fired N locks + N updates inside the same
-        # transaction, scaling round-trips linearly with cart depth.
-        from product.models import Product
-
-        product_ids = [item["product"].pk for item in items_data]
-        locked_products = {
-            p.pk: p
-            for p in Product.objects.select_for_update().filter(
-                pk__in=product_ids
-            )
-        }
-
-        for item_data in items_data:
-            product = item_data.get("product")
-            quantity = item_data.get("quantity", 1)
-            locked_product = locked_products.get(product.pk)
-            if locked_product is None:
-                # Product disappeared between cart load and order create.
-                raise serializers.ValidationError(
-                    {"items": [f"Product {product.pk} no longer available."]}
-                )
-
-            if locked_product.stock < quantity:
-                raise serializers.ValidationError(
-                    {
-                        "items": [
-                            f"Product '{locked_product.safe_translation_getter('name', any_language=True)}' "
-                            f"does not have enough stock. Available: {locked_product.stock}, "
-                            f"Requested: {quantity}"
-                        ]
-                    }
-                )
-
-            # Deduct stock immediately in transaction
-            locked_product.stock = max(0, locked_product.stock - quantity)
-            locked_product.save(update_fields=["stock"])
-
-        # Create order after stock is validated and deducted
-        order = Order.objects.create(**validated_data)
-
-        # Create order items (stock already deducted above)
-        for item_data in items_data:
-            product = item_data.get("product")
-            item_to_create = item_data.copy()
-            item_to_create["price"] = product.final_price
-
-            # Set flag BEFORE creating to prevent signal from deducting again
-            OrderItem._skip_stock_deduction = True
-            OrderItem.objects.create(order=order, **item_to_create)
-            OrderItem._skip_stock_deduction = False
-
-        order.paid_amount = order.calculate_order_total_amount()
-        order.save(update_fields=["paid_amount", "paid_amount_currency"])
-
-        # Mark order to send signal after transaction commits
-        order._send_created_signal = True
-
-        return order
 
     def update(self, instance, validated_data):
         # Order line items are immutable after creation: each carries a

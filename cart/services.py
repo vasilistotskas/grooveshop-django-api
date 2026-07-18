@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from enum import Enum, unique
 from typing import TYPE_CHECKING
@@ -7,6 +8,8 @@ from typing import TYPE_CHECKING
 from django.db import transaction
 
 from cart.models import Cart, CartItem
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -154,6 +157,10 @@ class CartService:
         if target_cart.id == source_cart.id:
             return
 
+        lines_moved = 0
+        lines_combined = 0
+        lines_capped = 0
+
         for item in (
             source_cart.items.select_for_update()
             .select_related("product")
@@ -177,17 +184,33 @@ class CartService:
                 stock = item.product.stock if item.product else 0
                 if stock > 0 and merged_quantity > stock:
                     merged_quantity = stock
+                    lines_capped += 1
                 existing_item.quantity = merged_quantity
                 existing_item.save()
                 item.delete()
+                lines_combined += 1
             else:
                 item.cart = target_cart
                 item.save()
+                lines_moved += 1
 
         if target_cart == self.cart:
             self.cart_items = self.cart.get_items()
 
+        source_uuid = source_cart.uuid
         source_cart.delete()
+        # One line per merge answers "why did my cart change after
+        # logging in" without DB archaeology — especially which lines
+        # were quantity-capped at stock.
+        logger.info(
+            "Merged guest cart %s into cart %s: moved=%s combined=%s "
+            "capped_at_stock=%s",
+            source_uuid,
+            target_cart.id,
+            lines_moved,
+            lines_combined,
+            lines_capped,
+        )
 
     def clean_cart(self):
         if self.cart:

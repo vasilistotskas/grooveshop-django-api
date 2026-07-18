@@ -200,14 +200,14 @@ class ShippingCarrierInterface(ABC):
         """Return a PayWay queryset filtered by this carrier's rules.
 
         Default: pass-through — the carrier accepts any pay-way the
-        platform offers. Override when the carrier rejects a payment
-        type for a given kind. Examples:
-
-        * BoxNow's API returns P411 for COD on locker pickup, so
-          ``BoxNowCarrier`` filters out non-online pay-ways when
-          ``kind == PICKUP_POINT``.
-        * A future Speedex carrier might restrict prepaid-only on
-          one kind by overriding the same hook.
+        platform offers. Override ONLY for a hard, protocol-level veto
+        the carrier itself enforces; merchant-level restrictions belong
+        in ``PayWayShippingExclusion`` rows (admin-managed, runtime
+        toggleable — e.g. blocking COD at BoxNow lockers when the
+        partner account lacks "pay on the go"), which
+        ``PayWayService.filter_by_carrier`` applies on top of this
+        hook. ``BoxNowCarrier`` deliberately does NOT override this
+        for exactly that reason.
         """
         return queryset
 

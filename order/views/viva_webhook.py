@@ -572,11 +572,23 @@ def _handle_payment_created(order, event_data, transaction_id):
         order.id,
     )
     verified_status, verified_data = _verify_transaction(transaction_id)
+    # Allowlisted fields only — never log the raw provider dict (it may
+    # carry cardholder data; see the redaction policy at the top of the
+    # webhook handler).
     logger.info(
-        "Viva Retrieve Transaction result for %s: status=%s | data=%s",
+        "Viva Retrieve Transaction result for %s: status=%s "
+        "raw_status=%s amount=%s order_code=%s",
         transaction_id,
         verified_status,
-        verified_data,
+        verified_data.get("raw_status")
+        if isinstance(verified_data, dict)
+        else None,
+        verified_data.get("amount")
+        if isinstance(verified_data, dict)
+        else None,
+        verified_data.get("order_code")
+        if isinstance(verified_data, dict)
+        else None,
     )
     if verified_status is None:
         logger.error(

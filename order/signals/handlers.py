@@ -190,9 +190,13 @@ def handle_order_created(
                         order.id,
                     )
             else:
-                # For guest orders, try to get cart_id from order metadata
+                # For guest orders, read the cart id from the cart snapshot
+                # both creation paths write into order metadata
+                # (OrderService.create_order_from_cart[_offline]).
                 cart_id = (
-                    order.metadata.get("cart_id") if order.metadata else None
+                    order.metadata.get("cart_snapshot", {}).get("cart_id")
+                    if order.metadata
+                    else None
                 )
                 if cart_id:
                     cart = Cart.objects.filter(

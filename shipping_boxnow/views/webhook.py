@@ -4,8 +4,7 @@ Public URL given to BoxNow for parcel-event notifications.
 Authentication is done exclusively via HMAC-SHA256 datasignature
 (no Knox/session auth — BoxNow is a machine-to-machine caller).
 
-Wire-up is deferred to a later wave; this file is intentionally not
-yet listed in urls.py.
+Registered in ``core/urls.py`` at ``boxnow/webhook/``.
 """
 
 from __future__ import annotations

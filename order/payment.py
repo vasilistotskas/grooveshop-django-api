@@ -769,6 +769,10 @@ class VivaWalletPaymentProvider(PaymentProvider):
             status_id = data.get("statusId", "")
             status = self._map_viva_status(status_id)
 
+            # Deliberately excludes Viva's ``cardNumber`` (and any other
+            # cardholder fields): nothing downstream consumes them, and
+            # keeping card data out of ``status_data`` keeps it out of
+            # logs and API responses (PCI/GDPR scope).
             status_data = {
                 "payment_id": payment_id,
                 "raw_status": status_id,
@@ -776,7 +780,6 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "amount": data.get("amount"),
                 "currency": data.get("currencyCode", "EUR"),
                 "order_code": data.get("orderCode"),
-                "card_number": data.get("cardNumber"),
                 "created": data.get("insDate"),
             }
 

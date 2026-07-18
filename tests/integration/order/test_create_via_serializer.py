@@ -39,6 +39,7 @@ class TestOrderCreateSerializerValidation(APITestCase):
         self.pay_way = PayWayFactory(
             provider_code="stripe",
             is_online_payment=True,
+            active=True,
         )
         self.country = CountryFactory()
         self.region = RegionFactory(country=self.country)
@@ -128,6 +129,39 @@ class TestOrderCreateSerializerValidation(APITestCase):
         serializer.is_valid()
         assert serializer.validated_data.get("billing_vat_id") == "123456789"
 
+    def test_serializer_pickup_point_requires_provider_code(self):
+        """A pickup_point order with no shipping_provider_code is rejected
+        — otherwise the service-layer locker/station validation is skipped
+        and the order is created with no provider and silently never
+        ships."""
+        data = self._base_data(shipping_kind="pickup_point")
+        data.pop("shipping_provider_code", None)
+        serializer = OrderCreateFromCartSerializer(data=data)
+        assert not serializer.is_valid()
+        assert "shipping_provider_code" in serializer.errors
+
+    def test_serializer_rejects_inactive_shipping_provider(self):
+        """An explicit provider code that is inactive (master switch off)
+        is rejected even if a stale client still sends it. The reseed
+        fixture seeds ``acs`` with is_active=False."""
+        data = self._base_data(
+            shipping_provider_code="acs", shipping_kind="home_delivery"
+        )
+        serializer = OrderCreateFromCartSerializer(data=data)
+        assert not serializer.is_valid()
+        assert "shipping_provider_code" in serializer.errors
+
+    def test_serializer_accepts_active_shipping_provider(self):
+        """An active provider code passes the master-switch re-check."""
+        from shipping.models import ShippingProvider
+
+        ShippingProvider.objects.filter(code="acs").update(is_active=True)
+        data = self._base_data(
+            shipping_provider_code="acs", shipping_kind="home_delivery"
+        )
+        serializer = OrderCreateFromCartSerializer(data=data)
+        assert serializer.is_valid(), serializer.errors
+
 
 @pytest.mark.django_db
 class TestOrderCreateBothFlowsViaSerializer(APITestCase):
@@ -178,7 +212,9 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         )
         mock_get_provider.return_value = mock_provider
 
-        pay_way = PayWayFactory(provider_code="stripe", is_online_payment=True)
+        pay_way = PayWayFactory(
+            provider_code="stripe", is_online_payment=True, active=True
+        )
         data = {
             **self._base_address(),
             "pay_way_id": pay_way.id,
@@ -207,7 +243,9 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         mock_validate_cart.return_value = {"valid": True, "errors": []}
         mock_validate_address.return_value = None
 
-        pay_way = PayWayFactory(provider_code="cod", is_online_payment=False)
+        pay_way = PayWayFactory(
+            provider_code="cod", is_online_payment=False, active=True
+        )
         data = {
             **self._base_address(),
             "pay_way_id": pay_way.id,
@@ -223,6 +261,74 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["status"], OrderStatus.PENDING.value)
+
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_inactive_pay_way_rejected_at_creation(
+        self, mock_validate_address, mock_validate_cart
+    ):
+        """An inactive pay-way is rejected at order creation (master
+        switch), even though the GET pay-way list already hides it — a
+        direct API call must not bypass it."""
+        mock_validate_cart.return_value = {"valid": True, "errors": []}
+        mock_validate_address.return_value = None
+
+        pay_way = PayWayFactory(
+            provider_code="cod", is_online_payment=False, active=False
+        )
+        data = {**self._base_address(), "pay_way_id": pay_way.id}
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            self.create_url,
+            data,
+            format="json",
+            HTTP_X_CART_ID=str(self.cart.uuid),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pay_way_id", response.data)
+
+    def test_carrier_excluded_pay_way_rejected_at_creation(self):
+        """A pay-way excluded for the chosen (carrier, kind) via a
+        PayWayShippingExclusion row is rejected at order creation — the
+        admin-configurable carrier-compatibility layer must apply at the
+        create boundary, not only in the GET pay-way list. (e.g. ops
+        disabling COD at a BoxNow locker for a partner without 'pay on the
+        go')."""
+        from pay_way.factories import PayWayShippingExclusionFactory
+        from shipping.models import ShippingProvider
+
+        boxnow = ShippingProvider.objects.get(code="boxnow")
+        boxnow.is_active = True
+        boxnow.save(update_fields=["is_active"])
+
+        pay_way = PayWayFactory(
+            provider_code="cod", is_online_payment=False, active=True
+        )
+        PayWayShippingExclusionFactory(
+            pay_way=pay_way,
+            shipping_provider=boxnow,
+            shipping_kind="pickup_point",
+        )
+
+        data = {
+            **self._base_address(),
+            "pay_way_id": pay_way.id,
+            "shipping_provider_code": "boxnow",
+            "shipping_kind": "pickup_point",
+            "boxnow_locker_id": "123",
+        }
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            self.create_url,
+            data,
+            format="json",
+            HTTP_X_CART_ID=str(self.cart.uuid),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pay_way_id", response.data)
 
     def test_online_flow_rejects_missing_pay_way_id(self):
         """Serializer catches missing pay_way_id before any DB lookup."""
@@ -247,7 +353,9 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         """floor, location_type pass through without error."""
         from unittest.mock import patch
 
-        pay_way = PayWayFactory(provider_code="cod", is_online_payment=False)
+        pay_way = PayWayFactory(
+            provider_code="cod", is_online_payment=False, active=True
+        )
         data = {
             **self._base_address(),
             "pay_way_id": pay_way.id,

@@ -96,7 +96,11 @@ def generate_provider_data():
 
 
 class PayWayFactory(factory.django.DjangoModelFactory):
-    active = factory.Faker("boolean")
+    # Default to a *usable* (active) pay-way. Order creation now rejects
+    # inactive pay-ways, so a random ``active`` default silently flaked
+    # any checkout test that omitted it. Tests exercising the inactive
+    # path must set ``active=False`` explicitly.
+    active = True
     cost = FuzzyDecimal(3, 10, 2)
     free_threshold = FuzzyDecimal(100, 200, 2)
     icon = factory.django.ImageField(
@@ -144,6 +148,11 @@ class PayWayFactory(factory.django.DjangoModelFactory):
         elif provider_code == "paypal":
             config = generate_paypal_config()
 
+        # These helpers build a *usable* payment method for tests, so
+        # default to active=True (the base factory randomises ``active``).
+        # Order creation now rejects inactive pay-ways, so a randomly
+        # inactive method would flake the checkout tests that use it.
+        kwargs.setdefault("active", True)
         return cls.create(
             provider_code=provider_code,
             is_online_payment=True,
@@ -160,6 +169,7 @@ class PayWayFactory(factory.django.DjangoModelFactory):
         if provider_code == "bank_transfer":
             config = generate_bank_transfer_config()
 
+        kwargs.setdefault("active", True)
         return cls.create(
             provider_code=provider_code,
             is_online_payment=False,

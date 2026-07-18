@@ -309,11 +309,32 @@ class OrderSignalsTestCase(TestCase):
 
         order_shipped.send(sender=Order, order=self.order)
 
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.SHIPPED.value)
         self.assertTrue(
             OrderHistory.objects.filter(
                 order=self.order, change_type="SHIPPING"
             ).exists()
         )
+
+    def test_handle_order_shipped_does_not_regress_delivered_order(self):
+        """Regression: a carrier same-poll PROCESSING -> DELIVERED bridge
+        writes SHIPPED then DELIVERED on one order instance, so the
+        SHIPPED transition's on_commit hook re-emits ``order_shipped``
+        with ``order.status`` already DELIVERED. ``handle_order_shipped``
+        must not attempt the illegal DELIVERED -> SHIPPED transition,
+        which previously raised ``InvalidStatusTransitionError`` and
+        aborted the remaining commit hooks (dropping the DELIVERED
+        email + notification). Prod orders, 2026-07-17.
+        """
+        self.order.status = OrderStatus.DELIVERED.value
+        self.order.save()
+
+        # Must not raise, and must not regress the order below DELIVERED.
+        order_shipped.send(sender=Order, order=self.order)
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.DELIVERED.value)
 
     def test_handle_order_completed(self):
         self.order.document_type = "INVOICE"

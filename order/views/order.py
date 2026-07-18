@@ -348,7 +348,6 @@ class OrderViewSet(BaseModelViewSet):
             "retrieve",
             "update",
             "partial_update",
-            "destroy",
             "my_orders",
             "reorder",
             "invoice",
@@ -366,6 +365,7 @@ class OrderViewSet(BaseModelViewSet):
             "retry_payment",
         }
         admin_only_actions = {
+            "destroy",
             "add_tracking",
             "update_status",
             "refund_order",
@@ -464,6 +464,56 @@ class OrderViewSet(BaseModelViewSet):
                 )
             ) from e
 
+    def _validate_pay_way_for_order(self, pay_way, validated_data):
+        """Reject an inactive or carrier-incompatible pay-way.
+
+        The GET ``/api/v1/pay-way`` list already hides pay-ways that are
+        inactive or excluded for the chosen carrier + kind, but order
+        creation resolved the pay_way by bare PK with no re-check — so a
+        direct API call (or a stale client cache) could place an order
+        with a pay-way that checkout would never have offered.
+        ``filter_by_carrier`` re-applies the two runtime-configurable
+        layers: the admin-managed ``PayWayShippingExclusion`` rows (e.g.
+        ops disabling COD at a BoxNow locker for a partner account that
+        does not have BoxNow's "pay on the go" active — it is NOT a
+        universal code-level veto; BoxNow COD is otherwise supported) and
+        each carrier adapter's ``filter_pay_ways`` hook. ``active()``
+        enforces the master switch. For home_delivery without an explicit
+        provider code ``filter_by_carrier`` is a pass-through, so only the
+        active check applies.
+        """
+        from pay_way.models import PayWay
+        from pay_way.services import PayWayService
+
+        allowed = PayWayService.filter_by_carrier(
+            PayWay.objects.active(),
+            provider_code=validated_data.get("shipping_provider_code"),
+            shipping_kind=validated_data.get("shipping_kind"),
+        )
+        if not allowed.filter(id=pay_way.id).exists():
+            # Log the rejection so "why can't the customer place this
+            # order?" is answerable from logs — the pay-way is either
+            # inactive or excluded for this carrier + kind.
+            logger.info(
+                "Order create rejected: pay_way=%s (provider=%s, active=%s) "
+                "not available for shipping_provider_code=%s shipping_kind=%s",
+                pay_way.id,
+                pay_way.provider_code,
+                pay_way.active,
+                validated_data.get("shipping_provider_code"),
+                validated_data.get("shipping_kind"),
+            )
+            raise ValidationError(
+                {
+                    "pay_way_id": [
+                        _(
+                            "The selected payment method is not available "
+                            "for this order."
+                        )
+                    ]
+                }
+            )
+
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         """
@@ -521,6 +571,8 @@ class OrderViewSet(BaseModelViewSet):
                         ]
                     }
                 )
+
+            self._validate_pay_way_for_order(pay_way, validated_data)
 
             # Step 2: Route to appropriate flow based on payment type
             # Providers that use hosted redirect checkout (order-first, no payment intent)
@@ -1216,26 +1268,31 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not order.metadata:
-            order.metadata = {}
-
-        if provider_code == "viva_wallet":
-            existing_code = order.metadata.get("viva_order_code")
-            new_code = checkout_response["session_id"]
-            if existing_code and existing_code != new_code:
-                logger.warning(
-                    "Order %s Viva order code replaced: %s → %s "
-                    "(retry or duplicate checkout session creation)",
-                    order.id,
-                    existing_code,
-                    new_code,
-                )
-            order.metadata["viva_order_code"] = new_code
-        else:
-            order.metadata["stripe_checkout_session_id"] = checkout_response[
-                "session_id"
-            ]
-        order.save(update_fields=["metadata"])
+        # Persist the provider session reference under a row lock so a
+        # concurrent checkout-session creation (double-click, retry)
+        # can't lose-update the metadata JSON. For Viva every issued
+        # orderCode must survive: the shopper may complete payment on any
+        # session, and the webhook + return endpoint resolve the order by
+        # whichever code was actually paid (see viva_order_code_q). The
+        # singular ``viva_order_code`` stays the latest for the return
+        # endpoint's documented ``s`` fallback.
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            metadata = locked.metadata or {}
+            if provider_code == "viva_wallet":
+                new_code = str(checkout_response["session_id"])
+                codes = metadata.get("viva_order_codes") or []
+                if new_code not in codes:
+                    codes.append(new_code)
+                metadata["viva_order_codes"] = codes
+                metadata["viva_order_code"] = new_code
+            else:
+                metadata["stripe_checkout_session_id"] = checkout_response[
+                    "session_id"
+                ]
+            locked.metadata = metadata
+            locked.save(update_fields=["metadata"])
+            order = locked
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(data=checkout_response)
@@ -1436,8 +1493,10 @@ class OrderViewSet(BaseModelViewSet):
                 resolved_via = "transaction_id"
 
         if row is None and order_code:
+            from order.views.viva_webhook import viva_order_code_q
+
             row = (
-                Order.objects.filter(metadata__viva_order_code=str(order_code))
+                Order.objects.filter(viva_order_code_q(order_code))
                 .values(*value_fields)
                 .first()
             )

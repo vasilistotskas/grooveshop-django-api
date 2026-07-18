@@ -387,7 +387,7 @@ class GuestOrderTestCase(APITestCase):
 
         self.country = CountryFactory(num_regions=0)
         self.region = RegionFactory(country=self.country)
-        self.pay_way = PayWayFactory()
+        self.pay_way = PayWayFactory(active=True)
 
         self.product1 = ProductFactory.create(
             stock=20, num_images=0, num_reviews=0, active=True

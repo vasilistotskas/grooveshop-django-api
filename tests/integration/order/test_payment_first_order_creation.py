@@ -40,6 +40,7 @@ class TestPaymentFirstOrderCreation(APITestCase):
             provider_code="stripe",
             is_online_payment=True,
             requires_confirmation=False,
+            active=True,
         )
 
         # Create location data

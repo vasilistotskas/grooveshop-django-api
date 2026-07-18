@@ -212,6 +212,29 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
             ).exists()
         )
 
+    def test_add_rejects_when_cumulative_quantity_exceeds_stock(self):
+        # Cart already holds 2 of product1 (stock 10). Adding 9 would
+        # stack to 11 via the F()-increment — the create serializer must
+        # validate the RESULTING total, not just the incoming delta.
+        create_data = {"product": self.product1.pk, "quantity": 9}
+
+        response = self.client.post(self.list_url, create_data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.cart_item.refresh_from_db()
+        self.assertEqual(self.cart_item.quantity, 2)
+
+    def test_add_allows_cumulative_quantity_up_to_stock(self):
+        # Cart holds 2 of product1 (stock 10); adding 8 reaches exactly
+        # 10 and must be accepted.
+        create_data = {"product": self.product1.pk, "quantity": 8}
+
+        response = self.client.post(self.list_url, create_data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.cart_item.refresh_from_db()
+        self.assertEqual(self.cart_item.quantity, 10)
+
     def test_update_cart_item(self):
         update_data = {"quantity": 5}
 

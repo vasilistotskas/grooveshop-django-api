@@ -91,3 +91,30 @@ class VivaWebhookMoneyPathTestCase(TestCase):
         # Acknowledged (200) so Viva stops retrying a webhook for an order
         # we don't have.
         self.assertEqual(response.status_code, 200)
+
+    def test_payment_on_earlier_session_code_is_resolved(self):
+        # Multi-session: the order was re-checked-out, so the singular
+        # ``viva_order_code`` holds the LATEST code while an earlier
+        # session's code survives only in ``viva_order_codes[]``. A
+        # payment completed on the earlier session MUST still resolve
+        # the order — previously the webhook matched only the latest
+        # code, 200'd as "not found", and the payment was silently lost
+        # (Viva treats a 200 as handled and never retries).
+        self.order.metadata = {
+            "viva_order_code": "OC_NEW",
+            "viva_order_codes": ["OC_OLD", "OC_NEW"],
+        }
+        self.order.save(update_fields=["metadata"])
+
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(PaymentStatus.COMPLETED, {"order_code": "OC_OLD"}),
+        ):
+            response = self._post(
+                self._event(OrderCode="OC_OLD", TransactionId="viva-txn-old")
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.payment_status, PaymentStatus.COMPLETED)
+        self.assertEqual(self.order.status, OrderStatus.PROCESSING)

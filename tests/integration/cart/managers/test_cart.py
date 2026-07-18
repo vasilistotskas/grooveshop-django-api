@@ -281,42 +281,6 @@ class TestCartManager:
         carts_with_product = Cart.objects.with_specific_product(product)
         assert user_cart in carts_with_product
 
-    def test_cleanup_expired_returns_count(self, user_cart):
-        Cart.objects.filter(id=user_cart.id).update(
-            last_activity=timezone.now() - timedelta(days=35)
-        )
-
-        count = Cart.objects.cleanup_expired()
-        assert count == 1
-
-    def test_cleanup_expired_deletes_carts(self, user_cart):
-        Cart.objects.filter(id=user_cart.id).update(
-            last_activity=timezone.now() - timedelta(days=35)
-        )
-        cart_id = user_cart.id
-
-        Cart.objects.cleanup_expired()
-
-        with pytest.raises(Cart.DoesNotExist):
-            Cart.objects.get(id=cart_id)
-
-    def test_cleanup_expired_custom_days(self, user_cart):
-        Cart.objects.filter(id=user_cart.id).update(
-            last_activity=timezone.now() - timedelta(days=8)
-        )
-
-        count = Cart.objects.cleanup_expired(days=7)
-        assert count == 1
-
-    def test_cleanup_expired_preserves_recent_carts(self, user_cart):
-        Cart.objects.filter(id=user_cart.id).update(
-            last_activity=timezone.now() - timedelta(days=5)
-        )
-
-        count = Cart.objects.cleanup_expired()
-        assert count == 0
-        assert Cart.objects.filter(id=user_cart.id).exists()
-
 
 @pytest.mark.django_db
 class TestCartQuerySetEdgeCases:

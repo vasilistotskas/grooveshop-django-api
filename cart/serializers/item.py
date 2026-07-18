@@ -242,7 +242,25 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
                     )
                 )
 
-            if product.stock < quantity:
+            # Adding to an existing line stacks onto the current quantity
+            # (create() does an F()-increment), so validate the RESULTING
+            # total against stock — not just the incoming delta. Otherwise
+            # a cart already holding N units silently exceeds available
+            # stock and the shopper only finds out at checkout-time stock
+            # reservation. Best-effort UX gate; the authoritative oversell
+            # guard remains StockManager.reserve_stock.
+            cart = self.context.get("cart")
+            existing_quantity = 0
+            if cart is not None:
+                existing_quantity = (
+                    CartItem.objects.filter(cart=cart, product=product)
+                    .values_list("quantity", flat=True)
+                    .first()
+                    or 0
+                )
+            requested_total = existing_quantity + quantity
+
+            if product.stock < requested_total:
                 raise serializers.ValidationError(
                     _(
                         "Not enough stock for '{product_name}'. Available: {product_stock}, Requested: {quantity}"
@@ -251,7 +269,7 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
                             "name", any_language=True
                         ),
                         product_stock=product.stock,
-                        quantity=quantity,
+                        quantity=requested_total,
                     )
                 )
         return attrs

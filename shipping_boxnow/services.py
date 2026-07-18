@@ -270,16 +270,26 @@ class BoxNowService:
             }
             update_fields = ["metadata", "updated_at"]
 
-            # COD amount is filled in here (not at row creation) because
-            # ``order.total_price`` requires order items to be persisted
-            # — which happens after the create_shipment_row hook fires.
+            # COD collects the customer's ACTUAL payable at the locker,
+            # which is ``paid_amount`` (order total minus any redeemed
+            # loyalty discount) — NOT ``total_price`` (pre-discount).
+            # Using total_price overcharged every discounted COD order by
+            # the discount and disagreed with ``invoiceValue`` below
+            # (also paid_amount). Mirrors the ACS COD sync
+            # (shipping_acs/services.py) including the ``> 0`` guard that
+            # keeps the amount inside BoxNow's valid (0, 5000) range.
+            # Filled here (not at row creation) because paid_amount is
+            # only persisted after the create_shipment_row hook fires.
             # Idempotent: re-runs see the existing non-zero amount and
             # skip the recompute.
+            paid_amount = getattr(order, "paid_amount", None)
             if (
                 shipment.payment_mode == BoxNowPaymentMode.COD
                 and shipment.amount_to_be_collected.amount == 0
+                and paid_amount
+                and paid_amount.amount > 0
             ):
-                shipment.amount_to_be_collected = order.total_price
+                shipment.amount_to_be_collected = paid_amount
                 update_fields.extend(
                     [
                         "amount_to_be_collected",
@@ -750,15 +760,26 @@ class BoxNowService:
         """
         data: dict = envelope["data"]
         message_id: str = envelope["id"]
+        # SHA-256 of the HMAC-signed ``data`` bytes, stamped by the webhook
+        # view. Absent only for events queued before this field shipped.
+        data_fingerprint: str | None = envelope.get("_data_fingerprint")
 
         # --- Idempotency check (outside transaction) ----------------------
-        if BoxNowParcelEvent.objects.filter(
-            webhook_message_id=message_id
-        ).exists():
+        # Dedup on the message id (BoxNow retries reuse it) AND on the
+        # signed-content fingerprint (a replay under a forged/new id keeps
+        # the same signed ``data``, so it collides here even though the id
+        # differs).
+        from django.db.models import Q
+
+        dedup = Q(webhook_message_id=message_id)
+        if data_fingerprint:
+            dedup |= Q(data_fingerprint=data_fingerprint)
+        if BoxNowParcelEvent.objects.filter(dedup).exists():
             logger.info(
-                "apply_webhook_event: message_id=%s already processed — "
-                "skipping",
+                "apply_webhook_event: already processed — skipping "
+                "(message_id=%s, data_fingerprint=%s)",
                 message_id,
+                (data_fingerprint or "<none>")[:12],
             )
             return None
 
@@ -823,12 +844,35 @@ class BoxNowService:
                 )
                 return None
 
+            # Re-check idempotency inside the lock. The ``select_for_update``
+            # on the shipment above serialises concurrent webhooks for THIS
+            # parcel, so a racing duplicate blocks here and then sees the
+            # row. A replay under a fresh id carries a matching
+            # ``data_fingerprint`` but a NEW ``message_id`` — which the
+            # message_id-keyed ``get_or_create`` below would not catch — so
+            # guard the fingerprint explicitly.
+            if (
+                data_fingerprint
+                and BoxNowParcelEvent.objects.filter(
+                    data_fingerprint=data_fingerprint
+                ).exists()
+            ):
+                logger.warning(
+                    "apply_webhook_event: replay detected — "
+                    "data_fingerprint=%s already processed under a "
+                    "different message_id (incoming id=%s) — skipping",
+                    data_fingerprint[:12],
+                    message_id,
+                )
+                return None
+
             # Re-check idempotency inside the transaction in case a
             # concurrent request inserted the row after our outer check.
             event, created = BoxNowParcelEvent.objects.get_or_create(
                 webhook_message_id=message_id,
                 defaults={
                     "shipment": shipment,
+                    "data_fingerprint": data_fingerprint,
                     "event_type": mapped_state,
                     "parcel_state": data.get("parcelState", ""),
                     "event_time": event_time,

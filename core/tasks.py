@@ -313,10 +313,18 @@ def cleanup_old_guest_carts():
         days = Setting.get("OLD_GUEST_CART_CLEANUP_DAYS", default=30)
         cutoff_date = timezone.now() - timedelta(days=days)
 
+        # Delete ALL sufficiently-old guest carts, empty or not. The
+        # 7-day ``cleanup_abandoned_carts`` job already sweeps *empty*
+        # guest carts; without dropping the ``items__isnull`` filter here
+        # a guest cart that still held items after a tab-close / cookie
+        # clear was never deleted by anything and lingered forever. Safe
+        # to remove non-empty ones at 30 days: guests get no abandoned-
+        # cart email (that flow is authenticated-only), the recovery page
+        # is auth-gated, and any StockReservations are long past their
+        # 15-minute TTL by then.
         count, _ = Cart.objects.filter(
             user__isnull=True,
             last_activity__lt=cutoff_date,
-            items__isnull=True,  # only empty guest carts
         ).delete()
 
         message = (

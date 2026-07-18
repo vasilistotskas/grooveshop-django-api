@@ -273,6 +273,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
     )
     def issue_voucher_now(self, request, object_id):
         from shipping_acs.models import AcsShipment as _Shipment
+        from shipping_acs.services import AcsService
         from shipping_acs.tasks import create_acs_voucher_for_order
 
         try:
@@ -280,6 +281,26 @@ class AcsShipmentAdmin(BaseModelAdmin):
         except _Shipment.DoesNotExist:
             messages.error(request, _("Shipment not found."))
             return
+
+        # A CANCELED shipment keeps its (now-deleted) voucher_no, which
+        # makes the mint task short-circuit and return the dead voucher.
+        # Reset it first so a fresh voucher is issued — ACS supports the
+        # delete → re-create reissue flow.
+        if shipment.shipment_state == AcsShipmentState.CANCELED:
+            try:
+                AcsService.reset_shipment_for_remint(shipment)
+            except Exception as exc:
+                messages.error(
+                    request,
+                    _("Cannot reset shipment for re-mint: %(err)s")
+                    % {"err": str(exc)},
+                )
+                return
+            messages.info(
+                request,
+                _("Cancelled shipment reset — minting a fresh voucher."),
+            )
+
         create_acs_voucher_for_order.delay(shipment.order_id)
         messages.info(request, _("Voucher creation task dispatched."))
 

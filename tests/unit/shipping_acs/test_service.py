@@ -232,6 +232,66 @@ class TestCancelVoucher:
         assert acs_client_mock.last_delete_call is None  # no-op
 
 
+class TestResetShipmentForRemint:
+    def test_reset_clears_voucher_and_preserves_history(self):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="7227891234",
+            shipment_state=AcsShipmentState.CANCELED,
+        )
+
+        AcsService.reset_shipment_for_remint(shipment)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no is None
+        assert shipment.shipment_state == AcsShipmentState.PENDING_CREATION
+        assert shipment.metadata["previous_vouchers"] == ["7227891234"]
+
+    def test_reset_refuses_non_canceled(self):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="7227891234",
+            shipment_state=AcsShipmentState.NEW,
+        )
+
+        with pytest.raises(AcsAPIError):
+            AcsService.reset_shipment_for_remint(shipment)
+
+        shipment.refresh_from_db()
+        assert shipment.voucher_no == "7227891234"
+
+    def test_reset_then_create_voucher_mints_fresh(self, acs_client_mock):
+        # End-to-end: after reset, create_voucher_for_order no longer
+        # short-circuits on the stale voucher — it mints a fresh one,
+        # closing the cancel dead-end.
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="OLD00000",
+            shipment_state=AcsShipmentState.CANCELED,
+        )
+
+        AcsService.reset_shipment_for_remint(shipment)
+        result = AcsService.create_voucher_for_order(order)
+
+        assert result.voucher_no == "7227891234"
+        assert result.shipment_state != AcsShipmentState.CANCELED
+
+
 # ---------------------------------------------------------------------------
 # poll_shipment_tracking
 # ---------------------------------------------------------------------------
@@ -518,6 +578,24 @@ class TestIssueDailyPickupList:
             voucher_no__in=["7227891111", "7227891222"]
         ):
             assert shipment.pickup_list_id == result.id
+
+    def test_skips_when_single_flight_lock_held(self, acs_client_mock):
+        # When another run (beat vs. admin "issue now") already holds the
+        # lock, issue is skipped (returns None) and the unlocked body —
+        # which makes the ACS_Issue_Pickup_List call — never runs, so the
+        # manifest is not double-issued.
+        from unittest.mock import patch
+
+        with (
+            patch(
+                "shipping_acs.services.AcsService._issue_pickup_list_unlocked"
+            ) as mock_unlocked,
+            patch("django.core.cache.cache.add", return_value=False),
+        ):
+            result = AcsService.issue_daily_pickup_list()
+
+        assert result is None
+        mock_unlocked.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

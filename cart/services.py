@@ -166,7 +166,18 @@ class CartService:
             )
 
             if existing_item:
-                existing_item.quantity += item.quantity
+                # Cap the merged quantity at available stock so a
+                # guest→user merge can't silently stack a line past stock
+                # (the login-time analog of the add-to-cart cumulative
+                # check). Best-effort UX gate only — the authoritative
+                # oversell guard remains StockManager.reserve_stock at
+                # checkout. Only caps when stock is positive, so an
+                # out-of-stock product's line isn't zeroed mid-merge.
+                merged_quantity = existing_item.quantity + item.quantity
+                stock = item.product.stock if item.product else 0
+                if stock > 0 and merged_quantity > stock:
+                    merged_quantity = stock
+                existing_item.quantity = merged_quantity
                 existing_item.save()
                 item.delete()
             else:

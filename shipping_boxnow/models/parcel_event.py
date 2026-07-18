@@ -38,6 +38,19 @@ class BoxNowParcelEvent(TimeStampMixinModel):
         db_index=True,
         help_text=_("CloudEvents 'id' field — idempotency key"),
     )
+    data_fingerprint = models.CharField(
+        _("Signed Data Fingerprint"),
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text=_(
+            "SHA-256 of the HMAC-signed 'data' bytes. The signature covers "
+            "only 'data', not the envelope 'id', so replay dedup keys on "
+            "this content hash as well — a captured event resubmitted under "
+            "a new/forged 'id' still collides here."
+        ),
+    )
     event_type = models.CharField(
         _("Event Type"),
         max_length=30,

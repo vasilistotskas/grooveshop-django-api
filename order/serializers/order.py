@@ -962,31 +962,52 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                 }
             )
 
-        # BoxNow cross-field validation. Trigger condition is the
-        # registry-driven ``(shipping_provider_code, shipping_kind)``
-        # pair.
-        is_boxnow_pickup = (
-            attrs.get("shipping_provider_code") == "boxnow"
-            and attrs.get("shipping_kind") == "pickup_point"
-        )
-        if is_boxnow_pickup:
-            # Defence-in-depth — ``/api/v1/shipping/options`` already
-            # filters by ``ShippingProvider.is_active``, but a stale
-            # frontend cache could still POST an order with a hidden
-            # provider. Re-check the registry row before accepting.
+        provider_code = attrs.get("shipping_provider_code")
+        shipping_kind = attrs.get("shipping_kind")
+
+        # A locker / pickup-point order MUST name its carrier. Without a
+        # provider code the service-layer payload validation
+        # (``ShippingService.validate_order_payload``, gated on a truthy
+        # code) never runs, so the carrier's locker/station requirement is
+        # skipped and the order is created with NO shipping provider — no
+        # shipment row is ever minted and it silently never ships. The
+        # frontend always pairs the two; a direct API call or stale client
+        # cache can omit the code.
+        if shipping_kind == "pickup_point" and not provider_code:
+            raise serializers.ValidationError(
+                {
+                    "shipping_provider_code": _(
+                        "A shipping provider is required for locker / "
+                        "pickup-point delivery."
+                    )
+                }
+            )
+
+        # ``ShippingProvider.is_active`` is the master switch — a provider
+        # hidden from checkout must stay unusable even if a stale client
+        # still POSTs its code. ``/api/v1/shipping/options`` already
+        # filters on it; re-check here because order creation resolves the
+        # code without re-checking. Applies to every carrier (the previous
+        # guard only covered BoxNow, leaving ACS unchecked).
+        if provider_code:
             from shipping.models import ShippingProvider
 
-            boxnow_active = ShippingProvider.objects.filter(
-                code="boxnow", is_active=True
-            ).exists()
-            if not boxnow_active:
+            if not ShippingProvider.objects.filter(
+                code=provider_code, is_active=True
+            ).exists():
                 raise serializers.ValidationError(
                     {
                         "shipping_provider_code": _(
-                            "BoxNow locker shipping is currently unavailable."
+                            "The selected shipping provider is currently "
+                            "unavailable."
                         )
                     }
                 )
+
+        # BoxNow-specific carrier field. The service-layer
+        # ``validate_order_payload`` also enforces this, but failing here
+        # gives the shopper a field-scoped 400 before order creation.
+        if provider_code == "boxnow" and shipping_kind == "pickup_point":
             if not attrs.get("boxnow_locker_id"):
                 raise serializers.ValidationError(
                     {
@@ -995,6 +1016,11 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                         )
                     }
                 )
+
+        # NOTE: pay-way active + carrier-compatibility is enforced in the
+        # view (``_validate_pay_way_for_order``) where the PayWay row is
+        # resolved from the DB — keeping this cross-field validator free
+        # of DB pay-way lookups.
 
         return attrs
 
@@ -1254,6 +1280,20 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "shipping_carrier",
         )
         read_only_fields = (
+            # Identity + routing + document fields are immutable via this
+            # (owner-reachable) PUT/PATCH serializer. It does a raw
+            # ``setattr`` mass-assign with no per-field authorization, so a
+            # writable ``user`` let an owner reassign their order to another
+            # account (or null it to a guest), and a writable ``pay_way`` /
+            # ``document_type`` bypassed the cross-field rules enforced at
+            # creation (e.g. INVOICE requires billing_vat_id). Legitimate
+            # edits to these go through the admin / dedicated service flows,
+            # never a customer PUT. Address/contact fields stay writable.
+            # (``paid_amount`` is already read-only via its explicit field
+            # declaration above, so it is intentionally not repeated here.)
+            "user",
+            "pay_way",
+            "document_type",
             "shipping_price",
             "payment_method_fee",
             "total_price_items",
@@ -1267,8 +1307,6 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         )
         extra_kwargs = {
             "user": {
-                "required": False,
-                "allow_null": True,
                 "help_text": _("User ID. Leave empty for guest orders."),
             }
         }

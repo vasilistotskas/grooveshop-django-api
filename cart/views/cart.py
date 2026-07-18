@@ -626,19 +626,23 @@ class CartViewSet(BaseModelViewSet):
                 else str(cart_total.currency)
             )
 
-            client_secret = str(payment_data.get("client_secret", ""))
-            payment_intent_id = str(payment_data.get("payment_id", ""))
-            amount = str(cart_total.amount)
-
-            # Return client_secret and payment_intent_id
+            # Serialize through CartPaymentIntentResponseSerializer (the
+            # declared response serializer) so the payload matches the
+            # OpenAPI contract the Nuxt client validates against. In
+            # particular ``amount`` MUST be a JSON number (DecimalField with
+            # COERCE_DECIMAL_TO_STRING=False) — returning a raw dict with
+            # ``str(amount)`` failed the client's Zod ``z.number()`` gate and
+            # broke every cart-Stripe checkout with a 422.
             response_data = {
-                "client_secret": client_secret,
-                "payment_intent_id": payment_intent_id,
-                "amount": amount,
+                "client_secret": str(payment_data.get("client_secret", "")),
+                "payment_intent_id": str(payment_data.get("payment_id", "")),
+                "amount": cart_total.amount,
                 "currency": currency_code,
             }
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(response_data)
             return Response(
-                response_data,
+                response_serializer.data,
                 status=status.HTTP_200_OK,
             )
 

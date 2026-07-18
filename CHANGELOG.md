@@ -3,6 +3,58 @@
 
 
 
+## v1.156.7 (2026-07-18)
+
+### Bug fixes
+
+* fix(order,cart,user): final-review hardening — PII log, dead code, guest-cart cleanup, auth/debug logging (#11)
+
+Findings from the post-audit final review, each verified against code:
+
+- Viva webhook logged the full Retrieve Transaction dict at INFO — which
+  includes Viva's cardNumber field — contradicting the file's own
+  redaction policy (GDPR Art. 32 / PCI scope). The log is now allowlisted
+  (raw_status, amount, order_code) AND card_number is dropped from
+  status_data at the source (order/payment.py): nothing consumed it, and
+  keeping card data out of status_data keeps it out of logs and API
+  responses for good.
+- Deleted OrderWriteSerializer.create() (~110 lines of dead legacy code):
+  OrderViewSet.create() routes to OrderService and never calls
+  serializer.save(); no other path constructs+saves it (tests only use
+  .is_valid()). It duplicated order creation with direct stock mutation
+  bypassing StockManager, and set an order._send_created_signal flag read
+  nowhere. Its removal also kills the only writer of the top-level
+  metadata["cart_id"] key.
+- Guest-cart cleanup in handle_order_created read that dead top-level
+  metadata["cart_id"] key — both live creation paths write it nested in
+  metadata["cart_snapshot"]["cart_id"], so the guest branch never fired
+  and empty guest Cart rows were orphaned until the 30-day sweep. Now
+  reads the snapshot key.
+- Two stale docstrings that contradicted live behavior: shipping/
+  interfaces.py filter_pay_ways example claimed BoxNowCarrier hard-vetoes
+  COD at lockers (it deliberately does not — PayWayShippingExclusion is
+  the mechanism), and shipping_boxnow/views/webhook.py claimed the
+  webhook is not wired into urls.py (it is, at boxnow/webhook/).
+
+Debug-logging additions (all structured, no PII/credentials):
+
+- Auth events (user/signals.py): login completed, per-step completion
+  (password OK → 2FA pending), login failed (identifier only), logout —
+  django.request's bare "Unauthorized: /_allauth/..." was undebuggable
+  during the 2026-07 login incidents.
+- Stock reservation rejections at checkout-start now log product /
+  available / requested / cart (the 409 was unanswerable from logs), and
+  the rollback release except-block actually logs instead of the comment
+  claiming it does.
+- Guest→user cart merge logs one line per merge (moved / combined /
+  capped_at_stock) answering "why did my cart change after logging in".
+
+Co-authored-by: Claude Opus 4.8 <noreply@anthropic.com> ([`fa16991`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fa16991f4e6aaa1ffe0f3c4e7292de0c9b3250d2))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.156.6 [skip ci] ([`b2ccda2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b2ccda2a2b4d6d557a1e98b1a2acd82566a88d01))
+
 ## v1.156.6 (2026-07-18)
 
 ### Bug fixes

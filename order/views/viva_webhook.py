@@ -8,6 +8,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -22,6 +23,31 @@ from order.tasks import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def viva_order_code_q(order_code: object) -> Q:
+    """Match an Order by ANY Viva orderCode ever issued for it.
+
+    Each ``create_checkout_session`` mints a fresh Viva orderCode and
+    appends it to ``metadata['viva_order_codes']`` (the most recent is
+    also mirrored in the legacy singular ``metadata['viva_order_code']``
+    for the return endpoint's documented ``s`` fallback). A shopper can
+    complete payment on an earlier session (stale tab, back button,
+    retry) whose orderCode is not the latest, so both the webhook and
+    the browser-return lookup MUST resolve any issued code. Matching
+    only the latest silently stranded the payment: Viva treats our 200
+    as handled and never retries (see
+    developer.viva.com/webhooks-for-payments/transaction-payment-created).
+
+    ``metadata__contains`` is the field-level JSONB ``@>`` containment
+    lookup (well-supported on PostgreSQL) rather than a key-transform
+    ``__contains``.
+    """
+    code = str(order_code)
+    return Q(metadata__viva_order_code=code) | Q(
+        metadata__contains={"viva_order_codes": [code]}
+    )
+
 
 # Payment statuses representing a financially settled (terminal) state.
 # A stale or out-of-order Viva webhook event MUST NOT overwrite any of these.
@@ -387,16 +413,13 @@ def _handle_webhook_event(request):
         logger.warning("No OrderCode in Viva Wallet webhook")
         return JsonResponse({"status": "ok"})
 
-    order = Order.objects.filter(
-        metadata__viva_order_code=str(order_code)
-    ).first()
+    order = Order.objects.filter(viva_order_code_q(order_code)).first()
 
     if not order:
         logger.error(
             "Order not found for Viva Wallet order code: %s | "
-            "(was searching for metadata.viva_order_code = '%s')",
+            "(searched metadata.viva_order_code + viva_order_codes[])",
             order_code,
-            str(order_code),
         )
         return JsonResponse({"status": "ok"})
 

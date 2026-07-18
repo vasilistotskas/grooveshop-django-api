@@ -36,7 +36,7 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.admin_user = UserAccountFactory(is_staff=True, is_superuser=True)
         self.other_user = UserAccountFactory()
 
-        self.pay_way = PayWayFactory()
+        self.pay_way = PayWayFactory(active=True)
         self.country = CountryFactory()
         self.region = RegionFactory(country=self.country)
 
@@ -237,6 +237,23 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
         actual_fields = set(response.data.keys())
         self.assertEqual(actual_fields, expected_fields)
 
+    def test_owner_cannot_reassign_order_to_another_user(self):
+        # ``user`` is read-only on OrderWriteSerializer: a raw setattr
+        # mass-assign previously let an owner PATCH their order onto
+        # another account (or null it to a guest), taking their PII with
+        # it. The address edit still applies; the user FK must not move.
+        self.client.force_authenticate(user=self.user)
+
+        payload = {"user": self.other_user.id, "city": "Reassigned City"}
+        response = self.client.patch(
+            self.get_order_detail_url(self.order.id), payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.user_id, self.user.id)
+        self.assertEqual(self.order.city, "Reassigned City")
+
     def test_list_orders(self):
         self.client.force_authenticate(user=self.admin_user)
         response = self.client.get(self.list_url)
@@ -391,6 +408,20 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Order.objects.filter(id=order_id).exists())
+
+    def test_owner_cannot_delete_own_order(self):
+        # ``destroy`` is admin-only: DRF's default destroy soft-deletes
+        # the row without releasing stock, refunding, or cancelling the
+        # courier voucher — bypassing OrderService.cancel_order. A
+        # non-staff owner must not reach it (customers cancel, not
+        # delete). Regression for the owner-reachable destroy hole.
+        self.client.force_authenticate(user=self.user)
+
+        order_id = self.order.id
+        response = self.client.delete(self.get_order_detail_url(order_id))
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Order.objects.filter(id=order_id).exists())
 
     def test_retrieve_nonexistent_order(self):
         self.client.force_authenticate(user=self.admin_user)

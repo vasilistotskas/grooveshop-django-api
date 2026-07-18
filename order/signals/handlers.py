@@ -475,10 +475,38 @@ def handle_order_item_post_save(
 def handle_order_shipped(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Handle order shipped signal."""
-    if order.status != OrderStatus.SHIPPED.value:
+    """Handle order shipped signal.
+
+    The defensive ``update_order_status`` below exists only for callers
+    that emit ``order_shipped`` directly (tests, admin tooling) without
+    routing through the state machine. It must only *advance* a
+    not-yet-shipped order — never regress one already past SHIPPED.
+
+    When a carrier poll (ACS/BoxNow) sees a same-poll PROCESSING →
+    DELIVERED jump it bridges by writing SHIPPED then DELIVERED on the
+    same ``order`` instance inside one transaction. By the time the
+    SHIPPED transition's ``on_commit`` hook re-emits ``order_shipped``,
+    ``order.status`` already reads DELIVERED, so a blind
+    ``update_order_status(order, SHIPPED)`` raised
+    ``InvalidStatusTransitionError`` (DELIVERED → SHIPPED). That
+    exception aborted the remaining commit hooks and silently dropped the
+    customer's DELIVERED email + notification (prod orders, 2026-07-17).
+    """
+    pre_shipped = (OrderStatus.PENDING.value, OrderStatus.PROCESSING.value)
+    if order.status in pre_shipped:
         logger.info("Updating order %s status to shipped", order.id)
         OrderService.update_order_status(order, OrderStatus.SHIPPED)
+    else:
+        # Already at/past SHIPPED (e.g. a carrier same-poll
+        # PROCESSING→DELIVERED bridge). Skipping the defensive re-bump is
+        # intentional — logged so the "why didn't order_shipped advance
+        # the status?" question is answerable without re-deriving it.
+        logger.debug(
+            "handle_order_shipped: order %s already at %s (past SHIPPED) "
+            "— skipping defensive status bump",
+            order.id,
+            order.status,
+        )
 
     OrderHistory.log_shipping_update(
         order=order,
@@ -1218,21 +1246,38 @@ def handle_stripe_checkout_completed(sender, **kwargs):
 
             if payment_status == "paid" and payment_intent_id:
                 from order.payment_events import publish_payment_status
+                from shipping.services import ShippingService
+
+                # Settled-state guard: Stripe does not guarantee event
+                # delivery order, so a delayed checkout.session.completed
+                # must never un-refund / un-cancel an order that already
+                # reached a settled financial state. Mirrors
+                # OrderService.handle_payment_succeeded.
+                if order.payment_status in {
+                    PaymentStatus.REFUNDED,
+                    PaymentStatus.PARTIALLY_REFUNDED,
+                    PaymentStatus.CANCELED,
+                }:
+                    logger.warning(
+                        "Ignoring checkout.session.completed for order %s: "
+                        "payment_status already %s",
+                        order.id,
+                        order.payment_status,
+                    )
+                    # Persist the webhook_processed flag set above so a
+                    # Stripe redelivery short-circuits on the idempotency
+                    # check instead of re-running this guard (harmless, but
+                    # avoids duplicate warning logs on every retry).
+                    order.save(update_fields=["metadata"])
+                    return
 
                 order.mark_as_paid(
                     payment_id=payment_intent_id, payment_method="stripe"
                 )
 
-                if order.status == OrderStatus.PENDING:
-                    OrderService.update_order_status(
-                        order, OrderStatus.PROCESSING
-                    )
-
                 order.metadata["stripe_checkout_session_id"] = session_id
                 order.metadata["stripe_payment_intent_id"] = payment_intent_id
                 order.save(update_fields=["metadata"])
-
-                publish_payment_status(order)
 
                 OrderHistory.log_payment_update(
                     order=order,
@@ -1243,6 +1288,44 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                         "checkout_session_id": session_id,
                     },
                 )
+
+                if order.status == OrderStatus.CANCELED:
+                    # Payment landed for an already-CANCELED order (the
+                    # customer cancelled before the webhook, or the two
+                    # raced). Record the receipt for reconciliation and
+                    # page staff (ERROR is the monitored channel) for a
+                    # manual refund — but do NOT advance status or mint a
+                    # shipment for a cancelled order. Mirrors
+                    # handle_payment_succeeded (G0281).
+                    order.metadata["payment_after_cancel"] = {
+                        "payment_id": payment_intent_id,
+                        "recorded_at": timezone.now().isoformat(),
+                    }
+                    order.save(update_fields=["metadata"])
+                    logger.error(
+                        "Payment %s received via checkout session for "
+                        "CANCELED order %s — manual refund required; NOT "
+                        "dispatching shipment creation",
+                        payment_intent_id,
+                        order.id,
+                    )
+                    publish_payment_status(order)
+                    return
+
+                if order.status == OrderStatus.PENDING:
+                    OrderService.update_order_status(
+                        order, OrderStatus.PROCESSING
+                    )
+
+                # Stripe's guidance is to fulfil hosted Checkout Sessions on
+                # checkout.session.completed (not payment_intent.succeeded).
+                # Dispatch the courier task here so a Stripe-Checkout order
+                # isn't left paid-but-never-shipped when the PaymentIntent
+                # event's payment_id lookup races/misses. Idempotent on the
+                # shipment row; wrapped in on_commit by ShippingService.
+                ShippingService.dispatch_create_shipment_task(order)
+
+                publish_payment_status(order)
 
                 logger.info(
                     "Order %s marked as paid via checkout session %s",

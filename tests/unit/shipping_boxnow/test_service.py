@@ -117,6 +117,56 @@ class TestCreateShipmentForOrder:
         assert order.tracking_number == "9219709201"
         assert order.shipping_carrier == "boxnow"
 
+    def test_cod_collects_paid_amount_not_pre_discount_total(self):
+        """COD ``amountToBeCollected`` must equal ``paid_amount`` (order
+        total minus redeemed loyalty discount), NOT ``total_price``
+        (pre-discount). Regression: a discounted COD order previously
+        overcharged the customer at the locker by the discount amount
+        and disagreed with ``invoiceValue`` (already paid_amount)."""
+        from django.conf import settings
+        from djmoney.money import Money
+
+        from product.factories.product import ProductFactory
+
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.PENDING,
+            shipping_price=Money("0.00", settings.DEFAULT_CURRENCY),
+            payment_method_fee=Money("0.00", settings.DEFAULT_CURRENCY),
+        )
+        order.items.all().delete()
+        order.items.create(
+            product=ProductFactory(stock=10, num_images=0, num_reviews=0),
+            price=Money("50.00", settings.DEFAULT_CURRENCY),
+            quantity=1,
+        )
+        # Loyalty discount: the order lists €50 but the customer only
+        # owes €40 at the locker.
+        order.paid_amount = Money("40.00", settings.DEFAULT_CURRENCY)
+        order.save(update_fields=["paid_amount", "paid_amount_currency"])
+        assert order.total_price == Money("50.00", settings.DEFAULT_CURRENCY)
+
+        BoxNowShipmentFactory(
+            order=order,
+            locker_external_id="4",
+            payment_mode="cod",
+            amount_to_be_collected=Money("0.00", settings.DEFAULT_CURRENCY),
+            parcel_state=BoxNowParcelState.PENDING_CREATION,
+        )
+
+        mock_cls = _mock_client_create_ok()
+        with patch("shipping_boxnow.services.BoxNowClient", mock_cls):
+            result = BoxNowService.create_shipment_for_order(order)
+
+        sent = mock_cls.return_value.create_delivery_request.call_args[0][0]
+        assert sent["amountToBeCollected"] == "40.00"
+        assert sent["invoiceValue"] == "40.00"
+
+        result.refresh_from_db()
+        assert result.amount_to_be_collected == Money(
+            "40.00", settings.DEFAULT_CURRENCY
+        )
+
     def test_idempotent_when_delivery_request_already_set(self):
         """Second call returns existing shipment without calling BoxNow API."""
         order = OrderFactory(status=OrderStatus.PROCESSING)
@@ -287,6 +337,44 @@ class TestApplyWebhookEvent:
             webhook_message_id=message_id
         ).count()
         assert count == 1
+
+    def test_stores_and_dedupes_on_data_fingerprint(self):
+        """The signed-data fingerprint is stored, and a replay of the same
+        signed content under a NEW message_id is deduped via it — the HMAC
+        covers only ``data``, so the envelope ``id`` is forgeable."""
+        shipment = BoxNowShipmentFactory(with_parcel=True)
+        fingerprint = "a" * 64
+
+        first = _build_envelope(
+            parcel_id=shipment.parcel_id,
+            event="in-depot",
+            message_id="msg-original",
+        )
+        first["_data_fingerprint"] = fingerprint
+
+        result_1 = BoxNowService.apply_webhook_event(first)
+        assert result_1 is not None
+        assert result_1.data_fingerprint == fingerprint
+
+        # Replay: identical signed content resubmitted under a fresh
+        # (forged) id — must be rejected via the fingerprint even though
+        # the message_id is new.
+        replay = _build_envelope(
+            parcel_id=shipment.parcel_id,
+            event="in-depot",
+            message_id="msg-forged-replay",
+        )
+        replay["_data_fingerprint"] = fingerprint
+
+        result_2 = BoxNowService.apply_webhook_event(replay)
+        assert result_2 is None
+
+        assert (
+            BoxNowParcelEvent.objects.filter(
+                data_fingerprint=fingerprint
+            ).count()
+            == 1
+        )
 
     def test_handles_unknown_event_type_gracefully(self):
         """An unrecognised event string is stored without raising."""

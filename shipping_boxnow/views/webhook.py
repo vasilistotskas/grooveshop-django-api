@@ -177,6 +177,24 @@ class BoxNowWebhookView(APIView):
             )
             return Response(status=400)
 
+        # Fingerprint the SIGNED bytes (not the envelope). The HMAC covers
+        # only ``data``, so the envelope ``id`` is attacker-controllable —
+        # dedup keyed on ``id`` alone lets a captured (data, datasignature)
+        # pair be replayed under a fresh id. The worker also keys dedup on
+        # this content hash, so a replay collides regardless of the id.
+        # Computed from the exact verified ``raw_data`` bytes here because
+        # the worker only sees the parsed dict (re-serialisation would not
+        # reproduce the signed byte sequence).
+        import hashlib
+
+        data_fingerprint = hashlib.sha256(raw_data).hexdigest()
+        envelope["_data_fingerprint"] = data_fingerprint
+        logger.info(
+            "BoxNow webhook: dispatching | id=%s | data_fingerprint=%s…",
+            message_id,
+            data_fingerprint[:12],
+        )
+
         # ------------------------------------------------------------------ #
         # 7. Dispatch to Celery and acknowledge.                               #
         # ------------------------------------------------------------------ #

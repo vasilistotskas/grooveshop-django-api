@@ -170,10 +170,21 @@ def process_boxnow_webhook_event(
         # Surface to the autoretry decorator above.
         raise
     except Exception as exc:  # pragma: no cover — defensive
+        # The HTTP view already returned 200, so BoxNow will not retry —
+        # a malformed/unexpected payload here means the event is lost
+        # (a possibly-missed state transition). Page admins instead of
+        # dropping it on a log line nobody reads (same rationale as the
+        # shipment-creation alert; cf. prod order 143).
+        from shipping.alerts import alert_admins_webhook_processing_failed
+
+        message_id = str(envelope.get("id", "<unknown>"))
         logger.exception(
             "BoxNow webhook apply failed for message %s: %s",
-            envelope.get("id", "<unknown>"),
+            message_id,
             exc,
+        )
+        alert_admins_webhook_processing_failed(
+            carrier="BoxNow", message_id=message_id, error=str(exc)
         )
         return {
             "status": "error",

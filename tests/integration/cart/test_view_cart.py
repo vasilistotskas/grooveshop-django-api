@@ -39,6 +39,59 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_create_payment_intent_returns_numeric_amount(self):
+        """The create-payment-intent ``amount`` must serialize as a JSON
+        number (DecimalField), matching the OpenAPI contract the Nuxt
+        client validates with ``z.number()``. Returning a raw ``str(amount)``
+        442'd every cart-Stripe checkout at the client's Zod gate."""
+        import json
+        from decimal import Decimal
+        from unittest.mock import MagicMock, patch
+
+        from djmoney.money import Money
+
+        from pay_way.factories import PayWayFactory
+
+        pay_way = PayWayFactory.create_online_payment(
+            provider_code="stripe", active=True
+        )
+
+        provider = MagicMock()
+        provider.process_payment.return_value = (
+            True,
+            {"client_secret": "cs_test_123", "payment_id": "pi_test_123"},
+        )
+
+        url = reverse("cart-create-payment-intent")
+        with (
+            patch(
+                "cart.views.cart.OrderService.calculate_shipping_cost",
+                return_value=Money("0.00", "EUR"),
+            ),
+            patch(
+                "cart.views.cart.OrderService.calculate_payment_method_fee",
+                return_value=Money("0.00", "EUR"),
+            ),
+            patch(
+                "pay_way.services.PayWayService.get_provider_for_pay_way",
+                return_value=provider,
+            ),
+        ):
+            response = self.client.post(
+                url,
+                {"pay_way_id": pay_way.id, "shipping_kind": "home_delivery"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Pre-render: DecimalField (coerce_to_string=False) yields a
+        # Decimal, never a str.
+        self.assertIsInstance(response.data["amount"], Decimal)
+        # The wire contract: the rendered JSON ``amount`` is a number.
+        rendered = json.loads(response.content)
+        self.assertNotIsInstance(rendered["amount"], str)
+        self.assertIsInstance(rendered["amount"], (int, float))
+
     def test_retrieve_no_n_plus_one(self):
         """Cart-detail query count must not grow with the number of items
         nor re-run the total_* property queries per line (G0081)."""

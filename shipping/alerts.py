@@ -59,3 +59,48 @@ def alert_admins_shipment_creation_failed(
             carrier,
             exc,
         )
+
+
+def alert_admins_webhook_processing_failed(
+    *, carrier: str, message_id: str, error: str
+) -> None:
+    """Email ADMINS that a verified carrier webhook could not be applied.
+
+    The HTTP endpoint already returned 200 (so the carrier will not
+    retry) before the async apply failed on an unexpected payload shape,
+    so the event is otherwise lost — a missed state transition (e.g. a
+    ``delivered`` → COD-paid flip) with no other signal. Same "make the
+    silent drop loud" intent as :func:`alert_admins_shipment_creation_failed`.
+
+    Best-effort: an SMTP failure must never fail the calling task.
+    """
+    if not settings.ADMINS:
+        logger.warning(
+            "alert_admins_webhook_processing_failed: no ADMINS configured "
+            "— carrier=%s message=%s error not emailed",
+            carrier,
+            message_id,
+        )
+        return
+    try:
+        mail_admins(
+            subject=(
+                f"{carrier}: webhook processing failed (message {message_id})"
+            ),
+            message=(
+                f"A verified {carrier} webhook (message id {message_id}) "
+                f"could not be applied:\n\n{error}\n\n"
+                "The HTTP endpoint already acknowledged it (200), so the "
+                "carrier will not retry — a parcel state transition may "
+                "have been missed. Inspect the parcel/order and reconcile "
+                "manually."
+            ),
+        )
+    except Exception as exc:
+        logger.error(
+            "alert_admins_webhook_processing_failed: email send failed "
+            "for carrier=%s message=%s: %s",
+            carrier,
+            message_id,
+            exc,
+        )

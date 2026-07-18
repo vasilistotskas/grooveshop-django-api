@@ -153,6 +153,22 @@ class CartServiceTest(TestCase):
             [self.product, guest_product],
         )
 
+    def test_merge_carts_caps_overlapping_quantity_at_stock(self):
+        # Same product in both carts: 4 (user) + 3 (guest) = 7 would
+        # exceed stock 5, so the merged line is capped at 5 (best-effort
+        # UX gate — checkout reservation stays the authoritative guard).
+        product = ProductFactory(num_images=0, num_reviews=0, stock=5)
+        cart_service = CartService(request=self.request)
+        cart_service.create_cart_item(product, 4)
+
+        guest_cart = CartFactory(user=None, num_cart_items=0)
+        CartItemFactory(cart=guest_cart, product=product, quantity=3)
+
+        cart_service.merge_carts(guest_cart)
+
+        merged = self.cart.items.get(product=product)
+        self.assertEqual(merged.quantity, 5)
+
 
 class GuestCartServiceTest(TestCase):
     def setUp(self):

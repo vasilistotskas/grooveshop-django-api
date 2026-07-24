@@ -177,6 +177,34 @@ class TestVivaWebhookTenantResolution:
         with self._noop_schema_context():
             assert _resolve_tenant_for_order_code("anything") is None
 
+    def test_match_via_viva_order_codes_history_array(self) -> None:
+        """A payment on an EARLIER checkout session (stale tab, back
+        button) carries an orderCode that only exists in the
+        ``metadata['viva_order_codes']`` history array. The resolver
+        must match through ``viva_order_code_q`` — matching only the
+        latest singular ``viva_order_code`` resolved no tenant, the
+        view acked 200, and Viva never retried (payment stranded).
+        """
+        from order.factories.order import OrderFactory
+        from order.views.viva_webhook import _resolve_tenant_for_order_code
+
+        _make_tenant("viva-array-resolver")
+        OrderFactory(
+            metadata={
+                "viva_order_code": "NEWEST-CODE",
+                "viva_order_codes": ["STALE-CODE-1", "NEWEST-CODE"],
+            }
+        )
+
+        # Under the no-op schema_context every active tenant "sees" the
+        # public-schema order, so iteration order decides WHICH tenant
+        # matches — the regression under test is that the stale array
+        # code resolves at all (the old narrow lookup returned None).
+        with self._noop_schema_context():
+            assert _resolve_tenant_for_order_code("STALE-CODE-1") is not None
+            assert _resolve_tenant_for_order_code("NEWEST-CODE") is not None
+            assert _resolve_tenant_for_order_code("NEVER-ISSUED") is None
+
 
 # ---------------------------------------------------------------------------
 # BoxNow webhook schema resolution

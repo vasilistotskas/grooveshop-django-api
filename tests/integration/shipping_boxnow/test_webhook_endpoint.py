@@ -160,6 +160,40 @@ class TestWebhookEndpoint:
     def setup_method(self):
         self.client = APIClient()
 
+    def test_duplicate_data_key_cannot_steer_tenant_resolution(self, settings):
+        """Appending a second, unsigned ``data`` object must not steer
+        tenant resolution. ``json.loads(raw_body)`` resolves duplicate
+        keys to the LAST occurrence, but the signature covers the FIRST
+        ``data`` (extract_data_substring) — the view reparses ``data``
+        from the signed bytes BEFORE resolving the tenant, so the
+        resolver must see the signed parcelId, never the appended one.
+        """
+        settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET
+
+        raw = _build_raw_body(parcel_id="signed-parcel", event="in-depot")
+        # Append an unsigned duplicate "data" object before the final
+        # closing brace — the raw-body parse would take this one.
+        forged = raw[:-1] + b',"data":{"parcelId":"evil-parcel"}}'
+
+        captured: dict[str, str] = {}
+
+        def _capture(parcel_id):
+            captured["parcel_id"] = parcel_id
+            return None  # unresolved → orphan ack (200)
+
+        with patch(
+            "shipping_boxnow.views.webhook._resolve_tenant_for_parcel",
+            side_effect=_capture,
+        ):
+            response = self.client.post(
+                _webhook_url(),
+                data=forged,
+                content_type="application/json",
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert captured["parcel_id"] == "signed-parcel"
+
     def test_invalid_signature_returns_401(self, settings):
         """Tampered body or wrong signature → 401."""
         settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET

@@ -200,7 +200,9 @@ class HealthLiveViewTestCase(TestCase):
     def test_returns_ok_without_authentication(self):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"status": "ok"})
+        # HealthProbeMiddleware answers ahead of tenant resolution with
+        # a plain JsonResponse — same body contract as the DRF view.
+        self.assertEqual(response.json(), {"status": "ok"})
 
     def test_does_not_touch_backing_services(self):
         # Liveness must never call the DB/Redis/Celery health paths, so a

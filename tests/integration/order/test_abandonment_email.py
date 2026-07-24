@@ -63,7 +63,10 @@ class AbandonmentEmailUnsubscribeTestCase(TestCase):
         url = match.group(1)
         token = url.rstrip("/").rsplit("/", 1)[1]
 
-        # The token must decode back to the user's pk under the unsubscribe
-        # salt — i.e. it is the current signing scheme, not the dead
-        # uidb64/reset-token format.
-        self.assertEqual(signing.loads(token, salt=UNSUBSCRIBE_SALT), user.pk)
+        # The token must decode back to the user's pk + owning schema
+        # under the unsubscribe salt — i.e. the current schema-scoped
+        # signing scheme, not the dead uidb64/reset-token format.
+        self.assertEqual(
+            signing.loads(token, salt=UNSUBSCRIBE_SALT),
+            {"schema": "public", "pk": user.pk},
+        )

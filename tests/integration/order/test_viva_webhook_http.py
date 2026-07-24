@@ -28,6 +28,38 @@ class VivaWebhookMoneyPathTestCase(TestCase):
             num_order_items=1,
             metadata={"viva_order_code": "OC123"},
         )
+        # Multi-tenant scaffolding — same pattern as
+        # tests/integration/tenant/test_multi_tenant_invariants.py: the
+        # webhook resolves the owning tenant by iterating non-public
+        # Tenant rows and entering each schema. Provision one row
+        # (auto_create_schema=False) and no-op schema_context so the
+        # lookup runs against the test's public schema.
+        from contextlib import contextmanager
+
+        from tenant.models import Tenant
+
+        tenant = Tenant(
+            schema_name="viva_http_test",
+            name="viva-http-test",
+            slug="viva-http-test",
+            owner_email="owner-viva-http-test@example.com",
+            is_active=True,
+            suspended_at=None,
+        )
+        tenant.auto_create_schema = False
+        tenant.save()
+
+        @contextmanager
+        def _noop(_schema):
+            yield
+
+        for target in (
+            "order.views.viva_webhook.schema_context",
+            "django_tenants.utils.schema_context",
+        ):
+            patcher = patch(target, _noop)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def _post(self, body: dict):
         return self.client.post(

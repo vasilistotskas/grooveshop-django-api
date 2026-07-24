@@ -230,7 +230,19 @@ def _reset_worker_cache():
         backend.clear()
         return
     client = get_client(None, write=True)
-    keys = list(client.scan_iter(match=f"{backend.key_prefix}:*", count=1000))
+    # make_tenant_key prepends the ACTIVE SCHEMA to every raw key
+    # ({schema}:{key_prefix}:{version}:{key}), so the worker-namespace
+    # pattern must tolerate the schema segment. Without it the per-test
+    # clear silently matched nothing and stale entries (e.g. parler's
+    # translation cache after a delete + same-PK recreate) leaked
+    # between tests as order-dependent failures.
+    patterns = (
+        f"{backend.key_prefix}:*",  # non-tenant layouts (safety net)
+        f"*:{backend.key_prefix}:*",  # {schema}:{prefix}:… tenant layout
+    )
+    keys: list = []
+    for pattern in patterns:
+        keys.extend(client.scan_iter(match=pattern, count=1000))
     if keys:
         client.delete(*keys)
 

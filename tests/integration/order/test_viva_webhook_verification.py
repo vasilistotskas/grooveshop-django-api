@@ -112,14 +112,18 @@ class TestVivaPaymentFailedVerification:
                 return_value=(PaymentStatus.FAILED, {"order_code": "OC2"}),
             ),
             patch(
-                "order.views.viva_webhook.send_payment_failed_email.delay"
+                "order.views.viva_webhook.send_payment_failed_email.apply_async"
             ) as mock_email,
         ):
             _handle_payment_failed(order, {}, "viva_txn_2")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.FAILED
-        mock_email.assert_called_once_with(order.id)
+        # Dispatched with the schema captured at lambda-build time so
+        # the worker enters the owning tenant's schema.
+        mock_email.assert_called_once()
+        assert mock_email.call_args.kwargs["args"] == [order.id]
+        assert "_schema_name" in mock_email.call_args.kwargs["headers"]
 
     def test_failed_raises_when_verification_returns_error(self):
         """A network blip during verification maps to FAILED with an

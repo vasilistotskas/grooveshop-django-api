@@ -196,7 +196,10 @@ class TestSubscriptionUtils:
         url = generate_unsubscribe_link(self.user, self.topic)
         token = url.rsplit("/", 2)[1]
 
-        assert signing.loads(token, salt=UNSUBSCRIBE_SALT) == self.user.pk
+        assert signing.loads(token, salt=UNSUBSCRIBE_SALT) == {
+            "schema": "public",
+            "pk": self.user.pk,
+        }
 
     @override_settings(
         DEFAULT_FROM_EMAIL="noreply@test.com",

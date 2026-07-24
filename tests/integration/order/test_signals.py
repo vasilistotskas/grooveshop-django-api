@@ -107,7 +107,7 @@ class OrderSignalsTestCase(TestCase):
         mock_email_task.assert_called_once_with(self.order.id)
         mock_admin_task.assert_called_once_with(self.order.id)
 
-    @patch("order.tasks.send_order_status_update_email.delay")
+    @patch("order.tasks.send_order_status_update_email.apply_async")
     def test_order_status_changed_signal(self, mock_email_task):
         # DELIVERED is a shopper-facing transition that uses the generic
         # status-update email (PROCESSING/SHIPPED are handled separately).
@@ -121,7 +121,14 @@ class OrderSignalsTestCase(TestCase):
             new_status=new_status,
         )
 
-        mock_email_task.assert_called_once_with(self.order.id, new_status)
+        # Dispatched via apply_async with the schema captured at
+        # lambda-build time (C1 in MULTI_TENANT_AUDIT.md).
+        mock_email_task.assert_called_once()
+        assert mock_email_task.call_args.kwargs["args"] == [
+            self.order.id,
+            new_status,
+        ]
+        assert "_schema_name" in mock_email_task.call_args.kwargs["headers"]
 
         self.assertTrue(
             OrderHistory.objects.filter(
@@ -204,10 +211,10 @@ class OrderSignalsTestCase(TestCase):
 
         with (
             patch(
-                "order.tasks.send_shipping_notification_email.delay"
+                "order.tasks.send_shipping_notification_email.apply_async"
             ) as mock_shipping_task,
             patch(
-                "order.tasks.send_order_status_update_email.delay"
+                "order.tasks.send_order_status_update_email.apply_async"
             ) as mock_status_task,
         ):
             order_status_changed.send(
@@ -220,7 +227,9 @@ class OrderSignalsTestCase(TestCase):
         # SHIPPED is owned by the dedicated shipping-notification email
         # (it carries the tracking number); the generic status template
         # must not also fire, or the shopper gets two "shipped" emails.
-        mock_shipping_task.assert_called_once_with(self.order.id)
+        mock_shipping_task.assert_called_once()
+        assert mock_shipping_task.call_args.kwargs["args"] == [self.order.id]
+        assert "_schema_name" in mock_shipping_task.call_args.kwargs["headers"]
         mock_status_task.assert_not_called()
 
     def test_handle_order_saved(self):
@@ -472,7 +481,9 @@ class OrderSignalsTestCase(TestCase):
 
         self.assertTrue(note_exists)
 
-    @patch("order.signals.handlers.send_shipping_notification_email.delay")
+    @patch(
+        "order.signals.handlers.send_shipping_notification_email.apply_async"
+    )
     def test_tracking_info_set_dispatches_shipping_email(self, mock_email_task):
         """Setting tracking_number + shipping_carrier on an order
         with neither previously set fires the shipping notification
@@ -487,7 +498,9 @@ class OrderSignalsTestCase(TestCase):
         self.order.shipping_carrier = "acs"
         self.order.save()
 
-        mock_email_task.assert_called_once_with(self.order.id)
+        mock_email_task.assert_called_once()
+        assert mock_email_task.call_args.kwargs["args"] == [self.order.id]
+        assert "_schema_name" in mock_email_task.call_args.kwargs["headers"]
 
     @patch("order.signals.handlers.send_shipping_notification_email.delay")
     def test_tracking_info_unchanged_does_not_redispatch(self, mock_email_task):

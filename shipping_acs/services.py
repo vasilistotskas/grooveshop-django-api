@@ -1477,7 +1477,7 @@ class AcsService:
     def _alert_admins_unmatched_payouts(
         *, skipped: int, cod_payment_date: date | None
     ) -> None:
-        """Email ADMINS about payout rows we could not attribute.
+        """Email the tenant's operators about unattributable payout rows.
 
         Unmatched rows mean ACS remitted COD money we can't tie to an
         order — silently dropping them is how the original Voucher_No
@@ -1485,13 +1485,10 @@ class AcsService:
         failure must not fail the reconcile itself (the payout rows
         that did match are already persisted).
         """
-        from django.conf import settings
-        from django.core.mail import mail_admins
+        from shipping.alerts import send_ops_alert  # noqa: PLC0415
 
-        if not settings.ADMINS:
-            return
         try:
-            mail_admins(
+            sent = send_ops_alert(
                 subject=(
                     f"ACS COD reconcile: {skipped} unmatched payout row(s)"
                 ),
@@ -1505,6 +1502,8 @@ class AcsService:
                     "the ACS COD beneficiary report."
                 ),
             )
+            if not sent:
+                return
         except Exception as exc:
             logger.error(
                 "reconcile_cod_payouts: failed to send unmatched-payout "

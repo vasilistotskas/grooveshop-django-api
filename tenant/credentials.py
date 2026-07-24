@@ -74,6 +74,35 @@ def tenant_contact_email() -> str:
     return getattr(settings, "INFO_EMAIL", "") or ""
 
 
+def tenant_admin_recipients() -> list[str]:
+    """Return merchant-operations alert recipients for the active tenant.
+
+    Operational alerts (failed shipment creation, stale-shipment
+    digests, unmatched COD payouts) concern the TENANT's store
+    operators — the people who can fix an address or reconcile a
+    payout — not the platform owner. Priority:
+      1. ``Tenant.contact_email`` + ``Tenant.owner_email`` (deduped)
+      2. ``settings.ADMINS`` addresses — platform fallback, which is
+         also the public-schema / no-tenant behaviour.
+    """
+    recipients: list[str] = []
+    for field in ("contact_email", "owner_email"):
+        value = _get_tenant_field(field)
+        if value and value not in recipients:
+            recipients.append(value)
+    if recipients:
+        return recipients
+    return [email for _name, email in getattr(settings, "ADMINS", [])]
+
+
+def tenant_site_name() -> str:
+    """Return the tenant's display name for email/branding contexts.
+
+    Priority: ``Tenant.name`` → ``settings.SITE_NAME``.
+    """
+    return _get_tenant_field("name", "SITE_NAME")
+
+
 # ---------------------------------------------------------------------------
 # Authentication — MFA
 # ---------------------------------------------------------------------------

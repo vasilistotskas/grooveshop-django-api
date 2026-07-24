@@ -327,7 +327,7 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
     ("Retire selected shipments"), which sets a terminal state and
     thereby stops the poller.
     """
-    from django.core.mail import mail_admins
+    from django.core.mail import send_mail
     from django.db.models import Q
     from django.template.loader import render_to_string
 
@@ -372,15 +372,24 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             stale_alert_sent=True
         )
 
-    if not settings.ADMINS:
+    from tenant.credentials import (  # noqa: PLC0415
+        tenant_admin_recipients,
+        tenant_contact_email,
+        tenant_from_email,
+        tenant_site_name,
+    )
+    from core.utils.tenant_urls import get_tenant_base_url  # noqa: PLC0415
+
+    recipients = tenant_admin_recipients()
+    if not recipients:
         logger.warning(
-            "check_stale_acs_shipments: no ADMINS configured — "
+            "check_stale_acs_shipments: no alert recipients configured — "
             "rolling back claim"
         )
         AcsShipment.objects.filter(id__in=shipment_ids).update(
             stale_alert_sent=False
         )
-        return {"alerted": 0, "reason": "no_admins"}
+        return {"alerted": 0, "reason": "no_recipients"}
 
     shipments = AcsShipment.objects.filter(id__in=shipment_ids).select_related(
         "order"
@@ -399,9 +408,9 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
     context = {
         "shipments": rows,
         "threshold_days": threshold_days,
-        "SITE_NAME": settings.SITE_NAME,
-        "INFO_EMAIL": settings.INFO_EMAIL,
-        "SITE_URL": settings.NUXT_BASE_URL,
+        "SITE_NAME": tenant_site_name(),
+        "INFO_EMAIL": tenant_contact_email(),
+        "SITE_URL": get_tenant_base_url(),
         "STATIC_BASE_URL": settings.STATIC_BASE_URL,
     }
     from django.utils.translation import gettext as _
@@ -416,9 +425,11 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         html_content = render_to_string(
             "emails/shipping_acs/stale_shipments_alert.html", context
         )
-        mail_admins(
-            subject=subject,
+        send_mail(
+            subject=f"[{tenant_site_name()}] {subject}",
             message=text_content,
+            from_email=tenant_from_email() or None,
+            recipient_list=recipients,
             html_message=html_content,
         )
     except Exception as exc:

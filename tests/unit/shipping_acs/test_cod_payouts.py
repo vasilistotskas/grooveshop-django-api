@@ -139,9 +139,9 @@ def test_reconcile_skips_and_alerts_on_unmatched_rows(settings):
     """A row with no POD and no resolvable reference is counted as
     skipped and ADMINS are alerted — unmatched payout money must be
     investigated, not silently dropped."""
-    settings.ADMINS = ["admin@example.com"]
+    settings.ADMINS = [("Admin", "admin@example.com")]
 
-    with patch("django.core.mail.mail_admins") as mock_mail:
+    with patch("shipping.alerts.send_mail") as mock_mail:
         result = _reconcile(
             [_BASE_ROW, {"Customer_Code": "x", "POD": ""}],
         )

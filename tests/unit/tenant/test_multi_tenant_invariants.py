@@ -151,6 +151,7 @@ class TestEmailHelperCallSites:
     """
 
     REQUIRED_HELPERS = ("tenant_from_email", "tenant_contact_email")
+    OPS_ALERT_HELPERS = ("tenant_admin_recipients", "tenant_from_email")
 
     EXPECTED_CALLERS = (
         # path inside grooveshop-django-api / required helpers
@@ -159,6 +160,7 @@ class TestEmailHelperCallSites:
         ("order/tasks.py", REQUIRED_HELPERS),
         ("shipping_acs/tasks.py", REQUIRED_HELPERS),
         ("shipping_boxnow/tasks.py", REQUIRED_HELPERS),
+        ("shipping/alerts.py", OPS_ALERT_HELPERS),
     )
 
     def test_outbound_email_paths_use_tenant_helpers(self) -> None:
@@ -175,3 +177,23 @@ class TestEmailHelperCallSites:
                     "either the file was renamed or a contributor "
                     "switched it back to settings.DEFAULT_FROM_EMAIL"
                 )
+
+    def test_shipping_modules_never_use_mail_admins(self) -> None:
+        """``mail_admins`` targets platform ADMINS. Merchant-facing
+        shipping alerts (failed vouchers, stale digests, COD payouts)
+        must route through ``shipping.alerts.send_ops_alert`` so they
+        reach the owning tenant's operators.
+        """
+        import pathlib
+
+        root = pathlib.Path(__file__).resolve().parents[3]
+        offenders = [
+            str(p.relative_to(root))
+            for pkg in ("shipping", "shipping_acs", "shipping_boxnow")
+            for p in (root / pkg).rglob("*.py")
+            if "mail_admins" in p.read_text(encoding="utf-8")
+        ]
+        assert not offenders, (
+            "shipping modules must use shipping.alerts.send_ops_alert, "
+            f"not mail_admins: {offenders}"
+        )

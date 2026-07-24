@@ -43,8 +43,12 @@ class UnsubscribeLinkViewTestCase(APITestCase):
             status=UserSubscription.SubscriptionStatus.ACTIVE,
         )
 
-    def _token(self) -> str:
-        return signing.dumps(self.user.pk, salt=UNSUBSCRIBE_SALT)
+    def _token(self, schema: str = "public") -> str:
+        # Mirrors ``_make_unsubscribe_token``: pk + owning schema.
+        # Tests execute in the public schema.
+        return signing.dumps(
+            {"schema": schema, "pk": self.user.pk}, salt=UNSUBSCRIBE_SALT
+        )
 
     def _topic_url(self, token: str) -> str:
         return reverse(
@@ -106,6 +110,27 @@ class UnsubscribeLinkViewTestCase(APITestCase):
             other_sub.status,
             UserSubscription.SubscriptionStatus.UNSUBSCRIBED,
         )
+
+    def test_token_minted_for_other_schema_rejected(self):
+        """SECRET_KEY is global and pk sequences repeat per schema — a
+        token minted on tenant A must not unsubscribe the same pk on
+        tenant B (cross-tenant unsubscribe forgery)."""
+        response = self.client.get(
+            self._topic_url(self._token(schema="tenant_b"))
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        self.subscription.refresh_from_db()
+        assert (
+            self.subscription.status
+            == UserSubscription.SubscriptionStatus.ACTIVE
+        )
+
+    def test_legacy_pk_only_token_rejected(self):
+        """Pre-schema tokens signed a bare pk; the verifier accepts only
+        the dict payload carrying the matching schema."""
+        legacy = signing.dumps(self.user.pk, salt=UNSUBSCRIBE_SALT)
+        response = self.client.get(self._topic_url(legacy))
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_get_tampered_token_rejected(self):
         response = self.client.get(self._topic_url("not-a-valid-token"))

@@ -13,6 +13,7 @@ from tenant.credentials import tenant_contact_email, tenant_from_email
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.cache import cache
+from django.db import connection
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils import timezone, translation
@@ -150,8 +151,18 @@ def check_subscription_before_send(user: "User", topic_slug: str) -> bool:
 
 
 def _make_unsubscribe_token(user: "AbstractBaseUser") -> str:
-    """Sign the user's pk into a self-contained, tamper-proof token."""
-    return signing.dumps(user.pk, salt=UNSUBSCRIBE_SALT)
+    """Sign the user's pk + owning schema into a tamper-proof token.
+
+    The schema is baked in because ``SECRET_KEY`` is global and the
+    user table exists in every tenant schema — a pk-only token minted
+    for tenant A's user 42 would verify on tenant B's domain and
+    silently unsubscribe tenant B's user 42. The verifier rejects any
+    token whose schema does not match ``connection.schema_name``.
+    """
+    return signing.dumps(
+        {"schema": connection.schema_name, "pk": user.pk},
+        salt=UNSUBSCRIBE_SALT,
+    )
 
 
 def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:

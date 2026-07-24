@@ -253,6 +253,30 @@ class TestBoxNowWebhookTenantResolution:
 
 
 # ---------------------------------------------------------------------------
+# K8s probe bypass
+# ---------------------------------------------------------------------------
+
+
+class TestHealthProbeBypass:
+    """Kubelet probes send the pod IP as Host — a hostname no
+    TenantDomain row can ever match. ``HealthProbeMiddleware`` (mounted
+    ahead of ``TenantMainMiddleware``) must answer the readiness path
+    with 200 regardless of the Host header and without touching any
+    backing service.
+    """
+
+    def test_health_live_answers_with_bogus_host(self, client):
+        # Deliberately NO django_db mark: pytest-django raises on any
+        # database access here, so a passing test doubles as proof the
+        # probe touches no backing service (a DB outage can't fail it).
+        response = client.get(
+            "/api/v1/health/live", HTTP_HOST="10.42.0.17:8000"
+        )
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
 # WebSocket group isolation
 # ---------------------------------------------------------------------------
 

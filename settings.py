@@ -198,6 +198,9 @@ INSTALLED_APPS = list(SHARED_APPS) + [
 ]
 
 MIDDLEWARE = [
+    # Probe bypass MUST precede TenantMainMiddleware — kubelet probes
+    # carry the pod IP as Host, which no TenantDomain row can match.
+    "core.middleware.health_probe.HealthProbeMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",

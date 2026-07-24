@@ -2,7 +2,7 @@ import logging
 
 from django.contrib.auth import get_user_model
 from django.core import signing
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils.crypto import get_random_string
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema, extend_schema_view
@@ -501,12 +501,13 @@ class UnsubscribeResponseSerializer(serializers.Serializer):
 
 def _validate_unsubscribe_token(token: str):
     # The token is a ``django.core.signing`` value carrying the user's pk
-    # (see ``user.utils.subscription._make_unsubscribe_token``). It is
+    # and owning schema (see
+    # ``user.utils.subscription._make_unsubscribe_token``). It is
     # tamper-proof and does not depend on the user's password/last_login,
     # so the link keeps working after logins/password changes — unlike the
     # old password-reset generator.
     try:
-        user_pk = signing.loads(
+        payload = signing.loads(
             token, salt=UNSUBSCRIBE_SALT, max_age=UNSUBSCRIBE_MAX_AGE
         )
     except signing.SignatureExpired:
@@ -523,6 +524,24 @@ def _validate_unsubscribe_token(token: str):
             "unsubscribe: bad signature — link is malformed or tampered"
         )
         return None, _("Invalid unsubscribe link")
+
+    # Schema scoping: SECRET_KEY is global and pk sequences repeat per
+    # schema, so a cryptographically valid token from another tenant's
+    # domain still verifies. Reject anything not minted for THIS schema
+    # with the same generic error a forged token gets.
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema") != connection.schema_name
+    ):
+        logger.warning(
+            "unsubscribe: token schema mismatch (minted for %r, "
+            "presented on %r)",
+            payload.get("schema") if isinstance(payload, dict) else None,
+            connection.schema_name,
+        )
+        return None, _("Invalid unsubscribe link")
+
+    user_pk = payload["pk"]
     try:
         user = User.objects.get(pk=user_pk)
     except User.DoesNotExist:

@@ -7,7 +7,7 @@ checks would read as "not allowed to access this tenant" and every
 login would fail.
 
 Superusers + staff get OWNER so they keep full access; everyone else
-gets MEMBER. New tenants get memberships via ``create_tenant`` /
+gets MEMBER. New tenants get memberships via ``tenant_create`` /
 the tenant admin — this migration only rescues the pre-existing data.
 """
 

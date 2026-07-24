@@ -127,6 +127,14 @@ class DashboardCallbackCachingTests(TestCase):
 class LowStockBoundaryTests(TestCase):
     """``_check_low_stock`` must include 0<stock<10 and exclude stock=0."""
 
+    def setUp(self):
+        # These tests exercise TENANT-schema behaviour (Product data
+        # exists); the test DB runs as public, where the guard would
+        # short-circuit to [].
+        patcher = patch("admin.dashboard._is_public_schema", return_value=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_excludes_zero_stock(self):
         from product.factories.product import ProductFactory
 

@@ -1983,8 +1983,11 @@ UNFOLD = {
         "de": "🇩🇪",
     },
     # ⌘K / Ctrl+K command palette: cross-model record search + history.
+    # ``search_models`` is schema-aware — the public (platform) admin
+    # may only search SHARED_APPS models; the rest exist solely inside
+    # tenant schemas and would raise ProgrammingError on every search.
     "COMMAND": {
-        "search_models": True,
+        "search_models": "core.utils.admin.command_search_models",
         "show_history": True,
     },
     "LOGIN": {

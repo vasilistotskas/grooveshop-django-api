@@ -187,6 +187,9 @@ def _check_low_stock() -> list[dict]:
     Excludes ``stock=0`` — that's "out of stock", a different concern
     surfaced elsewhere. We only want the "almost out, reorder now" band.
     """
+    if _is_public_schema():
+        # Product lives only in tenant schemas.
+        return []
 
     Product = apps.get_model("product", "Product")
     rows = (
@@ -232,7 +235,52 @@ def _check_failed_celery() -> int:
 # ── Zones A/B/C/E — cached payload ─────────────────────────────────────
 
 
+def _empty_zones() -> dict:
+    """Template-safe zone payload for the public (platform) admin.
+
+    Zones A/B/C/E query Order/User/ProductReview/Contact — tables that
+    exist only inside tenant schemas. On the public schema those
+    queries raise ProgrammingError, so the platform admin dashboard
+    renders neutral empties instead (same shape the template expects).
+    """
+    empty_chart = json.dumps({"labels": [], "datasets": []})
+    return {
+        "hero": {
+            "revenue_7d": 0.0,
+            "revenue_trend_pct": None,
+            "pending_orders": 0,
+            "new_customers_30d": 0,
+            "new_customers_today": 0,
+            "avg_order_value": 0.0,
+        },
+        "performance_chart_data": empty_chart,
+        "performance_chart_options": json.dumps({}),
+        "status_chart_data": empty_chart,
+        "status_chart_options": json.dumps({}),
+        "orders_queue": [],
+        "reviews_queue": [],
+        "messages_queue": [],
+        "funnel": {
+            "carts": 0,
+            "orders": 0,
+            "paid": 0,
+            "cart_to_order_pct": 0,
+            "order_to_paid_pct": 0,
+            "overall_pct": 0,
+        },
+        "retention": {
+            "paying_customers": 0,
+            "repeat_customers": 0,
+            "repeat_rate_pct": 0,
+        },
+        "top_products": [],
+    }
+
+
 def _build_cached_zones() -> dict:
+    if _is_public_schema():
+        return _empty_zones()
+
     User = apps.get_model("user", "UserAccount")
     Order = apps.get_model("order", "Order")
     ProductReview = apps.get_model("product", "ProductReview")

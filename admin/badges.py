@@ -1,5 +1,6 @@
 from django.apps import apps
 from django.core.cache import cache
+from django.db import ProgrammingError
 
 _BADGE_TTL = 60
 
@@ -12,7 +13,13 @@ def _cached_count(key: str, label: str, model: str, **filters) -> int | None:
         model_cls = apps.get_model(label, model)
     except LookupError:
         return None
-    value = model_cls.objects.filter(**filters).count()
+    try:
+        value = model_cls.objects.filter(**filters).count()
+    except ProgrammingError:
+        # Public (platform) schema: the badge's table lives only in
+        # tenant schemas — no badge rather than a 500 on every
+        # sidebar render.
+        return None
     cache.set(key, value, _BADGE_TTL)
     return value or None
 
@@ -93,10 +100,14 @@ def abandoned_carts_badge(request):
     except LookupError:
         return None
     now = timezone.now()
-    value = Cart.objects.filter(
-        updated_at__lt=now - timedelta(hours=24),
-        updated_at__gte=now - timedelta(days=30),
-    ).count()
+    try:
+        value = Cart.objects.filter(
+            updated_at__lt=now - timedelta(hours=24),
+            updated_at__gte=now - timedelta(days=30),
+        ).count()
+    except ProgrammingError:
+        # Public (platform) schema — cart tables are tenant-only.
+        return None
     cache.set("admin:badge:abandoned_carts", value, _BADGE_TTL)
     return value or None
 

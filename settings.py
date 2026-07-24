@@ -543,7 +543,13 @@ DISABLE_CACHE = getenv("DISABLE_CACHE", "False").lower() == "true"
 
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        # CustomCache = RedisCache + schema-scoped SCAN/UNLINK helpers
+        # (keys/delete_raw_keys/clear_by_prefixes). Registering it as
+        # THE default backend means the admin cache-purge service and
+        # the clear_cache command operate on the same tenant-keyed
+        # connection as every cache.get/set — no parallel raw client
+        # that bypasses make_tenant_key.
+        "BACKEND": "core.caches.CustomCache",
         "LOCATION": REDIS_URL,
         "KEY_PREFIX": DEFAULT_CACHE_KEY_PREFIX,
         "VERSION": DEFAULT_CACHE_VERSION,
@@ -567,9 +573,13 @@ NUXT_CACHE_PURGE_TOKEN = getenv("NUXT_CACHE_PURGE_TOKEN", "")
 if SYSTEM_ENV == "ci":
     CACHES = {
         "default": {
-            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "BACKEND": "core.caches.CustomCache",
             "LOCATION": "redis://127.0.0.1:6379/0",
             "KEY_PREFIX": "redis",
+            # KEY_FUNCTION must match production — dropping it here
+            # silently disabled tenant cache isolation in CI, so the
+            # suite never exercised the keys it ships with.
+            "KEY_FUNCTION": "tenant.cache.make_tenant_key",
         },
     }
 

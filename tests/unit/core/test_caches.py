@@ -203,3 +203,64 @@ class CustomCacheTestCase(TestCase):
         if hasattr(self, "key"):
             self.cache_instance.delete(self.key)
         super().tearDown()
+
+
+class TenantScopedPatternTestCase(TestCase):
+    """SCAN patterns follow the configured KEY_FUNCTION — with
+    ``make_tenant_key`` the pattern embeds the active schema, so one
+    tenant's ``keys()`` can never surface (or UNLINK) another
+    tenant's entries.
+    """
+
+    def setUp(self):
+        from unittest.mock import patch as mock_patch
+
+        REDIS_HOST = getenv("REDIS_HOST", "localhost")
+        REDIS_PORT = getenv("REDIS_PORT", "6379")
+        worker_id = getenv("PYTEST_XDIST_WORKER", "gw0")
+        worker_num = int("".join(filter(str.isdigit, worker_id)) or "0")
+        db_number = str((worker_num % 15) + 1)
+        self._patch = mock_patch
+        self.cache = CustomCache(
+            server=f"redis://{REDIS_HOST}:{REDIS_PORT}/{db_number}",
+            params={
+                "KEY_FUNCTION": "tenant.cache.make_tenant_key",
+                "KEY_PREFIX": "redis",
+            },
+        )
+        self.token = f"scoped_{uuid.uuid4().hex[:8]}"
+
+    def _in_schema(self, schema: str):
+        patcher = self._patch("tenant.cache.connection")
+        conn = patcher.start()
+        conn.schema_name = schema
+        self.addCleanup(patcher.stop)
+        return patcher
+
+    def test_keys_scoped_to_active_schema(self):
+        with self._patch("tenant.cache.connection") as conn:
+            conn.schema_name = "tenant_a"
+            self.cache.set(self.token, "a")
+            keys_a = self.cache.keys(self.token)
+
+        with self._patch("tenant.cache.connection") as conn:
+            conn.schema_name = "tenant_b"
+            self.cache.set(self.token, "b")
+            keys_b = self.cache.keys(self.token)
+            # tenant_b sees only its own copy…
+            self.assertEqual(len(keys_b), 1)
+            self.assertTrue(keys_b[0].startswith("tenant_b:"))
+
+        with self._patch("tenant.cache.connection") as conn:
+            conn.schema_name = "tenant_a"
+            # …and tenant_a's view is unchanged by tenant_b's write.
+            self.assertEqual(self.cache.keys(self.token), keys_a)
+            self.assertEqual(len(keys_a), 1)
+            self.assertTrue(keys_a[0].startswith("tenant_a:"))
+            # UNLINK through the scoped view removes only tenant_a's key.
+            self.cache.delete_raw_keys(keys_a)
+
+        with self._patch("tenant.cache.connection") as conn:
+            conn.schema_name = "tenant_b"
+            self.assertEqual(len(self.cache.keys(self.token)), 1)
+            self.cache.delete_raw_keys(self.cache.keys(self.token))

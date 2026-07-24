@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from os import getenv
 from typing import Any, Awaitable, cast
 
 from django.conf import settings
@@ -26,9 +25,18 @@ class CustomCache(RedisCache):
 
     Provides:
     - ``clear_by_prefixes()`` -- selectively clear keys by prefix
-      instead of FLUSHDB, safe for shared Redis instances.
+      instead of FLUSHDB, safe for shared Redis instances. Platform-
+      wide (all schemas) by design — used by the public-schema
+      ``clear_all_cache`` beat task and the clear_cache command.
     - ``keys()`` / ``delete_raw_keys()`` -- admin cache-management
-      utilities for pattern-based key inspection and deletion.
+      utilities for pattern-based key inspection and deletion,
+      scoped to the ACTIVE schema (raw layout per
+      ``tenant.cache.make_tenant_key``: ``{schema}:{prefix}:{version}:
+      {key}``) so one tenant's admin purge can never UNLINK another
+      tenant's keys.
+
+    Registered as ``CACHES["default"]`` so these helpers share the
+    tenant-keyed backend every ``cache.get/set`` uses.
     """
 
     _cache: RedisCacheClient
@@ -107,37 +115,47 @@ class CustomCache(RedisCache):
         results: dict[str, int] = {}
 
         for prefix in prefixes:
-            pattern = f"{prefix}*"
+            # Two raw layouts share the Redis DB: Django keys carry the
+            # tenant schema first ({schema}:{prefix}{key} via
+            # make_tenant_key), while non-Django keys (e.g. Nuxt's
+            # ``cache:``) start with the prefix directly. Scan both so
+            # the platform-wide clear covers every schema.
             deleted = 0
             batch: list[str | bytes] = []
+            for pattern in (f"{prefix}*", f"*:{prefix}*"):
+                for key in client.scan_iter(
+                    match=pattern, count=_SCAN_BATCH_SIZE
+                ):
+                    batch.append(key)
+                    if len(batch) >= _SCAN_BATCH_SIZE:
+                        deleted += cast(int, client.unlink(*batch))
+                        batch.clear()
 
-            for key in client.scan_iter(match=pattern, count=_SCAN_BATCH_SIZE):
-                batch.append(key)
-                if len(batch) >= _SCAN_BATCH_SIZE:
+                if batch:
                     deleted += cast(int, client.unlink(*batch))
                     batch.clear()
-
-            if batch:
-                deleted += cast(int, client.unlink(*batch))
 
             results[prefix] = deleted
             logger.info("Cleared %d keys with prefix '%s'", deleted, prefix)
 
         return results
 
-    @staticmethod
-    def _make_pattern(search: str | None = None) -> str:
+    def _make_pattern(self, search: str | None = None) -> str:
+        """SCAN pattern scoped to this backend's key namespace.
+
+        Built through ``make_key`` so it follows the configured
+        KEY_FUNCTION — with ``tenant.cache.make_tenant_key`` the
+        pattern embeds the ACTIVE schema
+        (``{schema}:{prefix}:{version}:…``), so admin purge and key
+        inspection from a tenant admin only ever see that tenant's
+        keys (and the platform admin only public's).
+        """
         if search is None:
-            return "*"
-        return f"*{search}*"
+            return self.make_key("*")
+        return self.make_key(f"*{search}*")
 
 
-REDIS_HOST = getenv("REDIS_HOST", "localhost")
-REDIS_PORT = getenv("REDIS_PORT", "6379")
-REDIS_PASSWORD = getenv("REDIS_PASSWORD", "")
-REDIS_URL = (
-    f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/0"
-    if REDIS_PASSWORD
-    else f"redis://{REDIS_HOST}:{REDIS_PORT}/0"
-)
-cache_instance = CustomCache(server=REDIS_URL, params={})
+# The configured default backend (a CustomCache via CACHES["default"])
+# — NOT a second, directly-constructed client. A standalone instance
+# had no KEY_PREFIX/KEY_FUNCTION, so its get/set landed outside the
+# tenant namespace and its SCAN helpers walked every tenant's keys.

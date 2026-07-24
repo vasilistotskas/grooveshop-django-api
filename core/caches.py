@@ -153,9 +153,3 @@ class CustomCache(RedisCache):
         if search is None:
             return self.make_key("*")
         return self.make_key(f"*{search}*")
-
-
-# The configured default backend (a CustomCache via CACHES["default"])
-# — NOT a second, directly-constructed client. A standalone instance
-# had no KEY_PREFIX/KEY_FUNCTION, so its get/set landed outside the
-# tenant namespace and its SCAN helpers walked every tenant's keys.

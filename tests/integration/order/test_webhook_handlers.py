@@ -97,7 +97,7 @@ class TestHandleStripePaymentSucceeded:
                 "order.signals.handlers.OrderService.handle_payment_succeeded"
             ) as mock_service,
             patch(
-                "order.signals.handlers.send_order_confirmation_email.delay"
+                "order.signals.handlers.send_order_confirmation_email.apply_async"
             ) as mock_email,
         ):
             mock_service.return_value = order
@@ -105,7 +105,11 @@ class TestHandleStripePaymentSucceeded:
                 sender=None, event=mock_djstripe_event
             )
 
-        mock_email.assert_called_once_with(order.id)
+        mock_email.assert_called_once()
+        assert mock_email.call_args.kwargs["args"] == [order.id]
+        # Schema captured at lambda-build time so the worker enters the
+        # owning tenant's schema, not public (C1 in MULTI_TENANT_AUDIT.md).
+        assert "_schema_name" in mock_email.call_args.kwargs["headers"]
 
     def test_successful_payment_skips_email_when_order_missing(
         self, mock_djstripe_event
@@ -119,7 +123,7 @@ class TestHandleStripePaymentSucceeded:
                 "order.signals.handlers.OrderService.handle_payment_succeeded"
             ) as mock_service,
             patch(
-                "order.signals.handlers.send_order_confirmation_email.delay"
+                "order.signals.handlers.send_order_confirmation_email.apply_async"
             ) as mock_email,
         ):
             mock_service.return_value = None
@@ -149,7 +153,9 @@ class TestHandleStripePaymentSucceeded:
             patch(
                 "order.signals.handlers.OrderService.handle_payment_succeeded"
             ) as mock_service,
-            patch("order.signals.handlers.send_order_confirmation_email.delay"),
+            patch(
+                "order.signals.handlers.send_order_confirmation_email.apply_async"
+            ),
         ):
             mock_service.return_value = order
             handle_stripe_payment_succeeded(
@@ -622,7 +628,7 @@ class TestHandleStripeDisputeCreated:
         )
 
         with patch(
-            "order.signals.handlers.send_dispute_notification_email.delay"
+            "order.signals.handlers.send_dispute_notification_email.apply_async"
         ) as mock_email:
             handle_stripe_dispute_created(
                 sender=None, event=self._dispute_event(payment_intent_id)
@@ -631,7 +637,9 @@ class TestHandleStripeDisputeCreated:
         order.refresh_from_db()
         assert order.metadata.get("disputed") is True
         assert order.metadata.get("dispute_id") == "dp_test_1"
-        mock_email.assert_called_once_with(order.id, "dp_test_1")
+        mock_email.assert_called_once()
+        assert mock_email.call_args.kwargs["args"] == [order.id, "dp_test_1"]
+        assert "_schema_name" in mock_email.call_args.kwargs["headers"]
 
     def test_dispute_without_payment_intent_is_noop(self):
         """A dispute event carrying no payment_intent bails out — it never
@@ -647,7 +655,7 @@ class TestHandleStripeDisputeCreated:
         event.data["object"]["payment_intent"] = None
 
         with patch(
-            "order.signals.handlers.send_dispute_notification_email.delay"
+            "order.signals.handlers.send_dispute_notification_email.apply_async"
         ) as mock_email:
             handle_stripe_dispute_created(sender=None, event=event)
 
@@ -691,7 +699,9 @@ class TestHandleStripeCheckoutCompleted:
                 "shipping.services.ShippingService."
                 "dispatch_create_shipment_task"
             ) as mock_dispatch,
-            patch("order.signals.handlers.send_order_confirmation_email.delay"),
+            patch(
+                "order.signals.handlers.send_order_confirmation_email.apply_async"
+            ),
         ):
             handle_stripe_checkout_completed(
                 sender=None, event=self._checkout_event(order.id)

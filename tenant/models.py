@@ -213,6 +213,18 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty → browser pixel is disabled for this tenant."
         ),
     )
+    tiktok_pixel_id = models.CharField(
+        _("TikTok Pixel ID"),
+        max_length=64,
+        blank=True,
+        default="",
+        help_text=_(
+            "TikTok Pixel ID for the storefront (e.g. 'C0ABCDEFGH123'). "
+            "Alphanumeric only. "
+            "Empty → TikTok pixel is disabled for this tenant."
+        ),
+    )
+
     ga_tracking_id = models.CharField(
         _("Google Analytics Tracking ID"),
         max_length=32,
@@ -624,6 +636,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_stripe_publishable_key()
         self._validate_allowed_csp_sources()
         self._validate_meta_pixel_id()
+        self._validate_tiktok_pixel_id()
         self._validate_ga_tracking_id()
         self._validate_social_urls()
         self._validate_box_now_partner_id()
@@ -689,6 +702,21 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                     "meta_pixel_id": _(
                         "Meta Pixel ID must contain digits only "
                         "(e.g. '123456789012345')."
+                    )
+                }
+            )
+
+    def _validate_tiktok_pixel_id(self) -> None:
+        """TikTok Pixel IDs are alphanumeric strings only."""
+        value = self.tiktok_pixel_id
+        if not value:
+            return
+        if not re.fullmatch(r"[A-Za-z0-9]+", value):
+            raise ValidationError(
+                {
+                    "tiktok_pixel_id": _(
+                        "TikTok Pixel ID must be alphanumeric "
+                        "(e.g. 'C0ABCDEFGH123')."
                     )
                 }
             )

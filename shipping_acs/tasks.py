@@ -296,7 +296,7 @@ def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:
     }
 
 
-@shared_task(bind=True)
+@shared_task(bind=True, base=TenantTask)
 def check_stale_acs_shipments(self) -> dict[str, Any]:
     """Alert admins about non-terminal shipments with no tracking movement.
 

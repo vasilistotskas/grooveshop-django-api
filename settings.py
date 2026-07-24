@@ -718,14 +718,16 @@ def get_celery_beat_schedule():
             else SCHEDULE_PRESETS["every_hour"],
         },
         "anonymize-old-search-queries": {
-            "task": "search.tasks.anonymize_old_search_queries",
+            # Fanout: SearchQuery is per-tenant; beat fires in public.
+            # kwargs (days=90) live in the wrapper body, not here.
+            "task": "tenant.tasks.fanout_anonymize_old_search_queries",
             "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
-            "kwargs": {"days": 90},
         },
         "cleanup-expired-data-exports": {
-            "task": "user.tasks.cleanup_expired_data_exports",
+            # Fanout: UserDataExport is per-tenant; beat fires in public.
+            "task": "tenant.tasks.fanout_cleanup_expired_data_exports",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
@@ -878,7 +880,8 @@ def get_celery_beat_schedule():
         # lands at the start of the working day; the claim flag inside
         # the task dedupes re-alerts.
         "check-stale-acs-shipments": {
-            "task": "shipping_acs.tasks.check_stale_acs_shipments",
+            # Fanout: AcsShipment is per-tenant; beat fires in public.
+            "task": "tenant.tasks.fanout_check_stale_acs_shipments",
             "schedule": crontab(hour="9", minute="0"),
             "options": {"queue": "celery", "expires": 3600},
         },

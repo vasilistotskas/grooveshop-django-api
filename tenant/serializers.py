@@ -59,6 +59,7 @@ class TenantConfigSerializer(serializers.Serializer):
 
     # --- Analytics (public IDs only) ---
     meta_pixel_id = serializers.CharField(read_only=True)
+    tiktok_pixel_id = serializers.CharField(read_only=True)
     ga_tracking_id = serializers.CharField(read_only=True)
 
     # --- Authentication ---
@@ -156,6 +157,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "allowed_csp_sources",
             # --- Analytics ---
             "meta_pixel_id",
+            "tiktok_pixel_id",
             "ga_tracking_id",
             "meta_capi_access_token",
             "meta_capi_dataset_id",

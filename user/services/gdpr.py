@@ -30,7 +30,7 @@ from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -51,6 +51,11 @@ def get_export_location() -> str:
     directory on the worker.
 
     Matches the pattern used by ``order.models.invoice`` for PDFs.
+
+    The path is schema-namespaced (``_gdpr_exports/{schema}``) so one
+    tenant's export/cleanup can never touch another tenant's PII
+    bundles — the write path, the download view, and the fanout
+    cleanup task all run inside the owning tenant's schema context.
     """
     base = getattr(
         settings,
@@ -59,7 +64,7 @@ def get_export_location() -> str:
         if settings.MEDIA_ROOT
         else "private_media",
     )
-    return os.path.join(base, "_gdpr_exports")
+    return os.path.join(base, "_gdpr_exports", connection.schema_name)
 
 
 def _serialize_money(value: Any) -> dict[str, Any] | None:

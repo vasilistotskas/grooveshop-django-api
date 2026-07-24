@@ -119,3 +119,101 @@ class TestFanoutTaskWrappers:
             tenant_tasks.fanout_check_low_stock_products()
 
         run.assert_called_once_with("product.tasks.check_low_stock_products")
+
+    @pytest.mark.django_db
+    def test_fanout_anonymize_old_search_queries(self):
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_anonymize_old_search_queries()
+
+        run.assert_called_once_with(
+            "search.tasks.anonymize_old_search_queries", days=90
+        )
+
+    @pytest.mark.django_db
+    def test_fanout_cleanup_expired_data_exports(self):
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_cleanup_expired_data_exports()
+
+        run.assert_called_once_with("user.tasks.cleanup_expired_data_exports")
+
+    @pytest.mark.django_db
+    def test_fanout_check_stale_acs_shipments(self):
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_check_stale_acs_shipments()
+
+        run.assert_called_once_with(
+            "shipping_acs.tasks.check_stale_acs_shipments"
+        )
+
+
+class TestBeatScheduleTenantCoverage:
+    """Every beat entry whose task touches TENANT_APPS-scoped tables must
+    dispatch through a ``tenant.tasks.fanout_*`` wrapper — a direct beat
+    call fires once in the public schema and silently processes zero rows
+    per tenant.
+
+    This is the self-enforcing version of the recurring merge-gap
+    checklist: merging a new beat entry from main without a fanout
+    wrapper (or without an explicit public-schema allowlist decision
+    here) fails this test instead of silently no-opping in production.
+    """
+
+    # Tasks that legitimately run ONCE in the public schema — platform
+    # infrastructure with no tenant-scoped table access. Adding a task
+    # here is an explicit reviewed decision, not a default.
+    PUBLIC_SCHEMA_TASKS = {
+        "core.tasks.monitor_system_health",
+        "core.tasks.scheduled_database_backup",
+        "core.tasks.cleanup_old_backups",
+        "core.tasks.clear_expired_sessions_task",
+        "core.tasks.clear_all_cache_task",
+        "core.tasks.clear_development_log_files_task",
+    }
+
+    def test_every_tenant_scoped_beat_entry_uses_fanout(self):
+        from django.conf import settings
+
+        offenders = [
+            f"{name} -> {entry['task']}"
+            for name, entry in settings.CELERY_BEAT_SCHEDULE.items()
+            if entry["task"] not in self.PUBLIC_SCHEMA_TASKS
+            and not entry["task"].startswith("tenant.tasks.fanout_")
+        ]
+        assert not offenders, (
+            "Beat entries dispatch tenant-scoped tasks directly — add a "
+            "fanout_* wrapper in tenant/tasks.py (or allowlist a genuinely "
+            f"public-schema task above): {offenders}"
+        )
+
+    def test_fanout_beat_entries_carry_no_kwargs(self):
+        from django.conf import settings
+
+        offenders = [
+            name
+            for name, entry in settings.CELERY_BEAT_SCHEDULE.items()
+            if entry["task"].startswith("tenant.tasks.fanout_")
+            and "kwargs" in entry
+        ]
+        assert not offenders, (
+            "fanout_* wrappers take no arguments — kwargs belong in the "
+            "wrapper body, or beat raises TypeError every tick: "
+            f"{offenders}"
+        )
+
+    def test_every_fanout_beat_target_exists(self):
+        from django.conf import settings
+        from tenant import tasks as tenant_tasks
+
+        missing = [
+            entry["task"]
+            for entry in settings.CELERY_BEAT_SCHEDULE.values()
+            if entry["task"].startswith("tenant.tasks.fanout_")
+            and not hasattr(tenant_tasks, entry["task"].rsplit(".", 1)[1])
+        ]
+        assert not missing, f"Beat points at missing fanout tasks: {missing}"

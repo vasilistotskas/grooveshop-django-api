@@ -109,3 +109,20 @@ def fanout_sync_acs_stations():
 @celery_app.task(base=TenantTask)
 def fanout_issue_daily_acs_pickup_list():
     return run_for_all_tenants("shipping_acs.tasks.issue_daily_acs_pickup_list")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_anonymize_old_search_queries():
+    return run_for_all_tenants(
+        "search.tasks.anonymize_old_search_queries", days=90
+    )
+
+
+@celery_app.task(base=TenantTask)
+def fanout_cleanup_expired_data_exports():
+    return run_for_all_tenants("user.tasks.cleanup_expired_data_exports")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_check_stale_acs_shipments():
+    return run_for_all_tenants("shipping_acs.tasks.check_stale_acs_shipments")

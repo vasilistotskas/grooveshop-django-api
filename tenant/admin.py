@@ -128,6 +128,7 @@ class TenantAdmin(ModelAdmin):
             {
                 "fields": [
                     "meta_pixel_id",
+                    "tiktok_pixel_id",
                     "ga_tracking_id",
                     "meta_capi_access_token",
                     "meta_capi_dataset_id",

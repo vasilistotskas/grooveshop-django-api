@@ -5,6 +5,7 @@ from django.db import connection, transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django_tenants.utils import schema_context
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
@@ -54,13 +55,23 @@ def handle_order_post_save(
     sender: type[Order], instance: Order, created: bool, **kwargs: Any
 ) -> None:
     """Handle order post-save signal."""
+    # Capture the active schema BEFORE registering on_commit callbacks.
+    # A save inside a webhook's schema_context commits AFTER that
+    # context exits, so the deferred signal emission (and every
+    # receiver + task dispatch it triggers) would otherwise run against
+    # the public schema. Re-entering schema_context here keeps the
+    # whole downstream chain — ORM reads and TenantTask header
+    # stamping — in the owning tenant's schema.
+    _schema = connection.schema_name
+
     if created:
 
         def send_created_signal():
-            order_created.send(sender=sender, order=instance)
-            logger.debug(
-                "Sent order_created signal for new order %s", instance.id
-            )
+            with schema_context(_schema):
+                order_created.send(sender=sender, order=instance)
+                logger.debug(
+                    "Sent order_created signal for new order %s", instance.id
+                )
 
         # Defer to on_commit so the Celery task sees the committed row.
         transaction.on_commit(send_created_signal)
@@ -82,18 +93,19 @@ def handle_order_post_save(
             _old=_old,
             _new=_new,
         ):
-            order_status_changed.send(
-                sender=_sender,
-                order=_instance,
-                old_status=_old,
-                new_status=_new,
-            )
-            logger.debug(
-                "Sent order_status_changed signal for order %s (%s -> %s)",
-                _instance.id,
-                _old,
-                _new,
-            )
+            with schema_context(_schema):
+                order_status_changed.send(
+                    sender=_sender,
+                    order=_instance,
+                    old_status=_old,
+                    new_status=_new,
+                )
+                logger.debug(
+                    "Sent order_status_changed signal for order %s (%s -> %s)",
+                    _instance.id,
+                    _old,
+                    _new,
+                )
 
         transaction.on_commit(send_status_changed_signal)
 
@@ -132,16 +144,17 @@ def handle_order_post_save(
     ):
 
         def send_shipment_dispatched() -> None:
-            order_shipment_dispatched.send(
-                sender=sender,
-                order=instance,
-                tracking_number=instance.tracking_number,
-                shipping_carrier=instance.shipping_carrier,
-            )
-            logger.debug(
-                "Sent order_shipment_dispatched signal for order %s",
-                instance.id,
-            )
+            with schema_context(_schema):
+                order_shipment_dispatched.send(
+                    sender=sender,
+                    order=instance,
+                    tracking_number=instance.tracking_number,
+                    shipping_carrier=instance.shipping_carrier,
+                )
+                logger.debug(
+                    "Sent order_shipment_dispatched signal for order %s",
+                    instance.id,
+                )
 
         transaction.on_commit(send_shipment_dispatched)
 
@@ -170,9 +183,17 @@ def handle_order_created(
 
     # Live in-app notification for authenticated shoppers. The task
     # itself drops guests silently, so there's no is_guest check here.
+    # ``_schema`` is captured at lambda-build time (inside the active
+    # schema_context); by the time on_commit fires the context has
+    # exited and TenantTask would stamp the public schema.
     if order.user_id:
+        _schema = connection.schema_name
         transaction.on_commit(
-            lambda oid=order.id: notify_order_created_live.delay(oid)
+            lambda oid=order.id, s=_schema: (
+                notify_order_created_live.apply_async(
+                    args=[oid], headers={"_schema_name": s}
+                )
+            )
         )
 
     # Clear cart after successful order creation (both user and guest)
@@ -270,18 +291,28 @@ def handle_order_status_changed(
     #     voucher-mint harmlessly defers).
     #   • Everything else (DELIVERED, CANCELED, COMPLETED, REFUNDED,
     #     RETURNED) uses the generic status-update template.
+    # ``_schema`` captured at lambda-build time — on_commit fires after
+    # any enclosing schema_context has exited (see the refund handler).
+    _schema = connection.schema_name
+
     if not suppress_customer:
         if new_status == OrderStatus.SHIPPED.value:
             transaction.on_commit(
-                lambda oid=order.id: send_shipping_notification_email.delay(oid)
+                lambda oid=order.id, sc=_schema: (
+                    send_shipping_notification_email.apply_async(
+                        args=[oid], headers={"_schema_name": sc}
+                    )
+                )
             )
         elif new_status not in (
             OrderStatus.PENDING.value,
             OrderStatus.PROCESSING.value,
         ):
             transaction.on_commit(
-                lambda oid=order.id, s=new_status: (
-                    send_order_status_update_email.delay(oid, s)
+                lambda oid=order.id, s=new_status, sc=_schema: (
+                    send_order_status_update_email.apply_async(
+                        args=[oid, s], headers={"_schema_name": sc}
+                    )
                 )
             )
 
@@ -292,8 +323,10 @@ def handle_order_status_changed(
     # one place (``order/notifications.py::_ORDER_STATUS_COPY``).
     if order.user_id and not suppress_customer:
         transaction.on_commit(
-            lambda oid=order.id, s=new_status: (
-                notify_order_status_changed_live.delay(oid, s)
+            lambda oid=order.id, s=new_status, sc=_schema: (
+                notify_order_status_changed_live.apply_async(
+                    args=[oid, s], headers={"_schema_name": sc}
+                )
             )
         )
 
@@ -353,8 +386,13 @@ def email_shipment_dispatched(
     ``transaction.on_commit`` so the worker sees the persisted
     tracking_number.
     """
+    _schema = connection.schema_name
     transaction.on_commit(
-        lambda oid=order.id: send_shipping_notification_email.delay(oid)
+        lambda oid=order.id, s=_schema: (
+            send_shipping_notification_email.apply_async(
+                args=[oid], headers={"_schema_name": s}
+            )
+        )
     )
 
 
@@ -626,8 +664,13 @@ def handle_order_completed(
             # is idempotent via ``order.invoicing.generate_invoice`` — calling
             # twice returns the existing Invoice row, so the fact that
             # ``order_completed`` might fire again on a re-save is safe.
+            _schema = connection.schema_name
             transaction.on_commit(
-                lambda oid=order.id: generate_order_invoice.delay(oid)
+                lambda oid=order.id, s=_schema: (
+                    generate_order_invoice.apply_async(
+                        args=[oid], headers={"_schema_name": s}
+                    )
+                )
             )
 
         OrderHistory.log_note(order=order, note="Order completed")
@@ -817,12 +860,23 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
         # transaction commits, so a later rollback discards them; the
         # worker also sees the committed row. Each task is independently
         # idempotent (metadata reservation / event-level guard).
+        # ``_schema`` captured at lambda-build time: on_commit fires
+        # after @with_tenant_schema_from_event's schema_context exits.
+        _schema = connection.schema_name
         transaction.on_commit(
-            lambda oid=order.id: send_order_confirmation_email.delay(oid)
+            lambda oid=order.id, s=_schema: (
+                send_order_confirmation_email.apply_async(
+                    args=[oid], headers={"_schema_name": s}
+                )
+            )
         )
         if order.user_id:
             transaction.on_commit(
-                lambda oid=order.id: notify_payment_confirmed_live.delay(oid)
+                lambda oid=order.id, s=_schema: (
+                    notify_payment_confirmed_live.apply_async(
+                        args=[oid], headers={"_schema_name": s}
+                    )
+                )
             )
 
 

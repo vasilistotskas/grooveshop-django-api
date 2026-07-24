@@ -21,6 +21,7 @@ from djmoney.money import Money
 from loyalty.enum import TransactionType
 from loyalty.models.tier import LoyaltyTier, LoyaltyTierTranslation
 from loyalty.models.transaction import PointsTransaction
+from order.enum.status import OrderStatus
 from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from product.factories.product import ProductFactory
@@ -306,7 +307,9 @@ class TestRedeemEndpoint:
         )
 
         # Create an order with a known items total (100 EUR > 2 EUR discount)
-        order = OrderFactory(user=user, num_order_items=0)
+        order = OrderFactory(
+            user=user, num_order_items=0, status=OrderStatus.PENDING
+        )
         OrderItemFactory(
             order=order,
             price=Money(Decimal("100.00"), "EUR"),
@@ -336,6 +339,82 @@ class TestRedeemEndpoint:
         assert Decimal(str(data["discount_amount"])) == Decimal("2.00")
         assert data["remaining_balance"] == 300
 
+    def test_redeem_rejected_on_non_pending_order(self):
+        """Redemption is refused once the order has left the pending state."""
+        user = UserAccountFactory(num_addresses=0)
+        PointsTransaction.objects.create(
+            user=user,
+            points=500,
+            transaction_type=TransactionType.EARN,
+            description="Test earn",
+        )
+        order = OrderFactory(
+            user=user, num_order_items=0, status=OrderStatus.COMPLETED
+        )
+        OrderItemFactory(
+            order=order, price=Money(Decimal("100.00"), "EUR"), quantity=1
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        with patch(
+            "loyalty.services.Setting.get", side_effect=_mock_settings_enabled
+        ):
+            response = client.post(
+                "/api/v1/loyalty/redeem",
+                {"points_amount": 200, "currency": "EUR", "order_id": order.id},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert not PointsTransaction.objects.filter(
+            user=user, transaction_type=TransactionType.REDEEM
+        ).exists()
+
+    def test_redeem_rejected_when_already_redeemed(self):
+        """A second redemption against the same order is refused."""
+        user = UserAccountFactory(num_addresses=0)
+        PointsTransaction.objects.create(
+            user=user,
+            points=500,
+            transaction_type=TransactionType.EARN,
+            description="Test earn",
+        )
+        order = OrderFactory(
+            user=user, num_order_items=0, status=OrderStatus.PENDING
+        )
+        OrderItemFactory(
+            order=order, price=Money(Decimal("100.00"), "EUR"), quantity=1
+        )
+        # An existing redemption for this order.
+        PointsTransaction.objects.create(
+            user=user,
+            points=-100,
+            transaction_type=TransactionType.REDEEM,
+            reference_order=order,
+            description="Already redeemed",
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=user)
+        with patch(
+            "loyalty.services.Setting.get", side_effect=_mock_settings_enabled
+        ):
+            response = client.post(
+                "/api/v1/loyalty/redeem",
+                {"points_amount": 200, "currency": "EUR", "order_id": order.id},
+                format="json",
+            )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        # Still only the single pre-existing redemption.
+        assert (
+            PointsTransaction.objects.filter(
+                user=user, transaction_type=TransactionType.REDEEM
+            ).count()
+            == 1
+        )
+
     def test_redeem_insufficient_balance(self):
         """Redemption with insufficient balance returns 400."""
         user = UserAccountFactory(num_addresses=0)
@@ -346,7 +425,9 @@ class TestRedeemEndpoint:
             description="Test earn",
         )
 
-        order = OrderFactory(user=user, num_order_items=0)
+        order = OrderFactory(
+            user=user, num_order_items=0, status=OrderStatus.PENDING
+        )
         OrderItemFactory(
             order=order,
             price=Money(Decimal("100.00"), "EUR"),
@@ -381,7 +462,9 @@ class TestRedeemEndpoint:
             description="Test earn",
         )
 
-        order = OrderFactory(user=user, num_order_items=0)
+        order = OrderFactory(
+            user=user, num_order_items=0, status=OrderStatus.PENDING
+        )
         OrderItemFactory(
             order=order,
             price=Money(Decimal("100.00"), "EUR"),

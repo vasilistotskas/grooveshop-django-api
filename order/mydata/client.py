@@ -19,6 +19,7 @@ What this layer does handle:
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 import requests
 
@@ -73,6 +74,84 @@ class MyDataClient:
             )
         except requests.RequestException as exc:
             logger.warning("myDATA CancelInvoice transport error: %s", exc)
+            raise MyDataTransportError(str(exc)) from exc
+        self._raise_for_status(response)
+        return response.content
+
+    def request_transmitted_docs(
+        self,
+        *,
+        entity_vat_number: str,
+        date_from: date,
+        date_to: date,
+        next_partition_key: str | None = None,
+        next_row_key: str | None = None,
+    ) -> bytes:
+        """GET ``/RequestTransmittedDocs`` for documents in a date window.
+
+        Per AADE myDATA API Documentation v1.0.10 (prod URL extracted
+        from the PDF's hyperlinks):
+
+            GET /RequestTransmittedDocs
+                ?mark={mark}          — start-from MARK (0 = beginning)
+                [&dateFrom]           — ISO date filter lower bound
+                [&dateTo]             — ISO date filter upper bound
+                [&entityVatNumber]    — issuer VAT (narrows to our docs)
+                [&counterVatNumber]   — counterpart VAT (unused here)
+                [&invType]            — invoice type filter (unused here)
+                [&maxMark]            — upper MARK bound (unused here)
+                [&nextPartitionKey]   — Azure Table Storage continuation
+                [&nextRowKey]         — Azure Table Storage continuation
+
+        We always supply ``entityVatNumber`` + ``dateFrom``/``dateTo`` to
+        scope results as tightly as possible. We set ``mark=0`` to start
+        from the beginning of the filtered window (AADE returns docs in
+        ascending MARK order). If AADE returns continuation tokens we
+        follow them until the result set is exhausted.
+
+        NOTE: This endpoint returns ``RequestedDoc`` (NOT ``ResponseDoc``)
+        wrapping ``invoicesDoc`` → ``invoice[]``. Each invoice carries
+        ``invoiceMark`` + ``uid`` among other fields.
+
+        ASSUMPTION (not confirmed against sandbox): the dev base URL
+        for this endpoint does NOT include the ``/myDATA`` path prefix —
+        per the second set of hyperlinks extracted from the PDF, the dev
+        endpoint is ``https://mydataapidev.aade.gr/RequestTransmittedDocs``
+        while the prod endpoint is
+        ``https://mydatapi.aade.gr/myDATA/RequestTransmittedDocs``.
+        The ``MyDataConfig.base_url`` already encodes this distinction,
+        so we just prepend the method path.
+        """
+        params: dict[str, str] = {
+            "mark": "0",
+            "entityVatNumber": entity_vat_number,
+            "dateFrom": date_from.strftime("%d/%m/%Y"),
+            "dateTo": date_to.strftime("%d/%m/%Y"),
+        }
+        if next_partition_key:
+            params["nextPartitionKey"] = next_partition_key
+        if next_row_key:
+            params["nextRowKey"] = next_row_key
+
+        url = f"{self._config.base_url}/RequestTransmittedDocs"
+        logger.info(
+            "myDATA RequestTransmittedDocs entityVat=%s dateFrom=%s "
+            "dateTo=%s env=%s",
+            entity_vat_number,
+            date_from.isoformat(),
+            date_to.isoformat(),
+            self._config.environment,
+        )
+        try:
+            response = self._session.get(
+                url,
+                params=params,
+                timeout=self._config.request_timeout_seconds,
+            )
+        except requests.RequestException as exc:
+            logger.warning(
+                "myDATA RequestTransmittedDocs transport error: %s", exc
+            )
             raise MyDataTransportError(str(exc)) from exc
         self._raise_for_status(response)
         return response.content

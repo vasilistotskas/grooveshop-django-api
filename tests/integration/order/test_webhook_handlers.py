@@ -7,6 +7,8 @@ from order.models import OrderHistory
 from order.signals.handlers import (
     handle_stripe_payment_succeeded,
     handle_stripe_payment_failed,
+    handle_stripe_dispute_created,
+    handle_stripe_checkout_completed,
 )
 from order.factories import OrderFactory
 
@@ -240,25 +242,34 @@ class TestHandleStripePaymentSucceeded:
         # Verify service was called but no error raised
         mock_service.assert_called_once_with(payment_intent_id)
 
-    def test_handles_service_exception_gracefully(self, mock_djstripe_event):
-        """
-        Test that handler catches and logs exceptions from OrderService.
-        """
-        # Setup
-        payment_intent_id = "pi_test_123456"
+    def test_service_exception_propagates(self, mock_djstripe_event):
+        """A processing error must PROPAGATE out of the receiver (G0231).
 
-        # Execute
+        The receiver runs inside dj-stripe's webhook atomic block; letting
+        the error escape rolls back both the idempotency mark and the Event
+        row so Stripe redelivers and reprocesses. Swallowing it would strand
+        a charged order at PENDING with no redelivery.
+        """
+        # Setup — order must exist so the idempotency mark is written first,
+        # exercising the strand-at-PENDING scenario the raise guards against.
+        payment_intent_id = "pi_test_123456"
+        OrderFactory(
+            payment_id=payment_intent_id,
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            metadata={},
+        )
+
         with patch(
             "order.signals.handlers.OrderService.handle_payment_succeeded"
         ) as mock_service:
             mock_service.side_effect = Exception("Database error")
 
-            # Should not raise exception (caught and logged)
-            handle_stripe_payment_succeeded(
-                sender=None, event=mock_djstripe_event
-            )
+            with pytest.raises(Exception, match="Database error"):
+                handle_stripe_payment_succeeded(
+                    sender=None, event=mock_djstripe_event
+                )
 
-        # Verify service was called
         mock_service.assert_called_once_with(payment_intent_id)
 
     def test_extracts_payment_intent_id_correctly(self, mock_djstripe_event):
@@ -443,10 +454,12 @@ class TestWebhookHandlerErrorHandling:
         # Setup - event with None payment_intent_id
         mock_djstripe_event.data["object"]["id"] = None
 
-        # Execute - should not raise exception
+        # Execute - should not raise: no order matches payment_id=None, so
+        # the service returns None and the handler skips post-processing.
         with patch(
             "order.signals.handlers.OrderService.handle_payment_succeeded"
         ) as mock_service:
+            mock_service.return_value = None
             handle_stripe_payment_succeeded(
                 sender=None, event=mock_djstripe_event
             )
@@ -577,3 +590,161 @@ class TestWebhookHandlerIntegration:
         order.refresh_from_db()
         assert order.metadata.get("webhook_processed_evt_first") is True
         assert order.metadata.get("webhook_processed_evt_second") is True
+
+
+@pytest.mark.django_db
+class TestHandleStripeDisputeCreated:
+    """Dispute handler must match the order by payment_intent (G0232)."""
+
+    def _dispute_event(self, payment_intent_id):
+        event = Mock(spec=Event)
+        event.id = "evt_dispute_1"
+        event.type = "charge.dispute.created"
+        event.data = {
+            "object": {
+                "id": "dp_test_1",
+                "charge": "ch_test_1",
+                "payment_intent": payment_intent_id,
+                "reason": "fraudulent",
+            }
+        }
+        return event
+
+    def test_dispute_flags_order_and_dispatches_email(self):
+        """A dispute whose payment_intent matches an order's payment_id
+        flags the order and dispatches the staff notification."""
+        payment_intent_id = "pi_disputed_123"
+        order = OrderFactory(
+            payment_id=payment_intent_id,
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            metadata={},
+        )
+
+        with patch(
+            "order.signals.handlers.send_dispute_notification_email.delay"
+        ) as mock_email:
+            handle_stripe_dispute_created(
+                sender=None, event=self._dispute_event(payment_intent_id)
+            )
+
+        order.refresh_from_db()
+        assert order.metadata.get("disputed") is True
+        assert order.metadata.get("dispute_id") == "dp_test_1"
+        mock_email.assert_called_once_with(order.id, "dp_test_1")
+
+    def test_dispute_without_payment_intent_is_noop(self):
+        """A dispute event carrying no payment_intent bails out — it never
+        flags an order (previously it matched on charge id and always
+        missed)."""
+        order = OrderFactory(
+            payment_id="pi_untouched_1",
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+            metadata={},
+        )
+        event = self._dispute_event("")
+        event.data["object"]["payment_intent"] = None
+
+        with patch(
+            "order.signals.handlers.send_dispute_notification_email.delay"
+        ) as mock_email:
+            handle_stripe_dispute_created(sender=None, event=event)
+
+        order.refresh_from_db()
+        assert "disputed" not in order.metadata
+        mock_email.assert_not_called()
+
+
+@pytest.mark.django_db
+class TestHandleStripeCheckoutCompleted:
+    """Tests for the hosted-Checkout fulfilment handler.
+
+    Stripe's guidance is to fulfil hosted Checkout Sessions on
+    ``checkout.session.completed`` (not ``payment_intent.succeeded``),
+    so this handler must dispatch shipment creation itself and must not
+    regress an already-settled order.
+    """
+
+    def _checkout_event(self, order_id, *, payment_status="paid"):
+        event = Mock(spec=Event)
+        event.id = f"evt_cs_{order_id}"
+        event.type = "checkout.session.completed"
+        event.data = {
+            "object": {
+                "id": "cs_test_1",
+                "payment_intent": "pi_cs_test_1",
+                "payment_status": payment_status,
+                "metadata": {"order_id": str(order_id)},
+            }
+        }
+        return event
+
+    def test_paid_checkout_dispatches_shipment(self):
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            metadata={},
+        )
+        with (
+            patch(
+                "shipping.services.ShippingService."
+                "dispatch_create_shipment_task"
+            ) as mock_dispatch,
+            patch("order.signals.handlers.send_order_confirmation_email.delay"),
+        ):
+            handle_stripe_checkout_completed(
+                sender=None, event=self._checkout_event(order.id)
+            )
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.COMPLETED
+        assert order.status == OrderStatus.PROCESSING
+        # The whole point of the fix: fulfilment happens on this event.
+        mock_dispatch.assert_called_once()
+
+    def test_settled_state_not_regressed_and_no_dispatch(self):
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.REFUNDED,
+            metadata={},
+        )
+        with patch(
+            "shipping.services.ShippingService.dispatch_create_shipment_task"
+        ) as mock_dispatch:
+            handle_stripe_checkout_completed(
+                sender=None, event=self._checkout_event(order.id)
+            )
+
+        order.refresh_from_db()
+        # A late checkout.session.completed must not un-refund the order
+        # nor mint a shipment for it.
+        assert order.payment_status == PaymentStatus.REFUNDED
+        mock_dispatch.assert_not_called()
+        # The idempotency flag is persisted even on the settled-guard
+        # path, so a Stripe redelivery short-circuits at the top of the
+        # handler instead of re-running the guard.
+        assert (
+            order.metadata.get(f"webhook_processed_evt_cs_{order.id}") is True
+        )
+
+    def test_canceled_order_records_payment_but_no_dispatch(self):
+        order = OrderFactory(
+            status=OrderStatus.CANCELED,
+            payment_status=PaymentStatus.PENDING,
+            metadata={},
+        )
+        with patch(
+            "shipping.services.ShippingService.dispatch_create_shipment_task"
+        ) as mock_dispatch:
+            handle_stripe_checkout_completed(
+                sender=None, event=self._checkout_event(order.id)
+            )
+
+        order.refresh_from_db()
+        # Money is recorded for reconciliation, but a cancelled order is
+        # never shipped.
+        assert order.payment_status == PaymentStatus.COMPLETED
+        assert order.status == OrderStatus.CANCELED
+        assert "payment_after_cancel" in order.metadata
+        mock_dispatch.assert_not_called()

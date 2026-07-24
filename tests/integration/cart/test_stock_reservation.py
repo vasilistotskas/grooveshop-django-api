@@ -7,6 +7,7 @@ from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from core.utils.testing import TestURLFixerMixin
 from order.models import StockReservation
+from order.stock import StockManager
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
@@ -168,6 +169,29 @@ class CartStockReservationTest(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["released_count"], 0)
         self.assertIn("failed_releases", response.data)
+
+    def test_release_reservations_rejects_foreign_cart(self):
+        """A caller cannot release another cart's reservations (IDOR)."""
+        other_cart = CartFactory(user=None, num_cart_items=0)
+        foreign = StockManager.reserve_stock(
+            product_id=self.product1.id,
+            quantity=1,
+            session_id=str(other_cart.uuid),
+            user_id=None,
+        )
+
+        response = self.client.post(
+            self.release_url,
+            {"reservation_ids": [foreign.id]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["released_count"], 0)
+        self.assertIn("failed_releases", response.data)
+
+        foreign.refresh_from_db()
+        self.assertFalse(foreign.consumed)
 
     def test_guest_cart_reserve_stock(self):
         """Test stock reservation for guest cart."""

@@ -11,7 +11,7 @@ from django.utils.dateparse import parse_datetime
 
 from shipping.services import DELIVERY_NOTES_MAX_LEN
 from shipping_boxnow.client import BoxNowClient
-from shipping_boxnow.enum import BoxNowParcelState
+from shipping_boxnow.enum import BoxNowParcelState, BoxNowPaymentMode
 from shipping_boxnow.exceptions import BoxNowAPIError
 from shipping_boxnow.models import (
     BoxNowLocker,
@@ -270,18 +270,26 @@ class BoxNowService:
             }
             update_fields = ["metadata", "updated_at"]
 
-            # COD amount is filled in here (not at row creation) because
-            # ``order.total_price`` requires order items to be persisted
-            # — which happens after the create_shipment_row hook fires.
+            # COD collects the customer's ACTUAL payable at the locker,
+            # which is ``paid_amount`` (order total minus any redeemed
+            # loyalty discount) — NOT ``total_price`` (pre-discount).
+            # Using total_price overcharged every discounted COD order by
+            # the discount and disagreed with ``invoiceValue`` below
+            # (also paid_amount). Mirrors the ACS COD sync
+            # (shipping_acs/services.py) including the ``> 0`` guard that
+            # keeps the amount inside BoxNow's valid (0, 5000) range.
+            # Filled here (not at row creation) because paid_amount is
+            # only persisted after the create_shipment_row hook fires.
             # Idempotent: re-runs see the existing non-zero amount and
             # skip the recompute.
-            from shipping_boxnow.enum.payment_mode import BoxNowPaymentMode
-
+            paid_amount = getattr(order, "paid_amount", None)
             if (
                 shipment.payment_mode == BoxNowPaymentMode.COD
                 and shipment.amount_to_be_collected.amount == 0
+                and paid_amount
+                and paid_amount.amount > 0
             ):
-                shipment.amount_to_be_collected = order.total_price
+                shipment.amount_to_be_collected = paid_amount
                 update_fields.extend(
                     [
                         "amount_to_be_collected",
@@ -316,8 +324,6 @@ class BoxNowService:
         # force ``"0.00"`` so a prepaid cart over €5000 still mints.
         # COD parcels carry the real amount and are pre-validated at
         # row creation time (carrier.create_shipment_row).
-        from shipping_boxnow.enum import BoxNowPaymentMode
-
         if shipment.payment_mode == BoxNowPaymentMode.PREPAID:
             amount_to_collect_str = "0.00"
         else:
@@ -760,15 +766,26 @@ class BoxNowService:
         """
         data: dict = envelope["data"]
         message_id: str = envelope["id"]
+        # SHA-256 of the HMAC-signed ``data`` bytes, stamped by the webhook
+        # view. Absent only for events queued before this field shipped.
+        data_fingerprint: str | None = envelope.get("_data_fingerprint")
 
         # --- Idempotency check (outside transaction) ----------------------
-        if BoxNowParcelEvent.objects.filter(
-            webhook_message_id=message_id
-        ).exists():
+        # Dedup on the message id (BoxNow retries reuse it) AND on the
+        # signed-content fingerprint (a replay under a forged/new id keeps
+        # the same signed ``data``, so it collides here even though the id
+        # differs).
+        from django.db.models import Q
+
+        dedup = Q(webhook_message_id=message_id)
+        if data_fingerprint:
+            dedup |= Q(data_fingerprint=data_fingerprint)
+        if BoxNowParcelEvent.objects.filter(dedup).exists():
             logger.info(
-                "apply_webhook_event: message_id=%s already processed — "
-                "skipping",
+                "apply_webhook_event: already processed — skipping "
+                "(message_id=%s, data_fingerprint=%s)",
                 message_id,
+                (data_fingerprint or "<none>")[:12],
             )
             return None
 
@@ -833,12 +850,35 @@ class BoxNowService:
                 )
                 return None
 
+            # Re-check idempotency inside the lock. The ``select_for_update``
+            # on the shipment above serialises concurrent webhooks for THIS
+            # parcel, so a racing duplicate blocks here and then sees the
+            # row. A replay under a fresh id carries a matching
+            # ``data_fingerprint`` but a NEW ``message_id`` — which the
+            # message_id-keyed ``get_or_create`` below would not catch — so
+            # guard the fingerprint explicitly.
+            if (
+                data_fingerprint
+                and BoxNowParcelEvent.objects.filter(
+                    data_fingerprint=data_fingerprint
+                ).exists()
+            ):
+                logger.warning(
+                    "apply_webhook_event: replay detected — "
+                    "data_fingerprint=%s already processed under a "
+                    "different message_id (incoming id=%s) — skipping",
+                    data_fingerprint[:12],
+                    message_id,
+                )
+                return None
+
             # Re-check idempotency inside the transaction in case a
             # concurrent request inserted the row after our outer check.
             event, created = BoxNowParcelEvent.objects.get_or_create(
                 webhook_message_id=message_id,
                 defaults={
                     "shipment": shipment,
+                    "data_fingerprint": data_fingerprint,
                     "event_type": mapped_state,
                     "parcel_state": data.get("parcelState", ""),
                     "event_time": event_time,
@@ -897,8 +937,7 @@ class BoxNowService:
                 )
 
             # --- Map BoxNow event to Order status transition --------------
-            order: Order = shipment.order
-            cls._apply_order_status_transition(order, mapped_state)
+            cls._apply_order_status_transition(shipment, mapped_state)
 
             # --- Enqueue arrival notification for final-destination -------
             # Wrap ``.delay`` in ``transaction.on_commit`` so the Celery
@@ -1216,7 +1255,7 @@ class BoxNowService:
                     ]
                 )
 
-            cls._apply_order_status_transition(locked.order, mapped_state)
+            cls._apply_order_status_transition(locked, mapped_state)
 
             if mapped_state == BoxNowParcelState.FINAL_DESTINATION:
                 from shipping_boxnow.tasks import (  # noqa: PLC0415
@@ -1362,7 +1401,9 @@ class BoxNowService:
 
     @classmethod
     def _apply_order_status_transition(
-        cls, order: Order, mapped_state: BoxNowParcelState | str
+        cls,
+        shipment: BoxNowShipment,
+        mapped_state: BoxNowParcelState | str,
     ) -> None:
         """
         Advance the Order's status based on the BoxNow parcel event.
@@ -1382,7 +1423,8 @@ class BoxNowService:
           states (or states before the target).
 
         Args:
-            order:        The ``Order`` linked to the shipment.
+            shipment:     The ``BoxNowShipment`` whose parcel event fired
+                          (must have ``order`` loaded/loadable).
             mapped_state: The ``BoxNowParcelState`` (or raw string for
                           unknown events).
         """
@@ -1390,6 +1432,7 @@ class BoxNowService:
         from order.exceptions import InvalidStatusTransitionError
         from order.services import OrderService
 
+        order: Order = shipment.order
         current_status: str = order.status
 
         # Never touch a terminal order.
@@ -1473,17 +1516,51 @@ class BoxNowService:
             )
             return
 
-        # Mirror AcsService: auto-complete already-paid orders when the
+        # BoxNow COD is paid at the locker: the customer must pay at
+        # the APM terminal before the compartment opens, so a parcel
+        # can only reach ``delivered`` after the money was collected.
+        # (Unlike ACS, where the courier remits later and the nightly
+        # COD reconcile confirms the payout — BoxNow's API has no
+        # payout endpoint, and none is needed.)
+        #
+        # Then mirror AcsService: auto-complete paid orders when the
         # carrier hands them DELIVERED. ``silent_for_customer=True``
         # because the customer just got the DELIVERED notifications in
-        # this same transition. COD orders rely on the COD reconcile
-        # pass to flip payment_status before this advance is allowed —
-        # that path keeps ``silent_for_customer=False`` so the
-        # "loyalty points credited" message isn't suppressed.
+        # this same transition.
         if new_status == "DELIVERED":
+            if shipment.payment_mode == BoxNowPaymentMode.COD:
+                cls._mark_cod_order_paid_on_delivery(shipment)
             OrderService.maybe_advance_to_completed(
                 order, silent_for_customer=True
             )
+
+    @classmethod
+    def _mark_cod_order_paid_on_delivery(cls, shipment: BoxNowShipment) -> None:
+        """Flip a COD order's payment from PENDING to COMPLETED.
+
+        BoxNow collects COD at the locker terminal *before* the
+        compartment opens, so a ``delivered`` parcel event is proof of
+        payment — no later remittance-reconcile step exists (or is
+        offered by the BoxNow API). Mirrors
+        ``AcsService._mark_cod_order_paid_if_pending``: idempotent on
+        ``payment_status == PENDING`` and fires ``order_paid`` so the
+        Meta CAPI Purchase dispatch runs (COD orders are past the
+        PENDING → PROCESSING transition that normally emits it).
+        """
+        from order.enum.status import PaymentStatus
+        from order.signals import order_paid
+
+        order = shipment.order
+        if order.payment_status != PaymentStatus.PENDING:
+            return
+        order.mark_as_paid(payment_method="boxnow_cod")
+        logger.info(
+            "BoxNow COD delivered: order=%s payment_status PENDING -> "
+            "COMPLETED (parcel=%s)",
+            order.id,
+            shipment.parcel_id,
+        )
+        order_paid.send(sender=type(order), order=order)
 
     @classmethod
     def _advance_pending_order_to_processing(cls, order: Order) -> None:

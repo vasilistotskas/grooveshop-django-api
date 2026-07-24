@@ -66,10 +66,19 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         shipment = BoxNowService.create_shipment_for_order(order)
+    except BoxNowRetryableError:
+        # Transient (HTTP 5xx / connection). Re-raise so Celery's autoretry_for
+        # handles it — BoxNowRetryableError subclasses BoxNowAPIError, so the
+        # handler below would otherwise swallow it as a permanent business
+        # error and the retry policy would be dead code.
+        raise
     except BoxNowAPIError as exc:
         # P-coded business error from BoxNow (e.g. P402 invalid locker,
         # P410 order number conflict). Do not retry — manual intervention
-        # is required.
+        # is required, so tell a human immediately (prod order 143 sat
+        # invisible for 10 days on the equivalent ACS path).
+        from shipping.alerts import alert_admins_shipment_creation_failed
+
         logger.error(
             "BoxNow business error for order %s: %s",
             order_id,
@@ -79,6 +88,9 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
                 "boxnow_code": exc.code,
                 "boxnow_status": exc.status_code,
             },
+        )
+        alert_admins_shipment_creation_failed(
+            order_id=order_id, carrier="BoxNow", error=str(exc)
         )
         return {
             "status": "boxnow_api_error",
@@ -164,10 +176,21 @@ def process_boxnow_webhook_event(
         # Surface to the autoretry decorator above.
         raise
     except Exception as exc:  # pragma: no cover — defensive
+        # The HTTP view already returned 200, so BoxNow will not retry —
+        # a malformed/unexpected payload here means the event is lost
+        # (a possibly-missed state transition). Page admins instead of
+        # dropping it on a log line nobody reads (same rationale as the
+        # shipment-creation alert; cf. prod order 143).
+        from shipping.alerts import alert_admins_webhook_processing_failed
+
+        message_id = str(envelope.get("id", "<unknown>"))
         logger.exception(
             "BoxNow webhook apply failed for message %s: %s",
-            envelope.get("id", "<unknown>"),
+            message_id,
             exc,
+        )
+        alert_admins_webhook_processing_failed(
+            carrier="BoxNow", message_id=message_id, error=str(exc)
         )
         return {
             "status": "error",
@@ -424,6 +447,10 @@ def poll_boxnow_tracking_one(self, shipment_id: int) -> dict[str, Any]:
 
     try:
         result = BoxNowService.sync_shipment_state(shipment)
+    except BoxNowRetryableError:
+        # Transient — re-raise so autoretry_for retries rather than the
+        # handler below swallowing it as a permanent poll failure.
+        raise
     except BoxNowAPIError as exc:
         logger.warning(
             "BoxNow poll failed for shipment=%s: %s", shipment_id, exc

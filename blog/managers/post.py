@@ -55,6 +55,21 @@ class BlogPostQuerySet(TranslatableOptimizedQuerySet):
             )
         return self.annotate(tags_count=Count("tags", distinct=True))
 
+    def published(self) -> Self:
+        """Only posts visible to the public.
+
+        A post is public when ``is_published`` is set and its
+        ``published_at`` is unset or already in the past. Mirrors
+        ``core.models.PublishedQuerySet.published``.
+        """
+        from django.utils import timezone
+
+        now = timezone.now()
+        return self.filter(
+            Q(published_at__lte=now, is_published=True)
+            | Q(published_at__isnull=True, is_published=True)
+        )
+
     def with_author(self) -> Self:
         """Select related author and user."""
         return self.select_related("author__user", "author")

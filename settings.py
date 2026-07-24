@@ -73,7 +73,8 @@ SITE_NAME = getenv("SITE_NAME", "Grooveshop")
 
 # django-tenants rejects unregistered domains before Django's host
 # validation, so ALLOWED_HOSTS=["*"] is safe. Dynamic tenant domains
-# can't be statically listed.
+# can't be statically listed. 'testserver' is not needed either —
+# Django's setup_test_environment() adds it for test runs (G0357).
 ALLOWED_HOSTS: list[str] = ["*"]
 
 USE_X_FORWARDED_HOST = getenv("USE_X_FORWARDED_HOST", "True") == "True"
@@ -113,7 +114,9 @@ SHARED_APPS = [
     # Infrastructure (framework-level, no per-tenant data)
     "corsheaders",
     "rest_framework",
-    "rest_framework.authtoken",
+    # rest_framework.authtoken is intentionally NOT installed — auth is
+    # Knox (BoundedTokenAuthentication) + session; the DRF token app was
+    # unused and only widened the schema-endpoint auth surface (G0358).
     "drf_spectacular",
     "rosetta",
     "storages",
@@ -323,6 +326,9 @@ REST_FRAMEWORK = {
         "search": None if DEBUG else "120/minute",
         "view_count": None if DEBUG else "60/hour",
         "viva_return": None if DEBUG else "30/minute",
+        # Public proxies to rate-limited carrier partner APIs.
+        "acs_address": None if DEBUG else "30/minute",
+        "boxnow_nearest": None if DEBUG else "10/minute",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -393,7 +399,7 @@ if ENABLE_DEBUG_TOOLBAR:
         "debug_toolbar.panels.templates.TemplatesPanel",
         # Cache panel reveals get/set/hit/miss on Redis — critical for
         # validating that the admin dashboard cache (5 min TTL on
-        # ``admin:dashboard:data:v3``) is actually warm under load.
+        # ``admin:dashboard:data:v4``) is actually warm under load.
         "debug_toolbar.panels.cache.CachePanel",
         "debug_toolbar.panels.signals.SignalsPanel",
         "debug_toolbar.panels.redirects.RedirectsPanel",
@@ -711,6 +717,19 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "anonymize-old-search-queries": {
+            "task": "search.tasks.anonymize_old_search_queries",
+            "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+            "kwargs": {"days": 90},
+        },
+        "cleanup-expired-data-exports": {
+            "task": "user.tasks.cleanup_expired_data_exports",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "send-inactive-user-notifications": {
             "task": "tenant.tasks.fanout_send_inactive_user_notifications",
             "schedule": SCHEDULE_PRESETS["monthly_first_6am"]
@@ -852,6 +871,16 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_poll_acs_tracking_batch",
             "schedule": crontab(minute="*/15"),
             "options": {"queue": "celery", "expires": 300},
+        },
+        # Surface non-terminal ACS shipments with no tracking movement
+        # for ACS_STALE_SHIPMENT_DAYS days (stuck parcels, dead
+        # vouchers) to ADMINS. Daily at 09:00 Athens so the digest
+        # lands at the start of the working day; the claim flag inside
+        # the task dedupes re-alerts.
+        "check-stale-acs-shipments": {
+            "task": "shipping_acs.tasks.check_stale_acs_shipments",
+            "schedule": crontab(hour="9", minute="0"),
+            "options": {"queue": "celery", "expires": 3600},
         },
         # Reconcile yesterday's COD payouts daily at 02:30 Athens —
         # safely after midnight so ACS's books for the prior day are
@@ -1027,7 +1056,13 @@ DB_POOL_TIMEOUT = float(getenv("DB_POOL_TIMEOUT", "10"))
 _db_options: dict = {
     "connect_timeout": 5,
     "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=10000",
-    "sslmode": getenv("DB_SSLMODE", "prefer"),
+    # Enforce TLS to Postgres in production ('require' rejects an
+    # unencrypted connection); dev/ci default to 'prefer' since local
+    # Postgres usually has no server cert (G0362).
+    "sslmode": getenv(
+        "DB_SSLMODE",
+        "require" if SYSTEM_ENV == "production" else "prefer",
+    ),
 }
 if DB_POOL_ENABLED:
     _db_options["pool"] = {
@@ -1091,10 +1126,24 @@ if _meili_master_key == "changeme" and SYSTEM_ENV == "production":
         "MEILI_MASTER_KEY must be set in production "
         "(current value is the insecure default 'changeme')."
     )
+# Read-only search key used for the public query paths (product/blog/federated
+# search). The master key must never serve untrusted search traffic (it can
+# manage keys, indexes and documents). Set MEILI_SEARCH_KEY to Meilisearch's
+# "Default Search API Key" (or a custom search-only key). When unset, the
+# search client falls back to the master key so local/dev still works.
+_meili_search_key = getenv("MEILI_SEARCH_KEY", "")
+if not _meili_search_key and SYSTEM_ENV == "production":
+    import logging as _logging
+
+    _logging.getLogger("meili").warning(
+        "MEILI_SEARCH_KEY is not set; public search falls back to the master "
+        "key. Provision a read-only search key for production."
+    )
 MEILISEARCH = {
     "HTTPS": getenv("MEILI_HTTPS", "False") == "True",
     "HOST": getenv("MEILI_HOST", "localhost"),
     "MASTER_KEY": _meili_master_key,
+    "SEARCH_KEY": _meili_search_key,
     "PORT": int(getenv("MEILI_PORT", "7700")),
     "TIMEOUT": int(getenv("MEILI_TIMEOUT", "30")),
     "CLIENT_AGENTS": None,
@@ -1880,6 +1929,11 @@ UNFOLD = {
     "SHOW_BACK_BUTTON": True,
     "BORDER_RADIUS": "0.625rem",
     "ENVIRONMENT": "admin.environment.environment_callback",
+    # Prefixes the browser-tab title (e.g. "[PROD]") so staff never
+    # edit the wrong environment by mistake.
+    "ENVIRONMENT_TITLE_PREFIX": (
+        "admin.environment.environment_title_prefix_callback"
+    ),
     "COLORS": {
         "base": {
             "50": "oklch(98.5% 0.002 247.839)",
@@ -1917,6 +1971,16 @@ UNFOLD = {
         },
     },
     "SHOW_LANGUAGES": True,
+    "LANGUAGE_FLAGS": {
+        "el": "🇬🇷",
+        "en": "🇬🇧",
+        "de": "🇩🇪",
+    },
+    # ⌘K / Ctrl+K command palette: cross-model record search + history.
+    "COMMAND": {
+        "search_models": True,
+        "show_history": True,
+    },
     "LOGIN": {
         "redirect_after": lambda request: reverse_lazy("admin:index"),
     },
@@ -1966,6 +2030,7 @@ UNFOLD = {
                             "admin:product_product_changelist"
                         ),
                         "badge": "admin.badges.low_stock_badge",
+                        "badge_variant": "danger",
                     },
                     {
                         "title": _("Categories"),
@@ -1981,6 +2046,7 @@ UNFOLD = {
                             "admin:product_productreview_changelist"
                         ),
                         "badge": "admin.badges.pending_reviews_badge",
+                        "badge_variant": "info",
                     },
                     {
                         "title": _("Tags"),
@@ -2001,6 +2067,13 @@ UNFOLD = {
                             "admin:product_attributevalue_changelist"
                         ),
                     },
+                    {
+                        "title": _("Variant Groups"),
+                        "icon": "workspaces",
+                        "link": reverse_lazy(
+                            "admin:product_productvariantgroup_changelist"
+                        ),
+                    },
                 ],
             },
             # ── Blog (content management) ─────────────────────────────
@@ -2014,6 +2087,7 @@ UNFOLD = {
                         "icon": "article",
                         "link": reverse_lazy("admin:blog_blogpost_changelist"),
                         "badge": "admin.badges.draft_blog_posts_badge",
+                        "badge_variant": "warning",
                     },
                     {
                         "title": _("Blog Categories"),
@@ -2036,6 +2110,7 @@ UNFOLD = {
                             "admin:blog_blogcomment_changelist"
                         ),
                         "badge": "admin.badges.pending_comments_badge",
+                        "badge_variant": "info",
                     },
                     {
                         "title": _("Blog Tags"),
@@ -2055,12 +2130,14 @@ UNFOLD = {
                         "icon": "receipt_long",
                         "link": reverse_lazy("admin:order_order_changelist"),
                         "badge": "admin.badges.pending_orders_badge",
+                        "badge_variant": "danger",
                     },
                     {
                         "title": _("Carts"),
                         "icon": "shopping_cart",
                         "link": reverse_lazy("admin:cart_cart_changelist"),
                         "badge": "admin.badges.abandoned_carts_badge",
+                        "badge_variant": "warning",
                     },
                     {
                         "title": _("Invoices"),
@@ -2091,6 +2168,7 @@ UNFOLD = {
                             "admin:contact_contact_changelist"
                         ),
                         "badge": "admin.badges.unread_messages_badge",
+                        "badge_variant": "info",
                     },
                 ],
             },
@@ -2625,6 +2703,7 @@ UNFOLD = {
             "models": [
                 "product.attribute",
                 "product.attributevalue",
+                "product.productvariantgroup",
             ],
             "items": [
                 {
@@ -2635,6 +2714,12 @@ UNFOLD = {
                     "title": _("Attribute Values"),
                     "link": reverse_lazy(
                         "admin:product_attributevalue_changelist"
+                    ),
+                },
+                {
+                    "title": _("Variant Groups"),
+                    "link": reverse_lazy(
+                        "admin:product_productvariantgroup_changelist"
                     ),
                 },
             ],
@@ -2733,7 +2818,6 @@ UNFOLD = {
                 },
             ]
             if entry["link"]
-            if entry["link"]
         ],
     ],
 }
@@ -2773,14 +2857,10 @@ SPECTACULAR_SETTINGS = {
     else ["rest_framework.permissions.IsAuthenticated"],
     "AUTHENTICATION_WHITELIST": [
         "knox.auth.TokenAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "SERVE_AUTHENTICATION": [
         "knox.auth.TokenAuthentication",
-        "rest_framework.authentication.TokenAuthentication",
-        "rest_framework.authentication.BasicAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "POSTPROCESSING_HOOKS": [
@@ -3156,11 +3236,14 @@ if not DJSTRIPE_WEBHOOK_SECRET or DJSTRIPE_WEBHOOK_SECRET == "whsec_...":
         )
     DJSTRIPE_WEBHOOK_SECRET = "whsec_dev_placeholder_not_used_for_verification"
 
-# Pin the Stripe API version so library upgrades can't silently shift
-# webhook payload shapes or idempotency keys. Update this in lockstep
-# with the version configured in the Stripe Dashboard. The dj-stripe
-# docs name this setting STRIPE_API_VERSION (not DJSTRIPE_-prefixed).
-STRIPE_API_VERSION = getenv("STRIPE_API_VERSION", "2024-04-10")
+# STRIPE_API_VERSION is intentionally NOT set. dj-stripe pins its own
+# DEFAULT_STRIPE_API_VERSION to match its Django model schema and uses that
+# for ALL Stripe communication, including webhook processing; the dj-stripe
+# docs state the value "should not be changed" (api_versions.md). Overriding
+# it forces dj-stripe to parse payloads shaped for one API version against
+# models built for another, silently corrupting the local Stripe mirror.
+# Ops: any manually-created Stripe Dashboard webhook endpoint should use the
+# account's current API version so its events match dj-stripe's schema.
 STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 
 # Viva Wallet Configuration
@@ -3231,6 +3314,9 @@ ACS_API_BASE_URL = getenv(
     "https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest",
 )
 ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
+# Days without a tracking event before a non-terminal shipment is
+# reported to ADMINS by check_stale_acs_shipments.
+ACS_STALE_SHIPMENT_DAYS = int(getenv("ACS_STALE_SHIPMENT_DAYS", "3"))
 ACS_LIVE_MODE = getenv("ACS_LIVE_MODE", "False").lower() == "true"
 ACS_PICKUP_LIST_TIMEZONE = getenv("ACS_PICKUP_LIST_TIMEZONE", "Europe/Athens")
 ACS_SUPPORTED_COUNTRIES = [

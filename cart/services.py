@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import uuid as uuid_module
+import logging
+import uuid
 from enum import Enum, unique
 from typing import TYPE_CHECKING
 
 from django.db import transaction
 
 from cart.models import Cart, CartItem
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from django.http import HttpRequest
@@ -53,28 +56,21 @@ class CartService:
             raise
 
     def _extract_cart_info(self):
-        """Parse the X-Cart-Id header as a UUID.
-
-        Cart has both an integer PK (``id``) for internal joins and a
-        UUID (``uuid``) inherited from ``UUIDModel``. The header carries
-        the UUID — the integer PK was enumerable and a metadata leak
-        (M18 in MULTI_TENANT_AUDIT.md). Any non-UUID value is rejected
-        as a malformed header rather than silently casting.
-        """
         if hasattr(self.request, "META"):
-            raw = self.request.META.get("HTTP_X_CART_ID")
+            raw_cart_id = self.request.META.get("HTTP_X_CART_ID")
         else:
-            raw = self.request.headers.get("X-Cart-Id")
+            raw_cart_id = self.request.headers.get("X-Cart-Id")
 
-        if raw:
+        # Guest carts are addressed by their unguessable UUID, never the
+        # sequential PK — otherwise any anonymous caller can enumerate other
+        # guests' carts by incrementing an integer header (IDOR). Reject
+        # anything that is not a valid UUID (M18 in MULTI_TENANT_AUDIT.md).
+        self.cart_id: uuid.UUID | None = None
+        if raw_cart_id:
             try:
-                self.cart_id: uuid_module.UUID | None = uuid_module.UUID(
-                    str(raw)
-                )
-            except (ValueError, AttributeError, TypeError):
+                self.cart_id = uuid.UUID(str(raw_cart_id))
+            except (ValueError, TypeError, AttributeError):
                 self.cart_id = None
-        else:
-            self.cart_id = None
 
     def __str__(self):
         return f"Cart {self.cart.user if self.cart and self.cart.user else 'Anonymous'}"
@@ -161,6 +157,10 @@ class CartService:
         if target_cart.id == source_cart.id:
             return
 
+        lines_moved = 0
+        lines_combined = 0
+        lines_capped = 0
+
         for item in (
             source_cart.items.select_for_update()
             .select_related("product")
@@ -173,24 +173,51 @@ class CartService:
             )
 
             if existing_item:
-                existing_item.quantity += item.quantity
+                # Cap the merged quantity at available stock so a
+                # guest→user merge can't silently stack a line past stock
+                # (the login-time analog of the add-to-cart cumulative
+                # check). Best-effort UX gate only — the authoritative
+                # oversell guard remains StockManager.reserve_stock at
+                # checkout. Only caps when stock is positive, so an
+                # out-of-stock product's line isn't zeroed mid-merge.
+                merged_quantity = existing_item.quantity + item.quantity
+                stock = item.product.stock if item.product else 0
+                if stock > 0 and merged_quantity > stock:
+                    merged_quantity = stock
+                    lines_capped += 1
+                existing_item.quantity = merged_quantity
                 existing_item.save()
                 item.delete()
+                lines_combined += 1
             else:
                 item.cart = target_cart
                 item.save()
+                lines_moved += 1
 
         if target_cart == self.cart:
             self.cart_items = self.cart.get_items()
 
+        source_uuid = source_cart.uuid
         source_cart.delete()
+        # One line per merge answers "why did my cart change after
+        # logging in" without DB archaeology — especially which lines
+        # were quantity-capped at stock.
+        logger.info(
+            "Merged guest cart %s into cart %s: moved=%s combined=%s "
+            "capped_at_stock=%s",
+            source_uuid,
+            target_cart.id,
+            lines_moved,
+            lines_combined,
+            lines_capped,
+        )
 
     def clean_cart(self):
         if self.cart:
             self.cart.items.all().delete()
             self.cart_items = []
 
-    def get_cart_by_id(self, cart_uuid: str | uuid_module.UUID):
+    def get_cart_by_id(self, cart_uuid: str | uuid.UUID):
         """Return the cart identified by ``cart_uuid`` if the caller owns it.
 
         Authenticated users may only fetch their own cart. Anonymous
@@ -202,8 +229,8 @@ class CartService:
         try:
             normalized = (
                 cart_uuid
-                if isinstance(cart_uuid, uuid_module.UUID)
-                else uuid_module.UUID(str(cart_uuid))
+                if isinstance(cart_uuid, uuid.UUID)
+                else uuid.UUID(str(cart_uuid))
             )
         except (ValueError, TypeError):
             return None

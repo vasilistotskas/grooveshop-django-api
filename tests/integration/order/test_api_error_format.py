@@ -326,7 +326,11 @@ class TestAPIErrorsUseConsistentFormat:
             ("GET", "/api/v1/order/{id}", status.HTTP_404_NOT_FOUND),
             ("PUT", "/api/v1/order/{id}", status.HTTP_404_NOT_FOUND),
             ("PATCH", "/api/v1/order/{id}", status.HTTP_404_NOT_FOUND),
-            ("DELETE", "/api/v1/order/{id}", status.HTTP_404_NOT_FOUND),
+            # ``destroy`` is admin-only, so a non-staff client is rejected
+            # at the permission layer (403) before the object lookup runs
+            # — it never reaches the 404. Still exercises error-format
+            # consistency (``detail`` present, no stack trace/SQL leak).
+            ("DELETE", "/api/v1/order/{id}", status.HTTP_403_FORBIDDEN),
             ("POST", "/api/v1/order/{id}/cancel", status.HTTP_404_NOT_FOUND),
         ],
     )

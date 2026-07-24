@@ -56,11 +56,13 @@ class TestOrderCreateWithBoxNow(APITestCase):
             provider_code="stripe",
             is_online_payment=True,
             requires_confirmation=False,
+            active=True,
         )
         self.cod_pay_way = PayWayFactory(
             provider_code="cash",
             is_online_payment=False,
             requires_confirmation=False,
+            active=True,
         )
         self.product = ProductFactory(
             active=True, stock=20, num_images=0, num_reviews=0

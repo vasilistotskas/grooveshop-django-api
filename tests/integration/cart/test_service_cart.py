@@ -152,6 +152,22 @@ class CartServiceTest(TestCase):
             [self.product, guest_product],
         )
 
+    def test_merge_carts_caps_overlapping_quantity_at_stock(self):
+        # Same product in both carts: 4 (user) + 3 (guest) = 7 would
+        # exceed stock 5, so the merged line is capped at 5 (best-effort
+        # UX gate — checkout reservation stays the authoritative guard).
+        product = ProductFactory(num_images=0, num_reviews=0, stock=5)
+        cart_service = CartService(request=self.request)
+        cart_service.create_cart_item(product, 4)
+
+        guest_cart = CartFactory(user=None, num_cart_items=0)
+        CartItemFactory(cart=guest_cart, product=product, quantity=3)
+
+        cart_service.merge_carts(guest_cart)
+
+        merged = self.cart.items.get(product=product)
+        self.assertEqual(merged.quantity, 5)
+
 
 class GuestCartServiceTest(TestCase):
     def setUp(self):
@@ -216,6 +232,28 @@ class GuestCartServiceTest(TestCase):
 
         self.assertEqual(cart.uuid, guest_cart.uuid)
         self.assertIsNone(cart.user)
+
+    def test_guest_cannot_access_cart_via_integer_pk(self):
+        """IDOR guard: the sequential PK must never resolve a guest cart."""
+        victim_cart = CartFactory(user=None)
+        CartItemFactory(cart=victim_cart, product=self.product, quantity=2)
+
+        # Attacker sends the victim's integer PK in X-Cart-Id. It is not a
+        # valid UUID, so it is ignored and the attacker never reaches the
+        # victim's cart.
+        request = self._create_guest_request(cart_id=victim_cart.id)
+        service = CartService(request=request)
+
+        assert service.cart is None or service.cart.id != victim_cart.id
+
+    def test_guest_reaches_own_cart_via_uuid(self):
+        own_cart = CartFactory(user=None)
+
+        request = self._create_guest_request(cart_id=own_cart.uuid)
+        service = CartService(request=request)
+
+        assert service.cart is not None
+        assert service.cart.id == own_cart.id
 
     def test_guest_cart_no_headers_creates_new(self):
         request = self._create_guest_request()

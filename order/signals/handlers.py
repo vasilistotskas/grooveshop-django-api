@@ -31,7 +31,6 @@ from order.signals import (
 from order.notifications import (
     notify_order_created_live,
     notify_order_refunded_live,
-    notify_order_shipment_dispatched_live,
     notify_order_status_changed_live,
     notify_payment_confirmed_live,
     notify_payment_failed_live,
@@ -193,11 +192,15 @@ def handle_order_created(
                         order.id,
                     )
             else:
-                # For guest orders, look up the cart via the UUID
-                # stored in metadata (M18 in MULTI_TENANT_AUDIT.md —
-                # the integer PK is internal only).
+                # For guest orders, read the cart UUID from the cart
+                # snapshot both creation paths write into order metadata
+                # (OrderService.create_order_from_cart[_offline]). The
+                # integer PK is internal only (M18 in
+                # MULTI_TENANT_AUDIT.md), so the lookup uses the UUID.
                 cart_uuid = (
-                    order.metadata.get("cart_id") if order.metadata else None
+                    order.metadata.get("cart_snapshot", {}).get("cart_uuid")
+                    if order.metadata
+                    else None
                 )
                 if cart_uuid:
                     cart = Cart.objects.filter(
@@ -248,19 +251,39 @@ def handle_order_status_changed(
     # Customer-notifications suppression flag (set by
     # OrderService._suppress_customer_status_notifications for chained
     # transitions where the customer just got the previous status's
-    # email/toast and a second one ms later would feel like spam).
-    # The email task already short-circuits via its own metadata flag;
-    # checking the WS-flag here keeps the toast in lockstep with that.
+    # email/toast and a second one ms later would feel like spam, e.g.
+    # the DELIVERED → COMPLETED auto-advance). Gates both the email and
+    # the WS toast below so they stay in lockstep.
     suppress_customer = bool(
         order.metadata
         and order.metadata.get(f"suppress_status_ws_{new_status}")
     )
 
-    transaction.on_commit(
-        lambda oid=order.id, s=new_status: send_order_status_update_email.delay(
-            oid, s
-        )
-    )
+    # Customer email dispatch policy — single source of truth.
+    #   • PENDING / PROCESSING are internal milestones (covered by the
+    #     order-received and payment-confirmed notifications) and never
+    #     get their own email.
+    #   • SHIPPED is owned by the dedicated shipping-notification email,
+    #     which carries the tracking number and only sends once the
+    #     parcel is genuinely in transit (the task self-gates on
+    #     status == SHIPPED + tracking present, so an early fire at
+    #     voucher-mint harmlessly defers).
+    #   • Everything else (DELIVERED, CANCELED, COMPLETED, REFUNDED,
+    #     RETURNED) uses the generic status-update template.
+    if not suppress_customer:
+        if new_status == OrderStatus.SHIPPED.value:
+            transaction.on_commit(
+                lambda oid=order.id: send_shipping_notification_email.delay(oid)
+            )
+        elif new_status not in (
+            OrderStatus.PENDING.value,
+            OrderStatus.PROCESSING.value,
+        ):
+            transaction.on_commit(
+                lambda oid=order.id, s=new_status: (
+                    send_order_status_update_email.delay(oid, s)
+                )
+            )
 
     # Live in-app notification. ``notify_order_status_changed_live``
     # filters internally for statuses we actually want to surface in the
@@ -307,44 +330,27 @@ def handle_order_status_changed(
 
 @receiver(
     order_shipment_dispatched,
-    dispatch_uid="order.notify_shipment_dispatched",
-)
-def notify_shipment_dispatched(
-    sender: type[Order], order: Order, **kwargs: Any
-) -> None:
-    """Forward the shipment-dispatched signal to the live notification task.
-
-    The signal is already fired via ``transaction.on_commit`` in
-    ``handle_order_post_save``, so we can call ``.delay`` directly — the
-    row is guaranteed committed by the time we run.
-    """
-    if not order.user_id:
-        return
-    notify_order_shipment_dispatched_live.delay(order.id)
-
-
-@receiver(
-    order_shipment_dispatched,
     dispatch_uid="order.email_shipment_dispatched",
 )
 def email_shipment_dispatched(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Send the customer their carrier-tracking email.
+    """Dispatch the customer's carrier-tracking email when tracking lands.
 
-    Fires alongside the live in-app notification: when the order
-    transitions from "no tracking" to "has tracking + carrier" — i.e.
-    a courier voucher minted and the parcel ID is on the order. Both
-    online (Stripe / Viva → handle_payment_succeeded → courier
-    dispatch) and COD (offline create → courier dispatch) paths land
-    here because both end in ``order.add_tracking_info(...)`` →
-    post-save → ``order_shipment_dispatched`` signal.
+    Fires when the order transitions from "no tracking" to "has
+    tracking + carrier" — i.e. a courier voucher minted. On a normal
+    COD/online order that happens at voucher-mint while the order is
+    still PROCESSING, so the shipping-notification task self-defers
+    (it only sends once ``status == SHIPPED``). This receiver exists
+    for the inverse ordering: an admin who flips the order to SHIPPED
+    first and attaches the tracking number afterwards — here the
+    SHIPPED transition deferred, and this fire is the one that
+    actually sends.
 
-    The shipping-notification task itself is idempotent on the
-    ``shipping_notification_email_sent`` metadata flag, so a duplicate
-    fire (e.g. tracking re-set by an admin correction) won't email
-    twice. Deferred to ``transaction.on_commit`` for the same reason
-    the live notification is — the worker must see the persisted
+    The task is idempotent on the ``shipping_notification_email_sent``
+    metadata flag, so the two dispatch points (this signal and the
+    SHIPPED status transition) collapse to a single email. Deferred to
+    ``transaction.on_commit`` so the worker sees the persisted
     tracking_number.
     """
     transaction.on_commit(
@@ -477,10 +483,38 @@ def handle_order_item_post_save(
 def handle_order_shipped(
     sender: type[Order], order: Order, **kwargs: Any
 ) -> None:
-    """Handle order shipped signal."""
-    if order.status != OrderStatus.SHIPPED.value:
+    """Handle order shipped signal.
+
+    The defensive ``update_order_status`` below exists only for callers
+    that emit ``order_shipped`` directly (tests, admin tooling) without
+    routing through the state machine. It must only *advance* a
+    not-yet-shipped order — never regress one already past SHIPPED.
+
+    When a carrier poll (ACS/BoxNow) sees a same-poll PROCESSING →
+    DELIVERED jump it bridges by writing SHIPPED then DELIVERED on the
+    same ``order`` instance inside one transaction. By the time the
+    SHIPPED transition's ``on_commit`` hook re-emits ``order_shipped``,
+    ``order.status`` already reads DELIVERED, so a blind
+    ``update_order_status(order, SHIPPED)`` raised
+    ``InvalidStatusTransitionError`` (DELIVERED → SHIPPED). That
+    exception aborted the remaining commit hooks and silently dropped the
+    customer's DELIVERED email + notification (prod orders, 2026-07-17).
+    """
+    pre_shipped = (OrderStatus.PENDING.value, OrderStatus.PROCESSING.value)
+    if order.status in pre_shipped:
         logger.info("Updating order %s status to shipped", order.id)
         OrderService.update_order_status(order, OrderStatus.SHIPPED)
+    else:
+        # Already at/past SHIPPED (e.g. a carrier same-poll
+        # PROCESSING→DELIVERED bridge). Skipping the defensive re-bump is
+        # intentional — logged so the "why didn't order_shipped advance
+        # the status?" question is answerable without re-deriving it.
+        logger.debug(
+            "handle_order_shipped: order %s already at %s (past SHIPPED) "
+            "— skipping defensive status bump",
+            order.id,
+            order.status,
+        )
 
     OrderHistory.log_shipping_update(
         order=order,
@@ -707,78 +741,89 @@ def handle_order_returned(
 @djstripe_receiver("payment_intent.succeeded")
 @with_tenant_schema_from_event
 def handle_stripe_payment_succeeded(sender, **kwargs):
-    """Handle Stripe payment success webhook."""
+    """Handle Stripe payment success webhook.
+
+    This receiver runs inside dj-stripe's webhook ``transaction.atomic``
+    block, so a failure here rolls back BOTH our idempotency mark and
+    dj-stripe's ``Event`` row — Stripe then redelivers and we reprocess
+    cleanly. We therefore must let processing errors PROPAGATE (G0231):
+    swallowing them would commit the ``webhook_processed`` mark against a
+    charged-but-unrecorded order that Stripe never retries (a redelivery
+    early-returns on the existing Event id), stranding it at PENDING until
+    ``auto_cancel_stuck_pending_orders`` cancels it 24h later with no
+    refund and no alert.
+    """
     logger.debug("Processing payment_intent.succeeded webhook")
 
     try:
         event: Event = kwargs["event"]
         payment_intent_id = event.data["object"]["id"]
         event_id = event.id
-
-        logger.info("Stripe payment succeeded: %s", payment_intent_id)
-
-        # Atomic idempotency check-and-mark with row lock to prevent
-        # duplicate processing from parallel webhook deliveries.
-        already_processed = False
-        with transaction.atomic():
-            order = (
-                Order.objects.select_for_update()
-                .filter(payment_id=payment_intent_id)
-                .first()
-            )
-            if order:
-                if order.metadata and order.metadata.get(
-                    f"webhook_processed_{event_id}"
-                ):
-                    logger.info(
-                        "Webhook %s already processed for order %s, skipping",
-                        event_id,
-                        order.id,
-                    )
-                    already_processed = True
-                else:
-                    if not order.metadata:
-                        order.metadata = {}
-                    order.metadata[f"webhook_processed_{event_id}"] = True
-                    order.save(update_fields=["metadata"])
-
-        if already_processed:
-            return
-
-        order = OrderService.handle_payment_succeeded(payment_intent_id)
-
-        if order:
-            OrderHistory.log_payment_update(
-                order=order,
-                previous_value={"payment_status": "pending"},
-                new_value={
-                    "payment_status": "completed",
-                    "payment_id": payment_intent_id,
-                },
-            )
-            # Payment is confirmed — now the customer gets the
-            # confirmation email. The task itself is idempotent via a
-            # metadata reservation, so parallel webhook deliveries or a
-            # subsequent checkout.session.completed event cannot cause
-            # a duplicate send.
-            # Direct .delay(): handle_payment_succeeded() has already
-            # returned and committed its own @transaction.atomic block;
-            # there is no outer transaction here so on_commit would be
-            # a no-op wrapper.  Both task dispatches use the same pattern.
-            send_order_confirmation_email.delay(order.id)
-
-            # Live notification for the same event. The event-level
-            # idempotency guard above (webhook_processed_{event_id})
-            # already prevents duplicate dispatches from Stripe
-            # redeliveries; the task itself is a single INSERT, so this
-            # is safe at-most-once per event.
-            if order.user_id:
-                notify_payment_confirmed_live.delay(order.id)
-
-    except Exception as e:
+    except (KeyError, TypeError) as e:
+        # Malformed event payload — a redelivery carries the same bad body,
+        # so log and drop rather than 500-looping Stripe. Nothing has been
+        # committed at this point.
         logger.error(
-            "Error handling payment_intent.succeeded: %s", e, exc_info=True
+            "Malformed payment_intent.succeeded event: %s", e, exc_info=True
         )
+        return
+
+    logger.info("Stripe payment succeeded: %s", payment_intent_id)
+
+    # Atomic idempotency check-and-mark with row lock to prevent
+    # duplicate processing from parallel webhook deliveries.
+    already_processed = False
+    with transaction.atomic():
+        order = (
+            Order.objects.select_for_update()
+            .filter(payment_id=payment_intent_id)
+            .first()
+        )
+        if order:
+            if order.metadata and order.metadata.get(
+                f"webhook_processed_{event_id}"
+            ):
+                logger.info(
+                    "Webhook %s already processed for order %s, skipping",
+                    event_id,
+                    order.id,
+                )
+                already_processed = True
+            else:
+                if not order.metadata:
+                    order.metadata = {}
+                order.metadata[f"webhook_processed_{event_id}"] = True
+                order.save(update_fields=["metadata"])
+
+    if already_processed:
+        return
+
+    # NO try/except around the processing section: any error must
+    # propagate so dj-stripe's outer atomic rolls back the mark + Event
+    # row and Stripe redelivers (G0231).
+    order = OrderService.handle_payment_succeeded(payment_intent_id)
+
+    if order:
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={"payment_status": "pending"},
+            new_value={
+                "payment_status": "completed",
+                "payment_id": payment_intent_id,
+            },
+        )
+        # Payment is confirmed — dispatch the confirmation email and live
+        # toast on commit (G0230). Both fire only if dj-stripe's outer
+        # transaction commits, so a later rollback discards them; the
+        # worker also sees the committed row. Each task is independently
+        # idempotent (metadata reservation / event-level guard).
+        transaction.on_commit(
+            lambda oid=order.id: send_order_confirmation_email.delay(oid)
+        )
+        if order.user_id:
+            transaction.on_commit(
+                lambda oid=order.id: notify_payment_confirmed_live.delay(oid)
+            )
 
 
 @djstripe_receiver("payment_intent.payment_failed")
@@ -1096,6 +1141,12 @@ def handle_stripe_dispute_created(sender, **kwargs):
     try:
         event: Event = kwargs["event"]
         dispute_data = event.data["object"]
+        # Look up by ``payment_intent`` (pi_…), NOT ``charge`` (ch_…):
+        # every write to ``Order.payment_id`` in this codebase stores a
+        # PaymentIntent id, so matching on the charge id never hits and
+        # the whole dispute flow was silently dead (G0232). ``charge`` is
+        # retained for the audit note / logs only.
+        payment_intent_id = dispute_data.get("payment_intent") or ""
         charge_id = dispute_data.get("charge", "")
         dispute_id = dispute_data.get("id", "")
         reason = dispute_data.get("reason", "")
@@ -1103,15 +1154,16 @@ def handle_stripe_dispute_created(sender, **kwargs):
         logger.warning(
             "Stripe dispute created",
             extra={
+                "payment_intent_id": payment_intent_id,
                 "charge_id": charge_id,
                 "dispute_id": dispute_id,
                 "reason": reason,
             },
         )
 
-        if not charge_id:
+        if not payment_intent_id:
             logger.error(
-                "charge.dispute.created event missing charge id: %s",
+                "charge.dispute.created event missing payment_intent: %s",
                 event.id,
             )
             return
@@ -1124,12 +1176,14 @@ def handle_stripe_dispute_created(sender, **kwargs):
         with transaction.atomic():
             order = (
                 Order.objects.select_for_update()
-                .filter(payment_id=charge_id)
+                .filter(payment_id=payment_intent_id)
                 .first()
             )
             if order is None:
                 logger.warning(
-                    "No order found for disputed charge %s (dispute=%s)",
+                    "No order found for disputed payment_intent %s "
+                    "(charge=%s, dispute=%s)",
+                    payment_intent_id,
                     charge_id,
                     dispute_id,
                 )
@@ -1245,21 +1299,38 @@ def handle_stripe_checkout_completed(sender, **kwargs):
 
             if payment_status == "paid" and payment_intent_id:
                 from order.payment_events import publish_payment_status
+                from shipping.services import ShippingService
+
+                # Settled-state guard: Stripe does not guarantee event
+                # delivery order, so a delayed checkout.session.completed
+                # must never un-refund / un-cancel an order that already
+                # reached a settled financial state. Mirrors
+                # OrderService.handle_payment_succeeded.
+                if order.payment_status in {
+                    PaymentStatus.REFUNDED,
+                    PaymentStatus.PARTIALLY_REFUNDED,
+                    PaymentStatus.CANCELED,
+                }:
+                    logger.warning(
+                        "Ignoring checkout.session.completed for order %s: "
+                        "payment_status already %s",
+                        order.id,
+                        order.payment_status,
+                    )
+                    # Persist the webhook_processed flag set above so a
+                    # Stripe redelivery short-circuits on the idempotency
+                    # check instead of re-running this guard (harmless, but
+                    # avoids duplicate warning logs on every retry).
+                    order.save(update_fields=["metadata"])
+                    return
 
                 order.mark_as_paid(
                     payment_id=payment_intent_id, payment_method="stripe"
                 )
 
-                if order.status == OrderStatus.PENDING:
-                    OrderService.update_order_status(
-                        order, OrderStatus.PROCESSING
-                    )
-
                 order.metadata["stripe_checkout_session_id"] = session_id
                 order.metadata["stripe_payment_intent_id"] = payment_intent_id
                 order.save(update_fields=["metadata"])
-
-                publish_payment_status(order)
 
                 OrderHistory.log_payment_update(
                     order=order,
@@ -1270,6 +1341,44 @@ def handle_stripe_checkout_completed(sender, **kwargs):
                         "checkout_session_id": session_id,
                     },
                 )
+
+                if order.status == OrderStatus.CANCELED:
+                    # Payment landed for an already-CANCELED order (the
+                    # customer cancelled before the webhook, or the two
+                    # raced). Record the receipt for reconciliation and
+                    # page staff (ERROR is the monitored channel) for a
+                    # manual refund — but do NOT advance status or mint a
+                    # shipment for a cancelled order. Mirrors
+                    # handle_payment_succeeded (G0281).
+                    order.metadata["payment_after_cancel"] = {
+                        "payment_id": payment_intent_id,
+                        "recorded_at": timezone.now().isoformat(),
+                    }
+                    order.save(update_fields=["metadata"])
+                    logger.error(
+                        "Payment %s received via checkout session for "
+                        "CANCELED order %s — manual refund required; NOT "
+                        "dispatching shipment creation",
+                        payment_intent_id,
+                        order.id,
+                    )
+                    publish_payment_status(order)
+                    return
+
+                if order.status == OrderStatus.PENDING:
+                    OrderService.update_order_status(
+                        order, OrderStatus.PROCESSING
+                    )
+
+                # Stripe's guidance is to fulfil hosted Checkout Sessions on
+                # checkout.session.completed (not payment_intent.succeeded).
+                # Dispatch the courier task here so a Stripe-Checkout order
+                # isn't left paid-but-never-shipped when the PaymentIntent
+                # event's payment_id lookup races/misses. Idempotent on the
+                # shipment row; wrapped in on_commit by ShippingService.
+                ShippingService.dispatch_create_shipment_task(order)
+
+                publish_payment_status(order)
 
                 logger.info(
                     "Order %s marked as paid via checkout session %s",

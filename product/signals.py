@@ -142,11 +142,6 @@ def reindex_product_translations(sender, instance, **kwargs):
     if update_fields and set(update_fields) <= {"view_count"}:
         return
 
-    # Get all translations for this product using the optimized queryset
-    translations = ProductTranslation.get_meilisearch_queryset().filter(
-        master=instance
-    )
-
     # Check if async indexing is enabled
     try:
         from meili.tasks import index_document_task
@@ -162,10 +157,15 @@ def reindex_product_translations(sender, instance, **kwargs):
     )
 
     if use_async:
-        # Fetch only PKs — we dispatch by PK, so fully loading each
-        # translation instance is wasted work. The early-return check
-        # and the dispatch loop share a single DB round-trip.
-        translation_pks = list(translations.values_list("pk", flat=True))
+        # Fetch only PKs from a PLAIN queryset — we dispatch by PK and the
+        # async task re-loads each row via get_meilisearch_queryset(). Using
+        # the optimized queryset here would run its favourites×reviews
+        # aggregate JOIN on every Product.save() just to collect PKs (G0307).
+        translation_pks = list(
+            ProductTranslation.objects.filter(master=instance).values_list(
+                "pk", flat=True
+            )
+        )
         if not translation_pks:
             return
         logger.debug("Reindexing ProductTranslation Async")
@@ -180,6 +180,11 @@ def reindex_product_translations(sender, instance, **kwargs):
 
         transaction.on_commit(_dispatch_reindex)
     else:
+        # Sync path (DEBUG) serializes each document inline, so it needs the
+        # optimized queryset with its counts/prefetches.
+        translations = ProductTranslation.get_meilisearch_queryset().filter(
+            master=instance
+        )
         if not translations.exists():
             return
         logger.debug("Reindexing ProductTranslation Sync")
@@ -296,11 +301,6 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
     if settings.MEILISEARCH.get("OFFLINE", False):
         return
 
-    # Get all translations for this product using the optimized queryset
-    translations = ProductTranslation.get_meilisearch_queryset().filter(
-        master=instance.product
-    )
-
     # Check if async indexing is enabled
     try:
         from meili.tasks import index_document_task
@@ -316,8 +316,13 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
     )
 
     if use_async:
-        # Fetch only PKs — see reindex_product_translations above.
-        translation_pks = list(translations.values_list("pk", flat=True))
+        # Fetch only PKs from a PLAIN queryset — see
+        # reindex_product_translations above (G0307).
+        translation_pks = list(
+            ProductTranslation.objects.filter(
+                master=instance.product
+            ).values_list("pk", flat=True)
+        )
         if not translation_pks:
             return
         logger.debug(
@@ -334,6 +339,10 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
 
         transaction.on_commit(_dispatch_attr_reindex)
     else:
+        # Sync path (DEBUG) serializes inline → needs the optimized queryset.
+        translations = ProductTranslation.get_meilisearch_queryset().filter(
+            master=instance.product
+        )
         if not translations.exists():
             return
         logger.debug(

@@ -28,7 +28,7 @@ env:
   SYSTEM_ENV: ci
   DEBUG: 'True'
   MEILI_HOST: 127.0.0.1
-  UV_VERSION: '0.11.16'
+  UV_VERSION: '0.11.25'
   FORCE_COLOR: 1
 
 jobs:
@@ -124,7 +124,7 @@ jobs:
     timeout-minutes: 30
     services:
       db:
-        image: postgres:17
+        image: postgres:17.10
         env:
           POSTGRES_DB: postgres
           POSTGRES_USER: postgres
@@ -142,7 +142,7 @@ jobs:
         ports:
           - 6379:6379
       meilisearch:
-        image: getmeili/meilisearch:v1.42.1
+        image: getmeili/meilisearch:v1.49.0
         ports:
           - 7700:7700
         env:

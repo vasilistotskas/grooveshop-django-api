@@ -279,6 +279,47 @@ def compile_user_data(user) -> dict[str, Any]:
     except Exception:  # noqa: BLE001 — loyalty app is optional
         pass
 
+    # Search history the user generated while authenticated — the query
+    # text plus the IP/user-agent captured at search time are all personal
+    # data about the subject, so right-of-access must include them.
+    from search.models import SearchQuery
+
+    search_history = [
+        {
+            "id": sq.id,
+            "query": sq.query,
+            "language_code": sq.language_code,
+            "content_type": sq.content_type,
+            "results_count": sq.results_count,
+            "ip_address": sq.ip_address,
+            "user_agent": sq.user_agent,
+            "timestamp": _iso(sq.timestamp),
+        }
+        for sq in SearchQuery.objects.filter(user=user)
+    ]
+
+    # Current (unconverted) cart — one per user via the unique constraint.
+    from cart.models.cart import Cart
+
+    cart_row = Cart.objects.filter(user=user).prefetch_related("items").first()
+    cart: dict[str, Any] | None = None
+    if cart_row is not None:
+        cart = {
+            "id": cart_row.id,
+            "uuid": str(cart_row.uuid),
+            "last_activity": _iso(cart_row.last_activity),
+            "created_at": _iso(cart_row.created_at),
+            "items": [
+                {
+                    "id": ci.id,
+                    "product_id": ci.product_id,
+                    "quantity": ci.quantity,
+                    "price_at_add": _serialize_money(ci.price_at_add),
+                }
+                for ci in cart_row.items.all()
+            ],
+        }
+
     return {
         "meta": {
             "exported_at": timezone.now().isoformat(),
@@ -295,6 +336,8 @@ def compile_user_data(user) -> dict[str, Any]:
         "notifications": notifications,
         "subscriptions": subscriptions,
         "loyalty": loyalty,
+        "search_history": search_history,
+        "cart": cart,
     }
 
 
@@ -307,6 +350,41 @@ def create_export_request(user) -> Any:
         status=UserDataExport.Status.PENDING,
         token=secrets.token_urlsafe(48),
     )
+
+
+def _scrub_carrier_shipment_pii(order_ids: list[int]) -> int:
+    """Strip the ``metadata['last_error']`` PII envelope from carrier
+    shipments linked to the given orders.
+
+    When voucher/parcel creation fails, the carrier services persist the
+    failing request payload — which includes the recipient's name,
+    address and phone — under ``metadata['last_error']['request_params']``
+    for post-mortem. That envelope survives order anonymisation (it lives
+    on the shipment, not the order), so erasure must clear it explicitly.
+    The rest of the metadata is non-personal operational data (billing
+    code, cached label URL, child voucher numbers) and is retained.
+
+    Returns the number of shipment rows scrubbed.
+    """
+    if not order_ids:
+        return 0
+
+    from shipping_acs.models import AcsShipment
+    from shipping_boxnow.models.shipment import BoxNowShipment
+
+    scrubbed = 0
+    for model in (AcsShipment, BoxNowShipment):
+        shipments = model.objects.filter(
+            order_id__in=order_ids,
+            metadata__has_key="last_error",
+        )
+        for shipment in shipments:
+            metadata = shipment.metadata or {}
+            metadata.pop("last_error", None)
+            shipment.metadata = metadata
+            shipment.save(update_fields=["metadata"])
+            scrubbed += 1
+    return scrubbed
 
 
 @transaction.atomic
@@ -338,6 +416,9 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     placeholder_name = "[deleted]"
 
     orders_qs = Order.objects.filter(user=user)
+    # Capture the order ids before the FK is nulled below — a later filter by
+    # user would then match nothing.
+    order_ids = list(orders_qs.values_list("id", flat=True))
     counts["orders_anonymised"] = orders_qs.update(
         user=None,
         first_name=placeholder_name,
@@ -353,6 +434,12 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
         location_type="",
         customer_notes="",
     )
+
+    # Carrier shipments keep a failed-creation error envelope in
+    # metadata['last_error'] that includes recipient PII (name, address,
+    # phone). Strip it so erasure is complete — the rest of the shipment
+    # metadata is non-personal operational data and is retained.
+    counts["carrier_pii_scrubbed"] = _scrub_carrier_shipment_pii(order_ids)
 
     # Product alerts are single-shot opt-ins — just delete them, no
     # historical value to preserve.

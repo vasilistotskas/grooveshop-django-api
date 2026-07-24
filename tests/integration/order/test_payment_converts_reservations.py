@@ -236,6 +236,136 @@ class TestPaymentConfirmationConvertsReservations:
                 f"Reservation {reservation.id} should be in order metadata for {description}"
             )
 
+    def test_duplicate_reservations_decrement_stock_only_once(
+        self, mock_payment_validation, country
+    ):
+        """Duplicate session reservations must not double-decrement stock.
+
+        Regression for the checkout reconciliation bug: reserve_stock was
+        called twice for the same session/product (e.g. the reserve endpoint
+        hit twice), leaving two unconsumed reservations. Checkout must
+        decrement physical stock by the cart quantity ONCE, converting one
+        reservation and releasing the surplus.
+        """
+        product = ProductFactory(stock=100, active=True)
+        user = UserAccountFactory()
+        cart = CartFactory(user=user)
+        CartItemFactory(cart=cart, product=product, quantity=10)
+
+        # Two reservations for the same session/product (duplicate reserve).
+        StockManager.reserve_stock(
+            product_id=product.id,
+            quantity=10,
+            session_id=str(cart.uuid),
+            user_id=user.id,
+        )
+        StockManager.reserve_stock(
+            product_id=product.id,
+            quantity=10,
+            session_id=str(cart.uuid),
+            user_id=user.id,
+        )
+
+        pay_way = PayWayFactory(provider_code="stripe")
+        shipping_address = {
+            "first_name": "Test",
+            "last_name": "User",
+            "email": "test@example.com",
+            "street": "123 Test St",
+            "street_number": "1",
+            "city": "Test City",
+            "zipcode": "12345",
+            "country_id": country.alpha_2,
+            "phone": "+1234567890",
+        }
+
+        order = OrderService.create_order_from_cart(
+            cart=cart,
+            shipping_address=shipping_address,
+            payment_intent_id="pi_test_dup_reservations",
+            pay_way=pay_way,
+            user=user,
+        )
+
+        product.refresh_from_db()
+        # Decremented by the cart quantity ONCE, not twice.
+        assert product.stock == 90
+
+        decrement_logs = StockLog.objects.filter(
+            product=product,
+            order=order,
+            operation_type=StockLog.OPERATION_DECREMENT,
+        )
+        assert decrement_logs.count() == 1
+        assert decrement_logs.first().quantity_delta == -10
+
+        # Both reservations are terminal (one converted, one released).
+        from order.models import StockReservation
+
+        assert not StockReservation.objects.filter(
+            session_id=str(cart.uuid), consumed=False
+        ).exists()
+
+    def test_expired_reservation_falls_back_to_decrement(
+        self, mock_payment_validation, country
+    ):
+        """An expired (unconsumed) reservation must not fail checkout.
+
+        Regression: convert_reservation_to_sale rejects expired reservations,
+        so routing an expired hold to the convert branch hard-failed the whole
+        order. The expired hold must instead be released and the stock
+        decremented directly when it is available.
+        """
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from order.models import StockReservation
+
+        product = ProductFactory(stock=100, active=True)
+        user = UserAccountFactory()
+        cart = CartFactory(user=user)
+        CartItemFactory(cart=cart, product=product, quantity=5)
+
+        reservation = StockManager.reserve_stock(
+            product_id=product.id,
+            quantity=5,
+            session_id=str(cart.uuid),
+            user_id=user.id,
+        )
+        # Force the reservation past its TTL.
+        StockReservation.objects.filter(pk=reservation.id).update(
+            expires_at=timezone.now() - timedelta(minutes=1)
+        )
+        reservation.refresh_from_db()
+        assert reservation.is_expired
+
+        pay_way = PayWayFactory(provider_code="stripe")
+        shipping_address = {
+            "first_name": "Test",
+            "last_name": "User",
+            "email": "test@example.com",
+            "street": "123 Test St",
+            "street_number": "1",
+            "city": "Test City",
+            "zipcode": "12345",
+            "country_id": country.alpha_2,
+            "phone": "+1234567890",
+        }
+
+        order = OrderService.create_order_from_cart(
+            cart=cart,
+            shipping_address=shipping_address,
+            payment_intent_id="pi_expired_reservation",
+            pay_way=pay_way,
+            user=user,
+        )
+
+        assert order is not None
+        product.refresh_from_db()
+        # Decremented by the cart quantity despite the expired reservation.
+        assert product.stock == 95
+
     def test_reservation_conversion_is_atomic(
         self, mock_payment_validation, country
     ):

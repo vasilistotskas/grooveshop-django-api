@@ -306,6 +306,28 @@ class TestCleanupOldGuestCartsTask:
 
         assert Cart.objects.filter(id=user_cart.id).exists()
 
+    def test_cleanup_old_guest_carts_removes_old_non_empty_carts(self, db):
+        # Regression: a guest cart that still held items after abandonment
+        # was never cleaned by anything (both jobs filtered
+        # items__isnull=True), so it lingered forever. The 30-day job now
+        # sweeps non-empty guest carts too.
+        from cart.factories import CartItemFactory
+        from product.factories.product import ProductFactory
+
+        old_cart = Cart.objects.create(user=None)
+        CartItemFactory(
+            cart=old_cart,
+            product=ProductFactory(num_images=0, num_reviews=0),
+        )
+        Cart.objects.filter(id=old_cart.id).update(
+            last_activity=timezone.now() - timedelta(days=35)
+        )
+
+        result = cleanup_old_guest_carts()
+
+        assert result["status"] == "success"
+        assert not Cart.objects.filter(id=old_cart.id).exists()
+
     def test_cleanup_old_guest_carts_no_carts_to_delete(self, db):
         Cart.objects.filter(
             user=None, last_activity__lt=timezone.now() - timedelta(days=30)

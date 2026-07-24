@@ -11,3 +11,15 @@ def environment_callback(request):
     if env in ("ci", "test"):
         return [_("CI"), "info"]
     return [_("Development"), "success"]
+
+
+def environment_title_prefix_callback(request):
+    """Browser-tab title prefix so staff can't mistake the environment."""
+    env = (getattr(settings, "SYSTEM_ENV", "") or "").lower()
+    if env in ("prod", "production"):
+        return "[PROD]"
+    if env in ("staging", "stage"):
+        return "[STAGE]"
+    if env in ("ci", "test"):
+        return "[CI]"
+    return "[DEV]"

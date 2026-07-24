@@ -37,3 +37,17 @@ class VivaReturnThrottle(AnonRateThrottle):
     AllowAny lookup that echoes order id/uuid/status — cap it tightly."""
 
     scope = "viva_return"
+
+
+class AcsAddressValidationThrottle(AnonRateThrottle):
+    """Per-IP throttle for the public ACS address-validation proxy, which
+    forwards to the rate-limited ACS partner API (G0016)."""
+
+    scope = "acs_address"
+
+
+class BoxNowNearestThrottle(AnonRateThrottle):
+    """Per-IP throttle for the public BoxNow nearest-locker proxy, which
+    forwards synchronously to the BoxNow partner API (G0059)."""
+
+    scope = "boxnow_nearest"

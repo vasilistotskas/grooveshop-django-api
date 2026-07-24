@@ -11,7 +11,6 @@ from core.utils.email import is_disposable_domain
 from country.models import Country
 from order.enum.document_type import OrderCreateDocumentTypeEnum
 from order.enum.status import OrderStatus
-from order.models.item import OrderItem
 from order.models.order import Order
 from order.serializers.item import (
     OrderItemCreateSerializer,
@@ -982,31 +981,52 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                 }
             )
 
-        # BoxNow cross-field validation. Trigger condition is the
-        # registry-driven ``(shipping_provider_code, shipping_kind)``
-        # pair.
-        is_boxnow_pickup = (
-            attrs.get("shipping_provider_code") == "boxnow"
-            and attrs.get("shipping_kind") == "pickup_point"
-        )
-        if is_boxnow_pickup:
-            # Defence-in-depth — ``/api/v1/shipping/options`` already
-            # filters by ``ShippingProvider.is_active``, but a stale
-            # frontend cache could still POST an order with a hidden
-            # provider. Re-check the registry row before accepting.
+        provider_code = attrs.get("shipping_provider_code")
+        shipping_kind = attrs.get("shipping_kind")
+
+        # A locker / pickup-point order MUST name its carrier. Without a
+        # provider code the service-layer payload validation
+        # (``ShippingService.validate_order_payload``, gated on a truthy
+        # code) never runs, so the carrier's locker/station requirement is
+        # skipped and the order is created with NO shipping provider — no
+        # shipment row is ever minted and it silently never ships. The
+        # frontend always pairs the two; a direct API call or stale client
+        # cache can omit the code.
+        if shipping_kind == "pickup_point" and not provider_code:
+            raise serializers.ValidationError(
+                {
+                    "shipping_provider_code": _(
+                        "A shipping provider is required for locker / "
+                        "pickup-point delivery."
+                    )
+                }
+            )
+
+        # ``ShippingProvider.is_active`` is the master switch — a provider
+        # hidden from checkout must stay unusable even if a stale client
+        # still POSTs its code. ``/api/v1/shipping/options`` already
+        # filters on it; re-check here because order creation resolves the
+        # code without re-checking. Applies to every carrier (the previous
+        # guard only covered BoxNow, leaving ACS unchecked).
+        if provider_code:
             from shipping.models import ShippingProvider
 
-            boxnow_active = ShippingProvider.objects.filter(
-                code="boxnow", is_active=True
-            ).exists()
-            if not boxnow_active:
+            if not ShippingProvider.objects.filter(
+                code=provider_code, is_active=True
+            ).exists():
                 raise serializers.ValidationError(
                     {
                         "shipping_provider_code": _(
-                            "BoxNow locker shipping is currently unavailable."
+                            "The selected shipping provider is currently "
+                            "unavailable."
                         )
                     }
                 )
+
+        # BoxNow-specific carrier field. The service-layer
+        # ``validate_order_payload`` also enforces this, but failing here
+        # gives the shopper a field-scoped 400 before order creation.
+        if provider_code == "boxnow" and shipping_kind == "pickup_point":
             if not attrs.get("boxnow_locker_id"):
                 raise serializers.ValidationError(
                     {
@@ -1015,6 +1035,11 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                         )
                     }
                 )
+
+        # NOTE: pay-way active + carrier-compatibility is enforced in the
+        # view (``_validate_pay_way_for_order``) where the PayWay row is
+        # resolved from the DB — keeping this cross-field validator free
+        # of DB pay-way lookups.
 
         return attrs
 
@@ -1113,136 +1138,20 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
 
         return attrs
 
-    def create(self, validated_data):
-        from django.conf import settings
-        from djmoney.money import Money
-        from extra_settings.models import Setting
-
-        items_data = validated_data.pop("items")
-
-        # Calculate items total and shipping
-        items_total = Money(0, settings.DEFAULT_CURRENCY)
-        for item_data in items_data:
-            product = item_data.get("product")
-            quantity = item_data.get("quantity", 1)
-            items_total += product.final_price * quantity
-
-        base_shipping_cost = Setting.get(
-            "CHECKOUT_SHIPPING_PRICE", default=3.00
-        )
-        free_shipping_threshold = Setting.get(
-            "FREE_SHIPPING_THRESHOLD", default=50.00
-        )
-
-        if items_total.amount >= float(free_shipping_threshold):
-            shipping_price = Money(0, items_total.currency)
-        else:
-            shipping_price = Money(
-                float(base_shipping_cost), items_total.currency
-            )
-
-        validated_data["shipping_price"] = shipping_price
-
-        # Store the guest cart's UUID in order metadata so the post-save
-        # signal can clear the cart. Header value is the cart UUID
-        # (M18 in MULTI_TENANT_AUDIT.md); store the normalised string
-        # form so JSONField round-tripping is identity.
-        request = self.context.get("request")
-        if request and not validated_data.get("user"):
-            cart_id_raw = None
-            if hasattr(request, "META"):
-                cart_id_raw = request.META.get("HTTP_X_CART_ID")
-            elif hasattr(request, "headers"):
-                cart_id_raw = request.headers.get("X-Cart-Id")
-
-            if cart_id_raw:
-                try:
-                    import uuid as _uuid  # noqa: PLC0415
-
-                    cart_uuid = _uuid.UUID(str(cart_id_raw))
-                    if "metadata" not in validated_data:
-                        validated_data["metadata"] = {}
-                    validated_data["metadata"]["cart_id"] = str(cart_uuid)
-                except (ValueError, TypeError):
-                    pass
-
-        # Validate and lock stock BEFORE creating order. Locking all
-        # products in one ``SELECT … FOR UPDATE WHERE pk IN (…)`` is
-        # one round-trip regardless of cart size — the previous
-        # per-item loop fired N locks + N updates inside the same
-        # transaction, scaling round-trips linearly with cart depth.
-        from product.models import Product
-
-        product_ids = [item["product"].pk for item in items_data]
-        locked_products = {
-            p.pk: p
-            for p in Product.objects.select_for_update().filter(
-                pk__in=product_ids
-            )
-        }
-
-        for item_data in items_data:
-            product = item_data.get("product")
-            quantity = item_data.get("quantity", 1)
-            locked_product = locked_products.get(product.pk)
-            if locked_product is None:
-                # Product disappeared between cart load and order create.
-                raise serializers.ValidationError(
-                    {"items": [f"Product {product.pk} no longer available."]}
-                )
-
-            if locked_product.stock < quantity:
-                raise serializers.ValidationError(
-                    {
-                        "items": [
-                            f"Product '{locked_product.safe_translation_getter('name', any_language=True)}' "
-                            f"does not have enough stock. Available: {locked_product.stock}, "
-                            f"Requested: {quantity}"
-                        ]
-                    }
-                )
-
-            # Deduct stock immediately in transaction
-            locked_product.stock = max(0, locked_product.stock - quantity)
-            locked_product.save(update_fields=["stock"])
-
-        # Create order after stock is validated and deducted
-        order = Order.objects.create(**validated_data)
-
-        # Create order items (stock already deducted above)
-        for item_data in items_data:
-            product = item_data.get("product")
-            item_to_create = item_data.copy()
-            item_to_create["price"] = product.final_price
-
-            # Set flag BEFORE creating to prevent signal from deducting again
-            OrderItem._skip_stock_deduction = True
-            OrderItem.objects.create(order=order, **item_to_create)
-            OrderItem._skip_stock_deduction = False
-
-        order.paid_amount = order.calculate_order_total_amount()
-        order.save(update_fields=["paid_amount", "paid_amount_currency"])
-
-        # Mark order to send signal after transaction commits
-        order._send_created_signal = True
-
-        return order
-
     def update(self, instance, validated_data):
-        items_data = validated_data.pop("items", None)
+        # Order line items are immutable after creation: each carries a
+        # committed stock reservation/deduction and a price snapshot.
+        # Deleting + recreating them here (owner-reachable via PUT/PATCH)
+        # bypassed ALL stock accounting and total recomputation, letting a
+        # customer silently corrupt inventory and order totals (G0222). We
+        # drop any ``items`` from the payload and update only the editable
+        # scalar fields; changing what was ordered goes through the
+        # dedicated refund/cancel service flows, not a raw serializer write.
+        validated_data.pop("items", None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
-
-        if items_data is not None:
-            instance.items.all().delete()
-
-            for item_data in items_data:
-                product = item_data.get("product")
-                item_to_create = item_data.copy()
-                item_to_create["price"] = product.final_price
-                OrderItem.objects.create(order=instance, **item_to_create)
 
         return instance
 
@@ -1280,6 +1189,20 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
             "shipping_carrier",
         )
         read_only_fields = (
+            # Identity + routing + document fields are immutable via this
+            # (owner-reachable) PUT/PATCH serializer. It does a raw
+            # ``setattr`` mass-assign with no per-field authorization, so a
+            # writable ``user`` let an owner reassign their order to another
+            # account (or null it to a guest), and a writable ``pay_way`` /
+            # ``document_type`` bypassed the cross-field rules enforced at
+            # creation (e.g. INVOICE requires billing_vat_id). Legitimate
+            # edits to these go through the admin / dedicated service flows,
+            # never a customer PUT. Address/contact fields stay writable.
+            # (``paid_amount`` is already read-only via its explicit field
+            # declaration above, so it is intentionally not repeated here.)
+            "user",
+            "pay_way",
+            "document_type",
             "shipping_price",
             "payment_method_fee",
             "total_price_items",
@@ -1293,8 +1216,6 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
         )
         extra_kwargs = {
             "user": {
-                "required": False,
-                "allow_null": True,
                 "help_text": _("User ID. Leave empty for guest orders."),
             }
         }
@@ -1433,6 +1354,15 @@ class PaymentStatusResponseSerializer(serializers.Serializer):
     created = serializers.IntegerField(required=False)
     last_updated = serializers.DateTimeField(required=False, allow_null=True)
     error = serializers.CharField(required=False)
+
+
+class VivaReturnLookupResponseSerializer(serializers.Serializer):
+    """Minimal, PII-free payload for the Viva post-payment redirect hop."""
+
+    id = serializers.IntegerField()
+    uuid = serializers.UUIDField()
+    status = serializers.CharField()
+    payment_status = serializers.CharField()
 
 
 class CancelOrderRequestSerializer(serializers.Serializer):

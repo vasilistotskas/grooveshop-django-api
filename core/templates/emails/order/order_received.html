@@ -21,7 +21,8 @@
 {% if payment_instructions %}
 <div class="email-card" style="border-left: 4px solid #2563eb;">
     <h3>{% trans "How to complete your payment" %}</h3>
-    <p>{{ payment_instructions|linebreaksbr }}</p>
+    {# payment_instructions is admin-authored WYSIWYG HTML — render as HTML, not escaped #}
+    <div>{{ payment_instructions|safe }}</div>
     <p><strong>{% trans "Please include your order number" %} <code>#{{ order.id }}</code> {% trans "in the payment reference." %}</strong></p>
 </div>
 {% endif %}

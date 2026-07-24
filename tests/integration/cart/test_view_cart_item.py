@@ -8,6 +8,7 @@ from cart.factories.item import CartItemFactory
 from cart.models import CartItem
 from core.utils.testing import TestURLFixerMixin
 from product.factories.product import ProductFactory
+from tests.utils import count_queries
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -71,6 +72,27 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
             "updated_at",
         }
         self.assertTrue(expected_fields.issubset(set(item_data.keys())))
+
+    def test_list_no_n_plus_one(self):
+        """Query count must not grow with the number of cart items (G0088)."""
+        with count_queries() as small:
+            self.client.get(self.list_url)
+
+        for _ in range(3):
+            product = ProductFactory(
+                active=True, num_images=0, num_reviews=0, stock=10
+            )
+            CartItemFactory(cart=self.cart, product=product, quantity=1)
+
+        with count_queries() as large:
+            self.client.get(self.list_url)
+
+        self.assertEqual(
+            small.count,
+            large.count,
+            f"Query count grew from {small.count} to {large.count} when "
+            f"cart items grew — N+1 regression.",
+        )
 
     def test_retrieve_uses_correct_serializer(self):
         response = self.client.get(self.detail_url)
@@ -189,6 +211,29 @@ class CartItemViewSetTest(TestURLFixerMixin, APITestCase):
                 cart=self.cart, product=new_product, quantity=3
             ).exists()
         )
+
+    def test_add_rejects_when_cumulative_quantity_exceeds_stock(self):
+        # Cart already holds 2 of product1 (stock 10). Adding 9 would
+        # stack to 11 via the F()-increment — the create serializer must
+        # validate the RESULTING total, not just the incoming delta.
+        create_data = {"product": self.product1.pk, "quantity": 9}
+
+        response = self.client.post(self.list_url, create_data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.cart_item.refresh_from_db()
+        self.assertEqual(self.cart_item.quantity, 2)
+
+    def test_add_allows_cumulative_quantity_up_to_stock(self):
+        # Cart holds 2 of product1 (stock 10); adding 8 reaches exactly
+        # 10 and must be accepted.
+        create_data = {"product": self.product1.pk, "quantity": 8}
+
+        response = self.client.post(self.list_url, create_data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.cart_item.refresh_from_db()
+        self.assertEqual(self.cart_item.quantity, 10)
 
     def test_update_cart_item(self):
         update_data = {"quantity": 5}

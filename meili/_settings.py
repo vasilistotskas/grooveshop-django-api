@@ -6,6 +6,7 @@ class MeiliSettings(TypedDict):
     HTTPS: bool
     HOST: str
     MASTER_KEY: str
+    SEARCH_KEY: str
     PORT: int
     TIMEOUT: int | None
     CLIENT_AGENTS: tuple[str] | None
@@ -20,6 +21,7 @@ class _MeiliSettings:
     https: bool
     host: str
     master_key: str
+    search_key: str
     port: int
     timeout: int | None
     client_agents: tuple[str] | None
@@ -38,6 +40,11 @@ class _MeiliSettings:
         if not master_key:
             raise ValueError("MEILISEARCH['MASTER_KEY'] is required")
 
+        # Fall back to the master key when no dedicated search key is
+        # provisioned so local/dev/test keep working; production should set
+        # MEILI_SEARCH_KEY to a read-only search key.
+        search_key = meili_settings.get("SEARCH_KEY") or master_key
+
         debug = meili_settings.get("DEBUG")
         sync = meili_settings.get("SYNC")
         offline = meili_settings.get("OFFLINE")
@@ -46,6 +53,7 @@ class _MeiliSettings:
             https=meili_settings.get("HTTPS", False),
             host=meili_settings.get("HOST", "localhost"),
             master_key=master_key,
+            search_key=search_key,
             port=meili_settings.get("PORT", 7700),
             timeout=meili_settings.get("TIMEOUT", None),
             client_agents=meili_settings.get("CLIENT_AGENTS", None),

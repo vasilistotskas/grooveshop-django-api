@@ -50,9 +50,11 @@ class NotificationUserWriteSerializer(
     serializers.ModelSerializer[NotificationUser]
 ):
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    notification = PrimaryKeyRelatedField(
-        queryset=NotificationUser.objects.none()
-    )
+    # ``notification`` is read-only: rows are created server-side when a
+    # notification is delivered, and a client must not be able to re-point an
+    # existing row to another notification and read its content (IDOR). Only
+    # the ``seen`` flag is client-writable (on the caller's own rows).
+    notification = PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = NotificationUser
@@ -61,29 +63,6 @@ class NotificationUserWriteSerializer(
             "notification",
             "seen",
         )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        from notification.models.notification import Notification  # noqa: PLC0415, I001
-
-        self.fields["notification"].queryset = Notification.objects.all()
-
-    def validate(self, attrs):
-        user = attrs.get("user")
-        notification = attrs.get("notification")
-
-        if (
-            self.instance is None
-            and user
-            and notification
-            and NotificationUser.objects.filter(
-                user=user, notification=notification
-            ).exists()
-        ):
-            raise serializers.ValidationError(
-                _("This user already has this notification.")
-            )
-        return attrs
 
 
 class NotificationUserActionSerializer(serializers.Serializer):

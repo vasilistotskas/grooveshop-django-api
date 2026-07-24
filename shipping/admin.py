@@ -1,6 +1,5 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 
 from admin.base import BaseModelAdmin
@@ -35,27 +34,17 @@ class ShippingProviderAdmin(BaseModelAdmin):
     # land on (per-provider sweep vs per-pay-way sweep).
     inlines = [PayWayShippingExclusionInline]
 
-    @admin.display(description=_("Logo"))
+    @admin.display(description=_("Logo"), empty_value="—")
     def logo_preview(self, obj):
-        """Inline thumbnail of the primary carrier logo.
-
-        Mirrors ``PayWayAdmin.icon_preview`` so the list view feels
-        consistent across both "branded carrier-like" admins. Operator
-        sees the actual image they uploaded, not a filename string,
-        which makes mistakes (wrong file, wrong provider) catchable
-        at a glance.
-        """
-        if obj.logo:
-            return format_html(
-                '<img src="{url}" style="max-height: 32px; max-width: 64px; '
-                'border-radius: 4px; object-fit: contain;" />',
-                url=obj.logo.url,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">No logo</span>'
+        """Inline thumbnail of the primary carrier logo."""
+        if not obj.logo:
+            return None
+        return format_html(
+            '<img src="{url}" width="64" height="32" alt="" />',
+            url=obj.logo.url,
         )
 
-    @admin.display(description=_("Pickup logo"))
+    @admin.display(description=_("Pickup logo"), empty_value="—")
     def logo_pickup_point_preview(self, obj):
         """Inline thumbnail of the optional pickup-point logo.
 
@@ -65,14 +54,11 @@ class ShippingProviderAdmin(BaseModelAdmin):
         (single-kind) and for any carrier the operator hasn't given a
         distinct locker illustration.
         """
-        if obj.logo_pickup_point:
-            return format_html(
-                '<img src="{url}" style="max-height: 32px; max-width: 64px; '
-                'border-radius: 4px; object-fit: contain;" />',
-                url=obj.logo_pickup_point.url,
-            )
-        return mark_safe(
-            '<span class="text-base-600 dark:text-base-300">—</span>'
+        if not obj.logo_pickup_point:
+            return None
+        return format_html(
+            '<img src="{url}" width="64" height="32" alt="" />',
+            url=obj.logo_pickup_point.url,
         )
 
     fieldsets = (

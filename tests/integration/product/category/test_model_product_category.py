@@ -4,7 +4,6 @@ from django.test import TestCase
 
 from product.factories.category import ProductCategoryFactory
 from product.factories.product import ProductFactory
-from product.models.category import ProductCategory
 from user.factories.account import UserAccountFactory
 from vat.factories import VatFactory
 
@@ -33,16 +32,21 @@ class CategoryModelTestCase(TestCase):
 
         self.assertEqual(category_str, category_name)
 
-    def test_get_ordering_queryset_with_parent(self):
-        self.assertEqual(ProductCategory.objects.count(), 2)
-        self.assertIn(self.sub_category, ProductCategory.objects.all())
-        self.assertIn(self.category, ProductCategory.objects.all())
+    def test_get_ordering_queryset_returns_siblings_only(self):
+        # The SortableModel ordering scope is the DIRECT siblings (same
+        # parent), NOT the sub-tree (G0310).
+        sibling = ProductCategoryFactory(slug="top-level-sibling")
 
-        parent_queryset = self.category.get_ordering_queryset()
+        top_level_qs = self.category.get_ordering_queryset()
+        self.assertIn(self.category, top_level_qs)
+        self.assertIn(sibling, top_level_qs)
+        # sub_category has a parent, so it is NOT in the top-level scope.
+        self.assertNotIn(self.sub_category, top_level_qs)
 
-        self.assertIn(self.sub_category, parent_queryset)
-
-        self.assertIn(self.category, parent_queryset)
+        # A child's scope is its parent's children — not the top level.
+        child_qs = self.sub_category.get_ordering_queryset()
+        self.assertIn(self.sub_category, child_qs)
+        self.assertNotIn(self.category, child_qs)
 
     def test_get_ordering_queryset_without_parent(self):
         no_parent_category = ProductCategoryFactory(
@@ -51,13 +55,10 @@ class CategoryModelTestCase(TestCase):
 
         parent_queryset = no_parent_category.get_ordering_queryset()
 
+        # Only top-level (parent=None) categories share this scope.
         self.assertIn(no_parent_category, parent_queryset)
-
-        self.assertIn(self.sub_category, parent_queryset)
         self.assertIn(self.category, parent_queryset)
-
-        for descendant in self.category.get_descendants(include_self=True):
-            self.assertIn(descendant, parent_queryset)
+        self.assertNotIn(self.sub_category, parent_queryset)
 
     def test_recursive_product_count_no_products(self):
         count = self.category.recursive_product_count

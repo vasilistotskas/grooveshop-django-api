@@ -271,6 +271,98 @@ class TestBalanceClampingOnReversal:
         assert LoyaltyService.get_user_balance(user) == 0
 
 
+@pytest.mark.django_db
+class TestBalanceClampingOnExpiration:
+    """Expiration must not drive the balance negative when points were spent."""
+
+    def test_expiration_clamps_to_available_balance(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from user.factories.account import UserAccountFactory
+
+        user = UserAccountFactory()
+
+        earn = PointsTransaction.objects.create(
+            user=user,
+            points=100,
+            transaction_type=TransactionType.EARN,
+            description="Earned",
+        )
+        # Backdate past the expiration cutoff.
+        PointsTransaction.objects.filter(pk=earn.pk).update(
+            created_at=timezone.now() - timedelta(days=400)
+        )
+        # User already spent 80, so only 20 remain.
+        PointsTransaction.objects.create(
+            user=user,
+            points=-80,
+            transaction_type=TransactionType.REDEEM,
+            description="Redeemed",
+        )
+        assert LoyaltyService.get_user_balance(user) == 20
+
+        def mock_settings(key, default=None):
+            return {"LOYALTY_POINTS_EXPIRATION_DAYS": 365}.get(key, default)
+
+        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+            count = LoyaltyService.process_expiration()
+
+        assert count == 1
+        # Clamped to the 20 still available, never negative.
+        assert LoyaltyService.get_user_balance(user) == 0
+        expire = PointsTransaction.objects.get(
+            user=user, transaction_type=TransactionType.EXPIRE
+        )
+        assert expire.points == -20
+
+
+@pytest.mark.django_db
+class TestRedeemClawbackOnReversal:
+    """Cancelling an order restores the points the customer redeemed on it."""
+
+    def test_reversal_restores_redeemed_points(self):
+        from order.models.order import Order
+        from user.factories.account import UserAccountFactory
+
+        user = UserAccountFactory()
+        order = Order.objects.create(user=user)
+
+        # Earned 100 on this order, redeemed 50 against it (balance 50).
+        PointsTransaction.objects.create(
+            user=user,
+            points=100,
+            transaction_type=TransactionType.EARN,
+            reference_order=order,
+            description="Earned",
+        )
+        PointsTransaction.objects.create(
+            user=user,
+            points=-50,
+            transaction_type=TransactionType.REDEEM,
+            reference_order=order,
+            description="Redeemed on order",
+        )
+        assert LoyaltyService.get_user_balance(user) == 50
+
+        def mock_settings(key, default=None):
+            return {"LOYALTY_ENABLED": True}.get(key, default)
+
+        with patch("loyalty.services.Setting.get", side_effect=mock_settings):
+            LoyaltyService.reverse_order_points(order.id)
+
+        # Earn fully reversed (restore happens first, so no clamp) and the 50
+        # redeemed points are credited back — net balance returns to 0.
+        assert LoyaltyService.get_user_balance(user) == 0
+        assert PointsTransaction.objects.filter(
+            user=user,
+            transaction_type=TransactionType.ADJUST,
+            points=50,
+            description__contains="Redeemed points restored",
+        ).exists()
+
+
 # ===========================================================================
 # 6. Over-redemption rejection
 # Validates: Requirement 4.2

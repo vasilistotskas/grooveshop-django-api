@@ -113,6 +113,15 @@ class ProductReviewWriteSerializer(
         )
         read_only_fields = ("status", "is_published")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # A review's product is fixed at creation. Allowing it to change on
+        # update would let a user re-point an existing review at a different
+        # product they never bought, bypassing the verified-purchase gate
+        # (G0303). Make it read-only once the review exists.
+        if self.instance is not None:
+            self.fields["product"].read_only = True
+
     def validate_rate(self, value: int) -> int:
         valid_rates = [choice[0] for choice in RateEnum.choices]
         if value not in valid_rates:

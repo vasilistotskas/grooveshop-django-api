@@ -108,7 +108,11 @@ class BlogPostFactory(CustomDjangoModelFactory):
     )
     category = factory.LazyFunction(get_or_create_category)
     author = factory.LazyFunction(get_or_create_author)
-    is_published = factory.Faker("pybool", truth_probability=80)
+    # Deterministic default: posts are published (and therefore publicly
+    # visible) unless a test explicitly overrides is_published=False. A random
+    # default made any test that creates a post and expects it to be listable
+    # /retrievable flaky now that the public API filters out drafts.
+    is_published = True
     featured = factory.Faker("pybool", truth_probability=20)
     view_count = factory.Faker("random_int", min=0, max=10000)
 

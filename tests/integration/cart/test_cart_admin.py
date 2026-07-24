@@ -21,6 +21,8 @@ from cart.models import Cart, CartItem
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
 
+pytestmark = pytest.mark.assert_english
+
 User = get_user_model()
 
 
@@ -107,79 +109,79 @@ class TestCartAdmin:
         user = UserAccountFactory()
         cart = CartFactory(user=user)
 
-        result = cart_admin.cart_owner_display(cart)
+        primary, secondary, _initials = cart_admin.cart_owner_display(cart)
 
-        assert user.email in result
-        assert "font-medium" in result
+        assert primary == (user.full_name or user.username)
+        assert secondary == user.email
 
     def test_cart_owner_display_guest(self, cart_admin):
         cart = CartFactory(user=None)
 
-        result = cart_admin.cart_owner_display(cart)
+        primary, secondary, _initials = cart_admin.cart_owner_display(cart)
 
-        assert "Guest" in result
-        assert f"Cart #{cart.id}" in result
+        assert primary == "Guest"
+        assert secondary == f"Cart #{cart.id}"
 
-    def test_cart_type_badge_authenticated(self, cart_admin):
+    def test_cart_type_authenticated(self, cart_admin):
         user = UserAccountFactory()
         cart = CartFactory(user=user)
 
-        result = cart_admin.cart_type_badge(cart)
+        value, label = cart_admin.cart_type(cart)
 
-        assert "User" in result
-        assert "bg-green-50" in result
+        assert value == "user"
+        assert label == "User"
 
-    def test_cart_type_badge_guest(self, cart_admin):
+    def test_cart_type_guest(self, cart_admin):
         cart = CartFactory(user=None)
 
-        result = cart_admin.cart_type_badge(cart)
+        value, label = cart_admin.cart_type(cart)
 
-        assert "Guest" in result
-        assert "bg-blue-50" in result
+        assert value == "guest"
+        assert label == "Guest"
 
-    def test_activity_status_badge_active(self, cart_admin):
+    def test_activity_state_active(self, cart_admin):
         recent_time = timezone.now() - timedelta(minutes=30)
         cart = CartFactory()
         Cart.objects.filter(id=cart.id).update(last_activity=recent_time)
         cart.refresh_from_db()
 
-        result = cart_admin.activity_status_badge(cart)
+        value, label = cart_admin.activity_state(cart)
 
-        assert "Active" in result
-        assert "bg-green-50" in result
+        assert value == "active"
+        assert label == "Active"
 
-    def test_activity_status_badge_recent(self, cart_admin):
+    def test_activity_state_recent(self, cart_admin):
         recent_time = timezone.now() - timedelta(hours=2)
         cart = CartFactory()
         Cart.objects.filter(id=cart.id).update(last_activity=recent_time)
         cart.refresh_from_db()
 
-        result = cart_admin.activity_status_badge(cart)
+        value, label = cart_admin.activity_state(cart)
 
-        assert "Recent" in result
-        assert "bg-yellow-50" in result
+        assert value == "recent"
+        assert label == "Recent"
 
-    def test_activity_status_badge_idle(self, cart_admin):
+    def test_activity_state_idle(self, cart_admin):
         idle_time = timezone.now() - timedelta(days=3)
         cart = CartFactory()
         Cart.objects.filter(id=cart.id).update(last_activity=idle_time)
         cart.refresh_from_db()
 
-        result = cart_admin.activity_status_badge(cart)
+        value, label = cart_admin.activity_state(cart)
 
-        assert "Idle" in result
-        assert "bg-orange-50" in result
+        assert value == "idle"
+        assert label == "Idle"
 
-    def test_activity_status_badge_abandoned(self, cart_admin):
+    def test_activity_state_abandoned(self, cart_admin):
         old_time = timezone.now() - timedelta(days=10)
         cart = CartFactory()
         Cart.objects.filter(id=cart.id).update(last_activity=old_time)
         cart.refresh_from_db()
 
-        result = cart_admin.activity_status_badge(cart)
+        value, label = cart_admin.activity_state(cart)
 
-        assert "Abandoned" in result
-        assert "bg-red-50" in result
+        assert value == "abandoned"
+        assert label == "Abandoned"
 
     def test_items_summary_empty_cart(self, cart_admin):
         cart = CartFactory()
@@ -209,8 +211,7 @@ class TestCartAdmin:
 
         result = cart_admin.price_summary(cart)
 
-        assert "€" in result or "EUR" in result
-        assert "font-bold" in result
+        assert "€" in result
 
     def test_cart_summary(self, cart_admin):
         cart = CartFactory()
@@ -218,24 +219,19 @@ class TestCartAdmin:
         result = cart_admin.cart_summary(cart)
 
         assert "Items:" in result
-        assert "Total Price:" in result
+        assert "Total price:" in result
         assert "VAT:" in result
-        assert "Activity:" in result
+        assert "Last activity:" in result
         assert "Created:" in result
 
     def test_financial_summary(self, cart_admin):
         cart = CartFactory()
 
-        try:
-            result = cart_admin.financial_summary(cart)
-            assert "Financial Breakdown" in result
-            assert "Final Total" in result
-            assert "Total VAT" in result
-        except ValueError as e:
-            if "Unknown format code 'f'" in str(e):
-                assert True
-            else:
-                raise
+        result = cart_admin.financial_summary(cart)
+
+        assert "Final total:" in result
+        assert "VAT:" in result
+        assert "Savings:" in result
 
 
 @pytest.mark.django_db
@@ -247,7 +243,6 @@ class TestCartItemInline:
         result = cart_item_inline.product_display(cart_item)
 
         assert str(product.id) in result
-        assert "font-medium" in result
 
     def test_unit_price_display_with_discount(self, cart_item_inline):
         cart_item = Mock()
@@ -258,7 +253,6 @@ class TestCartItemInline:
 
         assert "10" in result
         assert "8" in result
-        assert "line-through" in result
 
     def test_unit_price_display_without_discount(self, cart_item_inline):
         cart_item = Mock()
@@ -268,7 +262,7 @@ class TestCartItemInline:
         result = cart_item_inline.unit_price_display(cart_item)
 
         assert "10" in result
-        assert "line-through" not in result
+        assert "→" not in result
 
     def test_unit_price_display_no_attributes(self, cart_item_inline):
         cart_item = Mock(spec=[])
@@ -284,7 +278,6 @@ class TestCartItemInline:
         result = cart_item_inline.total_price_display(cart_item)
 
         assert "20" in result
-        assert "font-bold" in result
 
     def test_total_price_display_no_attribute(self, cart_item_inline):
         cart_item = Mock(spec=[])
@@ -299,8 +292,7 @@ class TestCartItemInline:
 
         result = cart_item_inline.discount_info(cart_item)
 
-        assert "15%" in result
-        assert "bg-red-50" in result
+        assert result == "-15%"
 
     def test_discount_info_without_discount(self, cart_item_inline):
         cart_item = Mock()
@@ -344,8 +336,7 @@ class TestCartItemAdmin:
 
         result = cart_item_admin.quantity_display(item)
 
-        assert "5" in result
-        assert "bg-blue-50" in result
+        assert result == "x5"
 
     def test_pricing_info(self, cart_item_admin):
         product = ProductFactory(price=Money(15, "EUR"))
@@ -353,22 +344,21 @@ class TestCartItemAdmin:
 
         result = cart_item_admin.pricing_info(item)
 
-        assert "€" in result or "EUR" in result
+        assert "€" in result
 
-    def test_discount_badge_with_discount(self, cart_item_admin):
+    def test_discount_display_with_discount(self, cart_item_admin):
         item = Mock()
         item.discount_percent = 20
 
-        result = cart_item_admin.discount_badge(item)
+        result = cart_item_admin.discount_display(item)
 
-        assert "20%" in result
-        assert "bg-red-50" in result
+        assert result == "-20%"
 
-    def test_discount_badge_without_discount(self, cart_item_admin):
+    def test_discount_display_without_discount(self, cart_item_admin):
         item = Mock()
         item.discount_percent = 0
 
-        result = cart_item_admin.discount_badge(item)
+        result = cart_item_admin.discount_display(item)
 
         assert result == ""
 

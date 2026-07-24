@@ -18,6 +18,16 @@ def _nuxt_routes(*names: str) -> tuple[str, ...]:
     return tuple(f"cache:nitro:routes:{name}*" for name in names)
 
 
+def _nuxt_functions(*names: str) -> tuple[str, ...]:
+    """Build Nuxt Nitro cached-function patterns.
+
+    ``defineCachedFunction`` stores entries under
+    ``cache:nitro:functions:<name>:*``.
+    """
+
+    return tuple(f"cache:nitro:functions:{name}*" for name in names)
+
+
 def register_default_surfaces() -> None:
     """Register the surfaces shipped by ``core``.
 
@@ -97,6 +107,14 @@ def register_default_surfaces() -> None:
                 "ProductAttributeViewSet",
                 "ProductAttributeValueViewSet",
                 "SearchProductViewSet",
+            )
+            # Meta/TikTok catalog feeds (/feeds/*.xml) render from the
+            # product list — stale prices/brands otherwise persist for
+            # up to the feed's SWR window after a catalog edit.
+            + _nuxt_functions(
+                "ProductFeed",
+                "feeds:products",
+                "feeds:product-category",
             ),
             related=("categories", "tags"),
             icon="inventory_2",

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.db.models import Prefetch
+
 from core.managers import OptimizedManager, OptimizedQuerySet
 
 if TYPE_CHECKING:
@@ -20,31 +22,35 @@ class FavouriteQuerySet(OptimizedQuerySet):
         """Select related user."""
         return self.select_related("user")
 
-    def with_product(self) -> Self:
-        """Select related product with translations."""
-        return self.select_related("product").prefetch_related(
-            "product__translations"
-        )
+    def _with_enriched_product(self) -> Self:
+        """Prefetch ``product`` with everything the embedded
+        ``ProductDetailSerializer`` renders — translations, category/vat/
+        brand, review/likes counts, images and attributes — so serializing N
+        favourites stays O(1) queries (G0301).
 
-    def with_product_images(self) -> Self:
-        """Prefetch product images."""
-        return self.prefetch_related("product__images__translations")
+        Composed from the Product optimizers directly rather than
+        ``Product.objects.for_detail()`` to avoid coupling to its
+        deleted/active filtering; a favourite can point at any product.
+        """
+        from product.models.product import Product
+
+        product_qs = (
+            Product.objects.with_translations()
+            .with_category()
+            .with_counts()
+            .with_main_image()
+            .with_product_attributes()
+        )
+        return self.prefetch_related(Prefetch("product", queryset=product_qs))
 
     def for_list(self) -> Self:
-        """
-        Optimized queryset for list views.
-
-        Includes user and product with translations.
-        """
-        return self.with_user().with_product()
+        """Optimized queryset for list views: user + fully enriched product
+        (the list serializer embeds the detail-tier product)."""
+        return self.with_user()._with_enriched_product()
 
     def for_detail(self) -> Self:
-        """
-        Optimized queryset for detail views.
-
-        Includes everything from for_list() plus product images.
-        """
-        return self.for_list().with_product_images()
+        """Optimized queryset for detail views (same enrichment as list)."""
+        return self.with_user()._with_enriched_product()
 
     def by_user(self, user_id: int) -> Self:
         """Filter by user ID."""

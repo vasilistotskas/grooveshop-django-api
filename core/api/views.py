@@ -16,9 +16,11 @@ from rest_framework import status
 from rest_framework.decorators import (
     action,
     api_view,
+    authentication_classes,
     permission_classes,
+    throttle_classes,
 )
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -416,6 +418,12 @@ class BaseModelViewSet(
     responses=HealthCheckResponseSerializer,
 )
 @api_view(["GET"])
+# No throttling: DRF's default throttles hit the Redis cache before the
+# view runs, so a Redis outage would 500 this endpoint — turning the
+# dependency check into a hard failure instead of the graceful
+# per-service booleans below. Probes also must never consume (or
+# exhaust) the shared anonymous throttle bucket.
+@throttle_classes([])
 def health_check(request):
     health_status = {
         "database": False,
@@ -449,6 +457,27 @@ def health_check(request):
     response = Response(health_status)
     get_token(request)
     return response
+
+
+@extend_schema(exclude=True)
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+# No throttling — see health_check. For this endpoint it would also be
+# a hidden shared dependency: the throttle's Redis GET runs before the
+# view, so a Redis blip would fail the probe on every pod at once even
+# though the view itself touches no backing service.
+@throttle_classes([])
+def health_live(request):
+    """Lightweight probe — confirms the worker processes requests.
+
+    Unlike ``health_check`` (which pings the database, Redis, and Celery
+    and is suited to the *startup* gate), this touches no backing
+    service, so a slow or unavailable dependency can never fail the
+    Kubernetes readiness/liveness probes and de-register or restart
+    healthy workers.
+    """
+    return Response({"status": "ok"})
 
 
 @extend_schema(

@@ -1,22 +1,16 @@
 from datetime import timedelta
-from unittest.mock import patch
 
 import pytest
-from django.test import override_settings
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django.utils.translation import gettext
 
+from admin.base import BaseTranslatableAdmin, BaseTranslatableTabularInline
 from country.models import Country
-from region.admin import (
-    CountryGroupFilter,
-    RegionAdmin,
-    RegionInline,
-    RegionStatusFilter,
-)
+from region.admin import RegionAdmin, RegionInline, RegionStatusFilter
 from region.models import Region
 
 pytestmark = pytest.mark.assert_english
@@ -164,119 +158,6 @@ class TestRegionStatusFilter(TestCase):
         self.assertEqual(list(queryset), list(filtered_queryset))
 
 
-class TestCountryGroupFilter(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.request = self.factory.get("/")
-        self.request.user = User.objects.create_user(
-            email="test@example.com", password="testpass123"
-        )
-
-        class MockModelAdmin:
-            pass
-
-        self.model_admin = MockModelAdmin()
-
-        self.us_country = Country.objects.create(
-            alpha_2="US", alpha_3="USA", iso_cc="840"
-        )
-
-        self.de_country = Country.objects.create(
-            alpha_2="DE", alpha_3="DEU", iso_cc="276"
-        )
-
-        self.cn_country = Country.objects.create(
-            alpha_2="CN", alpha_3="CHN", iso_cc="156"
-        )
-
-        self.us_region = Region.objects.create(
-            alpha="CA", country=self.us_country
-        )
-
-        self.de_region = Region.objects.create(
-            alpha="BY", country=self.de_country
-        )
-
-        self.cn_region = Region.objects.create(
-            alpha="BJ", country=self.cn_country
-        )
-
-    def test_filter_title_and_parameter(self):
-        filter_instance = CountryGroupFilter(
-            self.request, {}, Region, self.model_admin
-        )
-        self.assertEqual(filter_instance.title, "Country Groups")
-        self.assertEqual(filter_instance.parameter_name, "country_group")
-
-    def test_lookups(self):
-        filter_instance = CountryGroupFilter(
-            self.request, {}, Region, self.model_admin
-        )
-
-        lookups = filter_instance.lookups(self.request, None)
-        expected_lookups = [
-            ("europe", "European Countries"),
-            ("asia", "Asian Countries"),
-            ("america", "American Countries"),
-            ("africa", "African Countries"),
-            ("oceania", "Oceania Countries"),
-        ]
-
-        self.assertEqual(list(lookups), expected_lookups)
-
-    def test_queryset_europe_filter(self):
-        filter_instance = CountryGroupFilter(
-            self.request, {}, Region, self.model_admin
-        )
-        filter_instance.used_parameters = {"country_group": "europe"}
-
-        queryset = Region.objects.all()
-        filtered_queryset = filter_instance.queryset(self.request, queryset)
-
-        european_regions = list(filtered_queryset)
-        self.assertIn(self.de_region, european_regions)
-        self.assertNotIn(self.us_region, european_regions)
-        self.assertNotIn(self.cn_region, european_regions)
-
-    def test_queryset_asia_filter(self):
-        filter_instance = CountryGroupFilter(
-            self.request, {}, Region, self.model_admin
-        )
-        filter_instance.used_parameters = {"country_group": "asia"}
-
-        queryset = Region.objects.all()
-        filtered_queryset = filter_instance.queryset(self.request, queryset)
-
-        asian_regions = list(filtered_queryset)
-        self.assertIn(self.cn_region, asian_regions)
-        self.assertNotIn(self.us_region, asian_regions)
-        self.assertNotIn(self.de_region, asian_regions)
-
-    def test_queryset_america_filter(self):
-        filter_instance = CountryGroupFilter(
-            self.request, {}, Region, self.model_admin
-        )
-        filter_instance.used_parameters = {"country_group": "america"}
-
-        queryset = Region.objects.all()
-        filtered_queryset = filter_instance.queryset(self.request, queryset)
-
-        american_regions = list(filtered_queryset)
-        self.assertIn(self.us_region, american_regions)
-        self.assertNotIn(self.de_region, american_regions)
-        self.assertNotIn(self.cn_region, american_regions)
-
-    def test_queryset_no_filter(self):
-        filter_instance = CountryGroupFilter(
-            self.request, {}, Region, self.model_admin
-        )
-
-        queryset = Region.objects.all()
-        filtered_queryset = filter_instance.queryset(self.request, queryset)
-
-        self.assertEqual(list(queryset), list(filtered_queryset))
-
-
 class TestRegionInline(TestCase):
     def test_inline_configuration(self):
         inline = RegionInline(Region, AdminSite())
@@ -295,6 +176,9 @@ class TestRegionInline(TestCase):
         from parler.admin import TranslatableTabularInline
 
         self.assertTrue(issubclass(RegionInline, TranslatableTabularInline))
+        # Unfold-native base (fixes the previously-unstyled inline on
+        # CountryAdmin) — see admin.base.BaseTranslatableTabularInline.
+        self.assertTrue(issubclass(RegionInline, BaseTranslatableTabularInline))
 
 
 @override_settings(LANGUAGE_CODE="en-US")
@@ -324,6 +208,8 @@ class TestRegionAdmin(TestCase):
         self.region.save()
 
     def test_admin_configuration(self):
+        # These flags come from BaseModelAdmin's project-wide defaults
+        # now, rather than being re-declared per admin.
         self.assertTrue(self.admin.compressed_fields)
         self.assertTrue(self.admin.warn_unsaved_form)
         self.assertTrue(self.admin.list_fullwidth)
@@ -357,7 +243,6 @@ class TestRegionAdmin(TestCase):
 
         expected_filters = [
             RegionStatusFilter,
-            CountryGroupFilter,
             ("country", RelatedDropdownFilter),
             ("created_at", RangeDateTimeFilter),
             ("updated_at", RangeDateTimeFilter),
@@ -376,13 +261,13 @@ class TestRegionAdmin(TestCase):
 
     def test_readonly_fields(self):
         # sort_order is now editable via drag-and-drop (ordering_field = "sort_order");
-        # it is no longer forced into readonly_fields.
+        # it is no longer forced into readonly_fields. country_analytics
+        # was removed entirely (redundant per-country COUNT fields).
         expected_fields = (
             "uuid",
             "created_at",
             "updated_at",
             "region_analytics",
-            "country_analytics",
         )
         self.assertEqual(self.admin.readonly_fields, expected_fields)
 
@@ -395,8 +280,6 @@ class TestRegionAdmin(TestCase):
 
         self.assertIn("California", result)
         self.assertIn("CA", result)
-        self.assertIn("text-green-600", result)
-        self.assertIn("✅", result)
 
     def test_region_info_without_name(self):
         region_no_name = Region.objects.create(alpha="TX", country=self.country)
@@ -405,26 +288,12 @@ class TestRegionAdmin(TestCase):
 
         self.assertIn("Unnamed Region", result)
         self.assertIn("TX", result)
-        self.assertIn("text-orange-600", result)
-        self.assertIn("⚠️", result)
 
-    def test_country_display_with_flag(self):
-        with patch.object(self.country, "image_flag") as mock_flag:
-            mock_flag.url = "/media/flags/us.png"
-            mock_flag.__bool__ = lambda self: True
-
-            result = self.admin.country_display(self.region)
-
-            self.assertIn("United States", result)
-            self.assertIn("US", result)
-            self.assertIn('<img src="/media/flags/us.png"', result)
-
-    def test_country_display_without_flag(self):
+    def test_country_display(self):
         result = self.admin.country_display(self.region)
 
         self.assertIn("United States", result)
         self.assertIn("US", result)
-        self.assertIn("🏳️", result)
 
     def test_region_stats_numeric_code(self):
         numeric_region = Region.objects.create(
@@ -434,13 +303,13 @@ class TestRegionAdmin(TestCase):
         result = self.admin.region_stats(numeric_region)
 
         self.assertIn("3 chars", result)
-        self.assertIn("🔢 Numeric", result)
+        self.assertIn("Numeric", result)
 
     def test_region_stats_alpha_code(self):
         result = self.admin.region_stats(self.region)
 
         self.assertIn("2 chars", result)
-        self.assertIn("🔤 Alpha", result)
+        self.assertIn("Alpha", result)
 
     def test_region_stats_mixed_code(self):
         mixed_region = Region.objects.create(alpha="1A", country=self.country)
@@ -448,15 +317,12 @@ class TestRegionAdmin(TestCase):
         result = self.admin.region_stats(mixed_region)
 
         self.assertIn("2 chars", result)
-        self.assertIn("🔀 Mixed", result)
+        self.assertIn("Mixed", result)
 
     def test_sort_display_with_order(self):
         result = self.admin.sort_display(self.region)
 
-        self.assertIn("1", result)
-        self.assertIn("#1", result)
-        self.assertIn("bg-green-50", result)
-        self.assertIn("✅", result)
+        self.assertEqual(result, 1)
 
     def test_sort_display_no_order(self):
         no_order_region = Region.objects.create(
@@ -465,30 +331,13 @@ class TestRegionAdmin(TestCase):
 
         result = self.admin.sort_display(no_order_region)
 
-        self.assertIn("None", result)
-        self.assertIn("No Order", result)
-        self.assertIn("bg-red-50", result)
-        self.assertIn("❌", result)
-
-    def test_sort_display_first_order(self):
-        first_region = Region.objects.create(
-            alpha="TX", country=self.country, sort_order=0
-        )
-
-        result = self.admin.sort_display(first_region)
-
-        self.assertIn("0", result)
-        self.assertIn("First", result)
-        self.assertIn("bg-yellow-50", result)
-        self.assertIn("⚠️", result)
+        self.assertEqual(result, "No order")
 
     def test_completeness_badge_complete(self):
         result = self.admin.completeness_badge(self.region)
 
         self.assertIn("100%", result)
         self.assertIn("Complete", result)
-        self.assertIn("bg-green-50", result)
-        self.assertIn("✅", result)
 
     def test_completeness_badge_partial(self):
         partial_region = Region.objects.create(
@@ -500,8 +349,6 @@ class TestRegionAdmin(TestCase):
 
         self.assertIn("66%", result)
         self.assertIn("Good", result)
-        self.assertIn("bg-blue-50", result)
-        self.assertIn("🔷", result)
 
     def test_completeness_badge_poor(self):
         poor_region = Region.objects.create(
@@ -513,46 +360,25 @@ class TestRegionAdmin(TestCase):
 
         self.assertIn("33%", result)
         self.assertIn("Partial", result)
-        self.assertIn("bg-yellow-50", result)
-        self.assertIn("⚠️", result)
 
     def test_created_display(self):
         result = self.admin.created_display(self.region)
 
-        date_str = self.region.created_at.strftime("%Y-%m-%d")
-        time_str = self.region.created_at.strftime("%H:%M")
+        date_str = self.region.created_at.strftime("%d/%m/%Y")
         self.assertIn(date_str, result)
-        self.assertIn(time_str, result)
 
     def test_region_analytics(self):
         result = self.admin.region_analytics(self.region)
 
-        self.assertIn("Name Length", result)
-        self.assertIn("Code Length", result)
-        self.assertIn("Code Pattern", result)
-        self.assertIn("Case Pattern", result)
-        self.assertIn("Has Name", result)
-        self.assertIn("Sort Position", result)
+        self.assertIn("Name length", result)
+        self.assertIn("Code length", result)
+        self.assertIn("Has name", result)
+        self.assertIn("Sort position", result)
 
         self.assertIn("10 chars", result)
         self.assertIn("2 chars", result)
-        self.assertIn("Alpha", result)
-        self.assertIn("Upper", result)
         self.assertIn("Yes", result)
         self.assertIn("1", result)
-
-    def test_country_analytics(self):
-        result = self.admin.country_analytics(self.region)
-
-        self.assertIn("Country", result)
-        self.assertIn("Country Code", result)
-        self.assertIn("Total Regions", result)
-        self.assertIn("Position", result)
-        self.assertIn("Has Flag", result)
-        self.assertIn("Has ISO", result)
-
-        self.assertIn("United States", result)
-        self.assertIn("US", result)
 
     def test_update_sort_order_action(self):
         Region.objects.create(alpha="TX", country=self.country)
@@ -586,7 +412,9 @@ class TestRegionAdmin(TestCase):
         self.assertEqual(
             self.admin.country_display.short_description, _("Country")
         )
-        self.assertEqual(self.admin.region_stats.short_description, _("Stats"))
+        self.assertEqual(
+            self.admin.region_stats.short_description, _("Code Pattern")
+        )
         self.assertEqual(
             self.admin.sort_display.short_description, _("Sort Order")
         )
@@ -597,11 +425,8 @@ class TestRegionAdmin(TestCase):
             self.admin.created_display.short_description, _("Created")
         )
         self.assertEqual(
-            self.admin.region_analytics.short_description, _("Region Analytics")
-        )
-        self.assertEqual(
-            self.admin.country_analytics.short_description,
-            _("Country Analytics"),
+            self.admin.region_analytics.short_description,
+            _("Region Analytics"),
         )
 
 
@@ -622,6 +447,7 @@ class TestRegionAdminIntegration(TestCase):
 
         self.assertIsInstance(self.admin, ModelAdmin)
         self.assertIsInstance(self.admin, TranslatableAdmin)
+        self.assertIsInstance(self.admin, BaseTranslatableAdmin)
 
     def test_admin_has_required_methods(self):
         required_methods = [
@@ -633,13 +459,17 @@ class TestRegionAdminIntegration(TestCase):
             "completeness_badge",
             "created_display",
             "region_analytics",
-            "country_analytics",
             "update_sort_order",
         ]
 
         for method_name in required_methods:
             self.assertTrue(hasattr(self.admin, method_name))
             self.assertTrue(callable(getattr(self.admin, method_name)))
+
+    def test_country_analytics_removed(self):
+        # country_analytics was per-country COUNT noise, deleted as
+        # part of the unfold-native cleanup.
+        self.assertFalse(hasattr(self.admin, "country_analytics"))
 
     def test_fieldsets_structure(self):
         fieldsets = self.admin.fieldsets
@@ -681,8 +511,7 @@ class TestRegionAdminEdgeCases(TestCase):
 
         result = self.admin.region_analytics(special_region)
 
-        self.assertIn("Code Length", result)
-        self.assertIn("Mixed", result)
+        self.assertIn("Code length", result)
 
     def test_completeness_calculation_edge_cases(self):
         country = Country.objects.create(
@@ -725,7 +554,6 @@ class TestRegionAdminEdgeCases(TestCase):
             self.admin.completeness_badge(region_with_nones)
             self.admin.created_display(region_with_nones)
             self.admin.region_analytics(region_with_nones)
-            self.admin.country_analytics(region_with_nones)
         except Exception as e:
             self.fail(
                 f"Display methods should handle None values gracefully: {e}"

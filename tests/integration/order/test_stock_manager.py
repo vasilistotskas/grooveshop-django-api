@@ -1241,6 +1241,39 @@ class TestStockManagerDecrementStock:
         product.refresh_from_db()
         assert product.stock == 75  # 100 - 25
 
+    def test_decrement_respects_other_sessions_reservations_when_opted_in(
+        self,
+    ):
+        """With respect_reservations=True the checkout fallback must not
+        oversell against inventory another session has reserved (G0284)."""
+        from order.factories import OrderFactory
+
+        product = ProductFactory(stock=5)
+        order = OrderFactory(num_order_items=0)
+
+        # Another shopper has reserved 4 of the 5 units.
+        StockManager.reserve_stock(
+            product_id=product.id, quantity=4, session_id="other-session"
+        )
+
+        # Physical stock (5) would allow 3, but availability (5-4=1) does not.
+        with pytest.raises(InsufficientStockError):
+            StockManager.decrement_stock(
+                product_id=product.id,
+                quantity=3,
+                order_id=order.id,
+                respect_reservations=True,
+            )
+
+        # The default (admin/direct) path still checks only physical stock.
+        StockManager.decrement_stock(
+            product_id=product.id,
+            quantity=3,
+            order_id=order.id,
+        )
+        product.refresh_from_db()
+        assert product.stock == 2
+
     def test_decrement_stock_creates_audit_log(self):
         """Test that stock decrement creates a StockLog entry."""
         from order.factories import OrderFactory

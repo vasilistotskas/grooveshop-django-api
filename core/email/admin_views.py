@@ -34,6 +34,14 @@ class EmailTemplateManagementView(TemplateView):
         """
         context = super().get_context_data(**kwargs)
 
+        # Unfold renders its chrome (sidebar navigation, site dropdown,
+        # environment badge, theme state) from the admin site's
+        # ``each_context``. Plain TemplateViews don't get it, which left
+        # this page with a half-populated shell.
+        from django.contrib import admin
+
+        context.update(admin.site.each_context(self.request))
+
         from .registry import EmailTemplateRegistry
 
         # Get all templates grouped by category

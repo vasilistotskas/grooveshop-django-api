@@ -664,3 +664,31 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         call_kwargs = mock_stripe_create.call_args[1]
         metadata = call_kwargs["metadata"]
         self.assertEqual(metadata["cart_item_ids"], "")
+
+
+class StripeApiVersionConfigTestCase(TestCase):
+    """dj-stripe must run on its own schema-matched API version.
+
+    Pinning STRIPE_API_VERSION to an older value forces dj-stripe to parse
+    payloads shaped for one API version against models built for another,
+    silently corrupting the local Stripe mirror. dj-stripe's docs state the
+    value "should not be changed", so the project must not define it.
+    """
+
+    def test_stripe_api_version_is_not_overridden(self):
+        self.assertFalse(
+            hasattr(settings, "STRIPE_API_VERSION"),
+            "settings must not pin STRIPE_API_VERSION; dj-stripe manages it "
+            "to keep the API schema aligned with its model schema.",
+        )
+
+    def test_djstripe_resolves_to_installed_sdk_version(self):
+        import stripe
+        from djstripe.settings import djstripe_settings
+
+        # With no override, dj-stripe uses the installed SDK's api_version,
+        # which tracks the dj-stripe model schema train (currently .dahlia).
+        self.assertEqual(
+            djstripe_settings.STRIPE_API_VERSION, stripe.api_version
+        )
+        self.assertNotEqual(djstripe_settings.STRIPE_API_VERSION, "2024-04-10")

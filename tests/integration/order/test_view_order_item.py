@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from core.utils.testing import TestURLFixerMixin
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
+from order.models.item import OrderItem
 from order.serializers.item import (
     OrderItemDetailSerializer,
     OrderItemSerializer,
@@ -137,6 +138,48 @@ class OrderItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_create_forbidden_on_foreign_order(self):
+        # A user must not be able to attach items to another user's order.
+        self.client.force_authenticate(user=self.other_user)
+
+        payload = {
+            "order": self.order.id,
+            "product": self.product.id,
+            "quantity": 1,
+        }
+
+        response = self.client.post(
+            self.get_order_item_list_url(), payload, format="json"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertFalse(
+            OrderItem.objects.filter(
+                order=self.order, product=self.product, quantity=1
+            ).exists()
+        )
+
+    def test_update_cannot_reassign_to_foreign_order(self):
+        # The item's owner must not be able to move it into another user's
+        # order via update — `order` is a writable FK, and get_object only
+        # validates the item's CURRENT order.
+        self.client.force_authenticate(user=self.user)
+
+        payload = {
+            "order": self.other_order.id,
+            "product": self.product.id,
+            "quantity": 1,
+        }
+        response = self.client.put(
+            self.get_order_item_detail_url(self.order_item.id),
+            payload,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.order_item.refresh_from_db()
+        self.assertEqual(self.order_item.order_id, self.order.id)
 
     def test_update_valid(self):
         # self.user owns self.order, so owns self.order_item — expect 200
@@ -356,6 +399,7 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
 
     def setUp(self):
         self.user = UserAccountFactory()
+        self.staff = UserAccountFactory(is_staff=True)
         self.pay_way = PayWayFactory()
         self.product = ProductFactory(
             active=True, num_images=0, num_reviews=0, stock=20
@@ -370,8 +414,26 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
     def get_refund_url(self, pk):
         return reverse("order-item-refund", kwargs={"pk": pk})
 
-    def test_refund_action_valid(self):
+    def test_refund_action_forbidden_for_non_staff(self):
+        # Refund restocks inventory and flips refund state — a staff-only
+        # operation. The order owner must not be able to self-serve it.
         self.client.force_authenticate(user=self.user)
+
+        self.order.status = OrderStatus.DELIVERED.value
+        self.order.save()
+
+        response = self.client.post(
+            self.get_refund_url(self.order_item.id),
+            {"quantity": 1, "reason": "self refund"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.order_item.refresh_from_db()
+        self.assertFalse(self.order_item.is_refunded)
+
+    def test_refund_action_valid(self):
+        self.client.force_authenticate(user=self.staff)
 
         self.order.status = OrderStatus.DELIVERED.value
         self.order.save()
@@ -388,7 +450,7 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
         self.assertIn("refunded_amount", response.data)
 
     def test_refund_action_invalid_order_status(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.staff)
 
         self.order.status = OrderStatus.PENDING.value
         self.order.save()
@@ -403,7 +465,7 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_refund_action_excessive_quantity(self):
-        self.client.force_authenticate(user=self.user)
+        self.client.force_authenticate(user=self.staff)
 
         self.order.status = OrderStatus.DELIVERED.value
         self.order.save()

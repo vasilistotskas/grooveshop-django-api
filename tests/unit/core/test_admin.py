@@ -12,7 +12,7 @@ from django.test import TestCase, override_settings
 from djmoney.models.fields import Money
 from parler.models import TranslatableModel
 
-from core.admin import ExportActionMixin
+from admin.export import ExportActionMixin
 
 
 class MockAdminModel(models.Model):
@@ -120,6 +120,30 @@ class ExportActionMixinTest(TestCase):
 
         self.assertEqual(len(fields), 1)
         self.assertEqual(fields[0], regular_field)
+
+    def test_get_exportable_fields_excludes_sensitive(self):
+        # Secrets / private data must never be written to an export file.
+        mock_opts = MagicMock(spec=Options)
+
+        def _field(name):
+            field = MagicMock()
+            field.name = name
+            field.many_to_many = False
+            field.one_to_many = False
+            field.one_to_one = False
+            return field
+
+        mock_opts.get_fields.return_value = [
+            _field("email"),
+            _field("password"),
+            _field("private_metadata"),
+        ]
+
+        names = [f.name for f in self.mixin._get_exportable_fields(mock_opts)]
+
+        self.assertIn("email", names)
+        self.assertNotIn("password", names)
+        self.assertNotIn("private_metadata", names)
 
     @override_settings(LANGUAGES=[("en", "English"), ("fr", "French")])
     def test_export_csv_standard_model(self):

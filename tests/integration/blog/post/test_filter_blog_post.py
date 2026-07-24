@@ -19,6 +19,13 @@ class BlogPostFilterTest(APITestCase):
         self.author = BlogAuthorFactory(user=UserAccountFactory())
         self.category = BlogCategoryFactory()
 
+        # These tests exercise filter behaviour against the full post set
+        # (including drafts and future-dated posts), so they run as staff.
+        # The public draft-visibility rule is covered by
+        # test_anonymous_cannot_see_unpublished_posts below.
+        self.staff = UserAccountFactory(is_staff=True)
+        self.client.force_authenticate(user=self.staff)
+
         self.now = timezone.now()
 
         self.old_post = BlogPostFactory(
@@ -124,6 +131,25 @@ class BlogPostFilterTest(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(response.data["results"][0]["id"], self.recent_post.id)
+
+    def test_anonymous_cannot_see_unpublished_posts(self):
+        # Drafts and not-yet-published posts must be hidden from the public;
+        # only published, already-live posts are listable/retrievable.
+        self.client.force_authenticate(user=None)
+        response = self.client.get(reverse("blog-post-list"))
+        self.assertEqual(response.status_code, 200)
+
+        result_ids = [r["id"] for r in response.data["results"]]
+        self.assertIn(self.old_post.id, result_ids)
+        self.assertIn(self.recent_post.id, result_ids)
+        self.assertNotIn(self.draft_post.id, result_ids)
+        self.assertNotIn(self.future_post.id, result_ids)
+
+        # Direct retrieval of a draft by id is a 404 for the public.
+        detail = self.client.get(
+            reverse("blog-post-detail", kwargs={"pk": self.draft_post.id})
+        )
+        self.assertEqual(detail.status_code, 404)
 
     def test_camel_case_filters(self):
         url = reverse("blog-post-list")

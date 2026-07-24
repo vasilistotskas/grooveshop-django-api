@@ -72,6 +72,25 @@ class TestGreeklishConversion:
         variants = converter.convert_to_greek_variants("chara")
         assert any("χ" in v for v in variants)
 
+    def test_digraph_word_yields_fully_greek_variant(self):
+        """A word containing a digraph must still map the REST of the word
+        to Greek — the old code appended every character after the digraph
+        literally, producing mixed Greek/Latin garbage like 'θalassa' (G0335).
+        """
+        converter = GreeklishConverter(max_expansions=20)
+
+        for word in ("thalassa", "psomi", "chara", "efxaristo"):
+            variants = converter.convert_to_greek_variants(word)
+            fully_greek = [
+                v
+                for v in variants
+                if not any(ch.isascii() and ch.isalpha() for ch in v)
+            ]
+            assert fully_greek, (
+                f"{word!r} produced no fully-Greek variant "
+                f"(mixed-script leak): {variants}"
+            )
+
     def test_handles_vowel_variants(self):
         """Should generate variants for ambiguous vowels."""
         converter = GreeklishConverter(max_expansions=20)

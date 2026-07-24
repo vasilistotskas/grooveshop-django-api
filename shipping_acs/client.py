@@ -163,14 +163,31 @@ class AcsClient:
                 alias=alias,
                 error_message=f"ACS connection error: {exc}",
             ) from exc
+        except requests.Timeout as exc:
+            # Read timeouts mean the request MAY have been processed —
+            # blind HTTP-layer re-POST is unsafe (see _RETRY_CONFIG),
+            # but the Celery path is: the 3-phase claim in
+            # ``AcsService.create_voucher_for_order`` dedupes a
+            # re-mint, so surfacing this as retryable is correct.
+            raise AcsRetryableError(
+                alias=alias,
+                error_message=f"ACS timeout after {self.timeout}s: {exc}",
+            ) from exc
 
-        # Auth failures bypass the JSON envelope.
+        # Auth failures bypass the JSON envelope. Production ACS also
+        # returns sporadic transient 403/406s (~2% of tracking polls,
+        # self-healing on retry), so AcsAuthError is retryable — see
+        # its docstring. Only a *persistent* rejection indicates a bad
+        # key or a de-listed IP.
         if response.status_code in (403, 406):
             raise AcsAuthError(
                 alias=alias,
                 error_message=(
-                    "ACS rejected the request — invalid AcsApiKey or "
-                    "the calling IP is not in the allow-list."
+                    "ACS rejected the request at the auth layer "
+                    "(usually a transient rejection that succeeds on "
+                    "retry; persistent failures mean an invalid "
+                    "AcsApiKey or a calling IP missing from the "
+                    "allow-list)."
                 ),
                 http_status=response.status_code,
             )

@@ -52,3 +52,44 @@ def save_search_query(
         ip_address=ip_address,
         user_agent=user_agent,
     )
+
+
+@celery_app.task(base=MonitoredTask)
+def anonymize_old_search_queries(days: int = 90) -> int:
+    """Strip PII from SearchQuery rows older than ``days``.
+
+    SearchQuery keeps ip_address / user_agent / session_key / a user FK for
+    analytics, but retaining that identifiable data indefinitely is a GDPR
+    liability (G0342). After the retention window we null the identifiers,
+    keeping the aggregate analytics value (query text, counts, timing).
+    Registered as a periodic beat task.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+
+    from search.models import SearchQuery
+
+    cutoff = timezone.now() - timedelta(days=days)
+    scrubbed = (
+        SearchQuery.objects.filter(
+            timestamp__lt=cutoff,
+        )
+        .exclude(
+            ip_address__isnull=True,
+            user_agent="",
+            session_key__isnull=True,
+            user__isnull=True,
+        )
+        .update(
+            ip_address=None,
+            user_agent="",
+            session_key=None,
+            user=None,
+        )
+    )
+    logger.info(
+        "anonymize_old_search_queries: scrubbed %s rows older than %s days",
+        scrubbed,
+        days,
+    )
+    return scrubbed

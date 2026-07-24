@@ -24,6 +24,10 @@ from product.models.product import Product
 from user.factories.account import UserAccountFactory
 from vat.models import Vat
 
+# These tests assert English validation messages, so force the English
+# locale (the app default is Greek). Matches tests/unit/test_loyalty.
+pytestmark = pytest.mark.assert_english
+
 
 # ---------------------------------------------------------------------------
 # Helpers

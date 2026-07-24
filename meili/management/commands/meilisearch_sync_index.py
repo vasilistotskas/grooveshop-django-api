@@ -54,7 +54,9 @@ class Command(TenantCommandMixin, BaseCommand):
         self._update_settings(Model)
 
         tasks = []
-        for qs in batch_qs(Model.objects.all(), options["batch_size"]):
+        # Stable ordering required — batch_qs paginates with LIMIT/OFFSET, so
+        # an unordered queryset skips/duplicates documents per slice (G0174).
+        for qs in batch_qs(Model.objects.order_by("pk"), options["batch_size"]):
             tasks.append(
                 _client.get_index(Model.get_meili_index_name()).add_documents(
                     [self._serialize(m) for m in qs if m.meili_filter()]

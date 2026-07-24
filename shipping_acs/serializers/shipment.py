@@ -88,6 +88,12 @@ class AcsShipmentDetailSerializer(AcsShipmentSerializer):
         return f"/api/v1/shipping/acs/shipments/{obj.voucher_no}/label.pdf"
 
     class Meta(AcsShipmentSerializer.Meta):
+        # NOTE: `metadata`, `raw_shipment_status`, `delivery_flag` and
+        # `returned_flag` are deliberately NOT exposed here. This serializer is
+        # returned to the customer on the order-detail endpoint, and
+        # `metadata` carries internal data (ACS billing code, admin cancel
+        # reasons) and a failed-mint `last_error` envelope that includes
+        # recipient PII. Staff view these via AcsShipmentAdmin instead.
         fields = (
             *AcsShipmentSerializer.Meta.fields,
             "station_destination_external_id",
@@ -95,10 +101,6 @@ class AcsShipmentDetailSerializer(AcsShipmentSerializer):
             "station",
             "events",
             "label_url",
-            "delivery_flag",
-            "returned_flag",
-            "raw_shipment_status",
             "cancel_requested_at",
-            "metadata",
         )
         read_only_fields = fields

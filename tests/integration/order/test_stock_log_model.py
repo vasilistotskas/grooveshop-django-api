@@ -6,6 +6,9 @@ from product.factories import ProductFactory
 from user.factories import UserAccountFactory
 
 
+pytestmark = pytest.mark.assert_english
+
+
 @pytest.mark.django_db
 class TestStockLogModel:
     """Test suite for StockLog model."""

@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('pay_way', '0015_alter_payway_sort_order'),
+        ('pay_way', '0016_convert_instructions_to_htmlfield'),
     ]
 
     operations = [

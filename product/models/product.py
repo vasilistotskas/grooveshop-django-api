@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
@@ -43,6 +43,22 @@ from tag.models.tagged_item import TaggedModel
 DISCOUNT_PERCENT_MIN = Decimal("0.0")
 DISCOUNT_PERCENT_MAX = Decimal("100.0")
 
+TWO_PLACES = Decimal("0.01")
+
+
+def _quantize_cents(value: Decimal) -> Decimal:
+    """Round a monetary amount to whole cents (2dp, ROUND_HALF_UP — the
+    AADE convention, see ``order/mydata/builder.py``).
+
+    Percentage-derived amounts (VAT, discount) carry sub-cent precision
+    (e.g. 16.12 × 24% = 3.8688). Left unquantized they leak into
+    ``CartItem.price_at_add`` comparisons, cart totals and order metadata
+    snapshots, while the DB ``numeric(11,2)`` columns round independently
+    on insert — producing phantom "price drift" between in-memory and
+    persisted values.
+    """
+    return value.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
+
 
 class Product(
     SoftDeleteModel,
@@ -59,6 +75,24 @@ class Product(
     )
     category = TreeForeignKey(
         "product.ProductCategory",
+        on_delete=models.SET_NULL,
+        related_name="products",
+        null=True,
+        blank=True,
+    )
+    variant_group = models.ForeignKey(
+        "product.ProductVariantGroup",
+        on_delete=models.SET_NULL,
+        related_name="variants",
+        null=True,
+        blank=True,
+        help_text=_(
+            "Links this product to its sibling variations (e.g. the same item "
+            "in other colours). Members share variant selectors on the storefront."
+        ),
+    )
+    brand = models.ForeignKey(
+        "product.Brand",
         on_delete=models.SET_NULL,
         related_name="products",
         null=True,
@@ -173,6 +207,9 @@ class Product(
             BTreeIndex(fields=["active"], name="product_active_ix"),
             BTreeIndex(fields=["category"], name="product_category_ix"),
             BTreeIndex(
+                fields=["variant_group"], name="product_variant_group_ix"
+            ),
+            BTreeIndex(
                 fields=["active", "price"], name="product_active_price_ix"
             ),
             BTreeIndex(
@@ -256,7 +293,7 @@ class Product(
     @property
     def discount_value(self) -> Money:
         value = (self.price.amount * self.discount_percent) / 100
-        return Money(value, settings.DEFAULT_CURRENCY)
+        return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
 
     @property
     def price_save_percent(self) -> Decimal:
@@ -320,7 +357,7 @@ class Product(
     def vat_value(self) -> Money:
         if self.vat:
             value = (self.price.amount * self.vat.value) / 100
-            return Money(value, settings.DEFAULT_CURRENCY)
+            return Money(_quantize_cents(value), settings.DEFAULT_CURRENCY)
         return Money(0, settings.DEFAULT_CURRENCY)
 
     @property
@@ -336,7 +373,8 @@ class Product(
             if self.discount_value.currency != price_currency
             else self.discount_value
         )
-        return self.price + vat_value - discount_value
+        total = self.price + vat_value - discount_value
+        return Money(_quantize_cents(total.amount), price_currency)
 
     @property
     def main_image_path(self) -> str:
@@ -410,6 +448,27 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
                 _review_average=Avg("master__reviews__rate"),
                 _reviews_count=Count("master__reviews", distinct=True),
             )
+        )
+
+    @classmethod
+    def get_search_result_queryset(cls):
+        """Optimized queryset for hydrating Meilisearch product hits.
+
+        The search-result serializer reads ``obj.master.{slug, price,
+        final_price, vat.value, likes_count, review_average, main_image_path}``
+        per hit, so the master is prefetched through the Product optimizers
+        that annotate ``likes_count`` / ``review_average`` (matching the
+        property names — NOT the ``_``-prefixed indexing annotations) and
+        prefetch its main image. Without this the enrichment loop runs ~4 DB
+        queries per hit on the hottest public endpoint (G0336/G0351).
+        """
+        from django.db.models import Prefetch
+
+        master_qs = (
+            Product.objects.with_category().with_counts().with_main_image()
+        )
+        return cls.objects.prefetch_related(
+            Prefetch("master", queryset=master_qs)
         )
 
     def meili_filter(self) -> bool:

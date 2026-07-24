@@ -110,8 +110,12 @@ def create_celery_app():
             return
 
         try:
-            apply_db_overlay()
+            # Order matters: reload (evict + rebuild the base gettext
+            # catalogs) FIRST, then apply the DB overlay on top. The reverse
+            # order discarded the overlay because _reload_translations()
+            # rebuilds the catalogs from scratch (G0105).
             _reload_translations()
+            apply_db_overlay()
         except Exception:
             logger.exception(
                 "Failed to refresh worker translations after tick %s",

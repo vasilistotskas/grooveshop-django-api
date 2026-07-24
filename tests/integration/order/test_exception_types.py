@@ -375,20 +375,21 @@ class TestCorrectExceptionTypesAreRaised:
     @pytest.mark.parametrize(
         "payment_scenario,expected_exception,description",
         [
-            ("missing_payment_id", PaymentNotFoundError, "no_payment_intent"),
+            ("missing_payment_id", InvalidOrderDataError, "no_payment_intent"),
         ],
         ids=[
             "no_payment_intent",
         ],
     )
-    def test_payment_not_found_error_raised_for_payment_issues(
+    def test_missing_payment_id_raises_invalid_order_data_error(
         self, payment_scenario, expected_exception, description
     ):
         """
-        Test that PaymentNotFoundError is raised for payment-related issues.
+        Test that InvalidOrderDataError is raised when payment_intent_id is missing.
 
-        Verifies that payment operations raise PaymentNotFoundError when
-        payment intent is missing or invalid.
+        Verifies that order creation raises InvalidOrderDataError (not
+        PaymentNotFoundError) when payment_intent_id is absent — the ID is
+        missing input data, not a provider lookup failure.
         """
         # Create a valid product and cart for testing
         product = ProductFactory.create(

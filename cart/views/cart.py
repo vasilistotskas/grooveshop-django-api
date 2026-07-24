@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 from drf_spectacular.openapi import OpenApiTypes
@@ -43,6 +44,7 @@ from core.utils.serializers import (
     create_schema_view_config,
 )
 from order.exceptions import InsufficientStockError, StockReservationError
+from order.models import StockReservation
 from order.services import OrderService
 from order.stock import StockManager
 
@@ -260,6 +262,11 @@ class CartViewSet(BaseModelViewSet):
         cart = self.cart_service.get_or_create_cart()
         if not cart:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        # Re-load through for_detail() so the items are prefetched and the
+        # totals are annotated: the cart_service returns a bare row whose
+        # total_* properties would otherwise re-run get_items() several
+        # times and the nested items serializer would N+1 per line (G0081).
+        cart = Cart.objects.for_detail().get(pk=cart.pk)
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(cart)
         return Response(response_serializer.data, status=status.HTTP_200_OK)
@@ -275,6 +282,10 @@ class CartViewSet(BaseModelViewSet):
         request_serializer.is_valid(raise_exception=True)
         self.perform_update(request_serializer)
 
+        # Re-load optimized so the response serialization reads prefetched
+        # items + annotated totals rather than re-querying per property/line
+        # (G0081).
+        cart = Cart.objects.for_detail().get(pk=cart.pk)
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(
             cart, context=self.get_serializer_context()
@@ -340,7 +351,16 @@ class CartViewSet(BaseModelViewSet):
                 )
                 reservation_ids.append(reservation.id)
             except InsufficientStockError as e:
-                # Track which items failed to reserve
+                # Track which items failed to reserve — and log it, or the
+                # resulting 409 is unanswerable from server logs alone.
+                logger.info(
+                    "Stock reservation rejected: cart=%s product=%s "
+                    "available=%s requested=%s",
+                    cart.uuid,
+                    e.product_id,
+                    e.available,
+                    e.requested,
+                )
                 failed_items.append(
                     {
                         "product_id": e.product_id,
@@ -359,9 +379,16 @@ class CartViewSet(BaseModelViewSet):
             for reservation_id in reservation_ids:
                 try:
                     StockManager.release_reservation(reservation_id)
-                except StockReservationError:
-                    # Log but don't fail if release fails
-                    pass
+                except StockReservationError as release_error:
+                    # Don't fail the rollback, but leave a trace — a stuck
+                    # reservation holds stock until its TTL expiry.
+                    logger.warning(
+                        "Failed to release reservation %s during "
+                        "reserve_stock rollback for cart %s: %s",
+                        reservation_id,
+                        cart.uuid,
+                        release_error,
+                    )
 
             return Response(
                 {
@@ -408,14 +435,11 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Ownership gate (see C11 in MULTI_TENANT_AUDIT.md): a reservation
+        # Ownership gate (C11 in MULTI_TENANT_AUDIT.md): a reservation
         # belongs to the requester if it was made by their user account
-        # OR its session_id matches the current cart's UUID. Without this
-        # filter, any caller could pass an arbitrary integer reservation
-        # ID and release another customer's hold mid-checkout.
-        from django.db.models import Q
-        from order.models.stock_reservation import StockReservation
-
+        # OR its session_id matches the current cart's UUID. The ids come
+        # straight from the request body, so without this any caller could
+        # enumerate integer ids and free other customers' holds (IDOR).
         cart = self.cart_service.cart
         cart_uuid = str(cart.uuid) if cart else ""
         ownership = Q(pk__in=[])  # default: nothing
@@ -426,23 +450,28 @@ class CartViewSet(BaseModelViewSet):
 
         owned_ids = set(
             StockReservation.objects.filter(
-                ownership, pk__in=reservation_ids
-            ).values_list("pk", flat=True)
+                ownership, id__in=reservation_ids
+            ).values_list("id", flat=True)
         )
 
-        # Release each reservation
         released_count = 0
         failed_releases = []
 
         for reservation_id in reservation_ids:
-            if reservation_id not in owned_ids:
+            try:
+                owned = int(reservation_id) in owned_ids
+            except (TypeError, ValueError):
+                owned = False
+
+            if not owned:
                 failed_releases.append(
                     {
                         "reservation_id": reservation_id,
-                        "error": "not_owner",
+                        "error": "Reservation not found for this cart",
                     }
                 )
                 continue
+
             try:
                 StockManager.release_reservation(reservation_id)
                 released_count += 1
@@ -627,19 +656,23 @@ class CartViewSet(BaseModelViewSet):
                 else str(cart_total.currency)
             )
 
-            client_secret = str(payment_data.get("client_secret", ""))
-            payment_intent_id = str(payment_data.get("payment_id", ""))
-            amount = str(cart_total.amount)
-
-            # Return client_secret and payment_intent_id
+            # Serialize through CartPaymentIntentResponseSerializer (the
+            # declared response serializer) so the payload matches the
+            # OpenAPI contract the Nuxt client validates against. In
+            # particular ``amount`` MUST be a JSON number (DecimalField with
+            # COERCE_DECIMAL_TO_STRING=False) — returning a raw dict with
+            # ``str(amount)`` failed the client's Zod ``z.number()`` gate and
+            # broke every cart-Stripe checkout with a 422.
             response_data = {
-                "client_secret": client_secret,
-                "payment_intent_id": payment_intent_id,
-                "amount": amount,
+                "client_secret": str(payment_data.get("client_secret", "")),
+                "payment_intent_id": str(payment_data.get("payment_id", "")),
+                "amount": cart_total.amount,
                 "currency": currency_code,
             }
+            response_serializer_class = self.get_response_serializer()
+            response_serializer = response_serializer_class(response_data)
             return Response(
-                response_data,
+                response_serializer.data,
                 status=status.HTTP_200_OK,
             )
 

@@ -207,6 +207,15 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
     cancel_requested_at = models.DateTimeField(
         _("Cancel requested at"), null=True, blank=True
     )
+    stale_alert_sent = models.BooleanField(
+        _("Stale alert sent"),
+        default=False,
+        help_text=_(
+            "Set by check_stale_acs_shipments after admins were alerted "
+            "that this shipment shows no tracking movement; cleared "
+            "automatically when a new tracking event arrives."
+        ),
+    )
 
     metadata = models.JSONField(
         _("Metadata"),
@@ -224,7 +233,12 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
     # bag and the polling timestamps churn frequently and aren't
     # part of the audit story.
     history = HistoricalRecords(
-        excluded_fields=["metadata", "last_polled_at", "updated_at"],
+        excluded_fields=[
+            "metadata",
+            "last_polled_at",
+            "updated_at",
+            "stale_alert_sent",
+        ],
     )
 
     class Meta(TypedModelMeta):

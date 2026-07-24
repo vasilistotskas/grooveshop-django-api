@@ -792,12 +792,128 @@ class AcsService:
                 ]
             )
 
+    @classmethod
+    def reset_shipment_for_remint(cls, shipment: AcsShipment) -> None:
+        """Clear a CANCELED shipment's voucher so a fresh one can mint.
+
+        ACS cancellation (``ACS_Delete_Voucher``) leaves ``voucher_no``
+        set and the state CANCELED, and ``create_voucher_for_order``
+        short-circuits on any non-empty ``voucher_no`` — so a
+        cancelled-before-pickup order could never be re-shipped (a
+        one-way dead end). Per the ACS Web Services docs a deleted
+        voucher can be freely re-created ("if vouchers need to be
+        reissued ... delete these vouchers, and then run again the pickup
+        list" — acscourier.net), and ``Reference_Key1`` is a plain
+        reference, not a unique key. This preserves the old voucher
+        number in metadata history, clears ``voucher_no``, and resets the
+        state to PENDING_CREATION; the normal mint path then issues a
+        fresh voucher.
+
+        Refuses unless the shipment is CANCELED and not already in a
+        pickup list (an issued manifest is immutable).
+        """
+        with transaction.atomic():
+            shipment = AcsShipment.objects.select_for_update().get(
+                pk=shipment.pk
+            )
+            if shipment.shipment_state != AcsShipmentState.CANCELED:
+                raise AcsAPIError(
+                    alias="reset_for_remint",
+                    error_message=(
+                        "Only a CANCELED shipment can be reset for re-mint "
+                        f"(shipment={shipment.pk} is "
+                        f"{shipment.shipment_state})."
+                    ),
+                )
+            if shipment.pickup_list_id is not None:
+                raise AcsAPIError(
+                    alias="reset_for_remint",
+                    error_message=(
+                        "Cannot reset a shipment already finalised in a "
+                        "pickup list."
+                    ),
+                )
+
+            metadata = shipment.metadata or {}
+            if shipment.voucher_no:
+                metadata.setdefault("previous_vouchers", []).append(
+                    shipment.voucher_no
+                )
+            metadata.pop("mint_started_at", None)
+            metadata.pop("cancel_started_at", None)
+
+            previous_voucher = shipment.voucher_no
+            shipment.voucher_no = None
+            shipment.shipment_state = AcsShipmentState.PENDING_CREATION
+            shipment.cancel_requested_at = None
+            shipment.metadata = metadata
+            shipment._change_reason = "Reset for re-mint via admin"
+            shipment.save(
+                update_fields=[
+                    "voucher_no",
+                    "shipment_state",
+                    "cancel_requested_at",
+                    "metadata",
+                ]
+            )
+            logger.info(
+                "reset_shipment_for_remint: shipment=%s (order=%s) reset "
+                "PENDING_CREATION; previous voucher %s archived to "
+                "metadata.previous_vouchers — ready to re-mint",
+                shipment.pk,
+                shipment.order_id,
+                previous_voucher,
+            )
+
     # ------------------------------------------------------------------
     # Daily pickup list (manifest)
     # ------------------------------------------------------------------
 
     @classmethod
     def issue_daily_pickup_list(
+        cls,
+        *,
+        pickup_date: date | None = None,
+        billing_code: str | None = None,
+        issued_by_id: int | None = None,
+    ) -> AcsPickupList | None:
+        """Single-flight wrapper around :meth:`_issue_pickup_list_unlocked`.
+
+        This is invoked from BOTH the Mon–Fri beat task
+        (``issue_daily_acs_pickup_list``) AND the admin "issue now" view
+        (``AcsPickupListIssueView``), so two invocations can race — each
+        reads the same candidates (Phase 1) and both call
+        ``ACS_Issue_Pickup_List`` (Phase 2), double-issuing the manifest
+        at ACS; the loser's Phase-3 ``AcsPickupList`` INSERT then either
+        lands a spurious empty list or trips the unique ``pickup_list_no``
+        constraint with an uncaught ``IntegrityError``. A Redis
+        ``cache.add`` mutex (atomic SET NX) makes the issue single-flight
+        cluster-wide — mirrors ``poll_acs_tracking_batch``. The loser
+        skips and returns ``None``. DummyCache in tests always "acquires",
+        so tests are unaffected; the short TTL auto-releases if a worker
+        dies mid-issue.
+        """
+        from django.core.cache import cache
+
+        lock_key = "acs:pickup_list:lock"
+        lock_ttl = 5 * 60
+        if not cache.add(lock_key, 1, lock_ttl):
+            logger.info(
+                "issue_daily_pickup_list: another run holds the lock — "
+                "skipping to avoid a double-issue."
+            )
+            return None
+        try:
+            return cls._issue_pickup_list_unlocked(
+                pickup_date=pickup_date,
+                billing_code=billing_code,
+                issued_by_id=issued_by_id,
+            )
+        finally:
+            cache.delete(lock_key)
+
+    @classmethod
+    def _issue_pickup_list_unlocked(
         cls,
         *,
         pickup_date: date | None = None,
@@ -986,6 +1102,11 @@ class AcsService:
             if latest_event_at and latest_event_at != shipment.last_event_at:
                 shipment.last_event_at = latest_event_at
                 update_fields.append("last_event_at")
+                # Tracking is moving again — re-arm the staleness
+                # alert so a future stall alerts admins afresh.
+                if shipment.stale_alert_sent:
+                    shipment.stale_alert_sent = False
+                    update_fields.append("stale_alert_sent")
             if delivery_date and shipment.delivery_date != delivery_date:
                 shipment.delivery_date = delivery_date
                 update_fields.append("delivery_date")
@@ -1184,6 +1305,7 @@ class AcsService:
         *,
         cod_payment_date: date | None = None,
         user_locals: str = "GR",
+        silent_for_customer: bool = False,
     ) -> dict[str, int]:
         """Mirror ACS_COD_Beneficiary_Info into AcsCodPayout rows.
 
@@ -1192,13 +1314,34 @@ class AcsService:
         matching voucher number is found locally — accounting can then
         join through to the originating ``Order`` for reconciliation.
 
-        Returns a counters dict for the Celery task to log.
+        Per the ACS PDF ("ACS_COD_Beneficiary_Info" demo response) the
+        payout row carries the voucher number in ``POD`` — there is NO
+        ``Voucher_No`` column (the original implementation assumed one
+        and silently skipped every real payout row for 10 weeks; prod,
+        discovered 2026-07-11). ``Customer_RefNo_1`` /
+        ``Customer_RefNo_2`` echo the ``Reference_Key1/2`` we send at
+        voucher mint (``order.id`` / ``order.uuid``) and serve as
+        fallback match keys when ``POD`` is empty or unknown.
+
+        ``silent_for_customer=True`` suppresses the customer-facing
+        COMPLETED email/toast for orders flipped by this run. Both
+        callers pass it: the backfill command (weeks-old orders must
+        not suddenly email customers) and the nightly beat task (the
+        customer already got the DELIVERED notification and paid the
+        courier in person — site-owner decision 2026-07-11 that the
+        COD reconcile never emails customers). Internal state still
+        flows: order_paid fires, history is logged, status advances.
+
+        Returns a counters dict for the Celery task to log; ``skipped``
+        rows (no voucher and no reference match) additionally alert
+        ADMINS because unmatched payout money must be investigated.
         """
         # Lazy import — keeps service-module import cheap when COD is
         # not used and avoids forcing the full Money/decimal stack on
         # callers that only need shipment-related helpers.
         from decimal import Decimal
 
+        from django.core.exceptions import ValidationError
         from djmoney.money import Money
 
         from shipping_acs.models import AcsCodPayout
@@ -1213,10 +1356,50 @@ class AcsService:
 
         upserted = 0
         linked = 0
+        skipped = 0
         for row in rows:
-            voucher_no = row.get("Voucher_No") or row.get("voucher_no") or ""
-            voucher_no = str(voucher_no).strip()
+            # ``POD`` carries the voucher number on the wire (ACS PDF,
+            # ACS_COD_Beneficiary_Info Table_Data schema).
+            voucher_no = str(row.get("POD") or "").strip()
+
+            shipment = None
+            if voucher_no:
+                shipment = AcsShipment.objects.filter(
+                    voucher_no=voucher_no
+                ).first()
+            if shipment is None:
+                ref1 = str(row.get("Customer_RefNo_1") or "").strip()
+                if ref1.isdigit():
+                    shipment = AcsShipment.objects.filter(
+                        order_id=int(ref1)
+                    ).first()
+            if shipment is None:
+                ref2 = str(row.get("Customer_RefNo_2") or "").strip()
+                if ref2:
+                    try:
+                        shipment = AcsShipment.objects.filter(
+                            order__uuid=ref2
+                        ).first()
+                    except (ValidationError, ValueError):
+                        shipment = None
+            # When a shipment matched, its voucher number is canonical
+            # for the payout row — covers both an empty POD (Greek PDF
+            # demo shows one) and a POD value we failed to recognise.
+            if shipment is not None and shipment.voucher_no:
+                voucher_no = shipment.voucher_no
+
             if not voucher_no:
+                skipped += 1
+                logger.warning(
+                    "reconcile_cod_payouts: unmatched payout row — "
+                    "POD=%r Customer_RefNo_1=%r Customer_RefNo_2=%r "
+                    "Parcel_COD_Amount=%r Parcel_Delivery_Date=%r",
+                    row.get("POD"),
+                    row.get("Customer_RefNo_1"),
+                    row.get("Customer_RefNo_2"),
+                    row.get("Parcel_COD_Amount"),
+                    row.get("Parcel_Delivery_Date"),
+                )
                 continue
 
             payment_date = parse_datetime(row.get("COD_Payment_Date") or "")
@@ -1224,7 +1407,6 @@ class AcsService:
                 payment_date.date() if payment_date else cod_payment_date
             )
 
-            shipment = AcsShipment.objects.filter(voucher_no=voucher_no).first()
             if shipment is not None:
                 linked += 1
 
@@ -1275,12 +1457,65 @@ class AcsService:
             # PENDING; re-runs of a payout that's already been
             # reconciled are no-ops.
             if shipment is not None:
-                cls._mark_cod_order_paid_if_pending(shipment)
+                cls._mark_cod_order_paid_if_pending(
+                    shipment, silent_for_customer=silent_for_customer
+                )
 
-        return {"upserted": upserted, "linked": linked, "rows": len(rows)}
+        if skipped:
+            cls._alert_admins_unmatched_payouts(
+                skipped=skipped, cod_payment_date=cod_payment_date
+            )
+
+        return {
+            "upserted": upserted,
+            "linked": linked,
+            "skipped": skipped,
+            "rows": len(rows),
+        }
+
+    @staticmethod
+    def _alert_admins_unmatched_payouts(
+        *, skipped: int, cod_payment_date: date | None
+    ) -> None:
+        """Email ADMINS about payout rows we could not attribute.
+
+        Unmatched rows mean ACS remitted COD money we can't tie to an
+        order — silently dropping them is how the original Voucher_No
+        mapping bug went unnoticed for 10 weeks. Best-effort: an SMTP
+        failure must not fail the reconcile itself (the payout rows
+        that did match are already persisted).
+        """
+        from django.conf import settings
+        from django.core.mail import mail_admins
+
+        if not settings.ADMINS:
+            return
+        try:
+            mail_admins(
+                subject=(
+                    f"ACS COD reconcile: {skipped} unmatched payout row(s)"
+                ),
+                message=(
+                    f"{skipped} payout row(s) for COD_Payment_Date="
+                    f"{cod_payment_date or 'unspecified'} could not be "
+                    "matched to any AcsShipment (no POD voucher match and "
+                    "no Customer_RefNo_1/2 order match). See the "
+                    "celery-worker logs (reconcile_cod_payouts warnings) "
+                    "for the row details and reconcile manually against "
+                    "the ACS COD beneficiary report."
+                ),
+            )
+        except Exception as exc:
+            logger.error(
+                "reconcile_cod_payouts: failed to send unmatched-payout "
+                "admin alert: %s",
+                exc,
+            )
 
     @classmethod
-    def _mark_cod_order_paid_if_pending(cls, shipment: AcsShipment) -> None:
+    def _mark_cod_order_paid_if_pending(
+        cls, shipment: AcsShipment, *, silent_for_customer: bool = False
+    ) -> None:
         """Flip the linked order from PENDING payment to COMPLETED.
 
         Mirrors what ``Order.mark_as_paid`` does for online payments,
@@ -1319,7 +1554,9 @@ class AcsService:
         # double-fire (e.g. a payout being upserted twice) results in
         # one Meta event, not two.
         order_paid.send(sender=type(order), order=order)
-        OrderService.maybe_advance_to_completed(order)
+        OrderService.maybe_advance_to_completed(
+            order, silent_for_customer=silent_for_customer
+        )
 
     # ------------------------------------------------------------------
     # Private helpers — order status

@@ -12,7 +12,8 @@ from cart.models.cart import Cart
 from cart.models.item import CartItem
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
-    PaymentNotFoundError,
+    InvalidOrderDataError,
+    PaymentVerificationError,
 )
 from order.models.order import Order
 from order.models.stock_reservation import StockReservation
@@ -157,9 +158,9 @@ class TestOrderServiceCreateOrderFromCart:
 
     def test_missing_payment_intent_id_error(self):
         """
-        Test that missing payment_intent_id raises PaymentNotFoundError.
+        Test that missing payment_intent_id raises InvalidOrderDataError.
         """
-        with pytest.raises(PaymentNotFoundError) as exc_info:
+        with pytest.raises(InvalidOrderDataError) as exc_info:
             OrderService.create_order_from_cart(
                 cart=self.cart,
                 shipping_address=self.shipping_address,
@@ -173,7 +174,7 @@ class TestOrderServiceCreateOrderFromCart:
     @patch("order.payment.get_payment_provider")
     def test_invalid_payment_intent_id_error(self, mock_get_provider):
         """
-        Test that invalid payment_intent_id raises PaymentNotFoundError.
+        Test that invalid payment_intent_id raises PaymentVerificationError.
 
         Validates: Payment intent in invalid state (FAILED, CANCELED) raises error.
         Note: PENDING status is now accepted for Stripe's standard flow where
@@ -187,7 +188,7 @@ class TestOrderServiceCreateOrderFromCart:
         )
         mock_get_provider.return_value = mock_provider
 
-        with pytest.raises(PaymentNotFoundError) as exc_info:
+        with pytest.raises(PaymentVerificationError) as exc_info:
             OrderService.create_order_from_cart(
                 cart=self.cart,
                 shipping_address=self.shipping_address,
@@ -513,16 +514,15 @@ class TestOrderServiceHandlePaymentSucceeded:
         # So we need to check for the status update email instead
 
     @patch("order.signals.handlers.send_order_status_update_email.delay")
-    def test_payment_succeeded_triggers_status_update_email(
+    def test_payment_succeeded_sends_no_processing_status_email(
         self, mock_email_task
     ):
         """
-        Test that payment success triggers status update email via signal.
-
-        When order status changes from PENDING to PROCESSING, the
-        handle_order_status_changed signal handler sends a status update email.
-
-        Validates: Status update email is triggered (mocked Celery task)
+        Payment success transitions PENDING → PROCESSING, but that must
+        NOT send a generic status-update email: PROCESSING is an internal
+        milestone covered by the order-confirmation / payment-confirmed
+        email the webhook handler sends separately. Emitting both is the
+        duplicate-email bug this guards against.
         """
         # Handle payment succeeded
         result_order = OrderService.handle_payment_succeeded(
@@ -532,11 +532,8 @@ class TestOrderServiceHandlePaymentSucceeded:
         # Verify order status changed
         assert result_order.status == OrderStatus.PROCESSING
 
-        # Verify email task was called with correct arguments
-        # The signal handler should have been triggered by the status change
-        mock_email_task.assert_called_once_with(
-            self.order.id, OrderStatus.PROCESSING
-        )
+        # No generic status-update email for the PROCESSING transition.
+        mock_email_task.assert_not_called()
 
     def test_payment_succeeded_is_idempotent(self):
         """
@@ -672,6 +669,63 @@ class TestOrderServiceHandlePaymentSucceeded:
             mock_logger.error.assert_called_with(
                 "Order not found for payment_intent: %s", "pi_nonexistent"
             )
+
+    @pytest.mark.parametrize(
+        "settled_payment_status",
+        [
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.CANCELED,
+        ],
+    )
+    def test_payment_succeeded_does_not_regress_settled_payment_status(
+        self, settled_payment_status
+    ):
+        """
+        A stale or out-of-order payment_intent.succeeded webhook must NOT
+        overwrite a financially settled payment_status.  Stripe does NOT
+        guarantee event delivery order — a delayed 'succeeded' could arrive
+        after a 'charge.refunded' already moved the order to REFUNDED.
+        """
+        from django.conf import settings
+        from djmoney.money import Money
+        from order.models.order import Order
+
+        payment_id = f"pi_settled_{settled_payment_status.value}"
+        order = Order.objects.create(
+            user=self.user,
+            pay_way=self.pay_way,
+            payment_id=payment_id,
+            payment_status=settled_payment_status,
+            status=OrderStatus.DELIVERED,
+            email="test@example.com",
+            first_name="John",
+            last_name="Doe",
+            street="Main St",
+            street_number="123",
+            city="Athens",
+            zipcode="12345",
+            phone="+306900000000",
+            shipping_price=Money("5.00", settings.DEFAULT_CURRENCY),
+            paid_amount=Money("55.00", settings.DEFAULT_CURRENCY),
+        )
+
+        result = OrderService.handle_payment_succeeded(payment_id)
+
+        # Handler must return the order (not None)
+        assert result is not None
+        assert result.id == order.id
+
+        # payment_status must NOT have been regressed to COMPLETED
+        order.refresh_from_db()
+        assert order.payment_status == settled_payment_status, (
+            f"Settled payment_status {settled_payment_status} must not "
+            f"be overwritten by a stale succeeded event, "
+            f"got {order.payment_status}"
+        )
+
+        # order.status must be untouched
+        assert order.status == OrderStatus.DELIVERED
 
 
 @pytest.mark.django_db
@@ -1078,6 +1132,57 @@ class TestOrderServiceHandlePaymentFailed:
 
         # Note: Once implementation is updated to release reservations,
         # verify all reservations were released
+
+    @pytest.mark.parametrize(
+        "settled_payment_status",
+        [
+            PaymentStatus.COMPLETED,
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.CANCELED,
+        ],
+    )
+    def test_payment_failed_does_not_regress_settled_payment_status(
+        self, settled_payment_status
+    ):
+        """
+        A stale or out-of-order payment_intent.payment_failed webhook must
+        NOT overwrite a financially settled payment_status.  Stripe does
+        NOT guarantee event delivery order — a delayed 'failed' could
+        arrive after 'charge.refunded' already moved the order to REFUNDED.
+        """
+        payment_id = f"pi_settled_fail_{settled_payment_status.value}"
+        order = Order.objects.create(
+            user=self.user,
+            pay_way=self.pay_way,
+            payment_id=payment_id,
+            payment_status=settled_payment_status,
+            status=OrderStatus.DELIVERED,
+            email="test@example.com",
+            first_name="John",
+            last_name="Doe",
+            street="Main St",
+            street_number="123",
+            city="Athens",
+            zipcode="12345",
+            phone="+306900000000",
+            shipping_price=Money("5.00", settings.DEFAULT_CURRENCY),
+            paid_amount=Money("55.00", settings.DEFAULT_CURRENCY),
+        )
+
+        result = OrderService.handle_payment_failed(payment_id)
+
+        # Handler must return the order (not None)
+        assert result is not None
+        assert result.id == order.id
+
+        # payment_status must NOT have been regressed to FAILED
+        order.refresh_from_db()
+        assert order.payment_status == settled_payment_status, (
+            f"Settled payment_status {settled_payment_status} must not "
+            f"be overwritten by a stale failed event, "
+            f"got {order.payment_status}"
+        )
 
 
 @pytest.mark.django_db

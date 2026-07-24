@@ -326,7 +326,13 @@ def build_invoice_xml(
     order = invoice.order
     invoice_type = _pick_invoice_type(order, issuer_country=issuer_country)
     year = invoice.issue_date.year
-    series = f"{series_prefix}-{year}"
+    # Reuse the persisted ``mydata_series`` on a resubmission (mirrors the
+    # ``mydata_aa`` reuse below). Recomputing it from the live
+    # ``series_prefix`` would change the ``uid`` if the prefix config was
+    # edited between the first submission and a retry, defeating AADE's 228
+    # duplicate-uid dedup (G0265). NOTE: ``branch`` also feeds the uid and is
+    # not persisted, so it must not change between submit and resubmit.
+    series = invoice.mydata_series or f"{series_prefix}-{year}"
     # ``aa`` is the per-year sequential integer; ``InvoiceCounter``
     # already owns it, so reuse ``mydata_aa`` if pre-allocated (on
     # resubmission) else derive from the counter number baked into

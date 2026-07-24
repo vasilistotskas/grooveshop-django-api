@@ -111,6 +111,38 @@ class ProductModelTestCase(TestCase):
             self.product.price_save_percent, expected_price_save_percent
         )
 
+    def test_pricing_quantized_to_cents(self):
+        # 16.12 × 24% VAT = 3.8688 — unquantized this leaked sub-cent
+        # precision into price_at_add comparisons and cart totals while
+        # the DB numeric(11,2) columns rounded independently ("Cart price
+        # drift at checkout" warnings for identical displayed prices).
+        from vat.models import Vat
+
+        vat_24, _ = Vat.objects.get_or_create(value=Decimal("24"))
+        product = ProductFactory(
+            category=self.category,
+            vat=vat_24,
+            price=Decimal("16.12"),
+            discount_percent=Decimal("0.0"),
+        )
+
+        self.assertEqual(
+            product.vat_value, Money("3.87", settings.DEFAULT_CURRENCY)
+        )
+        self.assertEqual(
+            product.final_price, Money("19.99", settings.DEFAULT_CURRENCY)
+        )
+        for money in (
+            product.vat_value,
+            product.discount_value,
+            product.final_price,
+        ):
+            self.assertEqual(
+                money.amount,
+                money.amount.quantize(Decimal("0.01")),
+                f"{money} carries sub-cent precision",
+            )
+
     def test_fields(self):
         self.assertEqual(self.product.sku, "P123456")
         self.assertEqual(self.product.slug, "sample-product")

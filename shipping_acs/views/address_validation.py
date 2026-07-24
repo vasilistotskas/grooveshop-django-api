@@ -14,6 +14,7 @@ typical typing-storm pattern (street → zip → typo → fix).
 
 from __future__ import annotations
 
+import hashlib
 import logging
 
 from django.conf import settings
@@ -25,6 +26,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.api.throttling import AcsAddressValidationThrottle
 from shipping_acs.exceptions import AcsAPIError, AcsConfigError
 
 logger = logging.getLogger(__name__)
@@ -83,6 +85,10 @@ class AcsAddressValidationView(APIView):
     """POST /api/v1/shipping/acs/address-validation."""
 
     permission_classes = [AllowAny]
+    # Per-IP scoped throttle on top of the global anon cap — this public
+    # proxy forwards to the rate-limited ACS partner API, and the Redis cache
+    # only absorbs identical inputs (G0016).
+    throttle_classes = [AcsAddressValidationThrottle]
     serializer_class = AcsAddressValidationRequestSerializer
 
     @extend_schema(
@@ -112,7 +118,11 @@ class AcsAddressValidationView(APIView):
         address_id = serializer.validated_data.get("address_id") or None
         language = serializer.validated_data.get("language") or "GR"
 
-        cache_key = f"acs:address_validation:{language}:{address}"
+        # The address is shopper-typed free text (spaces, Greek, anything) —
+        # hash it so the cache key stays within Django's memcached-safe
+        # charset instead of tripping CacheKeyWarning on every lookup.
+        address_digest = hashlib.sha256(address.encode("utf-8")).hexdigest()
+        cache_key = f"acs:address_validation:{language}:{address_digest}"
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(_normalise_response(cached))

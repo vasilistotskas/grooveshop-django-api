@@ -25,7 +25,12 @@ urlpatterns = [
                 "get": "retrieve",
                 "put": "update",
                 "patch": "partial_update",
-                "delete": "destroy",
+                # No raw DELETE: a hard-delete would sever Order.user
+                # (SET_NULL) while leaving the customer's name / email /
+                # address on the order and the recipient PII in carrier
+                # shipment metadata. Account deletion must go through the
+                # GDPR-compliant ``delete_account`` action, which anonymises
+                # orders and scrubs carrier PII before removing the user.
             }
         ),
         name="user-account-detail",
@@ -172,12 +177,12 @@ urlpatterns = [
         name="user-subscription-topic-unsubscribe",
     ),
     path(
-        "user/unsubscribe/<str:uidb64>/<str:token>/<str:topic_slug>",
+        "user/unsubscribe/<str:token>/<str:topic_slug>",
         UnsubscribeTopicView.as_view(),
         name="user-unsubscribe-topic",
     ),
     path(
-        "user/unsubscribe/<str:uidb64>/<str:token>",
+        "user/unsubscribe/<str:token>",
         UnsubscribeAllView.as_view(),
         name="user-unsubscribe",
     ),

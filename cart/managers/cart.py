@@ -55,13 +55,14 @@ class CartQuerySet(OptimizedQuerySet):
         return self.select_related("user")
 
     def with_items_prefetch(self) -> Self:
-        """Prefetch cart items with product data."""
+        """Prefetch cart items through the CartItem optimizer so each item's
+        embedded product carries the counts / main image / attributes the
+        serializer renders — otherwise serializing the cart N+1s per line
+        (G0081)."""
+        from cart.models.item import CartItem
+
         return self.prefetch_related(
-            "items",
-            "items__product",
-            "items__product__translations",
-            "items__product__category",
-            "items__product__vat",
+            models.Prefetch("items", queryset=CartItem.objects.for_list())
         )
 
     def with_totals(self) -> Self:
@@ -130,14 +131,10 @@ class CartManager(OptimizedManager):
         """Return optimized queryset for detail views."""
         return self.get_queryset().for_detail()
 
-    def cleanup_expired(self, days=30) -> int:
-        """
-        Delete expired carts and return count.
-
-        This method has custom logic beyond simple delegation,
-        so it's explicitly defined on the Manager.
-        """
-        expired_carts = self.expired(days)
-        count = expired_carts.count()
-        expired_carts.delete()
-        return count
+    # NOTE: a ``cleanup_expired()`` manager method used to live here. It
+    # deleted ANY inactive cart — including a logged-in customer's saved
+    # cart with items — after 30 days, and was wired to no scheduled task
+    # (a foot-gun inviting a future engineer to schedule it). Removed:
+    # cart cleanup is owned by the guest-only Celery tasks in
+    # ``core/tasks.py`` (``cleanup_abandoned_carts`` / ``cleanup_old_guest_carts``),
+    # which never touch authenticated users' carts.

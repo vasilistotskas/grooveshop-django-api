@@ -168,13 +168,17 @@ class TestFailedPaymentReleasesReservations:
             # PENDING orders should be updated
             (OrderStatus.PENDING, PaymentStatus.PENDING, True),
             (OrderStatus.PENDING, PaymentStatus.PROCESSING, True),
-            # Already failed - idempotent
+            # Already failed - idempotent (FAILED is not a settled state)
             (OrderStatus.PENDING, PaymentStatus.FAILED, True),
-            # Advanced statuses - should still update payment status
-            (OrderStatus.PROCESSING, PaymentStatus.COMPLETED, True),
-            (OrderStatus.SHIPPED, PaymentStatus.COMPLETED, True),
-            # Canceled orders - should still update
+            # COMPLETED is a settled state — stale payment_failed must NOT
+            # regress the payment_status back to FAILED.
+            (OrderStatus.PROCESSING, PaymentStatus.COMPLETED, False),
+            (OrderStatus.SHIPPED, PaymentStatus.COMPLETED, False),
+            # Canceled orders with PENDING payment_status — still writable
             (OrderStatus.CANCELED, PaymentStatus.PENDING, True),
+            # REFUNDED is a settled state — stale payment_failed must NOT
+            # regress the payment_status back to FAILED.
+            (OrderStatus.REFUNDED, PaymentStatus.REFUNDED, False),
         ],
     )
     def test_payment_failure_updates_status_for_various_order_states(
@@ -186,8 +190,11 @@ class TestFailedPaymentReleasesReservations:
         """
         Test payment failure handling for orders in various states.
 
-        This test verifies that payment failure updates payment_status
-        regardless of the order's current status.
+        When should_update is True the handler writes FAILED.
+        When should_update is False the order is already in a settled
+        payment state (COMPLETED / REFUNDED / PARTIALLY_REFUNDED /
+        CANCELED) and a stale out-of-order webhook must NOT regress it.
+        Stripe does NOT guarantee webhook event delivery order.
         """
         payment_id = f"pi_test_{order_status.value}_{payment_status.value}"
 
@@ -208,10 +215,18 @@ class TestFailedPaymentReleasesReservations:
         # Refresh order from database
         order.refresh_from_db()
 
-        # Verify payment status is updated to FAILED
         if should_update:
+            # Non-settled start state: handler writes FAILED
             assert order.payment_status == PaymentStatus.FAILED, (
-                f"Payment status should be FAILED for {order_status}, got {order.payment_status}"
+                f"Payment status should be FAILED for {order_status}/"
+                f"{payment_status}, got {order.payment_status}"
+            )
+        else:
+            # Settled start state: handler must return the order unchanged
+            assert order.payment_status == payment_status, (
+                f"Settled payment_status {payment_status} must not be "
+                f"regressed to FAILED for order_status={order_status}, "
+                f"got {order.payment_status}"
             )
 
     @pytest.mark.parametrize(

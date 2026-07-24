@@ -104,6 +104,7 @@ class BoxNowNearestLockerResponseSerializer(serializers.Serializer):
     )
     image = serializers.CharField(
         read_only=True,
+        source="imageUrl",
         help_text=_("URL of locker image"),
     )
     lat = serializers.CharField(
@@ -124,6 +125,7 @@ class BoxNowNearestLockerResponseSerializer(serializers.Serializer):
     )
     postal_code = serializers.CharField(
         read_only=True,
+        source="postalCode",
         help_text=_("Postal code of the locker"),
     )
     country = serializers.CharField(
@@ -136,10 +138,12 @@ class BoxNowNearestLockerResponseSerializer(serializers.Serializer):
     )
     address_line_1 = serializers.CharField(
         read_only=True,
+        source="addressLine1",
         help_text=_("Primary address line"),
     )
     address_line_2 = serializers.CharField(
         read_only=True,
+        source="addressLine2",
         help_text=_("Secondary address line"),
     )
     region = serializers.CharField(

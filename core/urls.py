@@ -16,6 +16,7 @@ from drf_spectacular.views import (
 from core.api.views import (
     get_setting_by_key,
     health_check,
+    health_live,
     list_settings,
 )
 from core.rosetta_views import DBBackedTranslationFormView
@@ -25,10 +26,7 @@ from core.views import (
     robots_txt,
     upload_image,
 )
-from order.views.viva_webhook import (
-    ResolveVivaOrderCodeView,
-    viva_wallet_webhook,
-)
+from order.views.viva_webhook import viva_wallet_webhook
 from shipping_boxnow.views.webhook import BoxNowWebhookView
 
 import core.filters.camel_case_filters  # noqa
@@ -44,11 +42,6 @@ urlpatterns = [
         "viva-wallet/webhook/",
         viva_wallet_webhook,
         name="viva-wallet-webhook",
-    ),
-    path(
-        "viva-wallet/resolve-order",
-        ResolveVivaOrderCodeView.as_view(),
-        name="viva-wallet-resolve-order",
     ),
     path(
         "boxnow/webhook/",
@@ -107,6 +100,7 @@ urlpatterns += i18n_patterns(
     path("api/v1/", include("tenant.urls")),
     path("api/v1/", include("page_config.urls")),
     path("api/v1/health", health_check, name="api-health"),
+    path("api/v1/health/live", health_live, name="api-health-live"),
     path("api/v1/settings", list_settings, name="api-settings-list"),
     path("api/v1/settings/get", get_setting_by_key, name="api-settings-get"),
     path("api/v1/schema", SpectacularAPIView.as_view(), name="schema"),

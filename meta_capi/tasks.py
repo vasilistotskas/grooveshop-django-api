@@ -46,19 +46,36 @@ from meta_capi.services import (
 logger = logging.getLogger(__name__)
 
 
+_UNHASHED_PII_USER_DATA_KEYS = (
+    "client_ip_address",
+    "client_user_agent",
+    "fbp",
+    "fbc",
+)
+
+
 def _serialize_event_payload(event: Any) -> dict[str, Any]:
-    """SDK Events expose ``normalize`` which returns a dict ready for
-    JSON. We keep the result on ``MetaCapiEventLog.payload`` for
-    incident replay — by this point all PII is already SHA-256
-    hashed by the SDK, so storing it is fine.
+    """Serialize the SDK Event to a dict for ``MetaCapiEventLog.payload``
+    (incident replay).
+
+    User identifiers (em/ph/…) are SHA-256 hashed by the SDK, but CAPI does
+    NOT hash ``client_ip_address`` / ``client_user_agent`` / the ``_fbp`` /
+    ``_fbc`` cookies — those go to Meta in the clear. We strip them from the
+    persisted copy so the audit log holds no plaintext PII (G0200).
+    ``normalize()`` returns a fresh dict (and the client re-normalizes from
+    the event on send), so mutating it here does not affect what is sent.
     """
     try:
         normalized = event.normalize()
     except Exception:  # pragma: no cover — defensive
         return {}
-    if isinstance(normalized, dict):
-        return normalized
-    return {}
+    if not isinstance(normalized, dict):
+        return {}
+    user_data = normalized.get("user_data")
+    if isinstance(user_data, dict):
+        for key in _UNHASHED_PII_USER_DATA_KEYS:
+            user_data.pop(key, None)
+    return normalized
 
 
 def _dispatch(

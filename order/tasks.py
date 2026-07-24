@@ -1,16 +1,15 @@
 import logging
 from datetime import timedelta
+from html import unescape
 
 from django.conf import settings
-from django.contrib.auth.tokens import default_token_generator
 from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
+from django.utils.html import strip_tags
 from django.utils.translation import gettext as _
 from django.utils import translation
 
@@ -211,6 +210,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                 )
 
             payment_instructions = ""
+            payment_instructions_text = ""
             if pay_way and not pay_way.is_online_payment:
                 payment_instructions = (
                     pay_way.safe_translation_getter(
@@ -218,12 +218,21 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                     )
                     or ""
                 )
+                # ``PayWay.instructions`` is authored in the admin WYSIWYG
+                # editor, so it carries HTML (e.g. ``<div>…</div>``). The
+                # HTML email renders it with ``|safe``; the plain-text email
+                # needs the tags stripped and entities unescaped, otherwise
+                # the customer sees raw ``<div>`` markup.
+                payment_instructions_text = unescape(
+                    strip_tags(payment_instructions)
+                ).strip()
 
             context = {
                 "order": order,
                 "items": order.items.all(),
                 "pay_way": pay_way,
                 "payment_instructions": payment_instructions,
+                "payment_instructions_text": payment_instructions_text,
                 "is_paid": is_paid,
                 "SITE_NAME": settings.SITE_NAME,
                 "INFO_EMAIL": tenant_contact_email(),
@@ -839,25 +848,25 @@ def send_order_status_update_email(
             .get(id=order_id)
         )
 
-        if status in [OrderStatus.PENDING]:
-            return True
-
-        # Skip the generic status-update email when the transition is
-        # PENDING → PROCESSING triggered by a successful payment. The
-        # confirmation email (`order_payment_confirmed` template) is
-        # sent separately by the webhook handler and is the
-        # authoritative "payment received, now processing" notification.
-        # Sending both produced a duplicate "Σε επεξεργασία" + "Payment
-        # Confirmed" pair for every online order.
-        if (
-            status in (OrderStatus.PROCESSING, OrderStatus.PROCESSING.value)
-            and order.payment_status == PaymentStatus.COMPLETED
+        # Internal-only milestones never get their own customer email:
+        #   • PENDING — covered by the order-received confirmation.
+        #   • PROCESSING — an internal "we're preparing it" step,
+        #     covered by order-received (offline) or the payment-
+        #     confirmed notification (online). Surfacing it as its own
+        #     email produced a duplicate right after the confirmation.
+        #   • SHIPPED — owned by the dedicated
+        #     ``send_shipping_notification_email`` task, which carries
+        #     the tracking number and only fires once the parcel is
+        #     genuinely in transit. Routing it through the generic
+        #     status template here would double-send.
+        if status in (
+            OrderStatus.PENDING,
+            OrderStatus.PENDING.value,
+            OrderStatus.PROCESSING,
+            OrderStatus.PROCESSING.value,
+            OrderStatus.SHIPPED,
+            OrderStatus.SHIPPED.value,
         ):
-            logger.info(
-                "Order %s already has payment_status=COMPLETED; skipping "
-                "PROCESSING status-update email (confirmation email covers it)",
-                order.id,
-            )
             return True
 
         context = {
@@ -870,10 +879,6 @@ def send_order_status_update_email(
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
-
-        if status in (OrderStatus.SHIPPED, OrderStatus.SHIPPED.value):
-            context["tracking_number"] = order.tracking_number
-            context["carrier"] = order.shipping_carrier
 
         template_base = f"emails/order/order_{status.lower()}"
 
@@ -984,40 +989,53 @@ def _reserve_shipping_notification_email(order_id: int) -> bool:
 )
 def send_shipping_notification_email(self, order_id: int) -> bool:
     try:
-        # Only reserve on the first attempt. Retries are expected to
-        # re-send because the flag is held by this worker; releasing
-        # on every retry would defeat idempotency, and re-checking
-        # would block a legitimate retry after a transient failure.
-        if self.request.retries == 0:
-            try:
-                if not _reserve_shipping_notification_email(order_id):
-                    logger.info(
-                        "Shipping notification email already sent (or reserved) "
-                        "for order #%s, skipping",
-                        order_id,
-                    )
-                    return True
-            except Order.DoesNotExist:
-                logger.error(
-                    "Could not reserve shipping notification email — Order #%s "
-                    "not found",
-                    order_id,
-                    extra={"order_id": order_id},
-                )
-                return False
-
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
             .prefetch_related("items__product__translations")
             .get(id=order_id)
         )
 
+        # "Your order has shipped" must stay honest: it only goes out
+        # once the parcel is genuinely in transit (status SHIPPED) AND we
+        # have a tracking number to show. This task is dispatched from
+        # two events — the moment tracking lands
+        # (``order_shipment_dispatched``, which on a COD/online order
+        # fires at voucher-mint while the order is still PROCESSING) and
+        # the moment the order reaches SHIPPED (``order_status_changed``).
+        # Whichever fires first finds the other condition unmet and
+        # defers; the second one sends. Deferrals return ``True``
+        # (success, no-op) so Celery doesn't retry, and — crucially — we
+        # DON'T reserve the idempotency flag on a deferral, or the real
+        # send would be permanently blocked.
+        if order.status != OrderStatus.SHIPPED.value:
+            logger.debug(
+                "Order #%s is %s, not SHIPPED yet — deferring shipped email",
+                order_id,
+                order.status,
+            )
+            return True
+
         if not order.tracking_number or not order.shipping_carrier:
             logger.warning(
-                f"Attempted to send shipping notification for order #{order_id} without tracking info",
+                "Order #%s reached SHIPPED without tracking info — deferring "
+                "shipped email until tracking lands",
+                order_id,
                 extra={"order_id": order_id},
             )
-            return False
+            return True
+
+        # Only reserve on the first attempt. Retries are expected to
+        # re-send because the flag is held by this worker; releasing
+        # on every retry would defeat idempotency, and re-checking
+        # would block a legitimate retry after a transient failure.
+        if self.request.retries == 0:
+            if not _reserve_shipping_notification_email(order_id):
+                logger.info(
+                    "Shipping notification email already sent (or reserved) "
+                    "for order #%s, skipping",
+                    order_id,
+                )
+                return True
 
         context = {
             "order": order,
@@ -1363,17 +1381,16 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         send_invoice_email.delay(order_id)
         return False
     except MyDataDuplicateError as exc:
-        # AADE error 228: the same uid is already registered under
-        # another MARK. Retrying will only loop — the response is
-        # identical every time. Tier A.5 will call
-        # ``RequestTransmittedDocs`` to recover the existing MARK and
-        # flip the row to CONFIRMED; for now we log loud, leave
-        # REJECTED state in place, and deliver the pre-transmission
-        # PDF so the customer isn't blocked.
+        # AADE error 228: ``submit_invoice`` already attempted Tier A.5
+        # recovery via ``recover_mark_for_invoice`` / RequestTransmittedDocs.
+        # This branch is reached only when that recovery failed (zero
+        # matches, multiple matches, transport error during recovery query,
+        # or matched doc had no MARK). Leave REJECTED state in place and
+        # deliver the pre-transmission PDF so the customer isn't blocked.
         logger.error(
-            "myDATA submission rejected as duplicate for order #%s "
-            "(uid=%s). Ops reconciliation needed via "
-            "RequestTransmittedDocs: %s",
+            "myDATA submission duplicate uid for order #%s "
+            "(uid=%s); MARK recovery via RequestTransmittedDocs failed. "
+            "Manual reconciliation required: %s",
             order_id,
             invoice.mydata_uid,
             exc,
@@ -1381,9 +1398,10 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
         OrderHistory.log_note(
             order=order,
             note=(
-                f"myDATA reported duplicate uid for invoice "
-                f"{invoice.invoice_number} — manual reconciliation required "
-                f"(query RequestTransmittedDocs with uid={invoice.mydata_uid})"
+                f"myDATA duplicate uid for invoice "
+                f"{invoice.invoice_number}; automatic MARK recovery "
+                f"failed — manual reconciliation required "
+                f"(uid={invoice.mydata_uid})"
             ),
         )
         send_invoice_email.delay(order_id)
@@ -1514,36 +1532,46 @@ def cancel_mydata_invoice(self, order_id: int) -> bool:
     retry_jitter=True,
 )
 def check_pending_orders() -> int:
-    try:
-        now = timezone.now()
-        one_day_ago = now - timedelta(days=1)
-        max_reminders = Setting.get(
-            "PENDING_ORDER_REMINDER_MAX_COUNT", default=3
+    now = timezone.now()
+    one_day_ago = now - timedelta(days=1)
+    max_reminders = Setting.get("PENDING_ORDER_REMINDER_MAX_COUNT", default=3)
+    reminder_intervals = [
+        Setting.get(
+            f"PENDING_ORDER_REMINDER_INTERVAL_DAYS_{i}",
+            default=d,
         )
-        reminder_intervals = [
-            Setting.get(
-                f"PENDING_ORDER_REMINDER_INTERVAL_DAYS_{i}",
-                default=d,
+        for i, d in [(1, 1), (2, 3), (3, 7)]
+    ]
+    # Online payments only: a PENDING online order means the customer
+    # abandoned checkout and can still come back and pay. Offline
+    # orders (COD) sit PENDING only when voucher creation failed — an
+    # ops problem the shipping alerts surface; mailing the customer
+    # "complete your order" for those is wrong-audience (prod orders
+    # 31/36/38/39 received exactly that in April 2026 while stuck on
+    # a failed ACS mint).
+    pending_orders = Order.objects.filter(
+        status=OrderStatus.PENDING,
+        created_at__lt=one_day_ago,
+        reminder_count__lt=max_reminders,
+        pay_way__is_online_payment=True,
+    )
+
+    count = 0
+    for order in pending_orders:
+        if order.last_reminder_sent_at:
+            interval_index = min(
+                order.reminder_count,
+                len(reminder_intervals) - 1,
             )
-            for i, d in [(1, 1), (2, 3), (3, 7)]
-        ]
-        pending_orders = Order.objects.filter(
-            status=OrderStatus.PENDING,
-            created_at__lt=one_day_ago,
-            reminder_count__lt=max_reminders,
-        )
+            cooldown = timedelta(days=reminder_intervals[interval_index])
+            if now - order.last_reminder_sent_at < cooldown:
+                continue
 
-        count = 0
-        for order in pending_orders:
-            if order.last_reminder_sent_at:
-                interval_index = min(
-                    order.reminder_count,
-                    len(reminder_intervals) - 1,
-                )
-                cooldown = timedelta(days=reminder_intervals[interval_index])
-                if now - order.last_reminder_sent_at < cooldown:
-                    continue
-
+        # Per-order isolation: one undeliverable address must not
+        # starve every later order's reminder (the old whole-loop
+        # try/except also swallowed setup errors, defeating the
+        # task-level autoretry).
+        try:
             context = {
                 "order": order,
                 "SITE_NAME": settings.SITE_NAME,
@@ -1592,15 +1620,14 @@ def check_pending_orders() -> int:
             )
 
             count += 1
+        except Exception:
+            logger.error(
+                "Pending-order reminder failed for order %s",
+                order.id,
+                exc_info=True,
+            )
 
-        return count
-
-    except Exception as e:
-        logger.error(
-            f"Error checking pending orders: {e!s}",
-            extra={"error": str(e)},
-        )
-        return 0
+    return count
 
 
 @celery_app.task(
@@ -1819,10 +1846,16 @@ def send_checkout_abandonment_emails() -> int:
         if not cart.user or not cart.user.email:
             continue
         try:
-            uid = urlsafe_base64_encode(force_bytes(cart.user.pk))
-            token = default_token_generator.make_token(cart.user)
+            # Use the shared signing-based helper — the old
+            # uidb64/default_token_generator scheme was removed with the
+            # unsubscribe URL migration, so a hand-rolled link now resolves
+            # to the wrong view and always fails BadSignature (regression).
+            from user.utils.subscription import (
+                generate_blanket_unsubscribe_link,
+            )
+
             unsubscribe_url = (
-                f"{settings.API_BASE_URL.rstrip('/')}/api/v1/user/unsubscribe/{uid}/{token}"
+                generate_blanket_unsubscribe_link(cart.user)
                 if getattr(settings, "API_BASE_URL", None)
                 else ""
             )

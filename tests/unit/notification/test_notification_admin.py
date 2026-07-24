@@ -308,102 +308,89 @@ class NotificationAdminTestCase(TestCase):
 
         self.assertIn("Test Notification", result)
         self.assertIn("Test notification message", result)
-        self.assertIn("🔗", result)
-        self.assertIn("ID:", result)
 
-    def test_priority_badge(self):
-        test_cases = [
-            ("LOW", "inline-flex"),
-            ("NORMAL", "inline-flex"),
-            ("HIGH", "inline-flex"),
-            ("URGENT", "inline-flex"),
-            ("CRITICAL", "inline-flex"),
-        ]
+    def test_kind_label(self):
+        result = self.admin.kind_label(self.notification)
+        self.assertEqual(result, ("INFO", "Info"))
 
-        for priority, expected_css in test_cases:
-            with self.subTest(priority=priority):
-                self.notification.priority = priority
-                result = self.admin.priority_badge(self.notification)
+    def test_category_label(self):
+        result = self.admin.category_label(self.notification)
+        self.assertEqual(result, ("SYSTEM", "System"))
 
-                self.assertIn(expected_css, result)
-                self.assertTrue(len(result) > 0)
+    def test_priority_label(self):
+        result = self.admin.priority_label(self.notification)
+        self.assertEqual(result, ("HIGH", "High Priority"))
 
-    def test_category_badge(self):
-        test_cases = [
-            ("SYSTEM", "⚙️"),
-            ("ORDER", "📦"),
-            ("PAYMENT", "💳"),
-            ("SECURITY", "🔒"),
-            ("PROMOTION", "🎉"),
-        ]
-
-        for category, expected_emoji in test_cases:
-            with self.subTest(category=category):
-                self.notification.category = category
-                result = self.admin.category_badge(self.notification)
-
-                self.assertIn(expected_emoji, result)
-                self.assertIn("inline-flex", result)
-
-    def test_status_display(self):
-        result = self.admin.status_display(self.notification)
-        self.assertIn("Active", result)
+    def test_expiry_status(self):
+        result = self.admin.expiry_status(self.notification)
+        self.assertEqual(result, ("active", "Active"))
 
         self.notification.expiry_date = timezone.now() - timedelta(days=1)
-        result = self.admin.status_display(self.notification)
-        self.assertIn("Expired", result)
+        result = self.admin.expiry_status(self.notification)
+        self.assertEqual(result, ("expired", "Expired"))
 
         self.notification.expiry_date = None
-        result = self.admin.status_display(self.notification)
-        self.assertIn("Active", result)
+        result = self.admin.expiry_status(self.notification)
+        self.assertEqual(result, ("active", "Active"))
 
     def test_engagement_stats(self):
         result = self.admin.engagement_stats(self.notification)
 
-        self.assertIn("👥", result)
-        self.assertIn("👁️", result)
-        self.assertIn("👓", result)
+        self.assertIn("1/1", result)
         self.assertIn("%", result)
 
     def test_timing_info(self):
         result = self.admin.timing_info(self.notification)
 
-        self.assertIn("ago", result)
         self.assertTrue(len(result) > 0)
         import re
 
-        self.assertTrue(re.search(r"\d{2}-\d{2}", result))
-        self.assertTrue(
-            "left" in result or "No expiry" in result or "Expired" in result
-        )
+        self.assertTrue(re.search(r"\d{2}/\d{2}", result))
+
+        self.notification.expiry_date = timezone.now() - timedelta(days=1)
+        result = self.admin.timing_info(self.notification)
+        self.assertIn("expired", result)
+
+        self.notification.expiry_date = None
+        result = self.admin.timing_info(self.notification)
+        self.assertIn("no expiry", result)
 
     def test_notification_analytics(self):
         result = self.admin.notification_analytics(self.notification)
 
-        self.assertIn("Age:", result)
-        self.assertIn("Title Length:", result)
-        self.assertIn("Message Length:", result)
-        self.assertIn("Has Link:", result)
-        self.assertIn("Has Type:", result)
-        self.assertIn("Readability:", result)
+        self.assertIn("Title", result)
+        self.assertIn("Message", result)
         self.assertIn("chars", result)
+        self.assertIn("Yes", result)
+
+    def test_notification_analytics_unsaved(self):
+        unsaved = Notification(
+            title="Draft", message="Draft message", kind="INFO"
+        )
+        result = self.admin.notification_analytics(unsaved)
+        self.assertEqual(result, "Available after creation.")
 
     def test_engagement_summary(self):
         result = self.admin.engagement_summary(self.notification)
 
-        self.assertIn("Total Recipients:", result)
-        self.assertIn("Seen:", result)
-        self.assertIn("Unseen:", result)
-        self.assertIn("Engagement Rate:", result)
+        self.assertIn("1 seen", result)
+        self.assertIn("0 unseen", result)
         self.assertIn("%", result)
-        self.assertIn("Performance:", result)
 
     def test_timing_summary(self):
         result = self.admin.timing_summary(self.notification)
 
         self.assertIn("Created", result)
-        if self.notification.expiry_date:
-            self.assertIn("Expires", result)
+        self.assertIn("Expires", result)
+        self.assertIn("Active", result)
+
+    def test_timing_summary_unsaved(self):
+        # Regression test: this crashed with ``TypeError`` (``now -
+        # obj.created_at`` where ``created_at`` is ``None``) on the
+        # add form's readonly "Timing Information" fieldset.
+        unsaved = Notification(title="Draft", message="Draft message")
+        result = self.admin.timing_summary(unsaved)
+        self.assertEqual(result, "Available after creation.")
 
 
 class NotificationUserAdminTestCase(TestCase):
@@ -448,51 +435,48 @@ class NotificationUserAdminTestCase(TestCase):
     def test_user_info(self):
         result = self.admin.user_info(self.notification_user)
 
-        self.assertIn("testuser", result)
-        self.assertIn("test@example.com", result)
+        self.assertEqual(result[0], "testuser")
+        self.assertEqual(result[1], "test@example.com")
 
     def test_notification_info(self):
         result = self.admin.notification_info(self.notification_user)
 
         self.assertIn("Test Notification", result)
-        self.assertTrue(len(result) > 0)
-        self.assertIn("#", result)
+        self.assertIn("Info", result)
 
-    def test_seen_status(self):
-        result = self.admin.seen_status(self.notification_user)
-        self.assertIn("Seen", result)
+    def test_seen_label(self):
+        result = self.admin.seen_label(self.notification_user)
+        self.assertEqual(result, ("seen", "Seen"))
 
         self.notification_user.seen = False
         self.notification_user.seen_at = None
-        result = self.admin.seen_status(self.notification_user)
-        self.assertIn("Unseen", result)
+        result = self.admin.seen_label(self.notification_user)
+        self.assertEqual(result, ("unseen", "Unseen"))
 
-    def test_priority_indicator(self):
-        result = self.admin.priority_indicator(self.notification_user)
-
-        self.assertIn("⚠️", result)
-        self.assertIn("text-orange-600", result)
-        self.assertTrue(len(result) > 0)
+    def test_priority_label(self):
+        result = self.admin.priority_label(self.notification_user)
+        self.assertEqual(result, ("HIGH", "High Priority"))
 
     def test_timing_display(self):
         result = self.admin.timing_display(self.notification_user)
 
-        self.assertIn("ago", result)
         self.assertTrue(len(result) > 0)
-        import re
-
-        self.assertTrue(re.search(r"\d{2}-\d{2}", result))
-        self.assertTrue("Active" in result or "Expired" in result)
+        self.assertIn("Active", result)
 
     def test_user_notification_analytics(self):
         result = self.admin.user_notification_analytics(self.notification_user)
 
-        self.assertIn("Age:", result)
-        self.assertIn("Response Time:", result)
-        self.assertIn("Notification Status:", result)
-        self.assertIn("Priority Level:", result)
-        self.assertIn("Category:", result)
-        self.assertIn("Engagement:", result)
+        self.assertIn("Response time", result)
+        self.assertIn("Notification", result)
+        self.assertIn("High Priority", result)
+        self.assertIn("System", result)
+
+    def test_user_notification_analytics_unsaved(self):
+        unsaved = NotificationUser(
+            user=self.user, notification=self.notification
+        )
+        result = self.admin.user_notification_analytics(unsaved)
+        self.assertEqual(result, "Available after creation.")
 
 
 class NotificationAdminIntegrationTestCase(TestCase):
@@ -532,31 +516,26 @@ class NotificationAdminIntegrationTestCase(TestCase):
             )
 
     def test_admin_display_methods_integration(self):
-        request = self.factory.get("/")
-        request.user = Mock()
-
         for notification in self.notifications:
             notification_info = self.notification_admin.notification_info(
                 notification
             )
-            priority_badge = self.notification_admin.priority_badge(
+            kind_label = self.notification_admin.kind_label(notification)
+            category_label = self.notification_admin.category_label(
                 notification
             )
-            category_badge = self.notification_admin.category_badge(
+            priority_label = self.notification_admin.priority_label(
                 notification
             )
-            status_display = self.notification_admin.status_display(
-                notification
-            )
+            expiry_status = self.notification_admin.expiry_status(notification)
 
             self.assertIsInstance(notification_info, str)
-            self.assertIsInstance(priority_badge, str)
-            self.assertIsInstance(category_badge, str)
-            self.assertIsInstance(status_display, str)
-
             self.assertIn(notification.title, notification_info)
-            self.assertIn("inline-flex", priority_badge)
-            self.assertIn("inline-flex", category_badge)
+
+            self.assertEqual(kind_label, ("INFO", "Info"))
+            self.assertEqual(category_label[0], notification.category)
+            self.assertEqual(priority_label[0], notification.priority)
+            self.assertEqual(expiry_status, ("active", "Active"))
 
     def test_filter_functionality(self):
         request = self.factory.get("/")

@@ -31,9 +31,8 @@ class CartItemSerializer(serializers.ModelSerializer[CartItem]):
     )
 
     def get_cart_id(self, obj: CartItem) -> str:
-        # Returns the cart's UUID — the public identifier the storefront
-        # echoes back in X-Cart-Id (M18 in MULTI_TENANT_AUDIT.md). The
-        # integer PK stays internal.
+        # Expose the guest-addressable UUID, not the sequential PK, so clients
+        # persist an unguessable cart identifier (mirrors the X-Cart-Id flow).
         return str(obj.cart.uuid)
 
     @extend_schema_field(
@@ -189,6 +188,8 @@ class CartItemWriteSerializer(serializers.ModelSerializer[CartItem]):
         return attrs
 
     def create(self, validated_data: dict) -> CartItem:
+        from django.db.models import F
+
         cart = self.context.get("cart") or validated_data.get("cart")
         product = validated_data.get("product")
         quantity = validated_data.get("quantity")
@@ -196,19 +197,20 @@ class CartItemWriteSerializer(serializers.ModelSerializer[CartItem]):
         if not cart:
             raise serializers.ValidationError(_("Cart is not provided."))
 
-        existing_item = CartItem.objects.filter(
-            cart=cart, product=product
-        ).first()
-
-        if existing_item:
-            new_quantity = existing_item.quantity + quantity
-            existing_item.quantity = new_quantity
-            existing_item.save()
-            return existing_item
-        else:
-            return CartItem.objects.create(
-                cart=cart, product=product, quantity=quantity
+        # Atomic upsert: the previous filter().first()→create() was a
+        # check-then-act race — two concurrent add-to-cart calls for the same
+        # product both saw "no row" and both INSERTed, so the second 500'd on
+        # the (cart, product) unique constraint. get_or_create absorbs that
+        # collision and the F() increment adds the quantity race-free (G0091).
+        item, created = CartItem.objects.get_or_create(
+            cart=cart, product=product, defaults={"quantity": quantity}
+        )
+        if not created:
+            CartItem.objects.filter(pk=item.pk).update(
+                quantity=F("quantity") + quantity
             )
+            item.refresh_from_db(fields=["quantity"])
+        return item
 
     class Meta:
         model = CartItem
@@ -240,7 +242,25 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
                     )
                 )
 
-            if product.stock < quantity:
+            # Adding to an existing line stacks onto the current quantity
+            # (create() does an F()-increment), so validate the RESULTING
+            # total against stock — not just the incoming delta. Otherwise
+            # a cart already holding N units silently exceeds available
+            # stock and the shopper only finds out at checkout-time stock
+            # reservation. Best-effort UX gate; the authoritative oversell
+            # guard remains StockManager.reserve_stock.
+            cart = self.context.get("cart")
+            existing_quantity = 0
+            if cart is not None:
+                existing_quantity = (
+                    CartItem.objects.filter(cart=cart, product=product)
+                    .values_list("quantity", flat=True)
+                    .first()
+                    or 0
+                )
+            requested_total = existing_quantity + quantity
+
+            if product.stock < requested_total:
                 raise serializers.ValidationError(
                     _(
                         "Not enough stock for '{product_name}'. Available: {product_stock}, Requested: {quantity}"
@@ -249,12 +269,14 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
                             "name", any_language=True
                         ),
                         product_stock=product.stock,
-                        quantity=quantity,
+                        quantity=requested_total,
                     )
                 )
         return attrs
 
     def create(self, validated_data: dict) -> CartItem:
+        from django.db.models import F
+
         cart = self.context.get("cart") or validated_data.get("cart")
         product = validated_data.get("product")
         quantity = validated_data.get("quantity")
@@ -262,19 +284,20 @@ class CartItemCreateSerializer(serializers.ModelSerializer[CartItem]):
         if not cart:
             raise serializers.ValidationError(_("Cart is not provided."))
 
-        existing_item = CartItem.objects.filter(
-            cart=cart, product=product
-        ).first()
-
-        if existing_item:
-            new_quantity = existing_item.quantity + quantity
-            existing_item.quantity = new_quantity
-            existing_item.save()
-            return existing_item
-        else:
-            return CartItem.objects.create(
-                cart=cart, product=product, quantity=quantity
+        # Atomic upsert: the previous filter().first()→create() was a
+        # check-then-act race — two concurrent add-to-cart calls for the same
+        # product both saw "no row" and both INSERTed, so the second 500'd on
+        # the (cart, product) unique constraint. get_or_create absorbs that
+        # collision and the F() increment adds the quantity race-free (G0091).
+        item, created = CartItem.objects.get_or_create(
+            cart=cart, product=product, defaults={"quantity": quantity}
+        )
+        if not created:
+            CartItem.objects.filter(pk=item.pk).update(
+                quantity=F("quantity") + quantity
             )
+            item.refresh_from_db(fields=["quantity"])
+        return item
 
     class Meta:
         model = CartItem

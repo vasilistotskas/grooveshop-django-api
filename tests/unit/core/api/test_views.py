@@ -1,7 +1,9 @@
 from unittest.mock import Mock, patch
 from django.test import TestCase, RequestFactory
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.request import Request
+from rest_framework.test import APIClient
 
 from core.api.views import (
     BaseModelViewSet,
@@ -188,6 +190,32 @@ class BaseModelViewSetTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, mock_meta_data)
+
+
+class HealthLiveViewTestCase(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse("api-health-live")
+
+    def test_returns_ok_without_authentication(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"status": "ok"})
+
+    def test_does_not_touch_backing_services(self):
+        # Liveness must never call the DB/Redis/Celery health paths, so a
+        # downed dependency can never fail the probe and restart the pod.
+        with (
+            patch("core.api.views.connection.cursor") as db_cursor,
+            patch("core.api.views.Redis.from_url") as redis_from_url,
+            patch("core.api.views.celery_app.control.ping") as celery_ping,
+        ):
+            response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        db_cursor.assert_not_called()
+        redis_from_url.assert_not_called()
+        celery_ping.assert_not_called()
 
 
 class MetadataTestCase(TestCase):

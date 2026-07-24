@@ -9,6 +9,7 @@ from django.utils import timezone
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
+from pay_way.factories import PayWayFactory
 from order.tasks import (
     CONFIRMATION_EMAIL_SENT_AT_KEY,
     CONFIRMATION_EMAIL_SENT_FLAG,
@@ -27,14 +28,9 @@ from order.tasks import (
 @pytest.mark.django_db
 class OrderTasksSimpleTestCase(DjangoTestCase):
     def setUp(self):
-        # Pin both status and payment_status so tests that exercise the
-        # PROCESSING email path (status-update, template fallback) are
-        # deterministic — the factory's default payment_status is a
-        # random choice across all PaymentStatus values, which made
-        # these tests flake whenever COMPLETED was rolled (the task
-        # intentionally skips the PROCESSING status-update email when
-        # the payment is already complete, to avoid duplicating the
-        # separate "Payment Confirmed" email).
+        # Pin both status and payment_status so the status-update /
+        # shipping-notification tests start from a deterministic state
+        # (the factory's defaults are random across all enum values).
         self.order = OrderFactory.create(
             email="customer@example.com",
             first_name="John",
@@ -80,6 +76,61 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         self.assertFalse(result)
         mock_logger.assert_called_once()
+
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_order_received_renders_wysiwyg_instructions_safely(self):
+        """``PayWay.instructions`` is admin-authored WYSIWYG HTML. The HTML
+        email must render it as HTML (no literal ``<div>`` shown), and the
+        plain-text email must show stripped, entity-unescaped text — not raw
+        markup. Regression for the COD order-received email that displayed a
+        literal ``<div>`` to the customer.
+
+        Renders the REAL templates (render_to_string is NOT mocked) and
+        captures the EmailMultiAlternatives bodies.
+        """
+        from pay_way.factories import PayWayFactory
+
+        html_instr = "<div>Pay 5 EUR cash &amp; carry to the courier.</div>"
+        pay_way = PayWayFactory.create_offline_payment()
+        # Set the WYSIWYG HTML across every parler language so the order's
+        # resolved language always returns it (overrides the factory faker).
+        for lang in ("el", "en", "de"):
+            pay_way.set_current_language(lang)
+            pay_way.instructions = html_instr
+        pay_way.save()
+
+        order = OrderFactory.create(
+            email="cod@example.com",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            pay_way=pay_way,
+        )
+        _release_confirmation_email(order.id)
+
+        with patch("order.tasks.EmailMultiAlternatives") as mock_email:
+            instance = MagicMock()
+            mock_email.return_value = instance
+            result = send_order_confirmation_email(order.id)
+
+        self.assertTrue(result)
+        text_body = mock_email.call_args.args[1]
+        html_body = instance.attach_alternative.call_args.args[0]
+
+        # Plain-text email: tags stripped, entities unescaped — no markup.
+        self.assertIn("Pay 5 EUR cash & carry to the courier.", text_body)
+        self.assertNotIn("<div>", text_body)
+        self.assertNotIn("&amp;", text_body)
+        # HTML email: rendered as HTML, not escaped (no literal <div> shown).
+        self.assertIn(
+            "<div>Pay 5 EUR cash &amp; carry to the courier.</div>", html_body
+        )
+        self.assertNotIn("&lt;div&gt;", html_body)
 
     @patch("order.tasks.EmailMultiAlternatives")
     @patch("order.tasks.render_to_string")
@@ -227,8 +278,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         mock_render.side_effect = ["Email content", "HTML content"]
 
+        # DELIVERED is a shopper-facing status that uses the generic
+        # template. PROCESSING/SHIPPED are intentionally not sent here
+        # (PROCESSING is internal; SHIPPED has its own dedicated email).
         result = send_order_status_update_email(
-            self.order.id, OrderStatus.PROCESSING
+            self.order.id, OrderStatus.DELIVERED
         )
 
         self.assertTrue(result)
@@ -243,6 +297,19 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
 
         self.assertTrue(result)
+
+    @patch("order.tasks.EmailMultiAlternatives")
+    def test_send_order_status_update_email_skip_internal_statuses(
+        self, mock_email
+    ):
+        """PROCESSING and SHIPPED are not sent through the generic
+        status-update email: PROCESSING is an internal milestone, and
+        SHIPPED is owned by the dedicated shipping-notification email.
+        Both must short-circuit before building a message."""
+        for status in (OrderStatus.PROCESSING, OrderStatus.SHIPPED):
+            result = send_order_status_update_email(self.order.id, status)
+            self.assertTrue(result)
+        mock_email.assert_not_called()
 
     @patch("order.tasks.logger.error")
     def test_send_order_status_update_email_order_not_found(self, mock_logger):
@@ -269,7 +336,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         mock_email.return_value = mock_email_instance
 
         def render_side_effect(template_name, context):
-            if "order_processing" in template_name:
+            if "order_delivered" in template_name:
                 raise Exception("Template not found")
             else:
                 return "Generic email content"
@@ -277,7 +344,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         mock_render.side_effect = render_side_effect
 
         result = send_order_status_update_email(
-            self.order.id, OrderStatus.PROCESSING
+            self.order.id, OrderStatus.DELIVERED
         )
 
         self.assertTrue(result)
@@ -297,7 +364,11 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     def test_send_shipping_notification_email_success(
         self, mock_render, mock_email, mock_log_note
     ):
-        order_with_tracking = OrderFactory.create(email="customer@example.com")
+        # The shipped email only sends once the parcel is genuinely in
+        # transit (status SHIPPED) AND tracking is present — so pin both.
+        order_with_tracking = OrderFactory.create(
+            email="customer@example.com", status=OrderStatus.SHIPPED
+        )
         order_with_tracking.tracking_number = "TRACK123456"
         order_with_tracking.shipping_carrier = "UPS"
         order_with_tracking.save()
@@ -326,17 +397,50 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertTrue(mock_log_note.called)
 
     @patch("order.tasks.logger.warning")
-    def test_send_shipping_notification_email_no_tracking_info(
+    def test_send_shipping_notification_email_shipped_without_tracking_defers(
         self, mock_logger
     ):
+        # An order flipped to SHIPPED before tracking lands defers (and
+        # warns) rather than erroring — the email re-dispatches when
+        # order_shipment_dispatched fires with the tracking number. It
+        # must NOT reserve the idempotency flag, or the real send would
+        # be permanently blocked.
+        self.order.status = OrderStatus.SHIPPED
         self.order.tracking_number = ""
         self.order.shipping_carrier = ""
+        self.order.save()
+        # The save() above eagerly fired the SHIPPED transition's own
+        # dispatch; ignore those calls and assert on the explicit one.
+        mock_logger.reset_mock()
+
+        result = send_shipping_notification_email(self.order.id)
+
+        self.assertTrue(result)
+        mock_logger.assert_called_once()
+        self.order.refresh_from_db()
+        self.assertNotIn(
+            "shipping_notification_email_sent", self.order.metadata or {}
+        )
+
+    @patch("order.tasks.logger.debug")
+    def test_send_shipping_notification_email_not_shipped_defers(
+        self, mock_logger
+    ):
+        # Fired at voucher-mint (status still PROCESSING) the task must
+        # quietly defer — this is the normal COD/online ordering where
+        # tracking lands before the parcel is in transit.
+        self.order.status = OrderStatus.PROCESSING
+        self.order.tracking_number = "TRACK999"
+        self.order.shipping_carrier = "acs"
         self.order.save()
 
         result = send_shipping_notification_email(self.order.id)
 
-        self.assertFalse(result)
-        mock_logger.assert_called_once()
+        self.assertTrue(result)
+        self.order.refresh_from_db()
+        self.assertNotIn(
+            "shipping_notification_email_sent", self.order.metadata or {}
+        )
 
     @patch("order.tasks.logger.error")
     def test_send_shipping_notification_email_order_not_found(
@@ -442,22 +546,61 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         pending_order = OrderFactory.create(
             status=OrderStatus.PENDING,
             email="old@example.com",
-            created_at=timezone.now() - timedelta(days=2),
+            pay_way=PayWayFactory.create_online_payment(),
+        )
+        # ``created_at`` is auto_now_add — a factory kwarg is ignored on
+        # insert, so age the row via queryset update.
+        Order.objects.filter(pk=pending_order.pk).update(
+            created_at=timezone.now() - timedelta(days=2)
         )
 
         mock_render.return_value = "Email content"
         mock_email_instance = MagicMock()
         mock_email.return_value = mock_email_instance
+        mock_email.reset_mock()
 
         result = check_pending_orders()
 
-        self.assertGreaterEqual(result, 0)
-        if result > 0:
-            mock_email_instance.send.assert_called()
-            mock_log_note.assert_called()
-            pending_order.refresh_from_db()
-            self.assertEqual(pending_order.reminder_count, 1)
-            self.assertIsNotNone(pending_order.last_reminder_sent_at)
+        self.assertEqual(result, 1)
+        mock_email_instance.send.assert_called()
+        mock_log_note.assert_called()
+        pending_order.refresh_from_db()
+        self.assertEqual(pending_order.reminder_count, 1)
+        self.assertIsNotNone(pending_order.last_reminder_sent_at)
+
+    @patch("order.tasks.OrderHistory.log_note")
+    @patch("order.tasks.EmailMultiAlternatives")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_check_pending_orders_excludes_offline_orders(
+        self, mock_render, mock_email, mock_log_note
+    ):
+        """A COD/offline order stuck in PENDING means voucher creation
+        failed — an ops problem (surfaced by shipping alerts), not a
+        customer action. "Complete your order" must never reach them
+        (prod orders 31/36/38/39 got exactly that in April 2026)."""
+        cod_order = OrderFactory.create(
+            status=OrderStatus.PENDING,
+            email="cod@example.com",
+            pay_way=PayWayFactory.create_offline_payment(),
+        )
+        # created_at is auto_now_add — age the row via queryset update
+        # so the exclusion below is provably the pay-way filter, not age.
+        Order.objects.filter(pk=cod_order.pk).update(
+            created_at=timezone.now() - timedelta(days=2)
+        )
+        mock_email.reset_mock()
+
+        result = check_pending_orders()
+
+        self.assertEqual(result, 0)
+        mock_email.assert_not_called()
 
     @patch("order.tasks.OrderHistory.log_note")
     @patch("order.tasks.EmailMultiAlternatives")
@@ -478,6 +621,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             created_at=timezone.now() - timedelta(days=10),
             reminder_count=3,
             last_reminder_sent_at=timezone.now() - timedelta(days=8),
+            pay_way=PayWayFactory.create_online_payment(),
         )
         # Reset — OrderFactory.create fires order_created which eagerly
         # runs the confirmation-email task. We're asserting on
@@ -508,6 +652,7 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             created_at=timezone.now() - timedelta(days=5),
             reminder_count=1,
             last_reminder_sent_at=timezone.now() - timedelta(hours=12),
+            pay_way=PayWayFactory.create_online_payment(),
         )
         # Reset the mock — OrderFactory.create fires order_created which
         # eagerly runs the confirmation-email task (CELERY_TASK_ALWAYS_EAGER
@@ -520,24 +665,84 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertEqual(result, 0)
         mock_email.assert_not_called()
 
-    @patch("order.tasks.logger.error")
-    def test_check_pending_orders_exception(self, mock_logger):
+    def test_check_pending_orders_setup_error_propagates(self):
+        """Setup failures (DB down, broken Setting lookup) must escape
+        the task body so Celery's ``autoretry_for=(Exception,)`` can
+        retry — the old whole-loop try/except swallowed them and
+        silently returned 0."""
         with patch("order.models.order.Order.objects.filter") as mock_filter:
             mock_filter.side_effect = Exception("Database error")
 
+            with self.assertRaisesMessage(Exception, "Database error"):
+                check_pending_orders()
+
+    @patch("order.tasks.logger.error")
+    @patch("order.tasks.render_to_string")
+    @override_settings(
+        SITE_NAME="GrooveShop",
+        INFO_EMAIL="support@example.com",
+        NUXT_BASE_URL="http://example.com",
+        STATIC_BASE_URL="http://example.com",
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+    )
+    def test_check_pending_orders_isolates_per_order_failures(
+        self, mock_render, mock_logger
+    ):
+        """One undeliverable reminder must not starve the rest: the
+        failing order is logged and skipped, later orders still send."""
+        # Set the render stub BEFORE order creation: the decorator
+        # patch is already active while the order_created signal sends
+        # the confirmation email eagerly, and a MagicMock body would
+        # make that send fail and pollute the patched logger.
+        mock_render.return_value = "Email content"
+        pay_way = PayWayFactory.create_online_payment()
+        failing = OrderFactory.create(
+            status=OrderStatus.PENDING,
+            email="fail@example.com",
+            pay_way=pay_way,
+        )
+        healthy = OrderFactory.create(
+            status=OrderStatus.PENDING,
+            email="ok@example.com",
+            pay_way=pay_way,
+        )
+        # created_at is auto_now_add — age the rows via queryset update.
+        Order.objects.filter(pk__in=[failing.pk, healthy.pk]).update(
+            created_at=timezone.now() - timedelta(days=2)
+        )
+        # Only errors logged by check_pending_orders itself count.
+        mock_logger.reset_mock()
+
+        class _FlakySend:
+            """Raises only for the failing order's recipient."""
+
+            def __init__(self, subject, body, from_email, to, **kwargs):
+                self.to = to
+
+            def attach_alternative(self, *args, **kwargs):
+                pass
+
+            def send(self):
+                if "fail@example.com" in self.to:
+                    raise OSError("smtp rejected recipient")
+
+        with patch("order.tasks.EmailMultiAlternatives", _FlakySend):
             result = check_pending_orders()
 
-            self.assertEqual(result, 0)
-            mock_logger.assert_called_once()
+        self.assertEqual(result, 1)
+        mock_logger.assert_called_once()
+        healthy.refresh_from_db()
+        self.assertEqual(healthy.reminder_count, 1)
+        failing.refresh_from_db()
+        self.assertEqual(failing.reminder_count, 0)
 
 
 @pytest.mark.django_db
 class OrderTasksIntegrationTestCase(DjangoTestCase):
     def setUp(self):
-        # Pin payment_status: OrderFactory's default is random (see factories
-        # /order.py:180) and can land on COMPLETED, which makes
-        # send_order_status_update_email skip the PROCESSING email as a
-        # duplicate of the payment-confirmed email.
+        # Pin status + payment_status: OrderFactory's defaults are random
+        # (see factories/order.py:180), so fix them for deterministic
+        # email-sequence assertions.
         self.order = OrderFactory.create(
             email="integration@example.com",
             status=OrderStatus.PROCESSING,
@@ -565,15 +770,23 @@ class OrderTasksIntegrationTestCase(DjangoTestCase):
         mock_email_instance = MagicMock()
         mock_email.return_value = mock_email_instance
 
-        confirmation_result = send_order_confirmation_email(self.order.id)
-        status_result = send_order_status_update_email(
-            self.order.id, OrderStatus.PROCESSING
+        # The three customer-facing emails across an order's real
+        # lifecycle: order received → shipped (in transit, with tracking)
+        # → delivered. PROCESSING never emails (internal milestone), so
+        # it's deliberately absent from this sequence.
+        Order.objects.filter(id=self.order.id).update(
+            status=OrderStatus.SHIPPED
         )
+
+        confirmation_result = send_order_confirmation_email(self.order.id)
         shipping_result = send_shipping_notification_email(self.order.id)
+        status_result = send_order_status_update_email(
+            self.order.id, OrderStatus.DELIVERED
+        )
 
         self.assertTrue(confirmation_result)
-        self.assertTrue(status_result)
         self.assertTrue(shipping_result)
+        self.assertTrue(status_result)
 
         self.assertEqual(mock_email_instance.send.call_count, 3)
 

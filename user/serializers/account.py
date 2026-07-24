@@ -75,6 +75,17 @@ class UserWriteSerializer(UserSerializer):
             "uuid",
         )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Email is settable at registration (create) but read-only afterwards.
+        # Changing the primary email must go through allauth's email-management
+        # flow, which sends a verification link and updates the EmailAddress
+        # source-of-truth; a plain profile PUT/PATCH must not silently change
+        # it (that would bypass verification and desync allauth's EmailAddress
+        # table).
+        if self.instance is not None and "email" in self.fields:
+            self.fields["email"].read_only = True
+
     def validate_language_code(self, value: str) -> str:
         if not value:
             return settings.LANGUAGE_CODE
@@ -82,14 +93,6 @@ class UserWriteSerializer(UserSerializer):
         if value not in valid:
             raise serializers.ValidationError(_("Unsupported language code."))
         return value
-
-    def validate_email(self, email):
-        if self.instance and self.instance.email != email:
-            if User.objects.filter(email=email).exists():
-                raise serializers.ValidationError(
-                    _("A user with this email already exists.")
-                )
-        return email
 
     def validate_username(self, username):
         username = super().validate_username(username)

@@ -51,17 +51,23 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
 
         return response
 
+    # Non-query endpoints that live under /search/ but are NOT searches.
+    _NON_QUERY_SEARCH_SUFFIXES = ("/trending", "/analytics")
+
     def _is_search_endpoint(self, request: HttpRequest) -> bool:
         """
-        Check if the request is to a search endpoint.
+        Check if the request is to a real search-query endpoint.
 
-        Args:
-            request: The HTTP request
-
-        Returns:
-            True if the request path contains /search/
+        A bare ``/search/`` substring check also matched ``/search/trending``
+        and ``/search/analytics``, recording them as SearchQuery rows and
+        polluting the analytics with requests that were never actual searches
+        (G0338). Exclude those non-query endpoints explicitly.
         """
-        return "/search/" in request.path
+        path = request.path
+        if "/search/" not in path:
+            return False
+        stripped = path.rstrip("/")
+        return not stripped.endswith(self._NON_QUERY_SEARCH_SUFFIXES)
 
     def _track_search_async(
         self, request: HttpRequest, response: HttpResponseBase

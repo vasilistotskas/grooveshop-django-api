@@ -6,8 +6,11 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from cart.factories.cart import CartFactory
+from cart.factories.item import CartItemFactory
 from cart.models import Cart
 from core.utils.testing import TestURLFixerMixin
+from product.factories.product import ProductFactory
+from tests.utils import count_queries
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()
@@ -35,6 +38,81 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
     def test_cart_only_supports_detail_operations(self):
         response = self.client.get(self.detail_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_create_payment_intent_returns_numeric_amount(self):
+        """The create-payment-intent ``amount`` must serialize as a JSON
+        number (DecimalField), matching the OpenAPI contract the Nuxt
+        client validates with ``z.number()``. Returning a raw ``str(amount)``
+        442'd every cart-Stripe checkout at the client's Zod gate."""
+        import json
+        from decimal import Decimal
+        from unittest.mock import MagicMock, patch
+
+        from djmoney.money import Money
+
+        from pay_way.factories import PayWayFactory
+
+        pay_way = PayWayFactory.create_online_payment(
+            provider_code="stripe", active=True
+        )
+
+        provider = MagicMock()
+        provider.process_payment.return_value = (
+            True,
+            {"client_secret": "cs_test_123", "payment_id": "pi_test_123"},
+        )
+
+        url = reverse("cart-create-payment-intent")
+        with (
+            patch(
+                "cart.views.cart.OrderService.calculate_shipping_cost",
+                return_value=Money("0.00", "EUR"),
+            ),
+            patch(
+                "cart.views.cart.OrderService.calculate_payment_method_fee",
+                return_value=Money("0.00", "EUR"),
+            ),
+            patch(
+                "pay_way.services.PayWayService.get_provider_for_pay_way",
+                return_value=provider,
+            ),
+        ):
+            response = self.client.post(
+                url,
+                {"pay_way_id": pay_way.id, "shipping_kind": "home_delivery"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Pre-render: DecimalField (coerce_to_string=False) yields a
+        # Decimal, never a str.
+        self.assertIsInstance(response.data["amount"], Decimal)
+        # The wire contract: the rendered JSON ``amount`` is a number.
+        rendered = json.loads(response.content)
+        self.assertNotIsInstance(rendered["amount"], str)
+        self.assertIsInstance(rendered["amount"], (int, float))
+
+    def test_retrieve_no_n_plus_one(self):
+        """Cart-detail query count must not grow with the number of items
+        nor re-run the total_* property queries per line (G0081)."""
+        with count_queries() as small:
+            self.client.get(self.detail_url)
+
+        for _ in range(3):
+            product = ProductFactory(
+                active=True, num_images=0, num_reviews=0, stock=10
+            )
+            CartItemFactory(cart=self.cart, product=product, quantity=1)
+
+        with count_queries() as large:
+            self.client.get(self.detail_url)
+
+        self.assertEqual(
+            small.count,
+            large.count,
+            f"Query count grew from {small.count} to {large.count} when "
+            f"cart items grew — N+1 regression.",
+        )
 
     def test_retrieve_cart(self):
         response = self.client.get(self.detail_url)
@@ -122,15 +200,15 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
             >= datetime.datetime(2023, 7, 26, 12, 0, tzinfo=datetime.UTC)
         )
 
-    def test_update_invalid(self):
-        invalid_update_data = {
-            "user": 9999,
-        }
+    def test_update_ignores_user_field(self):
+        # user is read-only: a client cannot reassign the cart to another
+        # account via update (mass-assignment IDOR).
         response = self.client.put(
-            self.detail_url, invalid_update_data, format="json"
+            self.detail_url, {"user": self.other_user.pk}, format="json"
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("user", response.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.cart.refresh_from_db()
+        self.assertEqual(self.cart.user, self.user)
 
     def test_partial_update_valid(self):
         partial_data = {"user": self.user.pk}
@@ -158,14 +236,14 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.cart.refresh_from_db()
         self.assertEqual(response.data["user"], self.user.pk)
 
-    def test_partial_update_invalid(self):
-        invalid_partial_data = {
-            "user": "invalid_user_id",
-        }
+    def test_partial_update_ignores_user_field(self):
+        # user is read-only; reassignment attempts are ignored, not honoured.
         response = self.client.patch(
-            self.detail_url, invalid_partial_data, format="json"
+            self.detail_url, {"user": self.other_user.pk}, format="json"
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.cart.refresh_from_db()
+        self.assertEqual(self.cart.user, self.user)
 
     def test_destroy_valid(self):
         response = self.client.delete(self.detail_url)
@@ -229,14 +307,15 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
             expected_detail_fields.issubset(set(response.data.keys()))
         )
 
-    def test_validation_errors_consistent(self):
-        invalid_data = {
-            "user": "not_a_number",
-        }
-        response = self.client.put(self.detail_url, invalid_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-        self.assertIn("user", response.data)
+    def test_update_user_payload_is_ignored_not_validated(self):
+        # user is read-only, so even a malformed user value is ignored
+        # rather than surfacing a validation error — the cart keeps its owner.
+        response = self.client.put(
+            self.detail_url, {"user": "not_a_number"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.cart.refresh_from_db()
+        self.assertEqual(self.cart.user, self.user)
 
     def test_retrieve_cart_as_anonymous_user_with_headers(self):
         self.client.force_authenticate(user=None)
@@ -300,15 +379,15 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.data["user"], self.user.pk)
         self.assertFalse(Cart.objects.filter(id=guest_cart.id).exists())
 
-    def test_update_cart_with_invalid_data(self):
-        invalid_update_data = {
-            "user": 9999,
-        }
+    def test_update_cart_cannot_reassign_user(self):
+        # Reassigning the cart to a non-existent/foreign user id is ignored
+        # (user is read-only), guarding against mass-assignment.
         response = self.client.patch(
-            self.detail_url, data=invalid_update_data, format="json"
+            self.detail_url, data={"user": 9999}, format="json"
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("user", response.data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.cart.refresh_from_db()
+        self.assertEqual(self.cart.user, self.user)
 
     def test_partial_update_cart_with_extra_fields(self):
         extra_data = {

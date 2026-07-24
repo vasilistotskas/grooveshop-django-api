@@ -8,7 +8,7 @@ from djmoney.money import Money
 from order.services import OrderService
 from order.exceptions import (
     InvalidOrderDataError,
-    PaymentNotFoundError,
+    PaymentVerificationError,
 )
 from order.enum.status import OrderStatus, PaymentStatus
 
@@ -197,7 +197,7 @@ class TestCreateOrderFromCart:
 
     def test_missing_payment_intent_id_raises_error(self):
         """
-        Test that missing payment_intent_id raises PaymentNotFoundError.
+        Test that missing payment_intent_id raises InvalidOrderDataError.
         """
         from cart.factories import CartFactory, CartItemFactory
         from product.factories import ProductFactory
@@ -224,7 +224,7 @@ class TestCreateOrderFromCart:
         }
 
         # Execute & Verify
-        with pytest.raises(PaymentNotFoundError) as exc_info:
+        with pytest.raises(InvalidOrderDataError) as exc_info:
             OrderService.create_order_from_cart(
                 cart=cart,
                 shipping_address=shipping_address,
@@ -237,7 +237,7 @@ class TestCreateOrderFromCart:
 
     def test_unconfirmed_payment_intent_raises_error(self):
         """
-        Test that unconfirmed payment intent raises PaymentNotFoundError.
+        Test that unconfirmed payment intent raises PaymentVerificationError.
 
         Validates that only confirmed payments can create orders.
 
@@ -286,7 +286,7 @@ class TestCreateOrderFromCart:
             mock_provider.return_value = mock_instance
 
             # Execute & Verify
-            with pytest.raises(PaymentNotFoundError) as exc_info:
+            with pytest.raises(PaymentVerificationError) as exc_info:
                 OrderService.create_order_from_cart(
                     cart=cart,
                     shipping_address=shipping_address,

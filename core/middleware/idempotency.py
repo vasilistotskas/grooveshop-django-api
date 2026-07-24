@@ -40,6 +40,11 @@ IDEMPOTENCY_TTL_SECONDS = 60 * 60 * 24  # 24h
 IDEMPOTENT_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 CACHE_ALIAS = "default"
 KEY_NAMESPACE = "idem"
+# Sentinel + TTL for the in-flight reservation (G0103). The TTL is a
+# self-heal bound: if a worker dies mid-request without process_response
+# releasing the marker, a retry is unblocked after this window.
+_IN_FLIGHT_MARKER = "__idempotency_in_flight__"
+_IN_FLIGHT_TTL_SECONDS = 60
 MAX_CACHED_BODY_BYTES = 256 * 1024  # 256 KB — responses larger than this
 # (e.g. streaming file downloads) are not worth caching for idempotency.
 
@@ -93,9 +98,30 @@ class IdempotencyMiddleware(MiddlewareMixin):
 
         key = _cache_key(request, idempotency_key)
         cached = caches[CACHE_ALIAS].get(key)
+
+        if cached == _IN_FLIGHT_MARKER:
+            # A duplicate with the same key is still executing — tell the
+            # client to back off rather than run the handler a second time
+            # (G0103).
+            return JsonResponse(
+                {"detail": "A duplicate request is already in progress."},
+                status=409,
+            )
+
         if cached is None:
-            # First seen — stash the key on the request so process_response
-            # knows to cache the outcome.
+            # First seen — atomically reserve the key so a concurrent
+            # duplicate collides here (add() fails) instead of both
+            # executing (G0103). process_response replaces the marker with
+            # the real outcome, or releases it if the response isn't
+            # cacheable.
+            reserved = caches[CACHE_ALIAS].add(
+                key, _IN_FLIGHT_MARKER, _IN_FLIGHT_TTL_SECONDS
+            )
+            if not reserved:
+                return JsonResponse(
+                    {"detail": "A duplicate request is already in progress."},
+                    status=409,
+                )
             request._idempotency_cache_key = key  # type: ignore[attr-defined]
             return None
 
@@ -125,27 +151,37 @@ class IdempotencyMiddleware(MiddlewareMixin):
         if not key:
             return response
 
-        status = response.status_code
-        # Skip 5xx (retryable by design) and redirects (handler-specific).
-        if status >= 500 or 300 <= status < 400:
+        outcome = self._cacheable_outcome(response)
+        if outcome is None:
+            # Not cacheable (5xx retryable / redirect / oversized / non-JSON)
+            # — RELEASE the in-flight reservation so a legitimate retry isn't
+            # blocked with a 409 until the marker's TTL expires (G0103).
+            caches[CACHE_ALIAS].delete(key)
             return response
+
+        caches[CACHE_ALIAS].set(key, outcome, timeout=IDEMPOTENCY_TTL_SECONDS)
+        return response
+
+    @staticmethod
+    def _cacheable_outcome(response: HttpResponse) -> dict[str, Any] | None:
+        """Return the cacheable replay dict, or None when the response must
+        not be cached (5xx, redirect, oversized, or non-JSON body)."""
+        status = response.status_code
+        if status >= 500 or 300 <= status < 400:
+            return None
 
         content = getattr(response, "content", b"") or b""
         if len(content) > MAX_CACHED_BODY_BYTES:
-            return response
+            return None
 
-        body: Any
         content_type = response.get("Content-Type", "")
-        if content and "application/json" in content_type:
-            try:
-                body = json.loads(content.decode("utf-8"))
-            except (ValueError, UnicodeDecodeError):
-                return response
-        else:
-            # Non-JSON responses are stashed as a base64-free ASCII shell —
-            # the replay above only rehydrates JSON bodies, so anything
-            # else is skipped cleanly.
-            return response
+        if not (content and "application/json" in content_type):
+            return None
+
+        try:
+            body = json.loads(content.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return None
 
         headers_to_preserve = {
             name: value
@@ -153,14 +189,8 @@ class IdempotencyMiddleware(MiddlewareMixin):
             if name.lower()
             in {"content-type", "x-correlation-id", "location", "vary"}
         }
-
-        caches[CACHE_ALIAS].set(
-            key,
-            {
-                "status": status,
-                "body": body,
-                "headers": headers_to_preserve,
-            },
-            timeout=IDEMPOTENCY_TTL_SECONDS,
-        )
-        return response
+        return {
+            "status": status,
+            "body": body,
+            "headers": headers_to_preserve,
+        }

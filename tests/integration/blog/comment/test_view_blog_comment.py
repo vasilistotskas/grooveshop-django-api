@@ -391,6 +391,20 @@ class BlogCommentViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_update_likes_action_non_owner_can_like(self):
+        # Liking is for other users' comments: a non-owner must be able to
+        # like a comment they did not write (previously blocked by an
+        # owner-only permission).
+        other_user = UserAccountFactory()
+        self.client.force_authenticate(user=other_user)
+        url = reverse("blog-comment-update_likes", args=[self.comment.id])
+
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["action"], "liked")
+        self.assertTrue(self.comment.likes.filter(id=other_user.id).exists())
+
     def test_post_action(self):
         url = reverse("blog-comment-post", args=[self.comment.id])
         response = self.client.get(url)

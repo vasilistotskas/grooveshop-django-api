@@ -179,6 +179,100 @@ def _local(tag: str) -> str:
     return tag
 
 
+@dataclass(frozen=True)
+class TransmittedDoc:
+    """One ``<invoice>`` element inside a ``RequestedDoc`` response.
+
+    AADE's ``RequestTransmittedDocs`` returns a ``RequestedDoc`` whose
+    ``<invoicesDoc>`` wraps ``<invoice>`` children (``AadeBookInvoiceType``).
+    Each invoice carries ``<uid>`` (the submitter-generated SHA-1 we sent)
+    and ``<mark>`` (the AADE-assigned Registration Number). Only those two
+    fields are extracted — they're all MARK recovery needs; the rest of
+    the invoice (issuer, lines, totals) is present but ignored.
+
+    Element names validated against the AADE myDATA invoice schema
+    (``AadeBookInvoiceType``: ``uid`` + ``mark`` as direct children of
+    ``<invoice>``) and the reference ``firebed/aade-mydata`` library.
+    """
+
+    uid: str
+    invoice_mark: int | None
+
+
+@dataclass(frozen=True)
+class RequestedDocResult:
+    """Parsed ``RequestedDoc`` response from ``RequestTransmittedDocs``.
+
+    ``docs`` is the flat list of all ``<invoice>`` elements found across
+    all ``<invoicesDoc>`` groups. ``next_partition_key`` and
+    ``next_row_key`` are the Azure Table Storage continuation tokens;
+    both are ``None`` when the result set is exhausted (i.e. no more
+    pages to fetch).
+    """
+
+    docs: list[TransmittedDoc]
+    next_partition_key: str | None = None
+    next_row_key: str | None = None
+
+
+def parse_requested_doc(xml_bytes: bytes) -> RequestedDocResult:
+    """Parse the ``RequestedDoc`` XML returned by ``RequestTransmittedDocs``.
+
+    Validated structure (AADE myDATA invoice schema; confirmed against the
+    official RequestTransmittedDocs endpoint docs and the reference
+    ``firebed/aade-mydata`` library, incl. its sample response):
+
+        <RequestedDoc xmlns="http://www.aade.gr/myDATA/invoice/v1.0">
+          <continuationToken>            <!-- present only when paged -->
+            <nextPartitionKey>...</nextPartitionKey>
+            <nextRowKey>...</nextRowKey>
+          </continuationToken>
+          <invoicesDoc>
+            <invoice>
+              <uid>...</uid>
+              <mark>...</mark>
+              ...
+            </invoice>
+            ...
+          </invoicesDoc>
+        </RequestedDoc>
+
+    When no documents match the query, ``invoicesDoc`` may be absent or
+    empty — we return an empty ``docs`` list. The ``continuationToken`` is
+    absent on the final (or only) page, leaving both keys ``None``.
+    Namespaces are stripped via ``_local`` so the default ``xmlns`` AADE
+    sets does not affect element matching.
+    """
+    root = fromstring(xml_bytes)
+    if _local(root.tag) == "string" and root.text:
+        root = fromstring(root.text.encode("utf-8"))
+
+    docs: list[TransmittedDoc] = []
+    for invoices_doc_el in _iter_children(root, "invoicesDoc"):
+        for invoice_el in _iter_children(invoices_doc_el, "invoice"):
+            docs.append(
+                TransmittedDoc(
+                    uid=_text(invoice_el, "uid") or "",
+                    invoice_mark=_int_or_none(_text(invoice_el, "mark")),
+                )
+            )
+
+    # nextPartitionKey / nextRowKey live INSIDE the <continuationToken>
+    # wrapper, not as direct children of <RequestedDoc>.
+    next_partition_key: str | None = None
+    next_row_key: str | None = None
+    for ct_el in _iter_children(root, "continuationToken"):
+        next_partition_key = _text(ct_el, "nextPartitionKey")
+        next_row_key = _text(ct_el, "nextRowKey")
+        break
+
+    return RequestedDocResult(
+        docs=docs,
+        next_partition_key=next_partition_key,
+        next_row_key=next_row_key,
+    )
+
+
 def _int_or_none(value: str | None) -> int | None:
     if not value:
         return None

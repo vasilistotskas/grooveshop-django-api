@@ -71,7 +71,19 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         shipment = AcsService.create_voucher_for_order(order)
+    except AcsRetryableError:
+        # Transient (HTTP 5xx / 403 / 406 / connection). Re-raise so Celery's
+        # autoretry_for handles it — AcsRetryableError subclasses AcsAPIError,
+        # so the broader handler below would otherwise swallow it as a
+        # permanent business error and the retry policy would be dead code.
+        raise
     except AcsAPIError as exc:
+        # Business error (bad address, unacceptable destination
+        # station, …) — permanent, no retry. Tell a human immediately:
+        # the customer has checked out and is waiting (prod order 143
+        # stranded invisibly for 10 days on exactly this path).
+        from shipping.alerts import alert_admins_shipment_creation_failed
+
         logger.error(
             "ACS business error for order %s: %s",
             order_id,
@@ -81,6 +93,9 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
                 "alias": exc.alias,
                 "http_status": exc.http_status,
             },
+        )
+        alert_admins_shipment_creation_failed(
+            order_id=order_id, carrier="ACS", error=str(exc)
         )
         return {
             "status": "acs_api_error",
@@ -257,6 +272,11 @@ def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:
 
     try:
         shipment = AcsService.poll_shipment_tracking(shipment)
+    except AcsRetryableError:
+        # Transient — re-raise so autoretry_for retries. AcsRetryableError
+        # subclasses AcsAPIError, so the handler below would otherwise treat a
+        # retryable 5xx/406 as a permanent poll failure.
+        raise
     except AcsAPIError as exc:
         logger.warning(
             "ACS tracking poll failed for shipment=%s: %s",
@@ -274,6 +294,150 @@ def poll_acs_tracking_one(self, shipment_id: int) -> dict[str, Any]:
         "shipment_id": shipment_id,
         "shipment_state": shipment.shipment_state,
     }
+
+
+@shared_task(bind=True)
+def check_stale_acs_shipments(self) -> dict[str, Any]:
+    """Alert admins about non-terminal shipments with no tracking movement.
+
+    Two staleness classes are reported (real prod cases, 2026-07-11):
+
+    * **Stale tracking** — voucher exists, state non-terminal, and no
+      tracking event for ``settings.ACS_STALE_SHIPMENT_DAYS`` days
+      (falling back to ``created_at`` when no event was ever
+      recorded). Caught: a parcel stuck at the destination station
+      after a wrong-address delivery failure; a voucher sitting in
+      ``new`` for 50 days because the parcel was never handed over.
+    * **Stranded mint** — ``pending_creation`` for over 24 hours.
+      Voucher creation normally completes in seconds; a day-old
+      pending row means the mint task failed permanently or was lost
+      (order 143 stranded 10 days). The immediate mint-failure alert
+      (``shipping.alerts``) is the fast path; this digest is the
+      backstop for failures where no exception handler ran.
+
+    Mirrors ``product.tasks.check_low_stock_products``: rows are
+    claimed atomically (``stale_alert_sent=True``) before the email so
+    concurrent runs can't double-send, and the claim is released when
+    the email cannot be sent. The flag is re-armed by
+    ``AcsService.poll_shipment_tracking`` when a new event arrives, so
+    a shipment that moves and stalls again alerts afresh.
+
+    Alerted shipments keep polling — the alert asks a human to either
+    chase the parcel with ACS or retire the row via the admin action
+    ("Retire selected shipments"), which sets a terminal state and
+    thereby stops the poller.
+    """
+    from django.core.mail import mail_admins
+    from django.db.models import Q
+    from django.template.loader import render_to_string
+
+    from shipping_acs.enum.shipment_state import AcsShipmentState
+    from shipping_acs.models import AcsShipment
+
+    threshold_days = getattr(settings, "ACS_STALE_SHIPMENT_DAYS", 3)
+    now = timezone.now()
+    cutoff = now - timedelta(days=threshold_days)
+
+    stale_tracking = (
+        Q(voucher_no__isnull=False)
+        & ~Q(
+            shipment_state__in=[
+                AcsShipmentState.PENDING_CREATION,
+                AcsShipmentState.DELIVERED,
+                AcsShipmentState.RETURNED,
+                AcsShipmentState.CANCELED,
+                AcsShipmentState.LOST,
+            ]
+        )
+        & (
+            Q(last_event_at__lt=cutoff)
+            | (Q(last_event_at__isnull=True) & Q(created_at__lt=cutoff))
+        )
+    )
+    stranded_mint = Q(
+        shipment_state=AcsShipmentState.PENDING_CREATION,
+        created_at__lt=now - timedelta(hours=24),
+    )
+
+    with transaction.atomic():
+        shipment_ids = list(
+            AcsShipment.objects.select_for_update(skip_locked=True)
+            .filter(stale_alert_sent=False)
+            .filter(stale_tracking | stranded_mint)
+            .values_list("id", flat=True)
+        )
+        if not shipment_ids:
+            return {"alerted": 0}
+        AcsShipment.objects.filter(id__in=shipment_ids).update(
+            stale_alert_sent=True
+        )
+
+    if not settings.ADMINS:
+        logger.warning(
+            "check_stale_acs_shipments: no ADMINS configured — "
+            "rolling back claim"
+        )
+        AcsShipment.objects.filter(id__in=shipment_ids).update(
+            stale_alert_sent=False
+        )
+        return {"alerted": 0, "reason": "no_admins"}
+
+    shipments = AcsShipment.objects.filter(id__in=shipment_ids).select_related(
+        "order"
+    )
+    rows = [
+        {
+            "voucher_no": s.voucher_no or "—",
+            "order_id": s.order_id,
+            "shipment_state": s.get_shipment_state_display(),
+            "last_movement_at": s.last_event_at or s.created_at,
+            "days_stale": (now - (s.last_event_at or s.created_at)).days,
+        }
+        for s in shipments
+    ]
+
+    context = {
+        "shipments": rows,
+        "threshold_days": threshold_days,
+        "SITE_NAME": settings.SITE_NAME,
+        "INFO_EMAIL": settings.INFO_EMAIL,
+        "SITE_URL": settings.NUXT_BASE_URL,
+        "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+    }
+    from django.utils.translation import gettext as _
+
+    subject = _("Stale ACS shipment alert — {n} shipment(s)").format(
+        n=len(rows)
+    )
+    try:
+        text_content = render_to_string(
+            "emails/shipping_acs/stale_shipments_alert.txt", context
+        )
+        html_content = render_to_string(
+            "emails/shipping_acs/stale_shipments_alert.html", context
+        )
+        mail_admins(
+            subject=subject,
+            message=text_content,
+            html_message=html_content,
+        )
+    except Exception as exc:
+        logger.error(
+            "check_stale_acs_shipments: failed to send alert email: %s",
+            exc,
+            exc_info=True,
+        )
+        AcsShipment.objects.filter(id__in=shipment_ids).update(
+            stale_alert_sent=False
+        )
+        return {"alerted": 0, "error": str(exc)}
+
+    logger.info(
+        "Stale ACS shipment alert sent for %s shipment(s): %s",
+        len(shipment_ids),
+        shipment_ids,
+    )
+    return {"alerted": len(shipment_ids), "ids": shipment_ids}
 
 
 @shared_task(
@@ -303,7 +467,14 @@ def reconcile_acs_cod_payouts(self) -> dict[str, int]:
     from shipping_acs.services import AcsService
 
     yesterday = (timezone.localtime() - timedelta(days=1)).date()
-    result = AcsService.reconcile_cod_payouts(cod_payment_date=yesterday)
+    # silent_for_customer: the payment-flip and DELIVERED → COMPLETED
+    # advance are internal bookkeeping — the customer already received
+    # the DELIVERED notification days earlier and paid the courier in
+    # person, so a "completed" email now adds nothing (site-owner
+    # decision 2026-07-11: COD reconcile must never email customers).
+    result = AcsService.reconcile_cod_payouts(
+        cod_payment_date=yesterday, silent_for_customer=True
+    )
     # ``extra=result`` would crash because ``result['created'/'updated']``
     # collide with built-in ``LogRecord`` attributes. Namespace under a
     # wrapper key so the structured fields stay queryable.

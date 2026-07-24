@@ -137,10 +137,27 @@ class TestPaymentConfirmationActualTransition:
             f"Order status should be {expected_final_status}, got {order.status}"
         )
 
-        # Verify payment status is updated to COMPLETED
-        assert order.payment_status == PaymentStatus.COMPLETED, (
-            f"Payment status should be COMPLETED, got {order.payment_status}"
-        )
+        # Verify payment status: orders whose payment_status was already in a
+        # settled financial state (REFUNDED / PARTIALLY_REFUNDED / CANCELED)
+        # must NOT be regressed to COMPLETED by a stale out-of-order webhook.
+        # Payment providers do NOT guarantee delivery order.  All other
+        # starting states (PENDING, PROCESSING, FAILED, or COMPLETED) should
+        # land on COMPLETED as before.
+        _blocked_by_guard = {
+            PaymentStatus.REFUNDED,
+            PaymentStatus.PARTIALLY_REFUNDED,
+            PaymentStatus.CANCELED,
+        }
+        if initial_payment_status in _blocked_by_guard:
+            assert order.payment_status == initial_payment_status, (
+                f"Settled payment_status {initial_payment_status} must not "
+                f"be overwritten by a stale succeeded event, "
+                f"got {order.payment_status}"
+            )
+        else:
+            assert order.payment_status == PaymentStatus.COMPLETED, (
+                f"Payment status should be COMPLETED, got {order.payment_status}"
+            )
 
         # Verify status transition was recorded in history if status changed
         if should_transition:
@@ -172,6 +189,36 @@ class TestPaymentConfirmationActualTransition:
             assert order.status == initial_order_status, (
                 f"Order status should remain {initial_order_status}, got {order.status}"
             )
+
+    def test_payment_on_canceled_order_records_receipt_without_shipment(self):
+        """A late payment on a CANCELED order records the money and flags it
+        for manual refund, but must NOT dispatch courier shipment creation
+        (G0281)."""
+        from unittest.mock import patch
+
+        payment_id = "pi_test_canceled_late_payment"
+        order = OrderFactory(
+            status=OrderStatus.CANCELED,
+            payment_status=PaymentStatus.PENDING,
+            payment_id=payment_id,
+            num_order_items=0,
+        )
+
+        with patch(
+            "order.services.OrderService._dispatch_shipment_creation_task"
+        ) as mock_dispatch:
+            result = OrderService.handle_payment_succeeded(payment_id)
+
+        assert result is not None
+        mock_dispatch.assert_not_called()
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.CANCELED
+        assert order.payment_status == PaymentStatus.COMPLETED
+        assert "payment_after_cancel" in (order.metadata or {})
+        assert order.metadata["payment_after_cancel"]["payment_id"] == (
+            payment_id
+        )
 
     @pytest.mark.parametrize(
         "order_scenario",

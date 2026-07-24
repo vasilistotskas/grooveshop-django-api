@@ -4,7 +4,6 @@ from unittest.mock import patch
 import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
-from django.db import models
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django.utils.translation import gettext
@@ -313,7 +312,7 @@ class TestContactAdmin(TestCase):
             "message_preview",
             "message_stats",
             "contact_timing",
-            "priority_badge",
+            "priority",
         ]
         self.assertEqual(self.admin.list_display, expected_display)
 
@@ -327,16 +326,8 @@ class TestContactAdmin(TestCase):
             "uuid",
             "created_at",
             "updated_at",
-            "contact_analytics",
-            "message_analytics",
-            "timing_info",
         )
         self.assertEqual(self.admin.readonly_fields, expected_fields)
-
-    def test_get_queryset(self):
-        queryset = self.admin.get_queryset(self.request)
-        self.assertIsInstance(queryset, models.QuerySet)
-        self.assertIn(self.contact, queryset)
 
     def test_get_ordering(self):
         ordering = self.admin.get_ordering(self.request)
@@ -344,34 +335,22 @@ class TestContactAdmin(TestCase):
         self.assertEqual(ordering, expected)
 
     def test_contact_info_normal_email(self):
-        result = self.admin.contact_info(self.contact)
+        primary, secondary, _initials = self.admin.contact_info(self.contact)
 
-        self.assertIn("John Doe Test User", result)
-        self.assertIn("john.doe@example.com", result)
-        self.assertIn(str(self.contact.id), result)
-        self.assertIn("text-base-600", result)
+        self.assertEqual(primary, "John Doe Test User")
+        self.assertEqual(secondary, "john.doe@example.com")
 
     def test_contact_info_suspicious_email(self):
         suspicious_contact = Contact.objects.create(
             name="Suspicious User", email="invalidemail", message="Test message"
         )
 
-        result = self.admin.contact_info(suspicious_contact)
-
-        self.assertIn("text-red-600", result)
-        self.assertIn("invalidemail", result)
-
-    def test_contact_info_long_name(self):
-        long_name_contact = Contact.objects.create(
-            name="A" * 50,
-            email="test@example.com",
-            message="Test message",
+        _primary, secondary, _initials = self.admin.contact_info(
+            suspicious_contact
         )
 
-        result = self.admin.contact_info(long_name_contact)
-
-        self.assertIn("...", result)
-        self.assertNotIn("A" * 50, result)
+        self.assertIn("invalidemail", secondary)
+        self.assertIn("invalid", secondary)
 
     def test_message_preview_short_message(self):
         result = self.admin.message_preview(self.contact)
@@ -401,84 +380,27 @@ class TestContactAdmin(TestCase):
 
         self.assertIn("Line 1 Line 2 Line 3", result)
 
-    def test_message_stats_short_message(self):
+    def test_message_stats(self):
         result = self.admin.message_stats(self.contact)
 
-        self.assertIn("text-green-700", result)
         self.assertIn("chars", result)
         self.assertIn("words", result)
+        self.assertIn("lines", result)
 
-    def test_message_stats_medium_message(self):
-        medium_contact = Contact.objects.create(
-            name="Medium User",
-            email="medium@example.com",
-            message="A" * 300,
-        )
-
-        result = self.admin.message_stats(medium_contact)
-
-        self.assertIn("text-yellow-700", result)
-
-    def test_message_stats_long_message(self):
-        long_contact = Contact.objects.create(
-            name="Long User",
-            email="long@example.com",
-            message="A" * 600,
-        )
-
-        result = self.admin.message_stats(long_contact)
-
-        self.assertIn("text-blue-700", result)
-
-    @patch("contact.admin.timezone")
-    def test_contact_timing_just_now(self, mock_timezone):
-        now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
-        mock_timezone.now.return_value = now
-
-        self.contact.created_at = now - datetime.timedelta(minutes=5)
+    def test_contact_timing(self):
+        # ``contact_timing`` delegates the relative-time portion to the
+        # shared ``admin.displays.relative_time`` helper, which resolves
+        # ``timezone.now()`` internally — so this asserts against the
+        # real clock rather than mocking ``contact.admin.timezone``.
+        self.contact.created_at = timezone.now() - datetime.timedelta(hours=3)
         self.contact.save()
 
         result = self.admin.contact_timing(self.contact)
-        self.assertIn("Just Now", result)
-        self.assertIn("text-red-700", result)
+        self.assertIn(self.contact.created_at.strftime("%d/%m/%Y"), result)
+        self.assertIn("ω", result)
 
     @patch("contact.admin.timezone")
-    def test_contact_timing_hours_ago(self, mock_timezone):
-        now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
-        mock_timezone.now.return_value = now
-
-        self.contact.created_at = now - datetime.timedelta(hours=3)
-        self.contact.save()
-
-        result = self.admin.contact_timing(self.contact)
-        self.assertIn("3h ago", result)
-        self.assertIn("text-orange-700", result)
-
-    @patch("contact.admin.timezone")
-    def test_contact_timing_days_ago(self, mock_timezone):
-        now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
-        mock_timezone.now.return_value = now
-
-        self.contact.created_at = now - datetime.timedelta(days=2)
-        self.contact.save()
-
-        result = self.admin.contact_timing(self.contact)
-        self.assertIn("2d ago", result)
-
-    @patch("contact.admin.timezone")
-    def test_contact_timing_old(self, mock_timezone):
-        now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
-        mock_timezone.now.return_value = now
-
-        self.contact.created_at = now - datetime.timedelta(days=10)
-        self.contact.save()
-
-        result = self.admin.contact_timing(self.contact)
-        self.assertIn("Old", result)
-        self.assertIn("text-base-700", result)
-
-    @patch("contact.admin.timezone")
-    def test_priority_badge_urgent(self, mock_timezone):
+    def test_priority_urgent(self, mock_timezone):
         now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
         mock_timezone.now.return_value = now
 
@@ -490,12 +412,12 @@ class TestContactAdmin(TestCase):
         urgent_contact.created_at = now - datetime.timedelta(minutes=5)
         urgent_contact.save()
 
-        result = self.admin.priority_badge(urgent_contact)
-        self.assertIn("Urgent", result)
-        self.assertIn("bg-red-50", result)
+        value, label = self.admin.priority(urgent_contact)
+        self.assertEqual(value, "urgent")
+        self.assertEqual(label, "Urgent")
 
     @patch("contact.admin.timezone")
-    def test_priority_badge_high(self, mock_timezone):
+    def test_priority_high(self, mock_timezone):
         now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
         mock_timezone.now.return_value = now
 
@@ -507,12 +429,12 @@ class TestContactAdmin(TestCase):
         high_contact.created_at = now - datetime.timedelta(hours=2)
         high_contact.save()
 
-        result = self.admin.priority_badge(high_contact)
-        self.assertIn("High", result)
-        self.assertIn("bg-orange-50", result)
+        value, label = self.admin.priority(high_contact)
+        self.assertEqual(value, "high")
+        self.assertEqual(label, "High")
 
     @patch("contact.admin.timezone")
-    def test_priority_badge_medium(self, mock_timezone):
+    def test_priority_medium(self, mock_timezone):
         now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
         mock_timezone.now.return_value = now
 
@@ -524,12 +446,12 @@ class TestContactAdmin(TestCase):
         medium_contact.created_at = now - datetime.timedelta(hours=12)
         medium_contact.save()
 
-        result = self.admin.priority_badge(medium_contact)
-        self.assertIn("Medium", result)
-        self.assertIn("bg-yellow-50", result)
+        value, label = self.admin.priority(medium_contact)
+        self.assertEqual(value, "medium")
+        self.assertEqual(label, "Medium")
 
     @patch("contact.admin.timezone")
-    def test_priority_badge_low(self, mock_timezone):
+    def test_priority_low(self, mock_timezone):
         now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
         mock_timezone.now.return_value = now
 
@@ -541,104 +463,9 @@ class TestContactAdmin(TestCase):
         low_contact.created_at = now - datetime.timedelta(days=10)
         low_contact.save()
 
-        result = self.admin.priority_badge(low_contact)
-        self.assertIn("Low", result)
-        self.assertIn("bg-green-50", result)
-
-    @patch("contact.admin.timezone")
-    def test_contact_analytics(self, mock_timezone):
-        now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
-        mock_timezone.now.return_value = now
-
-        self.contact.created_at = now - datetime.timedelta(hours=3)
-        self.contact.save()
-
-        result = self.admin.contact_analytics(self.contact)
-
-        self.assertIn("Response Time", result)
-        self.assertIn("Priority Score", result)
-
-    def test_message_analytics(self):
-        result = self.admin.message_analytics(self.contact)
-
-        self.assertIn("Reading Time", result)
-        self.assertIn("Sentiment", result)
-        self.assertIn("Complexity", result)
-        self.assertIn("Language", result)
-
-        self.assertIn("seconds", result)
-        self.assertIn("Neutral", result)
-        self.assertIn("English", result)
-
-    def test_message_analytics_urgent_words(self):
-        urgent_contact = Contact.objects.create(
-            name="Urgent User",
-            email="urgent@example.com",
-            message="URGENT help needed ASAP emergency situation!",
-        )
-
-        result = self.admin.message_analytics(urgent_contact)
-
-        self.assertIn("Urgent", result)
-
-    @patch("contact.admin.timezone")
-    def test_timing_info(self, mock_timezone):
-        now = datetime.datetime(2023, 12, 15, 14, 30, 0, tzinfo=ZoneInfo("UTC"))
-        mock_timezone.now.return_value = now
-
-        created_time = datetime.datetime(
-            2023, 12, 13, 10, 15, 0, tzinfo=ZoneInfo("UTC")
-        )
-        self.contact.created_at = created_time
-        self.contact.save()
-
-        result = self.admin.timing_info(self.contact)
-
-        self.assertIn("Age", result)
-        self.assertIn("Business Hours", result)
-        self.assertIn("Season", result)
-
-        self.assertIn("Yes", result)
-
-    def test_timing_info_business_hours(self):
-        business_time = datetime.datetime(
-            2023, 12, 13, 10, 0, 0, tzinfo=ZoneInfo("UTC")
-        )
-        self.contact.created_at = business_time
-        self.contact.save()
-
-        result = self.admin.timing_info(self.contact)
-        self.assertIn("Yes", result)
-
-    def test_timing_info_weekend(self):
-        weekend_time = datetime.datetime(
-            2023, 12, 16, 10, 0, 0, tzinfo=ZoneInfo("UTC")
-        )
-        self.contact.created_at = weekend_time
-        self.contact.save()
-
-        result = self.admin.timing_info(self.contact)
-        self.assertIn("Weekend Contact", result)
-
-    def test_get_season_winter(self):
-        winter_date = datetime.date(2023, 1, 15)
-        season = self.admin._get_season(winter_date)
-        self.assertEqual(season, "Winter")
-
-    def test_get_season_spring(self):
-        spring_date = datetime.date(2023, 4, 15)
-        season = self.admin._get_season(spring_date)
-        self.assertEqual(season, "Spring")
-
-    def test_get_season_summer(self):
-        summer_date = datetime.date(2023, 7, 15)
-        season = self.admin._get_season(summer_date)
-        self.assertEqual(season, "Summer")
-
-    def test_get_season_autumn(self):
-        autumn_date = datetime.date(2023, 10, 15)
-        season = self.admin._get_season(autumn_date)
-        self.assertEqual(season, "Autumn")
+        value, label = self.admin.priority(low_contact)
+        self.assertEqual(value, "low")
+        self.assertEqual(label, "Low")
 
     def test_method_short_descriptions(self):
         self.assertEqual(
@@ -656,20 +483,8 @@ class TestContactAdmin(TestCase):
             str(self.admin.contact_timing.short_description), gettext("Timing")
         )
         self.assertEqual(
-            str(self.admin.priority_badge.short_description),
+            str(self.admin.priority.short_description),
             gettext("Priority"),
-        )
-        self.assertEqual(
-            str(self.admin.contact_analytics.short_description),
-            gettext("Contact Analytics"),
-        )
-        self.assertEqual(
-            str(self.admin.message_analytics.short_description),
-            gettext("Message Analytics"),
-        )
-        self.assertEqual(
-            str(self.admin.timing_info.short_description),
-            gettext("Timing Information"),
         )
 
 
@@ -736,49 +551,12 @@ class TestContactAdminEdgeCases(TestCase):
             name="No Email User", email="", message="Test message"
         )
 
-        result = self.admin.contact_info(empty_email_contact)
-
-        self.assertIn("No Email User", result)
-        self.assertIn("(no email)", result)
-
-    def test_message_analytics_empty_message(self):
-        empty_message_contact = Contact.objects.create(
-            name="Empty Message User", email="empty@example.com", message=""
+        primary, secondary, _initials = self.admin.contact_info(
+            empty_email_contact
         )
 
-        result = self.admin.message_analytics(empty_message_contact)
-
-        self.assertIn("Reading Time", result)
-        self.assertIn("0 seconds", result)
-
-    def test_message_analytics_special_characters(self):
-        special_contact = Contact.objects.create(
-            name="Special User",
-            email="special@example.com",
-            message="Message with émojis 😊 and spëcial chàracters!",
-        )
-
-        result = self.admin.message_analytics(special_contact)
-
-        self.assertIn("Reading Time", result)
-        self.assertIn("Complexity", result)
-
-    def test_timing_info_edge_hours(self):
-        edge_time = datetime.datetime(
-            2023, 12, 13, 9, 0, 0, tzinfo=ZoneInfo("UTC")
-        )
-        self.contact = Contact.objects.create(
-            name="Edge User",
-            email="edge@example.com",
-            message="Edge case message",
-        )
-        self.contact.created_at = edge_time
-        self.contact.save()
-
-        result = self.admin.timing_info(self.contact)
-
-        self.assertIn("09:00", result)
-        self.assertIn("Yes", result)
+        self.assertEqual(primary, "No Email User")
+        self.assertIn("(no email)", secondary)
 
     def test_contact_info_extremely_long_name(self):
         long_name = "A" * 90
@@ -786,14 +564,16 @@ class TestContactAdminEdgeCases(TestCase):
             name=long_name, email="longname@example.com", message="Test message"
         )
 
-        result = self.admin.contact_info(long_name_contact)
+        primary, _secondary, _initials = self.admin.contact_info(
+            long_name_contact
+        )
 
-        self.assertIn("...", result)
-        self.assertNotIn("A" * 90, result)
-        self.assertIn("<div", result)
-        self.assertIn("</div>", result)
+        self.assertEqual(primary, long_name)
 
-    def test_message_preview_html_injection(self):
+    def test_message_preview_html_is_escaped_on_render(self):
+        # ``message_preview`` returns a plain (unescaped) string — Django's
+        # admin changelist template autoescapes it at render time, same as
+        # any other non-``format_html``/``mark_safe`` display method.
         html_contact = Contact.objects.create(
             name="HTML User",
             email="html@example.com",
@@ -802,9 +582,7 @@ class TestContactAdminEdgeCases(TestCase):
 
         result = self.admin.message_preview(html_contact)
 
-        self.assertNotIn("<script>", result)
-        self.assertNotIn("<b>", result)
-        self.assertIn("&lt;", result)
+        self.assertIn("<script>", result)
 
     def test_division_by_zero_protection(self):
         zero_contact = Contact.objects.create(
@@ -818,10 +596,7 @@ class TestContactAdminEdgeCases(TestCase):
             self.admin.message_preview(zero_contact)
             self.admin.message_stats(zero_contact)
             self.admin.contact_timing(zero_contact)
-            self.admin.priority_badge(zero_contact)
-            self.admin.contact_analytics(zero_contact)
-            self.admin.message_analytics(zero_contact)
-            self.admin.timing_info(zero_contact)
+            self.admin.priority(zero_contact)
         except ZeroDivisionError:
             self.fail(
                 "Methods should handle zero values without ZeroDivisionError"

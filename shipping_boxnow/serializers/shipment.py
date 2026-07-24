@@ -106,6 +106,10 @@ class BoxNowShipmentDetailSerializer(BoxNowShipmentSerializer):
         return f"/api/v1/shipping/boxnow/parcels/{obj.parcel_id}/label.pdf"
 
     class Meta(BoxNowShipmentSerializer.Meta):
+        # `metadata` is intentionally not exposed — this serializer is returned
+        # to the customer on the order-detail endpoint and metadata carries
+        # internal data (including a failed-creation error envelope with
+        # recipient PII). Staff view it via BoxNowShipmentAdmin instead.
         fields = (
             *BoxNowShipmentSerializer.Meta.fields,
             "locker",
@@ -115,6 +119,5 @@ class BoxNowShipmentDetailSerializer(BoxNowShipmentSerializer):
             "amount_to_be_collected",
             "allow_return",
             "cancel_requested_at",
-            "metadata",
         )
         read_only_fields = fields

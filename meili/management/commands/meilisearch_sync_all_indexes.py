@@ -467,7 +467,7 @@ class Command(TenantCommandMixin, BaseCommand):
         documents are untouched, only orphans are removed.
         """
         meili = Model._meilisearch
-        index_name = meili["index_name"]
+        index_name = Model.get_meili_index_name()
         pk_field = meili.get("primary_key", "pk")
         index = _client.get_index(index_name)
 

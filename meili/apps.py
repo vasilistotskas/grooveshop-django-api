@@ -105,7 +105,7 @@ class MeiliConfig(AppConfig):
                 try:
                     logger.debug("Removing filtered-out document sync")
                     _client.get_index(
-                        model._meilisearch["index_name"]
+                        model.get_meili_index_name()
                     ).delete_document(_get_document_pk(model))
                 except Exception as e:
                     logger.error(

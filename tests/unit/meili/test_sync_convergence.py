@@ -12,7 +12,13 @@ from meili.management.commands.meilisearch_sync_all_indexes import Command
 
 
 class _FakeModel:
-    _meilisearch = {"index_name": "products", "primary_key": "pk"}
+    _meilisearch = {"base_index_name": "products", "primary_key": "pk"}
+
+    @classmethod
+    def get_meili_index_name(cls):
+        # Mirrors IndexMixin.get_meili_index_name(): schema-qualified
+        # name; tests run in the public schema.
+        return f"public__{cls._meilisearch['base_index_name']}"
 
 
 def _make_index(index_pks, *, page_size=1000):

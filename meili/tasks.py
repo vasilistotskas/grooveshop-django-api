@@ -89,7 +89,7 @@ def index_document_task(
         # This is the update path: post_save fires this task, and a save that
         # flips meili_filter() to False must delete the document.
         if not instance.meili_filter():
-            index_name = instance._meilisearch["index_name"]
+            index_name = instance.get_meili_index_name()
             document_pk = _get_document_pk(instance)
             logger.debug(
                 f"Model {app_label}.{model_name} pk={pk} filtered out; "

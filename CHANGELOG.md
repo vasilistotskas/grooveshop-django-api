@@ -3,6 +3,47 @@
 
 
 
+## v1.157.1 (2026-07-25)
+
+### Bug fixes
+
+* fix(shipping_acs): cache every Smartpoint locker, not one per area; quiet the kind=7 daily warning
+
+Two root causes found while resolving the daily 'Acs_Stations returned
+zero rows for kind=7' warning (validated against the live ACS API and
+the ACS REST PDF p.28):
+
+1. Locker collapse: external_id (ACS_SHOP_STATION_ID_EN) is the AREA
+   station code — 1,485 GR lockers share just 135 codes ('ATH' alone
+   covers 50 lockers), and the (external_id, branch_code) pair is the
+   real locker identity (1,484 distinct pairs). Upserting on
+   external_id alone collapsed each area to one arbitrary row and hid
+   ~90% of Smartpoints from the checkout picker. Now: unique
+   constraint on the pair (migration drops the solo unique — safe
+   under the PreSync deploy model, constraint removal + tiny table),
+   pair-keyed upsert, PK-based deactivation, and a pair-first station
+   lookup in the carrier.
+
+2. Kind semantics: per the PDF, GR kind 7 = Smartpoints WITHOUT a
+   locker ('δίχως locker') and kind 8 = WITH a locker — not
+   inbound/outbound as the enum claimed. Kind 7 is genuinely empty
+   upstream (0 rows vs 1,485 kind-8), and CY kind 7 is documented to
+   return nothing. The zero-rows log is now cache-aware: INFO when a
+   kind is empty both upstream and locally (documented steady state),
+   WARNING only when zero rows contradicts active cached rows
+   (transient failure — deactivation still skipped). Both logs carry
+   the country; per-kind sync counts are logged for future debugging.
+
+Enum members renamed to SMARTPOINT / SMARTPOINT_LOCKER with corrected
+labels (el translations updated), schema.yml regenerated.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Dm6tsW4QsAk4GWzj19o5QW ([`9ac390e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ac390eaccd5d0c6622fafd055efd27f91da36cc))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.157.0 [skip ci] ([`c41228d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c41228dea9d92e32b9370e26a50f9e5b14a1f013))
+
 ## v1.157.0 (2026-07-25)
 
 ### Bug fixes

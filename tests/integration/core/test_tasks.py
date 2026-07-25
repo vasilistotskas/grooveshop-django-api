@@ -721,8 +721,9 @@ class TestMonitorSystemHealthTask:
 
         # The storage probe uses ``default_storage`` (django.core.files.storage)
         # rather than raw ``open(MEDIA_ROOT/...)`` so it exercises the same
-        # backend the app writes to (S3 in prod).  Patch ``save`` to surface
-        # an OSError matching the ``except Exception`` branch in the task.
+        # backend the app writes to (the shared media PVC in prod).  Patch
+        # ``save`` to surface an OSError matching the ``except Exception``
+        # branch in the task.
         with patch(
             "django.core.files.storage.default_storage.save",
             side_effect=OSError("Storage error"),

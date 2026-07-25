@@ -1399,7 +1399,23 @@ class OrderService:
 
     @classmethod
     @transaction.atomic
-    def update_order_status(cls, order: Order, new_status: str) -> Order:
+    def update_order_status(
+        cls,
+        order: Order,
+        new_status: str,
+        *,
+        silent_for_customer: bool = False,
+    ) -> Order:
+        """Validate + apply a status transition.
+
+        ``silent_for_customer=True`` pre-stamps the suppression flags
+        (see ``_suppress_customer_status_notifications``) so the
+        customer email/WS toast for THIS transition is skipped while
+        history, signals and internal state still flow. Used by chained
+        transitions — e.g. the carrier bridge that walks PROCESSING →
+        SHIPPED → RETURNED must not tell the customer "your order is on
+        the way" moments before the return notification.
+        """
         try:
             if not new_status:
                 raise ValueError("New status cannot be empty")
@@ -1462,6 +1478,9 @@ class OrderService:
                 )
 
             old_status = order.status
+
+            if silent_for_customer:
+                cls._suppress_customer_status_notifications(order, new_status)
 
             order.status = new_status
             order.status_updated_at = timezone.now()

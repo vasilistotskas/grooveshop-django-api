@@ -1468,21 +1468,45 @@ class BoxNowService:
         # PROCESSING → SHIPPED → DELIVERED, so a direct jump is
         # rejected. Walk the missing SHIPPED step first. Mirrors
         # ``AcsService._apply_order_status_transition`` — same gap.
+        #
+        # RETURNED-family events (returned / expired / missing / lost /
+        # accepted-for-return) share the gap: the parcel physically
+        # left us before it could come back, but the SHIPPED-mapping
+        # event may never have been observed (missed webhook, or the
+        # jump happened between polls) — verified for the ACS twin
+        # against prod orders 179 & 189 (2026-07). The SHIPPED hop is
+        # silent on this path: "your order is on the way" moments
+        # before "your order was returned" would mislead; the RETURNED
+        # transition sends its own status-update email.
         if (
-            new_status == "DELIVERED"
+            new_status in ("DELIVERED", "RETURNED")
             and current_status in _PRE_SHIPPED_STATUSES
         ):
             try:
-                OrderService.update_order_status(order, "SHIPPED")
+                OrderService.update_order_status(
+                    order,
+                    "SHIPPED",
+                    silent_for_customer=new_status == "RETURNED",
+                )
             except InvalidStatusTransitionError as exc:
                 logger.warning(
                     "BoxNow: cannot bridge order=%s through SHIPPED "
-                    "before DELIVERED (%r → SHIPPED): %s",
+                    "before %s (%r → SHIPPED): %s",
                     order.id,
+                    new_status,
                     current_status,
                     exc,
                 )
                 return
+            logger.info(
+                "BoxNow: bridged order=%s through SHIPPED "
+                "(%r → SHIPPED → %r; parcel event %r arrived without an "
+                "observed shipped-mapping event)",
+                order.id,
+                current_status,
+                new_status,
+                str(mapped_state),
+            )
 
         logger.info(
             "_apply_order_status_transition: order=%s %r → %r "

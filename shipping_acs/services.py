@@ -1605,21 +1605,47 @@ class AcsService:
         # against prod order 73 on 2026-05-23: shipment_state=delivered
         # but order.status=PROCESSING two days later). Walk the
         # missing SHIPPED step first.
+        #
+        # RETURNED has the same gap (prod orders 179 & 189, 2026-07-20
+        # and 2026-07-24: returned_flag=1 arrived while the order still
+        # sat at PROCESSING, PROCESSING → RETURNED was rejected every
+        # poll, and the return was never recorded). A returned parcel
+        # was necessarily picked up and transported first — the ACS
+        # tracking summary marks shipment_status 7 with returned_flag=1
+        # AND delivery_flag=1 (the delivery back to the sender) — so
+        # bridging through SHIPPED is truthful. The SHIPPED hop is
+        # silent on this path: "your order is on the way" moments
+        # before "your order was returned" would mislead; the RETURNED
+        # transition sends its own status-update email.
         if (
-            new_status == "DELIVERED"
+            new_status in ("DELIVERED", "RETURNED")
             and current_status in _PRE_SHIPPED_ORDER_STATUSES
         ):
             try:
-                OrderService.update_order_status(order, "SHIPPED")
+                OrderService.update_order_status(
+                    order,
+                    "SHIPPED",
+                    silent_for_customer=new_status == "RETURNED",
+                )
             except InvalidStatusTransitionError as exc:
                 logger.warning(
                     "ACS poll: cannot bridge order=%s through SHIPPED "
-                    "before DELIVERED (%r → SHIPPED): %s",
+                    "before %s (%r → SHIPPED): %s",
                     order.id,
+                    new_status,
                     current_status,
                     exc,
                 )
                 return
+            logger.info(
+                "ACS poll: bridged order=%s through SHIPPED "
+                "(%r → SHIPPED → %r; shipment jumped to %r without an "
+                "observed in-transit state)",
+                order.id,
+                current_status,
+                new_status,
+                str(mapped_state),
+            )
 
         try:
             OrderService.update_order_status(order, new_status)

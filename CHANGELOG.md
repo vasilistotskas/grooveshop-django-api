@@ -3,6 +3,27 @@
 
 
 
+## v1.157.2 (2026-07-25)
+
+### Bug fixes
+
+* fix(shipping_acs): retrieve stations by uuid — external_id is no longer a single-object key
+
+The pair-keyed station cache (previous commit) made external_id
+ambiguous for the public detail endpoint: DRF's get_object() raised
+MultipleObjectsReturned → 500 for any area code with several lockers
+(verified in prod: GET /shipping/acs/stations/ATH). Nothing in the
+storefront retrieves by code (list/nearest only), so the path param
+switches to the model's uuid — the codebase's standard external
+lookup key, already exposed by both serializers.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Dm6tsW4QsAk4GWzj19o5QW ([`0380030`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0380030272d76775c07c8eebc01d7aff95c3a75c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.157.1 [skip ci] ([`52b17cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/52b17ccf2f3db5e71e074f015b1486270bb8ea4e))
+
 ## v1.157.1 (2026-07-25)
 
 ### Bug fixes

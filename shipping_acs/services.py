@@ -1173,11 +1173,11 @@ class AcsService:
             kinds = tuple(sorted({1, *country_kinds}))
 
         client = AcsClient()
-        seen_ids: set[str] = set()
+        seen_pks: set[int] = set()
         # Track which kinds returned data so deactivation only fires
         # against those kinds. Otherwise a kind whose API call returned
         # zero rows (transient failure) would have all its stations
-        # deactivated because they're absent from ``seen_ids`` —
+        # deactivated because they're absent from ``seen_pks`` —
         # exactly the cache-wiping outcome the per-kind ``continue``
         # was meant to prevent.
         successful_kinds: set[int] = set()
@@ -1186,11 +1186,39 @@ class AcsService:
         for kind in kinds:
             rows = client.stations(country=country, shop_kind=kind)
             if not rows:
-                logger.warning(
-                    "Acs_Stations returned zero rows for kind=%s — "
-                    "skipping deactivation to avoid wiping the cache.",
-                    kind,
-                )
+                # Zero rows is only suspicious when it CONTRADICTS the
+                # cache: active rows exist locally but the API says the
+                # kind is empty (transient upstream failure — skip
+                # deactivation so the cache survives). A kind that is
+                # empty both upstream and locally is a documented,
+                # steady state (e.g. GR kind=7 "Smartpoint without
+                # locker" has 0 stations since at least 2026-07; CY
+                # kind=7 is documented to return nothing) — INFO, not
+                # a daily WARNING.
+                cached_active = AcsStation.objects.filter(
+                    country_code=country,
+                    shop_kind=kind,
+                    is_active=True,
+                ).count()
+                if cached_active:
+                    logger.warning(
+                        "Acs_Stations returned zero rows for country=%s "
+                        "kind=%s but %s active cached station(s) exist "
+                        "— treating as a transient API failure and "
+                        "skipping deactivation to avoid wiping the "
+                        "cache.",
+                        country,
+                        kind,
+                        cached_active,
+                    )
+                else:
+                    logger.info(
+                        "Acs_Stations: country=%s kind=%s is empty "
+                        "upstream and has no cached rows — nothing to "
+                        "sync for this kind.",
+                        country,
+                        kind,
+                    )
                 continue
 
             successful_kinds.add(kind)
@@ -1202,10 +1230,17 @@ class AcsService:
                 )
                 if not external_id:
                     continue
-                AcsStation.objects.update_or_create(
+                # The (external_id, branch_code) PAIR is the locker
+                # identity: external_id is the AREA station code shared
+                # by every locker in that area (live API 2026-07-25:
+                # 1,485 GR lockers, 135 distinct station codes, 1,484
+                # distinct pairs). Upserting on external_id alone
+                # collapsed each area to a single arbitrary locker and
+                # hid ~90% of Smartpoints from the checkout picker.
+                station, _created = AcsStation.objects.update_or_create(
                     external_id=external_id,
+                    branch_code=str(row.get("ACS_SHOP_BRANCH_ID", "")),
                     defaults={
-                        "branch_code": str(row.get("ACS_SHOP_BRANCH_ID", "")),
                         "shop_kind": kind,
                         "name": (row.get("ACS_SHOP_STATION_DESCR") or "")[:255],
                         "address_line_1": (row.get("ACS_SHOP_ADDRESS") or "")[
@@ -1224,20 +1259,26 @@ class AcsService:
                         "last_synced_at": timezone.now(),
                     },
                 )
-                seen_ids.add(external_id)
+                seen_pks.add(station.pk)
                 upserted += 1
+            logger.info(
+                "Acs_Stations: country=%s kind=%s synced %s row(s).",
+                country,
+                kind,
+                len(rows),
+            )
 
         # Per-kind deactivation: only deactivate stations of kinds
         # that returned data. A kind that errored out keeps all its
         # rows active so a later successful sync can re-confirm them.
         deactivated = 0
-        if seen_ids and successful_kinds:
+        if seen_pks and successful_kinds:
             deactivated = (
                 AcsStation.objects.filter(
                     country_code=country,
                     shop_kind__in=successful_kinds,
                 )
-                .exclude(external_id__in=seen_ids)
+                .exclude(pk__in=seen_pks)
                 .update(is_active=False)
             )
 

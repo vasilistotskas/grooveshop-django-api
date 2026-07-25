@@ -216,7 +216,19 @@ class AcsCarrier(ShippingCarrierInterface):
 
         station = None
         if external_id:
-            station = AcsStation.objects.filter(external_id=external_id).first()
+            # external_id is the AREA station code shared by every
+            # locker in that area — the (external_id, branch_code)
+            # pair identifies the actual locker the customer picked.
+            # Fall back to code-only matching for payloads without a
+            # branch (physical-shop pickups, stale clients); the
+            # voucher itself always uses the raw payload values, so
+            # this FK is informational either way.
+            station = (
+                AcsStation.objects.filter(
+                    external_id=external_id, branch_code=branch_code
+                ).first()
+                or AcsStation.objects.filter(external_id=external_id).first()
+            )
 
         AcsShipment.objects.create(
             order=order,

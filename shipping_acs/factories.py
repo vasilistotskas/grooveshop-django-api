@@ -25,7 +25,7 @@ class AcsStationFactory(CustomDjangoModelFactory):
 
     external_id = factory.Sequence(lambda n: f"ACS-{n:04d}")
     branch_code = "1"
-    shop_kind = AcsShopKind.SMARTPOINT_INBOUND
+    shop_kind = AcsShopKind.SMARTPOINT_LOCKER
     name = factory.Faker("company")
     address_line_1 = factory.Faker("street_address")
     city = factory.Faker("city")

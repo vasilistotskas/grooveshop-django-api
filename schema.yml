@@ -28840,13 +28840,18 @@ components:
           type: string
           readOnly: true
           title: Εξωτερικό ID
-          description: ACS_SHOP_STATION_ID — χρησιμοποιείται ως Acs_Station_Destination.
+          description: 'ACS_SHOP_STATION_ID_EN — ο κωδικός σταθμού ΠΕΡΙΟΧΗΣ, χρησιμοποιείται
+            ως Acs_Station_Destination. ΔΕΝ είναι μοναδικός από μόνος του: κάθε locker
+            Smartpoint μιας περιοχής τον μοιράζεται (π.χ. 50 lockers κάτω από το ''ATH'')·
+            το ζεύγος (external_id, branch_code) είναι η ταυτότητα του locker.'
         branchCode:
           type: string
           readOnly: true
+          default: ''
           title: Κωδικός υποκαταστήματος
           description: ACS_SHOP_BRANCH_ID — συνδυάζεται με το external_id κατά τη
-            δημιουργία vouchers (Acs_Station_Branch_Destination).
+            δημιουργία vouchers (Acs_Station_Branch_Destination). Διακρίνει τα επιμέρους
+            lockers μιας περιοχής σταθμού.
         shopKind:
           allOf:
           - $ref: '#/components/schemas/ShopKindEnum'
@@ -28860,8 +28865,8 @@ components:
             * `3` - Συνεργαζόμενο κατάστημα (3)
             * `4` - Xpress Point
             * `5` - Kiosk
-            * `7` - Smartpoint (εισερχόμενα)
-            * `8` - Smartpoint (εξερχόμενα)
+            * `7` - Smartpoint (χωρίς locker)
+            * `8` - Smartpoint locker
         name:
           type: string
           readOnly: true
@@ -28956,13 +28961,18 @@ components:
           type: string
           readOnly: true
           title: Εξωτερικό ID
-          description: ACS_SHOP_STATION_ID — χρησιμοποιείται ως Acs_Station_Destination.
+          description: 'ACS_SHOP_STATION_ID_EN — ο κωδικός σταθμού ΠΕΡΙΟΧΗΣ, χρησιμοποιείται
+            ως Acs_Station_Destination. ΔΕΝ είναι μοναδικός από μόνος του: κάθε locker
+            Smartpoint μιας περιοχής τον μοιράζεται (π.χ. 50 lockers κάτω από το ''ATH'')·
+            το ζεύγος (external_id, branch_code) είναι η ταυτότητα του locker.'
         branchCode:
           type: string
           readOnly: true
+          default: ''
           title: Κωδικός υποκαταστήματος
           description: ACS_SHOP_BRANCH_ID — συνδυάζεται με το external_id κατά τη
-            δημιουργία vouchers (Acs_Station_Branch_Destination).
+            δημιουργία vouchers (Acs_Station_Branch_Destination). Διακρίνει τα επιμέρους
+            lockers μιας περιοχής σταθμού.
         shopKind:
           allOf:
           - $ref: '#/components/schemas/ShopKindEnum'
@@ -28976,8 +28986,8 @@ components:
             * `3` - Συνεργαζόμενο κατάστημα (3)
             * `4` - Xpress Point
             * `5` - Kiosk
-            * `7` - Smartpoint (εισερχόμενα)
-            * `8` - Smartpoint (εξερχόμενα)
+            * `7` - Smartpoint (χωρίς locker)
+            * `8` - Smartpoint locker
         name:
           type: string
           readOnly: true
@@ -39679,8 +39689,8 @@ components:
         * `3` - Συνεργαζόμενο κατάστημα (3)
         * `4` - Xpress Point
         * `5` - Kiosk
-        * `7` - Smartpoint (εισερχόμενα)
-        * `8` - Smartpoint (εξερχόμενα)
+        * `7` - Smartpoint (χωρίς locker)
+        * `8` - Smartpoint locker
     SubscriptionStatus:
       enum:
       - ACTIVE

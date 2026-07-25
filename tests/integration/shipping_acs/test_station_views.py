@@ -121,3 +121,33 @@ def test_list_excludes_inactive_stations():
     codes = {row["externalId"] for row in results}
     assert "ACTIVE-1" in codes
     assert "INACTIVE-1" not in codes
+
+
+def test_retrieve_by_uuid_disambiguates_shared_station_codes():
+    """Detail is keyed by ``uuid``: ``external_id`` is the AREA code
+    shared by every locker in that area, so a code-keyed retrieve
+    raised MultipleObjectsReturned → 500 once the cache became
+    pair-keyed (regression, 2026-07-25: 50 lockers under 'ATH')."""
+    first = AcsStationFactory(
+        external_id="ATH",
+        branch_code="521",
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
+    )
+    second = AcsStationFactory(
+        external_id="ATH",
+        branch_code="567",
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
+    )
+
+    client = APIClient()
+    for station in (first, second):
+        response = client.get(
+            reverse(
+                "shipping-acs-station-detail",
+                kwargs={"uuid": str(station.uuid)},
+            )
+        )
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["uuid"] == str(station.uuid)
+        assert body["branchCode"] == station.branch_code

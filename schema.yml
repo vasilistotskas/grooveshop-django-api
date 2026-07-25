@@ -23033,15 +23033,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedAcsStationList'
           description: ''
-  /api/v1/shipping/acs/stations/{external_id}:
+  /api/v1/shipping/acs/stations/{uuid}:
     get:
       operationId: api_v1_shipping_acs_stations_retrieve
       description: List / retrieve ACS stations and Smartpoint lockers.
       parameters:
       - in: path
-        name: externalId
+        name: uuid
         schema:
           type: string
+          format: uuid
         required: true
       tags:
       - api

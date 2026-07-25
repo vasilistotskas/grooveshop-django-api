@@ -31,8 +31,12 @@ urlpatterns = [
         AcsStationViewSet.as_view({"get": "nearest"}),
         name="shipping-acs-station-nearest",
     ),
+    # Detail is keyed by ``uuid`` — ``external_id`` is the AREA station
+    # code shared by every locker in that area (50 lockers under 'ATH'),
+    # so a code-keyed retrieve raised MultipleObjectsReturned → 500 the
+    # moment the pair-keyed cache landed (2026-07-25).
     path(
-        "shipping/acs/stations/<str:external_id>",
+        "shipping/acs/stations/<uuid:uuid>",
         AcsStationViewSet.as_view({"get": "retrieve"}),
         name="shipping-acs-station-detail",
     ),

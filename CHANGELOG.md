@@ -3,6 +3,56 @@
 
 
 
+## v1.157.0 (2026-07-25)
+
+### Bug fixes
+
+* fix(order,shipping): record carrier returns for never-observed-shipped orders
+
+Prod orders 179 & 189 (2026-07-20/24): the ACS poll saw
+returned_flag=1 while the orders still sat at PROCESSING. The state
+machine only allows PROCESSING -> SHIPPED/CANCELED, so the direct
+PROCESSING -> RETURNED transition was rejected on every poll and the
+returns were never recorded.
+
+Extend the existing DELIVERED bridge (prod order 73 precedent) to
+RETURNED in both carrier services: walk the missing SHIPPED step
+first — truthful, since a returned parcel was necessarily picked up
+(ACS shipment_status 7 pairs returned_flag=1 with delivery_flag=1,
+the delivery back to the sender). The SHIPPED hop is customer-silent
+via the new update_order_status(silent_for_customer=True) kwarg
+(same suppression flags as maybe_advance_to_completed) — 'your order
+is on the way' moments before the return notification would mislead;
+RETURNED sends its own status-update email. Successful bridges log
+at INFO with the jump context for future debugging.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Dm6tsW4QsAk4GWzj19o5QW ([`9f2fb9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f2fb9a43f0259f500d7a912db525dd3a964b72a))
+
+* fix(core): identify failing storage backend in health-probe warnings
+
+The daily monitor_system_health storage probe failed for months on
+celery workers with a bare '[Errno 30] Read-only file system' — the
+log line named neither the storage backend nor the target path, and
+the code comment claimed prod uses S3 when USE_AWS=False everywhere
+(default_storage is FileSystemStorage on the shared RWX media PVC).
+
+Failure log now includes the backend class and its resolved
+bucket/location; comment corrected to match the actual deployment
+(the media PVC must be mounted on every pod that runs this task —
+the missing celery-worker mount is fixed in grooveshop-infrastructure).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Dm6tsW4QsAk4GWzj19o5QW ([`fb06240`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fb062400a2d4bf2178f315c5dedc261a95536bc4))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.156.7 [skip ci] ([`b0e4d8e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0e4d8e866541b9257bf93090e671f51e31ecc5b))
+
+### Features
+
+* feat: Bump Versions ([`0626e94`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0626e9476daa5645872f7169689fde7b2b52eab0))
+
 ## v1.156.7 (2026-07-18)
 
 ### Bug fixes

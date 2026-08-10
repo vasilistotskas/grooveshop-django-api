@@ -3,6 +3,26 @@
 
 
 
+## v1.158.0 (2026-08-10)
+
+### Bug fixes
+
+* fix(deps): bump aiohttp to 3.14.3 to resolve CVE-2026-69244
+
+Trivy failed CI on aiohttp 3.13.5 (HIGH, fixed in 3.14.3), a transitive
+dependency of facebook-business pinned in uv.lock.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QePouSLwgLzeAiht8t1b9m ([`649751b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/649751b054d221ce622c23de4008ca4dfc0a3402))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.157.2 [skip ci] ([`655305c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/655305ca3ca8b415ce7c78963c0d9bfd958e6192))
+
+### Features
+
+* feat: Bump Versions ([`ff75f63`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff75f63b4f49fcb58ff1d3624953948bea9a4b58))
+
 ## v1.157.2 (2026-07-25)
 
 ### Bug fixes

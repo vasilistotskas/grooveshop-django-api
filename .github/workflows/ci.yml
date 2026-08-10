@@ -142,7 +142,7 @@ jobs:
         ports:
           - 6379:6379
       meilisearch:
-        image: getmeili/meilisearch:v1.49.0
+        image: getmeili/meilisearch:v1.53.0
         ports:
           - 7700:7700
         env:

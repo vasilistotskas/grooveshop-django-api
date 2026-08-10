@@ -73,7 +73,7 @@ services:
 
   meilisearch:
     container_name: meilisearch
-    image: getmeili/meilisearch:v1.49.0
+    image: getmeili/meilisearch:v1.53.0
     env_file:
       - ./docker/meilisearch/.env
     volumes:
@@ -86,14 +86,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    networks:
-      - grooveshop-backbone
-
-  meilisearch-mcp:
-    container_name: meilisearch-mcp
-    image: getmeili/meilisearch-mcp:latest
-    env_file:
-      - ./docker/meilisearch/.env
     networks:
       - grooveshop-backbone
 

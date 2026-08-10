@@ -3,6 +3,33 @@
 
 
 
+## v1.159.0 (2026-08-10)
+
+### Bug fixes
+
+* fix(celery): use exclusive pidbox/event queues for RabbitMQ 4.3
+
+RabbitMQ 4.3 denies the deprecated transient_nonexcl_queues feature
+by default, rejecting Celery's default pidbox and event queue
+declarations with 541 INTERNAL_ERROR — the worker and flower were
+stuck in a reconnect loop (~1 crash/second). Exclusive queues are the
+upstream replacement (kombu 5.7 default, kombu #2237/#2531); enable
+them via control_queue_exclusive / event_queue_exclusive on kombu 5.6.
+
+Pin the rabbitmq image to 4.3.2-management so the floating 4-management
+tag cannot flip broker behavior again.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QePouSLwgLzeAiht8t1b9m ([`576996a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/576996acaeb1aced0ec094a1b9218c78080fb079))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.158.1 [skip ci] ([`9c3883b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9c3883bdb30f1ed8caedf76779ae9714cde7767b))
+
+### Features
+
+* feat: Bump meilisearch ci and infra docker ([`2986e62`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2986e62b59088a8b44013debfeb41bb1a261567c))
+
 ## v1.158.1 (2026-08-10)
 
 ### Bug fixes

@@ -3,6 +3,33 @@
 
 
 
+## v1.158.1 (2026-08-10)
+
+### Bug fixes
+
+* fix(security): resolve all 13 open CodeQL alerts
+
+py/stack-trace-exposure (10): API error responses no longer embed
+str(exc) from caught exceptions. Carrier endpoints return the parsed
+business message (BoxNowAPIError.message / AcsAPIError.error_message)
+with a generic fallback; broad except blocks log server-side and
+return a generic message (subscription bulk_update, cart reservation
+release, order refund_info).
+
+py/clear-text-logging-sensitive-data (2): ACS price-quote warning no
+longer logs station codes derived from ACS_BILLING_CODE.
+
+py/overly-large-range (1): admin UI guard matches emoji via codepoint
+ranges instead of an astral-range regex character class that CodeQL
+parses as overlapping surrogate ranges.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QePouSLwgLzeAiht8t1b9m ([`b0bd4f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0bd4f8ba1f25c0560b1aa2b37c3a6454d8d1681))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.158.0 [skip ci] ([`655f84f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/655f84fd2fd0ddde08554c6275899f8c4c8f7ca8))
+
 ## v1.158.0 (2026-08-10)
 
 ### Bug fixes

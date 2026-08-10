@@ -582,6 +582,15 @@ CELERY_BROKER_CONNECTION_TIMEOUT = 30
 CELERY_BROKER_CONNECTION_RETRY = True
 CELERY_BROKER_CONNECTION_MAX_RETRIES = 100
 
+# RabbitMQ 4.3 denies the deprecated ``transient_nonexcl_queues``
+# feature, so the transient non-exclusive pidbox/event queues Celery
+# declares by default are rejected with 541 INTERNAL_ERROR and the
+# worker/flower reconnect-loop (kombu #2237). Exclusive queues are
+# the upstream replacement — kombu 5.7 makes them the pidbox default;
+# these settings adopt that behavior on kombu 5.6.
+CELERY_CONTROL_QUEUE_EXCLUSIVE = True
+CELERY_EVENT_QUEUE_EXCLUSIVE = True
+
 # Worker settings
 CELERY_WORKER_SEND_TASK_EVENTS = True
 CELERY_TASK_SEND_SENT_EVENT = True

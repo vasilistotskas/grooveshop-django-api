@@ -431,11 +431,14 @@ class AcsCarrier(ShippingCarrierInterface):
         # back to the flat rate.
         error_message = response.get("Error_Message") if response else None
         if error_message:
+            # Don't log the station codes themselves — they derive from
+            # ACS_BILLING_CODE (CodeQL py/clear-text-logging-sensitive-
+            # data); the operator can read them from the provider
+            # metadata / billing code directly.
             logger.warning(
-                "ACS_Price_Calculation business error (origin=%s "
-                "dest=%s): %s — falling back to flat rate.",
-                origin,
-                destination,
+                "ACS_Price_Calculation business error: %s — falling "
+                "back to flat rate. Check ShippingProvider metadata "
+                "['station_origin'] / ACS_BILLING_CODE.",
                 error_message,
             )
             return None

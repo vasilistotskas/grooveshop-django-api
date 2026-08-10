@@ -1833,9 +1833,19 @@ class OrderService:
                             "message": "Payment refunded successfully",
                         }
                     else:
+                        # ``refund_response["error"]`` carries raw provider
+                        # exception text (see order/payment.py) — log it,
+                        # never return it (CodeQL py/stack-trace-exposure).
+                        logger.error(
+                            "Refund failed for canceled order %s: %s",
+                            order.id,
+                            refund_response.get("error"),
+                        )
                         refund_info = {
                             "refunded": False,
-                            "error": refund_response.get("error"),
+                            "error": str(
+                                _("The refund could not be processed.")
+                            ),
                             "message": "Order canceled but refund failed",
                         }
                 except Exception as refund_error:
@@ -1847,7 +1857,7 @@ class OrderService:
                     )
                     refund_info = {
                         "refunded": False,
-                        "error": str(refund_error),
+                        "error": str(_("The refund could not be processed.")),
                         "message": "Order canceled but refund failed",
                     }
 

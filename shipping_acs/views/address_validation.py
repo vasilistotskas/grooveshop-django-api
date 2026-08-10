@@ -142,8 +142,14 @@ class AcsAddressValidationView(APIView):
             )
         except AcsAPIError as exc:
             logger.warning("ACS address validation failed: %s", exc)
+            # ``exc.error_message`` is the verbatim ACS business message —
+            # unlike ``str(exc)`` it is never raw exception text
+            # (CodeQL py/stack-trace-exposure).
             return Response(
-                {"detail": str(exc)},
+                {
+                    "detail": exc.error_message
+                    or "ACS address validation failed."
+                },
                 status=502,
             )
 

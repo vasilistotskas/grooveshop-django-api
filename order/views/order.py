@@ -1878,8 +1878,15 @@ class OrderViewSet(BaseModelViewSet):
                 exc.code,
                 exc,
             )
+            # ``exc.message`` is the parsed BoxNow business message —
+            # unlike ``str(exc)`` it is never raw exception text
+            # (CodeQL py/stack-trace-exposure).
             return Response(
-                {"detail": str(exc), "code": exc.code},
+                {
+                    "detail": exc.message
+                    or _("BoxNow rejected the cancellation."),
+                    "code": exc.code,
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1945,8 +1952,14 @@ class OrderViewSet(BaseModelViewSet):
                 shipment.voucher_no,
                 exc,
             )
+            # ``exc.error_message`` is the verbatim ACS business message —
+            # unlike ``str(exc)`` it is never raw exception text
+            # (CodeQL py/stack-trace-exposure).
             return Response(
-                {"detail": str(exc)},
+                {
+                    "detail": exc.error_message
+                    or _("ACS rejected the cancellation.")
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -2057,8 +2070,17 @@ class OrderViewSet(BaseModelViewSet):
                 order.shipping_provider.code,
                 exc,
             )
+            # Surface the carrier's parsed business message
+            # (``BoxNowAPIError.message`` / ``AcsAPIError.error_message``)
+            # rather than ``str(exc)``, which CodeQL treats as exception
+            # text (py/stack-trace-exposure).
+            detail = (
+                getattr(exc, "message", "")
+                or getattr(exc, "error_message", "")
+                or _("The carrier rejected the cancellation.")
+            )
             return Response(
-                {"detail": str(exc)},
+                {"detail": detail},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

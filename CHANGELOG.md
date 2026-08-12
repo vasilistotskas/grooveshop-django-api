@@ -3,6 +3,36 @@
 
 
 
+## v1.159.1 (2026-08-12)
+
+### Bug fixes
+
+* fix: clear uvicorn and billiard startup warnings
+
+Two warnings on every worker boot, both now silent.
+
+uvicorn: the worker pinned ws="websockets", which logs a
+UvicornDeprecationWarning and is slated to point at the Sans-I/O
+implementation anyway, so the pin bought no stability. Switches to
+"websockets-sansio" — the same protocol class uvicorn's "auto" already
+selects when the websockets package is installed. Verified by serving a
+Channels ProtocolTypeRouter under both implementations with
+lifespan="off" (matching CONFIG_KWARGS) and driving a real client
+through connect/send/recv: both pass, and only the legacy value warns.
+
+billiard 4.2.2 -> 4.2.4 (transitive via celery): 4.2.2 has `return`
+inside `finally` at pool.py:1856 and connection.py:349,351, which
+Python 3.14 flags as SyntaxWarning. Confirmed by AST-walking both
+versions — 3 occurrences in 4.2.2, 0 in 4.2.4 — and by recompiling the
+installed modules with SyntaxWarning promoted to error.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`c199f57`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c199f57d6aee01df39a9679ff6a84fbe1ed16d3c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.159.0 [skip ci] ([`658bf0a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/658bf0a4c6e9ef6b01ad2da012cd3555a4f5d14e))
+
 ## v1.159.0 (2026-08-10)
 
 ### Bug fixes

@@ -3,6 +3,25 @@
 
 
 
+## v1.160.1 (2026-08-13)
+
+### Bug fixes
+
+* fix(shipping): allow empty ACS address-validation response in the schema
+
+The endpoint returns a literal {} when ACS cannot geocode (documented
+in the view), but the response serializer declared every field
+required — schema-validating consumers (Nuxt parseDataAs) rejected the
+documented not-recognised case with a 422 on every unresolvable
+address typed into checkout step 0.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`48e4b26`](https://github.com/vasilistotskas/grooveshop-django-api/commit/48e4b263c12788a0f16b02980b9be6f8870c5b39))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.160.0 [skip ci] ([`f15adab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f15adabee23fce432cd578e4c2829a1609248f75))
+
 ## v1.160.0 (2026-08-13)
 
 ### Bug fixes

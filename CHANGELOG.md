@@ -3,6 +3,55 @@
 
 
 
+## v1.160.0 (2026-08-13)
+
+### Bug fixes
+
+* fix(order,tag): defuse paypal stub footgun and TaggedItem N+1
+
+PayPal: PayPalPaymentProvider is an unimplemented stub (every method
+raises NotImplementedError), yet create_payway seeded it active:True and
+the PAYMENT_PROVIDERS registry resolved it — one seed command away from
+a live checkout option that crashes order status verification. Seed is
+now active:False and the registry entry is removed, so a mis-seeded
+payway fails fast with "Unknown payment provider". Class kept as the
+implementation scaffold; test updated to assert the new fail-fast
+contract (production DB verified: no paypal PayWay row exists).
+
+TaggedItem: TaggedItemViewSet was the only viewset in the codebase not
+overriding get_queryset() with the optimized manager methods — its
+serializer touches tag translations, content_type and the
+content_object GFK per row, so every cache-cold list/retrieve was an
+N+1. Now mirrors the for_list()/for_detail() pattern used everywhere
+else.
+
+Verified: ruff + ty clean; 165 tag/order/management tests + 23 payment
+tests pass.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`d09d0ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d09d0abee61bf29c6a73c00837454b1088f94699))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.159.1 [skip ci] ([`24ef316`](https://github.com/vasilistotskas/grooveshop-django-api/commit/24ef3164526e8fccf042d5ba794d4ccbacdccb6d))
+
+### Features
+
+* feat(user): type the bulk_update subscription response in the schema
+
+bulkUpdateUserSubscriptions declared responses={200: None}, so the
+OpenAPI schema carried no 200 body and the Nuxt generator could not emit
+a response schema — leaving the storefront proxy route unable to
+runtime-validate the response (one of only 3 routes without parseDataAs).
+Adds BulkSubscriptionResultSerializer matching the actual view payload
+(success / failed{topic,error} / already_processed) and wires it into
+the ActionConfig; schema.yml regenerated.
+
+Verified: ruff + ty clean; 241 user tests pass.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`faa6ab5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/faa6ab589ccecab81815be1793de84e4b6fa8ccb))
+
 ## v1.159.1 (2026-08-12)
 
 ### Bug fixes

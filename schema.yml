@@ -27559,7 +27559,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '200':
-          description: No response body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkSubscriptionResult'
+          description: ''
   /api/v1/user/subscription/confirm/{token}:
     get:
       operationId: confirmSubscriptionByToken
@@ -31366,6 +31370,18 @@ components:
       - subject
       - time
       - type
+    BulkSubscriptionFailure:
+      type: object
+      properties:
+        topic:
+          type: string
+          readOnly: true
+        error:
+          type: string
+          readOnly: true
+      required:
+      - error
+      - topic
     BulkSubscriptionRequest:
       type: object
       properties:
@@ -31385,6 +31401,28 @@ components:
       required:
       - action
       - topicIds
+    BulkSubscriptionResult:
+      type: object
+      properties:
+        success:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        failed:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkSubscriptionFailure'
+          readOnly: true
+        alreadyProcessed:
+          type: array
+          items:
+            type: string
+          readOnly: true
+      required:
+      - alreadyProcessed
+      - failed
+      - success
     CancelOrderRequestRequest:
       type: object
       properties:

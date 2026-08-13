@@ -28,6 +28,7 @@ from user.filters.subscription import (
 )
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.serializers.subscription import (
+    BulkSubscriptionResultSerializer,
     BulkSubscriptionSerializer,
     SubscriptionTopicDetailSerializer,
     SubscriptionTopicSerializer,
@@ -253,7 +254,7 @@ user_subscription_config: SerializersConfig = {
         description=_("Subscribe or unsubscribe from multiple topics at once."),
         tags=["User Subscriptions"],
         responses={
-            200: None,
+            200: BulkSubscriptionResultSerializer,
         },
     ),
     "confirm": ActionConfig(

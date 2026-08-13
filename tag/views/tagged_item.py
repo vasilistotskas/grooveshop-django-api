@@ -46,6 +46,16 @@ class TaggedItemViewSet(BaseModelViewSet):
     serializers_config = serializers_config
     filterset_class = TaggedItemFilter
 
+    def get_queryset(self):
+        # The serializer touches tag (translated), content_type and the
+        # content_object GenericForeignKey per row — without the manager's
+        # select_related/prefetch_related every cache-cold list/retrieve
+        # is an N+1. Mirrors the get_queryset pattern used by every other
+        # viewset in the codebase.
+        if self.action == "list":
+            return TaggedItem.objects.for_list()
+        return TaggedItem.objects.for_detail()
+
     def get_permissions(self):
         # Attaching/detaching tags to arbitrary objects is a staff operation;
         # the default IsAuthenticatedOrReadOnly let ANY authenticated user

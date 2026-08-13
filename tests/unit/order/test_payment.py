@@ -10,6 +10,7 @@ from order.enum.status import PaymentStatus
 from order.payment import (
     PayPalPaymentProvider,
     StripePaymentProvider,
+    VivaWalletPaymentProvider,
     get_payment_provider,
 )
 
@@ -145,8 +146,14 @@ class PaymentModuleTestCase(TestCase):
         provider = get_payment_provider("stripe")
         self.assertIsInstance(provider, StripePaymentProvider)
 
-        provider = get_payment_provider("paypal")
-        self.assertIsInstance(provider, PayPalPaymentProvider)
+        provider = get_payment_provider("viva_wallet")
+        self.assertIsInstance(provider, VivaWalletPaymentProvider)
+
+        # PayPal is an unimplemented stub and deliberately unregistered —
+        # resolving it must fail fast instead of exposing a provider whose
+        # every method raises NotImplementedError mid-checkout.
+        with self.assertRaises(ValueError):
+            get_payment_provider("paypal")
 
         with self.assertRaises(ValueError):
             get_payment_provider("invalid_provider")

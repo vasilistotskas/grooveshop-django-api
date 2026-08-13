@@ -849,9 +849,13 @@ class PayPalPaymentProvider(PaymentProvider):
 
 
 def get_payment_provider(provider_name: str) -> PaymentProvider:
+    # PayPalPaymentProvider is intentionally absent: it is an
+    # unimplemented stub (every method raises NotImplementedError).
+    # Keeping it out means a mis-seeded "paypal" PayWay fails fast here
+    # with a clear "Unknown payment provider" instead of blowing up
+    # mid-checkout at get_payment_status(). Register it when implemented.
     providers = {
         "stripe": StripePaymentProvider,
-        "paypal": PayPalPaymentProvider,
         "viva_wallet": VivaWalletPaymentProvider,
     }
 

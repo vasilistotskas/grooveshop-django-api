@@ -59,21 +59,33 @@ class AcsAddressValidationRequestSerializer(serializers.Serializer):
 
 
 class AcsAddressValidationResponseSerializer(serializers.Serializer):
-    """A single resolved address — the first ACSObjectOutput row."""
+    """A single resolved address — the first ACSObjectOutput row.
+
+    Every field is ``required=False``: the endpoint returns a literal
+    ``{}`` when ACS cannot geocode the input (see the view docstring),
+    so the contract must allow the empty object or schema-validating
+    consumers reject the documented not-recognised case.
+    """
 
     geo_id = serializers.IntegerField(allow_null=True, required=False)
-    resolved_street = serializers.CharField(allow_blank=True)
-    resolved_street_num = serializers.CharField(allow_blank=True)
-    resolved_zip = serializers.CharField(allow_blank=True)
-    resolved_area = serializers.CharField(allow_blank=True)
+    resolved_street = serializers.CharField(allow_blank=True, required=False)
+    resolved_street_num = serializers.CharField(
+        allow_blank=True, required=False
+    )
+    resolved_zip = serializers.CharField(allow_blank=True, required=False)
+    resolved_area = serializers.CharField(allow_blank=True, required=False)
     resolved_long = serializers.FloatField(allow_null=True, required=False)
     resolved_lat = serializers.FloatField(allow_null=True, required=False)
-    resolved_station_id = serializers.CharField(allow_blank=True)
+    resolved_station_id = serializers.CharField(
+        allow_blank=True, required=False
+    )
     resolved_branch_id = serializers.IntegerField(
         allow_null=True, required=False
     )
-    resolved_providence = serializers.CharField(allow_blank=True)
-    address_id = serializers.CharField(allow_blank=True)
+    resolved_providence = serializers.CharField(
+        allow_blank=True, required=False
+    )
+    address_id = serializers.CharField(allow_blank=True, required=False)
 
 
 # ---------------------------------------------------------------------------

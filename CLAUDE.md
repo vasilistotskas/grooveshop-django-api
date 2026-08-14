@@ -60,7 +60,7 @@ All apps live at the project root (flat structure, no `src/` directory):
 
 - **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing. The `core/urls.py` is the root URL conf that mounts all other apps under `api/v1/`.
 - **product/**, **order/**, **cart/**, **blog/**, **user/** — Main domain apps
-- **search/** — Meilisearch integration with federated search, Greeklish expansion, and analytics
+- **search/** — Meilisearch integration with federated search, Greeklish transliteration, and analytics
 - **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
 - **notification/** — Real-time notifications via WebSocket (Django Channels consumer)
 - **loyalty/** — Points, XP, tiers, and rewards system
@@ -135,6 +135,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - **Stock management**: `StockManager` with atomic `reserve_stock()`/`release_stock()` using `select_for_update()` to prevent overselling under concurrent requests. The legacy `create_order` path also performs stock checks inside an atomic block. `StockReservation` model with TTL (default 15 min). `StockLog` for audit trail.
 - **Computed properties**: Models check `__dict__` for annotation values before falling back to DB queries (e.g. `likes_count`, `review_average`)
 - **Meilisearch indexing**: Models inherit `IndexMixin` with `MeiliMeta` class defining filterable/searchable/sortable fields, ranking rules, synonyms, typo tolerance. `meili_filter()` controls indexing eligibility. `get_additional_meili_fields()` adds computed fields.
+- **Greeklish search**: Handled at *index time* — searchable Greek fields are shadowed by canonical `*_greeklish` attributes (`search/transliteration.py`) and queries reach Meilisearch verbatim. Never rewrite queries into space-joined variants: Meilisearch's default `last` matching strategy only drops words from the end (the first word is effectively mandatory) and only the first 10 query words are considered.
 
 ### WebSocket / Real-time
 

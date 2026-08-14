@@ -22,7 +22,7 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 - **order/** — Order processing and management
 - **cart/** — Shopping cart functionalities
 - **blog/** — Blog posts, categories, comments, authors, and tags
-- **search/** — Meilisearch integration with federated search, Greeklish expansion, and analytics
+- **search/** — Meilisearch integration with federated search, Greeklish transliteration, and analytics
 - **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
 - **notification/** — Real-time notifications via WebSocket (Django Channels)
 - **loyalty/** — Points, XP, tiers, and rewards system

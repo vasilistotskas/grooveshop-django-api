@@ -635,10 +635,10 @@ class TestMeilisearchTestFederatedCommand:
         "meili.management.commands.meilisearch_test_federated.ProductTranslation"
     )
     @patch("meili.management.commands.meilisearch_test_federated.meili_client")
-    def test_test_federated_greeklish_expansion(
+    def test_test_federated_greek_language_query(
         self, mock_meili_client, mock_product, mock_blog
     ):
-        """Test Greeklish expansion for Greek language queries."""
+        """Greek-language queries run without any query rewriting."""
         mock_product._meilisearch = MOCK_PRODUCT_MEILISEARCH
         mock_blog._meilisearch = MOCK_BLOG_MEILISEARCH
 
@@ -660,7 +660,7 @@ class TestMeilisearchTestFederatedCommand:
 
         output = out.getvalue()
         assert "Language: el" in output
-        assert "Greeklish expanded" in output
+        assert "Greeklish expanded" not in output
 
     @patch(
         "meili.management.commands.meilisearch_test_federated.BlogPostTranslation"

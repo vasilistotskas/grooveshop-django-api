@@ -11,7 +11,6 @@ from django.core.management.base import BaseCommand
 from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
-from search.greeklish import expand_greeklish_query
 from meili._client import client as meili_client
 from product.models.product import ProductTranslation
 
@@ -53,11 +52,9 @@ class Command(BaseCommand):
             self.stdout.write(f"Language: {language_code}")
         self.stdout.write(f"Limit: {limit}")
 
-        # Apply Greeklish expansion if needed
+        # Greeklish queries match the indexed ``*_greeklish`` shadow
+        # fields directly (see search/transliteration.py).
         decoded_query = query
-        if language_code == "el":
-            decoded_query = expand_greeklish_query(query, max_variants=5)
-            self.stdout.write(f"Greeklish expanded: {decoded_query}")
 
         # Calculate result allocation (70% products, 30% blog posts)
         product_limit = int(limit * 0.7)

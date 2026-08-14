@@ -171,31 +171,26 @@ class TestFederatedSearchProperties:
 
     @pytest.mark.parametrize(
         "greek_query",
-        ["υπολογιστής", "κομπιούτερ", "τηλέφωνο"],
+        ["υπολογιστής", "ypologistis", "anavathmisi se windows"],
     )
-    @patch("search.views.expand_greeklish_query")
-    def test_greeklish_expansion_for_greek_queries(
-        self, mock_expand_greeklish, mock_models, mock_meili_client, greek_query
+    def test_query_sent_to_meilisearch_unmodified(
+        self, mock_models, mock_meili_client, greek_query
     ):
         """
-        For queries with language_code 'el', the query should be expanded using
-        expand_greeklish_query.
+        Greek and Greeklish queries must reach Meilisearch verbatim —
+        Greeklish matching happens against the indexed ``*_greeklish``
+        shadow fields, not through query rewriting.
         """
-        expanded_query = f"{greek_query} OR ypologistis"
-        mock_expand_greeklish.return_value = expanded_query
-
         request = self.factory.get(
             "/api/search/federated",
             {"query": greek_query, "language_code": "el"},
         )
         federated_search(request)
 
-        mock_expand_greeklish.assert_called_once()
-
         call_args = mock_meili_client.search_client.multi_search.call_args
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
         for query in queries:
-            assert query["q"] == expanded_query
+            assert query["q"] == greek_query
 
     @pytest.mark.parametrize(
         "total_limit",

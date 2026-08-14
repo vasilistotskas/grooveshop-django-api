@@ -693,7 +693,7 @@ class TestFederatedSearchEndToEnd:
     - Multi-index querying with federation mode
     - Result weighting and merging
     - Content filtering (active products, published blog posts)
-    - Greeklish expansion for Greek queries
+    - Verbatim query pass-through (Greeklish matches indexed shadow fields)
     - Analytics tracking integration
 
     NOTE: These tests require a running Meilisearch instance.
@@ -713,8 +713,7 @@ class TestFederatedSearchEndToEnd:
 
         This end-to-end test validates:
         1. Request parsing and validation
-        2. Greeklish expansion (if applicable)
-        3. Multi-search API call with federation
+        2. Multi-search API call with federation
         4. Result enrichment with Django objects
         5. Content type tagging
         6. Response serialization
@@ -856,9 +855,11 @@ class TestFederatedSearchEndToEnd:
                         "is_published = true" in str(f) for f in filters
                     ), "Blog posts should filter for is_published = true"
 
-    def test_federated_search_with_greeklish_expansion(self, api_client):
+    def test_federated_search_sends_query_unmodified(self, api_client):
         """
-        Test that Greek queries trigger Greeklish expansion.
+        Greek and Greeklish queries must reach Meilisearch verbatim —
+        Greeklish matching happens against the indexed ``*_greeklish``
+        shadow fields, not through query rewriting.
 
         Validates: Requirements 1.6
         """
@@ -871,35 +872,25 @@ class TestFederatedSearchEndToEnd:
                 "processingTimeMs": 30,
             }
 
-            with patch("search.views.expand_greeklish_query") as mock_expand:
-                mock_expand.return_value = "expanded query"
+            api_client.get(
+                "/api/v1/search/federated",
+                {
+                    "query": "anavathmisi se windows",
+                    "language_code": "el",
+                    "limit": 20,
+                },
+            )
 
-                # Execute search with Greek language code
-                api_client.get(
-                    "/api/v1/search/federated",
-                    {
-                        "query": "υπολογιστής",
-                        "language_code": "el",
-                        "limit": 20,
-                    },
+            assert mock_multi_search.called, "multi_search should be called"
+            call_args = mock_multi_search.call_args
+            queries = call_args.kwargs.get("queries") or (
+                call_args[1].get("queries") if len(call_args) > 1 else None
+            )
+
+            for query in queries:
+                assert query["q"] == "anavathmisi se windows", (
+                    "The raw query must be sent to Meilisearch unmodified"
                 )
-
-                # Verify Greeklish expansion was called
-                assert mock_expand.called, (
-                    "Greeklish expansion should be called for Greek queries"
-                )
-
-                # Verify expanded query was used in multi_search
-                assert mock_multi_search.called, "multi_search should be called"
-                call_args = mock_multi_search.call_args
-                queries = call_args.kwargs.get("queries") or (
-                    call_args[1].get("queries") if len(call_args) > 1 else None
-                )
-
-                for query in queries:
-                    assert query["q"] == "expanded query", (
-                        "Expanded query should be used in search"
-                    )
 
     def test_federated_search_result_allocation(self, api_client):
         """

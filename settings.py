@@ -1,6 +1,7 @@
 import datetime
 from os import getenv, makedirs, path
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import django_stubs_ext
 import dotenv
@@ -129,6 +130,7 @@ LOCAL_APPS = [
     "meili",
     "loyalty",
     "meta_capi",
+    "tenant",
 ]
 
 THIRD_PARTY_APPS = [
@@ -3261,3 +3263,58 @@ META_CAPI_PARTNER_AGENT = getenv(
 )
 # Per-request timeout for the facebook_business SDK's HTTP client.
 META_CAPI_HTTP_TIMEOUT = int(getenv("META_CAPI_HTTP_TIMEOUT", "10"))
+
+# ---------- Tenant (single-tenant, settings-backed) ----------
+# Stand-in for the `multi-tenant` branch's DB-backed `tenant` app: same
+# wire shape (see tenant/serializers.py, tenant/views.py) but sourced
+# from settings instead of a Tenant model/migration. The multi-tenant
+# branch's version supersedes this entirely at merge — no fallback
+# logic should ever combine the two.
+TENANT_SCHEMA_NAME = getenv("TENANT_SCHEMA_NAME", "webside")
+_tenant_primary_host = urlsplit(NUXT_BASE_URL).hostname or "localhost"
+TENANT_PRIMARY_DOMAIN = getenv("TENANT_PRIMARY_DOMAIN", _tenant_primary_host)
+TENANT_EXTRA_DOMAINS = [
+    d.strip()
+    for d in getenv(
+        "TENANT_EXTRA_DOMAINS", f"www.{TENANT_PRIMARY_DOMAIN}"
+    ).split(",")
+    if d.strip()
+]
+TENANT_STORE_DESCRIPTION = getenv("TENANT_STORE_DESCRIPTION", "")
+TENANT_LOGO_LIGHT_URL = getenv("TENANT_LOGO_LIGHT_URL", "")
+TENANT_LOGO_DARK_URL = getenv("TENANT_LOGO_DARK_URL", "")
+TENANT_FAVICON_URL = getenv("TENANT_FAVICON_URL", "")
+TENANT_PRIMARY_COLOR = getenv("TENANT_PRIMARY_COLOR", "neutral")
+TENANT_NEUTRAL_COLOR = getenv("TENANT_NEUTRAL_COLOR", "zinc")
+TENANT_ACCENT_HEX = getenv("TENANT_ACCENT_HEX", "#003DFF")
+TENANT_SUCCESS_HEX = getenv("TENANT_SUCCESS_HEX", "#16a34a")
+TENANT_WARNING_HEX = getenv("TENANT_WARNING_HEX", "#ca8a04")
+TENANT_ERROR_HEX = getenv("TENANT_ERROR_HEX", "#dc2626")
+TENANT_INFO_HEX = getenv("TENANT_INFO_HEX", "#2563eb")
+TENANT_THEME_PRESET = getenv("TENANT_THEME_PRESET", "default")
+# No JSON-from-env precedent elsewhere in this file; the MT model
+# default is an empty dict and no tenant currently sets this, so it's
+# a plain constant rather than a getenv-parsed value.
+TENANT_THEME_METADATA: dict = {}
+TENANT_LOYALTY_ENABLED = (
+    getenv("TENANT_LOYALTY_ENABLED", "True").lower() == "true"
+)
+TENANT_BLOG_ENABLED = getenv("TENANT_BLOG_ENABLED", "True").lower() == "true"
+TENANT_STRIPE_PUBLISHABLE_KEY = getenv("TENANT_STRIPE_PUBLISHABLE_KEY", "")
+TENANT_ALLOWED_CSP_SOURCES = [
+    s.strip()
+    for s in getenv("TENANT_ALLOWED_CSP_SOURCES", "").split(",")
+    if s.strip()
+]
+TENANT_TIKTOK_PIXEL_ID = getenv("TENANT_TIKTOK_PIXEL_ID", "")
+TENANT_GA_TRACKING_ID = getenv("TENANT_GA_TRACKING_ID", "")
+TENANT_TOTP_ISSUER = getenv("TENANT_TOTP_ISSUER", "")
+TENANT_TURNSTILE_SITE_KEY = getenv("TENANT_TURNSTILE_SITE_KEY", "")
+TENANT_SOCIALS_DISCORD = getenv("TENANT_SOCIALS_DISCORD", "")
+TENANT_SOCIALS_FACEBOOK = getenv("TENANT_SOCIALS_FACEBOOK", "")
+TENANT_SOCIALS_INSTAGRAM = getenv("TENANT_SOCIALS_INSTAGRAM", "")
+TENANT_SOCIALS_PINTEREST = getenv("TENANT_SOCIALS_PINTEREST", "")
+TENANT_SOCIALS_REDDIT = getenv("TENANT_SOCIALS_REDDIT", "")
+TENANT_SOCIALS_TIKTOK = getenv("TENANT_SOCIALS_TIKTOK", "")
+TENANT_SOCIALS_TWITTER = getenv("TENANT_SOCIALS_TWITTER", "")
+TENANT_SOCIALS_YOUTUBE = getenv("TENANT_SOCIALS_YOUTUBE", "")

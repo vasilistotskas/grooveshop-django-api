@@ -24726,6 +24726,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/tenant/resolve:
+    get:
+      operationId: api_v1_tenant_resolve_retrieve
+      parameters:
+      - in: query
+        name: domain
+        schema:
+          type: string
+        required: true
+      tags:
+      - Tenant
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantConfig'
+          description: ''
   /api/v1/user/account:
     get:
       operationId: listUserAccount
@@ -40262,6 +40283,166 @@ components:
       - contentType
       - objectId
       - tagId
+    TenantConfig:
+      type: object
+      description: |-
+        Public (AllowAny) serializer for the /api/v1/tenant/resolve endpoint.
+
+        Field-for-field mirror of the `multi-tenant` branch's
+        ``TenantConfigSerializer`` — only fields safe to expose to
+        unauthenticated callers appear here. Keep in sync with
+        `git show multi-tenant:tenant/serializers.py`.
+      properties:
+        schemaName:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        storeName:
+          type: string
+          readOnly: true
+        storeDescription:
+          type: string
+          readOnly: true
+        logoLightUrl:
+          type: string
+          readOnly: true
+        logoDarkUrl:
+          type: string
+          readOnly: true
+        faviconUrl:
+          type: string
+          readOnly: true
+        primaryColor:
+          type: string
+          readOnly: true
+        neutralColor:
+          type: string
+          readOnly: true
+        accentHex:
+          type: string
+          readOnly: true
+        successHex:
+          type: string
+          readOnly: true
+        warningHex:
+          type: string
+          readOnly: true
+        errorHex:
+          type: string
+          readOnly: true
+        infoHex:
+          type: string
+          readOnly: true
+        themePreset:
+          type: string
+          readOnly: true
+        themeMetadata:
+          readOnly: true
+        defaultLocale:
+          type: string
+          readOnly: true
+        defaultCurrency:
+          type: string
+          readOnly: true
+        primaryDomain:
+          type: string
+          readOnly: true
+        loyaltyEnabled:
+          type: boolean
+          readOnly: true
+        blogEnabled:
+          type: boolean
+          readOnly: true
+        stripePublishableKey:
+          type: string
+          readOnly: true
+        allowedCspSources:
+          type: array
+          items:
+            type: string
+          readOnly: true
+        metaPixelId:
+          type: string
+          readOnly: true
+        tiktokPixelId:
+          type: string
+          readOnly: true
+        gaTrackingId:
+          type: string
+          readOnly: true
+        totpIssuer:
+          type: string
+          readOnly: true
+        turnstileSiteKey:
+          type: string
+          readOnly: true
+        socialsDiscord:
+          type: string
+          readOnly: true
+        socialsFacebook:
+          type: string
+          readOnly: true
+        socialsInstagram:
+          type: string
+          readOnly: true
+        socialsPinterest:
+          type: string
+          readOnly: true
+        socialsReddit:
+          type: string
+          readOnly: true
+        socialsTiktok:
+          type: string
+          readOnly: true
+        socialsTwitter:
+          type: string
+          readOnly: true
+        socialsYoutube:
+          type: string
+          readOnly: true
+        boxNowPartnerId:
+          type: string
+          readOnly: true
+      required:
+      - accentHex
+      - allowedCspSources
+      - blogEnabled
+      - boxNowPartnerId
+      - defaultCurrency
+      - defaultLocale
+      - errorHex
+      - faviconUrl
+      - gaTrackingId
+      - infoHex
+      - logoDarkUrl
+      - logoLightUrl
+      - loyaltyEnabled
+      - metaPixelId
+      - name
+      - neutralColor
+      - primaryColor
+      - primaryDomain
+      - schemaName
+      - socialsDiscord
+      - socialsFacebook
+      - socialsInstagram
+      - socialsPinterest
+      - socialsReddit
+      - socialsTiktok
+      - socialsTwitter
+      - socialsYoutube
+      - storeDescription
+      - storeName
+      - stripePublishableKey
+      - successHex
+      - themeMetadata
+      - themePreset
+      - tiktokPixelId
+      - totpIssuer
+      - turnstileSiteKey
+      - warningHex
     TopQuery:
       type: object
       description: Serializer for top query analytics.

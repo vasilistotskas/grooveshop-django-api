@@ -66,5 +66,10 @@
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "postgres",
+    "kubernetes",
+    "pycharm"
+  ]
 }

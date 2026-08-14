@@ -4,19 +4,24 @@ Cover:
 * Cache hit / miss + invalidation via ``DASHBOARD_CACHE_KEY``.
 * Zone D (system warnings) is gated on ``request.user.is_superuser``.
 * ``low_stock_products`` excludes ``stock=0`` and respects the cap.
-* Hero KPIs surface a non-None trend % once prior data exists.
+* Hero revenue periods sum per window and surface a non-None trend %
+  once the prior window of equal length has data.
 """
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import RequestFactory, TestCase
+from django.utils import timezone
 
 from admin.dashboard import (
     DASHBOARD_CACHE_KEY,
+    REVENUE_PERIODS,
+    _build_cached_zones,
     _check_low_stock,
     dashboard_callback,
 )
@@ -109,6 +114,97 @@ class DashboardCallbackCachingTests(TestCase):
         self.assertIn("mydata_warnings", result)
         self.assertIn("low_stock_products", result)
         self.assertIn("failed_celery_count", result)
+
+
+class RevenuePeriodsTests(TestCase):
+    """Hero revenue card: per-window sums + trend vs the prior window."""
+
+    def _paid_order(self, amount: int, days_ago: int):
+        from django.conf import settings as dj_settings
+
+        from djmoney.money import Money
+
+        from order.enum.status import PaymentStatus
+        from order.factories.order import OrderFactory
+        from order.models.order import Order
+
+        order = OrderFactory(
+            payment_status=PaymentStatus.COMPLETED,
+            paid_amount=Money(amount, dj_settings.DEFAULT_CURRENCY),
+            num_order_items=0,
+        )
+        # created_at is auto_now_add — backdate via queryset update.
+        Order.objects.filter(pk=order.pk).update(
+            created_at=timezone.now() - timedelta(days=days_ago)
+        )
+        return order
+
+    def _periods(self) -> dict:
+        hero = _build_cached_zones()["hero"]
+        return {p["key"]: p for p in hero["revenue_periods"]}
+
+    def test_all_configured_periods_present_in_order(self):
+        hero = _build_cached_zones()["hero"]
+        self.assertEqual(
+            [p["key"] for p in hero["revenue_periods"]],
+            [key for key, *_ in REVENUE_PERIODS],
+        )
+
+    def test_amounts_split_by_window_and_trend_vs_prior(self):
+        self._paid_order(100, days_ago=2)  # current 7d window
+        self._paid_order(50, days_ago=10)  # prior 7d window, current 30d
+
+        periods = self._periods()
+        self.assertEqual(periods["7d"]["amount"], 100.0)
+        # (100 - 50) / 50 → +100% vs the prior 7-day window
+        self.assertEqual(periods["7d"]["trend_pct"], 100.0)
+        self.assertEqual(periods["30d"]["amount"], 150.0)
+        # No orders in days 30-60 — nothing to compare against.
+        self.assertIsNone(periods["30d"]["trend_pct"])
+        self.assertEqual(periods["365d"]["amount"], 150.0)
+
+    def test_unpaid_orders_excluded(self):
+        from django.conf import settings as dj_settings
+
+        from djmoney.money import Money
+
+        from order.enum.status import PaymentStatus
+        from order.factories.order import OrderFactory
+
+        OrderFactory(
+            payment_status=PaymentStatus.PENDING,
+            paid_amount=Money(999, dj_settings.DEFAULT_CURRENCY),
+            num_order_items=0,
+        )
+        periods = self._periods()
+        self.assertEqual(periods["7d"]["amount"], 0.0)
+        self.assertIsNone(periods["7d"]["trend_pct"])
+
+
+class DashboardRenderTests(TestCase):
+    """Full render of ``/admin/`` — catches template/context drift the
+    payload-level tests can't (e.g. the Alpine period switcher markup).
+    """
+
+    def test_index_renders_revenue_period_switcher(self):
+        from django.test import Client
+        from django.urls import reverse
+
+        cache.delete(DASHBOARD_CACHE_KEY)
+        admin_user = User.objects.create_superuser(
+            username="boss", email="boss@example.com", password="x"
+        )
+        client = Client()
+        client.force_login(admin_user)
+
+        response = client.get(reverse("admin:index"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        for key, *_ in REVENUE_PERIODS:
+            self.assertIn(f'data-period="{key}"', content)
+        # Alpine persistence key for the selected period
+        self.assertIn("dashboard-revenue-period", content)
 
 
 class LowStockBoundaryTests(TestCase):

@@ -130,24 +130,52 @@
     {% trans "Last 30 days" as last_30d_label %}
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
-        {# Revenue 7d with trend #}
-        {% trans "vs. prior 7 days" as vs_prior_label %}
+        {# Revenue with client-side period switcher (7d/1m/3m/1y).      #}
+        {# All periods ship in the cached payload; Alpine (bundled by   #}
+        {# unfold, incl. the persist plugin) toggles visibility and     #}
+        {# remembers the admin's choice in localStorage. x-init resets  #}
+        {# a stale persisted key if the period set ever changes.        #}
+        {% trans "vs. prior period of equal length" as vs_prior_label %}
         {% component "unfold/components/card.html" with footer=vs_prior_label %}
-            <div class="flex items-start justify-between">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
-                    {% component "unfold/components/icon.html" %}payments{% endcomponent %}
+            <div x-data="{ period: $persist('7d').as('dashboard-revenue-period') }"
+                 x-init="$el.querySelector(`[data-period='${period}']`) || (period = '7d')">
+                <div class="flex items-start justify-between">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
+                        {% component "unfold/components/icon.html" %}payments{% endcomponent %}
+                    </div>
+                    {% for p in hero.revenue_periods %}
+                        {% if p.trend_pct is not None %}
+                        <span x-cloak x-show="period === '{{ p.key }}'">
+                            {% capture as revenue_trend_text silent %}{% if p.trend_pct >= 0 %}+{% endif %}{{ p.trend_pct }}%{% endcapture %}
+                            {% if p.trend_pct >= 0 %}
+                                {% include "unfold/helpers/label.html" with variant="success" icon="trending_up" text=revenue_trend_text %}
+                            {% else %}
+                                {% include "unfold/helpers/label.html" with variant="danger" icon="trending_down" text=revenue_trend_text %}
+                            {% endif %}
+                        </span>
+                        {% endif %}
+                    {% endfor %}
                 </div>
-                {% if hero.revenue_trend_pct is not None %}
-                    {% capture as revenue_trend_text silent %}{% if hero.revenue_trend_pct >= 0 %}+{% endif %}{{ hero.revenue_trend_pct }}%{% endcapture %}
-                    {% if hero.revenue_trend_pct >= 0 %}
-                        {% include "unfold/helpers/label.html" with variant="success" icon="trending_up" text=revenue_trend_text %}
-                    {% else %}
-                        {% include "unfold/helpers/label.html" with variant="danger" icon="trending_down" text=revenue_trend_text %}
-                    {% endif %}
-                {% endif %}
+                {% for p in hero.revenue_periods %}
+                <div x-cloak x-show="period === '{{ p.key }}'">
+                    {% component "unfold/components/title.html" with class="mt-4!" %}€{{ p.amount|floatformat:2 }}{% endcomponent %}
+                </div>
+                {% endfor %}
+                <div class="mt-1 flex items-center justify-between gap-2">
+                    {% component "unfold/components/text.html" with class="font-medium" %}{% trans "Revenue" %}{% endcomponent %}
+                    <div class="flex gap-0.5 rounded-md bg-base-100 p-0.5 dark:bg-base-800" role="group" aria-label="{% trans 'Revenue period' %}">
+                        {% for p in hero.revenue_periods %}
+                        <button type="button"
+                                data-period="{{ p.key }}"
+                                @click="period = '{{ p.key }}'"
+                                :class="period === '{{ p.key }}' ? 'bg-white text-base-900 shadow-xs dark:bg-base-900 dark:text-base-100' : 'text-base-500 hover:text-base-700 dark:text-base-400 dark:hover:text-base-200'"
+                                :aria-pressed="period === '{{ p.key }}'"
+                                class="cursor-pointer rounded px-1.5 py-0.5 text-xs font-medium transition-colors"
+                                title="{{ p.long_label }}">{{ p.short_label }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
-            {% component "unfold/components/title.html" with class="mt-4!" %}€{{ hero.revenue_7d|floatformat:2 }}{% endcomponent %}
-            {% component "unfold/components/text.html" with class="mt-1 font-medium" %}{% trans "Revenue (7d)" %}{% endcomponent %}
         {% endcomponent %}
 
         {# Pending orders #}

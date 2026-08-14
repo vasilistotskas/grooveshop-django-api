@@ -3289,13 +3289,45 @@ msgstr "Εξέταση"
 msgid "Last 30 days"
 msgstr "Τελευταίες 30 ημέρες"
 
-#: .\core\templates\admin\index.html:134
-msgid "vs. prior 7 days"
-msgstr "έναντι προηγούμενων 7 ημερών"
+#: .\core\templates\admin\index.html:139
+msgid "vs. prior period of equal length"
+msgstr "έναντι προηγούμενης αντίστοιχης περιόδου"
 
-#: .\core\templates\admin\index.html:150
-msgid "Revenue (7d)"
-msgstr "Έσοδα (7 ημ)"
+#: .\core\templates\admin\index.html:166
+msgid "Revenue"
+msgstr "Έσοδα"
+
+#: .\core\templates\admin\index.html:167
+msgid "Revenue period"
+msgstr "Περίοδος εσόδων"
+
+#: .\admin\dashboard.py
+msgid "7d"
+msgstr "7ημ"
+
+#: .\admin\dashboard.py
+msgid "1m"
+msgstr "1μ"
+
+#: .\admin\dashboard.py
+msgid "3m"
+msgstr "3μ"
+
+#: .\admin\dashboard.py
+msgid "1y"
+msgstr "1ε"
+
+#: .\admin\dashboard.py
+msgid "Last 7 days"
+msgstr "Τελευταίες 7 ημέρες"
+
+#: .\admin\dashboard.py
+msgid "Last 3 months"
+msgstr "Τελευταίοι 3 μήνες"
+
+#: .\admin\dashboard.py
+msgid "Last 12 months"
+msgstr "Τελευταίοι 12 μήνες"
 
 #: .\core\templates\admin\index.html:154
 msgid "Tap to triage"

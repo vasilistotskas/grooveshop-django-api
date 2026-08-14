@@ -3,7 +3,8 @@
 Builds the data dict consumed by ``core/templates/admin/index.html``
 in five zones:
 
-A. Hero KPIs (4 cards)
+A. Hero KPIs (4 cards) — the revenue card carries per-period figures
+   (7d/1m/3m/1y) switched client-side via Alpine.js in the template
 B. Operations charts (revenue+orders bar/line, status doughnut) — chart
    payloads are pre-serialized to JSON strings so the template can feed
    them straight into unfold's ``{% component "unfold/components/chart/*.html" %}``
@@ -29,14 +30,25 @@ from datetime import timedelta
 
 from django.apps import apps
 from django.core.cache import cache
-from django.db.models import Avg, Count, Sum
+from django.db.models import Avg, Count, Q, Sum
 from django.db.models.functions import TruncDay
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-DASHBOARD_CACHE_KEY = "admin:dashboard:data:v4"
+DASHBOARD_CACHE_KEY = "admin:dashboard:data:v5"
 DASHBOARD_CACHE_TTL = 300  # 5 minutes
+
+# Selectable windows for the hero revenue card. Every period is compared
+# against the immediately preceding window of equal length for its trend
+# badge. Labels are lazy so they render in the request language even
+# though the payload is cached (lazy proxies survive cache pickling).
+REVENUE_PERIODS = (
+    ("7d", 7, _("7d"), _("Last 7 days")),
+    ("30d", 30, _("1m"), _("Last 30 days")),
+    ("90d", 90, _("3m"), _("Last 3 months")),
+    ("365d", 365, _("1y"), _("Last 12 months")),
+)
 
 # Stock-mandatory seller fields surfaced as Zone D banners.
 _REQUIRED_SELLER_SETTINGS = (
@@ -205,19 +217,13 @@ def _build_cached_zones() -> dict:
     from product.enum.review import ReviewStatus
 
     now = timezone.now()
-    week_ago = now - timedelta(days=7)
-    prior_week_start = now - timedelta(days=14)
     month_ago = now - timedelta(days=30)
-    today = now.date()
 
     return {
         **_zone_a_hero_kpis(
             Order,
             User,
             now,
-            today,
-            week_ago,
-            prior_week_start,
             month_ago,
             PaymentStatus,
             OrderStatus,
@@ -325,45 +331,19 @@ def _zone_a_hero_kpis(
     Order,
     User,
     now,
-    today,
-    week_ago,
-    prior_week_start,
     month_ago,
     PaymentStatus,
     OrderStatus,
 ) -> dict:
-    """4 hero KPI cards: revenue 7d, pending orders, new customers,
-    average order value.
+    """4 hero KPI cards: revenue (selectable period), pending orders,
+    new customers, average order value.
     """
-
-    revenue_7d = (
-        Order.objects.filter(
-            payment_status=PaymentStatus.COMPLETED,
-            created_at__gte=week_ago,
-        ).aggregate(total=Sum("paid_amount"))["total"]
-        or 0
-    )
-    revenue_prior = (
-        Order.objects.filter(
-            payment_status=PaymentStatus.COMPLETED,
-            created_at__gte=prior_week_start,
-            created_at__lt=week_ago,
-        ).aggregate(total=Sum("paid_amount"))["total"]
-        or 0
-    )
-    if revenue_prior:
-        trend_pct = round(
-            (float(revenue_7d) - float(revenue_prior))
-            / float(revenue_prior)
-            * 100,
-            1,
-        )
-    else:
-        trend_pct = None  # nothing to compare against
 
     pending_orders = Order.objects.filter(status=OrderStatus.PENDING).count()
     new_customers_30d = User.objects.filter(created_at__gte=month_ago).count()
-    new_customers_today = User.objects.filter(created_at__date=today).count()
+    new_customers_today = User.objects.filter(
+        created_at__date=now.date()
+    ).count()
     aov_30d = (
         Order.objects.filter(created_at__gte=month_ago).aggregate(
             avg=Avg("paid_amount")
@@ -373,14 +353,56 @@ def _zone_a_hero_kpis(
 
     return {
         "hero": {
-            "revenue_7d": float(revenue_7d),
-            "revenue_trend_pct": trend_pct,
+            "revenue_periods": _revenue_periods(Order, now, PaymentStatus),
             "pending_orders": pending_orders,
             "new_customers_30d": new_customers_30d,
             "new_customers_today": new_customers_today,
             "avg_order_value": round(float(aov_30d), 2),
         },
     }
+
+
+def _revenue_periods(Order, now, PaymentStatus) -> list[dict]:
+    """Paid revenue per selectable window, each with a trend badge.
+
+    One SQL round-trip: every window (current + the prior window of
+    equal length used for the trend comparison) is a filtered ``Sum``
+    inside a single ``aggregate()`` call.
+    """
+
+    aggregates = {}
+    for key, days, _short, _long in REVENUE_PERIODS:
+        start = now - timedelta(days=days)
+        prior_start = now - timedelta(days=days * 2)
+        aggregates[f"current_{key}"] = Sum(
+            "paid_amount", filter=Q(created_at__gte=start)
+        )
+        aggregates[f"prior_{key}"] = Sum(
+            "paid_amount",
+            filter=Q(created_at__gte=prior_start, created_at__lt=start),
+        )
+    totals = Order.objects.filter(
+        payment_status=PaymentStatus.COMPLETED
+    ).aggregate(**aggregates)
+
+    periods = []
+    for key, _days, short_label, long_label in REVENUE_PERIODS:
+        current = float(totals[f"current_{key}"] or 0)
+        prior = float(totals[f"prior_{key}"] or 0)
+        periods.append(
+            {
+                "key": key,
+                "short_label": short_label,
+                "long_label": long_label,
+                "amount": current,
+                "trend_pct": (
+                    round((current - prior) / prior * 100, 1)
+                    if prior
+                    else None  # nothing to compare against
+                ),
+            }
+        )
+    return periods
 
 
 # ── Zone B — Operations charts ────────────────────────────────────────

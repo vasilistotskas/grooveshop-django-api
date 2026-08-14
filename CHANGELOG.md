@@ -3,6 +3,43 @@
 
 
 
+## v1.162.1 (2026-08-14)
+
+### Bug fixes
+
+* fix(search): match Greeklish via indexed transliteration shadow fields (#12)
+
+Query-time Greeklish expansion joined whole-phrase Greek variants with
+spaces, which can never match under Meilisearch semantics: the default
+"last" matching strategy only drops words from the end of the query
+(making the leading Latin word effectively mandatory), only the first
+ten query words are considered, and the shared variant budget starved
+the correct word endings while transliterating embedded English words
+("windows") into garbage. On production, "anavathmisi se windows"
+returned zero results and "optiki ina" only matched a post whose body
+happened to contain a Latin slug.
+
+Index a canonical phonetic transliteration of every searchable Greek
+field instead (title/subtitle/body on BlogPostTranslation and
+name/description on ProductTranslation as *_greeklish shadow
+attributes) and send user queries to Meilisearch verbatim. Common
+Greeklish spellings exact-match the shadow fields; alternative
+conventions land within typo tolerance; Latin content passes through
+unchanged so brand names stay searchable. All 78 production Greek blog
+titles fold cleanly with zero unmapped characters.
+
+Requires one meilisearch_sync_all_indexes run after deploy (also
+scheduled daily at 02:00) to apply settings and re-push documents.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`de32f51`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de32f510e976ef2bbd6212b12d32efef5682938e))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.162.0 [skip ci] ([`be26fbe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be26fbedb886c47a18a548483a3bfe22da422c99))
+
 ## v1.162.0 (2026-08-14)
 
 ### Chores

@@ -3,6 +3,53 @@
 
 
 
+## v1.162.0 (2026-08-14)
+
+### Chores
+
+* chore(config): audit pyproject ignores — retire fixed ones, align ruff target
+
+Every suppression validated empirically (all ty rules flipped to warn
+for a full-count run; warning filters re-tested with filters stripped):
+
+- ty src exclude for search/views.py REMOVED — the infinite-cycle
+  panic is fixed in ty 0.0.35 and the file now checks cleanly.
+- drf-spectacular _UnionGenericAlias filter REMOVED — 0.30.0 ships the
+  upstream fix (tfranzel/drf-spectacular#1497); schema-generation tests
+  run warning-free without it.
+- daphne asyncio filters KEPT — both still fire on daphne 4.2.1 /
+  Python 3.14 (re-test note added).
+- twisted override rc pin advanced to the now-released 26.4.0 stable.
+- Every remaining ty ignore rule confirmed load-bearing: global
+  unresolved-attribute 265 hits / invalid-attribute-override 39 outside
+  tests; each per-section rule has real hits in scope (tests 2-3314,
+  factories 29, lib-stub dirs 1-12 — all third-party stub limitations,
+  admin.py unfold @action 59, order/payment.py stripe Unpack 157).
+- ruff target-version py313 -> py314 (requires-python is >=3.14; ruff
+  would infer py314 if unset) + the resulting PEP 758 reformat of 21
+  files (unparenthesized multi-exception syntax).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`47f258e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/47f258e2e4b113e4586005e6cb7066db613d99ca))
+
+* chore(deps): sync uv.lock to 1.161.1 [skip ci] ([`e4c7dcc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e4c7dcca7114252a27c82378e4dab7430b7103e3))
+
+### Features
+
+* feat(admin): add period filter to revenue card
+
+The dashboard hero revenue card now switches between 7d/1m/3m/1y
+windows. All periods ship in the cached payload via one filtered-
+aggregate query; an Alpine.js segmented control (bundled by unfold,
+incl. the persist plugin) toggles them client-side and remembers the
+admin's choice in localStorage. Each period's trend badge compares
+against the prior window of equal length. Dashboard cache key bumped
+to v5 for the payload shape change; Greek strings and compiled
+Tailwind CSS updated alongside.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011eV7Sx7AGjTikDFWS4bygq ([`c49bdab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c49bdab33df68a62cc4cf43a9cac597333b72699))
+
 ## v1.161.1 (2026-08-14)
 
 ### Bug fixes

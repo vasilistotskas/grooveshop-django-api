@@ -14,6 +14,7 @@ from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
 from meili.models import IndexMixin
 from core.models import SeoModel
+from search.transliteration import greeklish_shadow
 
 
 class BlogPost(
@@ -179,7 +180,15 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "is_published",
             "master_id",
         )
-        searchable_fields = ("master_id", "title", "subtitle", "body")
+        searchable_fields = (
+            "master_id",
+            "title",
+            "title_greeklish",
+            "subtitle",
+            "subtitle_greeklish",
+            "body",
+            "body_greeklish",
+        )
         displayed_fields = (
             "id",
             "master_id",
@@ -249,6 +258,9 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
     def get_additional_meili_fields(cls):
         return {
             "master_id": lambda obj: obj.master_id,
+            "title_greeklish": lambda obj: greeklish_shadow(obj.title),
+            "subtitle_greeklish": lambda obj: greeklish_shadow(obj.subtitle),
+            "body_greeklish": lambda obj: greeklish_shadow(obj.body),
             "likes_count": lambda obj: (
                 getattr(obj, "_likes_count", 0) or obj.master.likes_count
             ),

@@ -27,7 +27,6 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchThrottle
 from meili._client import client as meili_client
 from product.models.product import ProductTranslation
-from search.greeklish import expand_greeklish_query
 from search.models import SearchClick, SearchQuery
 from search.serializers import (
     BlogPostMeiliSearchResponseSerializer,
@@ -191,10 +190,9 @@ def blog_post_meili_search(request):
         request.query_params.get("language_code")
     )
 
+    # Greeklish queries match the indexed ``*_greeklish`` shadow fields
+    # directly (see search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
-
-    if language_code == "el":
-        decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
 
     search_qs = BlogPostTranslation.meilisearch.paginate(
         limit=limit, offset=offset
@@ -390,10 +388,9 @@ def product_meili_search(request):
         if f and f in _ALLOWED_PRODUCT_FACETS
     ]
 
-    # Decode and expand query for Greek language
+    # Greeklish queries match the indexed ``*_greeklish`` shadow fields
+    # directly (see search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
-    if language_code == "el":
-        decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
 
     search_qs = ProductTranslation.meilisearch.paginate(
         limit=limit, offset=offset
@@ -544,10 +541,9 @@ def federated_search(request):
         request.query_params.get("language_code")
     )
 
-    # Decode and expand query for Greek language
+    # Greeklish queries match the indexed ``*_greeklish`` shadow fields
+    # directly (see search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
-    if language_code == "el":
-        decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
 
     # Calculate result allocation (70% products, 30% blog posts)
     product_limit = int(limit * 0.7)  # noqa: F841

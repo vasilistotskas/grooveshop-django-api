@@ -5,7 +5,7 @@ These tests validate the complete federated search flow including:
 - Multi-index search with federation
 - Content filtering (active products, published blog posts)
 - Analytics tracking
-- Greeklish expansion
+- Greeklish queries (matched via indexed ``*_greeklish`` shadow fields)
 - Result weighting and merging
 
 NOTE: These tests require a running Meilisearch instance with properly
@@ -145,12 +145,11 @@ class TestFederatedSearchIntegration:
             if "object" in result:
                 assert result["object"].get("language_code") == "el"
 
-    def test_federated_search_applies_greeklish_expansion(self):
+    def test_federated_search_accepts_greeklish_query(self):
         """
-        Test that federated search applies Greeklish expansion for
-        Greek language queries.
+        Greeklish queries are valid input and match the indexed
+        ``*_greeklish`` shadow fields (see search/transliteration.py).
         """
-        # Search with Greeklish query
         response = self.client.get(
             self.federated_search_url,
             {
@@ -163,7 +162,6 @@ class TestFederatedSearchIntegration:
         assert response.status_code == 200
         data = response.json()
 
-        # Verify results are returned (Greeklish expansion should work)
         assert "results" in data
         # Note: Actual results depend on test data availability
 

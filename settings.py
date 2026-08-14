@@ -276,7 +276,6 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": None if DEBUG else "100000/day",
         "user": None if DEBUG else "150000/day",
-        "burst": None if DEBUG else "5/minute",
         # Per-endpoint scopes. Applied via throttle_classes on specific views
         # (ContactCreateThrottle, PaymentAttemptThrottle, PaymentAttemptAnonThrottle
         # in core.api.throttling) — the global anon/user throttles continue to

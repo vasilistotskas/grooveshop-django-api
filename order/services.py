@@ -67,7 +67,7 @@ def _log_price_drift_if_needed(cart_item, current_price) -> None:
             and frozen.currency == current_price.currency
         ):
             return
-    except (AttributeError, TypeError):
+    except AttributeError, TypeError:
         return
     logger.warning(
         "Cart price drift at checkout: cart_item=%s product=%s "
@@ -1388,7 +1388,7 @@ class OrderService:
                         errors["country_id"] = [
                             _("Country ID must be a positive integer")
                         ]
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     errors["country_id"] = [
                         _("Country ID must be a valid integer or country code")
                     ]
@@ -2044,7 +2044,7 @@ class OrderService:
         else:
             try:
                 cls.update_order_status(order, OrderStatus.SHIPPED)
-            except (ValueError, InvalidStatusTransitionError):
+            except ValueError, InvalidStatusTransitionError:
                 logger.warning(
                     "Could not update order %s to SHIPPED status from %s",
                     order.id,

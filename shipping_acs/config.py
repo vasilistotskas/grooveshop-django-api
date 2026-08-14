@@ -116,7 +116,7 @@ def nearest_limit() -> int:
     raw = metadata.get("nearest_limit", _DEFAULT_NEAREST_LIMIT)
     try:
         return max(1, int(raw))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _DEFAULT_NEAREST_LIMIT
 
 
@@ -178,7 +178,7 @@ def print_type() -> int:
     raw = metadata.get("print_type", _DEFAULT_PRINT_TYPE)
     try:
         value = int(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return _DEFAULT_PRINT_TYPE
     if value not in (1, 2):
         return _DEFAULT_PRINT_TYPE

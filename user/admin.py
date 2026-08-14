@@ -548,7 +548,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         )
         try:
             points_amount = int(raw_amount)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             messages.error(
                 request,
                 _("Invalid points amount: %(val)s") % {"val": raw_amount},
@@ -568,7 +568,7 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
 
         try:
             user = UserAccount.objects.get(pk=object_id)
-        except (UserAccount.DoesNotExist, ValueError, TypeError):
+        except UserAccount.DoesNotExist, ValueError, TypeError:
             messages.error(request, _("User not found."))
             return redirect(change_url)
 

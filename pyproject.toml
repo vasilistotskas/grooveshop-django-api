@@ -239,15 +239,16 @@ timeout = 600
 addopts = "--tb=short --maxfail=0 -n auto --dist loadfile"
 # Third-party deprecation noise we cannot fix here — each entry names the
 # offending package and the upstream state so it can be dropped on upgrade:
-# - daphne pins the Windows selector event-loop policy for Twisted compat;
-#   Python 3.14 deprecates both the policy class and set_event_loop_policy.
-# - drf-spectacular 0.29.0 (latest) touches typing._UnionGenericAlias on
-#   Python 3.14; fixed upstream (tfranzel/drf-spectacular#1497) but not yet
-#   released — remove the filter when the next release lands.
+# - daphne pins the Windows selector event-loop policy for Twisted compat
+#   (daphne/__init__.py); Python 3.14 deprecates both the policy class and
+#   set_event_loop_policy (removal slated for 3.16). Re-tested 2026-08-14
+#   on daphne 4.2.1: both still fire.
+#   (The former drf-spectacular _UnionGenericAlias filter was dropped
+#   2026-08-14 — 0.30.0 ships the tfranzel/drf-spectacular#1497 fix and
+#   the warning no longer fires under schema-generation tests.)
 filterwarnings = [
     "ignore:'asyncio.WindowsSelectorEventLoopPolicy' is deprecated:DeprecationWarning:daphne",
     "ignore:'asyncio.set_event_loop_policy' is deprecated:DeprecationWarning:daphne",
-    "ignore:'_UnionGenericAlias' is deprecated:DeprecationWarning:drf_spectacular.plumbing",
 ]
 markers = [
     "assert_english: pin gettext active language to English so substring assertions on validator / admin error messages stay stable when the compiled ``el`` ``.mo`` files happen to be present locally.",
@@ -267,9 +268,9 @@ override-dependencies = [
     # CVE-2026-59885, CVE-2026-59886 (HIGH) — fixed in 0.6.4
     "pyasn1>=0.6.4",
     # CVE-2026-42304 (HIGH) — DoS in twisted.names DNS compression
-    # pointer chains; fixed in 26.4.0rc2 (no stable patch yet).
+    # pointer chains; fixed in 26.4.0 (stable since 2026-08).
     # Extras kept inline so the resolver preserves pyopenssl/h2 etc.
-    "twisted[http2,tls]>=26.4.0rc2",
+    "twisted[http2,tls]>=26.4.0",
 ]
 
 # ─────────────────────────────────────────────────────────
@@ -282,7 +283,7 @@ django_settings_module = "settings"
 # Ruff configuration
 # ─────────────────────────────────────────────────────────
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 line-length = 80
 exclude = ["**/migrations/**"]
 
@@ -311,8 +312,6 @@ invalid-attribute-override = "ignore"
 [tool.ty.src]
 exclude = [
     "**/migrations/**",
-    # ty panics on search/views.py due to infinite cycle (ty bug)
-    "search/views.py",
 ]
 
 # Tests: factory_boy, DRF test client, Celery eager tasks, Mock/patch.

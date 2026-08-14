@@ -87,7 +87,7 @@ def _parse_int(value: str | None, default: int, name: str) -> int:
         return default
     try:
         return max(0, int(value))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         raise ValidationError({name: _("Must be a valid integer.")})
 
 
@@ -97,7 +97,7 @@ def _parse_optional_int(value: str | None, name: str) -> int | None:
         return None
     try:
         return int(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         raise ValidationError({name: _("Must be a valid integer.")})
 
 
@@ -107,7 +107,7 @@ def _parse_optional_float(value: str | None, name: str) -> float | None:
         return None
     try:
         return float(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         raise ValidationError({name: _("Must be a valid number.")})
 
 
@@ -117,7 +117,7 @@ def _parse_int_csv(value: str | None, name: str) -> list[int]:
         return []
     try:
         return [int(v.strip()) for v in value.split(",") if v.strip()]
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         raise ValidationError(
             {name: _("Must be a comma-separated list of integers.")}
         )
@@ -972,7 +972,7 @@ def search_trending(request):
 
     try:
         limit = int(request.query_params.get("limit", _TRENDING_DEFAULT_LIMIT))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         limit = _TRENDING_DEFAULT_LIMIT
     limit = max(1, min(limit, _TRENDING_MAX_LIMIT))
 

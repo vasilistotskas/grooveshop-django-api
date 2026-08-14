@@ -174,7 +174,7 @@ def _build_language_parameter(include_language_param):
             enum=available_languages,
             default=default_language,
         )
-    except (AttributeError, KeyError):
+    except AttributeError, KeyError:
         return None
 
 

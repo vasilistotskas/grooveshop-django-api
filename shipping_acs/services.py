@@ -1421,7 +1421,7 @@ class AcsService:
                         shipment = AcsShipment.objects.filter(
                             order__uuid=ref2
                         ).first()
-                    except (ValidationError, ValueError):
+                    except ValidationError, ValueError:
                         shipment = None
             # When a shipment matched, its voucher number is canonical
             # for the payout row — covers both an empty POD (Greek PDF
@@ -1784,7 +1784,7 @@ def _to_decimal(value: Any) -> Decimal | None:
         return None
     try:
         return Decimal(str(value))
-    except (TypeError, ValueError, ArithmeticError):
+    except TypeError, ValueError, ArithmeticError:
         return None
 
 

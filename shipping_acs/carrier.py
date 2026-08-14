@@ -209,7 +209,7 @@ class AcsCarrier(ShippingCarrierInterface):
         raw_qty = payload.get("acs_item_quantity")
         try:
             item_quantity = int(raw_qty) if raw_qty is not None else 1
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             item_quantity = 1
         if item_quantity < 1:
             item_quantity = 1
@@ -459,7 +459,7 @@ class AcsCarrier(ShippingCarrierInterface):
         )
         try:
             amount = float(normalised)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             logger.warning(
                 "Could not parse ACS price quote amount %r — "
                 "falling back to flat rate.",

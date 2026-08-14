@@ -54,7 +54,7 @@ def authenticate_ticket(ticket: str):
     # Django's RedisSerializer stores plain ints without pickling them.
     try:
         user_id = int(raw_value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         logger.warning(
             "WS ticket cache value is not a valid user PK: %r", raw_value
         )

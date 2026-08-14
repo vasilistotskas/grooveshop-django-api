@@ -1386,5 +1386,5 @@ class TestCommandArgumentValidation:
             call_command(*cmd_args, stdout=out, stderr=out)
             output = out.getvalue()
             assert "invalid" in output.lower() or "error" in output.lower()
-        except (SystemExit, CommandError, ValueError):
+        except SystemExit, CommandError, ValueError:
             pass  # Expected behavior - invalid numeric input should fail

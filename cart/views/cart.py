@@ -446,7 +446,7 @@ class CartViewSet(BaseModelViewSet):
         for reservation_id in reservation_ids:
             try:
                 owned = int(reservation_id) in owned_ids
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 owned = False
 
             if not owned:

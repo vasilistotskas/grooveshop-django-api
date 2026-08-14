@@ -3,6 +3,53 @@
 
 
 
+## v1.161.1 (2026-08-14)
+
+### Bug fixes
+
+* fix(product): localize product-alert emails per recipient
+
+send_product_alert_restock and send_product_alert_price_drop rendered
+subject, product name, and templates in the Celery worker's active
+language — the only customer-facing email tasks without a
+translation_override (they postdate the 2026-04 per-user-language
+pass). Both loops now wrap per-recipient in
+translation_override(get_user_language(user)): the product name
+resolves in the recipient's language, gettext subjects evaluate under
+it, and _send_product_alert_email's templates render inside it
+(docstring now states that contract). Anonymous alerts fall back to
+settings.LANGUAGE_CODE.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`e6745f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e6745f525dd88c53ef40d5c3c445420b82f57515))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.161.0 [skip ci] ([`6aaba72`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aaba7255364ea4cf34949c7a8aba27af66f8483))
+
+### Continuous integration
+
+* ci: bump meilisearch v1.53.0 -> v1.53.1 (parity with prod chart 0.38.0)
+
+Prod unpinned the engine from the chart (appVersion v1.53.1) on
+2026-08-14; CI and local compose follow so dev and prod run the same
+engine.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`1aa3142`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1aa31428f882d442aef3f867a9245674c9cb8c17))
+
+### Refactoring
+
+* refactor(core): drop the unused burst throttle rate
+
+DEFAULT_THROTTLE_RATES carried 'burst: 5/minute' with no throttle
+class anywhere using that scope (no ScopedRateThrottle usage, no
+throttle_scope references) — dead config since the scoped throttles
+got dedicated names.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`b43f078`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b43f0783604b50f58d8a9a1b6c2b99315a12ff55))
+
 ## v1.161.0 (2026-08-14)
 
 ### Chores

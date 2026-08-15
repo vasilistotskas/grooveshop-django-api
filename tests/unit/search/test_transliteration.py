@@ -2,7 +2,12 @@
 
 import pytest
 
-from search.transliteration import greek_to_greeklish, greeklish_shadow
+from search.transliteration import (
+    greek_to_greeklish,
+    greek_to_greeklish_alt,
+    greeklish_shadow,
+    greeklish_shadow_alt,
+)
 
 
 class TestGreekToGreeklish:
@@ -73,3 +78,54 @@ class TestGreeklishShadow:
         # A shadow identical to the source field would only duplicate
         # index content without adding matchable terms.
         assert greeklish_shadow("Windows 11 tips") is None
+
+
+class TestGreekToGreeklishAlt:
+    @pytest.mark.parametrize(
+        ("greek", "expected"),
+        [
+            # Real production titles containing word-initial μπ — the
+            # /b/ pronunciation users actually type ("bataria",
+            # "blokarisma") is unreachable from "mpataria" via typo
+            # tolerance (first-char insertion counts as two typos, plus
+            # a b→p substitution: three total).
+            (
+                "Γιατί τελειώνει γρήγορα η μπαταρία του κινητού "
+                "και τι να κάνεις",
+                "giati teleionei grigora i bataria tou kinitou "
+                "kai ti na kaneis",
+            ),
+            (
+                "Μπλοκάρισμα διαφημίσεων στο κινητό: Πως να το κάνεις",
+                "blokarisma diafimiseon sto kinito: pos na to kaneis",
+            ),
+            ("πως μπορείς να αγοράσεις", "pos boreis na agoraseis"),
+            # ντ and γκ at word start
+            ("ντουλάπα", "doulapa"),
+            ("γκάμα", "gama"),
+            # Uppercase digraphs
+            ("ΜΠΑΤΑΡΙΑ", "bataria"),
+            ("Ντύσιμο", "dusimo"),
+            # Mid-word digraphs keep the per-character fold — users
+            # type them orthographically there.
+            ("εκπομπή", "ekpompi"),
+            ("εντοπισμός", "entopismos"),
+            ("αγκαλιά", "agkalia"),
+        ],
+    )
+    def test_word_initial_digraphs_fold_to_voiced_stops(self, greek, expected):
+        assert greek_to_greeklish_alt(greek) == expected
+
+
+class TestGreeklishShadowAlt:
+    def test_returns_variant_for_word_initial_digraph(self):
+        assert greeklish_shadow_alt("μπαταρία κινητού") == "bataria kinitou"
+
+    def test_returns_none_without_word_initial_digraph(self):
+        # Identical to the primary greeklish shadow — indexing it again
+        # would add no matchable terms.
+        assert greeklish_shadow_alt("οπτική ίνα") is None
+
+    @pytest.mark.parametrize("text", [None, "", "Windows 11 tips"])
+    def test_returns_none_for_empty_or_non_greek_input(self, text):
+        assert greeklish_shadow_alt(text) is None

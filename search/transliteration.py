@@ -23,9 +23,22 @@ chars, 2 for ≥ 8 on these indexes). Latin text, digits, punctuation and
 whitespace pass through unchanged, which keeps embedded brand names
 ("Windows", "SSD") searchable and makes the fold a no-op for non-Greek
 content.
+
+Word-initial voiced-stop digraphs (μπ, ντ, γκ) need a second indexed
+variant (``*_greeklish_alt``): at word start they are pronounced /b/,
+/d/, /g/, so users type "bataria"/"boreis" at least as often as the
+per-character "mpataria"/"mporeis" — and typo tolerance cannot bridge
+the two spellings. "bataria" → "mpataria" costs an insertion touching
+the first character (which Meilisearch counts as TWO typos) plus a b→p
+substitution: three typos total, more than Meilisearch ever allows,
+regardless of word length. Single-substitution convention differences
+(η → "h", χ → "h", υ → "y") stay within typo tolerance and do not get
+variants.
 """
 
 from __future__ import annotations
+
+import re
 
 _GREEK_TO_GREEKLISH = {
     "α": "a",
@@ -81,12 +94,36 @@ _TRANSLATION_TABLE = str.maketrans(
 )
 
 
+# Word-initial voiced-stop digraphs, pronounced /b/, /d/, /g/. Mid-word
+# occurrences keep the per-character fold ("εκπομπή" → "ekpompi"), which
+# matches how users type them there.
+_WORD_INITIAL_DIGRAPHS = {
+    "μπ": "b",
+    "ντ": "d",
+    "γκ": "g",
+}
+
+_WORD_INITIAL_DIGRAPH_RE = re.compile(
+    r"\b(?:μπ|ντ|γκ)",
+    re.IGNORECASE,
+)
+
+
 def greek_to_greeklish(text: str) -> str:
     """Transliterate Greek characters to canonical lowercase Greeklish.
 
     Non-Greek characters are preserved as-is.
     """
     return text.translate(_TRANSLATION_TABLE)
+
+
+def greek_to_greeklish_alt(text: str) -> str:
+    """Transliterate with word-initial μπ/ντ/γκ folded to "b"/"d"/"g"."""
+    replaced = _WORD_INITIAL_DIGRAPH_RE.sub(
+        lambda match: _WORD_INITIAL_DIGRAPHS[match.group().lower()],
+        text,
+    )
+    return greek_to_greeklish(replaced)
 
 
 def greeklish_shadow(text: str | None) -> str | None:
@@ -101,3 +138,17 @@ def greeklish_shadow(text: str | None) -> str | None:
         return None
     folded = greek_to_greeklish(text)
     return folded if folded != text else None
+
+
+def greeklish_shadow_alt(text: str | None) -> str | None:
+    """Build the value for a ``*_greeklish_alt`` index attribute.
+
+    Returns the word-initial-digraph variant transliteration, or ``None``
+    when it is identical to the primary ``greeklish_shadow`` value — the
+    variant only earns its index space when the source contains a
+    word-initial μπ/ντ/γκ.
+    """
+    if not text:
+        return None
+    folded = greek_to_greeklish_alt(text)
+    return folded if folded != greek_to_greeklish(text) else None

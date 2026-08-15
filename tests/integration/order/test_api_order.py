@@ -474,6 +474,25 @@ class GuestOrderTestCase(APITestCase):
         self.assertEqual(response.data["email"], "guest@example.com")
         self.assertIsNone(response.data["user"])
 
+    def test_path_uuid_is_authoritative_over_query_param(self):
+        """The path param is the endpoint's identity — a stray/stale
+        ``?uuid=`` query (legacy callers duplicated it there) must not
+        override it and break access to the correctly-addressed order."""
+        guest_order = OrderFactory(user=None, email="guest@example.com")
+
+        order_uuid_url = reverse(
+            "order-retrieve-by-uuid", kwargs={"uuid": str(guest_order.uuid)}
+        )
+
+        self.client.force_authenticate(user=None)
+        response = self.client.get(
+            order_uuid_url,
+            {"uuid": "00000000-0000-0000-0000-000000000000"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["uuid"], str(guest_order.uuid))
+
     def test_guest_cannot_retrieve_authenticated_user_order(self):
         """Test that a guest cannot retrieve an order that belongs to a registered user."""
         user_order = OrderFactory(user=self.user, email=self.user.email)

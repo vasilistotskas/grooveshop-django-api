@@ -13311,6 +13311,75 @@ paths:
               schema:
                 $ref: '#/components/schemas/OrderDetail'
           description: ''
+  /api/v1/order/{id}/confirm_agent_payment:
+    post:
+      operationId: confirmAgentPaymentForOrder
+      description: Charge a Stripe SharedPaymentToken granted by an AI agent platform
+        (ACP/UCP delegated payments) for this order. Only available when agent-delegated
+        payments are enabled for the store and the order's payment method is Stripe.
+      summary: Complete payment with an agent-granted Stripe token
+      parameters:
+      - in: path
+        name: id
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+        required: true
+      tags:
+      - Orders
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ConfirmAgentPaymentRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ConfirmAgentPaymentRequestRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmAgentPaymentRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmAgentPaymentResponse'
+          description: ''
   /api/v1/order/{id}/create_checkout_session:
     post:
       operationId: createOrderCheckoutSession
@@ -32037,6 +32106,41 @@ components:
         * `1` - Μικρό
         * `2` - Μεσαίο
         * `3` - Μεγάλο
+    ConfirmAgentPaymentRequestRequest:
+      type: object
+      properties:
+        sharedPaymentToken:
+          type: string
+          minLength: 1
+          description: Stripe SharedPaymentToken (spt_…) granted to this store by
+            the agent platform, scoped to this exact purchase.
+          maxLength: 255
+      required:
+      - sharedPaymentToken
+    ConfirmAgentPaymentResponse:
+      type: object
+      properties:
+        paymentId:
+          type: string
+          description: Stripe PaymentIntent ID that charged the token
+        status:
+          type: string
+          description: Κατάσταση πληρωμής
+        amount:
+          type: string
+          description: Ποσό πληρωμής
+        currency:
+          type: string
+          description: Νόμισμα πληρωμής
+        provider:
+          type: string
+          description: Όνομα παρόχου πληρωμών
+      required:
+      - amount
+      - currency
+      - paymentId
+      - provider
+      - status
     ConfirmResponse:
       type: object
       properties:

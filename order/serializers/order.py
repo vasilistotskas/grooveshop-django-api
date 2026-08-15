@@ -1271,6 +1271,26 @@ class CreateCheckoutSessionResponseSerializer(serializers.Serializer):
     provider = serializers.CharField()
 
 
+class ConfirmAgentPaymentRequestSerializer(serializers.Serializer):
+    shared_payment_token = serializers.CharField(
+        max_length=255,
+        help_text=_(
+            "Stripe SharedPaymentToken (spt_…) granted to this store by "
+            "the agent platform, scoped to this exact purchase."
+        ),
+    )
+
+
+class ConfirmAgentPaymentResponseSerializer(serializers.Serializer):
+    payment_id = serializers.CharField(
+        help_text=_("Stripe PaymentIntent ID that charged the token")
+    )
+    status = serializers.CharField(help_text=_("Payment status"))
+    amount = serializers.CharField(help_text=_("Payment amount"))
+    currency = serializers.CharField(help_text=_("Payment currency"))
+    provider = serializers.CharField(help_text=_("Payment provider name"))
+
+
 class RefundOrderRequestSerializer(serializers.Serializer):
     amount = serializers.DecimalField(
         max_digits=10,

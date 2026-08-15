@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
@@ -35,6 +36,7 @@ from order.notifications import (
 )
 from order.tasks import (
     generate_order_invoice,
+    push_order_event_to_gateway,
     send_admin_new_order_email,
     send_dispute_notification_email,
     send_order_confirmation_email,
@@ -64,10 +66,11 @@ def handle_order_post_save(
         transaction.on_commit(send_created_signal)
         return
 
-    if (
+    status_changed = (
         hasattr(instance, "_original_status")
         and instance._original_status != instance.status
-    ):
+    )
+    if status_changed:
         # Defer to on_commit so the Celery task dispatched by the
         # signal handler sees the committed row (same pattern as
         # the `created` branch above).
@@ -117,17 +120,18 @@ def handle_order_post_save(
         else False
     )
 
-    if (
+    tracking_dispatched = (
         hasattr(instance, "_original_tracking_number")
         and hasattr(instance, "_original_shipping_carrier")
         and not (
             instance._original_tracking_number
             and instance._original_shipping_carrier
         )
-        and instance.tracking_number
-        and instance.shipping_carrier
+        and bool(instance.tracking_number)
+        and bool(instance.shipping_carrier)
         and not tracking_unchanged
-    ):
+    )
+    if tracking_dispatched:
 
         def send_shipment_dispatched() -> None:
             order_shipment_dispatched.send(
@@ -142,6 +146,23 @@ def handle_order_post_save(
             )
 
         transaction.on_commit(send_shipment_dispatched)
+
+    # Agent-gateway order-event push: one event per save that changed
+    # the order status, the payment status (which can move without a
+    # status change, e.g. a refund) or set tracking info. The task
+    # re-reads fresh values from the DB, so a single enqueue covers a
+    # save that changed several of them at once. Gated on the gateway
+    # URL so non-agent deployments never enqueue.
+    payment_status_changed = (
+        hasattr(instance, "_original_payment_status")
+        and instance._original_payment_status != instance.payment_status
+    )
+    if settings.AGENT_GATEWAY_INTERNAL_URL and (
+        status_changed or payment_status_changed or tracking_dispatched
+    ):
+        transaction.on_commit(
+            lambda oid=instance.id: push_order_event_to_gateway.delay(oid)
+        )
 
 
 @receiver(order_created, dispatch_uid="order.handle_order_created")

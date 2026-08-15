@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 
+from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.http import FileResponse
@@ -56,6 +57,8 @@ from order.serializers.invoice import InvoiceDownloadResponseSerializer
 from order.serializers.order import (
     AddTrackingSerializer,
     CancelOrderRequestSerializer,
+    ConfirmAgentPaymentRequestSerializer,
+    ConfirmAgentPaymentResponseSerializer,
     CreateCheckoutSessionRequestSerializer,
     CreateCheckoutSessionResponseSerializer,
     CreatePaymentIntentRequestSerializer,
@@ -148,6 +151,19 @@ serializers_config: SerializersConfig = {
         description=_(
             "Create a hosted checkout session (Stripe or Viva Wallet). "
             "The customer will be redirected to the provider's checkout page to complete payment."
+        ),
+        tags=["Orders"],
+    ),
+    "confirm_agent_payment": ActionConfig(
+        request=ConfirmAgentPaymentRequestSerializer,
+        response=ConfirmAgentPaymentResponseSerializer,
+        operation_id="confirmAgentPaymentForOrder",
+        summary=_("Complete payment with an agent-granted Stripe token"),
+        description=_(
+            "Charge a Stripe SharedPaymentToken granted by an AI agent "
+            "platform (ACP/UCP delegated payments) for this order. "
+            "Only available when agent-delegated payments are enabled "
+            "for the store and the order's payment method is Stripe."
         ),
         tags=["Orders"],
     ),
@@ -362,6 +378,7 @@ class OrderViewSet(BaseModelViewSet):
             "payment_status",
             "create_payment_intent",
             "create_checkout_session",
+            "confirm_agent_payment",
             "retry_payment",
         }
         admin_only_actions = {
@@ -408,13 +425,17 @@ class OrderViewSet(BaseModelViewSet):
                 "payment_status",
                 "create_payment_intent",
                 "create_checkout_session",
+                "confirm_agent_payment",
                 "retry_payment",
             }
             if self.action not in guest_allowed_actions:
                 raise PermissionDenied(
                     _("Guest orders can only be accessed via UUID.")
                 )
-            request_uuid = request.query_params.get("uuid") or self.kwargs.get(
+            # The path param (order/uuid/<uuid>) is authoritative where
+            # present — the pk-addressed payment/cancel actions supply
+            # the uuid via ?uuid= instead.
+            request_uuid = self.kwargs.get("uuid") or request.query_params.get(
                 "uuid"
             )
             if not (request_uuid and str(obj.uuid) == str(request_uuid)):
@@ -1298,6 +1319,109 @@ class OrderViewSet(BaseModelViewSet):
         response_serializer = response_serializer_class(data=checkout_response)
         response_serializer.is_valid(raise_exception=True)
 
+        return Response(response_serializer.validated_data)
+
+    @action(
+        detail=True,
+        methods=["POST"],
+        throttle_classes=[
+            AnonRateThrottle,
+            UserRateThrottle,
+            PaymentAttemptThrottle,
+            PaymentAttemptAnonThrottle,
+        ],
+    )
+    def confirm_agent_payment(self, request, *args, **kwargs):
+        """Complete payment with an agent-granted Stripe SharedPaymentToken.
+
+        The ACP/UCP delegated-payment path: the agent platform grants
+        the store a scoped ``spt_…`` token and the agent gateway calls
+        this endpoint to charge it server-side — no browser round-trip.
+        Gated by ``AGENT_STRIPE_DELEGATED_ENABLED`` (off until Stripe
+        Agentic Commerce enrollment completes).
+        """
+        from order.enum.status import PaymentStatus
+
+        if not settings.AGENT_STRIPE_DELEGATED_ENABLED:
+            return Response(
+                {
+                    "detail": _(
+                        "Agent-delegated payments are not enabled for "
+                        "this store."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = self.get_object()
+
+        if order.is_paid:
+            return Response(
+                {"detail": _("This order has already been paid.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not order.pay_way or order.pay_way.provider_code != "stripe":
+            return Response(
+                {
+                    "detail": _(
+                        "This order is not configured for Stripe payments."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        provider = get_payment_provider("stripe")
+        success, payment_response = provider.confirm_delegated_payment(
+            amount=order.total_price,
+            order_id=str(order.id),
+            order_uuid=str(order.uuid),
+            token=request_serializer.validated_data["shared_payment_token"],
+        )
+
+        if not success:
+            return Response(
+                {
+                    "detail": _("Failed to charge the shared payment token."),
+                    "error": payment_response,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Persist under a row lock (same reason as retry_payment: a
+        # concurrent webhook for the same intent must not lose-update).
+        # A synchronous "succeeded" marks the order paid inline so the
+        # agent gets a definitive answer; the payment_intent.succeeded
+        # webhook remains the idempotent backstop.
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            if payment_response["status"] == PaymentStatus.COMPLETED:
+                locked.mark_as_paid(
+                    payment_id=payment_response["payment_id"],
+                    payment_method="stripe_agent_spt",
+                )
+            else:
+                locked.payment_id = payment_response["payment_id"]
+                locked.save(update_fields=["payment_id"])
+            order = locked
+
+        OrderHistory.log_payment_update(
+            order=order,
+            previous_value={"payment_status": "pending"},
+            new_value={
+                "payment_status": str(order.payment_status),
+                "payment_id": order.payment_id or "",
+                "agent_delegated": True,
+            },
+        )
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(data=payment_response)
+        response_serializer.is_valid(raise_exception=True)
         return Response(response_serializer.validated_data)
 
     @action(detail=True, methods=["GET"])

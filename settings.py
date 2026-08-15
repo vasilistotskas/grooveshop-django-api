@@ -3318,3 +3318,22 @@ TENANT_SOCIALS_REDDIT = getenv("TENANT_SOCIALS_REDDIT", "")
 TENANT_SOCIALS_TIKTOK = getenv("TENANT_SOCIALS_TIKTOK", "")
 TENANT_SOCIALS_TWITTER = getenv("TENANT_SOCIALS_TWITTER", "")
 TENANT_SOCIALS_YOUTUBE = getenv("TENANT_SOCIALS_YOUTUBE", "")
+
+# ---------- Agent gateway (grooveshop-agent-gateway) ----------
+# Cluster-internal base URL of the agent gateway service. Empty (the
+# default) means the agent surface is off: order events are not pushed
+# and the gateway-aware cart throttle behaves like a plain anon throttle.
+AGENT_GATEWAY_INTERNAL_URL = getenv("AGENT_GATEWAY_INTERNAL_URL", "")
+# Shared secret between Django and the gateway, used in BOTH directions:
+# sent as ``X-Internal-Token`` on order-event pushes and verified against
+# the gateway's ``X-Internal-Gateway`` header on inbound cart mutations.
+# Must equal the gateway's ``INTERNAL_EVENTS_SECRET`` env value.
+AGENT_GATEWAY_INTERNAL_SECRET = getenv("AGENT_GATEWAY_INTERNAL_SECRET", "")
+# Per-request timeout for order-event pushes to the gateway.
+AGENT_GATEWAY_HTTP_TIMEOUT = int(getenv("AGENT_GATEWAY_HTTP_TIMEOUT", "5"))
+# Master flag for agent-delegated Stripe payments (the ACP/UCP tokenized
+# SharedPaymentToken flow). Off until Stripe Agentic Commerce enrollment
+# completes — the confirm endpoint returns a clean "not enabled" error.
+AGENT_STRIPE_DELEGATED_ENABLED = (
+    getenv("AGENT_STRIPE_DELEGATED_ENABLED", "False").lower() == "true"
+)

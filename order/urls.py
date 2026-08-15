@@ -44,6 +44,11 @@ urlpatterns = [
         name="order-create-checkout-session",
     ),
     path(
+        "order/<int:pk>/confirm_agent_payment",
+        OrderViewSet.as_view({"post": "confirm_agent_payment"}),
+        name="order-confirm-agent-payment",
+    ),
+    path(
         "order/<int:pk>/payment_status",
         OrderViewSet.as_view({"get": "payment_status"}),
         name="order-payment-status",

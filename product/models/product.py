@@ -39,7 +39,7 @@ from meili.models import IndexMixin
 from product.managers.product import ProductManager
 from product.models.image import ProductImage
 from core.models import SeoModel
-from search.transliteration import greeklish_shadow
+from search.transliteration import greeklish_shadow, greeklish_shadow_alt
 from tag.models.tagged_item import TaggedModel
 
 DISCOUNT_PERCENT_MIN = Decimal("0.0")
@@ -503,8 +503,10 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "master_id",
             "name",
             "name_greeklish",
+            "name_greeklish_alt",
             "description",
             "description_greeklish",
+            "description_greeklish_alt",
             "attribute_names",
             "attribute_values_text",
         )
@@ -577,7 +579,11 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
         return {
             "master_id": lambda obj: obj.master_id,
             "name_greeklish": lambda obj: greeklish_shadow(obj.name),
+            "name_greeklish_alt": lambda obj: greeklish_shadow_alt(obj.name),
             "description_greeklish": lambda obj: greeklish_shadow(
+                obj.description
+            ),
+            "description_greeklish_alt": lambda obj: greeklish_shadow_alt(
                 obj.description
             ),
             "likes_count": lambda obj: (

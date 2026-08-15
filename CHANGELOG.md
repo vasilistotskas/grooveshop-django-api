@@ -3,6 +3,37 @@
 
 
 
+## v1.162.2 (2026-08-15)
+
+### Bug fixes
+
+* fix(search): index word-initial voiced-stop digraph greeklish variants (#13)
+
+Queries typing word-initial μπ/ντ/γκ as the voiced stops they are
+pronounced as ("bataria", "blokarisma", "boreis") returned zero
+results: reaching the per-character fold ("mpataria") from "bataria"
+costs an insertion on the first character — which Meilisearch counts
+as two typos — plus a b→p substitution, three typos total, more than
+typo tolerance ever allows at any word length (validated with
+controlled probes against the production index).
+
+Add a second shadow attribute per greeklish field (*_greeklish_alt)
+that folds word-initial μπ→b, ντ→d, γκ→g before the canonical
+per-character transliteration, so both typing conventions match
+exactly. Mid-word digraphs keep the per-character fold, which is how
+users type them. The alt shadow is None unless it differs from the
+primary shadow, so it only costs index space when a word-initial
+digraph is present.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`7e775ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7e775ee53d3e1f5a49efa7715c82cc06880b0111))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.162.1 [skip ci] ([`09e8fe8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/09e8fe8e320d2006e0ea054f05cb760c185997cb))
+
 ## v1.162.1 (2026-08-14)
 
 ### Bug fixes

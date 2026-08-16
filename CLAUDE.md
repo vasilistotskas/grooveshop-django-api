@@ -189,7 +189,7 @@ Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key
 GitHub Actions (`.github/workflows/ci.yml`): 3-stage pipeline:
 1. **Quality** — Ruff format check
 2. **Testing** — PostgreSQL 17 + Redis + Meilisearch services, migrations, pytest with coverage (15 min timeout)
-3. **Release** — python-semantic-release → TestPyPI → PyPI (main branch only)
+3. **Release** — python-semantic-release cuts the version, changelog, and GitHub release with dist assets (main branch only); the Docker image workflow triggers on the published release. Not published to PyPI — this is a deployed application, not a library (dropped 2026-08 after the PyPI project hit its 10 GB size cap).
 
 ## Code Style
 

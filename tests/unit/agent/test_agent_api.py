@@ -111,3 +111,16 @@ class AgentAPITestCase(APITestCase):
             "points_to_next_tier",
         ):
             self.assertIn(key, response.data)
+
+
+class AuthorizeLoginRedirectTestCase(APITestCase):
+    def test_anonymous_authorize_redirects_to_shopper_login(self) -> None:
+        """The OIDC authorize view must send anonymous users to allauth's
+        shopper login — the admin login (the old global LOGIN_URL) rejects
+        non-staff, which would dead-end every account-linking flow."""
+        response = self.client.get("/identity/o/authorize", {"client_id": "x"})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            response["Location"].startswith("/accounts/login/"),
+            response["Location"],
+        )

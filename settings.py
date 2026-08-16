@@ -217,7 +217,11 @@ TEMPLATES = [
     },
 ]
 
-LOGIN_URL = "/admin/"
+# allauth's own login page: it serves SHOPPERS (email+password), which
+# the OIDC authorize view (/identity/o/authorize) depends on — the
+# admin login would reject non-staff. Staff hitting a @login_required
+# view land here too and can log in with the same credentials.
+LOGIN_URL = "/accounts/login/"
 AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
     "django.contrib.auth.backends.ModelBackend",

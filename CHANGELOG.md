@@ -3,6 +3,24 @@
 
 
 
+## v1.164.1 (2026-08-16)
+
+### Bug fixes
+
+* fix(agent): return 401 with a Bearer challenge for invalid tokens
+
+allauth's TokenAuthentication has no authenticate_header, so DRF
+rendered missing/invalid credentials as 403 — indistinguishable from a
+valid token lacking a scope. The agent gateway needs the 401 to emit
+its RFC 9728 WWW-Authenticate challenge and trigger re-authorization.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`66f5fb3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/66f5fb322bdf35e120ab205ad52ea0cf9624a61d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.164.0 [skip ci] ([`50fcee5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50fcee527682416258589f6292e29dec5aa79319))
+
 ## v1.164.0 (2026-08-16)
 
 ### Chores

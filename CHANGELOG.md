@@ -3,6 +3,34 @@
 
 
 
+## v1.162.3 (2026-08-16)
+
+### Bug fixes
+
+* fix(search): greeklish shadows for product attribute search fields (#14)
+
+Greek attribute values ("Πλαστικό", "Μπλε") often exist only in
+attribute_values_text — never in the product name — so greeklish
+queries like "plastiko" or "ble" could not match the product at all.
+Shadow attribute_names and attribute_values_text with the same
+*_greeklish / *_greeklish_alt pattern used for name and description.
+
+Also drop the TestPyPI/PyPI publish chain from the release job: this
+repository is a deployed application (Docker), not a library, and the
+PyPI project has hit its 10 GB total-size cap (502 releases, 10.74 GB)
+so every release job fails at the publish step. python-semantic-release
+keeps building dist assets for the GitHub release, which is what the
+Docker workflow triggers on.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`4047761`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404776158aacfbf3ee53cda54e72a97541d386d4))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.162.2 [skip ci] ([`6a19e21`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6a19e212d6f9db84b3c64e31545d079f6fae8dca))
+
 ## v1.162.2 (2026-08-15)
 
 ### Bug fixes

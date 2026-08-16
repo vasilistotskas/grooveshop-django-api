@@ -54,37 +54,43 @@ class AgentAPITestCase(APITestCase):
         raw = _mint_token(self.user, self.oidc_client, scopes, **kwargs)
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {raw}")
 
-    def test_anonymous_is_rejected(self) -> None:
-        for name in ("agent-me", "agent-orders", "agent-loyalty"):
+    def test_anonymous_is_rejected_with_401_challenge(self) -> None:
+        # Exactly 401 with a Bearer challenge — the agent gateway relies
+        # on the 401 to trigger the RFC 9728 re-auth flow; a 403 would
+        # make a bad token look like a merely under-scoped one.
+        for name in (
+            "agent-me",
+            "agent-orders",
+            "agent-loyalty",
+            "agent-favourites",
+        ):
             response = self.client.get(reverse(name))
-            self.assertIn(
-                response.status_code,
-                (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
-                name,
+            self.assertEqual(
+                response.status_code, status.HTTP_401_UNAUTHORIZED, name
             )
+            self.assertIn("Bearer", response["WWW-Authenticate"])
+
+    def test_invalid_token_is_401(self) -> None:
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer not-a-real-token")
+        response = self.client.get(reverse("agent-me"))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_wrong_scope_is_rejected(self) -> None:
         self._bearer(["profile"])
         response = self.client.get(reverse("agent-orders"))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_expired_token_is_rejected(self) -> None:
+    def test_expired_token_is_401(self) -> None:
         self._bearer(["profile"], expires_in=-60)
         response = self.client.get(reverse("agent-me"))
-        self.assertIn(
-            response.status_code,
-            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
-        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_session_auth_is_not_accepted(self) -> None:
         # The agent surface must be OIDC-token-only: a logged-in browser
         # session (or any non-OIDC credential) does not authenticate.
         self.client.force_login(self.user)
         response = self.client.get(reverse("agent-me"))
-        self.assertIn(
-            response.status_code,
-            (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
-        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_me_returns_linked_profile(self) -> None:
         self._bearer(["profile"])

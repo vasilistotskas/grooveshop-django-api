@@ -28,6 +28,19 @@ AGENT_ORDERS_LIMIT = 20
 AGENT_FAVOURITES_LIMIT = 30
 
 
+class AgentTokenAuthentication(TokenAuthentication):
+    """allauth's TokenAuthentication with a WWW-Authenticate challenge.
+
+    Without ``authenticate_header`` DRF renders missing/invalid
+    credentials as 403 instead of 401 — and the agent gateway relies on
+    the 401 to distinguish a bad token (re-run OAuth, RFC 9728
+    challenge) from a valid token that merely lacks a scope (403).
+    """
+
+    def authenticate_header(self, request):
+        return 'Bearer realm="agent"'
+
+
 class AgentAPIView(APIView):
     """Base for agent-facing resources under ``/api/v1/agent/``.
 
@@ -37,7 +50,7 @@ class AgentAPIView(APIView):
     below and nothing else.
     """
 
-    authentication_classes = [TokenAuthentication]
+    authentication_classes = [AgentTokenAuthentication]
 
 
 class AgentMeView(AgentAPIView):

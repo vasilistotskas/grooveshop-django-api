@@ -3,6 +3,24 @@
 
 
 
+## v1.165.0 (2026-08-16)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.164.1 [skip ci] ([`81f2ec1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/81f2ec1c51e6f5018b265af044185d2d9b31f343))
+
+### Features
+
+* feat(settings): admin kill switch for the storefront chat widget
+
+New CHAT_WIDGET_ENABLED extra-setting (bool, default True) toggled at
+/admin/extra_settings/setting/, exposed via PUBLIC_SETTING_KEYS so the
+storefront can gate the launcher. The gateway /chat endpoint stays up
+regardless — re-enabling needs no deploy.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`c8c1cd5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8c1cd560fa19aef2ff86894857d87fb78330705))
+
 ## v1.164.1 (2026-08-16)
 
 ### Bug fixes

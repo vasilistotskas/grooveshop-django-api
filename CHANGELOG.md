@@ -3,6 +3,25 @@
 
 
 
+## v1.163.1 (2026-08-16)
+
+### Bug fixes
+
+* fix(auth): LOGIN_URL → allauth shopper login
+
+The OIDC authorize view (/identity/o/authorize) redirects anonymous
+users to LOGIN_URL, which pointed at /admin/ — the admin login rejects
+non-staff, dead-ending every agent account-linking flow for real
+shoppers. allauth's /accounts/login/ serves shoppers and staff alike.
+Caught by the live browser E2E of the OAuth journey.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`5e9a84c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e9a84c4d6695c54585664c929e71cdf589aaa09))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.163.0 [skip ci] ([`9b51800`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9b518002ab49f8a3510090126e90d9fafc86a9c5))
+
 ## v1.163.0 (2026-08-16)
 
 ### Chores

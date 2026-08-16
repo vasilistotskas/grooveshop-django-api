@@ -7,6 +7,7 @@ from search.transliteration import (
     greek_to_greeklish_alt,
     greeklish_shadow,
     greeklish_shadow_alt,
+    greeklish_variants,
 )
 
 
@@ -129,3 +130,55 @@ class TestGreeklishShadowAlt:
     @pytest.mark.parametrize("text", [None, "", "Windows 11 tips"])
     def test_returns_none_for_empty_or_non_greek_input(self, text):
         assert greeklish_shadow_alt(text) is None
+
+
+class TestGreeklishVariants:
+    def test_matches_greeklatin_generator_parity_fixture(self):
+        # Exact output (values AND order) of the GreekLatinGenerator
+        # lineage for "αντηλιακό" — pinned against the Findloom
+        # search-service parity corpus (pkg/variants/testdata).
+        assert greeklish_variants("αντηλιακό") == (
+            "anthliako adhliako antiliako adiliako"
+        )
+
+    @pytest.mark.parametrize(
+        ("greek", "expected_variants"),
+        [
+            # Every common convention must be an EXACT member of the
+            # bag — these are precisely the renderings typo tolerance
+            # cannot reach (first-character divergence on short words).
+            ("χρήση", ["xrisi", "hrisi", "chrisi"]),
+            ("υλικό", ["yliko", "uliko", "iliko"]),
+            ("ώρα", ["wra", "ora", "vra"]),
+            ("μπλε", ["mple", "ble"]),
+            ("ξύλο", ["ksylo", "xylo", "ksulo", "xulo"]),
+        ],
+    )
+    def test_bag_contains_all_common_conventions(
+        self, greek, expected_variants
+    ):
+        bag = set(greeklish_variants(greek).split())
+        for variant in expected_variants:
+            assert variant in bag
+
+    def test_expansion_is_bounded(self):
+        # ευ(4) x η(2) x υ(3) x ω(3) would explode without the cap.
+        bag = greeklish_variants("ευηυω")
+        assert bag is not None
+        assert len(bag.split()) <= 20
+
+    def test_repeated_words_are_deduplicated(self):
+        assert greeklish_variants("ώρα ώρα") == "wra ora vra"
+
+    def test_mixed_text_only_expands_greek_words(self):
+        bag = greeklish_variants("Αναβάθμιση σε Windows 11")
+        assert bag is not None
+        words = set(bag.split())
+        assert "anavathmisi" in words
+        assert "anabathmish" in words
+        assert "Windows" not in words
+        assert "11" not in words
+
+    @pytest.mark.parametrize("text", [None, "", "Windows 11 tips"])
+    def test_returns_none_without_greek_words(self, text):
+        assert greeklish_variants(text) is None

@@ -14,7 +14,11 @@ from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
 from meili.models import IndexMixin
 from core.models import SeoModel
-from search.transliteration import greeklish_shadow, greeklish_shadow_alt
+from search.transliteration import (
+    greeklish_shadow,
+    greeklish_shadow_alt,
+    greeklish_variants,
+)
 
 
 class BlogPost(
@@ -180,14 +184,19 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "is_published",
             "master_id",
         )
+        # ``*_greeklish_variants`` bags exist only for the SHORT fields
+        # (title/subtitle) — expanding every body word would bloat the
+        # index and pollute ranking for no realistic recall gain.
         searchable_fields = (
             "master_id",
             "title",
             "title_greeklish",
             "title_greeklish_alt",
+            "title_greeklish_variants",
             "subtitle",
             "subtitle_greeklish",
             "subtitle_greeklish_alt",
+            "subtitle_greeklish_variants",
             "body",
             "body_greeklish",
             "body_greeklish_alt",
@@ -263,8 +272,14 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "master_id": lambda obj: obj.master_id,
             "title_greeklish": lambda obj: greeklish_shadow(obj.title),
             "title_greeklish_alt": lambda obj: greeklish_shadow_alt(obj.title),
+            "title_greeklish_variants": lambda obj: greeklish_variants(
+                obj.title
+            ),
             "subtitle_greeklish": lambda obj: greeklish_shadow(obj.subtitle),
             "subtitle_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                obj.subtitle
+            ),
+            "subtitle_greeklish_variants": lambda obj: greeklish_variants(
                 obj.subtitle
             ),
             "body_greeklish": lambda obj: greeklish_shadow(obj.body),

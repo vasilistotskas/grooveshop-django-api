@@ -187,10 +187,78 @@ class TestFederatedSearchProperties:
         )
         federated_search(request)
 
-        call_args = mock_meili_client.search_client.multi_search.call_args
+        # The zero-result relaxed fallback may issue a second call with
+        # the leading word dropped — the FIRST call must carry the raw
+        # query verbatim.
+        call_args = mock_meili_client.search_client.multi_search.call_args_list[
+            0
+        ]
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
         for query in queries:
             assert query["q"] == greek_query
+
+    def test_zero_results_retries_without_leading_word(
+        self, mock_models, mock_meili_client
+    ):
+        """
+        A multi-word query with no hits is retried once with the leading
+        word dropped — the only shape the ``last`` matching strategy can
+        never relax on its own.
+        """
+        request = self.factory.get(
+            "/api/search/federated",
+            {"query": "anaba8mish se windows", "language_code": "el"},
+        )
+        federated_search(request)
+
+        multi_search = mock_meili_client.search_client.multi_search
+        assert multi_search.call_count == 2
+        retry_call = multi_search.call_args_list[1]
+        queries = retry_call.kwargs.get("queries") or retry_call[1].get(
+            "queries"
+        )
+        for query in queries:
+            assert query["q"] == "se windows"
+
+    def test_zero_results_single_word_is_not_retried(
+        self, mock_models, mock_meili_client
+    ):
+        """A single-word query has nothing left to relax."""
+        request = self.factory.get(
+            "/api/search/federated",
+            {"query": "anaba8mish", "language_code": "el"},
+        )
+        federated_search(request)
+
+        assert mock_meili_client.search_client.multi_search.call_count == 1
+
+    def test_queries_with_hits_are_not_retried(
+        self, mock_models, mock_meili_client
+    ):
+        """The fallback only fires on zero hits."""
+        mock_product, _ = mock_models
+        mock_meili_client.search_client.multi_search.return_value = {
+            "hits": [
+                {
+                    "id": "1",
+                    "_federation": {
+                        "indexUid": "ProductTranslation",
+                        "queriesPosition": 0,
+                        "weightedRankingScore": 0.9,
+                    },
+                }
+            ],
+            "estimatedTotalHits": 1,
+        }
+        mock_product.get_search_result_queryset.return_value.filter.return_value = []
+
+        request = self.factory.get(
+            "/api/search/federated",
+            {"query": "anavathmisi se windows", "language_code": "el"},
+        )
+        federated_search(request)
+
+        assert mock_meili_client.search_client.multi_search.call_count == 1
 
     @pytest.mark.parametrize(
         "total_limit",
@@ -316,7 +384,11 @@ class TestFederatedSearchEdgeCases:
         )
         federated_search(request)
 
-        call_args = mock_meili_client.search_client.multi_search.call_args
+        # First call only — the zero-result relaxed fallback may issue a
+        # second call with the leading word dropped.
+        call_args = mock_meili_client.search_client.multi_search.call_args_list[
+            0
+        ]
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
         assert queries[0]["q"] == "laptop computer"
 

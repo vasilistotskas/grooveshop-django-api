@@ -882,9 +882,12 @@ class TestFederatedSearchEndToEnd:
             )
 
             assert mock_multi_search.called, "multi_search should be called"
-            call_args = mock_multi_search.call_args
-            queries = call_args.kwargs.get("queries") or (
-                call_args[1].get("queries") if len(call_args) > 1 else None
+            # The zero-result relaxed fallback may issue a second call
+            # with the leading word dropped — the FIRST call must carry
+            # the raw query verbatim.
+            first_call = mock_multi_search.call_args_list[0]
+            queries = first_call.kwargs.get("queries") or (
+                first_call[1].get("queries") if len(first_call) > 1 else None
             )
 
             for query in queries:

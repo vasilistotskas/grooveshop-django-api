@@ -97,3 +97,26 @@ class TestAttributeGreeklishShadows:
         assert (
             fields["attribute_values_text_greeklish_alt"](translation) is None
         )
+
+
+    def test_attribute_fields_have_full_variant_bags(
+        self, translation_with_greek_attributes
+    ):
+        fields = ProductTranslation.get_additional_meili_fields()
+        names_bag = set(
+            fields["attribute_names_greeklish_variants"](
+                translation_with_greek_attributes
+            ).split()
+        )
+        # υλικό: all three first-letter conventions (y/u/i) exactly
+        assert {"yliko", "uliko", "iliko"} <= names_bag
+        # χρώμα: the x- and h- conventions typo tolerance cannot reach
+        assert {"xroma", "hroma"} <= names_bag
+
+        values_bag = set(
+            fields["attribute_values_text_greeklish_variants"](
+                translation_with_greek_attributes
+            ).split()
+        )
+        assert {"mple", "ble"} <= values_bag
+        assert "plastiko" in values_bag

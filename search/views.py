@@ -128,6 +128,22 @@ def _validate_language_code(language_code: str | None) -> str | None:
     return language_code
 
 
+def _relaxed_query(query: str) -> str | None:
+    """Return the query with its leading word dropped, for a retry.
+
+    Meilisearch's default ``last`` matching strategy already relaxes
+    trailing words, so the only multi-word shape it can never rescue is
+    a leading word that matches nothing (an unindexed transliteration
+    convention, a pasted slug fragment, a typo beyond tolerance).
+    Returns ``None`` for single-word queries — there is nothing left to
+    relax.
+    """
+    parts = query.split()
+    if len(parts) < 2:
+        return None
+    return " ".join(parts[1:])
+
+
 @extend_schema(
     summary=_("Search blog posts"),
     description=_(
@@ -206,6 +222,11 @@ def blog_post_meili_search(request):
         search_qs = search_qs.locales(language_code)
 
     enriched_results = search_qs.search(q=decoded_query)
+
+    if not enriched_results["results"] and (
+        relaxed := _relaxed_query(decoded_query)
+    ):
+        enriched_results = search_qs.search(q=relaxed)
 
     serialized_data = []
     for result in enriched_results["results"]:
@@ -434,6 +455,11 @@ def product_meili_search(request):
 
     enriched_results = search_qs.search(q=decoded_query)
 
+    if not enriched_results["results"] and (
+        relaxed := _relaxed_query(decoded_query)
+    ):
+        enriched_results = search_qs.search(q=relaxed)
+
     serialized_data = []
     for result in enriched_results["results"]:
         obj = result["object"]
@@ -598,6 +624,20 @@ def federated_search(request):
             queries=multi_search_params["queries"],
             federation=multi_search_params["federation"],
         )
+
+        if not results.get("hits") and (
+            relaxed := _relaxed_query(decoded_query)
+        ):
+            # Fresh dicts — never mutate the already-submitted query
+            # objects (callers and tests may still hold references).
+            retry_queries = [
+                {**search_query, "q": relaxed}
+                for search_query in multi_search_params["queries"]
+            ]
+            results = meili_client.search_client.multi_search(
+                queries=retry_queries,
+                federation=multi_search_params["federation"],
+            )
 
     except Exception as e:
         logger.error(f"Federated search failed: {str(e)}")

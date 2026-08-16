@@ -544,6 +544,7 @@ PUBLIC_SETTING_KEYS = frozenset(
         "LOYALTY_XP_PER_LEVEL",
         "B2B_INVOICING_ENABLED",
         "RECENTLY_VIEWED_ENABLED",
+        "CHAT_WIDGET_ENABLED",
     }
 )
 

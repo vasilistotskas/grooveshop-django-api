@@ -1246,6 +1246,18 @@ EXTRA_SETTINGS_DEFAULTS = [
             "this flag only controls whether the rail renders."
         ),
     },
+    {
+        "name": "CHAT_WIDGET_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the AI shopping-assistant chat widget on the "
+            "storefront. Turning it off hides the launcher for every "
+            "visitor shortly after (client-side check); the gateway's "
+            "/chat endpoint itself stays up, so flipping back on needs "
+            "no deploy."
+        ),
+    },
     # Loyalty system settings
     {
         "name": "LOYALTY_ENABLED",

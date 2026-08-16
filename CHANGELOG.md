@@ -3,6 +3,25 @@
 
 
 
+## v1.164.0 (2026-08-16)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.163.1 [skip ci] ([`0bf1e14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0bf1e14c936805e0618d5f9107893129e98f0096))
+
+### Features
+
+* feat(agent): favourites on the agent surface
+
+GET /api/v1/agent/me/favourites — the linked shopper's favourited
+products (active only, newest first, capped) in a compact agent shape:
+localized name, VAT-inclusive price, stock flag. New favourites:read
+scope with consent copy; completes the identity-linking unlock set
+(orders, loyalty, favourites). Schema regenerated (pure addition).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`8140625`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8140625f899152dbab19e379ff5c3ac51aba1348))
+
 ## v1.163.1 (2026-08-16)
 
 ### Bug fixes

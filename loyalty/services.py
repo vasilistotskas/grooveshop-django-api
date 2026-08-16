@@ -402,6 +402,32 @@ class LoyaltyService:
         return LoyaltyTier.objects.get_for_level(level)
 
     @classmethod
+    def get_user_summary(cls, user) -> dict:
+        """Balance/level/tier snapshot in ``LoyaltySummarySerializer``
+        shape — shared by the storefront summary endpoint and the
+        agent-facing loyalty resource."""
+        tier = cls.get_user_tier(user)
+        next_tier = LoyaltyTier.objects.get_next_tier(tier)
+        points_to_next_tier = None
+        if next_tier is not None:
+            xp_per_level = Setting.get("LOYALTY_XP_PER_LEVEL", default=1000)
+            if xp_per_level <= 0:
+                xp_per_level = 1000
+            xp_needed_for_next_tier = (
+                next_tier.required_level - 1
+            ) * xp_per_level
+            points_to_next_tier = max(
+                0, xp_needed_for_next_tier - user.total_xp
+            )
+        return {
+            "points_balance": cls.get_user_balance(user),
+            "total_xp": user.total_xp,
+            "level": cls.get_user_level(user),
+            "tier": tier,
+            "points_to_next_tier": points_to_next_tier,
+        }
+
+    @classmethod
     def recalculate_tier(cls, user) -> None:
         """Recalculate and update user's tier based on current XP."""
         new_tier = cls.get_user_tier(user)

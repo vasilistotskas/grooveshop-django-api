@@ -131,6 +131,7 @@ LOCAL_APPS = [
     "loyalty",
     "meta_capi",
     "tenant",
+    "agent",
 ]
 
 THIRD_PARTY_APPS = [
@@ -152,6 +153,7 @@ THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
     "allauth.headless",
+    "allauth.idp.oidc",
     "allauth.socialaccount",
     "allauth.mfa",
     "allauth.usersessions",
@@ -3337,3 +3339,22 @@ AGENT_GATEWAY_HTTP_TIMEOUT = int(getenv("AGENT_GATEWAY_HTTP_TIMEOUT", "5"))
 AGENT_STRIPE_DELEGATED_ENABLED = (
     getenv("AGENT_STRIPE_DELEGATED_ENABLED", "False").lower() == "true"
 )
+
+# ---------- OIDC identity provider (allauth.idp — agent identity linking) --
+# Makes this API an OAuth 2.1 authorization server so AI agents (MCP
+# clients) can link a shopper's account: authorization-code + PKCE via
+# /identity/o/authorize (allauth's own login page at /accounts/login/
+# handles authentication), discovery at /.well-known/openid-configuration.
+# Agent-consumable resources live under /api/v1/agent/* and are protected
+# by allauth.idp's DRF TokenAuthentication + per-scope permissions.
+#
+# Dynamic Client Registration (RFC 7591) is open (no initial access
+# token) because MCP clients self-register; allauth rate-limits the
+# endpoint (3/m/ip) and clients are inert until a user consents.
+IDP_OIDC_DCR_ENABLED = getenv("IDP_OIDC_DCR_ENABLED", "True").lower() == "true"
+IDP_OIDC_DCR_REQUIRES_INITIAL_ACCESS_TOKEN = False
+# RSA/EC private key PEM for signing ID tokens / JWKS. Only required
+# once clients request the ``openid`` scope (plain OAuth scopes issue
+# opaque access tokens without it); provisioned via sealed secret.
+IDP_OIDC_PRIVATE_KEY = getenv("IDP_OIDC_PRIVATE_KEY", "")
+IDP_OIDC_ADAPTER = "agent.oidc.AgentOIDCAdapter"

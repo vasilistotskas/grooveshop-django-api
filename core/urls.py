@@ -7,6 +7,7 @@ from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
+from allauth.idp.oidc import views as oidc_views
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
@@ -60,6 +61,22 @@ urlpatterns += [
         ManageTOTPSvgView.as_api_view(client="app"),
         name="manage_totp_svg",
     ),
+    # OIDC identity provider (allauth.idp): /.well-known/openid-configuration
+    # + /identity/o/* (authorize, token, DCR, …). Root-mounted — OAuth
+    # clients (AI agents) construct these URLs from the issuer, never with
+    # a locale prefix.
+    path("", include("allauth.idp.urls")),
+    # RFC 8414 alias: plain-OAuth clients look for
+    # /.well-known/oauth-authorization-server; serve the same metadata
+    # document as the OIDC discovery endpoint.
+    path(
+        ".well-known/oauth-authorization-server",
+        oidc_views.configuration,
+        name="oauth_authorization_server_metadata",
+    ),
+    # Agent-facing scoped resources (OIDC bearer tokens only). Outside
+    # i18n_patterns for the same reason as the IdP endpoints.
+    path("api/v1/", include("agent.urls")),
 ]
 
 urlpatterns += i18n_patterns(

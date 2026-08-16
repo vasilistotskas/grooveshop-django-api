@@ -98,7 +98,6 @@ class TestAttributeGreeklishShadows:
             fields["attribute_values_text_greeklish_alt"](translation) is None
         )
 
-
     def test_attribute_fields_have_full_variant_bags(
         self, translation_with_greek_attributes
     ):

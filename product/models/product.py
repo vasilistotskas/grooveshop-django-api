@@ -39,7 +39,11 @@ from meili.models import IndexMixin
 from product.managers.product import ProductManager
 from product.models.image import ProductImage
 from core.models import SeoModel
-from search.transliteration import greeklish_shadow, greeklish_shadow_alt
+from search.transliteration import (
+    greeklish_shadow,
+    greeklish_shadow_alt,
+    greeklish_variants,
+)
 from tag.models.tagged_item import TaggedModel
 
 DISCOUNT_PERCENT_MIN = Decimal("0.0")
@@ -499,20 +503,27 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "attributes",
             "attribute_values",
         )
+        # ``*_greeklish_variants`` bags exist only for the SHORT fields
+        # (name/attributes) — expanding every description word would
+        # bloat the index and pollute ranking for no realistic recall
+        # gain.
         searchable_fields = (
             "master_id",
             "name",
             "name_greeklish",
             "name_greeklish_alt",
+            "name_greeklish_variants",
             "description",
             "description_greeklish",
             "description_greeklish_alt",
             "attribute_names",
             "attribute_names_greeklish",
             "attribute_names_greeklish_alt",
+            "attribute_names_greeklish_variants",
             "attribute_values_text",
             "attribute_values_text_greeklish",
             "attribute_values_text_greeklish_alt",
+            "attribute_values_text_greeklish_variants",
         )
         displayed_fields = (
             "id",
@@ -568,9 +579,15 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "computer": ["rechner", "pc"],
             "rechner": ["computer", "pc"],
         }
+        # Same thresholds as BlogPostTranslation — cross-index
+        # consistency matters because both feed the federated search.
+        # The looser historical {3, 5} setting gave 5-char words a
+        # two-typo budget, which let first-character noise match
+        # ("aroma" → "xroma"); transliteration-convention matching is
+        # the job of the ``*_greeklish_variants`` bags, not typos.
         typo_tolerance = {
             "enabled": True,
-            "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 5},
+            "minWordSizeForTypos": {"oneTypo": 4, "twoTypos": 8},
             "disableOnWords": [],
             "disableOnAttributes": [],
         }
@@ -584,6 +601,7 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "master_id": lambda obj: obj.master_id,
             "name_greeklish": lambda obj: greeklish_shadow(obj.name),
             "name_greeklish_alt": lambda obj: greeklish_shadow_alt(obj.name),
+            "name_greeklish_variants": lambda obj: greeklish_variants(obj.name),
             "description_greeklish": lambda obj: greeklish_shadow(
                 obj.description
             ),
@@ -683,12 +701,18 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "attribute_names_greeklish_alt": lambda obj: greeklish_shadow_alt(
                 _fetch(obj)[0]
             ),
+            "attribute_names_greeklish_variants": lambda obj: (
+                greeklish_variants(_fetch(obj)[0])
+            ),
             "attribute_values_text": lambda obj: _fetch(obj)[1],
             "attribute_values_text_greeklish": lambda obj: greeklish_shadow(
                 _fetch(obj)[1]
             ),
             "attribute_values_text_greeklish_alt": lambda obj: (
                 greeklish_shadow_alt(_fetch(obj)[1])
+            ),
+            "attribute_values_text_greeklish_variants": lambda obj: (
+                greeklish_variants(_fetch(obj)[1])
             ),
             "attribute_data": lambda obj: _fetch(obj)[2],
         }

@@ -39,6 +39,7 @@ variants.
 from __future__ import annotations
 
 import re
+import unicodedata
 
 _GREEK_TO_GREEKLISH = {
     "α": "a",
@@ -152,3 +153,163 @@ def greeklish_shadow_alt(text: str | None) -> str | None:
         return None
     folded = greek_to_greeklish_alt(text)
     return folded if folded != greek_to_greeklish(text) else None
+
+
+# ---------------------------------------------------------------------------
+# Full-convention variant bags for SHORT fields (``*_greeklish_variants``)
+# ---------------------------------------------------------------------------
+# The canonical fold plus typo tolerance cannot bridge convention
+# differences on a word's FIRST character for short words ("hrisi" for
+# χρήση, "yliko" for υλικό, "wra" for ώρα): a first-character typo costs
+# two typos, more than short words are allowed. The fix is exact
+# matching: index EVERY common Latin rendering of each Greek word.
+#
+# The table and expansion algorithm below are a faithful port of the
+# Solr GreekLatinGenerator lineage (the same table battle-tested in the
+# Findloom search service). Bags are bounded — at most
+# MAX_VARIANT_EXPANSIONS renderings per word — and are only indexed for
+# short fields (titles, names, attributes), never bodies/descriptions,
+# where the expansion would bloat the index and pollute ranking.
+
+MAX_VARIANT_EXPANSIONS = 20
+
+# Two-letter digraphs are substituted with single-rune placeholders
+# (uppercase Greek letters, which cannot collide with the lowercase
+# normalized input) so the per-character expansion loop can treat them
+# as ordinary slots. Order matters where digraphs could overlap.
+_VARIANT_DIGRAPHS: tuple[tuple[str, str], ...] = (
+    ("αι", "Α"),
+    ("ει", "Ε"),
+    ("οι", "Ο"),
+    ("ου", "Υ"),
+    ("ευ", "Φ"),
+    ("αυ", "Β"),
+    ("μπ", "Μ"),
+    ("γγ", "Γ"),
+    ("γκ", "Κ"),
+    ("ντ", "Ν"),
+)
+
+# Renderings per character (or digraph placeholder). The FIRST entry is
+# the primary rendering appended to every partial; the rest spawn new
+# partials, capped by the expansion budget.
+_VARIANT_RENDERINGS: dict[str, tuple[str, ...]] = {
+    "Α": ("ai", "e"),
+    "Ε": ("ei", "i"),
+    "Ο": ("oi", "i"),
+    "Υ": ("ou", "oy", "u"),
+    "Φ": ("eu", "ef", "ev", "ey"),
+    "Β": ("au", "af", "av", "ay"),
+    "Μ": ("mp", "b"),
+    "Γ": ("gg", "g"),
+    "Κ": ("gk", "g"),
+    "Ν": ("nt", "d"),
+    "α": ("a",),
+    "β": ("b", "v"),
+    "γ": ("g",),
+    "δ": ("d",),
+    "ε": ("e",),
+    "ζ": ("z",),
+    "η": ("h", "i"),
+    "θ": ("th",),
+    "ι": ("i",),
+    "κ": ("k",),
+    "λ": ("l",),
+    "μ": ("m",),
+    "ν": ("n",),
+    "ξ": ("ks", "x"),
+    "ο": ("o",),
+    "π": ("p",),
+    "ρ": ("r",),
+    "σ": ("s",),
+    "τ": ("t",),
+    "υ": ("y", "u", "i"),
+    "φ": ("f", "ph"),
+    "χ": ("x", "h", "ch"),
+    "ψ": ("ps",),
+    "ω": ("w", "o", "v"),
+}
+
+_PURE_GREEK_CHARS = frozenset("αβγδεζηθικλμνξοπρστυφχψω")
+
+_WORD_RE = re.compile(r"\w+")
+
+
+def _normalize_greek_word(word: str) -> str:
+    """Lowercase, strip combining marks (tonos/dialytika), fold ς → σ."""
+    lowered = word.lower()
+    decomposed = unicodedata.normalize("NFD", lowered)
+    stripped = "".join(char for char in decomposed if not ("̀" <= char <= "ͯ"))
+    return stripped.replace("ς", "σ")
+
+
+def _add_character(
+    partials: list[str],
+    renderings: tuple[str, ...],
+    max_expansions: int,
+) -> list[str]:
+    """Extend every partial transliteration by one character slot.
+
+    Alternative renderings spawn new partials (bounded by
+    ``max_expansions``); the primary rendering is always appended to the
+    existing partials. Newly spawned partials are not re-processed
+    within the same call (snapshot semantics), which keeps the output
+    order deterministic.
+    """
+    if not partials:
+        return list(renderings[:max_expansions])
+    snapshot_length = len(partials)
+    primary = renderings[0]
+    for i in range(snapshot_length):
+        partial = partials[i]
+        for alternative in renderings[1:]:
+            if len(partials) >= max_expansions:
+                break
+            partials.append(partial + alternative)
+        partials[i] = partial + primary
+    return partials
+
+
+def _word_variants(word: str, max_expansions: int) -> list[str]:
+    """Return every Latin rendering of a normalized pure-Greek word."""
+    placeheld = word
+    for digraph, placeholder in _VARIANT_DIGRAPHS:
+        placeheld = placeheld.replace(digraph, placeholder)
+    variants: list[str] = []
+    for char in placeheld:
+        renderings = _VARIANT_RENDERINGS.get(char)
+        if not renderings:
+            continue
+        variants = _add_character(variants, renderings, max_expansions)
+    return variants
+
+
+def greeklish_variants(
+    text: str | None,
+    max_expansions: int = MAX_VARIANT_EXPANSIONS,
+) -> str | None:
+    """Build the value for a ``*_greeklish_variants`` index attribute.
+
+    Space-joined, order-preserving deduped bag of every Latin rendering
+    of each Greek word in ``text``. Non-Greek and single-character
+    tokens contribute nothing (they are already searchable via the
+    source field). Returns ``None`` when no Greek word produced a
+    variant, so the attribute costs nothing on non-Greek content.
+    """
+    if not text:
+        return None
+    seen: set[str] = set()
+    bag: list[str] = []
+    for token in _WORD_RE.findall(text):
+        if len(token) < 2:
+            continue
+        normalized = _normalize_greek_word(token)
+        if not normalized or any(
+            char not in _PURE_GREEK_CHARS for char in normalized
+        ):
+            continue
+        for variant in _word_variants(normalized, max_expansions):
+            if variant not in seen:
+                seen.add(variant)
+                bag.append(variant)
+    return " ".join(bag) if bag else None

@@ -11,15 +11,21 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from agent.oidc import SCOPE_LOYALTY_READ, SCOPE_ORDERS_READ
-from agent.serializers import AgentProfileSerializer
+from agent.oidc import (
+    SCOPE_FAVOURITES_READ,
+    SCOPE_LOYALTY_READ,
+    SCOPE_ORDERS_READ,
+)
+from agent.serializers import AgentFavouriteSerializer, AgentProfileSerializer
 from loyalty.serializers.loyalty import LoyaltySummarySerializer
 from loyalty.services import LoyaltyService
 from order.serializers.order import OrderSerializer
 from order.services import OrderService
+from product.models.favourite import ProductFavourite
 
-# Agents want "my recent orders", not a paginated browse — cap the list.
+# Agents want "my recent items", not a paginated browse — cap the lists.
 AGENT_ORDERS_LIMIT = 20
+AGENT_FAVOURITES_LIMIT = 30
 
 
 class AgentAPIView(APIView):
@@ -84,6 +90,51 @@ class AgentOrdersView(AgentAPIView):
         serializer = OrderSerializer(
             orders, many=True, context={"request": request}
         )
+        return Response(serializer.data)
+
+
+class AgentFavouritesView(AgentAPIView):
+    permission_classes = [TokenPermission.has_scope(SCOPE_FAVOURITES_READ)]
+
+    @extend_schema(
+        operation_id="listAgentFavourites",
+        responses=AgentFavouriteSerializer(many=True),
+        summary="Linked account's favourite products (agent surface)",
+        description=(
+            "The linked shopper's favourited products (newest first, "
+            f"active products only, capped at {AGENT_FAVOURITES_LIMIT}) "
+            "— the basis for personalised recommendations. Requires "
+            "the `favourites:read` scope."
+        ),
+        tags=["Agent"],
+    )
+    def get(self, request: Request) -> Response:
+        favourites = (
+            ProductFavourite.objects.filter(
+                user=request.user, product__active=True
+            )
+            .select_related("product")
+            .prefetch_related("product__translations")
+            .order_by("-created_at")[:AGENT_FAVOURITES_LIMIT]
+        )
+        rows = []
+        for favourite in favourites:
+            product = favourite.product
+            price = product.final_price
+            rows.append(
+                {
+                    "product_id": product.id,
+                    "name": product.safe_translation_getter(
+                        "name", any_language=True
+                    )
+                    or "",
+                    "final_price": str(price.amount),
+                    "currency": str(price.currency),
+                    "in_stock": product.stock > 0,
+                    "added_at": favourite.created_at,
+                }
+            )
+        serializer = AgentFavouriteSerializer(rows, many=True)
         return Response(serializer.data)
 
 

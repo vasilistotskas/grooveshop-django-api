@@ -8,6 +8,7 @@ from allauth.idp.oidc.adapter import DefaultOIDCAdapter
 # and what the consent screen can display.
 SCOPE_ORDERS_READ = "orders:read"
 SCOPE_LOYALTY_READ = "loyalty:read"
+SCOPE_FAVOURITES_READ = "favourites:read"
 
 
 class AgentOIDCAdapter(DefaultOIDCAdapter):
@@ -17,4 +18,5 @@ class AgentOIDCAdapter(DefaultOIDCAdapter):
         **DefaultOIDCAdapter.scope_display,
         SCOPE_ORDERS_READ: _("View your orders and their status"),
         SCOPE_LOYALTY_READ: _("View your loyalty points and tier"),
+        SCOPE_FAVOURITES_READ: _("View your favourite products"),
     }

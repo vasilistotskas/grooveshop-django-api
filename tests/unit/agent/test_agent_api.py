@@ -19,6 +19,8 @@ from rest_framework.test import APITestCase
 from allauth.idp.oidc.models import Client, Token
 
 from order.factories.order import OrderFactory
+from product.factories.favourite import ProductFavouriteFactory
+from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
 
@@ -43,7 +45,9 @@ class AgentAPITestCase(APITestCase):
     def setUpTestData(cls) -> None:
         cls.user = UserAccountFactory()
         cls.oidc_client = Client.objects.create(name="Test agent")
-        cls.oidc_client.set_scopes(["profile", "orders:read", "loyalty:read"])
+        cls.oidc_client.set_scopes(
+            ["profile", "orders:read", "loyalty:read", "favourites:read"]
+        )
         cls.oidc_client.save()
 
     def _bearer(self, scopes: list[str], **kwargs) -> None:
@@ -98,6 +102,28 @@ class AgentAPITestCase(APITestCase):
         ids = [row["id"] for row in response.data]
         self.assertIn(own.id, ids)
         self.assertEqual(len(ids), 1)
+
+    def test_favourites_lists_active_products_only(self) -> None:
+        active = ProductFactory(active=True, stock=5)
+        inactive = ProductFactory(active=False)
+        ProductFavouriteFactory(user=self.user, product=active)
+        ProductFavouriteFactory(user=self.user, product=inactive)
+        ProductFavouriteFactory(product=active)  # someone else's
+
+        self._bearer(["favourites:read"])
+        response = self.client.get(reverse("agent-favourites"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        row = response.data[0]
+        self.assertEqual(row["product_id"], active.id)
+        self.assertTrue(row["in_stock"])
+        for key in ("name", "final_price", "currency", "added_at"):
+            self.assertIn(key, row)
+
+    def test_favourites_requires_scope(self) -> None:
+        self._bearer(["profile"])
+        response = self.client.get(reverse("agent-favourites"))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_loyalty_returns_summary_shape(self) -> None:
         self._bearer(["loyalty:read"])

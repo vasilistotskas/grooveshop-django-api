@@ -3,6 +3,51 @@
 
 
 
+## v1.166.0 (2026-08-16)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.165.0 [skip ci] ([`e8159c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8159c49753cdbb837e0253b88e092dee2fa0e30))
+
+### Code style
+
+* style: format variant test additions
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+---------
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`46814dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/46814dc3ca10ac3eb915ceccddd152ce010e16c4))
+
+### Features
+
+* feat(search): full-convention greeklish variant bags and relaxed fallback (#15) ([`46814dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/46814dc3ca10ac3eb915ceccddd152ce010e16c4))
+
+* feat(search): full-convention greeklish variant bags and relaxed fallback
+
+A typo on a word's first character costs two typos, so transliteration
+conventions that diverge on the first letter (hrisi/χρήση, yliko/υλικό,
+wra/ώρα) can never match short words through typo tolerance. Port the
+GreekLatinGenerator variant expansion (the table battle-tested in the
+Findloom search service) and index every common Latin rendering of each
+Greek word as *_greeklish_variants bags on the short fields only — blog
+title/subtitle, product name and attribute names/values — capped at 20
+renderings per word and parity-pinned against the Findloom corpus.
+
+Harmonize ProductTranslation minWordSizeForTypos to the blog's {4, 8}:
+the historical {3, 5} gave five-char words a two-typo budget, letting
+first-character noise match ("aroma" -> "xroma"), and made the two
+indexes behind the single federated search behave differently.
+
+Add a zero-result relaxed fallback to all three search views: the
+default `last` matching strategy only drops words from the end, so a
+leading word that matches nothing guarantees zero results; retry once
+with the leading word dropped.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56 ([`46814dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/46814dc3ca10ac3eb915ceccddd152ce010e16c4))
+
 ## v1.165.0 (2026-08-16)
 
 ### Chores

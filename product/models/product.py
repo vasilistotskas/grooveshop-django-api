@@ -508,7 +508,11 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "description_greeklish",
             "description_greeklish_alt",
             "attribute_names",
+            "attribute_names_greeklish",
+            "attribute_names_greeklish_alt",
             "attribute_values_text",
+            "attribute_values_text_greeklish",
+            "attribute_values_text_greeklish_alt",
         )
         displayed_fields = (
             "id",
@@ -673,7 +677,19 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
 
         return {
             "attribute_names": lambda obj: _fetch(obj)[0],
+            "attribute_names_greeklish": lambda obj: greeklish_shadow(
+                _fetch(obj)[0]
+            ),
+            "attribute_names_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                _fetch(obj)[0]
+            ),
             "attribute_values_text": lambda obj: _fetch(obj)[1],
+            "attribute_values_text_greeklish": lambda obj: greeklish_shadow(
+                _fetch(obj)[1]
+            ),
+            "attribute_values_text_greeklish_alt": lambda obj: (
+                greeklish_shadow_alt(_fetch(obj)[1])
+            ),
             "attribute_data": lambda obj: _fetch(obj)[2],
         }
 

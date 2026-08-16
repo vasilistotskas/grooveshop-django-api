@@ -3,6 +3,92 @@
 
 
 
+## v1.163.0 (2026-08-16)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.162.3 [skip ci] ([`0fe9234`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fe9234ed3834c56c47074f839b9a24ca5276f8d))
+
+### Features
+
+* feat(agent): identity linking — OIDC provider + scoped agent API
+
+Turns the API into an OAuth 2.1 authorization server for AI agents via
+allauth.idp.oidc (already our auth stack; new [idp-oidc] extra):
+authorization-code + PKCE at /identity/o/authorize (allauth's own
+login/consent pages), token endpoint, open Dynamic Client Registration
+(RFC 7591, rate-limited, no initial access token — MCP clients
+self-register), discovery at /.well-known/openid-configuration plus an
+RFC 8414 alias at /.well-known/oauth-authorization-server.
+
+New agent app: /api/v1/agent/me, /me/orders, /me/loyalty — OIDC
+bearer tokens ONLY (never Knox/session; the isolation keeps agent
+scopes least-privilege) with per-scope permissions (profile,
+orders:read, loyalty:read). Loyalty summary computation extracted to
+LoyaltyService.get_user_summary and shared with the storefront
+endpoint. Schema regenerated (pure addition). Full suite: 4989 passed.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`855eb13`](https://github.com/vasilistotskas/grooveshop-django-api/commit/855eb132c6d9aa1e1baa2bd0b0b36c9b07aa6033))
+
+* feat(order): agent-gateway integration — order events, SPT payments, cart throttle
+
+Four coordinated pieces for the grooveshop-agent-gateway:
+
+- Order-event push: push_order_event_to_gateway (MonitoredTask, retry
+  backoff) POSTs {schemaName, orderUuid, status, paymentStatus,
+  trackingNumber} to the gateway's cluster-internal endpoint on every
+  status/payment/tracking transition (single on_commit enqueue per
+  save; Order now snapshots _original_payment_status). Unset
+  AGENT_GATEWAY_INTERNAL_URL keeps the surface off; failures never
+  touch order processing.
+- Gateway-aware anon cart throttle: CartMutationAnonThrottle keys on
+  the cart UUID when the request carries the X-Internal-Gateway shared
+  secret — agent traffic egresses from gateway pods, so per-IP keying
+  would collapse every AI agent into one 30/min bucket.
+- Agent-delegated Stripe payments (flag-gated OFF): POST
+  /order/{id}/confirm_agent_payment charges a SharedPaymentToken via a
+  server-side confirmed PaymentIntent
+  (payment_method_data[shared_payment_granted_token], idempotent per
+  order). AGENT_STRIPE_DELEGATED_ENABLED stays False until Stripe
+  Agentic Commerce enrollment; disabled → clean 400.
+- order/uuid/{uuid} cleanup: the path param is authoritative for the
+  guest permission check — a stray ?uuid= query no longer overrides a
+  correctly-addressed order.
+
+Schema regenerated (pure addition). Full suite: 4965 passed.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`d34e5d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d34e5d001afc1909f9e334baad49e21f99e61205))
+
+* feat: settings-backed tenant/resolve endpoint for the agent gateway
+
+Adds a `tenant` app exposing GET /api/v1/tenant/resolve?domain= with the
+exact wire shape of the multi-tenant branch's TenantConfigSerializer,
+sourced from TENANT_* settings instead of a Tenant model. The gateway
+and (later) Nuxt resolve tenants through one code path on main; the MT
+branch's DB-backed version supersedes this wholesale at merge — no
+fallback logic combines the two.
+
+- AllowAny, 1h response cache, 404 for domains outside
+  TENANT_PRIMARY_DOMAIN/TENANT_EXTRA_DOMAINS (primary defaults to the
+  NUXT_BASE_URL host; no hardcoded production domains).
+- schema.yml regenerated.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`73d0807`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73d0807a4002500c4e8051917a5d112353b5fd18))
+
+### Refactoring
+
+* refactor(cache): drop Nuxt ProductFeed purge patterns
+
+The catalog feeds moved from Nuxt Nitro to the agent gateway (own
+Redis SWR cache, admin-independent); the cached-function purge
+patterns and the now-unused _nuxt_functions helper are dead code.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`1d304a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d304a188c14aa5960a3797883b02d9adac38495))
+
 ## v1.162.3 (2026-08-16)
 
 ### Bug fixes

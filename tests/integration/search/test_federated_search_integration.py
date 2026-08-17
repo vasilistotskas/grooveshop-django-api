@@ -107,10 +107,10 @@ class TestFederatedSearchIntegration:
         # Verify federation metadata in results
         if len(data["results"]) > 0:
             for result in data["results"]:
-                assert "_federation" in result
-                assert "indexUid" in result["_federation"]
-                assert "queriesPosition" in result["_federation"]
-                assert "weightedRankingScore" in result["_federation"]
+                assert "federation" in result
+                assert "indexUid" in result["federation"]
+                assert "queriesPosition" in result["federation"]
+                assert "weightedRankingScore" in result["federation"]
 
     def test_federated_search_applies_language_filter(self):
         """

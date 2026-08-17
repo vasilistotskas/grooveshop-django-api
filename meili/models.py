@@ -249,11 +249,6 @@ class IndexMixin(models.Model):
     meilisearch = _MeilisearchDescriptor()
 
     @classmethod
-    def get_meilisearch(cls) -> IndexQuerySet:
-        """Return a fresh IndexQuerySet instance."""
-        return IndexQuerySet(cls)
-
-    @classmethod
     def get_meilisearch_queryset(cls):
         """
         Return an optimized Django queryset for bulk indexing.

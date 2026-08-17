@@ -211,3 +211,28 @@ class TestUpdateClickScores:
     def test_no_clicks_is_a_safe_noop(self):
         result = update_click_scores.run()
         assert result == {"product": 0, "blog_post": 0}
+
+
+@pytest.mark.django_db
+class TestSaveSearchQueryTask:
+    def test_oversized_query_is_truncated_not_lost(self):
+        """A pasted >500-char query must not kill the task at the DB
+        layer (CharField max_length is only enforced by Postgres on
+        .create()) — the row is stored truncated instead."""
+        from search.tasks import save_search_query
+
+        save_search_query.run(
+            query="x" * 600,
+            language_code="el",
+            content_type="federated",
+            results_count=0,
+            estimated_total_hits=0,
+            processing_time_ms=5,
+            user_id=None,
+            session_key=None,
+            ip_address=None,
+            user_agent="pytest",
+            query_uuid=str(uuid4()),
+        )
+        row = SearchQuery.objects.get()
+        assert len(row.query) == 500

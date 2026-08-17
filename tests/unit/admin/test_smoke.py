@@ -76,6 +76,28 @@ def logged_in_client(superuser):
 
 
 @pytest.mark.parametrize("model,model_admin", _REGISTRY_ENTRIES)
+def test_search_fields_resolve(superuser, model, model_admin):
+    """Every admin's search must execute without raising.
+
+    Unfold's ⌘K command palette (``UNFOLD["COMMAND"]["search_models"]``)
+    runs ``get_search_results`` on EVERY registered admin with
+    non-empty ``search_fields``, so a single stale field name — ours
+    or a third-party package's — 500s the whole palette for every
+    query. The queryset is sliced and executed so database-level
+    errors (bad casts, unsupported lookups) surface too, not just
+    ``FieldError`` at resolve time.
+    """
+    request = RequestFactory().get(_changelist_url(model), {"q": "power bank"})
+    request.user = superuser
+    if not model_admin.get_search_fields(request):
+        return
+
+    queryset = model_admin.get_queryset(request)
+    results, _ = model_admin.get_search_results(request, queryset, "power bank")
+    list(results[:1])
+
+
+@pytest.mark.parametrize("model,model_admin", _REGISTRY_ENTRIES)
 def test_changelist_and_add_render(
     logged_in_client, superuser, model, model_admin
 ):

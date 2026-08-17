@@ -58,6 +58,10 @@ class SearchThrottle(AnonRateThrottle):
     scope = "search"
 
 
+class SearchClickThrottle(AnonRateThrottle):
+    scope = "search_click"
+
+
 class ViewCountThrottle(AnonRateThrottle):
     """Tight per-IP throttle for the product view-count increment endpoint."""
 

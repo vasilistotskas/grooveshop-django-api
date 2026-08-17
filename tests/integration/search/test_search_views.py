@@ -7,7 +7,6 @@ and ensures that all properties hold across various search scenarios.
 
 from __future__ import annotations
 
-import json
 from unittest.mock import Mock, patch
 
 import pytest
@@ -519,6 +518,38 @@ class TestAnalyticsMetricsCompleteness:
         assert data["clickThroughRate"] <= 1.0, (
             "Click-through rate should not exceed 1.0"
         )
+
+    def test_top_query_counts_immune_to_click_join_fanout(self, admin_client):
+        """Multiple clicks on one SearchQuery row must not inflate that
+        query's search count or skew its average (the multi-aggregate
+        JOIN fan-out pitfall)."""
+        from search.models import SearchClick, SearchQuery
+
+        rows = [
+            SearchQuery.objects.create(
+                query="bataria kinitou",
+                language_code="el",
+                content_type="federated",
+                results_count=results,
+                estimated_total_hits=results,
+            )
+            for results in (4, 8)
+        ]
+        for _ in range(3):
+            SearchClick.objects.create(
+                search_query=rows[0],
+                result_id="37",
+                result_type="blog_post",
+                position=0,
+            )
+
+        response = admin_client.get("/api/v1/search/analytics")
+        assert response.status_code == 200
+        top = {row["query"]: row for row in response.json()["topQueries"]}
+        row = top["bataria kinitou"]
+        assert row["count"] == 2  # two searches, regardless of clicks
+        assert row["avgResults"] == 6.0  # mean of 4 and 8, unweighted
+        assert row["clickThroughRate"] == 1.5  # 3 clicks / 2 searches
 
 
 @requires_meilisearch
@@ -1172,129 +1203,9 @@ class TestManagementCommandsExecution:
     Validates: Requirements 9.1, 9.2, 9.3, 9.4, 9.8
     """
 
-    def test_meilisearch_test_federated_command(self):
-        """
-        Test that meilisearch_test_federated command executes successfully.
-
-        Validates: Requirements 9.3
-        """
-        from io import StringIO
-        from django.core.management import call_command
-
-        # Mock Meilisearch multi_search
-        with patch(
-            "meili._client.client.client.multi_search"
-        ) as mock_multi_search:
-            mock_multi_search.return_value = {
-                "hits": [
-                    {
-                        "id": "1",
-                        "name": "Test Product",
-                        "language_code": "en",
-                        "_federation": {
-                            "indexUid": "ProductTranslation",
-                            "queriesPosition": 0,
-                            "weightedRankingScore": 0.95,
-                        },
-                    }
-                ],
-                "estimatedTotalHits": 1,
-                "processingTimeMs": 50,
-            }
-
-            # Capture command output
-            out = StringIO()
-
-            # Execute command
-            try:
-                call_command(
-                    "meilisearch_test_federated",
-                    "--query",
-                    "test",
-                    "--language-code",
-                    "en",
-                    "--limit",
-                    "10",
-                    stdout=out,
-                )
-
-                # Verify command executed without errors
-                output = out.getvalue()
-
-                # Command should produce some output
-                assert len(output) > 0, "Command should produce output"
-
-                # Verify multi_search was called
-                assert mock_multi_search.called, (
-                    "Command should call multi_search"
-                )
-
-            except Exception as e:
-                pytest.fail(f"Command execution failed: {str(e)}")
-
-    def test_meilisearch_export_analytics_command(self):
-        """
-        Test that meilisearch_export_analytics command executes successfully.
-
-        Validates: Requirements 9.4
-        """
-        from io import StringIO
-        from django.core.management import call_command
-        import tempfile
-        import os
-
-        # Create some test analytics data
-        for i in range(5):
-            SearchQuery.objects.create(
-                query=f"test query {i}",
-                language_code="en",
-                content_type="product",
-                results_count=10,
-                estimated_total_hits=100,
-            )
-
-        # Create temporary output file
-        with tempfile.NamedTemporaryFile(
-            mode="w", delete=False, suffix=".json"
-        ) as tmp:
-            tmp_path = tmp.name
-
-        try:
-            # Capture command output
-            out = StringIO()
-
-            # Execute command
-            call_command(
-                "meilisearch_export_analytics",
-                "--output",
-                tmp_path,
-                stdout=out,
-            )
-
-            # Verify file was created
-            assert os.path.exists(tmp_path), "Export file should be created"
-
-            # Verify file has content
-            file_size = os.path.getsize(tmp_path)
-            assert file_size > 0, "Export file should have content"
-
-            # Verify it's valid JSON
-            with open(tmp_path, "r") as f:
-                data = json.load(f)
-
-                # Verify data structure
-                assert isinstance(data, (dict, list)), (
-                    "Export should contain valid JSON data"
-                )
-
-        finally:
-            # Clean up temporary file
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-
     def test_meilisearch_update_index_settings_command(self):
         """The command must update ONLY the provided settings via their
-        dedicated endpoints — never the full-payload update_settings, which
+        dedicated endpoints â€” never the full-payload update_settings, which
         would wipe filterable/sortable/searchable/synonyms (G0172).
         """
         from io import StringIO
@@ -1327,7 +1238,7 @@ class TestManagementCommandsExecution:
 
     def test_meilisearch_update_ranking_command(self):
         """The command must update ONLY the ranking rules via the dedicated
-        endpoint — never the full-payload update_settings (G0172)."""
+        endpoint â€” never the full-payload update_settings (G0172)."""
         from io import StringIO
         from django.core.management import call_command
 

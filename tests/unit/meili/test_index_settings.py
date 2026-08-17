@@ -28,10 +28,6 @@ class TestMeiliIndexSettings:
             search_key="test_key",
             timeout=10,
             sync=False,
-            client_agents=("test-agent",),
-            debug=False,
-            offline=False,
-            batch_size=1000,
         )
 
     @pytest.mark.parametrize(

@@ -300,7 +300,7 @@ class FederatedSearchResultSerializer(serializers.Serializer):
     master = serializers.IntegerField(required=False)
 
     # Federation metadata
-    _federation = FederationMetadataSerializer(
+    federation = FederationMetadataSerializer(
         help_text="Federation metadata from Meilisearch"
     )
 

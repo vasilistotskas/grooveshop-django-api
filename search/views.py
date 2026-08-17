@@ -25,7 +25,7 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from blog.models.post import BlogPostTranslation
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import SearchThrottle
+from core.api.throttling import SearchClickThrottle, SearchThrottle
 from meili._client import client as meili_client
 from product.models.product import ProductTranslation
 from search.models import SearchClick, SearchQuery
@@ -561,7 +561,7 @@ def federated_search(request):
     2. Apply Greeklish expansion if language_code is 'el'
     3. Build multi_search queries for ProductTranslation and BlogPostTranslation
     4. Set federation weights (products: 1.0, blog_posts: 0.7)
-    5. Calculate result allocation (70% products, 30% blog posts)
+    5. Weight the merged ranking (products 1.0, blog posts 0.7)
     6. Execute multi_search with federation mode
     7. Enrich results with Django ORM objects
     8. Return unified results with content_type field
@@ -583,9 +583,6 @@ def federated_search(request):
     # Greeklish queries match the indexed ``*_greeklish`` shadow fields
     # directly (see search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
-
-    # Calculate result allocation (70% products, 30% blog posts)
-    product_limit = int(limit * 0.7)  # noqa: F841
 
     # Build filters for language and content filtering
     product_filters = []
@@ -730,7 +727,10 @@ def federated_search(request):
             }
 
             obj_data = serializer_class(obj, context=context).data
-            obj_data["_federation"] = hit.get("_federation", {})
+            # Exposed as ``federation`` — a leading underscore gets
+            # mangled by the camelCase renderer ("_federation" ->
+            # "Federation").
+            obj_data["federation"] = hit.get("_federation", {})
             enriched_results.append(obj_data)
 
         except Exception as e:
@@ -767,7 +767,7 @@ def federated_search(request):
 )
 @api_view(["POST"])
 @permission_classes([AllowAny])
-@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
+@throttle_classes([SearchClickThrottle, AnonRateThrottle, UserRateThrottle])
 def search_click(request):
     serializer = SearchClickRequestSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
@@ -904,22 +904,34 @@ def search_analytics(request):
     # Calculate total search count
     total_searches = queries_qs.count()
 
-    # Calculate click-through rate for each top query (single annotated query)
-    top_queries_with_clicks = (
+    # Per-query counts and clicks are computed in SEPARATE queries:
+    # combining Count("id")/Avg("results_count") with Count("clicks") in
+    # one annotate() fans out the JOIN to SearchClick before GROUP BY,
+    # inflating counts and skewing averages for any query text whose
+    # rows carry multiple clicks (Django's documented multi-aggregate
+    # pitfall).
+    top_query_rows = list(
         queries_qs.values("query")
         .annotate(
             count=Count("id"),
             avg_results=Avg("results_count"),
-            clicks_count=Count("clicks"),
         )
         .order_by("-count")[:20]
     )
+    clicks_by_query = dict(
+        SearchClick.objects.filter(
+            search_query__in=queries_qs,
+            search_query__query__in=[row["query"] for row in top_query_rows],
+        )
+        .values_list("search_query__query")
+        .annotate(clicks=Count("id"))
+    )
 
     top_queries = []
-    for query_data in top_queries_with_clicks:
+    for query_data in top_query_rows:
         query_count = query_data["count"]
         avg_results = query_data["avg_results"]
-        clicks_count = query_data["clicks_count"]
+        clicks_count = clicks_by_query.get(query_data["query"], 0)
         ctr = (clicks_count / query_count) if query_count > 0 else 0.0
 
         top_queries.append(

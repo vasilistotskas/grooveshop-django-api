@@ -281,6 +281,11 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
+    # One trusted reverse proxy (Traefik) fronts the app - DRF must key
+    # anon throttling off the XFF hop that proxy appended, not the whole
+    # client-controlled header (which would let callers mint a fresh
+    # throttle bucket per request).
+    "NUM_PROXIES": 1,
     "DEFAULT_THROTTLE_RATES": {
         "anon": None if DEBUG else "100000/day",
         "user": None if DEBUG else "150000/day",
@@ -294,6 +299,9 @@ REST_FRAMEWORK = {
         "cart_mutation": None if DEBUG else "60/minute",
         "cart_mutation_anon": None if DEBUG else "30/minute",
         "search": None if DEBUG else "120/minute",
+        # Clicks get their own budget - the anonymous click endpoint must
+        # not be able to starve the search allowance for the same client.
+        "search_click": None if DEBUG else "60/minute",
         "view_count": None if DEBUG else "60/hour",
         # Public proxies to rate-limited carrier partner APIs.
         "acs_address": None if DEBUG else "30/minute",
@@ -1097,8 +1105,6 @@ MEILISEARCH = {
     "SEARCH_KEY": _meili_search_key,
     "PORT": int(getenv("MEILI_PORT", "7700")),
     "TIMEOUT": int(getenv("MEILI_TIMEOUT", "30")),
-    "CLIENT_AGENTS": None,
-    "DEBUG": DEBUG,
     "SYNC": DEBUG,
     "ASYNC_INDEXING": getenv("MEILI_ASYNC_INDEXING", "True") == "True",
     "OFFLINE": getenv("MEILI_OFFLINE", "False") == "True",

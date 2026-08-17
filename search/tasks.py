@@ -52,7 +52,9 @@ def save_search_query(
 
     SearchQuery.objects.create(
         uuid=query_uuid,
-        query=query,
+        # CharField(max_length=500) is only enforced by the database on
+        # .create(); an unbounded pasted query must not kill the task.
+        query=query[:500],
         language_code=language_code,
         content_type=content_type,
         results_count=results_count,

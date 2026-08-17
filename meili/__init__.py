@@ -25,18 +25,6 @@ Example:
     # Search products
     results = Product.meilisearch.filter(price__gte=100).search("laptop")
 
-Batch Operations:
-    from meili.batch import BatchIndexer, suspend_indexing
-
-    # Batch indexing
-    with BatchIndexer() as indexer:
-        for product in products:
-            indexer.add(product)
-
-    # Suspend automatic indexing
-    with suspend_indexing():
-        Product.objects.bulk_create(products)
-
 Async Tasks:
     from meili.tasks import reindex_model_task
 
@@ -49,27 +37,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from meili.batch import (
-        BatchIndexer,
-        batch_index_context,
-        bulk_index_queryset,
-        suspend_indexing,
-    )
-    from meili.models import IndexMixin, MeiliGeo
-    from meili.querysets import BoundingBox, IndexQuerySet, Point, Radius
+    from meili.models import IndexMixin
+    from meili.querysets import IndexQuerySet
 
 # Lazy imports to avoid AppRegistryNotReady errors during Django startup
 _LAZY_IMPORTS = {
     "IndexMixin": "meili.models",
-    "MeiliGeo": "meili.models",
     "IndexQuerySet": "meili.querysets",
-    "Radius": "meili.querysets",
-    "BoundingBox": "meili.querysets",
-    "Point": "meili.querysets",
-    "BatchIndexer": "meili.batch",
-    "batch_index_context": "meili.batch",
-    "bulk_index_queryset": "meili.batch",
-    "suspend_indexing": "meili.batch",
 }
 
 
@@ -90,17 +64,6 @@ def __dir__():
 
 
 __all__ = [
-    # Core
     "IndexMixin",
     "IndexQuerySet",
-    "MeiliGeo",
-    # Geo types
-    "Radius",
-    "BoundingBox",
-    "Point",
-    # Batch utilities
-    "BatchIndexer",
-    "batch_index_context",
-    "bulk_index_queryset",
-    "suspend_indexing",
 ]

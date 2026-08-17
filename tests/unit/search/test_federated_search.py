@@ -6,7 +6,7 @@ federated search across ProductTranslation and BlogPostTranslation indexes
 using Meilisearch's multi_search API with federation mode.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from urllib.parse import quote
 
 import pytest
@@ -113,41 +113,42 @@ class TestFederatedSearchProperties:
         assert product_query["federationOptions"]["weight"] == 1.0
         assert blog_query["federationOptions"]["weight"] == 0.7
 
-    def test_federation_metadata_preservation(
-        self, mock_models, mock_meili_client
-    ):
+    def test_federation_metadata_preservation(self, mock_meili_client):
+        """Results carry ``federation`` metadata built from Meilisearch's
+        raw ``_federation`` hit key.
+
+        Uses a REAL product so the enrichment path actually runs — with
+        mocked models the bulk fetch yields nothing and the assertions
+        would never execute.
         """
-        Results should include _federation metadata with indexUid, queriesPosition,
-        and weightedRankingScore fields.
-        """
-        mock_product, _ = mock_models
-        mock_hits = [
-            {
-                "id": "1",
-                "_federation": {
-                    "indexUid": "ProductTranslation",
-                    "queriesPosition": 0,
-                    "weightedRankingScore": 0.95,
-                },
-                "_rankingScore": 0.95,
-            }
-        ]
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory()
+        translation = product.translations.first()
         mock_meili_client.search_client.multi_search.return_value = {
-            "hits": mock_hits,
+            "hits": [
+                {
+                    "id": str(translation.pk),
+                    "_federation": {
+                        "indexUid": "ProductTranslation",
+                        "queriesPosition": 0,
+                        "weightedRankingScore": 0.95,
+                    },
+                    "_rankingScore": 0.95,
+                }
+            ],
             "estimatedTotalHits": 1,
         }
-
-        mock_obj = MagicMock()
-        mock_obj.pk = "1"
-        mock_product.objects.get.return_value = mock_obj
 
         request = self.factory.get("/api/search/federated", {"query": "laptop"})
         response = federated_search(request)
 
         results = response.data["results"]
-        if results:
-            assert "_federation" in results[0]
-            assert "indexUid" in results[0]["_federation"]
+        assert len(results) == 1
+        # Exposed as ``federation`` — a leading underscore would be
+        # mangled by the camelCase renderer ("_federation" -> "Federation").
+        assert results[0]["federation"]["indexUid"] == "ProductTranslation"
+        assert "_federation" not in results[0]
 
     @pytest.mark.parametrize("language_code", ["en", "el", "de"])
     def test_language_filtering_across_indexes(

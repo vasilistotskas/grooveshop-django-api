@@ -34,6 +34,16 @@ class SearchQuery(models.Model):
 
     objects: SearchQueryManager = SearchQueryManager()
 
+    uuid = models.UUIDField(
+        null=True,
+        unique=True,
+        editable=False,
+        help_text=(
+            "Public identifier echoed to the client as ``query_id`` so a "
+            "later click can be attributed to this query. Nullable because "
+            "rows predating click tracking have none."
+        ),
+    )
     query = models.CharField(
         max_length=500,
         db_index=True,

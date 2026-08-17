@@ -425,6 +425,117 @@
 
 
     {# ────────────────────────────────────────────────────────────── #}
+    {# ZONE F — Search insights                                       #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {% trans "Last 30 days" as last_30d_badge %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {# KPI stack #}
+        <div class="flex flex-col gap-6">
+            {% trans "Searches" as searches_title %}
+            {% component "unfold/components/card.html" with title=searches_title action=last_30d_badge %}
+                {% component "unfold/components/title.html" %}{{ search_insights.searches_30d }}{% endcomponent %}
+                <div class="mt-2 text-sm text-base-600 dark:text-base-300">
+                    {% trans "committed queries, empty searches excluded" %}
+                </div>
+            {% endcomponent %}
+            {% trans "Zero Results" as zero_title %}
+            {% component "unfold/components/card.html" with title=zero_title action=last_30d_badge %}
+                {% component "unfold/components/title.html" %}{{ search_insights.zero_result_pct }}%{% endcomponent %}
+                <div class="mt-2 text-sm text-base-600 dark:text-base-300">
+                    {{ search_insights.zero_result_count }} {% trans "searches found nothing" %}
+                </div>
+            {% endcomponent %}
+            {% trans "Result Clicks" as clicks_title %}
+            {% component "unfold/components/card.html" with title=clicks_title action=last_30d_badge %}
+                {% if search_insights.clicks_30d is None %}
+                    {% component "unfold/components/title.html" %}—{% endcomponent %}
+                    <div class="mt-2 text-sm text-base-600 dark:text-base-300">
+                        {% trans "No click data recorded yet" %}
+                    </div>
+                {% else %}
+                    {% component "unfold/components/title.html" %}{{ search_insights.clicks_30d }}{% endcomponent %}
+                    <div class="mt-2 text-sm text-base-600 dark:text-base-300">
+                        {{ search_insights.ctr_pct }}% {% trans "click-through rate" %}
+                    </div>
+                {% endif %}
+            {% endcomponent %}
+        </div>
+
+        {# 14-day volume chart #}
+        {% trans "Search Volume" as search_volume_title %}
+        {% trans "Last 14 days" as last_14d_badge %}
+        <div class="lg:col-span-2">
+            {% component "unfold/components/card.html" with title=search_volume_title action=last_14d_badge %}
+                {% component "unfold/components/chart/bar.html" with data=search_volume_chart_data options=search_volume_chart_options class="h-[320px]" %}{% endcomponent %}
+            {% endcomponent %}
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {# Top queries #}
+        {% trans "Top Search Queries" as top_queries_title %}
+        {% component "unfold/components/card.html" with title=top_queries_title action=last_30d_badge size="md" %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
+                        <tr>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Query" %}</th>
+                            <th class="px-3 py-2 text-right font-medium">{% trans "Searches" %}</th>
+                            <th class="px-3 py-2 text-right font-medium">{% trans "Zero results" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-base-200 dark:divide-base-800">
+                        {% for row in search_insights.top_queries %}
+                        <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
+                            <td class="px-3 py-2 font-medium text-base-700 dark:text-base-200">{{ row.query }}</td>
+                            <td class="px-3 py-2 text-right text-base-700 dark:text-base-200">{{ row.count }}</td>
+                            <td class="px-3 py-2 text-right">
+                                {% if row.zero %}
+                                {% capture as zero_count_text silent %}{{ row.zero }}{% endcapture %}
+                                {% include "unfold/helpers/label.html" with variant="warning" text=zero_count_text %}
+                                {% else %}
+                                <span class="text-base-500 dark:text-base-400">0</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="px-3 py-6 text-center text-base-600 dark:text-base-300">
+                                {% trans "No search data yet" %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endcomponent %}
+
+        {# Zero-result queries — the synonym / content-gap worklist #}
+        {% trans "Zero-Result Queries" as zero_queries_title %}
+        {% component "unfold/components/card.html" with title=zero_queries_title action=last_30d_badge size="md" %}
+            {% component "unfold/components/text.html" with class="mb-3" %}{% trans "What visitors searched for and didn't find — candidates for synonyms, new content, or new products." %}{% endcomponent %}
+            <ul class="divide-y divide-base-200 dark:divide-base-800">
+                {% for row in search_insights.zero_queries %}
+                <li class="py-2 flex items-center justify-between gap-3">
+                    <span class="text-sm font-medium text-orange-700 dark:text-orange-400 truncate">{{ row.query }}</span>
+                    {% capture as zero_query_count silent %}{{ row.count }}×{% endcapture %}
+                    {% include "unfold/helpers/label.html" with variant="warning" text=zero_query_count %}
+                </li>
+                {% empty %}
+                <li class="py-6 text-center text-base-600 dark:text-base-300 text-sm">
+                    {% trans "No zero-result searches" %} 🎉
+                </li>
+                {% endfor %}
+            </ul>
+        {% endcomponent %}
+
+    </div>
+
+
+    {# ────────────────────────────────────────────────────────────── #}
     {# ZONE D — Low stock list (superuser-only, only when present)    #}
     {# ────────────────────────────────────────────────────────────── #}
     {% if is_superuser and low_stock_products %}

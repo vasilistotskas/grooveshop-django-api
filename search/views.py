@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from urllib.parse import unquote
+from uuid import uuid4
 
 from django.conf import settings as django_settings
 from django.core.cache import caches
@@ -35,6 +36,8 @@ from search.serializers import (
     ProductMeiliSearchResponseSerializer,
     ProductTranslationSerializer,
     SearchAnalyticsResponseSerializer,
+    SearchClickRequestSerializer,
+    SearchClickResponseSerializer,
     TrendingSearchResponseSerializer,
 )
 
@@ -223,10 +226,13 @@ def blog_post_meili_search(request):
 
     enriched_results = search_qs.search(q=decoded_query)
 
+    relaxed_query = None
     if not enriched_results["results"] and (
         relaxed := _relaxed_query(decoded_query)
     ):
         enriched_results = search_qs.search(q=relaxed)
+        if enriched_results["results"]:
+            relaxed_query = relaxed
 
     serialized_data = []
     for result in enriched_results["results"]:
@@ -241,6 +247,8 @@ def blog_post_meili_search(request):
 
     return Response(
         {
+            "query_id": uuid4(),
+            "relaxed_query": relaxed_query,
             "limit": limit,
             "offset": offset,
             "estimated_total_hits": enriched_results["estimated_total_hits"],
@@ -455,10 +463,13 @@ def product_meili_search(request):
 
     enriched_results = search_qs.search(q=decoded_query)
 
+    relaxed_query = None
     if not enriched_results["results"] and (
         relaxed := _relaxed_query(decoded_query)
     ):
         enriched_results = search_qs.search(q=relaxed)
+        if enriched_results["results"]:
+            relaxed_query = relaxed
 
     serialized_data = []
     for result in enriched_results["results"]:
@@ -472,6 +483,8 @@ def product_meili_search(request):
         serialized_data.append(obj_data)
 
     response_data = {
+        "query_id": uuid4(),
+        "relaxed_query": relaxed_query,
         "limit": limit,
         "offset": offset,
         "estimated_total_hits": enriched_results["estimated_total_hits"],
@@ -625,6 +638,7 @@ def federated_search(request):
             federation=multi_search_params["federation"],
         )
 
+        relaxed_query = None
         if not results.get("hits") and (
             relaxed := _relaxed_query(decoded_query)
         ):
@@ -638,6 +652,8 @@ def federated_search(request):
                 queries=retry_queries,
                 federation=multi_search_params["federation"],
             )
+            if results.get("hits"):
+                relaxed_query = relaxed
 
     except Exception as e:
         logger.error(f"Federated search failed: {str(e)}")
@@ -724,6 +740,8 @@ def federated_search(request):
     # Return response
     return Response(
         {
+            "query_id": uuid4(),
+            "relaxed_query": relaxed_query,
             "limit": limit,
             "offset": offset,
             "estimated_total_hits": estimated_total_hits,
@@ -731,6 +749,39 @@ def federated_search(request):
         },
         status=status.HTTP_200_OK,
     )
+
+
+@extend_schema(
+    summary=_("Log a click on a search result"),
+    description=_(
+        "Attribute a click on a search result to the query that produced "
+        "it. The query_id comes from the search response. Feeds the "
+        "click-through ranking signal and search analytics."
+    ),
+    tags=["Search"],
+    request=SearchClickRequestSerializer,
+    responses={
+        202: SearchClickResponseSerializer,
+        400: ErrorResponseSerializer,
+    },
+)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([SearchThrottle, AnonRateThrottle, UserRateThrottle])
+def search_click(request):
+    serializer = SearchClickRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    from search.tasks import save_search_click
+
+    save_search_click.delay(
+        query_uuid=str(data["query_id"]),
+        result_id=str(data["result_id"]),
+        result_type=data["result_type"],
+        position=data["position"],
+    )
+    return Response({"detail": _("Accepted.")}, status=status.HTTP_202_ACCEPTED)
 
 
 @extend_schema(

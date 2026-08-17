@@ -696,6 +696,12 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "update-search-click-scores": {
+            "task": "search.tasks.update_click_scores",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "anonymize-old-search-queries": {
             "task": "search.tasks.anonymize_old_search_queries",
             "schedule": SCHEDULE_PRESETS["weekly_sunday_3am"]

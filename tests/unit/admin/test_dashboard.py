@@ -231,3 +231,74 @@ class LowStockBoundaryTests(TestCase):
             ProductFactory(stock=1 + (i % 9), active=True)
         rows = _check_low_stock()
         self.assertLessEqual(len(rows), 10)
+
+
+class SearchInsightsZoneTests(TestCase):
+    """Zone F filtering rules, validated against real production data
+    shapes: 93% empty-query placeholder rows, per-keystroke fragments
+    ("P", "Po", "Pow"), and genuine greeklish queries.
+    """
+
+    def _make_query(self, query, results_count=5, days_ago=0):
+        from search.models import SearchQuery
+
+        row = SearchQuery.objects.create(
+            query=query,
+            language_code="el",
+            content_type="federated",
+            results_count=results_count,
+            estimated_total_hits=results_count,
+        )
+        if days_ago:
+            SearchQuery.objects.filter(pk=row.pk).update(
+                timestamp=timezone.now() - timedelta(days=days_ago)
+            )
+        return row
+
+    def _zone(self):
+        from admin.dashboard import _zone_f_search_insights
+
+        now = timezone.now()
+        return _zone_f_search_insights(now, now - timedelta(days=30))[
+            "search_insights"
+        ]
+
+    def test_empty_and_fragment_queries_are_excluded(self):
+        self._make_query("")  # placeholder/browse request
+        self._make_query("Po", results_count=0)  # keystroke fragment
+        self._make_query("bataria kinitou")
+        self._make_query("optiki ina", results_count=0)
+
+        insights = self._zone()
+
+        assert insights["searches_30d"] == 3  # empty excluded
+        top = [row["query"] for row in insights["top_queries"]]
+        assert "Po" not in top
+        assert "bataria kinitou" in top
+        zero = [row["query"] for row in insights["zero_queries"]]
+        assert zero == ["optiki ina"]
+
+    def test_old_rows_are_outside_the_window(self):
+        self._make_query("klip kalodion", days_ago=45)
+        insights = self._zone()
+        assert insights["searches_30d"] == 0
+
+    def test_click_metrics_render_dash_until_first_click(self):
+        self._make_query("power bank")
+        insights = self._zone()
+        assert insights["clicks_30d"] is None
+        assert insights["ctr_pct"] is None
+
+    def test_click_metrics_appear_once_clicks_exist(self):
+        from search.models import SearchClick
+
+        row = self._make_query("power bank")
+        SearchClick.objects.create(
+            search_query=row,
+            result_id="2",
+            result_type="product",
+            position=0,
+        )
+        insights = self._zone()
+        assert insights["clicks_30d"] == 1
+        assert insights["ctr_pct"] == 100.0

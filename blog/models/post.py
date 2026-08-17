@@ -53,6 +53,19 @@ class BlogPost(
     )
     featured = models.BooleanField(_("Featured"), default=False)
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
+    click_score = models.PositiveIntegerField(
+        _("Click Score"),
+        # db_default (not default): the DB-level DEFAULT survives the
+        # migration, so old pods still INSERTing without this column
+        # during the rollout window don't violate NOT NULL - the
+        # checkout path writes product history rows on every sale.
+        db_default=0,
+        editable=False,
+        help_text=(
+            "Search click-through ranking signal - trailing-window click "
+            "count refreshed by search.tasks.update_click_scores"
+        ),
+    )
 
     objects: BlogPostManager = BlogPostManager()
 
@@ -220,6 +233,9 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "view_count",
             "created_at",
         )
+        # click_score is the search click-through signal refreshed by
+        # search.tasks.update_click_scores - demonstrated reader
+        # preference breaks relevance ties.
         ranking_rules = [
             "words",
             "typo",
@@ -227,6 +243,7 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "attribute",
             "sort",
             "exactness",
+            "click_score:desc",
         ]
         synonyms = {
             # English synonyms
@@ -288,6 +305,7 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
                 getattr(obj, "_likes_count", 0) or obj.master.likes_count
             ),
             "view_count": lambda obj: obj.master.view_count,
+            "click_score": lambda obj: obj.master.click_score,
             "created_at": lambda obj: (
                 obj.master.created_at.isoformat()
                 if obj.master.created_at

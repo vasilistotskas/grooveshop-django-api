@@ -278,6 +278,22 @@ class SearchInsightsZoneTests(TestCase):
         zero = [row["query"] for row in insights["zero_queries"]]
         assert zero == ["optiki ina"]
 
+    def test_lane_split_query_is_not_a_zero_result(self):
+        # One user search logs separate product/blog/federated rows;
+        # "windows" found 11 blog posts but 0 products — NOT a content
+        # gap. Only never-successful queries are zero-result.
+        self._make_query("windows", results_count=0)
+        self._make_query("windows", results_count=11)
+        self._make_query("asirmati skoupa", results_count=0)
+        self._make_query("asirmati skoupa", results_count=0)
+
+        insights = self._zone()
+
+        zero = [row["query"] for row in insights["zero_queries"]]
+        assert zero == ["asirmati skoupa"]
+        assert insights["zero_result_count"] == 2  # dead query's rows only
+        assert insights["zero_result_pct"] == 50.0  # 2 of 4 meaningful rows
+
     def test_old_rows_are_outside_the_window(self):
         self._make_query("klip kalodion", days_ago=45)
         insights = self._zone()

@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from django.conf import settings as django_settings
 from django.core.cache import caches
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Max
 from extra_settings.models import Setting
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -838,7 +838,7 @@ def search_analytics(request):
 
     Metrics:
     - Top 20 queries by frequency
-    - Zero-result queries (results_count = 0)
+    - Zero-result queries (queries that never returned results)
     - Search volume by content_type and language
     - Average results count
     - Average processing time
@@ -943,11 +943,15 @@ def search_analytics(request):
             }
         )
 
-    # Aggregate zero-result queries (results_count = 0)
+    # A query counts as zero-result only if it NEVER returned results
+    # in the window (HAVING MAX(results_count) = 0): the storefront
+    # fires product/blog/federated sub-searches per user search, each
+    # logged as its own row, so a per-row results_count=0 filter would
+    # list queries whose other lane found plenty.
     zero_result_queries = (
-        queries_qs.filter(results_count=0)
-        .values("query", "language_code")
-        .annotate(count=Count("id"))
+        queries_qs.values("query", "language_code")
+        .annotate(count=Count("id"), max_results=Max("results_count"))
+        .filter(max_results=0)
         .order_by("-count")[:20]
     )
 

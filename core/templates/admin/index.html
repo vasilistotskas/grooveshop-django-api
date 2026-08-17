@@ -484,7 +484,6 @@
                         <tr>
                             <th class="px-3 py-2 text-left font-medium">{% trans "Query" %}</th>
                             <th class="px-3 py-2 text-right font-medium">{% trans "Searches" %}</th>
-                            <th class="px-3 py-2 text-right font-medium">{% trans "Zero results" %}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-base-200 dark:divide-base-800">
@@ -492,18 +491,10 @@
                         <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
                             <td class="px-3 py-2 font-medium text-base-700 dark:text-base-200">{{ row.query }}</td>
                             <td class="px-3 py-2 text-right text-base-700 dark:text-base-200">{{ row.count }}</td>
-                            <td class="px-3 py-2 text-right">
-                                {% if row.zero %}
-                                {% capture as zero_count_text silent %}{{ row.zero }}{% endcapture %}
-                                {% include "unfold/helpers/label.html" with variant="warning" text=zero_count_text %}
-                                {% else %}
-                                <span class="text-base-500 dark:text-base-400">0</span>
-                                {% endif %}
-                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="3" class="px-3 py-6 text-center text-base-600 dark:text-base-300">
+                            <td colspan="2" class="px-3 py-6 text-center text-base-600 dark:text-base-300">
                                 {% trans "No search data yet" %}
                             </td>
                         </tr>

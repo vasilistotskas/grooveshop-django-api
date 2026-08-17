@@ -551,6 +551,32 @@ class TestAnalyticsMetricsCompleteness:
         assert row["avgResults"] == 6.0  # mean of 4 and 8, unweighted
         assert row["clickThroughRate"] == 1.5  # 3 clicks / 2 searches
 
+    def test_zero_result_list_immune_to_lane_split_rows(self, admin_client):
+        """One user search logs separate product/blog/federated rows.
+        A query whose blog lane found results must not appear in the
+        zero-result list because its product lane logged 0."""
+        for content_type, results in (("product", 0), ("blog_post", 11)):
+            SearchQuery.objects.create(
+                query="windows",
+                language_code="el",
+                content_type=content_type,
+                results_count=results,
+                estimated_total_hits=results,
+            )
+        SearchQuery.objects.create(
+            query="asirmati skoupa",
+            language_code="el",
+            content_type="product",
+            results_count=0,
+            estimated_total_hits=0,
+        )
+
+        response = admin_client.get("/api/v1/search/analytics")
+        assert response.status_code == 200
+        zero = [q["query"] for q in response.json()["zeroResultQueries"]]
+        assert "windows" not in zero
+        assert "asirmati skoupa" in zero
+
 
 @requires_meilisearch
 @pytest.mark.django_db

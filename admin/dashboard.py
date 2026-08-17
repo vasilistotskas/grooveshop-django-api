@@ -31,7 +31,7 @@ from datetime import timedelta
 
 from django.apps import apps
 from django.core.cache import cache
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Avg, Count, Max, Q, Sum
 from django.db.models.functions import Length, TruncDay
 from django.urls import reverse
 from django.utils import timezone
@@ -252,9 +252,13 @@ def _zone_f_search_insights(now, month_ago) -> dict:
 
     Empty queries (placeholder/browse requests — the vast majority of
     rows) are excluded everywhere; the query tables additionally drop
-    sub-3-char keystroke fragments. Click-through metrics render as
-    None until click tracking has recorded data, so the template can
-    show "—" instead of a fabricated zero.
+    sub-3-char keystroke fragments. A query counts as zero-result only
+    if it NEVER returned results in the window (HAVING
+    MAX(results_count) = 0): each user search is logged as separate
+    product/blog/federated sub-search rows, so a per-row filter would
+    flag queries whose other lane found plenty. Click-through metrics
+    render as None until click tracking has recorded data, so the
+    template can show "—" instead of a fabricated zero.
     """
     from search.models import SearchClick, SearchQuery
 
@@ -267,23 +271,26 @@ def _zone_f_search_insights(now, month_ago) -> dict:
         qlen__gte=_SEARCH_MIN_QUERY_LEN
     )
     meaningful_total = meaningful.count()
-    zero_total = meaningful.filter(results_count=0).count()
+    zero_query_texts = (
+        meaningful.values("query")
+        .annotate(max_results=Max("results_count"))
+        .filter(max_results=0)
+        .values("query")
+    )
+    zero_total = meaningful.filter(query__in=zero_query_texts).count()
 
     clicks_30d = SearchClick.objects.filter(timestamp__gte=month_ago).count()
     has_any_click = SearchClick.objects.exists()
 
     top_rows = list(
         meaningful.values("query")
-        .annotate(
-            count=Count("id"),
-            zero=Count("id", filter=Q(results_count=0)),
-        )
+        .annotate(count=Count("id"))
         .order_by("-count")[:_SEARCH_TOP_QUERIES]
     )
     zero_rows = list(
-        meaningful.filter(results_count=0)
-        .values("query")
-        .annotate(count=Count("id"))
+        meaningful.values("query")
+        .annotate(count=Count("id"), max_results=Max("results_count"))
+        .filter(max_results=0)
         .order_by("-count")[:_SEARCH_TOP_QUERIES]
     )
 

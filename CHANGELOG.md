@@ -3,6 +3,32 @@
 
 
 
+## v1.167.2 (2026-08-17)
+
+### Bug fixes
+
+* fix(meili): restore meilisearch_apply_settings - deploy hook depends on it (#18)
+
+The audit round deleted this command as dead code, but its consumer
+lives in another repository: the grooveshop-infrastructure prepare-helm
+PreSync job runs it on every deploy to keep MeiliMeta settings from
+drifting (a drifted sortable field once made every product ?sort= query
+500). The deletion crash-looped the v1.167.1 rollout's prepare hook
+with "Unknown command".
+
+Restored verbatim, with the cross-repo consumer documented in the
+docstring and a guard test so a repo-local reference scan can never
+classify it as dead again.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`d0acb40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0acb40e56fabd187b6a5cd814f7ccb06e72707f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.167.1 [skip ci] ([`805bec3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/805bec33c26a165178e8515b5bd2749f86db3271))
+
 ## v1.167.1 (2026-08-17)
 
 ### Bug fixes

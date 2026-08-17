@@ -60,7 +60,7 @@ All apps live at the project root (flat structure, no `src/` directory):
 
 - **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing. The `core/urls.py` is the root URL conf that mounts all other apps under `api/v1/`.
 - **product/**, **order/**, **cart/**, **blog/**, **user/** — Main domain apps
-- **search/** — Meilisearch integration with federated search, Greeklish expansion, and analytics
+- **search/** — Meilisearch integration with federated search, Greeklish transliteration, and analytics
 - **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
 - **notification/** — Real-time notifications via WebSocket (Django Channels consumer)
 - **loyalty/** — Points, XP, tiers, and rewards system
@@ -135,6 +135,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 - **Stock management**: `StockManager` with atomic `reserve_stock()`/`release_stock()` using `select_for_update()` to prevent overselling under concurrent requests. The legacy `create_order` path also performs stock checks inside an atomic block. `StockReservation` model with TTL (default 15 min). `StockLog` for audit trail.
 - **Computed properties**: Models check `__dict__` for annotation values before falling back to DB queries (e.g. `likes_count`, `review_average`)
 - **Meilisearch indexing**: Models inherit `IndexMixin` with `MeiliMeta` class defining filterable/searchable/sortable fields, ranking rules, synonyms, typo tolerance. `meili_filter()` controls indexing eligibility. `get_additional_meili_fields()` adds computed fields.
+- **Greeklish search**: Handled at *index time* (`search/transliteration.py`), queries reach Meilisearch verbatim. Three shadow layers: canonical `*_greeklish` on every searchable Greek field; `*_greeklish_alt` (word-initial μπ/ντ/γκ → b/d/g); and `*_greeklish_variants` bags on SHORT fields only (titles, names, attributes — never bodies) holding every common Latin rendering per word (η→h/i, υ→y/u/i, ω→w/o/v, χ→x/h/ch, …; GreekLatinGenerator lineage, capped at 20/word) so conventions match exactly without leaning on typo tolerance. Never rewrite queries into space-joined variants: the default `last` matching strategy only drops words from the end (first word effectively mandatory) and only the first 10 query words are considered; a typo on a word's FIRST character costs two typos. The search views retry zero-result multi-word queries once with the leading word dropped (`_relaxed_query`) — the one shape `last` can never relax. Keep `minWordSizeForTypos` identical across indexes ({4, 8}); they feed one federated search.
 
 ### WebSocket / Real-time
 
@@ -188,7 +189,7 @@ Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key
 GitHub Actions (`.github/workflows/ci.yml`): 3-stage pipeline:
 1. **Quality** — Ruff format check
 2. **Testing** — PostgreSQL 17 + Redis + Meilisearch services, migrations, pytest with coverage (15 min timeout)
-3. **Release** — python-semantic-release → TestPyPI → PyPI (main branch only)
+3. **Release** — python-semantic-release cuts the version, changelog, and GitHub release with dist assets (main branch only); the Docker image workflow triggers on the published release. Not published to PyPI — this is a deployed application, not a library (dropped 2026-08 after the PyPI project hit its 10 GB size cap).
 
 ## Code Style
 

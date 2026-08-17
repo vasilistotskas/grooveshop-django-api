@@ -180,6 +180,11 @@ class TestContactManager(TestCase):
         assert isinstance(manager, models.Manager)
 
     def test_by_email_domain_performance(self):
+        # Prime the connection: django-tenants >= 3.14 clears its cached
+        # search_path on rollback(), so the first query after a test
+        # boundary re-issues ``SET search_path`` — which would count
+        # against the assertion below.
+        Contact.objects.exists()
         with self.assertNumQueries(1):
             list(Contact.objects.by_email_domain("example.com"))
 

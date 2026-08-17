@@ -69,7 +69,7 @@ class CartService:
         if raw_cart_id:
             try:
                 self.cart_id = uuid.UUID(str(raw_cart_id))
-            except (ValueError, TypeError, AttributeError):
+            except ValueError, TypeError, AttributeError:
                 self.cart_id = None
 
     def __str__(self):
@@ -232,7 +232,7 @@ class CartService:
                 if isinstance(cart_uuid, uuid.UUID)
                 else uuid.UUID(str(cart_uuid))
             )
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
 
         if self.request.user.is_authenticated:

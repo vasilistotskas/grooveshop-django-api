@@ -38,6 +38,11 @@ from meili.models import IndexMixin
 from product.managers.product import ProductManager
 from product.models.image import ProductImage
 from core.models import SeoModel
+from search.transliteration import (
+    greeklish_shadow,
+    greeklish_shadow_alt,
+    greeklish_variants,
+)
 from tag.models.tagged_item import TaggedModel
 
 DISCOUNT_PERCENT_MIN = Decimal("0.0")
@@ -144,6 +149,19 @@ class Product(
         on_delete=models.SET_NULL,
     )
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
+    click_score = models.PositiveIntegerField(
+        _("Click Score"),
+        # db_default (not default): the DB-level DEFAULT survives the
+        # migration, so old pods still INSERTing without this column
+        # during the rollout window don't violate NOT NULL - the
+        # checkout path writes product history rows on every sale.
+        db_default=0,
+        editable=False,
+        help_text=(
+            "Search click-through ranking signal - trailing-window click "
+            "count refreshed by search.tasks.update_click_scores"
+        ),
+    )
     weight = MeasurementField(
         # Lazy translation, NOT ``str(_("Weight"))``: forcing the
         # string at module-import time bakes the locale-resolved
@@ -500,12 +518,27 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "attributes",
             "attribute_values",
         )
+        # ``*_greeklish_variants`` bags exist only for the SHORT fields
+        # (name/attributes) — expanding every description word would
+        # bloat the index and pollute ranking for no realistic recall
+        # gain.
         searchable_fields = (
             "master_id",
             "name",
+            "name_greeklish",
+            "name_greeklish_alt",
+            "name_greeklish_variants",
             "description",
+            "description_greeklish",
+            "description_greeklish_alt",
             "attribute_names",
+            "attribute_names_greeklish",
+            "attribute_names_greeklish_alt",
+            "attribute_names_greeklish_variants",
             "attribute_values_text",
+            "attribute_values_text_greeklish",
+            "attribute_values_text_greeklish_alt",
+            "attribute_values_text_greeklish_variants",
         )
         displayed_fields = (
             "id",
@@ -533,6 +566,10 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "created_at",
             "stock",
         )
+        # Custom rule tail, in business-priority order: availability
+        # dominates (a binary signal - stock QUANTITY is not relevance),
+        # then demonstrated shopper preference (click_score, refreshed by
+        # search.tasks.update_click_scores), then promotions.
         ranking_rules = [
             "words",
             "typo",
@@ -540,7 +577,8 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "attribute",
             "sort",
             "exactness",
-            "stock:desc",
+            "in_stock:desc",
+            "click_score:desc",
             "discount_percent:desc",
         ]
         synonyms = {
@@ -561,9 +599,15 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "computer": ["rechner", "pc"],
             "rechner": ["computer", "pc"],
         }
+        # Same thresholds as BlogPostTranslation — cross-index
+        # consistency matters because both feed the federated search.
+        # The looser historical {3, 5} setting gave 5-char words a
+        # two-typo budget, which let first-character noise match
+        # ("aroma" → "xroma"); transliteration-convention matching is
+        # the job of the ``*_greeklish_variants`` bags, not typos.
         typo_tolerance = {
             "enabled": True,
-            "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 5},
+            "minWordSizeForTypos": {"oneTypo": 4, "twoTypos": 8},
             "disableOnWords": [],
             "disableOnAttributes": [],
         }
@@ -575,6 +619,15 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
     def get_additional_meili_fields(cls):
         return {
             "master_id": lambda obj: obj.master_id,
+            "name_greeklish": lambda obj: greeklish_shadow(obj.name),
+            "name_greeklish_alt": lambda obj: greeklish_shadow_alt(obj.name),
+            "name_greeklish_variants": lambda obj: greeklish_variants(obj.name),
+            "description_greeklish": lambda obj: greeklish_shadow(
+                obj.description
+            ),
+            "description_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                obj.description
+            ),
             "likes_count": lambda obj: (
                 getattr(obj, "_likes_count", 0) or obj.master.likes_count
             ),
@@ -595,6 +648,8 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
                 else None
             ),
             "stock": lambda obj: obj.master.stock,
+            "in_stock": lambda obj: obj.master.stock > 0,
+            "click_score": lambda obj: obj.master.click_score,
             "active": lambda obj: obj.master.active,
             "is_deleted": lambda obj: obj.master.is_deleted,
             "attributes": lambda obj: list(
@@ -662,7 +717,25 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
 
         return {
             "attribute_names": lambda obj: _fetch(obj)[0],
+            "attribute_names_greeklish": lambda obj: greeklish_shadow(
+                _fetch(obj)[0]
+            ),
+            "attribute_names_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                _fetch(obj)[0]
+            ),
+            "attribute_names_greeklish_variants": lambda obj: (
+                greeklish_variants(_fetch(obj)[0])
+            ),
             "attribute_values_text": lambda obj: _fetch(obj)[1],
+            "attribute_values_text_greeklish": lambda obj: greeklish_shadow(
+                _fetch(obj)[1]
+            ),
+            "attribute_values_text_greeklish_alt": lambda obj: (
+                greeklish_shadow_alt(_fetch(obj)[1])
+            ),
+            "attribute_values_text_greeklish_variants": lambda obj: (
+                greeklish_variants(_fetch(obj)[1])
+            ),
             "attribute_data": lambda obj: _fetch(obj)[2],
         }
 

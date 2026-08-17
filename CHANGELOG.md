@@ -3,6 +3,887 @@
 
 
 
+## v1.168.1 (2026-08-17)
+
+### Bug fixes
+
+* fix(search): zero-result analytics immune to per-lane sub-search rows
+
+Each storefront search logs separate product/blog/federated
+SearchQuery rows, so a per-row results_count=0 filter listed queries
+whose other lane found plenty (e.g. "windows": product row 0, blog
+row 11). A query now counts as zero-result only if it NEVER returned
+results in the window (HAVING MAX(results_count) = 0) — applied to
+the analytics endpoint's zeroResultQueries, the Zone F zero-result
+worklist and KPI, and the misleading per-lane "Zero results" column
+is dropped from the top-queries table.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56 ([`b58c0d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b58c0d57bcc3793f972b28c3b77cdcc7b79b3afa))
+
+* fix(admin): repair stale dj-stripe search_fields crashing ⌘K palette (#19)
+
+dj-stripe 2.11.0 moved Stripe payload columns into the stripe_data
+JSONField but left five admins (Account, Customer, Session, Invoice,
+PromotionCode) searching fields that no longer exist, so any admin
+search against them raises FieldError. Unfold's command palette
+(COMMAND.search_models) searches every registered admin, so every
+palette query 500'd at /admin/search/.
+
+Replace stale entries with stripe_data (same pattern as dj-stripe's
+own AccountV2Admin) via a documented patch applied in
+MyAdminConfig.ready(), and add a registry-wide smoke test that
+executes every admin's get_search_results so any future stale
+search_fields — ours or a dependency's — fails CI instead of taking
+down the palette.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`658de5f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/658de5f0bd7332261b098c41112620ba915f159c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.168.0 [skip ci] ([`d08874d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d08874d6f66e80e971a5dc0c6dfc6c0b6dbb3529))
+
+## v1.168.0 (2026-08-17)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.167.2 [skip ci] ([`e8d3500`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8d350050410a0bdf2b1c39b14565d87018afc05))
+
+### Features
+
+* feat(tenant): per-tenant chat credential on tenant/resolve
+
+TENANT_CHAT_API_KEY rides the resolve payload as chatApiKey — but only
+for callers presenting the agent gateway's X-Internal-Token (constant
+time compare against AGENT_GATEWAY_INTERNAL_SECRET). The public payload,
+the cache, and the OpenAPI schema never carry it. On the multi-tenant
+branch this becomes a Tenant column so every client brings their own
+model-provider key (own quota, own consent, own billing).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`c6a5a46`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6a5a4669f570fbff451d1dab87cfc83d481a61e))
+
+## v1.167.2 (2026-08-17)
+
+### Bug fixes
+
+* fix(meili): restore meilisearch_apply_settings - deploy hook depends on it (#18)
+
+The audit round deleted this command as dead code, but its consumer
+lives in another repository: the grooveshop-infrastructure prepare-helm
+PreSync job runs it on every deploy to keep MeiliMeta settings from
+drifting (a drifted sortable field once made every product ?sort= query
+500). The deletion crash-looped the v1.167.1 rollout's prepare hook
+with "Unknown command".
+
+Restored verbatim, with the cross-repo consumer documented in the
+docstring and a guard test so a repo-local reference scan can never
+classify it as dead again.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`d0acb40`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d0acb40e56fabd187b6a5cd814f7ccb06e72707f))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.167.1 [skip ci] ([`805bec3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/805bec33c26a165178e8515b5bd2749f86db3271))
+
+## v1.167.1 (2026-08-17)
+
+### Bug fixes
+
+* fix(search): audit hardening — analytics correctness, contract fixes, dead code (#17) ([`a6b935c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6b935ce77e5d8df3f10ff22ed7af6a84052c747))
+
+* fix(search): audit hardening - analytics correctness, contract fixes, dead code
+
+Full search-audit round; every finding validated against code and the
+live deployment before fixing:
+
+- search_analytics top-query metrics: computing Count("id") /
+  Avg("results_count") together with Count("clicks") in one annotate()
+  fans the SearchClick JOIN out before GROUP BY, inflating counts and
+  skewing averages for any query text with multi-click rows. Clicks
+  now come from a separate aggregate merged by query text; regression
+test locks the exact numbers.
+- save_search_query truncates to the column limit - an oversized
+  pasted query was a guaranteed DataError, three doomed retries and a
+  silently lost analytics row (reproduced against production).
+- Federated results expose "federation": the previous "_federation"
+  key was mangled to "Federation" by the camelCase renderer (verified
+  live), breaking the camelCase contract. The vacuous federation
+  metadata test now uses a real product so its assertions execute.
+- search/click gets its own throttle scope (60/min) so anonymous click
+  spam cannot starve the shared 120/min search budget.
+- REST_FRAMEWORK NUM_PROXIES=1: without it DRF keys anon throttling
+  off the entire client-controlled X-Forwarded-For header, letting a
+  caller mint a fresh throttle bucket per request.
+- Dead code removed: search/utils.py (six orphaned helpers),
+  meili/batch.py (+ lazy-import surface), four orphaned management
+  commands (apply_settings, clear_index, test_federated,
+  export_analytics) with their tests, eight dead queryset methods,
+  IndexMixin.get_meilisearch, and the always-None
+  CLIENT_AGENTS/DEBUG/OFFLINE/BATCH_SIZE knobs (ASYNC_INDEXING added
+  to the settings TypedDict - used but undeclared). Dead
+  product_limit allocation in federated_search + stale docstring step.
+
+Deliberately kept: the meili geo-search surface (guarded, tested,
+generic-library capability - stripping it risks the indexing hot path
+for zero functional gain).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56 ([`a6b935c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6b935ce77e5d8df3f10ff22ed7af6a84052c747))
+
+### Chores
+
+* chore: drop untracked schema.json build artifact
+
+The repo tracks schema.yml only; the JSON flavor is generated on
+demand for the storefront's codegen.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+---------
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`a6b935c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6b935ce77e5d8df3f10ff22ed7af6a84052c747))
+
+* chore(deps): sync uv.lock to 1.167.0 [skip ci] ([`cafea4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cafea4b5bc7e76d36c1792164ebd8f9d969320a6))
+
+## v1.167.0 (2026-08-17)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.166.0 [skip ci] ([`329fa65`](https://github.com/vasilistotskas/grooveshop-django-api/commit/329fa657f364a6c07f5d5dd09a42c5df74a8b610))
+
+### Features
+
+* feat(search): click tracking, CTR ranking signal, insights dashboard (#16)
+
+Phase 1 of the search plan - measure behavior and rank by it:
+
+- POST search/click attributes result clicks to the query that
+  produced them via a query_id minted per search response (stored on
+  SearchQuery.uuid by the analytics middleware task). Clicks were
+  previously impossible to record - the model existed with no write
+  path.
+- Nightly update_click_scores task turns trailing-30-day clicks into a
+  click_score ranking attribute on Product and BlogPost (minimum 2
+  clicks, top 50 per type - single clicks are noise), pushed to
+  Meilisearch as partial document updates. click_score:desc joins the
+  ranking rule tail on both indexes.
+- Product availability ranking is now binary: in_stock:desc replaces
+  stock:desc (a quantity is not a relevance signal; 100 units should
+  not outrank 3). click_score fields use db_default so the DB-level
+  default survives the migration and old pods can keep inserting
+  product history rows during the rollout window.
+- Search responses disclose relaxed_query when the zero-result
+  fallback produced the results, so clients can render "showing
+  results for ..." instead of silently swapping queries.
+- Admin dashboard Zone F - Search Insights: 30-day KPIs, top queries,
+  zero-result queries (the synonym/content-gap worklist), and a 14-day
+  volume chart. Empty placeholder queries and sub-3-char keystroke
+  fragments are excluded - validated against production data where
+  they are 93% of rows. Click metrics render as a dash until the
+  first click is ever recorded.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`d3ddb90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d3ddb9089cbb55b2f4e84903700af3fdcfb9d0ce))
+
+## v1.166.0 (2026-08-16)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.165.0 [skip ci] ([`e8159c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8159c49753cdbb837e0253b88e092dee2fa0e30))
+
+### Code style
+
+* style: format variant test additions
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+---------
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`46814dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/46814dc3ca10ac3eb915ceccddd152ce010e16c4))
+
+### Features
+
+* feat(search): full-convention greeklish variant bags and relaxed fallback (#15) ([`46814dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/46814dc3ca10ac3eb915ceccddd152ce010e16c4))
+
+* feat(search): full-convention greeklish variant bags and relaxed fallback
+
+A typo on a word's first character costs two typos, so transliteration
+conventions that diverge on the first letter (hrisi/χρήση, yliko/υλικό,
+wra/ώρα) can never match short words through typo tolerance. Port the
+GreekLatinGenerator variant expansion (the table battle-tested in the
+Findloom search service) and index every common Latin rendering of each
+Greek word as *_greeklish_variants bags on the short fields only — blog
+title/subtitle, product name and attribute names/values — capped at 20
+renderings per word and parity-pinned against the Findloom corpus.
+
+Harmonize ProductTranslation minWordSizeForTypos to the blog's {4, 8}:
+the historical {3, 5} gave five-char words a two-typo budget, letting
+first-character noise match ("aroma" -> "xroma"), and made the two
+indexes behind the single federated search behave differently.
+
+Add a zero-result relaxed fallback to all three search views: the
+default `last` matching strategy only drops words from the end, so a
+leading word that matches nothing guarantees zero results; retry once
+with the leading word dropped.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56 ([`46814dc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/46814dc3ca10ac3eb915ceccddd152ce010e16c4))
+
+## v1.165.0 (2026-08-16)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.164.1 [skip ci] ([`81f2ec1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/81f2ec1c51e6f5018b265af044185d2d9b31f343))
+
+### Features
+
+* feat(settings): admin kill switch for the storefront chat widget
+
+New CHAT_WIDGET_ENABLED extra-setting (bool, default True) toggled at
+/admin/extra_settings/setting/, exposed via PUBLIC_SETTING_KEYS so the
+storefront can gate the launcher. The gateway /chat endpoint stays up
+regardless — re-enabling needs no deploy.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`c8c1cd5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c8c1cd560fa19aef2ff86894857d87fb78330705))
+
+## v1.164.1 (2026-08-16)
+
+### Bug fixes
+
+* fix(agent): return 401 with a Bearer challenge for invalid tokens
+
+allauth's TokenAuthentication has no authenticate_header, so DRF
+rendered missing/invalid credentials as 403 — indistinguishable from a
+valid token lacking a scope. The agent gateway needs the 401 to emit
+its RFC 9728 WWW-Authenticate challenge and trigger re-authorization.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`66f5fb3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/66f5fb322bdf35e120ab205ad52ea0cf9624a61d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.164.0 [skip ci] ([`50fcee5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/50fcee527682416258589f6292e29dec5aa79319))
+
+## v1.164.0 (2026-08-16)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.163.1 [skip ci] ([`0bf1e14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0bf1e14c936805e0618d5f9107893129e98f0096))
+
+### Features
+
+* feat(agent): favourites on the agent surface
+
+GET /api/v1/agent/me/favourites — the linked shopper's favourited
+products (active only, newest first, capped) in a compact agent shape:
+localized name, VAT-inclusive price, stock flag. New favourites:read
+scope with consent copy; completes the identity-linking unlock set
+(orders, loyalty, favourites). Schema regenerated (pure addition).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`8140625`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8140625f899152dbab19e379ff5c3ac51aba1348))
+
+## v1.163.1 (2026-08-16)
+
+### Bug fixes
+
+* fix(auth): LOGIN_URL → allauth shopper login
+
+The OIDC authorize view (/identity/o/authorize) redirects anonymous
+users to LOGIN_URL, which pointed at /admin/ — the admin login rejects
+non-staff, dead-ending every agent account-linking flow for real
+shoppers. allauth's /accounts/login/ serves shoppers and staff alike.
+Caught by the live browser E2E of the OAuth journey.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`5e9a84c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5e9a84c4d6695c54585664c929e71cdf589aaa09))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.163.0 [skip ci] ([`9b51800`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9b518002ab49f8a3510090126e90d9fafc86a9c5))
+
+## v1.163.0 (2026-08-16)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.162.3 [skip ci] ([`0fe9234`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0fe9234ed3834c56c47074f839b9a24ca5276f8d))
+
+### Features
+
+* feat(agent): identity linking — OIDC provider + scoped agent API
+
+Turns the API into an OAuth 2.1 authorization server for AI agents via
+allauth.idp.oidc (already our auth stack; new [idp-oidc] extra):
+authorization-code + PKCE at /identity/o/authorize (allauth's own
+login/consent pages), token endpoint, open Dynamic Client Registration
+(RFC 7591, rate-limited, no initial access token — MCP clients
+self-register), discovery at /.well-known/openid-configuration plus an
+RFC 8414 alias at /.well-known/oauth-authorization-server.
+
+New agent app: /api/v1/agent/me, /me/orders, /me/loyalty — OIDC
+bearer tokens ONLY (never Knox/session; the isolation keeps agent
+scopes least-privilege) with per-scope permissions (profile,
+orders:read, loyalty:read). Loyalty summary computation extracted to
+LoyaltyService.get_user_summary and shared with the storefront
+endpoint. Schema regenerated (pure addition). Full suite: 4989 passed.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`855eb13`](https://github.com/vasilistotskas/grooveshop-django-api/commit/855eb132c6d9aa1e1baa2bd0b0b36c9b07aa6033))
+
+* feat(order): agent-gateway integration — order events, SPT payments, cart throttle
+
+Four coordinated pieces for the grooveshop-agent-gateway:
+
+- Order-event push: push_order_event_to_gateway (MonitoredTask, retry
+  backoff) POSTs {schemaName, orderUuid, status, paymentStatus,
+  trackingNumber} to the gateway's cluster-internal endpoint on every
+  status/payment/tracking transition (single on_commit enqueue per
+  save; Order now snapshots _original_payment_status). Unset
+  AGENT_GATEWAY_INTERNAL_URL keeps the surface off; failures never
+  touch order processing.
+- Gateway-aware anon cart throttle: CartMutationAnonThrottle keys on
+  the cart UUID when the request carries the X-Internal-Gateway shared
+  secret — agent traffic egresses from gateway pods, so per-IP keying
+  would collapse every AI agent into one 30/min bucket.
+- Agent-delegated Stripe payments (flag-gated OFF): POST
+  /order/{id}/confirm_agent_payment charges a SharedPaymentToken via a
+  server-side confirmed PaymentIntent
+  (payment_method_data[shared_payment_granted_token], idempotent per
+  order). AGENT_STRIPE_DELEGATED_ENABLED stays False until Stripe
+  Agentic Commerce enrollment; disabled → clean 400.
+- order/uuid/{uuid} cleanup: the path param is authoritative for the
+  guest permission check — a stray ?uuid= query no longer overrides a
+  correctly-addressed order.
+
+Schema regenerated (pure addition). Full suite: 4965 passed.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`d34e5d0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d34e5d001afc1909f9e334baad49e21f99e61205))
+
+* feat: settings-backed tenant/resolve endpoint for the agent gateway
+
+Adds a `tenant` app exposing GET /api/v1/tenant/resolve?domain= with the
+exact wire shape of the multi-tenant branch's TenantConfigSerializer,
+sourced from TENANT_* settings instead of a Tenant model. The gateway
+and (later) Nuxt resolve tenants through one code path on main; the MT
+branch's DB-backed version supersedes this wholesale at merge — no
+fallback logic combines the two.
+
+- AllowAny, 1h response cache, 404 for domains outside
+  TENANT_PRIMARY_DOMAIN/TENANT_EXTRA_DOMAINS (primary defaults to the
+  NUXT_BASE_URL host; no hardcoded production domains).
+- schema.yml regenerated.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`73d0807`](https://github.com/vasilistotskas/grooveshop-django-api/commit/73d0807a4002500c4e8051917a5d112353b5fd18))
+
+### Refactoring
+
+* refactor(cache): drop Nuxt ProductFeed purge patterns
+
+The catalog feeds moved from Nuxt Nitro to the agent gateway (own
+Redis SWR cache, admin-independent); the cached-function purge
+patterns and the now-unused _nuxt_functions helper are dead code.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`1d304a1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1d304a188c14aa5960a3797883b02d9adac38495))
+
+## v1.162.3 (2026-08-16)
+
+### Bug fixes
+
+* fix(search): greeklish shadows for product attribute search fields (#14)
+
+Greek attribute values ("Πλαστικό", "Μπλε") often exist only in
+attribute_values_text — never in the product name — so greeklish
+queries like "plastiko" or "ble" could not match the product at all.
+Shadow attribute_names and attribute_values_text with the same
+*_greeklish / *_greeklish_alt pattern used for name and description.
+
+Also drop the TestPyPI/PyPI publish chain from the release job: this
+repository is a deployed application (Docker), not a library, and the
+PyPI project has hit its 10 GB total-size cap (502 releases, 10.74 GB)
+so every release job fails at the publish step. python-semantic-release
+keeps building dist assets for the GitHub release, which is what the
+Docker workflow triggers on.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`4047761`](https://github.com/vasilistotskas/grooveshop-django-api/commit/404776158aacfbf3ee53cda54e72a97541d386d4))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.162.2 [skip ci] ([`6a19e21`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6a19e212d6f9db84b3c64e31545d079f6fae8dca))
+
+## v1.162.2 (2026-08-15)
+
+### Bug fixes
+
+* fix(search): index word-initial voiced-stop digraph greeklish variants (#13)
+
+Queries typing word-initial μπ/ντ/γκ as the voiced stops they are
+pronounced as ("bataria", "blokarisma", "boreis") returned zero
+results: reaching the per-character fold ("mpataria") from "bataria"
+costs an insertion on the first character — which Meilisearch counts
+as two typos — plus a b→p substitution, three typos total, more than
+typo tolerance ever allows at any word length (validated with
+controlled probes against the production index).
+
+Add a second shadow attribute per greeklish field (*_greeklish_alt)
+that folds word-initial μπ→b, ντ→d, γκ→g before the canonical
+per-character transliteration, so both typing conventions match
+exactly. Mid-word digraphs keep the per-character fold, which is how
+users type them. The alt shadow is None unless it differs from the
+primary shadow, so it only costs index space when a word-initial
+digraph is present.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`7e775ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7e775ee53d3e1f5a49efa7715c82cc06880b0111))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.162.1 [skip ci] ([`09e8fe8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/09e8fe8e320d2006e0ea054f05cb760c185997cb))
+
+## v1.162.1 (2026-08-14)
+
+### Bug fixes
+
+* fix(search): match Greeklish via indexed transliteration shadow fields (#12)
+
+Query-time Greeklish expansion joined whole-phrase Greek variants with
+spaces, which can never match under Meilisearch semantics: the default
+"last" matching strategy only drops words from the end of the query
+(making the leading Latin word effectively mandatory), only the first
+ten query words are considered, and the shared variant budget starved
+the correct word endings while transliterating embedded English words
+("windows") into garbage. On production, "anavathmisi se windows"
+returned zero results and "optiki ina" only matched a post whose body
+happened to contain a Latin slug.
+
+Index a canonical phonetic transliteration of every searchable Greek
+field instead (title/subtitle/body on BlogPostTranslation and
+name/description on ProductTranslation as *_greeklish shadow
+attributes) and send user queries to Meilisearch verbatim. Common
+Greeklish spellings exact-match the shadow fields; alternative
+conventions land within typo tolerance; Latin content passes through
+unchanged so brand names stay searchable. All 78 production Greek blog
+titles fold cleanly with zero unmapped characters.
+
+Requires one meilisearch_sync_all_indexes run after deploy (also
+scheduled daily at 02:00) to apply settings and re-push documents.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`de32f51`](https://github.com/vasilistotskas/grooveshop-django-api/commit/de32f510e976ef2bbd6212b12d32efef5682938e))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.162.0 [skip ci] ([`be26fbe`](https://github.com/vasilistotskas/grooveshop-django-api/commit/be26fbedb886c47a18a548483a3bfe22da422c99))
+
+## v1.162.0 (2026-08-14)
+
+### Chores
+
+* chore(config): audit pyproject ignores — retire fixed ones, align ruff target
+
+Every suppression validated empirically (all ty rules flipped to warn
+for a full-count run; warning filters re-tested with filters stripped):
+
+- ty src exclude for search/views.py REMOVED — the infinite-cycle
+  panic is fixed in ty 0.0.35 and the file now checks cleanly.
+- drf-spectacular _UnionGenericAlias filter REMOVED — 0.30.0 ships the
+  upstream fix (tfranzel/drf-spectacular#1497); schema-generation tests
+  run warning-free without it.
+- daphne asyncio filters KEPT — both still fire on daphne 4.2.1 /
+  Python 3.14 (re-test note added).
+- twisted override rc pin advanced to the now-released 26.4.0 stable.
+- Every remaining ty ignore rule confirmed load-bearing: global
+  unresolved-attribute 265 hits / invalid-attribute-override 39 outside
+  tests; each per-section rule has real hits in scope (tests 2-3314,
+  factories 29, lib-stub dirs 1-12 — all third-party stub limitations,
+  admin.py unfold @action 59, order/payment.py stripe Unpack 157).
+- ruff target-version py313 -> py314 (requires-python is >=3.14; ruff
+  would infer py314 if unset) + the resulting PEP 758 reformat of 21
+  files (unparenthesized multi-exception syntax).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`47f258e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/47f258e2e4b113e4586005e6cb7066db613d99ca))
+
+* chore(deps): sync uv.lock to 1.161.1 [skip ci] ([`e4c7dcc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e4c7dcca7114252a27c82378e4dab7430b7103e3))
+
+### Features
+
+* feat(admin): add period filter to revenue card
+
+The dashboard hero revenue card now switches between 7d/1m/3m/1y
+windows. All periods ship in the cached payload via one filtered-
+aggregate query; an Alpine.js segmented control (bundled by unfold,
+incl. the persist plugin) toggles them client-side and remembers the
+admin's choice in localStorage. Each period's trend badge compares
+against the prior window of equal length. Dashboard cache key bumped
+to v5 for the payload shape change; Greek strings and compiled
+Tailwind CSS updated alongside.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011eV7Sx7AGjTikDFWS4bygq ([`c49bdab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c49bdab33df68a62cc4cf43a9cac597333b72699))
+
+## v1.161.1 (2026-08-14)
+
+### Bug fixes
+
+* fix(product): localize product-alert emails per recipient
+
+send_product_alert_restock and send_product_alert_price_drop rendered
+subject, product name, and templates in the Celery worker's active
+language — the only customer-facing email tasks without a
+translation_override (they postdate the 2026-04 per-user-language
+pass). Both loops now wrap per-recipient in
+translation_override(get_user_language(user)): the product name
+resolves in the recipient's language, gettext subjects evaluate under
+it, and _send_product_alert_email's templates render inside it
+(docstring now states that contract). Anonymous alerts fall back to
+settings.LANGUAGE_CODE.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`e6745f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e6745f525dd88c53ef40d5c3c445420b82f57515))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.161.0 [skip ci] ([`6aaba72`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aaba7255364ea4cf34949c7a8aba27af66f8483))
+
+### Continuous integration
+
+* ci: bump meilisearch v1.53.0 -> v1.53.1 (parity with prod chart 0.38.0)
+
+Prod unpinned the engine from the chart (appVersion v1.53.1) on
+2026-08-14; CI and local compose follow so dev and prod run the same
+engine.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`1aa3142`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1aa31428f882d442aef3f867a9245674c9cb8c17))
+
+### Refactoring
+
+* refactor(core): drop the unused burst throttle rate
+
+DEFAULT_THROTTLE_RATES carried 'burst: 5/minute' with no throttle
+class anywhere using that scope (no ScopedRateThrottle usage, no
+throttle_scope references) — dead config since the scoped throttles
+got dedicated names.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`b43f078`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b43f0783604b50f58d8a9a1b6c2b99315a12ff55))
+
+## v1.161.0 (2026-08-14)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.160.1 [skip ci] ([`e69cd5c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e69cd5ca97581c9cdb37af48e9770643469501a7))
+
+### Features
+
+* feat: Bump Versions ([`af79a9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/af79a9fe1a2940d348ce4318c73b0364669e79da))
+
+## v1.160.1 (2026-08-13)
+
+### Bug fixes
+
+* fix(shipping): allow empty ACS address-validation response in the schema
+
+The endpoint returns a literal {} when ACS cannot geocode (documented
+in the view), but the response serializer declared every field
+required — schema-validating consumers (Nuxt parseDataAs) rejected the
+documented not-recognised case with a 422 on every unresolvable
+address typed into checkout step 0.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`48e4b26`](https://github.com/vasilistotskas/grooveshop-django-api/commit/48e4b263c12788a0f16b02980b9be6f8870c5b39))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.160.0 [skip ci] ([`f15adab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f15adabee23fce432cd578e4c2829a1609248f75))
+
+## v1.160.0 (2026-08-13)
+
+### Bug fixes
+
+* fix(order,tag): defuse paypal stub footgun and TaggedItem N+1
+
+PayPal: PayPalPaymentProvider is an unimplemented stub (every method
+raises NotImplementedError), yet create_payway seeded it active:True and
+the PAYMENT_PROVIDERS registry resolved it — one seed command away from
+a live checkout option that crashes order status verification. Seed is
+now active:False and the registry entry is removed, so a mis-seeded
+payway fails fast with "Unknown payment provider". Class kept as the
+implementation scaffold; test updated to assert the new fail-fast
+contract (production DB verified: no paypal PayWay row exists).
+
+TaggedItem: TaggedItemViewSet was the only viewset in the codebase not
+overriding get_queryset() with the optimized manager methods — its
+serializer touches tag translations, content_type and the
+content_object GFK per row, so every cache-cold list/retrieve was an
+N+1. Now mirrors the for_list()/for_detail() pattern used everywhere
+else.
+
+Verified: ruff + ty clean; 165 tag/order/management tests + 23 payment
+tests pass.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`d09d0ab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d09d0abee61bf29c6a73c00837454b1088f94699))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.159.1 [skip ci] ([`24ef316`](https://github.com/vasilistotskas/grooveshop-django-api/commit/24ef3164526e8fccf042d5ba794d4ccbacdccb6d))
+
+### Features
+
+* feat(user): type the bulk_update subscription response in the schema
+
+bulkUpdateUserSubscriptions declared responses={200: None}, so the
+OpenAPI schema carried no 200 body and the Nuxt generator could not emit
+a response schema — leaving the storefront proxy route unable to
+runtime-validate the response (one of only 3 routes without parseDataAs).
+Adds BulkSubscriptionResultSerializer matching the actual view payload
+(success / failed{topic,error} / already_processed) and wires it into
+the ActionConfig; schema.yml regenerated.
+
+Verified: ruff + ty clean; 241 user tests pass.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`faa6ab5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/faa6ab589ccecab81815be1793de84e4b6fa8ccb))
+
+## v1.159.1 (2026-08-12)
+
+### Bug fixes
+
+* fix: clear uvicorn and billiard startup warnings
+
+Two warnings on every worker boot, both now silent.
+
+uvicorn: the worker pinned ws="websockets", which logs a
+UvicornDeprecationWarning and is slated to point at the Sans-I/O
+implementation anyway, so the pin bought no stability. Switches to
+"websockets-sansio" — the same protocol class uvicorn's "auto" already
+selects when the websockets package is installed. Verified by serving a
+Channels ProtocolTypeRouter under both implementations with
+lifespan="off" (matching CONFIG_KWARGS) and driving a real client
+through connect/send/recv: both pass, and only the legacy value warns.
+
+billiard 4.2.2 -> 4.2.4 (transitive via celery): 4.2.2 has `return`
+inside `finally` at pool.py:1856 and connection.py:349,351, which
+Python 3.14 flags as SyntaxWarning. Confirmed by AST-walking both
+versions — 3 occurrences in 4.2.2, 0 in 4.2.4 — and by recompiling the
+installed modules with SyntaxWarning promoted to error.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01UP2bR4aPN64baimeifEGQb ([`c199f57`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c199f57d6aee01df39a9679ff6a84fbe1ed16d3c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.159.0 [skip ci] ([`658bf0a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/658bf0a4c6e9ef6b01ad2da012cd3555a4f5d14e))
+
+## v1.159.0 (2026-08-10)
+
+### Bug fixes
+
+* fix(celery): use exclusive pidbox/event queues for RabbitMQ 4.3
+
+RabbitMQ 4.3 denies the deprecated transient_nonexcl_queues feature
+by default, rejecting Celery's default pidbox and event queue
+declarations with 541 INTERNAL_ERROR — the worker and flower were
+stuck in a reconnect loop (~1 crash/second). Exclusive queues are the
+upstream replacement (kombu 5.7 default, kombu #2237/#2531); enable
+them via control_queue_exclusive / event_queue_exclusive on kombu 5.6.
+
+Pin the rabbitmq image to 4.3.2-management so the floating 4-management
+tag cannot flip broker behavior again.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QePouSLwgLzeAiht8t1b9m ([`576996a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/576996acaeb1aced0ec094a1b9218c78080fb079))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.158.1 [skip ci] ([`9c3883b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9c3883bdb30f1ed8caedf76779ae9714cde7767b))
+
+### Features
+
+* feat: Bump meilisearch ci and infra docker ([`2986e62`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2986e62b59088a8b44013debfeb41bb1a261567c))
+
+## v1.158.1 (2026-08-10)
+
+### Bug fixes
+
+* fix(security): resolve all 13 open CodeQL alerts
+
+py/stack-trace-exposure (10): API error responses no longer embed
+str(exc) from caught exceptions. Carrier endpoints return the parsed
+business message (BoxNowAPIError.message / AcsAPIError.error_message)
+with a generic fallback; broad except blocks log server-side and
+return a generic message (subscription bulk_update, cart reservation
+release, order refund_info).
+
+py/clear-text-logging-sensitive-data (2): ACS price-quote warning no
+longer logs station codes derived from ACS_BILLING_CODE.
+
+py/overly-large-range (1): admin UI guard matches emoji via codepoint
+ranges instead of an astral-range regex character class that CodeQL
+parses as overlapping surrogate ranges.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QePouSLwgLzeAiht8t1b9m ([`b0bd4f8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0bd4f8ba1f25c0560b1aa2b37c3a6454d8d1681))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.158.0 [skip ci] ([`655f84f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/655f84fd2fd0ddde08554c6275899f8c4c8f7ca8))
+
+## v1.158.0 (2026-08-10)
+
+### Bug fixes
+
+* fix(deps): bump aiohttp to 3.14.3 to resolve CVE-2026-69244
+
+Trivy failed CI on aiohttp 3.13.5 (HIGH, fixed in 3.14.3), a transitive
+dependency of facebook-business pinned in uv.lock.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QePouSLwgLzeAiht8t1b9m ([`649751b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/649751b054d221ce622c23de4008ca4dfc0a3402))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.157.2 [skip ci] ([`655305c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/655305ca3ca8b415ce7c78963c0d9bfd958e6192))
+
+### Features
+
+* feat: Bump Versions ([`ff75f63`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff75f63b4f49fcb58ff1d3624953948bea9a4b58))
+
+## v1.157.2 (2026-07-25)
+
+### Bug fixes
+
+* fix(shipping_acs): retrieve stations by uuid — external_id is no longer a single-object key
+
+The pair-keyed station cache (previous commit) made external_id
+ambiguous for the public detail endpoint: DRF's get_object() raised
+MultipleObjectsReturned → 500 for any area code with several lockers
+(verified in prod: GET /shipping/acs/stations/ATH). Nothing in the
+storefront retrieves by code (list/nearest only), so the path param
+switches to the model's uuid — the codebase's standard external
+lookup key, already exposed by both serializers.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Dm6tsW4QsAk4GWzj19o5QW ([`0380030`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0380030272d76775c07c8eebc01d7aff95c3a75c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.157.1 [skip ci] ([`52b17cc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/52b17ccf2f3db5e71e074f015b1486270bb8ea4e))
+
+## v1.157.1 (2026-07-25)
+
+### Bug fixes
+
+* fix(shipping_acs): cache every Smartpoint locker, not one per area; quiet the kind=7 daily warning
+
+Two root causes found while resolving the daily 'Acs_Stations returned
+zero rows for kind=7' warning (validated against the live ACS API and
+the ACS REST PDF p.28):
+
+1. Locker collapse: external_id (ACS_SHOP_STATION_ID_EN) is the AREA
+   station code — 1,485 GR lockers share just 135 codes ('ATH' alone
+   covers 50 lockers), and the (external_id, branch_code) pair is the
+   real locker identity (1,484 distinct pairs). Upserting on
+   external_id alone collapsed each area to one arbitrary row and hid
+   ~90% of Smartpoints from the checkout picker. Now: unique
+   constraint on the pair (migration drops the solo unique — safe
+   under the PreSync deploy model, constraint removal + tiny table),
+   pair-keyed upsert, PK-based deactivation, and a pair-first station
+   lookup in the carrier.
+
+2. Kind semantics: per the PDF, GR kind 7 = Smartpoints WITHOUT a
+   locker ('δίχως locker') and kind 8 = WITH a locker — not
+   inbound/outbound as the enum claimed. Kind 7 is genuinely empty
+   upstream (0 rows vs 1,485 kind-8), and CY kind 7 is documented to
+   return nothing. The zero-rows log is now cache-aware: INFO when a
+   kind is empty both upstream and locally (documented steady state),
+   WARNING only when zero rows contradicts active cached rows
+   (transient failure — deactivation still skipped). Both logs carry
+   the country; per-kind sync counts are logged for future debugging.
+
+Enum members renamed to SMARTPOINT / SMARTPOINT_LOCKER with corrected
+labels (el translations updated), schema.yml regenerated.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Dm6tsW4QsAk4GWzj19o5QW ([`9ac390e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9ac390eaccd5d0c6622fafd055efd27f91da36cc))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.157.0 [skip ci] ([`c41228d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c41228dea9d92e32b9370e26a50f9e5b14a1f013))
+
+## v1.157.0 (2026-07-25)
+
+### Bug fixes
+
+* fix(order,shipping): record carrier returns for never-observed-shipped orders
+
+Prod orders 179 & 189 (2026-07-20/24): the ACS poll saw
+returned_flag=1 while the orders still sat at PROCESSING. The state
+machine only allows PROCESSING -> SHIPPED/CANCELED, so the direct
+PROCESSING -> RETURNED transition was rejected on every poll and the
+returns were never recorded.
+
+Extend the existing DELIVERED bridge (prod order 73 precedent) to
+RETURNED in both carrier services: walk the missing SHIPPED step
+first — truthful, since a returned parcel was necessarily picked up
+(ACS shipment_status 7 pairs returned_flag=1 with delivery_flag=1,
+the delivery back to the sender). The SHIPPED hop is customer-silent
+via the new update_order_status(silent_for_customer=True) kwarg
+(same suppression flags as maybe_advance_to_completed) — 'your order
+is on the way' moments before the return notification would mislead;
+RETURNED sends its own status-update email. Successful bridges log
+at INFO with the jump context for future debugging.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Dm6tsW4QsAk4GWzj19o5QW ([`9f2fb9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9f2fb9a43f0259f500d7a912db525dd3a964b72a))
+
+* fix(core): identify failing storage backend in health-probe warnings
+
+The daily monitor_system_health storage probe failed for months on
+celery workers with a bare '[Errno 30] Read-only file system' — the
+log line named neither the storage backend nor the target path, and
+the code comment claimed prod uses S3 when USE_AWS=False everywhere
+(default_storage is FileSystemStorage on the shared RWX media PVC).
+
+Failure log now includes the backend class and its resolved
+bucket/location; comment corrected to match the actual deployment
+(the media PVC must be mounted on every pod that runs this task —
+the missing celery-worker mount is fixed in grooveshop-infrastructure).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Dm6tsW4QsAk4GWzj19o5QW ([`fb06240`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fb062400a2d4bf2178f315c5dedc261a95536bc4))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.156.7 [skip ci] ([`b0e4d8e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0e4d8e866541b9257bf93090e671f51e31ecc5b))
+
+### Features
+
+* feat: Bump Versions ([`0626e94`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0626e9476daa5645872f7169689fde7b2b52eab0))
+
 ## v1.156.7 (2026-07-18)
 
 ### Bug fixes

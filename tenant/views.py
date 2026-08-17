@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+from secrets import compare_digest
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.db.models import Prefetch
@@ -24,6 +26,15 @@ from tenant.serializers import (
 logger = logging.getLogger(__name__)
 
 TENANT_RESOLVE_CACHE_TTL = 3600  # 1 hour
+
+
+def _is_gateway(request: Request) -> bool:
+    """True when the caller proves it is the agent gateway via the
+    shared internal secret (the same one the order-event push uses).
+    """
+    secret = settings.AGENT_GATEWAY_INTERNAL_SECRET
+    token = request.headers.get("X-Internal-Token", "")
+    return bool(secret) and compare_digest(token, secret)
 
 
 @extend_schema(
@@ -49,26 +60,34 @@ def tenant_resolve(request: Request) -> Response:
         )
 
     cache_key = f"tenant_resolve:{domain}"
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return Response(cached)
-
-    # Always query from public schema
-    tenant_domain = (
-        TenantDomain.objects.select_related("tenant")
-        .filter(domain=domain, tenant__is_active=True)
-        .first()
-    )
-
-    if tenant_domain is None:
-        return Response(
-            {"detail": "Store not found."},
-            status=status.HTTP_404_NOT_FOUND,
+    data = cache.get(cache_key)
+    if data is None:
+        # Always query from public schema
+        tenant_domain = (
+            TenantDomain.objects.select_related("tenant")
+            .filter(domain=domain, tenant__is_active=True)
+            .first()
         )
 
-    serializer = TenantConfigSerializer(tenant_domain.tenant)
-    cache.set(cache_key, serializer.data, TENANT_RESOLVE_CACHE_TTL)
-    return Response(serializer.data)
+        if tenant_domain is None:
+            return Response(
+                {"detail": "Store not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data = TenantConfigSerializer(tenant_domain.tenant).data
+        cache.set(cache_key, data, TENANT_RESOLVE_CACHE_TTL)
+
+    # Secrets ride only on internally-authenticated responses and are
+    # never cached — the cache holds exactly the public payload.
+    if _is_gateway(request):
+        chat_api_key = (
+            TenantDomain.objects.filter(domain=domain, tenant__is_active=True)
+            .values_list("tenant__chat_api_key", flat=True)
+            .first()
+        )
+        data = {**data, "chat_api_key": chat_api_key or ""}
+    return Response(data)
 
 
 @extend_schema(

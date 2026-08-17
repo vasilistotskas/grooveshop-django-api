@@ -20,7 +20,6 @@ class Client:
             base_url,
             settings.master_key,
             timeout=settings.timeout,
-            client_agents=settings.client_agents,
         )
         # Read-only client for public search traffic. Authenticated with the
         # search key (falls back to the master key when none is provisioned)
@@ -29,7 +28,6 @@ class Client:
             base_url,
             settings.search_key,
             timeout=settings.timeout,
-            client_agents=settings.client_agents,
         )
         self.is_sync = settings.sync
         self.tasks: list[Task | TaskInfo] = []

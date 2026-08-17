@@ -3289,13 +3289,45 @@ msgstr "Εξέταση"
 msgid "Last 30 days"
 msgstr "Τελευταίες 30 ημέρες"
 
-#: .\core\templates\admin\index.html:134
-msgid "vs. prior 7 days"
-msgstr "έναντι προηγούμενων 7 ημερών"
+#: .\core\templates\admin\index.html:139
+msgid "vs. prior period of equal length"
+msgstr "έναντι προηγούμενης αντίστοιχης περιόδου"
 
-#: .\core\templates\admin\index.html:150
-msgid "Revenue (7d)"
-msgstr "Έσοδα (7 ημ)"
+#: .\core\templates\admin\index.html:166
+msgid "Revenue"
+msgstr "Έσοδα"
+
+#: .\core\templates\admin\index.html:167
+msgid "Revenue period"
+msgstr "Περίοδος εσόδων"
+
+#: .\admin\dashboard.py
+msgid "7d"
+msgstr "7ημ"
+
+#: .\admin\dashboard.py
+msgid "1m"
+msgstr "1μ"
+
+#: .\admin\dashboard.py
+msgid "3m"
+msgstr "3μ"
+
+#: .\admin\dashboard.py
+msgid "1y"
+msgstr "1ε"
+
+#: .\admin\dashboard.py
+msgid "Last 7 days"
+msgstr "Τελευταίες 7 ημέρες"
+
+#: .\admin\dashboard.py
+msgid "Last 3 months"
+msgstr "Τελευταίοι 3 μήνες"
+
+#: .\admin\dashboard.py
+msgid "Last 12 months"
+msgstr "Τελευταίοι 12 μήνες"
 
 #: .\core\templates\admin\index.html:154
 msgid "Tap to triage"
@@ -11666,13 +11698,13 @@ msgstr "Xpress Point"
 msgid "Kiosk"
 msgstr "Kiosk"
 
-#: .\shipping_acs\enum\shop_kind.py:34
-msgid "Smartpoint (inbound)"
-msgstr "Smartpoint (εισερχόμενα)"
+#: .\shipping_acs\enum\shop_kind.py:38
+msgid "Smartpoint (no locker)"
+msgstr "Smartpoint (χωρίς locker)"
 
-#: .\shipping_acs\enum\shop_kind.py:35
-msgid "Smartpoint (outbound)"
-msgstr "Smartpoint (εξερχόμενα)"
+#: .\shipping_acs\enum\shop_kind.py:39
+msgid "Smartpoint locker"
+msgstr "Smartpoint locker"
 
 #: .\shipping_acs\models\cod_payout.py:33
 msgid ""
@@ -11992,21 +12024,31 @@ msgstr "Αποστολές ACS"
 msgid "External ID"
 msgstr "Εξωτερικό ID"
 
-#: .\shipping_acs\models\station.py:27
-msgid "ACS_SHOP_STATION_ID — used as Acs_Station_Destination."
-msgstr "ACS_SHOP_STATION_ID — χρησιμοποιείται ως Acs_Station_Destination."
+#: .\shipping_acs\models\station.py:26
+msgid ""
+"ACS_SHOP_STATION_ID_EN — the AREA station code, used as "
+"Acs_Station_Destination. NOT unique on its own: every Smartpoint locker in "
+"an area shares it (e.g. 50 lockers under 'ATH'); the (external_id, "
+"branch_code) pair is the locker's identity."
+msgstr ""
+"ACS_SHOP_STATION_ID_EN — ο κωδικός σταθμού ΠΕΡΙΟΧΗΣ, χρησιμοποιείται ως "
+"Acs_Station_Destination. ΔΕΝ είναι μοναδικός από μόνος του: κάθε locker "
+"Smartpoint μιας περιοχής τον μοιράζεται (π.χ. 50 lockers κάτω από το "
+"'ATH')· το ζεύγος (external_id, branch_code) είναι η ταυτότητα του locker."
 
-#: .\shipping_acs\models\station.py:30
+#: .\shipping_acs\models\station.py:37
 msgid "Branch code"
 msgstr "Κωδικός υποκαταστήματος"
 
-#: .\shipping_acs\models\station.py:35
+#: .\shipping_acs\models\station.py:42
 msgid ""
 "ACS_SHOP_BRANCH_ID — paired with external_id when creating vouchers "
-"(Acs_Station_Branch_Destination)."
+"(Acs_Station_Branch_Destination). Distinguishes individual lockers within a "
+"station area."
 msgstr ""
 "ACS_SHOP_BRANCH_ID — συνδυάζεται με το external_id κατά τη δημιουργία "
-"vouchers (Acs_Station_Branch_Destination)."
+"vouchers (Acs_Station_Branch_Destination). Διακρίνει τα επιμέρους lockers "
+"μιας περιοχής σταθμού."
 
 #: .\shipping_acs\models\station.py:40
 msgid "Shop kind"

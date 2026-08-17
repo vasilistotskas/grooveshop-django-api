@@ -237,6 +237,21 @@ class BulkSubscriptionSerializer(serializers.Serializer):
         return value
 
 
+class BulkSubscriptionFailureSerializer(serializers.Serializer):
+    topic = serializers.CharField(read_only=True)
+    error = serializers.CharField(read_only=True)
+
+
+class BulkSubscriptionResultSerializer(serializers.Serializer):
+    success = serializers.ListField(
+        child=serializers.CharField(), read_only=True
+    )
+    failed = BulkSubscriptionFailureSerializer(many=True, read_only=True)
+    already_processed = serializers.ListField(
+        child=serializers.CharField(), read_only=True
+    )
+
+
 class UserSubscriptionStatusSerializer(serializers.Serializer):
     subscribed = serializers.ListField(
         child=SubscriptionTopicSerializer(), read_only=True, required=False

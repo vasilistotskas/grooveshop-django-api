@@ -6,7 +6,7 @@ federated search across ProductTranslation and BlogPostTranslation indexes
 using Meilisearch's multi_search API with federation mode.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from urllib.parse import quote
 
 import pytest
@@ -115,41 +115,42 @@ class TestFederatedSearchProperties:
         assert product_query["federationOptions"]["weight"] == 1.0
         assert blog_query["federationOptions"]["weight"] == 0.7
 
-    def test_federation_metadata_preservation(
-        self, mock_models, mock_meili_client
-    ):
+    def test_federation_metadata_preservation(self, mock_meili_client):
+        """Results carry ``federation`` metadata built from Meilisearch's
+        raw ``_federation`` hit key.
+
+        Uses a REAL product so the enrichment path actually runs — with
+        mocked models the bulk fetch yields nothing and the assertions
+        would never execute.
         """
-        Results should include _federation metadata with indexUid, queriesPosition,
-        and weightedRankingScore fields.
-        """
-        mock_product, _ = mock_models
-        mock_hits = [
-            {
-                "id": "1",
-                "_federation": {
-                    "indexUid": "ProductTranslation",
-                    "queriesPosition": 0,
-                    "weightedRankingScore": 0.95,
-                },
-                "_rankingScore": 0.95,
-            }
-        ]
+        from product.factories.product import ProductFactory
+
+        product = ProductFactory()
+        translation = product.translations.first()
         mock_meili_client.search_client.multi_search.return_value = {
-            "hits": mock_hits,
+            "hits": [
+                {
+                    "id": str(translation.pk),
+                    "_federation": {
+                        "indexUid": "ProductTranslation",
+                        "queriesPosition": 0,
+                        "weightedRankingScore": 0.95,
+                    },
+                    "_rankingScore": 0.95,
+                }
+            ],
             "estimatedTotalHits": 1,
         }
-
-        mock_obj = MagicMock()
-        mock_obj.pk = "1"
-        mock_product.objects.get.return_value = mock_obj
 
         request = self.factory.get("/api/search/federated", {"query": "laptop"})
         response = federated_search(request)
 
         results = response.data["results"]
-        if results:
-            assert "_federation" in results[0]
-            assert "indexUid" in results[0]["_federation"]
+        assert len(results) == 1
+        # Exposed as ``federation`` — a leading underscore would be
+        # mangled by the camelCase renderer ("_federation" -> "Federation").
+        assert results[0]["federation"]["indexUid"] == "ProductTranslation"
+        assert "_federation" not in results[0]
 
     @pytest.mark.parametrize("language_code", ["en", "el", "de"])
     def test_language_filtering_across_indexes(
@@ -173,31 +174,132 @@ class TestFederatedSearchProperties:
 
     @pytest.mark.parametrize(
         "greek_query",
-        ["υπολογιστής", "κομπιούτερ", "τηλέφωνο"],
+        ["υπολογιστής", "ypologistis", "anavathmisi se windows"],
     )
-    @patch("search.views.expand_greeklish_query")
-    def test_greeklish_expansion_for_greek_queries(
-        self, mock_expand_greeklish, mock_models, mock_meili_client, greek_query
+    def test_query_sent_to_meilisearch_unmodified(
+        self, mock_models, mock_meili_client, greek_query
     ):
         """
-        For queries with language_code 'el', the query should be expanded using
-        expand_greeklish_query.
+        Greek and Greeklish queries must reach Meilisearch verbatim —
+        Greeklish matching happens against the indexed ``*_greeklish``
+        shadow fields, not through query rewriting.
         """
-        expanded_query = f"{greek_query} OR ypologistis"
-        mock_expand_greeklish.return_value = expanded_query
-
         request = self.factory.get(
             "/api/search/federated",
             {"query": greek_query, "language_code": "el"},
         )
         federated_search(request)
 
-        mock_expand_greeklish.assert_called_once()
-
-        call_args = mock_meili_client.search_client.multi_search.call_args
+        # The zero-result relaxed fallback may issue a second call with
+        # the leading word dropped — the FIRST call must carry the raw
+        # query verbatim.
+        call_args = mock_meili_client.search_client.multi_search.call_args_list[
+            0
+        ]
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
         for query in queries:
-            assert query["q"] == expanded_query
+            assert query["q"] == greek_query
+
+    def test_zero_results_retries_without_leading_word(
+        self, mock_models, mock_meili_client
+    ):
+        """
+        A multi-word query with no hits is retried once with the leading
+        word dropped — the only shape the ``last`` matching strategy can
+        never relax on its own.
+        """
+        request = self.factory.get(
+            "/api/search/federated",
+            {"query": "anaba8mish se windows", "language_code": "el"},
+        )
+        response = federated_search(request)
+
+        multi_search = mock_meili_client.search_client.multi_search
+        assert multi_search.call_count == 2
+        # The fallback found nothing either (mock returns no hits), so
+        # the response must NOT claim a relaxed query was used.
+        assert response.data["relaxed_query"] is None
+        assert response.data["query_id"]
+        retry_call = multi_search.call_args_list[1]
+        queries = retry_call.kwargs.get("queries") or retry_call[1].get(
+            "queries"
+        )
+        for query in queries:
+            assert query["q"] == "se windows"
+
+    def test_successful_fallback_disclosed_as_relaxed_query(
+        self, mock_models, mock_meili_client
+    ):
+        """When the retry finds hits, the response says which query
+        actually matched — never a silent swap."""
+        mock_product, _ = mock_models
+        mock_meili_client.search_client.multi_search.side_effect = [
+            {"hits": [], "estimatedTotalHits": 0},
+            {
+                "hits": [
+                    {
+                        "id": "1",
+                        "_federation": {
+                            "indexUid": "ProductTranslation",
+                            "queriesPosition": 0,
+                            "weightedRankingScore": 0.9,
+                        },
+                    }
+                ],
+                "estimatedTotalHits": 1,
+            },
+        ]
+        mock_product.get_search_result_queryset.return_value.filter.return_value = []
+
+        request = self.factory.get(
+            "/api/search/federated",
+            {"query": "anaba8mish se windows", "language_code": "el"},
+        )
+        response = federated_search(request)
+
+        assert response.data["relaxed_query"] == "se windows"
+
+    def test_zero_results_single_word_is_not_retried(
+        self, mock_models, mock_meili_client
+    ):
+        """A single-word query has nothing left to relax."""
+        request = self.factory.get(
+            "/api/search/federated",
+            {"query": "anaba8mish", "language_code": "el"},
+        )
+        federated_search(request)
+
+        assert mock_meili_client.search_client.multi_search.call_count == 1
+
+    def test_queries_with_hits_are_not_retried(
+        self, mock_models, mock_meili_client
+    ):
+        """The fallback only fires on zero hits."""
+        mock_product, _ = mock_models
+        mock_meili_client.search_client.multi_search.return_value = {
+            "hits": [
+                {
+                    "id": "1",
+                    "_federation": {
+                        "indexUid": "ProductTranslation",
+                        "queriesPosition": 0,
+                        "weightedRankingScore": 0.9,
+                    },
+                }
+            ],
+            "estimatedTotalHits": 1,
+        }
+        mock_product.get_search_result_queryset.return_value.filter.return_value = []
+
+        request = self.factory.get(
+            "/api/search/federated",
+            {"query": "anavathmisi se windows", "language_code": "el"},
+        )
+        response = federated_search(request)
+
+        assert mock_meili_client.search_client.multi_search.call_count == 1
+        assert response.data["relaxed_query"] is None
+        assert response.data["query_id"]
 
     @pytest.mark.parametrize(
         "total_limit",
@@ -323,7 +425,11 @@ class TestFederatedSearchEdgeCases:
         )
         federated_search(request)
 
-        call_args = mock_meili_client.search_client.multi_search.call_args
+        # First call only — the zero-result relaxed fallback may issue a
+        # second call with the leading word dropped.
+        call_args = mock_meili_client.search_client.multi_search.call_args_list[
+            0
+        ]
         queries = call_args.kwargs.get("queries") or call_args[1].get("queries")
         assert queries[0]["q"] == "laptop computer"
 

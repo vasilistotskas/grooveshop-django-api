@@ -149,6 +149,7 @@ TENANT_APPS = [
     "allauth",
     "allauth.account",
     "allauth.headless",
+    "allauth.idp.oidc",
     "allauth.socialaccount",
     "allauth.mfa",
     "allauth.usersessions",
@@ -167,6 +168,9 @@ TENANT_APPS = [
     "contact",
     "loyalty",
     "page_config",
+    # Agent surface (OIDC-bearer API over tenant-schema data; no models
+    # of its own — placed here because everything it serves is per-store)
+    "agent",
     "shipping",
     "shipping_boxnow",
     "shipping_acs",
@@ -247,7 +251,11 @@ TEMPLATES = [
     },
 ]
 
-LOGIN_URL = "/admin/"
+# allauth's own login page: it serves SHOPPERS (email+password), which
+# the OIDC authorize view (/identity/o/authorize) depends on — the
+# admin login would reject non-staff. Staff hitting a @login_required
+# view land here too and can log in with the same credentials.
+LOGIN_URL = "/accounts/login/"
 AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
     "django.contrib.auth.backends.ModelBackend",
@@ -313,10 +321,14 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
     ],
+    # One trusted reverse proxy (Traefik) fronts the app - DRF must key
+    # anon throttling off the XFF hop that proxy appended, not the whole
+    # client-controlled header (which would let callers mint a fresh
+    # throttle bucket per request).
+    "NUM_PROXIES": 1,
     "DEFAULT_THROTTLE_RATES": {
         "anon": None if DEBUG else "100000/day",
         "user": None if DEBUG else "150000/day",
-        "burst": None if DEBUG else "5/minute",
         # Per-endpoint scopes. Applied via throttle_classes on specific views
         # (ContactCreateThrottle, PaymentAttemptThrottle, PaymentAttemptAnonThrottle
         # in core.api.throttling) — the global anon/user throttles continue to
@@ -327,6 +339,9 @@ REST_FRAMEWORK = {
         "cart_mutation": None if DEBUG else "60/minute",
         "cart_mutation_anon": None if DEBUG else "30/minute",
         "search": None if DEBUG else "120/minute",
+        # Clicks get their own budget - the anonymous click endpoint must
+        # not be able to starve the search allowance for the same client.
+        "search_click": None if DEBUG else "60/minute",
         "view_count": None if DEBUG else "60/hour",
         "viva_return": None if DEBUG else "30/minute",
         # Public proxies to rate-limited carrier partner APIs.
@@ -634,6 +649,15 @@ CELERY_BROKER_CONNECTION_TIMEOUT = 30
 CELERY_BROKER_CONNECTION_RETRY = True
 CELERY_BROKER_CONNECTION_MAX_RETRIES = 100
 
+# RabbitMQ 4.3 denies the deprecated ``transient_nonexcl_queues``
+# feature, so the transient non-exclusive pidbox/event queues Celery
+# declares by default are rejected with 541 INTERNAL_ERROR and the
+# worker/flower reconnect-loop (kombu #2237). Exclusive queues are
+# the upstream replacement — kombu 5.7 makes them the pidbox default;
+# these settings adopt that behavior on kombu 5.6.
+CELERY_CONTROL_QUEUE_EXCLUSIVE = True
+CELERY_EVENT_QUEUE_EXCLUSIVE = True
+
 # Worker settings
 CELERY_WORKER_SEND_TASK_EVENTS = True
 CELERY_TASK_SEND_SENT_EVENT = True
@@ -727,6 +751,14 @@ def get_celery_beat_schedule():
         "clear-expired-sessions": {
             "task": "core.tasks.clear_expired_sessions_task",
             "schedule": SCHEDULE_PRESETS["weekly_monday_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "update-search-click-scores": {
+            # Fanout: SearchClick/Product/BlogPost are per-tenant; beat
+            # fires in public.
+            "task": "tenant.tasks.fanout_update_click_scores",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
@@ -1120,6 +1152,12 @@ DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"]
 TENANT_MODEL = "tenant.Tenant"
 TENANT_DOMAIN_MODEL = "tenant.TenantDomain"
 PUBLIC_SCHEMA_URLCONF = "tenant.urls_public"
+# django-tenants >= 3.14 issues ``SET search_path`` before EVERY cursor
+# unless this flag caches it per connection (one extra round-trip per
+# query otherwise). Safe since 3.14: the cache is invalidated on
+# set_tenant/set_schema AND on rollback(), so tenant switches and
+# aborted transactions always re-issue the SET.
+TENANT_LIMIT_SET_CALLS = True
 
 if SYSTEM_ENV == "ci":
     DATABASES = {
@@ -1162,8 +1200,6 @@ MEILISEARCH = {
     "SEARCH_KEY": _meili_search_key,
     "PORT": int(getenv("MEILI_PORT", "7700")),
     "TIMEOUT": int(getenv("MEILI_TIMEOUT", "30")),
-    "CLIENT_AGENTS": None,
-    "DEBUG": DEBUG,
     "SYNC": DEBUG,
     "ASYNC_INDEXING": getenv("MEILI_ASYNC_INDEXING", "True") == "True",
     "OFFLINE": getenv("MEILI_OFFLINE", "False") == "True",
@@ -1340,6 +1376,18 @@ EXTRA_SETTINGS_DEFAULTS = [
             "Show the 'Recently Viewed' rail on the storefront home page. "
             "The history itself is stored client-side in localStorage; "
             "this flag only controls whether the rail renders."
+        ),
+    },
+    {
+        "name": "CHAT_WIDGET_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the AI shopping-assistant chat widget on the "
+            "storefront. Turning it off hides the launcher for every "
+            "visitor shortly after (client-side check); the gateway's "
+            "/chat endpoint itself stays up, so flipping back on needs "
+            "no deploy."
         ),
     },
     # Loyalty system settings
@@ -3372,3 +3420,41 @@ META_CAPI_PARTNER_AGENT = getenv(
 )
 # Per-request timeout for the facebook_business SDK's HTTP client.
 META_CAPI_HTTP_TIMEOUT = int(getenv("META_CAPI_HTTP_TIMEOUT", "10"))
+
+# ---------- Agent gateway (grooveshop-agent-gateway) ----------
+# Cluster-internal base URL of the agent gateway service. Empty (the
+# default) means the agent surface is off: order events are not pushed
+# and the gateway-aware cart throttle behaves like a plain anon throttle.
+AGENT_GATEWAY_INTERNAL_URL = getenv("AGENT_GATEWAY_INTERNAL_URL", "")
+# Shared secret between Django and the gateway, used in BOTH directions:
+# sent as ``X-Internal-Token`` on order-event pushes and verified against
+# the gateway's ``X-Internal-Gateway`` header on inbound cart mutations.
+# Must equal the gateway's ``INTERNAL_EVENTS_SECRET`` env value.
+AGENT_GATEWAY_INTERNAL_SECRET = getenv("AGENT_GATEWAY_INTERNAL_SECRET", "")
+# Per-request timeout for order-event pushes to the gateway.
+AGENT_GATEWAY_HTTP_TIMEOUT = int(getenv("AGENT_GATEWAY_HTTP_TIMEOUT", "5"))
+# Master flag for agent-delegated Stripe payments (the ACP/UCP tokenized
+# SharedPaymentToken flow). Off until Stripe Agentic Commerce enrollment
+# completes — the confirm endpoint returns a clean "not enabled" error.
+AGENT_STRIPE_DELEGATED_ENABLED = (
+    getenv("AGENT_STRIPE_DELEGATED_ENABLED", "False").lower() == "true"
+)
+
+# ---------- OIDC identity provider (allauth.idp — agent identity linking) --
+# Makes this API an OAuth 2.1 authorization server so AI agents (MCP
+# clients) can link a shopper's account: authorization-code + PKCE via
+# /identity/o/authorize (allauth's own login page at /accounts/login/
+# handles authentication), discovery at /.well-known/openid-configuration.
+# Agent-consumable resources live under /api/v1/agent/* and are protected
+# by allauth.idp's DRF TokenAuthentication + per-scope permissions.
+#
+# Dynamic Client Registration (RFC 7591) is open (no initial access
+# token) because MCP clients self-register; allauth rate-limits the
+# endpoint (3/m/ip) and clients are inert until a user consents.
+IDP_OIDC_DCR_ENABLED = getenv("IDP_OIDC_DCR_ENABLED", "True").lower() == "true"
+IDP_OIDC_DCR_REQUIRES_INITIAL_ACCESS_TOKEN = False
+# RSA/EC private key PEM for signing ID tokens / JWKS. Only required
+# once clients request the ``openid`` scope (plain OAuth scopes issue
+# opaque access tokens without it); provisioned via sealed secret.
+IDP_OIDC_PRIVATE_KEY = getenv("IDP_OIDC_PRIVATE_KEY", "")
+IDP_OIDC_ADAPTER = "agent.oidc.AgentOIDCAdapter"

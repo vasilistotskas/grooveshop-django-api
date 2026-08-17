@@ -40,7 +40,7 @@ def image_to_media_path(image_field: Any) -> str:
         return ""
     try:
         url = image_field.url
-    except (ValueError, AttributeError):
+    except ValueError, AttributeError:
         return ""
     if not url:
         return ""

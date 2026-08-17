@@ -708,7 +708,7 @@ def _handle_payment_created(order, event_data, transaction_id):
                     order.id,
                 )
                 return
-        except (TypeError, ValueError, AttributeError):
+        except TypeError, ValueError, AttributeError:
             logger.warning(
                 "Could not parse Viva verified amount %r for order %s — "
                 "proceeding with status-only verification.",

@@ -547,6 +547,9 @@ PUBLIC_SETTING_KEYS = frozenset(
         # Public contact email for storefront footer/contact page.
         # Falls back to Tenant.contact_email or settings.INFO_EMAIL.
         "CONTACT_EMAIL",
+        # Chat-widget kill switch — admin hides the storefront launcher
+        # per tenant without a deploy; the gateway /chat stays up.
+        "CHAT_WIDGET_ENABLED",
     }
 )
 

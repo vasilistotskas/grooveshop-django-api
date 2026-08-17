@@ -26,11 +26,28 @@ ADMIN_FILES = sorted(
 # Pictographs, dingbats, transport, supplemental symbols — the emoji
 # blocks that used to decorate status pills. Plain typography (arrows,
 # em-dashes, Greek letters) is deliberately NOT banned.
-_EMOJI = re.compile(
-    "[\U0001f300-\U0001faff\U00002700-\U000027bf"
-    "\U0001f000-\U0001f0ff\U00002b00-\U00002bff"
-    "\U00002460-\U000024ff✅❌⚠⭐❤]"
+# Codepoint ranges instead of a regex character class: CodeQL's regex
+# parser reads astral ranges as surrogate pairs and reports
+# py/overly-large-range on the class.
+_EMOJI_RANGES = (
+    (0x1F000, 0x1F0FF),
+    (0x1F300, 0x1FAFF),
+    (0x2460, 0x24FF),
+    (0x2700, 0x27BF),
+    (0x2B00, 0x2BFF),
 )
+_EMOJI_EXTRA = frozenset("✅❌⚠⭐❤")
+
+
+def _first_emoji(line: str) -> str | None:
+    for char in line:
+        code = ord(char)
+        if char in _EMOJI_EXTRA or any(
+            lo <= code <= hi for lo, hi in _EMOJI_RANGES
+        ):
+            return char
+    return None
+
 
 _BANNED = {
     "inline style attribute": re.compile(r'style\s*=\s*["\']'),
@@ -47,10 +64,10 @@ def test_admin_file_uses_unfold_vocabulary(path: Path) -> None:
 
     emoji_hits = sorted(
         {
-            f"line {lineno}: {match.group(0)!r}"
+            f"line {lineno}: {char!r}"
             for lineno, line in enumerate(text.splitlines(), start=1)
-            for match in [_EMOJI.search(line)]
-            if match
+            for char in [_first_emoji(line)]
+            if char
         }
     )
     assert not emoji_hits, (

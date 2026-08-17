@@ -43,6 +43,7 @@ PENDING → PROCESSING → SHIPPED → DELIVERED → COMPLETED
   - `PROCESSING → SHIPPED` from carrier events (`_apply_order_status_transition` in both services).
   - `SHIPPED → DELIVERED` from carrier events.
   - `DELIVERED → COMPLETED` for paid orders (`OrderService.maybe_advance_to_completed`).
+  - Carrier bridge: when a carrier reports DELIVERED or RETURNED while the order is still PENDING/PROCESSING (state jump between polls / missed webhook), `_apply_order_status_transition` walks the missing SHIPPED step first. The SHIPPED hop is customer-silent on the RETURNED path (`update_order_status(..., silent_for_customer=True)`) — prod orders 179 & 189 (2026-07) were stuck because the direct PROCESSING → RETURNED was rejected forever.
 
 ### 2.2 PaymentStatus transitions
 

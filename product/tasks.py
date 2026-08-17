@@ -8,9 +8,11 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import escape
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import override as translation_override
 
 from core import celery_app
 from core.tasks import MonitoredTask
+from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -334,6 +336,10 @@ def _send_product_alert_email(
 ) -> bool:
     """Send a product-alert email with RFC 8058 unsubscribe headers.
 
+    Callers must invoke this inside ``translation_override(...)`` for the
+    recipient's language — the templates are rendered here, so the active
+    language at call time is what the recipient sees.
+
     When ``user`` is provided the email carries a ``List-Unsubscribe``
     header pointing to the blanket-unsubscribe URL so Gmail/Outlook
     surface a one-click control. Anonymous alerts (``ProductAlert``
@@ -414,10 +420,6 @@ def send_product_alert_restock(product_id: int) -> dict:
     product_url = get_tenant_frontend_url(
         f"/products/{product.id}/{product.slug}"
     )
-    product_name = (
-        product.safe_translation_getter("name", any_language=True)
-        or f"Product {product.slug or product.id}"
-    )
 
     alerts = ProductAlert.objects.filter(
         product_id=product_id,
@@ -433,26 +435,35 @@ def send_product_alert_restock(product_id: int) -> dict:
         if not recipient:
             continue
 
-        context = {
-            "product_name": product_name,
-            "product_url": product_url,
-            "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": tenant_contact_email(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
-        }
-        subject = _("[{site}] {name} is back in stock").format(
-            site=settings.SITE_NAME, name=product_name
-        )
-        if _send_product_alert_email(
-            recipient=recipient,
-            subject=str(subject),
-            context=context,
-            template_basename="restock_alert",
-            user=alert.user if alert.user_id else None,
-            list_id="product-restock-alerts",
-        ):
-            sent += 1
+        # Localize the whole email — product name, subject, and the
+        # templates rendered inside the helper — to the recipient's
+        # language (anonymous alerts fall back to LANGUAGE_CODE).
+        user = alert.user if alert.user_id else None
+        with translation_override(get_user_language(user)):
+            product_name = (
+                product.safe_translation_getter("name", any_language=True)
+                or f"Product {product.slug or product.id}"
+            )
+            context = {
+                "product_name": product_name,
+                "product_url": product_url,
+                "SITE_NAME": settings.SITE_NAME,
+                "INFO_EMAIL": tenant_contact_email(),
+                "SITE_URL": get_tenant_base_url(),
+                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            }
+            subject = _("[{site}] {name} is back in stock").format(
+                site=settings.SITE_NAME, name=product_name
+            )
+            if _send_product_alert_email(
+                recipient=recipient,
+                subject=str(subject),
+                context=context,
+                template_basename="restock_alert",
+                user=user,
+                list_id="product-restock-alerts",
+            ):
+                sent += 1
 
     # Single-shot: deactivate every alert we processed, even failures —
     # a retry loop would otherwise hammer broken addresses.
@@ -487,10 +498,6 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
     product_url = get_tenant_frontend_url(
         f"/products/{product.id}/{product.slug}"
     )
-    product_name = (
-        product.safe_translation_getter("name", any_language=True)
-        or f"Product {product.slug or product.id}"
-    )
 
     alerts = ProductAlert.objects.filter(
         product_id=product_id,
@@ -509,28 +516,35 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
         if not recipient:
             continue
 
-        context = {
-            "product_name": product_name,
-            "product_url": product_url,
-            "new_price": new_price,
-            "target_price": str(alert.target_price.amount),
-            "SITE_NAME": settings.SITE_NAME,
-            "INFO_EMAIL": tenant_contact_email(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
-        }
-        subject = _("[{site}] Price drop: {name} is now at your target").format(
-            site=settings.SITE_NAME, name=product_name
-        )
-        if _send_product_alert_email(
-            recipient=recipient,
-            subject=str(subject),
-            context=context,
-            template_basename="price_drop_alert",
-            user=alert.user if alert.user_id else None,
-            list_id="product-price-drop-alerts",
-        ):
-            sent += 1
+        # Same per-recipient localization rationale as the restock task.
+        user = alert.user if alert.user_id else None
+        with translation_override(get_user_language(user)):
+            product_name = (
+                product.safe_translation_getter("name", any_language=True)
+                or f"Product {product.slug or product.id}"
+            )
+            context = {
+                "product_name": product_name,
+                "product_url": product_url,
+                "new_price": new_price,
+                "target_price": str(alert.target_price.amount),
+                "SITE_NAME": settings.SITE_NAME,
+                "INFO_EMAIL": tenant_contact_email(),
+                "SITE_URL": get_tenant_base_url(),
+                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            }
+            subject = _(
+                "[{site}] Price drop: {name} is now at your target"
+            ).format(site=settings.SITE_NAME, name=product_name)
+            if _send_product_alert_email(
+                recipient=recipient,
+                subject=str(subject),
+                context=context,
+                template_basename="price_drop_alert",
+                user=user,
+                list_id="product-price-drop-alerts",
+            ):
+                sent += 1
         triggered_ids.append(alert.id)
 
     if triggered_ids:

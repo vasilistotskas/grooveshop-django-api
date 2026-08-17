@@ -180,6 +180,13 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
+            "Agentic Commerce",
+            {
+                "fields": ["chat_api_key"],
+                "classes": ["collapse"],
+            },
+        ),
+        (
             "Security",
             {
                 "fields": ["allowed_csp_sources"],

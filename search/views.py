@@ -3,10 +3,11 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 from urllib.parse import unquote
+from uuid import uuid4
 
 from django.conf import settings as django_settings
 from django.core.cache import caches
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Max
 from extra_settings.models import Setting
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -24,10 +25,9 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from blog.models.post import BlogPostTranslation
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import SearchThrottle
+from core.api.throttling import SearchClickThrottle, SearchThrottle
 from meili._client import client as meili_client
 from product.models.product import ProductTranslation
-from search.greeklish import expand_greeklish_query
 from search.models import SearchClick, SearchQuery
 from search.serializers import (
     BlogPostMeiliSearchResponseSerializer,
@@ -36,6 +36,8 @@ from search.serializers import (
     ProductMeiliSearchResponseSerializer,
     ProductTranslationSerializer,
     SearchAnalyticsResponseSerializer,
+    SearchClickRequestSerializer,
+    SearchClickResponseSerializer,
     TrendingSearchResponseSerializer,
 )
 
@@ -87,7 +89,7 @@ def _parse_int(value: str | None, default: int, name: str) -> int:
         return default
     try:
         return max(0, int(value))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         raise ValidationError({name: _("Must be a valid integer.")})
 
 
@@ -97,7 +99,7 @@ def _parse_optional_int(value: str | None, name: str) -> int | None:
         return None
     try:
         return int(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         raise ValidationError({name: _("Must be a valid integer.")})
 
 
@@ -107,7 +109,7 @@ def _parse_optional_float(value: str | None, name: str) -> float | None:
         return None
     try:
         return float(value)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         raise ValidationError({name: _("Must be a valid number.")})
 
 
@@ -117,7 +119,7 @@ def _parse_int_csv(value: str | None, name: str) -> list[int]:
         return []
     try:
         return [int(v.strip()) for v in value.split(",") if v.strip()]
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         raise ValidationError(
             {name: _("Must be a comma-separated list of integers.")}
         )
@@ -127,6 +129,22 @@ def _validate_language_code(language_code: str | None) -> str | None:
     if language_code and language_code not in _VALID_LANGUAGE_CODES:
         raise ValidationError({"language_code": _("Invalid language code.")})
     return language_code
+
+
+def _relaxed_query(query: str) -> str | None:
+    """Return the query with its leading word dropped, for a retry.
+
+    Meilisearch's default ``last`` matching strategy already relaxes
+    trailing words, so the only multi-word shape it can never rescue is
+    a leading word that matches nothing (an unindexed transliteration
+    convention, a pasted slug fragment, a typo beyond tolerance).
+    Returns ``None`` for single-word queries — there is nothing left to
+    relax.
+    """
+    parts = query.split()
+    if len(parts) < 2:
+        return None
+    return " ".join(parts[1:])
 
 
 @extend_schema(
@@ -191,10 +209,9 @@ def blog_post_meili_search(request):
         request.query_params.get("language_code")
     )
 
+    # Greeklish queries match the indexed ``*_greeklish`` shadow fields
+    # directly (see search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
-
-    if language_code == "el":
-        decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
 
     search_qs = BlogPostTranslation.meilisearch.paginate(
         limit=limit, offset=offset
@@ -209,6 +226,14 @@ def blog_post_meili_search(request):
 
     enriched_results = search_qs.search(q=decoded_query)
 
+    relaxed_query = None
+    if not enriched_results["results"] and (
+        relaxed := _relaxed_query(decoded_query)
+    ):
+        enriched_results = search_qs.search(q=relaxed)
+        if enriched_results["results"]:
+            relaxed_query = relaxed
+
     serialized_data = []
     for result in enriched_results["results"]:
         obj = result["object"]
@@ -222,6 +247,8 @@ def blog_post_meili_search(request):
 
     return Response(
         {
+            "query_id": uuid4(),
+            "relaxed_query": relaxed_query,
             "limit": limit,
             "offset": offset,
             "estimated_total_hits": enriched_results["estimated_total_hits"],
@@ -390,10 +417,9 @@ def product_meili_search(request):
         if f and f in _ALLOWED_PRODUCT_FACETS
     ]
 
-    # Decode and expand query for Greek language
+    # Greeklish queries match the indexed ``*_greeklish`` shadow fields
+    # directly (see search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
-    if language_code == "el":
-        decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
 
     search_qs = ProductTranslation.meilisearch.paginate(
         limit=limit, offset=offset
@@ -437,6 +463,14 @@ def product_meili_search(request):
 
     enriched_results = search_qs.search(q=decoded_query)
 
+    relaxed_query = None
+    if not enriched_results["results"] and (
+        relaxed := _relaxed_query(decoded_query)
+    ):
+        enriched_results = search_qs.search(q=relaxed)
+        if enriched_results["results"]:
+            relaxed_query = relaxed
+
     serialized_data = []
     for result in enriched_results["results"]:
         obj = result["object"]
@@ -449,6 +483,8 @@ def product_meili_search(request):
         serialized_data.append(obj_data)
 
     response_data = {
+        "query_id": uuid4(),
+        "relaxed_query": relaxed_query,
         "limit": limit,
         "offset": offset,
         "estimated_total_hits": enriched_results["estimated_total_hits"],
@@ -525,7 +561,7 @@ def federated_search(request):
     2. Apply Greeklish expansion if language_code is 'el'
     3. Build multi_search queries for ProductTranslation and BlogPostTranslation
     4. Set federation weights (products: 1.0, blog_posts: 0.7)
-    5. Calculate result allocation (70% products, 30% blog posts)
+    5. Weight the merged ranking (products 1.0, blog posts 0.7)
     6. Execute multi_search with federation mode
     7. Enrich results with Django ORM objects
     8. Return unified results with content_type field
@@ -544,13 +580,9 @@ def federated_search(request):
         request.query_params.get("language_code")
     )
 
-    # Decode and expand query for Greek language
+    # Greeklish queries match the indexed ``*_greeklish`` shadow fields
+    # directly (see search/transliteration.py) — no query rewriting.
     decoded_query = unquote(query)
-    if language_code == "el":
-        decoded_query = expand_greeklish_query(decoded_query, max_variants=5)
-
-    # Calculate result allocation (70% products, 30% blog posts)
-    product_limit = int(limit * 0.7)  # noqa: F841
 
     # Build filters for language and content filtering
     product_filters = []
@@ -602,6 +634,23 @@ def federated_search(request):
             queries=multi_search_params["queries"],
             federation=multi_search_params["federation"],
         )
+
+        relaxed_query = None
+        if not results.get("hits") and (
+            relaxed := _relaxed_query(decoded_query)
+        ):
+            # Fresh dicts — never mutate the already-submitted query
+            # objects (callers and tests may still hold references).
+            retry_queries = [
+                {**search_query, "q": relaxed}
+                for search_query in multi_search_params["queries"]
+            ]
+            results = meili_client.search_client.multi_search(
+                queries=retry_queries,
+                federation=multi_search_params["federation"],
+            )
+            if results.get("hits"):
+                relaxed_query = relaxed
 
     except Exception as e:
         logger.error(f"Federated search failed: {str(e)}")
@@ -678,7 +727,10 @@ def federated_search(request):
             }
 
             obj_data = serializer_class(obj, context=context).data
-            obj_data["_federation"] = hit.get("_federation", {})
+            # Exposed as ``federation`` — a leading underscore gets
+            # mangled by the camelCase renderer ("_federation" ->
+            # "Federation").
+            obj_data["federation"] = hit.get("_federation", {})
             enriched_results.append(obj_data)
 
         except Exception as e:
@@ -688,6 +740,8 @@ def federated_search(request):
     # Return response
     return Response(
         {
+            "query_id": uuid4(),
+            "relaxed_query": relaxed_query,
             "limit": limit,
             "offset": offset,
             "estimated_total_hits": estimated_total_hits,
@@ -695,6 +749,39 @@ def federated_search(request):
         },
         status=status.HTTP_200_OK,
     )
+
+
+@extend_schema(
+    summary=_("Log a click on a search result"),
+    description=_(
+        "Attribute a click on a search result to the query that produced "
+        "it. The query_id comes from the search response. Feeds the "
+        "click-through ranking signal and search analytics."
+    ),
+    tags=["Search"],
+    request=SearchClickRequestSerializer,
+    responses={
+        202: SearchClickResponseSerializer,
+        400: ErrorResponseSerializer,
+    },
+)
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@throttle_classes([SearchClickThrottle, AnonRateThrottle, UserRateThrottle])
+def search_click(request):
+    serializer = SearchClickRequestSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    from search.tasks import save_search_click
+
+    save_search_click.delay(
+        query_uuid=str(data["query_id"]),
+        result_id=str(data["result_id"]),
+        result_type=data["result_type"],
+        position=data["position"],
+    )
+    return Response({"detail": _("Accepted.")}, status=status.HTTP_202_ACCEPTED)
 
 
 @extend_schema(
@@ -751,7 +838,7 @@ def search_analytics(request):
 
     Metrics:
     - Top 20 queries by frequency
-    - Zero-result queries (results_count = 0)
+    - Zero-result queries (queries that never returned results)
     - Search volume by content_type and language
     - Average results count
     - Average processing time
@@ -817,22 +904,34 @@ def search_analytics(request):
     # Calculate total search count
     total_searches = queries_qs.count()
 
-    # Calculate click-through rate for each top query (single annotated query)
-    top_queries_with_clicks = (
+    # Per-query counts and clicks are computed in SEPARATE queries:
+    # combining Count("id")/Avg("results_count") with Count("clicks") in
+    # one annotate() fans out the JOIN to SearchClick before GROUP BY,
+    # inflating counts and skewing averages for any query text whose
+    # rows carry multiple clicks (Django's documented multi-aggregate
+    # pitfall).
+    top_query_rows = list(
         queries_qs.values("query")
         .annotate(
             count=Count("id"),
             avg_results=Avg("results_count"),
-            clicks_count=Count("clicks"),
         )
         .order_by("-count")[:20]
     )
+    clicks_by_query = dict(
+        SearchClick.objects.filter(
+            search_query__in=queries_qs,
+            search_query__query__in=[row["query"] for row in top_query_rows],
+        )
+        .values_list("search_query__query")
+        .annotate(clicks=Count("id"))
+    )
 
     top_queries = []
-    for query_data in top_queries_with_clicks:
+    for query_data in top_query_rows:
         query_count = query_data["count"]
         avg_results = query_data["avg_results"]
-        clicks_count = query_data["clicks_count"]
+        clicks_count = clicks_by_query.get(query_data["query"], 0)
         ctr = (clicks_count / query_count) if query_count > 0 else 0.0
 
         top_queries.append(
@@ -844,11 +943,15 @@ def search_analytics(request):
             }
         )
 
-    # Aggregate zero-result queries (results_count = 0)
+    # A query counts as zero-result only if it NEVER returned results
+    # in the window (HAVING MAX(results_count) = 0): the storefront
+    # fires product/blog/federated sub-searches per user search, each
+    # logged as its own row, so a per-row results_count=0 filter would
+    # list queries whose other lane found plenty.
     zero_result_queries = (
-        queries_qs.filter(results_count=0)
-        .values("query", "language_code")
-        .annotate(count=Count("id"))
+        queries_qs.values("query", "language_code")
+        .annotate(count=Count("id"), max_results=Max("results_count"))
+        .filter(max_results=0)
         .order_by("-count")[:20]
     )
 
@@ -972,7 +1075,7 @@ def search_trending(request):
 
     try:
         limit = int(request.query_params.get("limit", _TRENDING_DEFAULT_LIMIT))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         limit = _TRENDING_DEFAULT_LIMIT
     limit = max(1, min(limit, _TRENDING_MAX_LIMIT))
 

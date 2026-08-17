@@ -28,6 +28,7 @@ from user.filters.subscription import (
 )
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.serializers.subscription import (
+    BulkSubscriptionResultSerializer,
     BulkSubscriptionSerializer,
     SubscriptionTopicDetailSerializer,
     SubscriptionTopicSerializer,
@@ -253,7 +254,7 @@ user_subscription_config: SerializersConfig = {
         description=_("Subscribe or unsubscribe from multiple topics at once."),
         tags=["User Subscriptions"],
         responses={
-            200: None,
+            200: BulkSubscriptionResultSerializer,
         },
     ),
     "confirm": ActionConfig(
@@ -376,9 +377,20 @@ class UserSubscriptionViewSet(BaseModelViewSet):
                         except UserSubscription.DoesNotExist:
                             results["already_processed"].append(topic.name)
 
-                except Exception as e:
+                except Exception:
+                    # Log the real error server-side; exception text must
+                    # not reach the response body (CodeQL
+                    # py/stack-trace-exposure).
+                    logger.exception(
+                        "Subscription bulk_update failed | user=%s topic=%s",
+                        user.id,
+                        topic.id,
+                    )
                     results["failed"].append(
-                        {"topic": topic.name, "error": str(e)}
+                        {
+                            "topic": topic.name,
+                            "error": _("Unable to update this subscription."),
+                        }
                     )
 
         return Response(results)

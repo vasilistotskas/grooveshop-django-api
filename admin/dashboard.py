@@ -1,9 +1,10 @@
 """Webside admin dashboard data layer.
 
 Builds the data dict consumed by ``core/templates/admin/index.html``
-in five zones:
+in six zones:
 
-A. Hero KPIs (4 cards)
+A. Hero KPIs (4 cards) — the revenue card carries per-period figures
+   (7d/1m/3m/1y) switched client-side via Alpine.js in the template
 B. Operations charts (revenue+orders bar/line, status doughnut) — chart
    payloads are pre-serialized to JSON strings so the template can feed
    them straight into unfold's ``{% component "unfold/components/chart/*.html" %}``
@@ -14,8 +15,9 @@ C. Action queues (recent orders, pending reviews, contact messages) —
 D. System warnings (superuser-only — seller config, MyDATA, low stock,
    failed Celery tasks)
 E. Growth (conversion funnel, repeat-customer rate, top products)
+F. Search insights (KPIs, top/zero-result queries, volume chart)
 
-Zones A/B/C/E are request-independent and are cached in Redis for 5
+Zones A/B/C/E/F are request-independent and are cached in Redis for 5
 min. Zone D is computed fresh per request because operational alerts
 must reflect the latest state. All visible strings are wrapped with
 ``gettext_lazy`` so the dashboard renders fully in Greek when the
@@ -30,14 +32,25 @@ from datetime import timedelta
 from django.apps import apps
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import Avg, Count, Sum
-from django.db.models.functions import TruncDay
+from django.db.models import Avg, Count, Max, Q, Sum
+from django.db.models.functions import Length, TruncDay
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-DASHBOARD_CACHE_KEY = "admin:dashboard:data:v4"
+DASHBOARD_CACHE_KEY = "admin:dashboard:data:v5"
 DASHBOARD_CACHE_TTL = 300  # 5 minutes
+
+# Selectable windows for the hero revenue card. Every period is compared
+# against the immediately preceding window of equal length for its trend
+# badge. Labels are lazy so they render in the request language even
+# though the payload is cached (lazy proxies survive cache pickling).
+REVENUE_PERIODS = (
+    ("7d", 7, _("7d"), _("Last 7 days")),
+    ("30d", 30, _("1m"), _("Last 30 days")),
+    ("90d", 90, _("3m"), _("Last 3 months")),
+    ("365d", 365, _("1y"), _("Last 12 months")),
+)
 
 # Stock-mandatory seller fields surfaced as Zone D banners.
 _REQUIRED_SELLER_SETTINGS = (
@@ -54,7 +67,7 @@ _CHART_TICK_COLOR = "#9ca3af"
 def dashboard_callback(request, context):
     """Populate ``context`` with the five-zone dashboard payload.
 
-    Zones A/B/C/E are served from the Redis cache (busted on writes via
+    Zones A/B/C/E/F are served from the Redis cache (busted on writes via
     ``admin/signals.py``); Zone D is recomputed on every request so
     fixing a missing setting reflects on the next page load.
     """
@@ -238,16 +251,25 @@ def _check_failed_celery() -> int:
 def _empty_zones() -> dict:
     """Template-safe zone payload for the public (platform) admin.
 
-    Zones A/B/C/E query Order/User/ProductReview/Contact — tables that
-    exist only inside tenant schemas. On the public schema those
-    queries raise ProgrammingError, so the platform admin dashboard
-    renders neutral empties instead (same shape the template expects).
+    Zones A/B/C/E/F query Order/User/ProductReview/Contact/SearchQuery —
+    tables that exist only inside tenant schemas. On the public schema
+    those queries raise ProgrammingError, so the platform admin
+    dashboard renders neutral empties instead (same shape the template
+    expects).
     """
     empty_chart = json.dumps({"labels": [], "datasets": []})
     return {
         "hero": {
-            "revenue_7d": 0.0,
-            "revenue_trend_pct": None,
+            "revenue_periods": [
+                {
+                    "key": key,
+                    "short_label": short_label,
+                    "long_label": long_label,
+                    "amount": 0.0,
+                    "trend_pct": None,
+                }
+                for key, _days, short_label, long_label in REVENUE_PERIODS
+            ],
             "pending_orders": 0,
             "new_customers_30d": 0,
             "new_customers_today": 0,
@@ -274,6 +296,17 @@ def _empty_zones() -> dict:
             "repeat_rate_pct": 0,
         },
         "top_products": [],
+        "search_insights": {
+            "searches_30d": 0,
+            "zero_result_pct": 0,
+            "zero_result_count": 0,
+            "clicks_30d": None,
+            "ctr_pct": None,
+            "top_queries": [],
+            "zero_queries": [],
+        },
+        "search_volume_chart_data": empty_chart,
+        "search_volume_chart_options": json.dumps({}),
     }
 
 
@@ -290,19 +323,13 @@ def _build_cached_zones() -> dict:
     from product.enum.review import ReviewStatus
 
     now = timezone.now()
-    week_ago = now - timedelta(days=7)
-    prior_week_start = now - timedelta(days=14)
     month_ago = now - timedelta(days=30)
-    today = now.date()
 
     return {
         **_zone_a_hero_kpis(
             Order,
             User,
             now,
-            today,
-            week_ago,
-            prior_week_start,
             month_ago,
             PaymentStatus,
             OrderStatus,
@@ -310,6 +337,142 @@ def _build_cached_zones() -> dict:
         **_zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus),
         **_zone_c_queues(Order, ProductReview, Contact, ReviewStatus),
         **_zone_e_growth(Order, User, now, month_ago, PaymentStatus),
+        **_zone_f_search_insights(now, month_ago),
+    }
+
+
+# ── Zone F — Search insights ──────────────────────────────────────────
+
+# Query fragments below this length are search-as-you-type noise, not
+# intent — prod data shows per-keystroke rows ("P", "Po", "Pow") dwarf
+# committed queries, and a 2-char fragment topped the zero-result list.
+_SEARCH_MIN_QUERY_LEN = 3
+
+# Top-N sizes for the two query tables.
+_SEARCH_TOP_QUERIES = 10
+
+
+def _zone_f_search_insights(now, month_ago) -> dict:
+    """Search KPIs, top/zero-result query tables, 14-day volume chart.
+
+    Empty queries (placeholder/browse requests — the vast majority of
+    rows) are excluded everywhere; the query tables additionally drop
+    sub-3-char keystroke fragments. A query counts as zero-result only
+    if it NEVER returned results in the window (HAVING
+    MAX(results_count) = 0): each user search is logged as separate
+    product/blog/federated sub-search rows, so a per-row filter would
+    flag queries whose other lane found plenty. Click-through metrics
+    render as None until click tracking has recorded data, so the
+    template can show "—" instead of a fabricated zero.
+    """
+    from search.models import SearchClick, SearchQuery
+
+    recent = SearchQuery.objects.filter(timestamp__gte=month_ago).exclude(
+        query=""
+    )
+
+    searches_30d = recent.count()
+    meaningful = recent.annotate(qlen=Length("query")).filter(
+        qlen__gte=_SEARCH_MIN_QUERY_LEN
+    )
+    meaningful_total = meaningful.count()
+    zero_query_texts = (
+        meaningful.values("query")
+        .annotate(max_results=Max("results_count"))
+        .filter(max_results=0)
+        .values("query")
+    )
+    zero_total = meaningful.filter(query__in=zero_query_texts).count()
+
+    clicks_30d = SearchClick.objects.filter(timestamp__gte=month_ago).count()
+    has_any_click = SearchClick.objects.exists()
+
+    top_rows = list(
+        meaningful.values("query")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:_SEARCH_TOP_QUERIES]
+    )
+    zero_rows = list(
+        meaningful.values("query")
+        .annotate(count=Count("id"), max_results=Max("results_count"))
+        .filter(max_results=0)
+        .order_by("-count")[:_SEARCH_TOP_QUERIES]
+    )
+
+    # 14-day daily volume — same window and style as the Zone B chart.
+    days = 14
+    period_start = now - timedelta(days=days - 1)
+    by_day = {
+        row["day"].date(): row["count"]
+        for row in SearchQuery.objects.filter(timestamp__gte=period_start)
+        .exclude(query="")
+        .annotate(day=TruncDay("timestamp"))
+        .values("day")
+        .annotate(count=Count("id"))
+        if row["day"]
+    }
+    labels: list[str] = []
+    series: list[int] = []
+    for i in range(days):
+        day_val = (now - timedelta(days=days - 1 - i)).date()
+        labels.append(day_val.strftime("%d/%m"))
+        series.append(by_day.get(day_val, 0))
+
+    volume_chart = {
+        "labels": labels,
+        "datasets": [
+            {
+                "label": str(_("Searches")),
+                "type": "bar",
+                "data": series,
+                "backgroundColor": "#0ea5e9",  # sky-500
+                "hoverBackgroundColor": "#0284c7",  # sky-600
+                "borderRadius": 6,
+                "borderSkipped": "start",
+                "barPercentage": 0.85,
+                "categoryPercentage": 0.9,
+            },
+        ],
+    }
+    volume_chart_options = {
+        "responsive": True,
+        "maintainAspectRatio": False,
+        "plugins": {
+            "legend": {"display": False},
+            "tooltip": {"enabled": True, "padding": 10},
+        },
+        "scales": {
+            "x": {
+                "grid": {"display": False},
+                "ticks": {"color": _CHART_TICK_COLOR, "maxRotation": 0},
+            },
+            "y": {
+                "beginAtZero": True,
+                "ticks": {"color": _CHART_TICK_COLOR, "precision": 0},
+                "grid": {"color": "rgba(148, 163, 184, 0.2)"},
+            },
+        },
+    }
+
+    def _pct(num: int, den: int) -> float:
+        return round(num / den * 100, 1) if den else 0.0
+
+    return {
+        "search_insights": {
+            "searches_30d": searches_30d,
+            "zero_result_pct": _pct(zero_total, meaningful_total),
+            "zero_result_count": zero_total,
+            # None (rendered "—") until click tracking has EVER recorded
+            # a click — a hard zero would misread as "nobody clicks".
+            "clicks_30d": clicks_30d if has_any_click else None,
+            "ctr_pct": (
+                _pct(clicks_30d, searches_30d) if has_any_click else None
+            ),
+            "top_queries": top_rows,
+            "zero_queries": zero_rows,
+        },
+        "search_volume_chart_data": json.dumps(volume_chart),
+        "search_volume_chart_options": json.dumps(volume_chart_options),
     }
 
 
@@ -410,45 +573,19 @@ def _zone_a_hero_kpis(
     Order,
     User,
     now,
-    today,
-    week_ago,
-    prior_week_start,
     month_ago,
     PaymentStatus,
     OrderStatus,
 ) -> dict:
-    """4 hero KPI cards: revenue 7d, pending orders, new customers,
-    average order value.
+    """4 hero KPI cards: revenue (selectable period), pending orders,
+    new customers, average order value.
     """
-
-    revenue_7d = (
-        Order.objects.filter(
-            payment_status=PaymentStatus.COMPLETED,
-            created_at__gte=week_ago,
-        ).aggregate(total=Sum("paid_amount"))["total"]
-        or 0
-    )
-    revenue_prior = (
-        Order.objects.filter(
-            payment_status=PaymentStatus.COMPLETED,
-            created_at__gte=prior_week_start,
-            created_at__lt=week_ago,
-        ).aggregate(total=Sum("paid_amount"))["total"]
-        or 0
-    )
-    if revenue_prior:
-        trend_pct = round(
-            (float(revenue_7d) - float(revenue_prior))
-            / float(revenue_prior)
-            * 100,
-            1,
-        )
-    else:
-        trend_pct = None  # nothing to compare against
 
     pending_orders = Order.objects.filter(status=OrderStatus.PENDING).count()
     new_customers_30d = User.objects.filter(created_at__gte=month_ago).count()
-    new_customers_today = User.objects.filter(created_at__date=today).count()
+    new_customers_today = User.objects.filter(
+        created_at__date=now.date()
+    ).count()
     aov_30d = (
         Order.objects.filter(created_at__gte=month_ago).aggregate(
             avg=Avg("paid_amount")
@@ -458,14 +595,56 @@ def _zone_a_hero_kpis(
 
     return {
         "hero": {
-            "revenue_7d": float(revenue_7d),
-            "revenue_trend_pct": trend_pct,
+            "revenue_periods": _revenue_periods(Order, now, PaymentStatus),
             "pending_orders": pending_orders,
             "new_customers_30d": new_customers_30d,
             "new_customers_today": new_customers_today,
             "avg_order_value": round(float(aov_30d), 2),
         },
     }
+
+
+def _revenue_periods(Order, now, PaymentStatus) -> list[dict]:
+    """Paid revenue per selectable window, each with a trend badge.
+
+    One SQL round-trip: every window (current + the prior window of
+    equal length used for the trend comparison) is a filtered ``Sum``
+    inside a single ``aggregate()`` call.
+    """
+
+    aggregates = {}
+    for key, days, _short, _long in REVENUE_PERIODS:
+        start = now - timedelta(days=days)
+        prior_start = now - timedelta(days=days * 2)
+        aggregates[f"current_{key}"] = Sum(
+            "paid_amount", filter=Q(created_at__gte=start)
+        )
+        aggregates[f"prior_{key}"] = Sum(
+            "paid_amount",
+            filter=Q(created_at__gte=prior_start, created_at__lt=start),
+        )
+    totals = Order.objects.filter(
+        payment_status=PaymentStatus.COMPLETED
+    ).aggregate(**aggregates)
+
+    periods = []
+    for key, _days, short_label, long_label in REVENUE_PERIODS:
+        current = float(totals[f"current_{key}"] or 0)
+        prior = float(totals[f"prior_{key}"] or 0)
+        periods.append(
+            {
+                "key": key,
+                "short_label": short_label,
+                "long_label": long_label,
+                "amount": current,
+                "trend_pct": (
+                    round((current - prior) / prior * 100, 1)
+                    if prior
+                    else None  # nothing to compare against
+                ),
+            }
+        )
+    return periods
 
 
 # ── Zone B — Operations charts ────────────────────────────────────────

@@ -131,7 +131,17 @@ class BoxNowCancelView(APIView):
                 exc.code,
                 exc,
             )
-            return Response({"detail": str(exc), "code": exc.code}, status=400)
+            # ``exc.message`` is the parsed BoxNow business message —
+            # unlike ``str(exc)`` it is never raw exception text
+            # (CodeQL py/stack-trace-exposure).
+            return Response(
+                {
+                    "detail": exc.message
+                    or "BoxNow rejected the cancellation.",
+                    "code": exc.code,
+                },
+                status=400,
+            )
 
         logger.info(
             "BoxNow parcel cancelled by admin | parcel_id=%s | user=%s",

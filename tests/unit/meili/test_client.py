@@ -18,10 +18,6 @@ class TestMeiliClient:
             search_key="test_key",
             timeout=10,
             sync=False,
-            client_agents=("test-agent",),
-            debug=False,
-            offline=False,
-            batch_size=1000,
         )
 
     @patch("meili._client._Client")
@@ -42,7 +38,6 @@ class TestMeiliClient:
             "http://localhost:7700",
             "test_key",
             timeout=10,
-            client_agents=("test-agent",),
         )
 
     @patch("meili._client._Client")
@@ -55,10 +50,6 @@ class TestMeiliClient:
             search_key="https_search_key",
             timeout=30,
             sync=True,
-            client_agents=None,
-            debug=False,
-            offline=False,
-            batch_size=1000,
         )
 
         client = Client(https_settings)
@@ -69,13 +60,11 @@ class TestMeiliClient:
             "https://example.com:443",
             "https_key",
             timeout=30,
-            client_agents=None,
         )
         mock_client_class.assert_any_call(
             "https://example.com:443",
             "https_search_key",
             timeout=30,
-            client_agents=None,
         )
         assert client.is_sync is True
 
@@ -320,10 +309,6 @@ class TestMeiliClient:
             search_key="readonly_search_key",
             timeout=10,
             sync=False,
-            client_agents=None,
-            debug=False,
-            offline=False,
-            batch_size=1000,
         )
 
         client = Client(distinct)
@@ -493,10 +478,6 @@ class TestMeiliClient:
             search_key="test_key",
             sync=True,
             timeout=None,
-            client_agents=None,
-            debug=False,
-            offline=False,
-            batch_size=1000,
         )
 
         client = Client(sync_settings)
@@ -527,10 +508,6 @@ class TestMeiliClient:
             search_key="test_key",
             sync=True,
             timeout=None,
-            client_agents=None,
-            debug=False,
-            offline=False,
-            batch_size=1000,
         )
 
         client = Client(sync_settings)
@@ -566,10 +543,6 @@ class TestMeiliClient:
             search_key="test_key",
             sync=True,
             timeout=None,
-            client_agents=None,
-            debug=False,
-            offline=False,
-            batch_size=1000,
         )
 
         client = Client(sync_settings)
@@ -603,10 +576,6 @@ class TestMeiliClient:
             search_key="test_key",
             sync=True,
             timeout=None,
-            client_agents=None,
-            debug=False,
-            offline=False,
-            batch_size=1000,
         )
 
         client = Client(sync_settings)

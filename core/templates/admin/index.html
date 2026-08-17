@@ -130,24 +130,52 @@
     {% trans "Last 30 days" as last_30d_label %}
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
-        {# Revenue 7d with trend #}
-        {% trans "vs. prior 7 days" as vs_prior_label %}
+        {# Revenue with client-side period switcher (7d/1m/3m/1y).      #}
+        {# All periods ship in the cached payload; Alpine (bundled by   #}
+        {# unfold, incl. the persist plugin) toggles visibility and     #}
+        {# remembers the admin's choice in localStorage. x-init resets  #}
+        {# a stale persisted key if the period set ever changes.        #}
+        {% trans "vs. prior period of equal length" as vs_prior_label %}
         {% component "unfold/components/card.html" with footer=vs_prior_label %}
-            <div class="flex items-start justify-between">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
-                    {% component "unfold/components/icon.html" %}payments{% endcomponent %}
+            <div x-data="{ period: $persist('7d').as('dashboard-revenue-period') }"
+                 x-init="$el.querySelector(`[data-period='${period}']`) || (period = '7d')">
+                <div class="flex items-start justify-between">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300">
+                        {% component "unfold/components/icon.html" %}payments{% endcomponent %}
+                    </div>
+                    {% for p in hero.revenue_periods %}
+                        {% if p.trend_pct is not None %}
+                        <span x-cloak x-show="period === '{{ p.key }}'">
+                            {% capture as revenue_trend_text silent %}{% if p.trend_pct >= 0 %}+{% endif %}{{ p.trend_pct }}%{% endcapture %}
+                            {% if p.trend_pct >= 0 %}
+                                {% include "unfold/helpers/label.html" with variant="success" icon="trending_up" text=revenue_trend_text %}
+                            {% else %}
+                                {% include "unfold/helpers/label.html" with variant="danger" icon="trending_down" text=revenue_trend_text %}
+                            {% endif %}
+                        </span>
+                        {% endif %}
+                    {% endfor %}
                 </div>
-                {% if hero.revenue_trend_pct is not None %}
-                    {% capture as revenue_trend_text silent %}{% if hero.revenue_trend_pct >= 0 %}+{% endif %}{{ hero.revenue_trend_pct }}%{% endcapture %}
-                    {% if hero.revenue_trend_pct >= 0 %}
-                        {% include "unfold/helpers/label.html" with variant="success" icon="trending_up" text=revenue_trend_text %}
-                    {% else %}
-                        {% include "unfold/helpers/label.html" with variant="danger" icon="trending_down" text=revenue_trend_text %}
-                    {% endif %}
-                {% endif %}
+                {% for p in hero.revenue_periods %}
+                <div x-cloak x-show="period === '{{ p.key }}'">
+                    {% component "unfold/components/title.html" with class="mt-4!" %}€{{ p.amount|floatformat:2 }}{% endcomponent %}
+                </div>
+                {% endfor %}
+                <div class="mt-1 flex items-center justify-between gap-2">
+                    {% component "unfold/components/text.html" with class="font-medium" %}{% trans "Revenue" %}{% endcomponent %}
+                    <div class="flex gap-0.5 rounded-md bg-base-100 p-0.5 dark:bg-base-800" role="group" aria-label="{% trans 'Revenue period' %}">
+                        {% for p in hero.revenue_periods %}
+                        <button type="button"
+                                data-period="{{ p.key }}"
+                                @click="period = '{{ p.key }}'"
+                                :class="period === '{{ p.key }}' ? 'bg-white text-base-900 shadow-xs dark:bg-base-900 dark:text-base-100' : 'text-base-500 hover:text-base-700 dark:text-base-400 dark:hover:text-base-200'"
+                                :aria-pressed="period === '{{ p.key }}'"
+                                class="cursor-pointer rounded px-1.5 py-0.5 text-xs font-medium transition-colors"
+                                title="{{ p.long_label }}">{{ p.short_label }}</button>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
-            {% component "unfold/components/title.html" with class="mt-4!" %}€{{ hero.revenue_7d|floatformat:2 }}{% endcomponent %}
-            {% component "unfold/components/text.html" with class="mt-1 font-medium" %}{% trans "Revenue (7d)" %}{% endcomponent %}
         {% endcomponent %}
 
         {# Pending orders #}
@@ -388,6 +416,108 @@
                 {% empty %}
                 <li class="py-6 text-center text-base-600 dark:text-base-300 text-sm">
                     {% trans "No products yet" %}
+                </li>
+                {% endfor %}
+            </ul>
+        {% endcomponent %}
+
+    </div>
+
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# ZONE F — Search insights                                       #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {% trans "Last 30 days" as last_30d_badge %}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {# KPI stack #}
+        <div class="flex flex-col gap-6">
+            {% trans "Searches" as searches_title %}
+            {% component "unfold/components/card.html" with title=searches_title action=last_30d_badge %}
+                {% component "unfold/components/title.html" %}{{ search_insights.searches_30d }}{% endcomponent %}
+                <div class="mt-2 text-sm text-base-600 dark:text-base-300">
+                    {% trans "committed queries, empty searches excluded" %}
+                </div>
+            {% endcomponent %}
+            {% trans "Zero Results" as zero_title %}
+            {% component "unfold/components/card.html" with title=zero_title action=last_30d_badge %}
+                {% component "unfold/components/title.html" %}{{ search_insights.zero_result_pct }}%{% endcomponent %}
+                <div class="mt-2 text-sm text-base-600 dark:text-base-300">
+                    {{ search_insights.zero_result_count }} {% trans "searches found nothing" %}
+                </div>
+            {% endcomponent %}
+            {% trans "Result Clicks" as clicks_title %}
+            {% component "unfold/components/card.html" with title=clicks_title action=last_30d_badge %}
+                {% if search_insights.clicks_30d is None %}
+                    {% component "unfold/components/title.html" %}—{% endcomponent %}
+                    <div class="mt-2 text-sm text-base-600 dark:text-base-300">
+                        {% trans "No click data recorded yet" %}
+                    </div>
+                {% else %}
+                    {% component "unfold/components/title.html" %}{{ search_insights.clicks_30d }}{% endcomponent %}
+                    <div class="mt-2 text-sm text-base-600 dark:text-base-300">
+                        {{ search_insights.ctr_pct }}% {% trans "click-through rate" %}
+                    </div>
+                {% endif %}
+            {% endcomponent %}
+        </div>
+
+        {# 14-day volume chart #}
+        {% trans "Search Volume" as search_volume_title %}
+        {% trans "Last 14 days" as last_14d_badge %}
+        <div class="lg:col-span-2">
+            {% component "unfold/components/card.html" with title=search_volume_title action=last_14d_badge %}
+                {% component "unfold/components/chart/bar.html" with data=search_volume_chart_data options=search_volume_chart_options class="h-[320px]" %}{% endcomponent %}
+            {% endcomponent %}
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {# Top queries #}
+        {% trans "Top Search Queries" as top_queries_title %}
+        {% component "unfold/components/card.html" with title=top_queries_title action=last_30d_badge size="md" %}
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead class="bg-base-50 dark:bg-base-800 text-base-600 dark:text-base-400 uppercase">
+                        <tr>
+                            <th class="px-3 py-2 text-left font-medium">{% trans "Query" %}</th>
+                            <th class="px-3 py-2 text-right font-medium">{% trans "Searches" %}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-base-200 dark:divide-base-800">
+                        {% for row in search_insights.top_queries %}
+                        <tr class="hover:bg-base-50 dark:hover:bg-base-800/50">
+                            <td class="px-3 py-2 font-medium text-base-700 dark:text-base-200">{{ row.query }}</td>
+                            <td class="px-3 py-2 text-right text-base-700 dark:text-base-200">{{ row.count }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="2" class="px-3 py-6 text-center text-base-600 dark:text-base-300">
+                                {% trans "No search data yet" %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endcomponent %}
+
+        {# Zero-result queries — the synonym / content-gap worklist #}
+        {% trans "Zero-Result Queries" as zero_queries_title %}
+        {% component "unfold/components/card.html" with title=zero_queries_title action=last_30d_badge size="md" %}
+            {% component "unfold/components/text.html" with class="mb-3" %}{% trans "What visitors searched for and didn't find — candidates for synonyms, new content, or new products." %}{% endcomponent %}
+            <ul class="divide-y divide-base-200 dark:divide-base-800">
+                {% for row in search_insights.zero_queries %}
+                <li class="py-2 flex items-center justify-between gap-3">
+                    <span class="text-sm font-medium text-orange-700 dark:text-orange-400 truncate">{{ row.query }}</span>
+                    {% capture as zero_query_count silent %}{{ row.count }}×{% endcapture %}
+                    {% include "unfold/helpers/label.html" with variant="warning" text=zero_query_count %}
+                </li>
+                {% empty %}
+                <li class="py-6 text-center text-base-600 dark:text-base-300 text-sm">
+                    {% trans "No zero-result searches" %} 🎉
                 </li>
                 {% endfor %}
             </ul>

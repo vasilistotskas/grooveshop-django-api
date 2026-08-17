@@ -539,6 +539,120 @@ class TestPollShipmentDeliveryTransitions:
         assert order.status == OrderStatus.COMPLETED
 
 
+@pytest.fixture
+def acs_client_mock_returned(monkeypatch):
+    """Variant of ``acs_client_mock`` that drives summaries to RETURNED.
+
+    Mirrors the production payload for a returned-to-sender parcel:
+    per the ACS web-services doc, ``shipment_status`` 7 pairs
+    ``returned_flag=1`` with ``delivery_flag=1`` (the delivery back to
+    the sender) — ``from_tracking_summary`` must classify that as
+    RETURNED, not DELIVERED.
+    """
+    from shipping_acs import services
+
+    class _ReturnedClient:
+        billing_code = "TEST_BILLING"
+
+        def tracking_summary(self, voucher_no):
+            return {
+                "delivery_flag": 1,
+                "returned_flag": 1,
+                "shipment_status": 7,
+                "delivery_date": "2026-07-20T11:00:00",
+            }
+
+        def tracking_details(self, voucher_no):
+            return [
+                {
+                    "checkpoint_date_time": "2026-07-20T11:00:00",
+                    "checkpoint_action": "ΕΠΙΣΤΡΟΦΗ ΣΤΟΝ ΑΠΟΣΤΟΛΕΑ",
+                    "checkpoint_location": "ΑΘΗΝΑ",
+                    "checkpoint_notes": "",
+                }
+            ]
+
+    monkeypatch.setattr(services, "AcsClient", _ReturnedClient)
+    return _ReturnedClient
+
+
+class TestPollShipmentReturnTransitions:
+    """ACS RETURNED tracking event → Order status auto-advance.
+
+    Regression guards for prod orders 179 & 189 (2026-07-20 /
+    2026-07-24): the poll saw ``returned_flag=1`` while the orders
+    still sat at PROCESSING, the direct PROCESSING → RETURNED
+    transition was rejected by the state machine on every poll, and
+    the returns were never recorded.
+    """
+
+    def test_returned_walks_through_shipped_when_processing(
+        self, acs_client_mock_returned
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+        from order.tasks import _status_update_reservation_key
+
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9999998893",
+            shipment_state=AcsShipmentState.IN_TRANSIT,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        order.refresh_from_db()
+        shipment.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.RETURNED
+        assert order.status == OrderStatus.RETURNED
+
+        # The bridge's SHIPPED hop is customer-silent — a "your order
+        # is on the way" email/toast moments before the return
+        # notification would mislead.
+        meta = order.metadata or {}
+        shipped_email_flag = _status_update_reservation_key(
+            order.id, OrderStatus.SHIPPED.value
+        )
+        assert meta.get(shipped_email_flag) is True
+        assert (
+            meta.get(f"suppress_status_ws_{OrderStatus.SHIPPED.value}") is True
+        )
+        # ...while RETURNED notifies the customer normally.
+        assert (
+            meta.get(f"suppress_status_ws_{OrderStatus.RETURNED.value}") is None
+        )
+
+    def test_returned_direct_from_shipped_needs_no_bridge(
+        self, acs_client_mock_returned
+    ):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.SHIPPED,
+            payment_status=PaymentStatus.PENDING,
+        )
+        shipment = AcsShipmentFactory(
+            order=order,
+            voucher_no="9999998894",
+            shipment_state=AcsShipmentState.OUT_FOR_DELIVERY,
+        )
+
+        AcsService.poll_shipment_tracking(shipment)
+
+        order.refresh_from_db()
+        shipment.refresh_from_db()
+        assert shipment.shipment_state == AcsShipmentState.RETURNED
+        assert order.status == OrderStatus.RETURNED
+        # No bridge ran — SHIPPED notifications were never suppressed.
+        meta = order.metadata or {}
+        assert (
+            meta.get(f"suppress_status_ws_{OrderStatus.SHIPPED.value}") is None
+        )
+
+
 # ---------------------------------------------------------------------------
 # issue_daily_pickup_list
 # ---------------------------------------------------------------------------

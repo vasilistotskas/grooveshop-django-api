@@ -1493,7 +1493,7 @@ class ProductAdmin(
 
         try:
             window_days = int(request.GET.get("days") or 90)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             window_days = 90
         window_days = max(7, min(window_days, 365))
         since = timezone.now() - timedelta(days=window_days)

@@ -95,7 +95,14 @@ class Command(BaseCommand):
                 "free_threshold": Money(0, default_currency),
                 "is_online_payment": True,
                 "requires_confirmation": False,
-                "active": True,
+                # PayPalPaymentProvider is an unimplemented stub (every
+                # method raises NotImplementedError) and is deliberately
+                # NOT registered in PAYMENT_PROVIDERS. Seeding this
+                # active would put a checkout option live that crashes
+                # order status verification on first use. Flip to True
+                # only once the provider is actually implemented and
+                # re-registered.
+                "active": False,
                 "sort_order": 2,
                 "configuration": {
                     "environment": "sandbox",

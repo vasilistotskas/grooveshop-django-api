@@ -12,6 +12,11 @@ from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
 from meili.models import IndexMixin
 from core.models import SeoModel
+from search.transliteration import (
+    greeklish_shadow,
+    greeklish_shadow_alt,
+    greeklish_variants,
+)
 
 
 class BlogPost(
@@ -46,6 +51,19 @@ class BlogPost(
     )
     featured = models.BooleanField(_("Featured"), default=False)
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
+    click_score = models.PositiveIntegerField(
+        _("Click Score"),
+        # db_default (not default): the DB-level DEFAULT survives the
+        # migration, so old pods still INSERTing without this column
+        # during the rollout window don't violate NOT NULL - the
+        # checkout path writes product history rows on every sale.
+        db_default=0,
+        editable=False,
+        help_text=(
+            "Search click-through ranking signal - trailing-window click "
+            "count refreshed by search.tasks.update_click_scores"
+        ),
+    )
 
     objects: BlogPostManager = BlogPostManager()
 
@@ -175,7 +193,23 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "is_published",
             "master_id",
         )
-        searchable_fields = ("master_id", "title", "subtitle", "body")
+        # ``*_greeklish_variants`` bags exist only for the SHORT fields
+        # (title/subtitle) — expanding every body word would bloat the
+        # index and pollute ranking for no realistic recall gain.
+        searchable_fields = (
+            "master_id",
+            "title",
+            "title_greeklish",
+            "title_greeklish_alt",
+            "title_greeklish_variants",
+            "subtitle",
+            "subtitle_greeklish",
+            "subtitle_greeklish_alt",
+            "subtitle_greeklish_variants",
+            "body",
+            "body_greeklish",
+            "body_greeklish_alt",
+        )
         displayed_fields = (
             "id",
             "master_id",
@@ -195,6 +229,9 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "view_count",
             "created_at",
         )
+        # click_score is the search click-through signal refreshed by
+        # search.tasks.update_click_scores - demonstrated reader
+        # preference breaks relevance ties.
         ranking_rules = [
             "words",
             "typo",
@@ -202,6 +239,7 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
             "attribute",
             "sort",
             "exactness",
+            "click_score:desc",
         ]
         synonyms = {
             # English synonyms
@@ -245,10 +283,25 @@ class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
     def get_additional_meili_fields(cls):
         return {
             "master_id": lambda obj: obj.master_id,
+            "title_greeklish": lambda obj: greeklish_shadow(obj.title),
+            "title_greeklish_alt": lambda obj: greeklish_shadow_alt(obj.title),
+            "title_greeklish_variants": lambda obj: greeklish_variants(
+                obj.title
+            ),
+            "subtitle_greeklish": lambda obj: greeklish_shadow(obj.subtitle),
+            "subtitle_greeklish_alt": lambda obj: greeklish_shadow_alt(
+                obj.subtitle
+            ),
+            "subtitle_greeklish_variants": lambda obj: greeklish_variants(
+                obj.subtitle
+            ),
+            "body_greeklish": lambda obj: greeklish_shadow(obj.body),
+            "body_greeklish_alt": lambda obj: greeklish_shadow_alt(obj.body),
             "likes_count": lambda obj: (
                 getattr(obj, "_likes_count", 0) or obj.master.likes_count
             ),
             "view_count": lambda obj: obj.master.view_count,
+            "click_score": lambda obj: obj.master.click_score,
             "created_at": lambda obj: (
                 obj.master.created_at.isoformat()
                 if obj.master.created_at

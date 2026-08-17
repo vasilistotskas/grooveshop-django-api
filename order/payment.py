@@ -260,6 +260,76 @@ class StripePaymentProvider(PaymentProvider):
             )
             return False, {"error": str(e)}
 
+    def confirm_delegated_payment(
+        self, amount: Money, order_id: str, order_uuid: str, token: str
+    ) -> tuple[bool, dict[str, Any]]:
+        """Charge an agent-granted SharedPaymentToken (SPT).
+
+        Stripe agentic commerce: the agent platform grants this store a
+        scoped ``spt_…`` token; confirming a PaymentIntent with
+        ``payment_method_data[shared_payment_granted_token]`` clones the
+        customer's payment method and charges it entirely server-side —
+        no client confirmation round-trip. Stripe rejects tokens that
+        are expired, over their amount limit, or bound to another
+        seller, so a bad token surfaces as a StripeError here.
+        """
+        # ``shared_payment_granted_token`` is an agentic-commerce preview
+        # param the installed stripe SDK's TypedDicts don't know yet;
+        # the plain dict is passed through to the API verbatim.
+        payment_method_data: Any = {
+            "shared_payment_granted_token": token,
+        }
+        from django.db import connection as _connection
+
+        try:
+            stripe_pi = stripe.PaymentIntent.create(
+                amount=int(round(amount.amount * 100)),
+                currency=str(amount.currency).lower(),
+                confirm=True,
+                payment_method_data=payment_method_data,
+                metadata={
+                    "order_id": order_id,
+                    "source": "django_app",
+                    "agent_delegated": "true",
+                    # Webhook tenant routing: without this the resulting
+                    # payment_intent.succeeded event has no schema to
+                    # re-enter and would be processed in public.
+                    "tenant_schema": getattr(
+                        _connection, "schema_name", "public"
+                    ),
+                },
+                # One charge attempt per order — an agent retrying the
+                # same completion must not double-charge the token.
+                idempotency_key=f"agent_spt_{order_uuid}",
+            )
+            logger.info(
+                "Stripe SPT PaymentIntent created: %s (status=%s)",
+                stripe_pi.id,
+                stripe_pi.status,
+            )
+
+            try:
+                PaymentIntent.sync_from_stripe_data(stripe_pi)
+            except Exception as sync_error:
+                logger.warning(
+                    f"Failed to sync PaymentIntent to dj-stripe: {sync_error}"
+                )
+
+            return True, {
+                "payment_id": stripe_pi.id,
+                "status": self._map_stripe_status(stripe_pi.status),
+                "amount": str(amount.amount),
+                "currency": str(amount.currency),
+                "provider": "stripe",
+            }
+        except stripe.StripeError as e:
+            logger.error(
+                f"Stripe SPT payment failed: {e}",
+                extra={"order_id": order_id, "error": str(e)},
+                exc_info=True,
+            )
+            return False, {"error": str(e), "stripe_error": True}
+
     def process_payment(
         self, amount: Money, order_id: str, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
@@ -887,9 +957,13 @@ class PayPalPaymentProvider(PaymentProvider):
 
 
 def get_payment_provider(provider_name: str) -> PaymentProvider:
+    # PayPalPaymentProvider is intentionally absent: it is an
+    # unimplemented stub (every method raises NotImplementedError).
+    # Keeping it out means a mis-seeded "paypal" PayWay fails fast here
+    # with a clear "Unknown payment provider" instead of blowing up
+    # mid-checkout at get_payment_status(). Register it when implemented.
     providers = {
         "stripe": StripePaymentProvider,
-        "paypal": PayPalPaymentProvider,
         "viva_wallet": VivaWalletPaymentProvider,
     }
 

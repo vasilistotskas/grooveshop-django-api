@@ -180,7 +180,7 @@ class IdempotencyMiddleware(MiddlewareMixin):
 
         try:
             body = json.loads(content.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
+        except ValueError, UnicodeDecodeError:
             return None
 
         headers_to_preserve = {

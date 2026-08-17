@@ -48,6 +48,12 @@ class TestTierLevelMapCache(TestCase):
 
         cache.delete(_TIER_LEVEL_CACHE_KEY)
 
+        # Prime the connection: django-tenants >= 3.14 clears its cached
+        # search_path on rollback() (factories roll back savepoints), so
+        # the first query after that re-issues ``SET search_path`` —
+        # which would count against the assertion below.
+        LoyaltyTier.objects.exists()
+
         with self.assertNumQueries(1):
             mapping = _get_tier_level_map()
 

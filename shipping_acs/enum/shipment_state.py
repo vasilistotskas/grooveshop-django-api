@@ -66,7 +66,7 @@ class AcsShipmentState(models.TextChoices):
 
         try:
             status = int(status_raw) if status_raw not in (None, "") else None
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             status = None
 
         # ``shipment_status=5`` is ambiguous: per ACS PDF it can mean
@@ -122,5 +122,5 @@ def _normalise_flag(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None

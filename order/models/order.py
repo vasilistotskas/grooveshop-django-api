@@ -330,6 +330,10 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._original_status = self.status
+        # Payment status is snapshotted too so the post_save handler can
+        # detect payment transitions (they can occur without a status
+        # change, e.g. a refund) for the agent-gateway event push.
+        self._original_payment_status = self.payment_status
         # Cache tracking state so the post_save handler can detect the
         # null → set transition that fires ``order_shipment_dispatched``.
         # Using the field values (not pk) covers both fresh instances
@@ -358,6 +362,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
         super().save(*args, **kwargs)
         self._original_status = self.status
+        self._original_payment_status = self.payment_status
         self._original_tracking_number = self.tracking_number
         self._original_shipping_carrier = self.shipping_carrier
 

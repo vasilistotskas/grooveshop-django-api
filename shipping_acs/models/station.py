@@ -23,8 +23,13 @@ class AcsStation(UUIDModel, TimeStampMixinModel):
     external_id = models.CharField(
         _("External ID"),
         max_length=32,
-        unique=True,
-        help_text=_("ACS_SHOP_STATION_ID — used as Acs_Station_Destination."),
+        help_text=_(
+            "ACS_SHOP_STATION_ID_EN — the AREA station code, used as "
+            "Acs_Station_Destination. NOT unique on its own: every "
+            "Smartpoint locker in an area shares it (e.g. 50 lockers "
+            "under 'ATH'); the (external_id, branch_code) pair is the "
+            "locker's identity."
+        ),
     )
     branch_code = models.CharField(
         _("Branch code"),
@@ -33,7 +38,8 @@ class AcsStation(UUIDModel, TimeStampMixinModel):
         default="",
         help_text=_(
             "ACS_SHOP_BRANCH_ID — paired with external_id when "
-            "creating vouchers (Acs_Station_Branch_Destination)."
+            "creating vouchers (Acs_Station_Branch_Destination). "
+            "Distinguishes individual lockers within a station area."
         ),
     )
     shop_kind = models.PositiveSmallIntegerField(
@@ -88,6 +94,17 @@ class AcsStation(UUIDModel, TimeStampMixinModel):
         verbose_name = _("ACS station")
         verbose_name_plural = _("ACS stations")
         ordering = ["postal_code", "external_id"]
+        constraints = [
+            # The pair is the locker identity (verified against the
+            # live API 2026-07-25: 1,485 GR lockers → 135 distinct
+            # station codes but 1,484 distinct pairs). A unique
+            # external_id alone collapsed every locker in an area
+            # into one row.
+            models.UniqueConstraint(
+                fields=["external_id", "branch_code"],
+                name="acs_station_ext_branch_uq",
+            ),
+        ]
         indexes = [
             *TimeStampMixinModel.Meta.indexes,
             BTreeIndex(fields=["external_id"], name="acs_station_ext_id_ix"),

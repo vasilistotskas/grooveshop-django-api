@@ -209,14 +209,26 @@ class AcsCarrier(ShippingCarrierInterface):
         raw_qty = payload.get("acs_item_quantity")
         try:
             item_quantity = int(raw_qty) if raw_qty is not None else 1
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             item_quantity = 1
         if item_quantity < 1:
             item_quantity = 1
 
         station = None
         if external_id:
-            station = AcsStation.objects.filter(external_id=external_id).first()
+            # external_id is the AREA station code shared by every
+            # locker in that area — the (external_id, branch_code)
+            # pair identifies the actual locker the customer picked.
+            # Fall back to code-only matching for payloads without a
+            # branch (physical-shop pickups, stale clients); the
+            # voucher itself always uses the raw payload values, so
+            # this FK is informational either way.
+            station = (
+                AcsStation.objects.filter(
+                    external_id=external_id, branch_code=branch_code
+                ).first()
+                or AcsStation.objects.filter(external_id=external_id).first()
+            )
 
         AcsShipment.objects.create(
             order=order,
@@ -419,11 +431,14 @@ class AcsCarrier(ShippingCarrierInterface):
         # back to the flat rate.
         error_message = response.get("Error_Message") if response else None
         if error_message:
+            # Don't log the station codes themselves — they derive from
+            # ACS_BILLING_CODE (CodeQL py/clear-text-logging-sensitive-
+            # data); the operator can read them from the provider
+            # metadata / billing code directly.
             logger.warning(
-                "ACS_Price_Calculation business error (origin=%s "
-                "dest=%s): %s — falling back to flat rate.",
-                origin,
-                destination,
+                "ACS_Price_Calculation business error: %s — falling "
+                "back to flat rate. Check ShippingProvider metadata "
+                "['station_origin'] / ACS_BILLING_CODE.",
                 error_message,
             )
             return None
@@ -444,7 +459,7 @@ class AcsCarrier(ShippingCarrierInterface):
         )
         try:
             amount = float(normalised)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             logger.warning(
                 "Could not parse ACS price quote amount %r — "
                 "falling back to flat rate.",

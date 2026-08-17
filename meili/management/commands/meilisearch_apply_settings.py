@@ -3,6 +3,13 @@ Management command to apply index settings updates without reindexing.
 
 This command updates Meilisearch index settings for ProductTranslation and
 BlogPostTranslation indexes based on their MeiliMeta configuration.
+
+CROSS-REPO CONSUMER - do not delete: the grooveshop-infrastructure
+prepare-helm PreSync job runs this on EVERY deploy
+(manifests/app-constructs/grooveshop/prepare-helm/templates/job.yaml)
+so MeiliMeta settings changes (sortable/filterable/ranking fields) never
+drift from the live indexes. A drifted sortable field once made every
+``?sort=`` product query 500.
 """
 
 from contextlib import nullcontext as _nullcontext

@@ -18,7 +18,7 @@ def test_list_defaults_to_locker_kinds_only():
     we must not flood it with general shop rows."""
     AcsStationFactory(
         external_id="LOCKER-A",
-        shop_kind=AcsShopKind.SMARTPOINT_INBOUND,
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
         postal_code="11525",
     )
     AcsStationFactory(
@@ -58,13 +58,13 @@ def test_list_shop_kind_override_surfaces_shops():
 def test_nearest_returns_postcode_match():
     AcsStationFactory(
         external_id="ATH-1",
-        shop_kind=AcsShopKind.SMARTPOINT_INBOUND,
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
         postal_code="11525",
         city="ΑΘΗΝΑ",
     )
     AcsStationFactory(
         external_id="THE-1",
-        shop_kind=AcsShopKind.SMARTPOINT_INBOUND,
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
         postal_code="54630",
         city="ΘΕΣΣΑΛΟΝΙΚΗ",
     )
@@ -83,7 +83,7 @@ def test_nearest_returns_postcode_match():
 def test_nearest_falls_back_to_city_when_postcode_misses():
     AcsStationFactory(
         external_id="MOL-1",
-        shop_kind=AcsShopKind.SMARTPOINT_INBOUND,
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
         postal_code="84500",
         city="ΜΟΛΟΣ",
     )
@@ -107,12 +107,12 @@ def test_nearest_requires_postal_code():
 def test_list_excludes_inactive_stations():
     AcsStationFactory(
         external_id="ACTIVE-1",
-        shop_kind=AcsShopKind.SMARTPOINT_INBOUND,
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
         is_active=True,
     )
     AcsStationFactory(
         external_id="INACTIVE-1",
-        shop_kind=AcsShopKind.SMARTPOINT_INBOUND,
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
         is_active=False,
     )
     client = APIClient()
@@ -121,3 +121,33 @@ def test_list_excludes_inactive_stations():
     codes = {row["externalId"] for row in results}
     assert "ACTIVE-1" in codes
     assert "INACTIVE-1" not in codes
+
+
+def test_retrieve_by_uuid_disambiguates_shared_station_codes():
+    """Detail is keyed by ``uuid``: ``external_id`` is the AREA code
+    shared by every locker in that area, so a code-keyed retrieve
+    raised MultipleObjectsReturned → 500 once the cache became
+    pair-keyed (regression, 2026-07-25: 50 lockers under 'ATH')."""
+    first = AcsStationFactory(
+        external_id="ATH",
+        branch_code="521",
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
+    )
+    second = AcsStationFactory(
+        external_id="ATH",
+        branch_code="567",
+        shop_kind=AcsShopKind.SMARTPOINT_LOCKER,
+    )
+
+    client = APIClient()
+    for station in (first, second):
+        response = client.get(
+            reverse(
+                "shipping-acs-station-detail",
+                kwargs={"uuid": str(station.uuid)},
+            )
+        )
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["uuid"] == str(station.uuid)
+        assert body["branchCode"] == station.branch_code

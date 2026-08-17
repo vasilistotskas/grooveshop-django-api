@@ -88,9 +88,12 @@ class TenantConfigSerializer(serializers.Serializer):
     # NOTE: ``from_email``, ``contact_email``, ``meta_capi_access_token``,
     # ``meta_capi_dataset_id``, all Viva Wallet keys, all ACS credentials,
     # ``box_now_client_id``, ``box_now_client_secret``, ``box_now_warehouse_id``,
-    # ``box_now_notify_phone``, and ``turnstile_secret_key`` are intentionally
-    # excluded — they are secrets or internal config that must never be
-    # served to anonymous callers. Only available via TenantAdminSerializer.
+    # ``box_now_notify_phone``, ``turnstile_secret_key``, and
+    # ``chat_api_key`` are intentionally excluded — they are secrets or
+    # internal config that must never be served to anonymous callers.
+    # Only available via TenantAdminSerializer (``chat_api_key`` is
+    # additionally appended to tenant_resolve responses for the agent
+    # gateway only, after an X-Internal-Token check — never cached).
 
     def get_primary_domain(self, obj: Tenant) -> str:
         domain = obj.domains.filter(is_primary=True).first()
@@ -166,6 +169,8 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             # --- Bot Protection ---
             "turnstile_site_key",
             "turnstile_secret_key",
+            # --- Agentic Commerce ---
+            "chat_api_key",
             # --- Social Links ---
             "socials_discord",
             "socials_facebook",

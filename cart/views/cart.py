@@ -460,7 +460,7 @@ class CartViewSet(BaseModelViewSet):
         for reservation_id in reservation_ids:
             try:
                 owned = int(reservation_id) in owned_ids
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 owned = False
 
             if not owned:
@@ -475,12 +475,23 @@ class CartViewSet(BaseModelViewSet):
             try:
                 StockManager.release_reservation(reservation_id)
                 released_count += 1
-            except StockReservationError as e:
-                # Track failed releases but continue processing others
+            except StockReservationError:
+                # Track failed releases but continue processing others.
+                # Details go to the server log only — exception text must
+                # not reach the response body (CodeQL
+                # py/stack-trace-exposure).
+                logger.warning(
+                    "Failed to release stock reservation %s",
+                    reservation_id,
+                    exc_info=True,
+                )
                 failed_releases.append(
                     {
                         "reservation_id": reservation_id,
-                        "error": str(e),
+                        "error": _(
+                            "Release failed — the reservation may already "
+                            "be released or expired."
+                        ),
                     }
                 )
 

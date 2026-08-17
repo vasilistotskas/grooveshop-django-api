@@ -119,6 +119,11 @@ def fanout_anonymize_old_search_queries():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_update_click_scores():
+    return run_for_all_tenants("search.tasks.update_click_scores")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_cleanup_expired_data_exports():
     return run_for_all_tenants("user.tasks.cleanup_expired_data_exports")
 

@@ -111,32 +111,7 @@ class LoyaltyViewSet(BaseModelViewSet):
     @action(detail=False, methods=["GET"])
     def summary(self, request):
         """GET /api/v1/loyalty/summary - User's loyalty summary."""
-        user = request.user
-        balance = LoyaltyService.get_user_balance(user)
-        level = LoyaltyService.get_user_level(user)
-        tier = LoyaltyService.get_user_tier(user)
-
-        # Calculate points to next tier
-        next_tier = LoyaltyTier.objects.get_next_tier(tier)
-        points_to_next_tier = None
-        if next_tier is not None:
-            xp_per_level = Setting.get("LOYALTY_XP_PER_LEVEL", default=1000)
-            if xp_per_level <= 0:
-                xp_per_level = 1000
-            xp_needed_for_next_tier = (
-                next_tier.required_level - 1
-            ) * xp_per_level
-            points_to_next_tier = max(
-                0, xp_needed_for_next_tier - user.total_xp
-            )
-
-        data = {
-            "points_balance": balance,
-            "total_xp": user.total_xp,
-            "level": level,
-            "tier": tier,
-            "points_to_next_tier": points_to_next_tier,
-        }
+        data = LoyaltyService.get_user_summary(request.user)
 
         response_serializer_class = self.get_response_serializer()
         serializer = response_serializer_class(

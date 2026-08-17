@@ -983,7 +983,9 @@ class AcsService:
             return None
 
         # --- Phase 3: persist atomically; re-confirm under lock ---
-        billing = billing_code or getattr(settings, "ACS_BILLING_CODE", "")
+        from tenant.credentials import acs_credentials  # noqa: PLC0415
+
+        billing = billing_code or acs_credentials()["billing_code"]
         with transaction.atomic():
             confirmed = list(
                 AcsShipment.objects.select_for_update()
@@ -1173,11 +1175,11 @@ class AcsService:
             kinds = tuple(sorted({1, *country_kinds}))
 
         client = AcsClient()
-        seen_ids: set[str] = set()
+        seen_pks: set[int] = set()
         # Track which kinds returned data so deactivation only fires
         # against those kinds. Otherwise a kind whose API call returned
         # zero rows (transient failure) would have all its stations
-        # deactivated because they're absent from ``seen_ids`` —
+        # deactivated because they're absent from ``seen_pks`` —
         # exactly the cache-wiping outcome the per-kind ``continue``
         # was meant to prevent.
         successful_kinds: set[int] = set()
@@ -1186,11 +1188,39 @@ class AcsService:
         for kind in kinds:
             rows = client.stations(country=country, shop_kind=kind)
             if not rows:
-                logger.warning(
-                    "Acs_Stations returned zero rows for kind=%s — "
-                    "skipping deactivation to avoid wiping the cache.",
-                    kind,
-                )
+                # Zero rows is only suspicious when it CONTRADICTS the
+                # cache: active rows exist locally but the API says the
+                # kind is empty (transient upstream failure — skip
+                # deactivation so the cache survives). A kind that is
+                # empty both upstream and locally is a documented,
+                # steady state (e.g. GR kind=7 "Smartpoint without
+                # locker" has 0 stations since at least 2026-07; CY
+                # kind=7 is documented to return nothing) — INFO, not
+                # a daily WARNING.
+                cached_active = AcsStation.objects.filter(
+                    country_code=country,
+                    shop_kind=kind,
+                    is_active=True,
+                ).count()
+                if cached_active:
+                    logger.warning(
+                        "Acs_Stations returned zero rows for country=%s "
+                        "kind=%s but %s active cached station(s) exist "
+                        "— treating as a transient API failure and "
+                        "skipping deactivation to avoid wiping the "
+                        "cache.",
+                        country,
+                        kind,
+                        cached_active,
+                    )
+                else:
+                    logger.info(
+                        "Acs_Stations: country=%s kind=%s is empty "
+                        "upstream and has no cached rows — nothing to "
+                        "sync for this kind.",
+                        country,
+                        kind,
+                    )
                 continue
 
             successful_kinds.add(kind)
@@ -1202,10 +1232,17 @@ class AcsService:
                 )
                 if not external_id:
                     continue
-                AcsStation.objects.update_or_create(
+                # The (external_id, branch_code) PAIR is the locker
+                # identity: external_id is the AREA station code shared
+                # by every locker in that area (live API 2026-07-25:
+                # 1,485 GR lockers, 135 distinct station codes, 1,484
+                # distinct pairs). Upserting on external_id alone
+                # collapsed each area to a single arbitrary locker and
+                # hid ~90% of Smartpoints from the checkout picker.
+                station, _created = AcsStation.objects.update_or_create(
                     external_id=external_id,
+                    branch_code=str(row.get("ACS_SHOP_BRANCH_ID", "")),
                     defaults={
-                        "branch_code": str(row.get("ACS_SHOP_BRANCH_ID", "")),
                         "shop_kind": kind,
                         "name": (row.get("ACS_SHOP_STATION_DESCR") or "")[:255],
                         "address_line_1": (row.get("ACS_SHOP_ADDRESS") or "")[
@@ -1224,20 +1261,26 @@ class AcsService:
                         "last_synced_at": timezone.now(),
                     },
                 )
-                seen_ids.add(external_id)
+                seen_pks.add(station.pk)
                 upserted += 1
+            logger.info(
+                "Acs_Stations: country=%s kind=%s synced %s row(s).",
+                country,
+                kind,
+                len(rows),
+            )
 
         # Per-kind deactivation: only deactivate stations of kinds
         # that returned data. A kind that errored out keeps all its
         # rows active so a later successful sync can re-confirm them.
         deactivated = 0
-        if seen_ids and successful_kinds:
+        if seen_pks and successful_kinds:
             deactivated = (
                 AcsStation.objects.filter(
                     country_code=country,
                     shop_kind__in=successful_kinds,
                 )
-                .exclude(external_id__in=seen_ids)
+                .exclude(pk__in=seen_pks)
                 .update(is_active=False)
             )
 
@@ -1380,7 +1423,7 @@ class AcsService:
                         shipment = AcsShipment.objects.filter(
                             order__uuid=ref2
                         ).first()
-                    except (ValidationError, ValueError):
+                    except ValidationError, ValueError:
                         shipment = None
             # When a shipment matched, its voucher number is canonical
             # for the payout row — covers both an empty POD (Greek PDF
@@ -1604,21 +1647,47 @@ class AcsService:
         # against prod order 73 on 2026-05-23: shipment_state=delivered
         # but order.status=PROCESSING two days later). Walk the
         # missing SHIPPED step first.
+        #
+        # RETURNED has the same gap (prod orders 179 & 189, 2026-07-20
+        # and 2026-07-24: returned_flag=1 arrived while the order still
+        # sat at PROCESSING, PROCESSING → RETURNED was rejected every
+        # poll, and the return was never recorded). A returned parcel
+        # was necessarily picked up and transported first — the ACS
+        # tracking summary marks shipment_status 7 with returned_flag=1
+        # AND delivery_flag=1 (the delivery back to the sender) — so
+        # bridging through SHIPPED is truthful. The SHIPPED hop is
+        # silent on this path: "your order is on the way" moments
+        # before "your order was returned" would mislead; the RETURNED
+        # transition sends its own status-update email.
         if (
-            new_status == "DELIVERED"
+            new_status in ("DELIVERED", "RETURNED")
             and current_status in _PRE_SHIPPED_ORDER_STATUSES
         ):
             try:
-                OrderService.update_order_status(order, "SHIPPED")
+                OrderService.update_order_status(
+                    order,
+                    "SHIPPED",
+                    silent_for_customer=new_status == "RETURNED",
+                )
             except InvalidStatusTransitionError as exc:
                 logger.warning(
                     "ACS poll: cannot bridge order=%s through SHIPPED "
-                    "before DELIVERED (%r → SHIPPED): %s",
+                    "before %s (%r → SHIPPED): %s",
                     order.id,
+                    new_status,
                     current_status,
                     exc,
                 )
                 return
+            logger.info(
+                "ACS poll: bridged order=%s through SHIPPED "
+                "(%r → SHIPPED → %r; shipment jumped to %r without an "
+                "observed in-transit state)",
+                order.id,
+                current_status,
+                new_status,
+                str(mapped_state),
+            )
 
         try:
             OrderService.update_order_status(order, new_status)
@@ -1716,7 +1785,7 @@ def _to_decimal(value: Any) -> Decimal | None:
         return None
     try:
         return Decimal(str(value))
-    except (TypeError, ValueError, ArithmeticError):
+    except TypeError, ValueError, ArithmeticError:
         return None
 
 

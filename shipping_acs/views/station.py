@@ -35,7 +35,12 @@ class AcsStationViewSet(viewsets.ReadOnlyModelViewSet):
 
     queryset = AcsStation.objects.filter(is_active=True)
     permission_classes = [AllowAny]
-    lookup_field = "external_id"
+    # ``uuid``, not ``external_id`` — the latter is the AREA station
+    # code shared by every locker in that area, so it stopped being a
+    # valid single-object key when the cache became pair-keyed
+    # (external_id, branch_code). Nothing in the storefront retrieves
+    # by code; list/nearest carry ``uuid`` for detail links.
+    lookup_field = "uuid"
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         "external_id",

@@ -626,16 +626,17 @@ def monitor_system_health():
         logger.warning(error_msg)
         errors.append(error_msg)
 
-    try:
-        # Probe the configured default storage backend (S3 in prod via
-        # ``PrivateMediaStorage``, local FS in dev). Using
-        # ``default_storage`` instead of raw ``open(MEDIA_ROOT/...)`` so
-        # the check actually exercises the bucket the app writes to —
-        # the prod media volume isn't mounted on backend pods, so the
-        # local-FS path always failed even when S3 was healthy.
-        from django.core.files.base import ContentFile
-        from django.core.files.storage import default_storage
+    from django.core.files.base import ContentFile
+    from django.core.files.storage import default_storage
 
+    try:
+        # Probe the configured default storage backend end-to-end
+        # (write → delete). With ``USE_AWS=False`` this is a
+        # ``FileSystemStorage`` rooted at ``MEDIA_ROOT`` — in K8s that
+        # is the shared RWX media PVC, which must be mounted read-write
+        # on every pod that runs this task (backend AND celery
+        # workers). A missing mount surfaces as ``[Errno 30] Read-only
+        # file system`` from the container's read-only root filesystem.
         probe_name = ".health_check"
         if default_storage.exists(probe_name):
             default_storage.delete(probe_name)
@@ -645,7 +646,13 @@ def monitor_system_health():
         logger.debug("Storage health check passed")
 
     except Exception as e:
-        error_msg = f"Storage health check failed: {e}"
+        backend = default_storage.__class__.__name__
+        target = getattr(default_storage, "bucket_name", None) or getattr(
+            default_storage, "location", "<unknown>"
+        )
+        error_msg = (
+            f"Storage health check failed via {backend} at {target!r}: {e}"
+        )
         logger.warning(error_msg)
         errors.append(error_msg)
 

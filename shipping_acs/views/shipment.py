@@ -110,7 +110,16 @@ class AcsCancelView(APIView):
                 voucher_no,
                 exc,
             )
-            return Response({"detail": str(exc)}, status=400)
+            # ``exc.error_message`` is the verbatim ACS business message —
+            # unlike ``str(exc)`` it is never raw exception text
+            # (CodeQL py/stack-trace-exposure).
+            return Response(
+                {
+                    "detail": exc.error_message
+                    or "ACS rejected the cancellation."
+                },
+                status=400,
+            )
 
         return Response(
             {"status": "cancelled", "voucher_no": voucher_no},

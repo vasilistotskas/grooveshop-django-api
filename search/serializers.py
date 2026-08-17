@@ -183,7 +183,28 @@ class ProductMeiliSearchResultSerializer(serializers.Serializer):
     vat_percent = serializers.FloatField(allow_null=True)
 
 
-class BlogPostMeiliSearchResponseSerializer(serializers.Serializer):
+class SearchDisclosureSerializer(serializers.Serializer):
+    """Common disclosure fields every search response carries.
+
+    ``query_id`` attributes later clicks to this query (see the
+    ``search/click`` endpoint); ``relaxed_query`` reports the trimmed
+    query the zero-result fallback actually matched, so clients can
+    disclose "showing results for …" instead of silently swapping.
+    """
+
+    query_id = serializers.UUIDField(
+        help_text="Identifier for this search, used to attribute clicks"
+    )
+    relaxed_query = serializers.CharField(
+        allow_null=True,
+        help_text=(
+            "The relaxed query used by the zero-result fallback, or null "
+            "when results matched the original query"
+        ),
+    )
+
+
+class BlogPostMeiliSearchResponseSerializer(SearchDisclosureSerializer):
     limit = serializers.IntegerField()
     offset = serializers.IntegerField()
     estimated_total_hits = serializers.IntegerField()
@@ -205,7 +226,7 @@ class FacetStatsSerializer(serializers.Serializer):
     view_count = FacetStatsItemSerializer(required=False)
 
 
-class ProductMeiliSearchResponseSerializer(serializers.Serializer):
+class ProductMeiliSearchResponseSerializer(SearchDisclosureSerializer):
     limit = serializers.IntegerField()
     offset = serializers.IntegerField()
     estimated_total_hits = serializers.IntegerField()
@@ -279,12 +300,12 @@ class FederatedSearchResultSerializer(serializers.Serializer):
     master = serializers.IntegerField(required=False)
 
     # Federation metadata
-    _federation = FederationMetadataSerializer(
+    federation = FederationMetadataSerializer(
         help_text="Federation metadata from Meilisearch"
     )
 
 
-class FederatedSearchResponseSerializer(serializers.Serializer):
+class FederatedSearchResponseSerializer(SearchDisclosureSerializer):
     """Serializer for federated search response."""
 
     limit = serializers.IntegerField(
@@ -419,3 +440,27 @@ class TrendingSearchResponseSerializer(serializers.Serializer):
         help_text="BCP-47 filter applied; null when the caller didn't pass one.",
     )
     results = TrendingSearchItemSerializer(many=True)
+
+
+class SearchClickRequestSerializer(serializers.Serializer):
+    """Payload for attributing a result click to a search query."""
+
+    query_id = serializers.UUIDField(
+        help_text="The query_id returned by the search response"
+    )
+    result_id = serializers.CharField(
+        max_length=100,
+        help_text="ID of the clicked result (Product or BlogPost ID)",
+    )
+    result_type = serializers.ChoiceField(
+        choices=["product", "blog_post"],
+        help_text="Type of the clicked result",
+    )
+    position = serializers.IntegerField(
+        min_value=0,
+        help_text="0-indexed position of the result in the result list",
+    )
+
+
+class SearchClickResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()

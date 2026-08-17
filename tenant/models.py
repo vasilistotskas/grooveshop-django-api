@@ -588,6 +588,23 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         ),
     )
 
+    # === Agentic Commerce (secret) ===
+
+    chat_api_key = models.CharField(
+        _("Chat API Key"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "LLM API key for the storefront chat assistant (served to "
+            "the agent gateway only via the internal-token-gated "
+            "tenant resolve endpoint). Each tenant brings their own "
+            "key — own quota, consent, and billing. Never expose to "
+            "the browser. Empty disables the chat assistant for this "
+            "tenant."
+        ),
+    )
+
     auto_create_schema = True
 
     # Schema names that may never be deleted through normal paths.

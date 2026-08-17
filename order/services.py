@@ -67,7 +67,7 @@ def _log_price_drift_if_needed(cart_item, current_price) -> None:
             and frozen.currency == current_price.currency
         ):
             return
-    except (AttributeError, TypeError):
+    except AttributeError, TypeError:
         return
     logger.warning(
         "Cart price drift at checkout: cart_item=%s product=%s "
@@ -1388,7 +1388,7 @@ class OrderService:
                         errors["country_id"] = [
                             _("Country ID must be a positive integer")
                         ]
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     errors["country_id"] = [
                         _("Country ID must be a valid integer or country code")
                     ]
@@ -1399,7 +1399,23 @@ class OrderService:
 
     @classmethod
     @transaction.atomic
-    def update_order_status(cls, order: Order, new_status: str) -> Order:
+    def update_order_status(
+        cls,
+        order: Order,
+        new_status: str,
+        *,
+        silent_for_customer: bool = False,
+    ) -> Order:
+        """Validate + apply a status transition.
+
+        ``silent_for_customer=True`` pre-stamps the suppression flags
+        (see ``_suppress_customer_status_notifications``) so the
+        customer email/WS toast for THIS transition is skipped while
+        history, signals and internal state still flow. Used by chained
+        transitions — e.g. the carrier bridge that walks PROCESSING →
+        SHIPPED → RETURNED must not tell the customer "your order is on
+        the way" moments before the return notification.
+        """
         try:
             if not new_status:
                 raise ValueError("New status cannot be empty")
@@ -1462,6 +1478,9 @@ class OrderService:
                 )
 
             old_status = order.status
+
+            if silent_for_customer:
+                cls._suppress_customer_status_notifications(order, new_status)
 
             order.status = new_status
             order.status_updated_at = timezone.now()
@@ -1814,9 +1833,19 @@ class OrderService:
                             "message": "Payment refunded successfully",
                         }
                     else:
+                        # ``refund_response["error"]`` carries raw provider
+                        # exception text (see order/payment.py) — log it,
+                        # never return it (CodeQL py/stack-trace-exposure).
+                        logger.error(
+                            "Refund failed for canceled order %s: %s",
+                            order.id,
+                            refund_response.get("error"),
+                        )
                         refund_info = {
                             "refunded": False,
-                            "error": refund_response.get("error"),
+                            "error": str(
+                                _("The refund could not be processed.")
+                            ),
                             "message": "Order canceled but refund failed",
                         }
                 except Exception as refund_error:
@@ -1828,7 +1857,7 @@ class OrderService:
                     )
                     refund_info = {
                         "refunded": False,
-                        "error": str(refund_error),
+                        "error": str(_("The refund could not be processed.")),
                         "message": "Order canceled but refund failed",
                     }
 
@@ -2015,7 +2044,7 @@ class OrderService:
         else:
             try:
                 cls.update_order_status(order, OrderStatus.SHIPPED)
-            except (ValueError, InvalidStatusTransitionError):
+            except ValueError, InvalidStatusTransitionError:
                 logger.warning(
                     "Could not update order %s to SHIPPED status from %s",
                     order.id,

@@ -9,10 +9,9 @@ class MeiliSettings(TypedDict):
     SEARCH_KEY: str
     PORT: int
     TIMEOUT: int | None
-    CLIENT_AGENTS: tuple[str] | None
-    DEBUG: bool | None
     SYNC: bool | None
     OFFLINE: bool | None
+    ASYNC_INDEXING: bool | None
     DEFAULT_BATCH_SIZE: int
 
 
@@ -24,11 +23,7 @@ class _MeiliSettings:
     search_key: str
     port: int
     timeout: int | None
-    client_agents: tuple[str] | None
-    debug: bool
     sync: bool
-    offline: bool
-    batch_size: int
 
     @classmethod
     def from_settings(cls) -> "_MeiliSettings":
@@ -45,9 +40,7 @@ class _MeiliSettings:
         # MEILI_SEARCH_KEY to a read-only search key.
         search_key = meili_settings.get("SEARCH_KEY") or master_key
 
-        debug = meili_settings.get("DEBUG")
         sync = meili_settings.get("SYNC")
-        offline = meili_settings.get("OFFLINE")
 
         return cls(
             https=meili_settings.get("HTTPS", False),
@@ -56,9 +49,5 @@ class _MeiliSettings:
             search_key=search_key,
             port=meili_settings.get("PORT", 7700),
             timeout=meili_settings.get("TIMEOUT", None),
-            client_agents=meili_settings.get("CLIENT_AGENTS", None),
-            debug=settings.DEBUG if debug is None else debug,
             sync=False if sync is None else sync,
-            offline=False if offline is None else offline,
-            batch_size=meili_settings.get("DEFAULT_BATCH_SIZE", 1000),
         )

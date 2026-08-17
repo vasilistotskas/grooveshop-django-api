@@ -230,3 +230,80 @@ class TestTenantResolveOnPublicSchema:
             "/api/v1/tenant/resolve?domain=public-check.example"
         )
         assert response.status_code == 200
+
+
+class TestTenantResolveChatApiKey:
+    """The chat credential rides ONLY on gateway-authenticated responses.
+
+    Ported from main's settings-backed test_resolve.py onto the
+    DB-backed implementation: the key now lives on the Tenant row and
+    the cache must hold exactly the public payload.
+    """
+
+    def _tenant_with_key(self, tenant_factory, slug, domain):
+        tenant = tenant_factory(slug)
+        tenant.chat_api_key = "tenant-chat-key"
+        tenant.save(update_fields=["chat_api_key"])
+        TenantDomain.objects.create(
+            tenant=tenant, domain=domain, is_primary=True
+        )
+        return tenant
+
+    @pytest.mark.django_db
+    def test_chat_api_key_requires_the_internal_secret(
+        self, resolve_client, tenant_factory, settings
+    ):
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
+        self._tenant_with_key(
+            tenant_factory, "chat-key-tenant", "chat-key.example"
+        )
+        url = "/api/v1/tenant/resolve?domain=chat-key.example"
+
+        public = resolve_client.get(url)
+        assert "chatApiKey" not in public.json()
+
+        forged = resolve_client.get(url, HTTP_X_INTERNAL_TOKEN="wrong")
+        assert "chatApiKey" not in forged.json()
+
+        gateway = resolve_client.get(url, HTTP_X_INTERNAL_TOKEN="gw-secret")
+        assert gateway.json()["chatApiKey"] == "tenant-chat-key"
+
+        # The gateway request must not have poisoned the public cache.
+        from django.core.cache import cache
+
+        after = resolve_client.get(url)
+        assert "chatApiKey" not in after.json()
+        cached = cache.get("tenant_resolve:chat-key.example")
+        assert cached is not None
+        assert "chat_api_key" not in cached
+
+    @pytest.mark.django_db
+    def test_chat_api_key_withheld_when_no_internal_secret_configured(
+        self, resolve_client, tenant_factory, settings
+    ):
+        # An empty AGENT_GATEWAY_INTERNAL_SECRET must never match an
+        # empty header — the secret stays withheld entirely.
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = ""
+        self._tenant_with_key(
+            tenant_factory, "chat-key-nosecret", "chat-nosecret.example"
+        )
+        response = resolve_client.get(
+            "/api/v1/tenant/resolve?domain=chat-nosecret.example",
+            HTTP_X_INTERNAL_TOKEN="",
+        )
+        assert "chatApiKey" not in response.json()
+
+    @pytest.mark.django_db
+    def test_keyless_tenant_serves_empty_key_to_the_gateway(
+        self, resolve_client, tenant_factory, settings
+    ):
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
+        tenant = tenant_factory("chat-keyless")
+        TenantDomain.objects.create(
+            tenant=tenant, domain="chat-keyless.example", is_primary=True
+        )
+        response = resolve_client.get(
+            "/api/v1/tenant/resolve?domain=chat-keyless.example",
+            HTTP_X_INTERNAL_TOKEN="gw-secret",
+        )
+        assert response.json()["chatApiKey"] == ""

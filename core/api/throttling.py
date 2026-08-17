@@ -1,4 +1,24 @@
+import hmac
+
+from django.conf import settings
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+
+
+def _gateway_cart_ident(request) -> str | None:
+    """Cart UUID to throttle on when the request is from the agent gateway.
+
+    The gateway authenticates itself with the ``X-Internal-Gateway``
+    shared secret (its ``INTERNAL_EVENTS_SECRET``). Returns ``None`` —
+    meaning "throttle normally" — unless the secret is configured,
+    matches, and the request carries a cart UUID.
+    """
+    secret = settings.AGENT_GATEWAY_INTERNAL_SECRET
+    provided = request.headers.get("X-Internal-Gateway", "")
+    if not secret or not provided:
+        return None
+    if not hmac.compare_digest(provided, secret):
+        return None
+    return request.headers.get("X-Cart-Id") or None
 
 
 class ContactCreateThrottle(AnonRateThrottle):
@@ -20,9 +40,26 @@ class CartMutationThrottle(UserRateThrottle):
 class CartMutationAnonThrottle(AnonRateThrottle):
     scope = "cart_mutation_anon"
 
+    def get_cache_key(self, request, view):
+        # All AI-agent traffic egresses from agent-gateway pods, so the
+        # default REMOTE_ADDR key would put every agent in one shared
+        # 30/min bucket. Authenticated gateway requests are keyed on the
+        # cart UUID instead; everyone else keeps the per-IP key.
+        ident = _gateway_cart_ident(request)
+        if ident:
+            return self.cache_format % {
+                "scope": self.scope,
+                "ident": f"gw:{ident}",
+            }
+        return super().get_cache_key(request, view)
+
 
 class SearchThrottle(AnonRateThrottle):
     scope = "search"
+
+
+class SearchClickThrottle(AnonRateThrottle):
+    scope = "search_click"
 
 
 class ViewCountThrottle(AnonRateThrottle):

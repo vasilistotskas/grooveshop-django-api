@@ -497,6 +497,47 @@ class TestApplyWebhookEvent:
         # Paid → DELIVERED auto-advances to COMPLETED.
         assert order.status == OrderStatus.COMPLETED
 
+    def test_returned_walks_through_shipped_when_processing(self):
+        """A returned-family event can arrive while the order still
+        sits at PROCESSING (missed final_destination webhook). The
+        state machine requires SHIPPED first — walk the missing step,
+        customer-silently, then land RETURNED. Mirrors the ACS fix for
+        prod orders 179 & 189 (2026-07)."""
+        from order.tasks import _status_update_reservation_key
+
+        order = OrderFactory(
+            status=OrderStatus.PROCESSING,
+            payment_status=PaymentStatus.COMPLETED,
+        )
+        shipment = BoxNowShipmentFactory(
+            order=order,
+            with_parcel=True,
+            parcel_state=BoxNowParcelState.IN_DEPOT,
+        )
+
+        envelope = _build_envelope(
+            parcel_id=shipment.parcel_id,
+            event="returned",
+        )
+        BoxNowService.apply_webhook_event(envelope)
+
+        order.refresh_from_db()
+        assert order.status == OrderStatus.RETURNED
+
+        # The bridge's SHIPPED hop is customer-silent; RETURNED itself
+        # notifies normally.
+        meta = order.metadata or {}
+        shipped_email_flag = _status_update_reservation_key(
+            order.id, OrderStatus.SHIPPED.value
+        )
+        assert meta.get(shipped_email_flag) is True
+        assert (
+            meta.get(f"suppress_status_ws_{OrderStatus.SHIPPED.value}") is True
+        )
+        assert (
+            meta.get(f"suppress_status_ws_{OrderStatus.RETURNED.value}") is None
+        )
+
 
 # ---------------------------------------------------------------------------
 # cancel_shipment

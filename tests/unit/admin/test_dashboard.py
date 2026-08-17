@@ -136,9 +136,7 @@ class RevenuePeriodsTests(TestCase):
         # Revenue zones read Order rows — tenant-schema data. The test
         # DB runs as public, where the guard would serve _empty_zones()
         # and every assertion below would be vacuous.
-        patcher = patch(
-            "admin.dashboard._is_public_schema", return_value=False
-        )
+        patcher = patch("admin.dashboard._is_public_schema", return_value=False)
         patcher.start()
         self.addCleanup(patcher.stop)
 

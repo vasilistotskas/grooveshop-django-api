@@ -391,3 +391,91 @@ def test_box_now_partner_id_non_digits_raises():
     with pytest.raises(ValidationError) as exc_info:
         t.clean()
     assert "box_now_partner_id" in exc_info.value.message_dict
+
+
+# ---------------------------------------------------------------------------
+# Tenant.stripe_secret_key validation
+# ---------------------------------------------------------------------------
+
+
+def test_stripe_secret_key_empty_is_valid():
+    t = _unsaved_tenant(stripe_secret_key="")
+    t.clean()  # must not raise
+
+
+def test_stripe_secret_key_sk_prefixes_are_valid():
+    for key in ("sk_live_abc", "sk_test_abc", "rk_live_abc"):
+        t = _unsaved_tenant(stripe_secret_key=key)
+        t.clean()  # must not raise
+
+
+def test_stripe_secret_key_publishable_key_raises():
+    t = _unsaved_tenant(stripe_secret_key="pk_live_abc123")
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "stripe_secret_key" in exc_info.value.message_dict
+
+
+def test_stripe_secret_key_mode_mismatch_raises():
+    # Live secret + test publishable: confirmations the browser can
+    # never complete — must fail at save time.
+    t = _unsaved_tenant(
+        stripe_secret_key="sk_live_abc",
+        stripe_publishable_key="pk_test_abc",
+    )
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    msg = " ".join(exc_info.value.message_dict["stripe_secret_key"])
+    assert "mode" in msg.lower()
+
+
+def test_stripe_secret_key_matching_modes_are_valid():
+    t = _unsaved_tenant(
+        stripe_secret_key="sk_test_abc",
+        stripe_publishable_key="pk_test_abc",
+    )
+    t.clean()  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# Tenant.theme_metadata validation
+# ---------------------------------------------------------------------------
+
+
+def test_theme_metadata_empty_is_valid():
+    t = _unsaved_tenant(theme_metadata={})
+    t.clean()  # must not raise
+
+
+def test_theme_metadata_known_tokens_are_valid():
+    t = _unsaved_tenant(
+        theme_metadata={
+            "radius": "0.5rem",
+            "fontSans": "poppins",
+            "container": "narrow",
+            "colors": {"primaryScale": {"500": "#123456"}},
+        }
+    )
+    t.clean()  # must not raise
+
+
+def test_theme_metadata_unknown_key_raises():
+    t = _unsaved_tenant(theme_metadata={"customCss": "body{}"})
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
+def test_theme_metadata_bad_enum_value_raises():
+    t = _unsaved_tenant(theme_metadata={"fontSans": "comic-sans"})
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
+def test_theme_metadata_bad_scale_hex_raises():
+    t = _unsaved_tenant(
+        theme_metadata={
+            "colors": {"primaryScale": {"500": "red; } * { display:none"}}
+        }
+    )
+    with pytest.raises(ValidationError):
+        t.clean()

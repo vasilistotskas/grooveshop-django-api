@@ -50,6 +50,9 @@ class Tenant:
     socials_twitter: str
     socials_youtube: str
     box_now_partner_id: str
+    # SECRET — excluded from TenantConfigSerializer; the resolve view
+    # appends it only for internally-authenticated (gateway) callers.
+    chat_api_key: str
 
 
 def get_tenant_config() -> Tenant:
@@ -99,6 +102,7 @@ def get_tenant_config() -> Tenant:
         socials_twitter=settings.TENANT_SOCIALS_TWITTER,
         socials_youtube=settings.TENANT_SOCIALS_YOUTUBE,
         box_now_partner_id=settings.BOXNOW_PARTNER_ID,
+        chat_api_key=settings.TENANT_CHAT_API_KEY,
     )
 
 

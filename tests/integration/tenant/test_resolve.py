@@ -70,6 +70,51 @@ class TenantResolveViewTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json()["primaryDomain"], "webside.gr")
 
+    @override_settings(
+        TENANT_CHAT_API_KEY="tenant-chat-key",
+        AGENT_GATEWAY_INTERNAL_SECRET="gw-secret",
+    )
+    def test_chat_api_key_requires_the_internal_secret(self):
+        # Public callers never see the secret — with or without a bogus
+        # token — and the cached payload stays public even after an
+        # authenticated request populated it.
+        public = self.client.get(
+            reverse("tenant-resolve"), {"domain": "webside.gr"}
+        )
+        self.assertNotIn("chatApiKey", public.json())
+
+        forged = self.client.get(
+            reverse("tenant-resolve"),
+            {"domain": "webside.gr"},
+            HTTP_X_INTERNAL_TOKEN="wrong",
+        )
+        self.assertNotIn("chatApiKey", forged.json())
+
+        gateway = self.client.get(
+            reverse("tenant-resolve"),
+            {"domain": "webside.gr"},
+            HTTP_X_INTERNAL_TOKEN="gw-secret",
+        )
+        self.assertEqual(gateway.json()["chatApiKey"], "tenant-chat-key")
+
+        after = self.client.get(
+            reverse("tenant-resolve"), {"domain": "webside.gr"}
+        )
+        self.assertNotIn("chatApiKey", after.json())
+        self.assertNotIn("chat_api_key", cache.get("tenant_resolve:webside.gr"))
+
+    @override_settings(TENANT_CHAT_API_KEY="tenant-chat-key")
+    def test_chat_api_key_withheld_when_no_internal_secret_configured(self):
+        # An empty AGENT_GATEWAY_INTERNAL_SECRET must never match an
+        # empty header — the secret stays withheld entirely.
+        with override_settings(AGENT_GATEWAY_INTERNAL_SECRET=""):
+            response = self.client.get(
+                reverse("tenant-resolve"),
+                {"domain": "webside.gr"},
+                HTTP_X_INTERNAL_TOKEN="",
+            )
+        self.assertNotIn("chatApiKey", response.json())
+
     def test_successful_resolve_is_cached(self):
         first = self.client.get(
             reverse("tenant-resolve"), {"domain": "webside.gr"}

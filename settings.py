@@ -3311,6 +3311,12 @@ TENANT_EXTRA_DOMAINS = [
     if d.strip()
 ]
 TENANT_STORE_DESCRIPTION = getenv("TENANT_STORE_DESCRIPTION", "")
+# Per-tenant chatbot credential (Google AI Studio / any OpenAI-compatible
+# provider). SECRET: served by ``tenant/resolve`` ONLY to callers that
+# present the gateway's ``X-Internal-Token`` — never in the public payload
+# and never in the OpenAPI schema. On the multi-tenant branch this becomes
+# a column on the Tenant model so every client brings their own key.
+TENANT_CHAT_API_KEY = getenv("TENANT_CHAT_API_KEY", "")
 TENANT_LOGO_LIGHT_URL = getenv("TENANT_LOGO_LIGHT_URL", "")
 TENANT_LOGO_DARK_URL = getenv("TENANT_LOGO_DARK_URL", "")
 TENANT_FAVICON_URL = getenv("TENANT_FAVICON_URL", "")

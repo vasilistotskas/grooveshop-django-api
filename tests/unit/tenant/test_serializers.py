@@ -45,6 +45,7 @@ def _make_tenant(**overrides) -> Tenant:
         socials_twitter="",
         socials_youtube="",
         box_now_partner_id="",
+        chat_api_key="",
     )
     defaults.update(overrides)
     return Tenant(**defaults)
@@ -101,5 +102,6 @@ class TenantConfigSerializerTests(SimpleTestCase):
             "meta_capi_access_token",
             "from_email",
             "contact_email",
+            "chat_api_key",
         ):
             self.assertNotIn(admin_only_field, data)

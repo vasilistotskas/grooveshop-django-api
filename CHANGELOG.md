@@ -3,6 +3,49 @@
 
 
 
+## v1.168.1 (2026-08-17)
+
+### Bug fixes
+
+* fix(search): zero-result analytics immune to per-lane sub-search rows
+
+Each storefront search logs separate product/blog/federated
+SearchQuery rows, so a per-row results_count=0 filter listed queries
+whose other lane found plenty (e.g. "windows": product row 0, blog
+row 11). A query now counts as zero-result only if it NEVER returned
+results in the window (HAVING MAX(results_count) = 0) — applied to
+the analytics endpoint's zeroResultQueries, the Zone F zero-result
+worklist and KPI, and the misleading per-lane "Zero results" column
+is dropped from the top-queries table.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56 ([`b58c0d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b58c0d57bcc3793f972b28c3b77cdcc7b79b3afa))
+
+* fix(admin): repair stale dj-stripe search_fields crashing ⌘K palette (#19)
+
+dj-stripe 2.11.0 moved Stripe payload columns into the stripe_data
+JSONField but left five admins (Account, Customer, Session, Invoice,
+PromotionCode) searching fields that no longer exist, so any admin
+search against them raises FieldError. Unfold's command palette
+(COMMAND.search_models) searches every registered admin, so every
+palette query 500'd at /admin/search/.
+
+Replace stale entries with stripe_data (same pattern as dj-stripe's
+own AccountV2Admin) via a documented patch applied in
+MyAdminConfig.ready(), and add a registry-wide smoke test that
+executes every admin's get_search_results so any future stale
+search_fields — ours or a dependency's — fails CI instead of taking
+down the palette.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`658de5f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/658de5f0bd7332261b098c41112620ba915f159c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.168.0 [skip ci] ([`d08874d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d08874d6f66e80e971a5dc0c6dfc6c0b6dbb3529))
+
 ## v1.168.0 (2026-08-17)
 
 ### Chores

@@ -209,16 +209,52 @@ class TestFederatedSearchProperties:
             "/api/search/federated",
             {"query": "anaba8mish se windows", "language_code": "el"},
         )
-        federated_search(request)
+        response = federated_search(request)
 
         multi_search = mock_meili_client.search_client.multi_search
         assert multi_search.call_count == 2
+        # The fallback found nothing either (mock returns no hits), so
+        # the response must NOT claim a relaxed query was used.
+        assert response.data["relaxed_query"] is None
+        assert response.data["query_id"]
         retry_call = multi_search.call_args_list[1]
         queries = retry_call.kwargs.get("queries") or retry_call[1].get(
             "queries"
         )
         for query in queries:
             assert query["q"] == "se windows"
+
+    def test_successful_fallback_disclosed_as_relaxed_query(
+        self, mock_models, mock_meili_client
+    ):
+        """When the retry finds hits, the response says which query
+        actually matched — never a silent swap."""
+        mock_product, _ = mock_models
+        mock_meili_client.search_client.multi_search.side_effect = [
+            {"hits": [], "estimatedTotalHits": 0},
+            {
+                "hits": [
+                    {
+                        "id": "1",
+                        "_federation": {
+                            "indexUid": "ProductTranslation",
+                            "queriesPosition": 0,
+                            "weightedRankingScore": 0.9,
+                        },
+                    }
+                ],
+                "estimatedTotalHits": 1,
+            },
+        ]
+        mock_product.get_search_result_queryset.return_value.filter.return_value = []
+
+        request = self.factory.get(
+            "/api/search/federated",
+            {"query": "anaba8mish se windows", "language_code": "el"},
+        )
+        response = federated_search(request)
+
+        assert response.data["relaxed_query"] == "se windows"
 
     def test_zero_results_single_word_is_not_retried(
         self, mock_models, mock_meili_client
@@ -256,9 +292,11 @@ class TestFederatedSearchProperties:
             "/api/search/federated",
             {"query": "anavathmisi se windows", "language_code": "el"},
         )
-        federated_search(request)
+        response = federated_search(request)
 
         assert mock_meili_client.search_client.multi_search.call_count == 1
+        assert response.data["relaxed_query"] is None
+        assert response.data["query_id"]
 
     @pytest.mark.parametrize(
         "total_limit",

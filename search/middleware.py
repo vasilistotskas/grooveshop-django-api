@@ -98,6 +98,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
             results_count = 0
             estimated_total_hits = 0
             processing_time_ms = None
+            query_uuid = None
 
             try:
                 # Try to parse JSON response
@@ -111,6 +112,12 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                     processing_time_ms = response_data.get(
                         "processingTimeMs"
                     ) or response_data.get("processing_time_ms")
+                    # The view mints a query_id per search response; the
+                    # stored row carries it so a later click submitted
+                    # with that id can be attributed to this query.
+                    query_uuid = response_data.get(
+                        "queryId"
+                    ) or response_data.get("query_id")
             except (json.JSONDecodeError, AttributeError, KeyError) as e:
                 logger.debug(f"Could not parse response data: {str(e)}")
 
@@ -140,6 +147,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                 session_key=session_key,
                 ip_address=ip_address,
                 user_agent=user_agent,
+                query_uuid=query_uuid,
             )
 
             logger.debug(

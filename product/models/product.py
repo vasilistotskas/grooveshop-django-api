@@ -150,6 +150,19 @@ class Product(
         on_delete=models.SET_NULL,
     )
     view_count = models.PositiveBigIntegerField(_("View Count"), default=0)
+    click_score = models.PositiveIntegerField(
+        _("Click Score"),
+        # db_default (not default): the DB-level DEFAULT survives the
+        # migration, so old pods still INSERTing without this column
+        # during the rollout window don't violate NOT NULL - the
+        # checkout path writes product history rows on every sale.
+        db_default=0,
+        editable=False,
+        help_text=(
+            "Search click-through ranking signal - trailing-window click "
+            "count refreshed by search.tasks.update_click_scores"
+        ),
+    )
     weight = MeasurementField(
         # Lazy translation, NOT ``str(_("Weight"))``: forcing the
         # string at module-import time bakes the locale-resolved
@@ -551,6 +564,10 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "created_at",
             "stock",
         )
+        # Custom rule tail, in business-priority order: availability
+        # dominates (a binary signal - stock QUANTITY is not relevance),
+        # then demonstrated shopper preference (click_score, refreshed by
+        # search.tasks.update_click_scores), then promotions.
         ranking_rules = [
             "words",
             "typo",
@@ -558,7 +575,8 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
             "attribute",
             "sort",
             "exactness",
-            "stock:desc",
+            "in_stock:desc",
+            "click_score:desc",
             "discount_percent:desc",
         ]
         synonyms = {
@@ -628,6 +646,8 @@ class ProductTranslation(TranslatedFieldsModel, IndexMixin):
                 else None
             ),
             "stock": lambda obj: obj.master.stock,
+            "in_stock": lambda obj: obj.master.stock > 0,
+            "click_score": lambda obj: obj.master.click_score,
             "active": lambda obj: obj.master.active,
             "is_deleted": lambda obj: obj.master.is_deleted,
             "attributes": lambda obj: list(

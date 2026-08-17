@@ -6,6 +6,7 @@ from search.views import (
     federated_search,
     product_meili_search,
     search_analytics,
+    search_click,
     search_trending,
 )
 
@@ -24,6 +25,11 @@ urlpatterns = [
         "search/federated",
         federated_search,
         name="search-federated",
+    ),
+    path(
+        "search/click",
+        search_click,
+        name="search-click",
     ),
     path(
         "search/analytics",

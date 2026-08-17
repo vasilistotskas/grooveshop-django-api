@@ -1,7 +1,7 @@
 """Webside admin dashboard data layer.
 
 Builds the data dict consumed by ``core/templates/admin/index.html``
-in five zones:
+in six zones:
 
 A. Hero KPIs (4 cards) — the revenue card carries per-period figures
    (7d/1m/3m/1y) switched client-side via Alpine.js in the template
@@ -15,8 +15,9 @@ C. Action queues (recent orders, pending reviews, contact messages) —
 D. System warnings (superuser-only — seller config, MyDATA, low stock,
    failed Celery tasks)
 E. Growth (conversion funnel, repeat-customer rate, top products)
+F. Search insights (KPIs, top/zero-result queries, volume chart)
 
-Zones A/B/C/E are request-independent and are cached in Redis for 5
+Zones A/B/C/E/F are request-independent and are cached in Redis for 5
 min. Zone D is computed fresh per request because operational alerts
 must reflect the latest state. All visible strings are wrapped with
 ``gettext_lazy`` so the dashboard renders fully in Greek when the
@@ -31,7 +32,7 @@ from datetime import timedelta
 from django.apps import apps
 from django.core.cache import cache
 from django.db.models import Avg, Count, Q, Sum
-from django.db.models.functions import TruncDay
+from django.db.models.functions import Length, TruncDay
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -65,7 +66,7 @@ _CHART_TICK_COLOR = "#9ca3af"
 def dashboard_callback(request, context):
     """Populate ``context`` with the five-zone dashboard payload.
 
-    Zones A/B/C/E are served from the Redis cache (busted on writes via
+    Zones A/B/C/E/F are served from the Redis cache (busted on writes via
     ``admin/signals.py``); Zone D is recomputed on every request so
     fixing a missing setting reflects on the next page load.
     """
@@ -231,6 +232,135 @@ def _build_cached_zones() -> dict:
         **_zone_b_ops_charts(Order, now, OrderStatus, PaymentStatus),
         **_zone_c_queues(Order, ProductReview, Contact, ReviewStatus),
         **_zone_e_growth(Order, User, now, month_ago, PaymentStatus),
+        **_zone_f_search_insights(now, month_ago),
+    }
+
+
+# ── Zone F — Search insights ──────────────────────────────────────────
+
+# Query fragments below this length are search-as-you-type noise, not
+# intent — prod data shows per-keystroke rows ("P", "Po", "Pow") dwarf
+# committed queries, and a 2-char fragment topped the zero-result list.
+_SEARCH_MIN_QUERY_LEN = 3
+
+# Top-N sizes for the two query tables.
+_SEARCH_TOP_QUERIES = 10
+
+
+def _zone_f_search_insights(now, month_ago) -> dict:
+    """Search KPIs, top/zero-result query tables, 14-day volume chart.
+
+    Empty queries (placeholder/browse requests — the vast majority of
+    rows) are excluded everywhere; the query tables additionally drop
+    sub-3-char keystroke fragments. Click-through metrics render as
+    None until click tracking has recorded data, so the template can
+    show "—" instead of a fabricated zero.
+    """
+    from search.models import SearchClick, SearchQuery
+
+    recent = SearchQuery.objects.filter(timestamp__gte=month_ago).exclude(
+        query=""
+    )
+
+    searches_30d = recent.count()
+    meaningful = recent.annotate(qlen=Length("query")).filter(
+        qlen__gte=_SEARCH_MIN_QUERY_LEN
+    )
+    meaningful_total = meaningful.count()
+    zero_total = meaningful.filter(results_count=0).count()
+
+    clicks_30d = SearchClick.objects.filter(timestamp__gte=month_ago).count()
+    has_any_click = SearchClick.objects.exists()
+
+    top_rows = list(
+        meaningful.values("query")
+        .annotate(
+            count=Count("id"),
+            zero=Count("id", filter=Q(results_count=0)),
+        )
+        .order_by("-count")[:_SEARCH_TOP_QUERIES]
+    )
+    zero_rows = list(
+        meaningful.filter(results_count=0)
+        .values("query")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:_SEARCH_TOP_QUERIES]
+    )
+
+    # 14-day daily volume — same window and style as the Zone B chart.
+    days = 14
+    period_start = now - timedelta(days=days - 1)
+    by_day = {
+        row["day"].date(): row["count"]
+        for row in SearchQuery.objects.filter(timestamp__gte=period_start)
+        .exclude(query="")
+        .annotate(day=TruncDay("timestamp"))
+        .values("day")
+        .annotate(count=Count("id"))
+        if row["day"]
+    }
+    labels: list[str] = []
+    series: list[int] = []
+    for i in range(days):
+        day_val = (now - timedelta(days=days - 1 - i)).date()
+        labels.append(day_val.strftime("%d/%m"))
+        series.append(by_day.get(day_val, 0))
+
+    volume_chart = {
+        "labels": labels,
+        "datasets": [
+            {
+                "label": str(_("Searches")),
+                "type": "bar",
+                "data": series,
+                "backgroundColor": "#0ea5e9",  # sky-500
+                "hoverBackgroundColor": "#0284c7",  # sky-600
+                "borderRadius": 6,
+                "borderSkipped": "start",
+                "barPercentage": 0.85,
+                "categoryPercentage": 0.9,
+            },
+        ],
+    }
+    volume_chart_options = {
+        "responsive": True,
+        "maintainAspectRatio": False,
+        "plugins": {
+            "legend": {"display": False},
+            "tooltip": {"enabled": True, "padding": 10},
+        },
+        "scales": {
+            "x": {
+                "grid": {"display": False},
+                "ticks": {"color": _CHART_TICK_COLOR, "maxRotation": 0},
+            },
+            "y": {
+                "beginAtZero": True,
+                "ticks": {"color": _CHART_TICK_COLOR, "precision": 0},
+                "grid": {"color": "rgba(148, 163, 184, 0.2)"},
+            },
+        },
+    }
+
+    def _pct(num: int, den: int) -> float:
+        return round(num / den * 100, 1) if den else 0.0
+
+    return {
+        "search_insights": {
+            "searches_30d": searches_30d,
+            "zero_result_pct": _pct(zero_total, meaningful_total),
+            "zero_result_count": zero_total,
+            # None (rendered "—") until click tracking has EVER recorded
+            # a click — a hard zero would misread as "nobody clicks".
+            "clicks_30d": clicks_30d if has_any_click else None,
+            "ctr_pct": (
+                _pct(clicks_30d, searches_30d) if has_any_click else None
+            ),
+            "top_queries": top_rows,
+            "zero_queries": zero_rows,
+        },
+        "search_volume_chart_data": json.dumps(volume_chart),
+        "search_volume_chart_options": json.dumps(volume_chart_options),
     }
 
 

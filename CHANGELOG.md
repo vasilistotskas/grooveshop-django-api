@@ -3,6 +3,26 @@
 
 
 
+## v1.168.0 (2026-08-17)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.167.2 [skip ci] ([`e8d3500`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e8d350050410a0bdf2b1c39b14565d87018afc05))
+
+### Features
+
+* feat(tenant): per-tenant chat credential on tenant/resolve
+
+TENANT_CHAT_API_KEY rides the resolve payload as chatApiKey — but only
+for callers presenting the agent gateway's X-Internal-Token (constant
+time compare against AGENT_GATEWAY_INTERNAL_SECRET). The public payload,
+the cache, and the OpenAPI schema never carry it. On the multi-tenant
+branch this becomes a Tenant column so every client brings their own
+model-provider key (own quota, own consent, own billing).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jh1xeWDFLpuJYGodzKXBy8 ([`c6a5a46`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6a5a4669f570fbff451d1dab87cfc83d481a61e))
+
 ## v1.167.2 (2026-08-17)
 
 ### Bug fixes

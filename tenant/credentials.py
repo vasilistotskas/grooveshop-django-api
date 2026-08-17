@@ -15,8 +15,26 @@ Design rules:
 
 from __future__ import annotations
 
+from typing import TypedDict
+
 from django.conf import settings
 from django.db import connection
+
+
+class VivaWalletCredentials(TypedDict):
+    merchant_id: str
+    api_key: str
+    client_id: str
+    client_secret: str
+    webhook_verification_key: str
+    source_code: str
+    live_mode: bool
+
+
+class StripeCredentials(TypedDict):
+    secret_key: str
+    publishable_key: str
+    live_mode: bool
 
 
 def _get_tenant_field(
@@ -167,7 +185,7 @@ def tenant_turnstile_secret_key() -> str:
 # ---------------------------------------------------------------------------
 
 
-def viva_wallet_credentials() -> dict[str, str]:
+def viva_wallet_credentials() -> VivaWalletCredentials:
     """Return all Viva Wallet credentials for the current tenant.
 
     Resolution order per key:
@@ -185,8 +203,14 @@ def viva_wallet_credentials() -> dict[str, str]:
             "client_id":                 str,
             "client_secret":             str,
             "webhook_verification_key":  str,
+            "source_code":               str,
+            "live_mode":                 bool,
         }
     """
+    tenant = getattr(connection, "tenant", None)
+    live_mode = getattr(tenant, "viva_wallet_live_mode", None)
+    if live_mode is None:
+        live_mode = bool(getattr(settings, "VIVA_WALLET_LIVE_MODE", False))
     return {
         "merchant_id": _get_tenant_field(
             "viva_wallet_merchant_id", "VIVA_WALLET_MERCHANT_ID"
@@ -204,6 +228,69 @@ def viva_wallet_credentials() -> dict[str, str]:
             "viva_wallet_webhook_verification_key",
             "VIVA_WALLET_WEBHOOK_VERIFICATION_KEY",
         ),
+        "source_code": _get_tenant_field(
+            "viva_wallet_source_code", "VIVA_WALLET_SOURCE_CODE"
+        ),
+        "live_mode": live_mode,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Payments — Stripe
+# ---------------------------------------------------------------------------
+
+
+def stripe_credentials() -> StripeCredentials:
+    """Return the Stripe identity for the current tenant.
+
+    Resolution — deliberately NOT the unconditional-fallback pattern the
+    other helpers use, because money must never silently route to the
+    platform's Stripe account:
+
+      1. ``Tenant.stripe_secret_key`` when set — the tenant's own
+         account.
+      2. The platform ``STRIPE_LIVE/TEST_SECRET_KEY`` settings ONLY when
+         ``Tenant.stripe_use_platform_account`` is True (the founding
+         tenant during migration), or when there is no active tenant at
+         all (public schema — management commands, platform routines).
+      3. Otherwise ``""`` — Stripe is unavailable for this tenant and
+         callers must treat the provider as unconfigured.
+
+    Returns:
+        {
+            "secret_key":      str,   # "" == Stripe unavailable
+            "publishable_key": str,
+            "live_mode":       bool,
+        }
+    """
+    tenant = getattr(connection, "tenant", None)
+    in_tenant = (
+        tenant is not None
+        and getattr(tenant, "schema_name", "public") != "public"
+    )
+
+    secret_key = ""
+    if in_tenant:
+        secret_key = getattr(tenant, "stripe_secret_key", "") or ""
+
+    if not secret_key and (
+        not in_tenant or getattr(tenant, "stripe_use_platform_account", False)
+    ):
+        live = bool(getattr(settings, "STRIPE_LIVE_MODE", False))
+        secret_key = (
+            getattr(settings, "STRIPE_LIVE_SECRET_KEY", "")
+            if live
+            else getattr(settings, "STRIPE_TEST_SECRET_KEY", "")
+        ) or ""
+
+    publishable_key = _get_tenant_field(
+        "stripe_publishable_key", "STRIPE_PUBLISHABLE_KEY"
+    )
+    live_mode = secret_key.startswith(("sk_live_", "rk_live_"))
+    return {
+        "secret_key": secret_key,
+        "publishable_key": publishable_key,
+        "live_mode": live_mode,
     }
 
 
@@ -266,11 +353,9 @@ def box_now_credentials() -> dict[str, str]:
     for the storefront BoxNow widget, but it's included here so the
     ``BoxNowClient`` constructor receives a single source of truth.
 
-    ``webhook_secret`` has no Tenant model field yet (the secret must
-    never reach the browser); it falls back exclusively to
-    ``settings.BOXNOW_WEBHOOK_SECRET``.  When per-tenant webhook secrets
-    are required, add ``box_now_webhook_secret`` to the Tenant model and
-    update the ``"box_now_webhook_secret"`` field name below.
+    ``webhook_secret`` resolves from ``Tenant.box_now_webhook_secret``
+    (each tenant holds their own BoxNow contract) with the platform
+    ``settings.BOXNOW_WEBHOOK_SECRET`` as fallback.
 
     Returns:
         {
@@ -296,7 +381,6 @@ def box_now_credentials() -> dict[str, str]:
         "notify_phone": _get_tenant_field(
             "box_now_notify_phone", "BOXNOW_NOTIFY_PHONE"
         ),
-        # No Tenant model field for webhook secret — settings-only for now.
         "webhook_secret": _get_tenant_field(
             "box_now_webhook_secret", "BOXNOW_WEBHOOK_SECRET"
         ),

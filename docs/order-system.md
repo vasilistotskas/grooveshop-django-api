@@ -88,6 +88,35 @@ Three entry points in `order/services.py`:
 
 ## 4. Payment paths
 
+**Per-tenant payment identity.** Every tenant runs its OWN payment
+accounts:
+
+- **Stripe — separate accounts, not Connect.** dj-stripe lives in
+  TENANT_APPS (per-schema tables); `StripePaymentProvider` resolves the
+  key via `tenant.credentials.stripe_credentials()` and passes it per
+  call (`api_key=`, never the `stripe.api_key` module global). A tenant
+  with no `stripe_secret_key` has Stripe unavailable unless
+  `stripe_use_platform_account` is enabled (founding-tenant migration
+  switch). Webhooks are HOST-ROUTED per tenant:
+  `https://api.<tenant-domain>/stripe/webhook/<uuid>/` — django-tenants
+  selects the schema, then dj-stripe's UUID view verifies against the
+  per-schema `WebhookEndpoint` row secret. Provisioning (APIKey row +
+  Stripe endpoint incl. secret): `manage.py bootstrap_stripe
+  --schema=<schema>` (idempotent; `--rotate-endpoint` to re-mint).
+  Migration for the founding tenant: enable
+  `stripe_use_platform_account`, run `bootstrap_stripe`, disable the old
+  dashboard-configured endpoint.
+- **Viva Wallet** — all credentials incl. `source_code` and `live_mode`
+  per-tenant (settings fallback). The webhook route on the tenant's own
+  API host resolves the tenant BEFORE the GET verification challenge,
+  so per-tenant verification keys work with no view changes; POST
+  delivery still resolves the order by payload as source of truth.
+- **BoxNow** — HMAC secret per-tenant (`box_now_webhook_secret`),
+  resolved from the signed `parcelId` before verification.
+- **Availability gate** — `PayWayService.is_provider_configured()`
+  hides credential-less providers from the shopper pay-way list AND
+  refuses checkout-session/SPT creation for them.
+
 ### 4.1 Stripe online (`payment_intent.succeeded`)
 
 Webhook handler: `order/signals/handlers.py::handle_stripe_payment_succeeded` (`L633`).

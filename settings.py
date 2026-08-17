@@ -3292,16 +3292,15 @@ STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "")
 STRIPE_LIVE_MODE = not DEBUG
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
 DJSTRIPE_WEBHOOK_VALIDATION = "verify_signature"
-DJSTRIPE_WEBHOOK_SECRET = getenv("DJSTRIPE_WEBHOOK_SECRET", "")
-if not DJSTRIPE_WEBHOOK_SECRET or DJSTRIPE_WEBHOOK_SECRET == "whsec_...":
-    if SYSTEM_ENV == "production":
-        from django.core.exceptions import ImproperlyConfigured
-
-        raise ImproperlyConfigured(
-            "DJSTRIPE_WEBHOOK_SECRET must be set to a real Stripe webhook "
-            "secret in production (DJSTRIPE_WEBHOOK_VALIDATION=verify_signature)."
-        )
-    DJSTRIPE_WEBHOOK_SECRET = "whsec_dev_placeholder_not_used_for_verification"
+# Webhook verification is per-schema: dj-stripe's UUID-routed webhook
+# view verifies each delivery against the ``WebhookEndpoint`` ROW secret
+# provisioned by ``manage.py bootstrap_stripe`` — this settings value is
+# only dj-stripe's legacy fallback and no code path depends on it, so a
+# missing env var must not block startup.
+DJSTRIPE_WEBHOOK_SECRET = (
+    getenv("DJSTRIPE_WEBHOOK_SECRET", "")
+    or "whsec_dev_placeholder_not_used_for_verification"
+)
 
 # STRIPE_API_VERSION is intentionally NOT set. dj-stripe pins its own
 # DEFAULT_STRIPE_API_VERSION to match its Django model schema and uses that

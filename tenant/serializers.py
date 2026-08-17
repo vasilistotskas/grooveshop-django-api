@@ -189,6 +189,11 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "viva_wallet_client_id",
             "viva_wallet_client_secret",
             "viva_wallet_webhook_verification_key",
+            "viva_wallet_source_code",
+            "viva_wallet_live_mode",
+            # --- Payments — Stripe (secrets) ---
+            "stripe_secret_key",
+            "stripe_use_platform_account",
             # --- Shipping — ACS ---
             "acs_api_key",
             "acs_company_id",
@@ -203,6 +208,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "box_now_client_secret",
             "box_now_warehouse_id",
             "box_now_notify_phone",
+            "box_now_webhook_secret",
             # --- Timestamps ---
             "created_at",
             "updated_at",

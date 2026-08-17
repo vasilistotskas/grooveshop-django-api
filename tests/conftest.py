@@ -36,6 +36,15 @@ settings.DISABLE_CACHE = True
 settings.MEILISEARCH["OFFLINE"] = True
 settings.SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
+# Deterministic Stripe identity for provider construction: unit tests run
+# in the public schema, where stripe_credentials() falls back to the
+# platform settings keys — make sure one exists even when the CI env
+# defines no STRIPE_TEST_SECRET_KEY (all outbound calls are mocked).
+settings.STRIPE_LIVE_MODE = False
+settings.STRIPE_TEST_SECRET_KEY = (
+    getattr(settings, "STRIPE_TEST_SECRET_KEY", "") or "sk_test_dummy"
+)
+
 # Strip unnecessary middleware for test performance
 settings.MIDDLEWARE = [
     m

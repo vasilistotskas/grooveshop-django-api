@@ -79,7 +79,9 @@ class BoxNowWebhookView(APIView):
         - No DRF authentication or permission checks at the DRF layer
           (AllowAny + empty authentication_classes).
         - The only gate is the HMAC-SHA256 ``datasignature`` field, verified
-          against ``settings.BOXNOW_WEBHOOK_SECRET``.
+          against the resolved tenant's ``box_now_webhook_secret`` (each
+          tenant holds their own BoxNow contract; the platform
+          ``settings.BOXNOW_WEBHOOK_SECRET`` is the fallback).
 
     Response contract (per BoxNow docs — they retry until 200):
         - 200: event accepted (including no-op duplicates after wave-2 service
@@ -210,7 +212,7 @@ class BoxNowWebhookView(APIView):
 
         if not secret:
             logger.error(
-                "BoxNow webhook: BOXNOW_WEBHOOK_SECRET is not configured"
+                "BoxNow webhook: no webhook secret configured"
                 " for tenant=%s — cannot verify signature | id=%s",
                 tenant_schema,
                 message_id,

@@ -1245,6 +1245,24 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Availability gate: the shopper-facing pay-way list already
+        # hides unconfigured providers, but a stale client (or a key
+        # removed mid-session) could still submit one — refuse before
+        # the provider constructor raises ImproperlyConfigured.
+        from pay_way.services import PayWayService  # noqa: PLC0415
+
+        if not PayWayService.is_provider_configured(
+            order.pay_way.provider_code
+        ):
+            return Response(
+                {
+                    "detail": _(
+                        "This payment method is not available for this store."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         request_serializer_class = self.get_request_serializer()
         request_serializer = request_serializer_class(data=request.data)
         request_serializer.is_valid(raise_exception=True)
@@ -1351,6 +1369,16 @@ class OrderViewSet(BaseModelViewSet):
                         "this store."
                     )
                 },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # The SPT is granted against a specific merchant account, so it
+        # must be confirmed with THIS tenant's own Stripe identity.
+        from pay_way.services import PayWayService  # noqa: PLC0415
+
+        if not PayWayService.is_provider_configured("stripe"):
+            return Response(
+                {"detail": _("Stripe is not configured for this store.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

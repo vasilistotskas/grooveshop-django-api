@@ -88,4 +88,17 @@ class PayWayViewSet(BaseModelViewSet):
             user and user.is_authenticated and user.is_staff
         ):
             qs = qs.active()
+            # Also hide providers this tenant holds no credentials for —
+            # a seeded-but-keyless Stripe/Viva row would dead-end the
+            # shopper at checkout-session creation.
+            from pay_way.services import PayWayService  # noqa: PLC0415
+
+            codes = set(
+                qs.exclude(provider_code="").values_list(
+                    "provider_code", flat=True
+                )
+            )
+            unavailable = PayWayService.unconfigured_provider_codes(codes)
+            if unavailable:
+                qs = qs.exclude(provider_code__in=unavailable)
         return qs

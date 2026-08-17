@@ -62,6 +62,10 @@ def _fake_tenant(schema_name: str = "webside", connect_id: str | None = None):
     return SimpleNamespace(
         schema_name=schema_name,
         stripe_connect_account_id=connect_id or "",
+        # Providers now construct against the tenant's OWN Stripe
+        # identity — a keyless tenant raises ImproperlyConfigured.
+        stripe_secret_key="sk_test_fake_tenant_key",
+        stripe_use_platform_account=False,
     )
 
 

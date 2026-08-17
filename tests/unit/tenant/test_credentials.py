@@ -792,3 +792,98 @@ class TestGetBaseEmailContext:
 
         ctx = get_base_email_context()
         assert ctx["INFO_EMAIL"] == "platform_info@example.com"
+
+
+# ---------------------------------------------------------------------------
+# stripe_credentials()
+# ---------------------------------------------------------------------------
+
+
+class TestStripeCredentials:
+    def test_tenant_key_wins(self, bind_tenant, tenant_factory, settings):
+        from tenant.credentials import stripe_credentials
+
+        settings.STRIPE_LIVE_MODE = False
+        settings.STRIPE_TEST_SECRET_KEY = "sk_test_platform"
+        tenant = tenant_factory("stripe-own-key")
+        tenant.stripe_secret_key = "sk_live_tenant"
+        tenant.save(update_fields=["stripe_secret_key"])
+        bind_tenant(tenant)
+
+        creds = stripe_credentials()
+        assert creds["secret_key"] == "sk_live_tenant"
+        assert creds["live_mode"] is True
+
+    def test_keyless_tenant_gets_no_platform_fallback(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        # The deliberate break from the unconditional-fallback pattern:
+        # money must never silently route to the platform account.
+        from tenant.credentials import stripe_credentials
+
+        settings.STRIPE_LIVE_MODE = False
+        settings.STRIPE_TEST_SECRET_KEY = "sk_test_platform"
+        tenant = tenant_factory("stripe-keyless")
+        bind_tenant(tenant)
+
+        assert stripe_credentials()["secret_key"] == ""
+
+    def test_platform_account_opt_in_restores_fallback(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        from tenant.credentials import stripe_credentials
+
+        settings.STRIPE_LIVE_MODE = False
+        settings.STRIPE_TEST_SECRET_KEY = "sk_test_platform"
+        tenant = tenant_factory("stripe-platform-optin")
+        tenant.stripe_use_platform_account = True
+        tenant.save(update_fields=["stripe_use_platform_account"])
+        bind_tenant(tenant)
+
+        creds = stripe_credentials()
+        assert creds["secret_key"] == "sk_test_platform"
+        assert creds["live_mode"] is False
+
+    def test_public_schema_uses_platform_keys(self, monkeypatch, settings):
+        # No active tenant (management commands, platform routines).
+        from tenant.credentials import stripe_credentials
+
+        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        settings.STRIPE_LIVE_MODE = True
+        settings.STRIPE_LIVE_SECRET_KEY = "sk_live_platform"
+
+        assert stripe_credentials()["secret_key"] == "sk_live_platform"
+
+
+class TestVivaWalletSourceAndMode:
+    def test_source_code_and_live_mode_from_tenant(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        settings.VIVA_WALLET_SOURCE_CODE = "PlatformSource"
+        settings.VIVA_WALLET_LIVE_MODE = False
+        tenant = tenant_factory("viva-source")
+        tenant.viva_wallet_source_code = "T1234"
+        tenant.viva_wallet_live_mode = True
+        tenant.save(
+            update_fields=[
+                "viva_wallet_source_code",
+                "viva_wallet_live_mode",
+            ]
+        )
+        bind_tenant(tenant)
+
+        creds = viva_wallet_credentials()
+        assert creds["source_code"] == "T1234"
+        assert creds["live_mode"] is True
+
+    def test_unset_live_mode_falls_back_to_settings(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        settings.VIVA_WALLET_SOURCE_CODE = "PlatformSource"
+        settings.VIVA_WALLET_LIVE_MODE = True
+        tenant = tenant_factory("viva-mode-fallback")
+        bind_tenant(tenant)
+
+        creds = viva_wallet_credentials()
+        assert creds["source_code"] == "PlatformSource"
+        assert creds["live_mode"] is True

@@ -4,6 +4,7 @@ from typing import Any
 
 import stripe
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
@@ -39,62 +40,31 @@ class PaymentProvider(ABC):
 
 
 class StripePaymentProvider(PaymentProvider):
+    """Stripe over the current tenant's OWN Stripe account.
+
+    The key comes from ``tenant.credentials.stripe_credentials()`` and is
+    passed per call via ``api_key=`` — NEVER assigned to the
+    ``stripe.api_key`` module global, which is shared process state and
+    a cross-tenant race under ASGI/threads. Webhook verification is
+    dj-stripe's job: its UUID-routed webhook view verifies against the
+    per-schema ``WebhookEndpoint`` row secret (see
+    ``tenant/management/commands/bootstrap_stripe.py``).
+    """
+
     def __init__(self):
-        if hasattr(settings, "STRIPE_LIVE_MODE") and settings.STRIPE_LIVE_MODE:
-            self.api_key = settings.STRIPE_LIVE_SECRET_KEY
-            stripe.api_key = settings.STRIPE_LIVE_SECRET_KEY
-        else:
-            self.api_key = settings.STRIPE_TEST_SECRET_KEY
-            stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
+        from tenant.credentials import stripe_credentials  # noqa: PLC0415
 
-        self.webhook_secret = getattr(settings, "DJSTRIPE_WEBHOOK_SECRET", "")
-
-    def verify_webhook_signature(
-        self, payload: bytes, signature: str
-    ) -> dict[str, Any]:
-        """
-        Verify Stripe webhook signature.
-
-        Uses stripe.Webhook.construct_event with DJSTRIPE_WEBHOOK_SECRET to verify
-        that the webhook request actually came from Stripe and hasn't been tampered with.
-
-        Args:
-            payload: Raw webhook payload bytes from request.body
-            signature: Stripe signature from HTTP_STRIPE_SIGNATURE header
-
-        Returns:
-            Verified event dictionary from Stripe
-
-        Raises:
-            stripe.error.SignatureVerificationError: If signature is invalid
-            ValueError: If payload is invalid JSON
-
-        Example:
-            >>> provider = StripePaymentProvider()
-            >>> event = provider.verify_webhook_signature(
-            ...     payload=request.body,
-            ...     signature=request.META['HTTP_STRIPE_SIGNATURE']
-            ... )
-            >>> print(event['type'])
-            'payment_intent.succeeded'
-        """
-        if not self.webhook_secret:
-            logger.error("DJSTRIPE_WEBHOOK_SECRET not configured")
-            raise ValueError("Webhook secret not configured")
-
-        try:
-            event = stripe.Webhook.construct_event(
-                payload, signature, self.webhook_secret
+        creds = stripe_credentials()
+        self.api_key: str = creds["secret_key"]
+        if not self.api_key:
+            # No tenant key and no platform-account opt-in: Stripe is
+            # unavailable for this tenant. Fail loudly — the pay-way
+            # availability gate should have hidden the provider.
+            raise ImproperlyConfigured(
+                "Stripe is not configured for this tenant: no "
+                "stripe_secret_key on the Tenant and "
+                "stripe_use_platform_account is disabled."
             )
-            return event
-        except ValueError as e:
-            # Invalid payload
-            logger.error(f"Invalid webhook payload: {e}")
-            raise
-        except stripe.StripeError as e:
-            # Invalid signature or other Stripe error
-            logger.error(f"Webhook signature verification failed: {e}")
-            raise
 
     def _map_stripe_status(self, stripe_status: str) -> PaymentStatus:
         status_mapping = {
@@ -226,7 +196,9 @@ class StripePaymentProvider(PaymentProvider):
                     subscriber_id
                 )
 
-            session = stripe.checkout.Session.create(**checkout_session_data)
+            session = stripe.checkout.Session.create(
+                **checkout_session_data, api_key=self.api_key
+            )
 
             logger.info(
                 "Stripe Checkout Session created successfully",
@@ -299,8 +271,11 @@ class StripePaymentProvider(PaymentProvider):
                     ),
                 },
                 # One charge attempt per order — an agent retrying the
-                # same completion must not double-charge the token.
+                # same completion must not double-charge the token. The
+                # key is naturally account-scoped now: two tenants can
+                # share an order uuid without colliding.
                 idempotency_key=f"agent_spt_{order_uuid}",
+                api_key=self.api_key,
             )
             logger.info(
                 "Stripe SPT PaymentIntent created: %s (status=%s)",
@@ -309,7 +284,9 @@ class StripePaymentProvider(PaymentProvider):
             )
 
             try:
-                PaymentIntent.sync_from_stripe_data(stripe_pi)
+                PaymentIntent.sync_from_stripe_data(
+                    stripe_pi, api_key=self.api_key
+                )
             except Exception as sync_error:
                 logger.warning(
                     f"Failed to sync PaymentIntent to dj-stripe: {sync_error}"
@@ -416,14 +393,20 @@ class StripePaymentProvider(PaymentProvider):
             # Create payment intent with idempotency key if provided
             if idempotency_key:
                 stripe_pi = stripe.PaymentIntent.create(
-                    **payment_intent_data, idempotency_key=idempotency_key
+                    **payment_intent_data,
+                    idempotency_key=idempotency_key,
+                    api_key=self.api_key,
                 )
             else:
-                stripe_pi = stripe.PaymentIntent.create(**payment_intent_data)
+                stripe_pi = stripe.PaymentIntent.create(
+                    **payment_intent_data, api_key=self.api_key
+                )
             logger.info("Stripe PaymentIntent created: %s", stripe_pi.id)
 
             try:
-                djstripe_pi = PaymentIntent.sync_from_stripe_data(stripe_pi)
+                djstripe_pi = PaymentIntent.sync_from_stripe_data(
+                    stripe_pi, api_key=self.api_key
+                )
                 logger.info(
                     f"PaymentIntent synced to dj-stripe: {djstripe_pi.id}"
                 )
@@ -491,10 +474,14 @@ class StripePaymentProvider(PaymentProvider):
             }
             if amount:
                 refund_params["amount"] = int(round(amount.amount * 100))
-            stripe_refund = stripe.Refund.create(**refund_params)
+            stripe_refund = stripe.Refund.create(
+                **refund_params, api_key=self.api_key
+            )
 
             try:
-                djstripe_refund = Refund.sync_from_stripe_data(stripe_refund)
+                djstripe_refund = Refund.sync_from_stripe_data(
+                    stripe_refund, api_key=self.api_key
+                )
                 logger.info(f"Refund synced to dj-stripe: {djstripe_refund.id}")
             except Exception as sync_error:
                 logger.warning(
@@ -537,8 +524,12 @@ class StripePaymentProvider(PaymentProvider):
                 extra={"payment_id": payment_id},
             )
 
-            stripe_pi = stripe.PaymentIntent.retrieve(payment_id)
-            djstripe_pi = PaymentIntent.sync_from_stripe_data(stripe_pi)
+            stripe_pi = stripe.PaymentIntent.retrieve(
+                payment_id, api_key=self.api_key
+            )
+            djstripe_pi = PaymentIntent.sync_from_stripe_data(
+                stripe_pi, api_key=self.api_key
+            )
 
             status = self._map_stripe_status(stripe_pi.status)
             status_data = {
@@ -588,10 +579,11 @@ class VivaWalletPaymentProvider(PaymentProvider):
         self.api_key = creds["api_key"]
         self.client_id = creds["client_id"]
         self.client_secret = creds["client_secret"]
-        self.source_code = getattr(
-            settings, "VIVA_WALLET_SOURCE_CODE", "Default"
-        )
-        self.live_mode = getattr(settings, "VIVA_WALLET_LIVE_MODE", False)
+        # Both per-tenant with settings fallback: the source code is a
+        # per-merchant Smart Checkout identifier, and live/demo mode
+        # follows the tenant's own Viva account.
+        self.source_code = creds["source_code"] or "Default"
+        self.live_mode = creds["live_mode"]
 
         if self.live_mode:
             self.auth_url = self.LIVE_AUTH_URL

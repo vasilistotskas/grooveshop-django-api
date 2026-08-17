@@ -3,6 +3,10 @@ import ipaddress
 import json
 import logging
 from base64 import b64encode
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tenant.credentials import VivaWalletCredentials
 
 import requests
 from django.conf import settings
@@ -196,10 +200,12 @@ def _handle_verification(request):
     )
 
 
-def _fetch_verification_key(creds: dict | None = None):
-    if creds is None:
-        from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+def _fetch_verification_key(
+    creds: "VivaWalletCredentials | None" = None,
+):
+    from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
 
+    if creds is None:
         creds = viva_wallet_credentials()
 
     merchant_id = creds["merchant_id"]
@@ -209,7 +215,8 @@ def _fetch_verification_key(creds: dict | None = None):
         logger.error("Viva Wallet merchant_id or api_key not configured")
         return ""
 
-    live_mode = getattr(settings, "VIVA_WALLET_LIVE_MODE", False)
+    # Per-tenant: the tenant's own Viva account decides demo vs live.
+    live_mode = creds["live_mode"]
     base_url = (
         "https://www.vivapayments.com"
         if live_mode

@@ -1,12 +1,13 @@
 """Tenant-context helpers for dj-stripe webhook receivers.
 
-All ``@djstripe_receiver`` handlers run in the public schema because
-dj-stripe processes webhooks on the shared Django request path before any
-tenant-routing middleware runs.  Every Stripe object that we create
-(PaymentIntent, Checkout Session) is stamped with
-``metadata.tenant_schema`` inside ``order/payment.py``.  These helpers
-extract that value and re-enter the correct schema context so that ORM
-operations inside the handler see the right rows.
+Stripe webhooks are HOST-ROUTED: each tenant's endpoint lives on its own
+API domain (``https://<tenant-api-domain>/stripe/webhook/<uuid>/``), so
+``TenantMainMiddleware`` has already selected the tenant schema before
+dj-stripe verifies and processes the event. Every Stripe object we
+create is additionally stamped with ``metadata.tenant_schema`` inside
+``order/payment.py`` — these helpers extract that value and re-enter the
+schema explicitly, which keeps the handlers correct as defense in depth
+(and for any event replayed outside a tenant request context).
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import functools
 import logging
 from typing import Callable
 
+from django.db import connection
 from django_tenants.utils import get_public_schema_name, schema_context
 
 logger = logging.getLogger(__name__)
@@ -28,7 +30,11 @@ def _tenant_schema_from_event(event) -> str:
     2. ``event.data.object.payment_intent.metadata.tenant_schema``  — expanded
        PI on Charge/Dispute events where the PI is embedded
     3. ``event.data.metadata.tenant_schema`` — top-level fallback
-    4. Public schema name as safe default.
+    4. The CURRENT connection schema — dashboard-initiated objects
+       (manual refunds, disputes) carry no tenant_schema metadata, but
+       the webhook arrived on the tenant's own host-routed endpoint, so
+       the schema the middleware already selected is authoritative.
+       Bouncing these to public would silently skip the handler.
     """
     try:
         data = event.data if hasattr(event, "data") else {}
@@ -53,14 +59,20 @@ def _tenant_schema_from_event(event) -> str:
             if schema:
                 return schema.strip()
 
-        return get_public_schema_name()
+        # 4. Host-routed fallback: trust the schema the middleware
+        # selected for this request.
+        return getattr(connection, "schema_name", None) or (
+            get_public_schema_name()
+        )
     except Exception:
         logger.warning(
             "Could not extract tenant_schema from Stripe event %s",
             getattr(event, "id", "unknown"),
             exc_info=True,
         )
-        return get_public_schema_name()
+        return getattr(connection, "schema_name", None) or (
+            get_public_schema_name()
+        )
 
 
 def with_tenant_schema_from_event(func: Callable) -> Callable:

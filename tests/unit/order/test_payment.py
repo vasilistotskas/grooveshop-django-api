@@ -1,7 +1,6 @@
 from decimal import Decimal
 from unittest import TestCase, mock
 
-from stripe._error import SignatureVerificationError, StripeError
 from django.conf import settings
 from djmoney.money import Money
 from djstripe.models import PaymentIntent
@@ -27,16 +26,33 @@ class PaymentModuleTestCase(TestCase):
         )
         self.assertEqual(PaymentStatus.CANCELED.value, "CANCELED")
 
-    @mock.patch("order.payment.settings")
-    def test_stripe_payment_provider_init(self, mock_settings):
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
+    @mock.patch("tenant.credentials.stripe_credentials")
+    def test_stripe_payment_provider_init(self, mock_creds):
+        mock_creds.return_value = {
+            "secret_key": "sk_test_tenant_key",
+            "publishable_key": "pk_test_x",
+            "live_mode": False,
+        }
 
         provider = StripePaymentProvider()
 
-        self.assertEqual(provider.api_key, "test_api_key")
-        self.assertEqual(provider.webhook_secret, "test_webhook_secret")
+        self.assertEqual(provider.api_key, "sk_test_tenant_key")
+
+    @mock.patch("tenant.credentials.stripe_credentials")
+    def test_stripe_payment_provider_init_unconfigured_raises(self, mock_creds):
+        # No tenant key and no platform-account opt-in: constructing the
+        # provider must fail loudly instead of silently charging the
+        # platform account.
+        from django.core.exceptions import ImproperlyConfigured
+
+        mock_creds.return_value = {
+            "secret_key": "",
+            "publishable_key": "",
+            "live_mode": False,
+        }
+
+        with self.assertRaises(ImproperlyConfigured):
+            StripePaymentProvider()
 
     @mock.patch("order.payment.settings")
     def test_paypal_payment_provider_init(self, mock_settings):
@@ -157,188 +173,6 @@ class PaymentModuleTestCase(TestCase):
 
         with self.assertRaises(ValueError):
             get_payment_provider("invalid_provider")
-
-
-class StripeWebhookSignatureVerificationTestCase(TestCase):
-    """
-    Test webhook signature verification for StripePaymentProvider.
-    """
-
-    @mock.patch("order.payment.stripe.Webhook.construct_event")
-    @mock.patch("order.payment.settings")
-    def test_verify_webhook_signature_success(
-        self, mock_settings, mock_construct_event
-    ):
-        """
-        Test successful webhook signature verification.
-
-        Validates:
-        - Uses stripe.Webhook.construct_event
-        - Uses DJSTRIPE_WEBHOOK_SECRET from settings
-        - Returns verified event dictionary
-        """
-        # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
-
-        expected_event = {
-            "id": "evt_test_123",
-            "type": "payment_intent.succeeded",
-            "data": {"object": {"id": "pi_test_123"}},
-        }
-        mock_construct_event.return_value = expected_event
-
-        provider = StripePaymentProvider()
-        payload = b'{"test": "payload"}'
-        signature = "test_signature"
-
-        # Execute
-        result = provider.verify_webhook_signature(payload, signature)
-
-        # Verify
-        self.assertEqual(result, expected_event)
-        mock_construct_event.assert_called_once_with(
-            payload, signature, "test_webhook_secret"
-        )
-
-    @mock.patch("order.payment.stripe.Webhook.construct_event")
-    @mock.patch("order.payment.settings")
-    def test_verify_webhook_signature_invalid_signature(
-        self, mock_settings, mock_construct_event
-    ):
-        """
-        Test webhook signature verification with invalid signature.
-
-        Validates:
-        - Raises SignatureVerificationError on invalid signature
-        - Logs error message
-        """
-        # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
-
-        mock_construct_event.side_effect = SignatureVerificationError(
-            "Invalid signature", "sig_header"
-        )
-
-        provider = StripePaymentProvider()
-        payload = b'{"test": "payload"}'
-        signature = "invalid_signature"
-
-        # Execute & Verify
-        with self.assertRaises(SignatureVerificationError):
-            provider.verify_webhook_signature(payload, signature)
-
-    @mock.patch("order.payment.stripe.Webhook.construct_event")
-    @mock.patch("order.payment.settings")
-    def test_verify_webhook_signature_invalid_payload(
-        self, mock_settings, mock_construct_event
-    ):
-        """
-        Test webhook signature verification with invalid payload.
-
-        Validates:
-        - Raises ValueError on invalid JSON payload
-        - Logs error message
-        """
-        # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
-
-        mock_construct_event.side_effect = ValueError("Invalid JSON")
-
-        provider = StripePaymentProvider()
-        payload = b"invalid json"
-        signature = "test_signature"
-
-        # Execute & Verify
-        with self.assertRaises(ValueError):
-            provider.verify_webhook_signature(payload, signature)
-
-    @mock.patch("order.payment.settings")
-    def test_verify_webhook_signature_missing_secret(self, mock_settings):
-        """
-        Test webhook signature verification without configured secret.
-
-        Validates:
-        - Raises ValueError when DJSTRIPE_WEBHOOK_SECRET is not configured
-        - Error message indicates webhook secret not configured
-        """
-        # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = ""
-        mock_settings.STRIPE_LIVE_MODE = False
-
-        provider = StripePaymentProvider()
-        payload = b'{"test": "payload"}'
-        signature = "test_signature"
-
-        # Execute & Verify
-        with self.assertRaises(ValueError) as context:
-            provider.verify_webhook_signature(payload, signature)
-
-        self.assertIn("Webhook secret not configured", str(context.exception))
-
-    @mock.patch("order.payment.stripe.Webhook.construct_event")
-    @mock.patch("order.payment.settings")
-    def test_verify_webhook_signature_stripe_error(
-        self, mock_settings, mock_construct_event
-    ):
-        """
-        Test webhook signature verification with generic Stripe error.
-
-        Validates:
-        - Raises StripeError for other Stripe-related errors
-        - Logs error with context
-        """
-        # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "test_webhook_secret"
-        mock_settings.STRIPE_LIVE_MODE = False
-
-        mock_construct_event.side_effect = StripeError("API error")
-
-        provider = StripePaymentProvider()
-        payload = b'{"test": "payload"}'
-        signature = "test_signature"
-
-        # Execute & Verify
-        with self.assertRaises(StripeError):
-            provider.verify_webhook_signature(payload, signature)
-
-    @mock.patch("order.payment.stripe.Webhook.construct_event")
-    @mock.patch("order.payment.settings")
-    def test_verify_webhook_signature_uses_correct_secret(
-        self, mock_settings, mock_construct_event
-    ):
-        """
-        Test that verification uses DJSTRIPE_WEBHOOK_SECRET from settings.
-
-        Validates:
-        - Correct webhook secret is passed to stripe.Webhook.construct_event
-        - Secret is retrieved from settings.DJSTRIPE_WEBHOOK_SECRET
-        """
-        # Setup
-        mock_settings.STRIPE_TEST_SECRET_KEY = "test_api_key"
-        mock_settings.DJSTRIPE_WEBHOOK_SECRET = "whsec_test_secret_key_123"
-        mock_settings.STRIPE_LIVE_MODE = False
-
-        expected_event = {"id": "evt_test", "type": "test.event"}
-        mock_construct_event.return_value = expected_event
-
-        provider = StripePaymentProvider()
-        payload = b'{"test": "payload"}'
-        signature = "test_signature"
-
-        # Execute
-        provider.verify_webhook_signature(payload, signature)
-
-        # Verify - check that the correct secret was used
-        call_args = mock_construct_event.call_args
-        self.assertEqual(call_args[0][2], "whsec_test_secret_key_123")
 
 
 class StripePaymentIntentMetadataTestCase(TestCase):

@@ -9,6 +9,8 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_tenants.models import DomainMixin, TenantMixin
 
+from tenant.validators import validate_theme_metadata
+
 from core.models import TimeStampMixinModel, UUIDModel
 
 
@@ -155,19 +157,59 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default=ThemePreset.DEFAULT,
     )
     theme_metadata = models.JSONField(
-        _("Theme Metadata"), default=dict, blank=True
+        _("Theme Metadata"),
+        default=dict,
+        blank=True,
+        validators=[validate_theme_metadata],
+        help_text=_(
+            "Per-token theme overrides on top of the preset. Legal "
+            "keys: radius, fontSans, container, colors.primaryScale / "
+            "colors.neutralScale (shade → #RRGGBB). Anything else is "
+            "rejected — the storefront token compiler ignores invalid "
+            "metadata entirely."
+        ),
     )
 
     # Feature flags
     loyalty_enabled = models.BooleanField(_("Loyalty Enabled"), default=False)
     blog_enabled = models.BooleanField(_("Blog Enabled"), default=True)
 
-    # Stripe Connect
+    # Stripe Connect — dormant/reserved. The platform runs SEPARATE
+    # Stripe accounts per tenant (``stripe_secret_key`` below), not
+    # Connect: dj-stripe's webhook pipeline has no per-connected-account
+    # event routing, while its per-schema WebhookEndpoint/APIKey design
+    # maps 1:1 onto one-account-per-schema. Kept as a future option.
     stripe_connect_account_id = models.CharField(
         _("Stripe Connect Account ID"),
         max_length=255,
         blank=True,
         default="",
+    )
+
+    stripe_secret_key = models.CharField(
+        _("Stripe secret key"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "The tenant's OWN Stripe secret key (sk_live_*, sk_test_* "
+            "or a restricted rk_* key). Secret — never expose to the "
+            "browser. Empty means Stripe is unavailable for this "
+            "tenant unless 'use platform account' is enabled."
+        ),
+    )
+    # Safety switch: money must never silently route to the platform's
+    # Stripe account. Only the webside tenant flips this during the
+    # migration window — every other tenant either brings its own key
+    # or has no Stripe.
+    stripe_use_platform_account = models.BooleanField(
+        _("Use platform Stripe account"),
+        default=False,
+        help_text=_(
+            "When enabled AND no per-tenant secret key is set, Stripe "
+            "calls fall back to the platform-wide settings keys. "
+            "Intended only for the founding tenant during migration."
+        ),
     )
 
     # Public Stripe key — safe to expose to unauthenticated callers.
@@ -459,6 +501,28 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "settings.VIVA_WALLET_WEBHOOK_VERIFICATION_KEY."
         ),
     )
+    viva_wallet_source_code = models.CharField(
+        _("Viva Wallet Source Code"),
+        max_length=32,
+        blank=True,
+        default="",
+        help_text=_(
+            "Viva Wallet Smart Checkout payment source code — a "
+            "per-merchant identifier, so each tenant needs their own. "
+            "Empty falls back to settings.VIVA_WALLET_SOURCE_CODE."
+        ),
+    )
+    viva_wallet_live_mode = models.BooleanField(
+        _("Viva Wallet Live Mode"),
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_(
+            "Whether this tenant's Viva credentials are live (demo "
+            "otherwise). Unset falls back to "
+            "settings.VIVA_WALLET_LIVE_MODE."
+        ),
+    )
 
     # === Shipping — ACS ===
 
@@ -573,6 +637,18 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Empty falls back to settings.BOXNOW_NOTIFY_PHONE."
         ),
     )
+    box_now_webhook_secret = models.CharField(
+        _("BoxNow Webhook Secret"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "HMAC secret for verifying BoxNow webhook deliveries — "
+            "per-tenant, since each tenant holds their own BoxNow "
+            "contract. Empty falls back to "
+            "settings.BOXNOW_WEBHOOK_SECRET."
+        ),
+    )
 
     # === Bot Protection (secret) ===
 
@@ -651,6 +727,8 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     def clean(self) -> None:
         super().clean()
         self._validate_stripe_publishable_key()
+        self._validate_stripe_secret_key()
+        self._validate_theme_metadata()
         self._validate_allowed_csp_sources()
         self._validate_meta_pixel_id()
         self._validate_tiktok_pixel_id()
@@ -672,6 +750,48 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
                     )
                 }
             )
+
+    def _validate_stripe_secret_key(self) -> None:
+        key = self.stripe_secret_key
+        if not key:
+            return
+        if not key.startswith(("sk_live_", "sk_test_", "rk_")):
+            raise ValidationError(
+                {
+                    "stripe_secret_key": _(
+                        "Stripe secret key must start with 'sk_live_', "
+                        "'sk_test_' or 'rk_' (restricted key)."
+                    )
+                }
+            )
+        # Mode cross-check: a live secret paired with a test publishable
+        # key (or vice versa) produces confirmations the browser can
+        # never complete — fail loudly at save time instead.
+        pub = self.stripe_publishable_key
+        if pub:
+            secret_live = key.startswith("sk_live_")
+            pub_live = pub.startswith("pk_live_")
+            if key.startswith(("sk_live_", "sk_test_")) and (
+                secret_live != pub_live
+            ):
+                raise ValidationError(
+                    {
+                        "stripe_secret_key": _(
+                            "Stripe key mode mismatch: the secret key "
+                            "and the publishable key must both be live "
+                            "or both be test."
+                        )
+                    }
+                )
+
+    def _validate_theme_metadata(self) -> None:
+        # Field validators only run in full_clean()/DRF; mirror the
+        # check here so admin actions and direct clean() calls get the
+        # same guarantee as the sibling validators.
+        try:
+            validate_theme_metadata(self.theme_metadata)
+        except ValidationError as exc:
+            raise ValidationError({"theme_metadata": exc.messages}) from exc
 
     def _validate_allowed_csp_sources(self) -> None:
         sources = self.allowed_csp_sources

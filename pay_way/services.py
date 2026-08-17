@@ -16,6 +16,53 @@ logger = logging.getLogger(__name__)
 
 class PayWayService:
     @staticmethod
+    def is_provider_configured(provider_code: str) -> bool:
+        """True when the current tenant can actually charge through the
+        named provider.
+
+        PayWay rows are per-schema, but seeding alone doesn't prove the
+        tenant holds credentials — a row can be seeded before the
+        merchant pastes their keys, or keys can be removed later. This
+        gate keeps such providers out of the shopper-facing list AND
+        blocks checkout-session creation for them.
+
+        Only the two credentialed charge providers are gated:
+
+        - ``stripe``: requires ``stripe_credentials()["secret_key"]`` —
+          the tenant's own key, or the platform key behind the explicit
+          ``stripe_use_platform_account`` opt-in.
+        - ``viva_wallet``: requires the Smart Checkout OAuth pair
+          (client id + secret).
+
+        Every other code passes through unchanged: ``""`` and offline
+        processors (``cash``, ``bank_transfer``) need no credentials,
+        and unregistered/unimplemented online codes keep their existing
+        behavior (listed, then rejected by the ``supported_providers``
+        check at checkout-session creation).
+        """
+        from tenant.credentials import (  # noqa: PLC0415
+            stripe_credentials,
+            viva_wallet_credentials,
+        )
+
+        code = (provider_code or "").lower()
+        if code == "stripe":
+            return bool(stripe_credentials()["secret_key"])
+        if code == "viva_wallet":
+            creds = viva_wallet_credentials()
+            return bool(creds["client_id"] and creds["client_secret"])
+        return True
+
+    @staticmethod
+    def unconfigured_provider_codes(codes) -> set[str]:
+        """Subset of ``codes`` the current tenant cannot charge through."""
+        return {
+            code
+            for code in codes
+            if code and not PayWayService.is_provider_configured(code)
+        }
+
+    @staticmethod
     def filter_by_carrier(
         queryset: QuerySet,
         *,

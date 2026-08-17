@@ -3,6 +3,48 @@
 
 
 
+## v1.167.0 (2026-08-17)
+
+### Chores
+
+* chore(deps): sync uv.lock to 1.166.0 [skip ci] ([`329fa65`](https://github.com/vasilistotskas/grooveshop-django-api/commit/329fa657f364a6c07f5d5dd09a42c5df74a8b610))
+
+### Features
+
+* feat(search): click tracking, CTR ranking signal, insights dashboard (#16)
+
+Phase 1 of the search plan - measure behavior and rank by it:
+
+- POST search/click attributes result clicks to the query that
+  produced them via a query_id minted per search response (stored on
+  SearchQuery.uuid by the analytics middleware task). Clicks were
+  previously impossible to record - the model existed with no write
+  path.
+- Nightly update_click_scores task turns trailing-30-day clicks into a
+  click_score ranking attribute on Product and BlogPost (minimum 2
+  clicks, top 50 per type - single clicks are noise), pushed to
+  Meilisearch as partial document updates. click_score:desc joins the
+  ranking rule tail on both indexes.
+- Product availability ranking is now binary: in_stock:desc replaces
+  stock:desc (a quantity is not a relevance signal; 100 units should
+  not outrank 3). click_score fields use db_default so the DB-level
+  default survives the migration and old pods can keep inserting
+  product history rows during the rollout window.
+- Search responses disclose relaxed_query when the zero-result
+  fallback produced the results, so clients can render "showing
+  results for ..." instead of silently swapping queries.
+- Admin dashboard Zone F - Search Insights: 30-day KPIs, top queries,
+  zero-result queries (the synonym/content-gap worklist), and a 14-day
+  volume chart. Empty placeholder queries and sub-3-char keystroke
+  fragments are excluded - validated against production data where
+  they are 93% of rows. Click metrics render as a dash until the
+  first click is ever recorded.
+
+
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`d3ddb90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d3ddb9089cbb55b2f4e84903700af3fdcfb9d0ce))
+
 ## v1.166.0 (2026-08-16)
 
 ### Chores

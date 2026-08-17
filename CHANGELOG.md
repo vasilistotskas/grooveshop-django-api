@@ -3,6 +3,67 @@
 
 
 
+## v1.167.1 (2026-08-17)
+
+### Bug fixes
+
+* fix(search): audit hardening — analytics correctness, contract fixes, dead code (#17) ([`a6b935c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6b935ce77e5d8df3f10ff22ed7af6a84052c747))
+
+* fix(search): audit hardening - analytics correctness, contract fixes, dead code
+
+Full search-audit round; every finding validated against code and the
+live deployment before fixing:
+
+- search_analytics top-query metrics: computing Count("id") /
+  Avg("results_count") together with Count("clicks") in one annotate()
+  fans the SearchClick JOIN out before GROUP BY, inflating counts and
+  skewing averages for any query text with multi-click rows. Clicks
+  now come from a separate aggregate merged by query text; regression
+test locks the exact numbers.
+- save_search_query truncates to the column limit - an oversized
+  pasted query was a guaranteed DataError, three doomed retries and a
+  silently lost analytics row (reproduced against production).
+- Federated results expose "federation": the previous "_federation"
+  key was mangled to "Federation" by the camelCase renderer (verified
+  live), breaking the camelCase contract. The vacuous federation
+  metadata test now uses a real product so its assertions execute.
+- search/click gets its own throttle scope (60/min) so anonymous click
+  spam cannot starve the shared 120/min search budget.
+- REST_FRAMEWORK NUM_PROXIES=1: without it DRF keys anon throttling
+  off the entire client-controlled X-Forwarded-For header, letting a
+  caller mint a fresh throttle bucket per request.
+- Dead code removed: search/utils.py (six orphaned helpers),
+  meili/batch.py (+ lazy-import surface), four orphaned management
+  commands (apply_settings, clear_index, test_federated,
+  export_analytics) with their tests, eight dead queryset methods,
+  IndexMixin.get_meilisearch, and the always-None
+  CLIENT_AGENTS/DEBUG/OFFLINE/BATCH_SIZE knobs (ASYNC_INDEXING added
+  to the settings TypedDict - used but undeclared). Dead
+  product_limit allocation in federated_search + stale docstring step.
+
+Deliberately kept: the meili geo-search surface (guarded, tested,
+generic-library capability - stripping it risks the indexing hot path
+for zero functional gain).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56 ([`a6b935c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6b935ce77e5d8df3f10ff22ed7af6a84052c747))
+
+### Chores
+
+* chore: drop untracked schema.json build artifact
+
+The repo tracks schema.yml only; the JSON flavor is generated on
+demand for the storefront's codegen.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01QL3Fj7M3fbKEvS5nGu6i56
+
+---------
+
+Co-authored-by: Claude Fable 5 <noreply@anthropic.com> ([`a6b935c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a6b935ce77e5d8df3f10ff22ed7af6a84052c747))
+
+* chore(deps): sync uv.lock to 1.167.0 [skip ci] ([`cafea4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cafea4b5bc7e76d36c1792164ebd8f9d969320a6))
+
 ## v1.167.0 (2026-08-17)
 
 ### Chores

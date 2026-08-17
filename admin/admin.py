@@ -19,6 +19,55 @@ class MyAdminSite(UnfoldAdminSite):
     site_title = getenv("UNFOLD_SITE_TITLE", "Webside Admin")
     index_title = _("Dashboard")
 
+    def has_permission(self, request) -> bool:
+        """Membership-gate the tenant admin.
+
+        ``is_staff`` is a GLOBAL flag on the shared ``UserAccount`` —
+        without this override, staff granted for one store could open
+        every other store's ``/admin/``. Rules:
+
+        - Platform superusers pass everywhere (they manage all tenants).
+        - On the PUBLIC schema (platform admin): Django's default
+          ``is_active and is_staff``.
+        - On a TENANT schema: additionally require an active
+          ``UserTenantMembership`` with a staff-capable role
+          (STAFF/ADMIN/OWNER) in THIS tenant.
+        """
+        if not super().has_permission(request):
+            return False
+        user = request.user
+        if user.is_superuser:
+            return True
+
+        from tenant.membership import (  # noqa: PLC0415
+            get_current_tenant,
+            get_membership,
+        )
+
+        tenant = get_current_tenant()
+        if tenant is None:
+            # Public schema — the platform admin. Default rules apply.
+            return True
+        membership = get_membership(user, tenant)
+        return membership is not None and membership.is_tenant_staff
+
+    def each_context(self, request):
+        """Per-tenant admin branding.
+
+        The class attributes are the platform defaults (public-schema
+        admin); on a tenant host the header/title show that store's
+        name so operators always know which store they're editing.
+        """
+        context = super().each_context(request)
+        from tenant.membership import get_current_tenant  # noqa: PLC0415
+
+        tenant = get_current_tenant()
+        if tenant is not None:
+            name = tenant.store_name or tenant.name
+            context["site_header"] = name
+            context["site_title"] = _("%(name)s Admin") % {"name": name}
+        return context
+
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [

@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.factories.item import OrderItemFactory

@@ -2,7 +2,7 @@ from django.conf import settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from tag.factories.tag import TagFactory
 from tag.models.tag import Tag
 from user.factories.account import UserAccountFactory

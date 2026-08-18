@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 
 from country.factories import CountryFactory
 from region.factories import RegionFactory
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]

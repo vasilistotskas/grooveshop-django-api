@@ -27,14 +27,13 @@ The left panel shows all available email templates organized by category:
 - Auto-expands collapsed categories with matches
 
 **Categories** (collapsible):
-- **Order Lifecycle**: Templates for order status changes (11 templates)
-  - Order Confirmation, Shipped, Delivered, Canceled, etc.
+- **Order Lifecycle**: Templates for order status changes
+  - Shipped, Delivered, Canceled, Refunded, etc.
 - **Subscription**: Subscription-related templates
   - Subscription Confirmation
 - **User Management**: User account templates
   - Inactive User Notification
-- **Marketing**: Marketing and newsletter templates
-  - Newsletter
+- **Marketing**: Marketing templates
 
 **Category Features**:
 - Click the arrow button (▼/▶) to collapse/expand each category
@@ -70,7 +69,7 @@ The preview panel allows you to test templates:
 
 ### Using Sample Data (Recommended)
 
-1. Click on any template in the left panel (e.g., "Order Confirmation")
+1. Click on any template in the left panel (e.g., "Order Shipped")
 2. Select your preferred language from the dropdown
 3. Keep "Sample Data" selected as the data source
 4. Click "Generate Preview"
@@ -177,7 +176,6 @@ The preview panel allows you to test templates:
 ### Active Templates
 
 These templates are currently being used by the system:
-- Order Confirmation (sent when order is created)
 - Order Shipped (sent when order ships)
 - Order Delivered (sent when order is delivered)
 - Order Canceled (sent when order is canceled)

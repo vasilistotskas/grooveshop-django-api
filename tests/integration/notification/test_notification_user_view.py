@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from notification.enum import (
     NotificationKindEnum,
 )

@@ -12,10 +12,12 @@ from tests.utils.query_counter import (
     count_queries,
     get_query_limit,
 )
+from tests.utils.testing import TestURLFixerMixin
 
 __all__ = [
     "QUERY_LIMITS",
     "QueryCountAssertion",
+    "TestURLFixerMixin",
     "assert_max_queries",
     "count_queries",
     "get_query_limit",

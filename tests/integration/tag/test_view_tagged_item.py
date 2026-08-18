@@ -7,7 +7,7 @@ from tag.factories.tag import TagFactory
 from tag.factories.tagged_item import TaggedProductFactory
 from tag.models.tagged_item import TaggedItem
 from product.factories.product import ProductFactory
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 
 User = get_user_model()
 

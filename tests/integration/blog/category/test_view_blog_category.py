@@ -9,7 +9,7 @@ from blog.models.category import BlogCategory
 from blog.serializers.category import (
     BlogCategorySerializer,
 )
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 languages = [

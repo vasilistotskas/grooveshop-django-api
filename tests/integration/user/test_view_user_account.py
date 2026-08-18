@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from user.serializers.account import UserDetailsSerializer
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()

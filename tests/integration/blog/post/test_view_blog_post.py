@@ -9,7 +9,7 @@ from blog.factories.category import BlogCategoryFactory
 from blog.factories.post import BlogPostFactory
 from blog.factories.tag import BlogTagFactory
 from blog.models.post import BlogPost
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 languages = [

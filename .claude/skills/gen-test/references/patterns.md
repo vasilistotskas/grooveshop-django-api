@@ -221,7 +221,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 from your_app.factories import YourModelFactory
 from your_app.models import YourModel
@@ -779,7 +779,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 # Project test utilities
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from tests.utils.query_counter import (
     QueryCountAssertion,
     assert_max_queries,

@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from blog.factories.tag import BlogTagFactory
 from blog.models.tag import BlogTag
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 
 languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]

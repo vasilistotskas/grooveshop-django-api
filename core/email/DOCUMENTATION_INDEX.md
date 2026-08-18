@@ -97,13 +97,11 @@ core/templates/emails/
 ├── base/
 │   └── email_base.html         # Base template
 ├── order/
-│   └── (11 templates)          # Order lifecycle
+│   └── ...                     # Order lifecycle
 ├── subscription/
 │   └── confirmation.html       # Subscription
-├── user/
-│   └── inactive_user_email_template.html  # User management
-└── marketing/
-    └── newsletter.html         # Marketing
+└── user/
+    └── inactive_user_email_template.html  # User management
 ```
 
 ## Getting Started

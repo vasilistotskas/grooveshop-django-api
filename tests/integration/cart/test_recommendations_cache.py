@@ -14,7 +14,7 @@ from rest_framework.test import APITestCase
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from cart.serializers.item import CartItemDetailSerializer, _CART_RECS_TTL
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 

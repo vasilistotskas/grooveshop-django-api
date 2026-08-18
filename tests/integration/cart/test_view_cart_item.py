@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
 from cart.models import CartItem
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from product.factories.product import ProductFactory
 from tests.utils import count_queries
 from user.factories.account import UserAccountFactory

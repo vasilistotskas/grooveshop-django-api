@@ -8,7 +8,7 @@ from blog.factories.author import BlogAuthorFactory
 from blog.factories.comment import BlogCommentFactory
 from blog.factories.post import BlogPostFactory
 from blog.models.comment import BlogComment
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 languages = [

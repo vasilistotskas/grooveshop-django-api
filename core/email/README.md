@@ -144,7 +144,7 @@ Available context generators:
 - `generate_order_context` - Order data (order, items, tracking)
 - `generate_subscription_context` - Subscription data
 - `generate_user_context` - User data
-- `generate_marketing_context` - Marketing data (newsletters)
+- `generate_marketing_context` - Marketing data
 
 ### Adding a Custom Generator
 
@@ -249,16 +249,15 @@ core/templates/emails/
 ├── base/
 │   └── email_base.html          # Base template
 ├── order/
-│   ├── order_confirmation.html
-│   ├── order_confirmation.txt
 │   ├── order_shipped.html
 │   ├── order_shipped.txt
 │   └── ...
 ├── subscription/
 │   ├── confirmation.html
 │   └── ...
-├── inactive_user_email_template.html  # Root level
-├── newsletter.html                     # Root level
+├── user/
+│   ├── inactive_user_email_template.html
+│   └── ...
 └── ...
 ```
 

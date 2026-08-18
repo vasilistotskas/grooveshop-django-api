@@ -2,9 +2,11 @@
 
 Domain models expose a ``main_image_path`` property that Nuxt + the
 media-stream service consume to build cached, resized image URLs. The
-path must match the media-stream route pattern — either the
-``/media/{tenantSchema}/uploads/...`` tenant-scoped pattern or the
-legacy ``/media/uploads/...`` pattern.
+path must match media-stream's ``UPLOADED_MEDIA`` route pattern —
+``media/{tenantSchema}/uploads/...`` — which is the only pattern it
+registers for uploaded media. There is no legacy (pre-multi-tenant)
+route: media-stream emits a 404 for any ``media/uploads/...`` request
+missing the tenant segment, since no ``IMAGE_SOURCES`` pattern matches it.
 
 Historically every model hardcoded ``f"media/uploads/{subdir}/{basename}"``.
 Under ``TenantFileSystemStorage`` files live at

@@ -10,7 +10,7 @@ from blog.models.author import BlogAuthor
 from blog.serializers.author import (
     BlogAuthorDetailSerializer,
 )
-from core.utils.testing import TestURLFixerMixin
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 languages = [

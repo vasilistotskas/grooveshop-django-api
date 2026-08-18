@@ -10,10 +10,12 @@ from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest
 from django.utils import translation
+from django.utils.encoding import force_str
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from core.utils.i18n import resolve_request_language
 from core.utils.tenant_urls import get_tenant_frontend_url
+from tenant.credentials import tenant_from_email, tenant_site_name
 
 if TYPE_CHECKING:  # pragma: no cover
     from allauth.socialaccount.models import SocialAccount
@@ -36,6 +38,30 @@ class UserAccountAdapter(DefaultAccountAdapter):
         ) or settings.LANGUAGE_CODE
         with translation.override(language):
             return super().send_mail(template_prefix, email, context)
+
+    def format_email_subject(self, subject: str) -> str:
+        """Prefix the subject with the active tenant's display name.
+
+        ``ACCOUNT_EMAIL_SUBJECT_PREFIX`` is a settings-baked string
+        evaluated once at process start (``f"[{SITE_NAME}] "``), so it
+        can't vary per tenant. This override reads ``tenant_site_name()``
+        at send time instead, so tenant-B users see "[Tenant B] ..."
+        rather than the platform's baked-in ``SITE_NAME``. webside.gr
+        (no active tenant row / empty ``Tenant.name``) falls back to
+        ``settings.SITE_NAME`` inside ``tenant_site_name()``, so this
+        stays byte-identical to the old ``ACCOUNT_EMAIL_SUBJECT_PREFIX``
+        for the platform tenant.
+        """
+        prefix = f"[{tenant_site_name()}] "
+        return prefix + force_str(subject)
+
+    def get_from_email(self) -> str:
+        """Return the active tenant's outbound sender address.
+
+        Priority: ``Tenant.from_email`` → ``settings.DEFAULT_FROM_EMAIL``
+        (see ``tenant.credentials.tenant_from_email``).
+        """
+        return tenant_from_email()
 
     def get_client_ip(self, request: HttpRequest) -> str:
         """

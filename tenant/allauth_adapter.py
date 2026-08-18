@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import logging
+from urllib.parse import urlsplit, urlunsplit
 
+from allauth.headless.adapter import DefaultHeadlessAdapter
 from django import forms
 from django.db import connection
 from django.utils.translation import gettext_lazy as _
@@ -10,6 +12,19 @@ from tenant.membership import user_has_tenant_access
 from user.adapter import SocialAccountAdapter, UserAccountAdapter
 
 logger = logging.getLogger(__name__)
+
+
+def _default_url_scheme() -> str:
+    """Return the right URL scheme for this deployment.
+
+    Defaults to ``https`` for production and anything else that
+    doesn't override. Falls back to ``ACCOUNT_DEFAULT_HTTP_PROTOCOL``
+    so dev environments running on plain HTTP don't email users a
+    link they cannot open.
+    """
+    from django.conf import settings
+
+    return getattr(settings, "ACCOUNT_DEFAULT_HTTP_PROTOCOL", "https")
 
 
 def _resolve_tenant_from_request(request):
@@ -94,32 +109,23 @@ class TenantAccountAdapter(UserAccountAdapter):
         return domain.domain if domain else None
 
     def _scheme(self) -> str:
-        """Return the right URL scheme for this deployment.
-
-        Defaults to ``https`` for production and anything else that
-        doesn't override. Falls back to ``ACCOUNT_DEFAULT_HTTP_PROTOCOL``
-        so dev environments running on plain HTTP don't email users a
-        link they cannot open.
-        """
-        from django.conf import settings
-
-        return getattr(settings, "ACCOUNT_DEFAULT_HTTP_PROTOCOL", "https")
+        return _default_url_scheme()
 
     def get_email_confirmation_url(self, request, emailconfirmation):
         # Accept either a full HMAC emailconfirmation model or the raw
         # key string depending on caller; allauth's headless stack
         # sometimes passes the model and sometimes the key.
+        #
+        # This IS a genuinely-invoked hook: ``DefaultAccountAdapter.
+        # send_confirmation_mail`` calls ``self.get_email_confirmation_url``
+        # directly (verified against the installed allauth package),
+        # unlike ``get_reset_password_url`` below (removed — allauth
+        # never calls an adapter method by that name).
         key = getattr(emailconfirmation, "key", None) or str(emailconfirmation)
         domain = self._get_tenant_domain()
         if domain:
             return f"{self._scheme()}://{domain}/account/verify-email/{key}"
         return super().get_email_confirmation_url(request, emailconfirmation)
-
-    def get_reset_password_url(self, request):
-        domain = self._get_tenant_domain()
-        if domain:
-            return f"{self._scheme()}://{domain}/account/password/reset"
-        return super().get_reset_password_url(request)
 
     def pre_login(self, request, user, **kwargs):
         """Block login when the user has no membership in this tenant.
@@ -251,3 +257,63 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
         user = super().save_user(request, sociallogin, form=form)
         _ensure_member_membership(user)
         return user
+
+
+class TenantHeadlessAdapter(DefaultHeadlessAdapter):
+    """Tenant-aware frontend URL rewriting for allauth's headless flows.
+
+    ``allauth.core.internal.httpkit.get_frontend_url`` — the function
+    password reset / signup / email-confirmation / social-login-error
+    links actually go through — delegates to
+    ``allauth.headless.adapter.get_adapter().get_frontend_url(...)``
+    whenever ``allauth.headless`` is installed (it is here, see
+    ``INSTALLED_APPS``). ``DefaultAccountAdapter`` (``ACCOUNT_ADAPTER``,
+    i.e. ``TenantAccountAdapter``) has **no** ``get_frontend_url``
+    method at all — it is a hook on the separate ``HEADLESS_ADAPTER``
+    class hierarchy. Wire this class in via ``settings.HEADLESS_ADAPTER``
+    so the rewrite actually runs.
+
+    ``settings.HEADLESS_FRONTEND_URLS`` values are always absolute
+    (built from ``NUXT_BASE_URL``), so the platform URL returned by
+    ``super().get_frontend_url()`` already has a full scheme+host. This
+    override swaps that scheme+host for the requesting tenant's primary
+    domain, keeping path/query/fragment (and the allauth-substituted
+    ``{key}``/etc placeholders) untouched. Falls through to the
+    platform URL unchanged when no tenant is resolvable (public schema,
+    admin routines, misconfiguration).
+
+    Resolves the tenant from ``self.request.get_host()`` (via
+    ``_resolve_tenant_from_request``), NOT ``connection.tenant`` — same
+    H7 rationale as ``TenantAccountAdapter.pre_login`` /
+    ``TenantSocialAccountAdapter.get_app``: under Daphne/Channels,
+    ``database_sync_to_async`` thread pooling can leave a stale
+    ``connection.tenant`` from an earlier request on the same thread.
+    """
+
+    def get_frontend_url(self, urlname: str, **kwargs) -> str | None:
+        url = super().get_frontend_url(urlname, **kwargs)
+        if not url:
+            return url
+
+        tenant = _resolve_tenant_from_request(self.request)
+        if (
+            tenant is None
+            or getattr(tenant, "schema_name", "public") == "public"
+        ):
+            return url
+
+        domain_obj = tenant.domains.filter(is_primary=True).first()
+        domain = getattr(domain_obj, "domain", "") if domain_obj else ""
+        if not domain:
+            return url
+
+        parsed = urlsplit(url)
+        return urlunsplit(
+            (
+                _default_url_scheme(),
+                domain,
+                parsed.path,
+                parsed.query,
+                parsed.fragment,
+            )
+        )

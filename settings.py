@@ -526,6 +526,10 @@ ACCOUNT_LOGOUT_ON_PASSWORD_CHANGE = True
 ACCOUNT_REAUTHENTICATION_TIMEOUT = int(
     getenv("ACCOUNT_REAUTHENTICATION_TIMEOUT", "300")
 )
+# Baked at import time, so it can't vary per tenant — superseded at
+# send time by UserAccountAdapter.format_email_subject() (per-tenant
+# via tenant_site_name()). Kept as the settings-declared fallback in
+# case a caller ever calls allauth's DefaultAccountAdapter directly.
 ACCOUNT_EMAIL_SUBJECT_PREFIX = f"[{SITE_NAME}] "
 
 LOGIN_REDIRECT_URL = NUXT_BASE_URL + "/account"
@@ -540,6 +544,13 @@ USERSESSIONS_TRACK_ACTIVITY = True
 
 HEADLESS_CLIENTS = ("app",)
 HEADLESS_TOKEN_STRATEGY = "core.api.tokens.SessionTokenStrategy"
+# ``allauth.core.internal.httpkit.get_frontend_url`` — the function
+# password-reset / signup / email-confirmation / social-login-error
+# links actually go through — delegates here (via
+# ``allauth.headless.adapter.get_adapter()``), NOT to ACCOUNT_ADAPTER.
+# TenantHeadlessAdapter rewrites the platform URL below (built from
+# NUXT_BASE_URL) to the requesting tenant's own primary domain.
+HEADLESS_ADAPTER = "tenant.allauth_adapter.TenantHeadlessAdapter"
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": f"{NUXT_BASE_URL}/account/verify-email/{{key}}",
     "account_reset_password": f"{NUXT_BASE_URL}/account/password/reset",
@@ -1304,18 +1315,20 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "string",
         # Relative path template — the {token} placeholder is filled at
         # send time.  The full URL is built dynamically by
-        # send_subscription_confirmation() via get_tenant_base_url() so
-        # that the link points to the correct tenant's API domain rather
+        # send_subscription_confirmation() via
+        # core.utils.tenant_urls.get_tenant_api_base_url() so that the
+        # link points to the correct tenant's API domain (an explicit
+        # "api*" TenantDomain row, else api.<primary domain>) rather
         # than the platform-wide API_BASE_URL baked at startup.
         "value": "/api/v1/user/subscription/confirm/{token}",
         "description": (
             "URL path template for subscription confirmation emails. "
             "The {token} placeholder is substituted at send time. "
             "The API host prefix is prepended dynamically using the "
-            "current tenant's primary domain (falls back to "
+            "current tenant's API domain (falls back to "
             "settings.API_BASE_URL). "
             "Example resolved value: "
-            "https://myshop.com/api/v1/user/subscription/confirm/abc123"
+            "https://api.myshop.com/api/v1/user/subscription/confirm/abc123"
         ),
     },
     {
@@ -1977,6 +1990,17 @@ ROSETTA_AUTO_COMPILE = True
 ROSETTA_POFILE_WRAP_WIDTH = 0
 ROSETTA_CACHE_NAME = "default"
 ROSETTA_STORAGE_CLASS = "core.rosetta_storage.CacheClearingRosettaStorage"
+# core.models.Translation is a SHARED (public-schema-only) model — a
+# Rosetta edit rewrites the ONE platform-wide gettext overlay served to
+# every tenant. django-tenants resolves /rosetta/... on ANY tenant
+# host, so without this the editor is reachable (and destructive) from
+# every tenant's own staff/superuser. Comma-separated schema allowlist;
+# at cutover set to "public,webside" so platform staff keep access via
+# the webside host during migration.
+ROSETTA_ALLOWED_SCHEMAS = getenv("ROSETTA_ALLOWED_SCHEMAS", "public")
+ROSETTA_ACCESS_CONTROL_FUNCTION = (
+    "core.rosetta_access.tenant_scoped_rosetta_access"
+)
 
 UNFOLD = {
     "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "Webside Admin"),

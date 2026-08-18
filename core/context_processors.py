@@ -9,7 +9,7 @@ from django.conf import settings
 from django.http import HttpRequest
 
 from core.utils.tenant_urls import get_tenant_base_url
-from tenant.credentials import tenant_contact_email
+from tenant.credentials import tenant_contact_email, tenant_site_name
 
 
 @lru_cache(maxsize=1)
@@ -48,7 +48,7 @@ def metadata(request: HttpRequest) -> dict[str, Any]:
     Returns:
         Dictionary with site metadata and optional request details
     """
-    site_name = settings.SITE_NAME
+    site_name = tenant_site_name()
     site_description = os.getenv("SITE_DESCRIPTION", "Grooveshop Description")
     site_keywords = os.getenv("SITE_KEYWORDS", "Grooveshop Keywords")
     site_author = os.getenv("SITE_AUTHOR", "Grooveshop Author")

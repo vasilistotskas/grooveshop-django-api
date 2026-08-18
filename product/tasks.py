@@ -14,7 +14,11 @@ from core import celery_app
 from core.tasks import MonitoredTask
 from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
-from tenant.credentials import tenant_contact_email, tenant_from_email
+from tenant.credentials import (
+    tenant_contact_email,
+    tenant_from_email,
+    tenant_site_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -282,13 +286,13 @@ def check_low_stock_products() -> dict:
 
     context = {
         "products": rows,
-        "SITE_NAME": settings.SITE_NAME,
+        "SITE_NAME": tenant_site_name(),
         "INFO_EMAIL": tenant_contact_email(),
         "SITE_URL": get_tenant_base_url(),
         "STATIC_BASE_URL": settings.STATIC_BASE_URL,
     }
     subject = _("[{site}] Low stock alert — {n} product(s)").format(
-        site=settings.SITE_NAME, n=len(rows)
+        site=tenant_site_name(), n=len(rows)
     )
     try:
         text_content = render_to_string(
@@ -447,13 +451,13 @@ def send_product_alert_restock(product_id: int) -> dict:
             context = {
                 "product_name": product_name,
                 "product_url": product_url,
-                "SITE_NAME": settings.SITE_NAME,
+                "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
             subject = _("[{site}] {name} is back in stock").format(
-                site=settings.SITE_NAME, name=product_name
+                site=tenant_site_name(), name=product_name
             )
             if _send_product_alert_email(
                 recipient=recipient,
@@ -528,14 +532,14 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
                 "product_url": product_url,
                 "new_price": new_price,
                 "target_price": str(alert.target_price.amount),
-                "SITE_NAME": settings.SITE_NAME,
+                "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
             subject = _(
                 "[{site}] Price drop: {name} is now at your target"
-            ).format(site=settings.SITE_NAME, name=product_name)
+            ).format(site=tenant_site_name(), name=product_name)
             if _send_product_alert_email(
                 recipient=recipient,
                 subject=str(subject),

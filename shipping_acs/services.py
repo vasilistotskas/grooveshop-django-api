@@ -15,7 +15,6 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
@@ -32,6 +31,7 @@ from shipping_acs.models import (
     AcsStation,
     AcsTrackingEvent,
 )
+from tenant.credentials import tenant_site_name
 
 if TYPE_CHECKING:
     from order.models.order import Order
@@ -584,7 +584,7 @@ class AcsService:
         from shipping_acs.enum.charge_type import AcsChargeType
         from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
 
-        sender = getattr(settings, "SITE_NAME", "GrooveShop")
+        sender = tenant_site_name() or "GrooveShop"
         fallback_country = acs_config.default_country()
         country_code = (
             order.country_id

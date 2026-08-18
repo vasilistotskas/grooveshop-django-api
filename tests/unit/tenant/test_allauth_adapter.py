@@ -14,7 +14,7 @@ UserAccountAdapter / SocialAccountAdapter:
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django import forms
@@ -22,9 +22,11 @@ from django.contrib.auth import get_user_model
 
 from tenant.allauth_adapter import (
     TenantAccountAdapter,
+    TenantHeadlessAdapter,
     TenantSocialAccountAdapter,
 )
 from tenant.models import (
+    TenantDomain,
     TenantMembershipRole,
     UserTenantMembership,
 )
@@ -281,6 +283,72 @@ class TestSaveUserCreatesMembership:
         ).exists()
 
 
+class TestTenantAwareEmailFormatting:
+    """``UserAccountAdapter.format_email_subject`` / ``get_from_email``.
+
+    ``TenantAccountAdapter`` (``settings.ACCOUNT_ADAPTER``) inherits both
+    from ``UserAccountAdapter`` without overriding them, so exercising
+    the concrete adapter class here covers the adapter actually wired
+    up for allauth account emails (signup confirmation, password reset,
+    MFA recovery codes, …).
+    """
+
+    @pytest.mark.django_db
+    def test_format_email_subject_uses_tenant_store_name(
+        self, tenant_factory, bind_tenant
+    ):
+        tenant = tenant_factory("adapter-subject-1")
+        tenant.store_name = "Branded Store"
+        tenant.save()
+        bind_tenant(tenant)
+
+        adapter = TenantAccountAdapter()
+        assert (
+            adapter.format_email_subject("Confirm your email")
+            == "[Branded Store] Confirm your email"
+        )
+
+    @pytest.mark.django_db
+    def test_format_email_subject_falls_back_to_settings_when_no_tenant(
+        self, monkeypatch, settings
+    ):
+        from django.db import connection
+
+        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        settings.SITE_NAME = "GrooveShop"
+
+        adapter = TenantAccountAdapter()
+        assert (
+            adapter.format_email_subject("Confirm your email")
+            == "[GrooveShop] Confirm your email"
+        )
+
+    @pytest.mark.django_db
+    def test_get_from_email_uses_tenant_from_email(
+        self, tenant_factory, bind_tenant
+    ):
+        tenant = tenant_factory("adapter-from-1")
+        tenant.from_email = "shop@brand.com"
+        tenant.save()
+        bind_tenant(tenant)
+
+        adapter = TenantAccountAdapter()
+        assert adapter.get_from_email() == "shop@brand.com"
+
+    @pytest.mark.django_db
+    def test_get_from_email_falls_back_to_default_from_email(
+        self, tenant_factory, bind_tenant, settings
+    ):
+        tenant = tenant_factory("adapter-from-2")
+        tenant.from_email = ""
+        tenant.save()
+        bind_tenant(tenant)
+        settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
+
+        adapter = TenantAccountAdapter()
+        assert adapter.get_from_email() == "noreply@platform.com"
+
+
 class TestSaveUserInPublicSchema:
     @pytest.mark.django_db
     def test_no_membership_when_public_schema(
@@ -304,3 +372,116 @@ class TestSaveUserInPublicSchema:
         )
 
         assert UserTenantMembership.objects.filter(user=user).count() == 0
+
+
+class TestHeadlessGetFrontendUrl:
+    """``TenantHeadlessAdapter.get_frontend_url`` is the hook password
+    reset / signup / email-confirmation / social-login-error links
+    actually go through (``allauth.core.internal.httpkit.
+    get_frontend_url`` delegates to ``HEADLESS_ADAPTER``, NOT
+    ``ACCOUNT_ADAPTER`` — see the class docstring). These tests exercise
+    it end-to-end through allauth's real ``default_get_frontend_url``
+    machinery rather than mocking it, so a settings/wiring regression
+    (e.g. ``HEADLESS_ADAPTER`` pointing at the wrong class) would show
+    up here.
+    """
+
+    @staticmethod
+    def _adapter_with_host(host: str) -> TenantHeadlessAdapter:
+        adapter = TenantHeadlessAdapter()
+        request = MagicMock()
+        request.get_host.return_value = host
+        adapter.request = request
+        return adapter
+
+    @pytest.mark.django_db
+    def test_platform_context_returns_url_unchanged(self, settings):
+        settings.HEADLESS_FRONTEND_URLS = {
+            "account_reset_password_from_key": (
+                "https://platform.example/account/password/reset/key/{key}"
+            ),
+        }
+        # Host doesn't match any TenantDomain row — no tenant resolvable.
+        adapter = self._adapter_with_host("unmatched-host.example")
+
+        url = adapter.get_frontend_url(
+            "account_reset_password_from_key", key="abc123"
+        )
+
+        assert (
+            url == "https://platform.example/account/password/reset/key/abc123"
+        )
+
+    @pytest.mark.django_db
+    def test_tenant_context_rewrites_scheme_and_host_keeps_path_and_query(
+        self, tenant_factory, settings
+    ):
+        settings.ACCOUNT_DEFAULT_HTTP_PROTOCOL = "https"
+        settings.HEADLESS_FRONTEND_URLS = {
+            "account_reset_password_from_key": (
+                "https://platform.example/account/password/reset/key/{key}?x=1"
+            ),
+        }
+        tenant = tenant_factory("headless-reset")
+        TenantDomain.objects.create(
+            tenant=tenant, domain="tenant-b.example", is_primary=True
+        )
+        adapter = self._adapter_with_host("tenant-b.example")
+
+        url = adapter.get_frontend_url(
+            "account_reset_password_from_key", key="abc123"
+        )
+
+        assert url == (
+            "https://tenant-b.example/account/password/reset/key/abc123?x=1"
+        )
+
+    @pytest.mark.django_db
+    def test_public_schema_tenant_returns_url_unchanged(
+        self, settings, monkeypatch
+    ):
+        # A resolvable tenant whose schema IS public (edge case — the
+        # platform's own host resolving to a TenantDomain row) must not
+        # be rewritten; public is the platform itself.
+        settings.HEADLESS_FRONTEND_URLS = {
+            "account_signup": "https://platform.example/account/signup",
+        }
+        monkeypatch.setattr(
+            "tenant.allauth_adapter._resolve_tenant_from_request",
+            lambda request: SimpleNamespace(schema_name="public"),
+        )
+        adapter = self._adapter_with_host("platform.example")
+
+        url = adapter.get_frontend_url("account_signup")
+
+        assert url == "https://platform.example/account/signup"
+
+    @pytest.mark.django_db
+    def test_no_tenant_domain_row_returns_url_unchanged(
+        self, tenant_factory, settings
+    ):
+        # Tenant resolves but has no primary domain row (defensive —
+        # shouldn't happen in practice, mirrors get_tenant_base_url's
+        # fallback behaviour).
+        settings.HEADLESS_FRONTEND_URLS = {
+            "account_signup": "https://platform.example/account/signup",
+        }
+        tenant = tenant_factory("headless-no-domain")
+        adapter = self._adapter_with_host("irrelevant.example")
+
+        with patch(
+            "tenant.allauth_adapter._resolve_tenant_from_request",
+            return_value=tenant,
+        ):
+            url = adapter.get_frontend_url("account_signup")
+
+        assert url == "https://platform.example/account/signup"
+
+    def test_returns_none_when_headless_frontend_urls_missing_and_not_headless_only(
+        self, settings
+    ):
+        settings.HEADLESS_FRONTEND_URLS = {}
+        settings.HEADLESS_ONLY = False
+        adapter = self._adapter_with_host("unmatched-host.example")
+
+        assert adapter.get_frontend_url("account_signup") is None

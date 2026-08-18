@@ -42,7 +42,7 @@ from django.utils import timezone
 from django.utils.translation import override as translation_override
 
 from core.utils.tenant_urls import get_tenant_frontend_url
-from tenant.credentials import tenant_contact_email
+from tenant.credentials import tenant_contact_email, tenant_site_name
 from extra_settings.models import Setting
 
 from core.utils.i18n import get_order_language
@@ -76,11 +76,11 @@ INVOICE_SELLER_SETTING_KEYS = {
 def _seller_snapshot() -> dict[str, str]:
     """Resolve seller info from ``extra_settings`` with dev-friendly defaults.
 
-    Falls back to ``settings.SITE_NAME`` / ``INFO_EMAIL`` when the
+    Falls back to ``tenant_site_name()`` / ``INFO_EMAIL`` when the
     dedicated invoice settings haven't been populated — lets a fresh
     install render SOMETHING without failing at render time.
     """
-    default_name = getattr(settings, "SITE_NAME", "Grooveshop")
+    default_name = tenant_site_name()
     default_email = tenant_contact_email()
     resolved = {}
     for field, key in INVOICE_SELLER_SETTING_KEYS.items():

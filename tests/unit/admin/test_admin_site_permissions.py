@@ -103,9 +103,7 @@ class TestAdminSitePermission:
         bind_tenant(tenant)
         assert admin_site.has_permission(_request_for(staff)) is False
 
-    def test_non_staff_denied_even_with_membership(
-        self, tenant, bind_tenant
-    ):
+    def test_non_staff_denied_even_with_membership(self, tenant, bind_tenant):
         shopper = UserAccountFactory(is_staff=False)
         UserTenantMembership.objects.create(
             user=shopper,

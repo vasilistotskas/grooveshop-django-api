@@ -133,6 +133,4 @@ def test_navigation_footer_columns_shape():
         ],
     )
     with pytest.raises(ValidationError):
-        validate_navigation_items(
-            "footer", [{"label": "Help", "children": []}]
-        )
+        validate_navigation_items("footer", [{"label": "Help", "children": []}])

@@ -22,7 +22,11 @@ class TenantCsrfMiddleware(CsrfViewMiddleware):
         if not origin:
             return False
 
-        cache_key = f"tenant_domains:{tenant.schema_name}"
+        # "global:" — schema-independent (tenant.cache.make_tenant_key):
+        # the invalidating signal (tenant/signals.py) always fires from
+        # the public schema, so a schema-prefixed key here would never
+        # be found by that delete.
+        cache_key = f"global:tenant_domains:{tenant.schema_name}"
         domains = cache.get(cache_key)
         if domains is None:
             domains = set(tenant.domains.values_list("domain", flat=True))

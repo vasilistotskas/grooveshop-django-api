@@ -23,6 +23,7 @@ from tenant.credentials import (
     tenant_meta_capi_access_token,
     tenant_meta_capi_dataset_id,
     tenant_meta_pixel_id,
+    tenant_site_name,
     tenant_totp_issuer,
     tenant_turnstile_secret_key,
     viva_wallet_credentials,
@@ -427,6 +428,62 @@ class TestTenantContactEmail:
         assert tenant_contact_email() == "info@webside.gr"
 
 
+class TestTenantSiteName:
+    """``tenant_site_name()`` — store_name → name → settings.SITE_NAME."""
+
+    def test_store_name_wins_when_set(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        tenant = tenant_factory("site-name-1")
+        tenant.name = "Internal Tenant Name"
+        tenant.store_name = "Branded Store"
+        tenant.save()
+        bind_tenant(tenant)
+        settings.SITE_NAME = "SETTINGS_IGNORED"
+        assert tenant_site_name() == "Branded Store"
+
+    def test_falls_back_to_name_when_store_name_empty(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        tenant = tenant_factory("site-name-2")
+        tenant.name = "Internal Tenant Name"
+        tenant.store_name = ""
+        tenant.save()
+        bind_tenant(tenant)
+        settings.SITE_NAME = "SETTINGS_IGNORED"
+        assert tenant_site_name() == "Internal Tenant Name"
+
+    def test_falls_back_to_settings_when_both_empty(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        tenant = tenant_factory("site-name-3")
+        tenant.name = ""
+        tenant.store_name = ""
+        tenant.save()
+        bind_tenant(tenant)
+        settings.SITE_NAME = "Platform Default"
+        assert tenant_site_name() == "Platform Default"
+
+    def test_no_tenant_uses_settings(self, monkeypatch, settings):
+        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        settings.SITE_NAME = "GlobalShop"
+        assert tenant_site_name() == "GlobalShop"
+
+    def test_webside_safety_name_and_store_name_agree(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        """webside.gr: seed migration sets both fields to "Webside", so
+        the store_name-first reorder is a no-op for the platform tenant.
+        """
+        tenant = tenant_factory("ws-site-name")
+        tenant.name = "Webside"
+        tenant.store_name = "Webside"
+        tenant.save()
+        bind_tenant(tenant)
+        settings.SITE_NAME = "Webside"
+        assert tenant_site_name() == "Webside"
+
+
 # ---------------------------------------------------------------------------
 # Phase 2B: MFA TOTP issuer
 # ---------------------------------------------------------------------------
@@ -607,9 +664,7 @@ class TestMFAAdapterTotpIssuer:
         adapter = MFAAdapter()
         assert adapter.get_totp_issuer() == "PlatformIssuer"
 
-    def test_no_tenant_uses_allauth_app_settings(
-        self, monkeypatch, settings
-    ):
+    def test_no_tenant_uses_allauth_app_settings(self, monkeypatch, settings):
         import allauth.mfa.app_settings as allauth_mfa_settings
 
         from core.adapter import MFAAdapter
@@ -798,6 +853,66 @@ class TestGetBaseEmailContext:
 
         ctx = get_base_email_context()
         assert ctx["INFO_EMAIL"] == "platform_info@example.com"
+
+    def test_site_name_uses_tenant_store_name(
+        self, bind_tenant, tenant_factory, settings, db
+    ):
+        from core.utils.email import get_base_email_context
+
+        tenant = tenant_factory("ctx-sitename-1")
+        tenant.store_name = "Branded Store"
+        tenant.save()
+        bind_tenant(tenant)
+
+        ctx = get_base_email_context()
+        assert ctx["SITE_NAME"] == "Branded Store"
+
+    def test_site_logo_url_uses_tenant_logo_light_url(
+        self, bind_tenant, tenant_factory, settings, db
+    ):
+        from core.utils.email import get_base_email_context
+
+        tenant = tenant_factory("ctx-logo-1")
+        tenant.logo_light_url = "https://cdn.example.com/brand/logo-light.svg"
+        tenant.save()
+        bind_tenant(tenant)
+
+        ctx = get_base_email_context()
+        assert (
+            ctx["SITE_LOGO_URL"]
+            == "https://cdn.example.com/brand/logo-light.svg"
+        )
+
+    def test_site_logo_url_falls_back_to_static_default(
+        self, bind_tenant, tenant_factory, settings, db
+    ):
+        from core.utils.email import get_base_email_context
+
+        tenant = tenant_factory("ctx-logo-2")
+        tenant.logo_light_url = ""
+        tenant.save()
+        bind_tenant(tenant)
+        settings.STATIC_BASE_URL = "https://static.example.com"
+
+        ctx = get_base_email_context()
+        assert (
+            ctx["SITE_LOGO_URL"]
+            == "https://static.example.com/static/logo-dark.svg"
+        )
+
+    def test_site_logo_url_falls_back_when_no_tenant(
+        self, monkeypatch, settings, db
+    ):
+        from core.utils.email import get_base_email_context
+
+        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        settings.STATIC_BASE_URL = "https://static.example.com"
+
+        ctx = get_base_email_context()
+        assert (
+            ctx["SITE_LOGO_URL"]
+            == "https://static.example.com/static/logo-dark.svg"
+        )
 
 
 # ---------------------------------------------------------------------------

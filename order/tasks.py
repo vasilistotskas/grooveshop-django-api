@@ -20,7 +20,11 @@ from core import celery_app
 from core.tasks import MonitoredTask
 from core.utils.i18n import get_order_language, get_user_language
 from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
-from tenant.credentials import tenant_contact_email, tenant_from_email
+from tenant.credentials import (
+    tenant_contact_email,
+    tenant_from_email,
+    tenant_site_name,
+)
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.services import OrderService
@@ -235,7 +239,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                 "payment_instructions": payment_instructions,
                 "payment_instructions_text": payment_instructions_text,
                 "is_paid": is_paid,
-                "SITE_NAME": settings.SITE_NAME,
+                "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
@@ -385,14 +389,14 @@ def send_dispute_notification_email(
             "order": order,
             "dispute_id": dispute_id,
             "reason": reason,
-            "SITE_NAME": settings.SITE_NAME,
+            "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
         }
 
         subject = (
-            f"[{settings.SITE_NAME}] Stripe dispute opened — Order #{order_id}"
+            f"[{tenant_site_name()}] Stripe dispute opened — Order #{order_id}"
         )
 
         try:
@@ -492,7 +496,7 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             "order": order,
             "items": order.items.all(),
             "pay_way": order.pay_way,
-            "SITE_NAME": settings.SITE_NAME,
+            "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": staff_email,
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
@@ -597,7 +601,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         context = {
             "order": order,
             "retry_url": retry_url,
-            "SITE_NAME": settings.SITE_NAME,
+            "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
@@ -746,7 +750,7 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             if order.payment_status
             else "Refunded",
             "items": order.items.all(),
-            "SITE_NAME": settings.SITE_NAME,
+            "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
@@ -875,7 +879,7 @@ def send_order_status_update_email(
             "items": order.items.select_related("product").all(),
             "status": status,
             "status_display": OrderStatus(status).label,
-            "SITE_NAME": settings.SITE_NAME,
+            "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
@@ -1042,7 +1046,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             "order": order,
             "tracking_number": order.tracking_number,
             "carrier": order.shipping_carrier,
-            "SITE_NAME": settings.SITE_NAME,
+            "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
@@ -1247,7 +1251,7 @@ def send_invoice_email(self, order_id: int) -> bool:
             context = {
                 "order": order,
                 "invoice": invoice,
-                "SITE_NAME": settings.SITE_NAME,
+                "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
@@ -1575,7 +1579,7 @@ def check_pending_orders() -> int:
         try:
             context = {
                 "order": order,
-                "SITE_NAME": settings.SITE_NAME,
+                "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
@@ -1877,14 +1881,14 @@ def send_checkout_abandonment_emails() -> int:
                     "/account/subscriptions/"
                 ),
                 "unsubscribe_url": unsubscribe_url,
-                "SITE_NAME": settings.SITE_NAME,
+                "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,
             }
             with translation.override(get_user_language(cart.user)):
                 subject = _("Did you forget something? — {site_name}").format(
-                    site_name=settings.SITE_NAME
+                    site_name=tenant_site_name()
                 )
                 text_content = render_to_string(
                     "emails/cart/checkout_abandoned.txt", context
@@ -1892,7 +1896,7 @@ def send_checkout_abandonment_emails() -> int:
                 html_content = render_to_string(
                     "emails/cart/checkout_abandoned.html", context
                 )
-            headers = {"List-ID": f"abandoned-cart.{settings.SITE_NAME}"}
+            headers = {"List-ID": f"abandoned-cart.{tenant_site_name()}"}
             if unsubscribe_url:
                 headers["List-Unsubscribe"] = (
                     f"<mailto:{tenant_contact_email()}?subject=unsubscribe>, "

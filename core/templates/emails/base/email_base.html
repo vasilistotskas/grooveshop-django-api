@@ -336,7 +336,7 @@
             <!-- Header with Logo -->
             <div class="email-header">
                 {% block email_header %}
-                <img src="{{ STATIC_BASE_URL }}/static/logo-dark.svg" alt="{{ SITE_NAME }}" class="email-logo">
+                <img src="{% if SITE_LOGO_URL %}{{ SITE_LOGO_URL }}{% else %}{{ STATIC_BASE_URL }}/static/logo-dark.svg{% endif %}" alt="{{ SITE_NAME }}" class="email-logo">
                 {% endblock %}
             </div>
 

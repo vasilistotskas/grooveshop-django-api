@@ -116,9 +116,21 @@ def tenant_admin_recipients() -> list[str]:
 def tenant_site_name() -> str:
     """Return the tenant's display name for email/branding contexts.
 
-    Priority: ``Tenant.name`` → ``settings.SITE_NAME``.
+    Priority:
+      1. ``Tenant.store_name`` — the customer-facing branding field
+         (blank by default; what ``MyAdminSite`` already uses for
+         ``site_header``/``site_title``).
+      2. ``Tenant.name`` — the always-set internal tenant name.
+      3. ``settings.SITE_NAME`` — platform fallback (public schema,
+         no active tenant, or a tenant row with both fields empty).
+
+    The webside.gr seed migration (``0002_seed_webside_tenant``) sets
+    both ``name`` and ``store_name`` to ``"Webside"``, so this
+    reordering is a no-op for the platform tenant.
     """
-    return _get_tenant_field("name", "SITE_NAME")
+    return _get_tenant_field("store_name") or _get_tenant_field(
+        "name", "SITE_NAME"
+    )
 
 
 # ---------------------------------------------------------------------------

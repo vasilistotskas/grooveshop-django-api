@@ -8,8 +8,16 @@ from datetime import timedelta
 from extra_settings.models import Setting
 from django.conf import settings
 
-from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
-from tenant.credentials import tenant_contact_email, tenant_from_email
+from core.utils.tenant_urls import (
+    get_tenant_api_base_url,
+    get_tenant_base_url,
+    get_tenant_frontend_url,
+)
+from tenant.credentials import (
+    tenant_contact_email,
+    tenant_from_email,
+    tenant_site_name,
+)
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.cache import cache
@@ -77,12 +85,9 @@ def send_subscription_confirmation(
         # The confirmation URL points at a Django API endpoint
         # (``/api/v1/user/subscription/confirm/<token>``), NOT the
         # storefront. There is no Nuxt proxy for that path, so we must
-        # build against the API origin. In single-tenant deployments
-        # this is the tenant's only API URL; for multi-tenant the
-        # follow-up is either a per-tenant ``get_tenant_api_base_url``
-        # helper (api.<tenant-domain>) or a Nuxt proxy route that
-        # forwards to Django — see H1 in MULTI_TENANT_AUDIT.md.
-        api_base = settings.API_BASE_URL.rstrip("/")
+        # build against the tenant's API origin — a platform-wide
+        # ``API_BASE_URL`` would 404 for every non-platform tenant.
+        api_base = get_tenant_api_base_url()
         # If the stored value already looks like an absolute URL (legacy
         # rows from before this fix), respect it as-is so existing tenants
         # aren't broken until they run backfill_extra_settings_defaults.
@@ -102,7 +107,7 @@ def send_subscription_confirmation(
             "topic": subscription.topic,
             "subscription": subscription,
             "confirmation_url": confirmation_url,
-            "SITE_NAME": settings.SITE_NAME,
+            "SITE_NAME": tenant_site_name(),
             "SITE_URL": get_tenant_base_url(),
             "INFO_EMAIL": tenant_contact_email(),
             "STATIC_BASE_URL": settings.STATIC_BASE_URL,
@@ -167,10 +172,13 @@ def _make_unsubscribe_token(user: "AbstractBaseUser") -> str:
 
 def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
     # The unsubscribe URL targets a Django API endpoint that has no
-    # Nuxt proxy, so the API origin is the correct base. Multi-tenant
-    # follow-up tracked against H1 in MULTI_TENANT_AUDIT.md.
+    # Nuxt proxy, so the tenant's API origin is the correct base. The
+    # token bakes in ``connection.schema_name`` (see
+    # ``_make_unsubscribe_token``) and the verifier rejects any token
+    # whose schema doesn't match the request's — so a platform-host
+    # link here is guaranteed rejected for every non-platform tenant.
     token = _make_unsubscribe_token(user)
-    base_url = settings.API_BASE_URL.rstrip("/")
+    base_url = get_tenant_api_base_url()
     return f"{base_url}/api/v1/user/unsubscribe/{token}/{topic.slug}"
 
 
@@ -191,9 +199,9 @@ def generate_blanket_unsubscribe_link(
     (e.g. ``ProductAlert.user``) can pass it directly — only ``pk`` is
     required.
     """
-    # Django API endpoint — see note above. H1 in MULTI_TENANT_AUDIT.md.
+    # Django API endpoint — see note on ``generate_unsubscribe_link``.
     token = _make_unsubscribe_token(user)
-    base_url = settings.API_BASE_URL.rstrip("/")
+    base_url = get_tenant_api_base_url()
     return f"{base_url}/api/v1/user/unsubscribe/{token}"
 
 
@@ -217,7 +225,7 @@ def build_list_unsubscribe_headers(
             f"<{unsubscribe_url}>"
         ),
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        "List-ID": f"{list_id}.{settings.SITE_NAME}",
+        "List-ID": f"{list_id}.{tenant_site_name()}",
     }
 
 
@@ -239,7 +247,7 @@ def build_transactional_list_headers(*, list_id: str) -> dict[str, str]:
         "List-Unsubscribe": (
             f"<mailto:{tenant_contact_email()}?subject=unsubscribe>"
         ),
-        "List-ID": f"{list_id}.{settings.SITE_NAME}",
+        "List-ID": f"{list_id}.{tenant_site_name()}",
     }
 
 
@@ -293,7 +301,7 @@ def send_newsletter(
                 "preferences_url": get_tenant_frontend_url(
                     "/account/subscriptions/"
                 ),
-                "SITE_NAME": settings.SITE_NAME,
+                "SITE_NAME": tenant_site_name(),
                 "SITE_URL": get_tenant_base_url(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,

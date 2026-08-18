@@ -11,6 +11,10 @@ Celery tasks) and builds an absolute URL against that tenant's primary
 domain. Falls back to ``settings.NUXT_BASE_URL`` so callers that might
 run in the public schema or under misconfiguration still produce a valid
 URL.
+
+``get_tenant_api_base_url`` is the API-origin sibling: for links that
+target a Django endpoint directly (no Nuxt proxy), e.g. unsubscribe /
+subscription-confirmation. Falls back to ``settings.API_BASE_URL``.
 """
 
 from __future__ import annotations
@@ -59,3 +63,57 @@ def get_tenant_frontend_url(path: str = "") -> str:
     if not path.startswith("/"):
         path = "/" + path
     return f"{base}{path}"
+
+
+def get_tenant_api_base_url() -> str:
+    """Return the base URL for the current tenant's API host.
+
+    Distinct from :func:`get_tenant_base_url`, which resolves the
+    *storefront* (Nuxt) origin. Some outbound links (e.g. the
+    newsletter unsubscribe / subscription-confirmation endpoints)
+    point straight at a Django API route with no Nuxt proxy in front
+    of it, so they must resolve against the tenant's API origin
+    instead — a storefront-host link would 404, and the platform-wide
+    ``settings.API_BASE_URL`` would send every non-platform tenant's
+    recipients to the wrong tenant's API (and, for the signed
+    unsubscribe token, a guaranteed schema-mismatch rejection).
+
+    Resolution order:
+    1. An explicit ``TenantDomain`` row whose ``domain`` starts with
+       ``"api"`` (case-insensitive) — covers both the production
+       convention (``api.<primary-domain>``) and shapes like
+       ``api-staging.webside.gr`` that don't follow the
+       ``api.<primary>`` pattern.
+    2. ``api.<primary domain>`` derived from the tenant's primary
+       domain — the infra TEMPLATE provisions this subdomain for
+       every tenant even before an explicit row exists.
+    3. ``settings.API_BASE_URL`` as a platform-wide fallback (public
+       schema, missing tenant, or a tenant with no domains at all).
+
+    Always returns a URL without trailing slash. Defensive against
+    tenants that don't expose ``.domains`` — falls through to the
+    settings value rather than raising.
+    """
+    tenant = getattr(connection, "tenant", None)
+    domains_manager = getattr(tenant, "domains", None) if tenant else None
+    if domains_manager is not None:
+        try:
+            api_domain_obj = (
+                domains_manager.filter(domain__istartswith="api")
+                .order_by("-is_primary")
+                .first()
+            )
+        except Exception:  # noqa: BLE001 — any failure falls through
+            api_domain_obj = None
+        if api_domain_obj and getattr(api_domain_obj, "domain", ""):
+            return f"https://{api_domain_obj.domain}"
+
+        try:
+            primary_domain_obj = domains_manager.filter(is_primary=True).first()
+        except Exception:  # noqa: BLE001 — any failure falls through
+            primary_domain_obj = None
+        if primary_domain_obj and getattr(primary_domain_obj, "domain", ""):
+            return f"https://api.{primary_domain_obj.domain}"
+
+    fallback = getattr(settings, "API_BASE_URL", "") or ""
+    return fallback.rstrip("/")

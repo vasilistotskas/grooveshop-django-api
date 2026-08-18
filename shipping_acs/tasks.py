@@ -29,7 +29,11 @@ from django.utils import timezone
 from shipping_acs.exceptions import AcsAPIError, AcsRetryableError
 from core.utils.tenant_urls import get_tenant_base_url
 from tenant.celery import TenantTask
-from tenant.credentials import tenant_contact_email, tenant_from_email
+from tenant.credentials import (
+    tenant_contact_email,
+    tenant_from_email,
+    tenant_site_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -557,7 +561,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
             "order": order,
             "shipment": shipment,
             "voucher_no": shipment.voucher_no,
-            "SITE_NAME": settings.SITE_NAME,
+            "SITE_NAME": tenant_site_name(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": getattr(settings, "STATIC_BASE_URL", ""),
         }

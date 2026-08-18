@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.utils import timezone
@@ -300,11 +299,14 @@ class BoxNowService:
             shipment.save(update_fields=update_fields)
 
         # ---- Phase 2: API call (no transaction, no lock) -----------------
-        from tenant.credentials import box_now_credentials  # noqa: PLC0415
+        from tenant.credentials import (  # noqa: PLC0415
+            box_now_credentials,
+            tenant_site_name,
+        )
 
         bn_creds = box_now_credentials()
         notify_phone = bn_creds["notify_phone"] or "+302100000000"
-        site_name = getattr(settings, "SITE_NAME", "GrooveShop")
+        site_name = tenant_site_name() or "GrooveShop"
         warehouse_id = str(bn_creds["warehouse_id"] or "2")
         paid_amount = getattr(order, "paid_amount", None)
         invoice_value = str(paid_amount.amount) if paid_amount else "0.00"

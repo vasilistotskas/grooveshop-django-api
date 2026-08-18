@@ -54,8 +54,7 @@ def test_rewrites_session_and_csrf_domains(
         == expected
     )
     assert (
-        response.cookies[django_settings.CSRF_COOKIE_NAME]["domain"]
-        == expected
+        response.cookies[django_settings.CSRF_COOKIE_NAME]["domain"] == expected
     )
     # Other cookies keep whatever the view set.
     assert response.cookies["unrelated"]["domain"] == ".webside.gr"

@@ -10,7 +10,11 @@ from django.utils import translation
 from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowRetryableError
 from core.utils.tenant_urls import get_tenant_base_url
 from tenant.celery import TenantTask
-from tenant.credentials import tenant_contact_email, tenant_from_email
+from tenant.credentials import (
+    tenant_contact_email,
+    tenant_from_email,
+    tenant_site_name,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -283,7 +287,7 @@ def boxnow_send_arrival_notification(
             "locker": locker,
             "locker_address": locker_address,
             "parcel_id": shipment.parcel_id,
-            "SITE_NAME": settings.SITE_NAME,
+            "SITE_NAME": tenant_site_name(),
             "SITE_URL": get_tenant_base_url(),
             "STATIC_BASE_URL": getattr(settings, "STATIC_BASE_URL", ""),
         }

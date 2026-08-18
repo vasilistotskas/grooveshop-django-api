@@ -33,6 +33,8 @@ from django.contrib.auth import get_user_model
 from django.db import connection, transaction
 from django.utils import timezone
 
+from tenant.credentials import tenant_site_name
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -328,7 +330,7 @@ def compile_user_data(user) -> dict[str, Any]:
     return {
         "meta": {
             "exported_at": timezone.now().isoformat(),
-            "site": settings.SITE_NAME,
+            "site": tenant_site_name(),
             "schema_version": 1,
         },
         "profile": profile,

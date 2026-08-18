@@ -19,11 +19,11 @@ import logging
 import time
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urljoin
 
 from django.conf import settings
 from extra_settings.models import Setting
 
+from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
 from meta_capi.events import META_EVENT_ID_KEYS, ContentType, StandardEvent
 from tenant.credentials import (
     tenant_meta_capi_access_token,
@@ -294,12 +294,13 @@ def _success_url_for_order(order: Order) -> str:
     as a hint for content-matching and reporting, so we send the
     canonical user-facing URL even though the event was minted
     server-side.
+
+    Uses the active tenant's storefront domain (via
+    ``get_tenant_frontend_url``) rather than the platform-wide
+    ``settings.NUXT_BASE_URL``, so a tenant-B order reports back to
+    tenant-B's domain instead of webside.gr.
     """
-    base = (
-        settings.NUXT_BASE_URL.rstrip("/")
-        if getattr(settings, "NUXT_BASE_URL", None)
-        else ""
-    )
+    base = get_tenant_base_url()
     if not base:
         return ""
     # Order UUID is the public guest-safe identifier; matches the
@@ -307,7 +308,7 @@ def _success_url_for_order(order: Order) -> str:
     uuid = getattr(order, "uuid", None)
     if not uuid:
         return base
-    return urljoin(base + "/", f"checkout/success/{uuid}")
+    return get_tenant_frontend_url(f"/checkout/success/{uuid}")
 
 
 def _new_event(

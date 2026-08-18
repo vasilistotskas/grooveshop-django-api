@@ -24,7 +24,15 @@ from rosetta.storage import CacheRosettaStorage
 
 logger = logging.getLogger(__name__)
 
-TRANSLATION_VERSION_CACHE_KEY = "rosetta:translation_version"
+# "global:" — schema-independent (tenant.cache.make_tenant_key). The
+# Rosetta save that bumps this key can land in ANY allowed schema
+# (public, or an allowlisted tenant per ROSETTA_ALLOWED_SCHEMAS), while
+# EVERY pod's TranslationReloadMiddleware reads it from whatever schema
+# the CURRENT request resolved to (core/middleware/translation_reload.py
+# runs after TenantMainMiddleware) and every Celery worker's
+# task_prerun handler reads it too (core/celery.py). A schema-prefixed
+# key would only propagate the tick within the schema that wrote it.
+TRANSLATION_VERSION_CACHE_KEY = "global:rosetta:translation_version"
 
 
 class CacheClearingRosettaStorage(CacheRosettaStorage):

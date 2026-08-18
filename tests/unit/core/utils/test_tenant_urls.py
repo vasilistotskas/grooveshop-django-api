@@ -16,7 +16,11 @@ import pytest
 from django.db import connection
 from django.test import override_settings
 
-from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
+from core.utils.tenant_urls import (
+    get_tenant_api_base_url,
+    get_tenant_base_url,
+    get_tenant_frontend_url,
+)
 
 
 @pytest.fixture
@@ -32,6 +36,49 @@ def _fake_tenant(primary_domain: str, schema_name: str = "tenant_a"):
     primary_domain_obj = SimpleNamespace(domain=primary_domain)
     domains_qs = MagicMock()
     domains_qs.filter.return_value.first.return_value = primary_domain_obj
+    return SimpleNamespace(schema_name=schema_name, domains=domains_qs)
+
+
+def _fake_tenant_with_rows(
+    rows: list[tuple[str, bool]], schema_name="tenant_a"
+):
+    """Build a tenant whose ``.domains`` manager answers both the
+    ``domain__istartswith="api"`` and ``is_primary=True`` filter shapes
+    ``get_tenant_api_base_url`` issues, backed by a real (small) list
+    instead of a single canned MagicMock return value.
+
+    ``rows`` is a list of ``(domain, is_primary)`` tuples.
+    """
+    domain_objs = [SimpleNamespace(domain=d, is_primary=p) for d, p in rows]
+
+    def _filter(**kwargs):
+        results = list(domain_objs)
+        if "domain__istartswith" in kwargs:
+            prefix = kwargs["domain__istartswith"].lower()
+            results = [
+                r for r in results if r.domain.lower().startswith(prefix)
+            ]
+        if "is_primary" in kwargs:
+            results = [
+                r for r in results if r.is_primary == kwargs["is_primary"]
+            ]
+
+        filtered = MagicMock()
+        filtered.first.return_value = results[0] if results else None
+        ordered = MagicMock()
+        # Real query orders by -is_primary; mirror that so a primary
+        # "api" row wins over a non-primary one when both match.
+        ordered_results = sorted(
+            results, key=lambda r: r.is_primary, reverse=True
+        )
+        ordered.first.return_value = (
+            ordered_results[0] if ordered_results else None
+        )
+        filtered.order_by.return_value = ordered
+        return filtered
+
+    domains_qs = MagicMock()
+    domains_qs.filter.side_effect = _filter
     return SimpleNamespace(schema_name=schema_name, domains=domains_qs)
 
 
@@ -90,3 +137,69 @@ class TestGetTenantFrontendUrl:
         bind_tenant(_fake_tenant(primary_domain="tenant-b.example"))
         second = get_tenant_frontend_url("/cart")
         assert second == "https://tenant-b.example/cart"
+
+
+class TestGetTenantApiBaseUrl:
+    """Unlike ``get_tenant_base_url`` (storefront), this resolves the
+    tenant's API origin for links with no Nuxt proxy in front of them
+    (e.g. newsletter unsubscribe / subscription confirmation)."""
+
+    def test_prefers_explicit_api_domain_row(self, bind_tenant):
+        bind_tenant(
+            _fake_tenant_with_rows(
+                [
+                    ("webside.gr", True),
+                    ("api.webside.gr", False),
+                ]
+            )
+        )
+        assert get_tenant_api_base_url() == "https://api.webside.gr"
+
+    def test_matches_non_dotted_api_prefix(self, bind_tenant):
+        # Staging convention: "api-staging.webside.gr" — starts with
+        # "api" but not "api.".
+        bind_tenant(
+            _fake_tenant_with_rows(
+                [
+                    ("webside.gr", True),
+                    ("api-staging.webside.gr", False),
+                ]
+            )
+        )
+        assert get_tenant_api_base_url() == "https://api-staging.webside.gr"
+
+    def test_falls_back_to_derived_api_subdomain(self, bind_tenant):
+        # No explicit "api*" row at all — derive from the primary domain.
+        bind_tenant(_fake_tenant_with_rows([("tenant-b.com", True)]))
+        assert get_tenant_api_base_url() == "https://api.tenant-b.com"
+
+    @override_settings(API_BASE_URL="https://fallback-api.example")
+    def test_falls_back_to_settings_when_no_tenant(self, bind_tenant):
+        bind_tenant(None)
+        assert get_tenant_api_base_url() == "https://fallback-api.example"
+
+    @override_settings(API_BASE_URL="https://fallback-api.example/")
+    def test_fallback_strips_trailing_slash(self, bind_tenant):
+        bind_tenant(None)
+        assert get_tenant_api_base_url() == "https://fallback-api.example"
+
+    @override_settings(API_BASE_URL="https://fallback-api.example")
+    def test_falls_back_when_no_domains_at_all(self, bind_tenant):
+        bind_tenant(_fake_tenant_with_rows([]))
+        assert get_tenant_api_base_url() == "https://fallback-api.example"
+
+    def test_switches_tenants_per_call(self, bind_tenant):
+        bind_tenant(_fake_tenant_with_rows([("tenant-a.example", True)]))
+        first = get_tenant_api_base_url()
+        assert first == "https://api.tenant-a.example"
+
+        bind_tenant(
+            _fake_tenant_with_rows(
+                [
+                    ("tenant-b.example", True),
+                    ("api.tenant-b.example", False),
+                ]
+            )
+        )
+        second = get_tenant_api_base_url()
+        assert second == "https://api.tenant-b.example"

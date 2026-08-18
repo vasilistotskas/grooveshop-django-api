@@ -21,7 +21,11 @@ from django.utils.translation import gettext as _
 
 from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import get_tenant_base_url
-from tenant.credentials import tenant_contact_email, tenant_from_email
+from tenant.credentials import (
+    tenant_contact_email,
+    tenant_from_email,
+    tenant_site_name,
+)
 
 from extra_settings.models import Setting
 
@@ -514,7 +518,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                     "email": user.email,
                 },
                 "unsubscribe_url": unsubscribe_url,
-                "SITE_NAME": settings.SITE_NAME,
+                "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
                 "STATIC_BASE_URL": settings.STATIC_BASE_URL,

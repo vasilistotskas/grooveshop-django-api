@@ -132,6 +132,54 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
         self.assertNotIn("&lt;div&gt;", html_body)
 
+    @override_settings(SITE_NAME="GrooveShop")
+    @patch(
+        "user.utils.subscription.tenant_site_name", return_value="Branded Store"
+    )
+    @patch("order.tasks.tenant_site_name", return_value="Branded Store")
+    def test_order_confirmation_uses_tenant_store_name(
+        self, mock_tasks_site_name, mock_subscription_site_name
+    ):
+        """``SITE_NAME`` context / ``List-ID`` header must come from
+        ``tenant_site_name()`` (the active tenant's ``store_name``), not
+        the platform-wide ``settings.SITE_NAME`` — a tenant-B customer's
+        confirmation email must say "Branded Store", never "GrooveShop".
+
+        ``send_order_confirmation_email`` is a ``TenantTask``: a direct
+        (non-``apply_async``) call in tests always executes inside
+        ``schema_context("public")`` (no ``_schema_name`` header), so
+        binding a fake ``connection.tenant`` before the call would be
+        silently overridden for the task's duration. Patching
+        ``tenant_site_name`` at each call site instead exercises exactly
+        what TASK A changed — the call sites in ``order.tasks`` and
+        ``user.utils.subscription.build_transactional_list_headers`` —
+        without fighting the schema-switch machinery.
+
+        Renders the REAL templates (render_to_string is NOT mocked), same
+        approach as the WYSIWYG-safety test above.
+        """
+        order = OrderFactory.create(
+            email="tenant-branded@example.com",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        _release_confirmation_email(order.id)
+
+        with patch("order.tasks.EmailMultiAlternatives") as mock_email:
+            instance = MagicMock()
+            mock_email.return_value = instance
+            result = send_order_confirmation_email(order.id)
+
+        self.assertTrue(result)
+        html_body = instance.attach_alternative.call_args.args[0]
+        self.assertIn("Branded Store", html_body)
+        self.assertNotIn("GrooveShop", html_body)
+
+        headers = mock_email.call_args.kwargs.get("headers", {})
+        self.assertEqual(
+            headers.get("List-ID"), "order_confirmation.Branded Store"
+        )
+
     @patch("order.tasks.EmailMultiAlternatives")
     @patch("order.tasks.render_to_string")
     @override_settings(

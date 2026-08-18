@@ -94,6 +94,38 @@ class TestSubscriptionUtils:
         mock_email.attach_alternative.assert_called_once()
         mock_email.send.assert_called_once()
 
+    @patch("user.utils.subscription.render_to_string")
+    @patch("user.utils.subscription.EmailMultiAlternatives")
+    @patch("user.utils.subscription.check_subscription_before_send")
+    @patch("user.utils.subscription.get_tenant_api_base_url")
+    def test_send_subscription_confirmation_uses_tenant_api_base_url(
+        self, mock_api_base, mock_check, mock_email_class, mock_render
+    ):
+        """confirmation_url must be built against the tenant's API host,
+        not the platform-wide API_BASE_URL — there is no Nuxt proxy for
+        this Django-only endpoint."""
+        mock_api_base.return_value = "https://api.tenant-b.example"
+        mock_check.return_value = False
+        mock_render.return_value = "<html>Test confirmation email</html>"
+        mock_email_class.return_value = MagicMock()
+
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            topic=self.topic,
+            status=UserSubscription.SubscriptionStatus.PENDING,
+            confirmation_token="test-token-123",
+        )
+
+        result = send_subscription_confirmation(subscription, self.user)
+
+        assert result is True
+        mock_api_base.assert_called_once()
+        rendered_context = mock_render.call_args_list[0].args[1]
+        assert rendered_context["confirmation_url"] == (
+            "https://api.tenant-b.example"
+            "/api/v1/user/subscription/confirm/test-token-123"
+        )
+
     @patch("user.utils.subscription.check_subscription_before_send")
     def test_send_subscription_confirmation_already_active(self, mock_check):
         mock_check.return_value = True
@@ -158,6 +190,27 @@ class TestSubscriptionUtils:
         result = send_subscription_confirmation(subscription, self.user)
 
         assert result is False
+
+    @patch("user.utils.subscription._make_unsubscribe_token")
+    @patch("user.utils.subscription.get_tenant_api_base_url")
+    def test_generate_unsubscribe_link_uses_tenant_api_base_url(
+        self, mock_api_base, mock_token
+    ):
+        """The unsubscribe URL must use the TENANT's API host, not the
+        platform-wide API_BASE_URL — the token bakes in the tenant's
+        schema and a platform-host link is rejected on every
+        non-platform tenant (RFC 8058 one-click unsubscribe break)."""
+        mock_token.return_value = "signed-token"
+        mock_api_base.return_value = "https://api.tenant-b.example"
+
+        result = generate_unsubscribe_link(self.user, self.topic)
+
+        expected_url = (
+            "https://api.tenant-b.example/api/v1/user/unsubscribe/"
+            "signed-token/test-newsletter"
+        )
+        assert result == expected_url
+        mock_api_base.assert_called_once()
 
     @override_settings(API_BASE_URL="https://api.test-site.com")
     @patch("user.utils.subscription._make_unsubscribe_token")

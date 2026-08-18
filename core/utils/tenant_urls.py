@@ -94,26 +94,55 @@ def get_tenant_api_base_url() -> str:
     tenants that don't expose ``.domains`` — falls through to the
     settings value rather than raising.
     """
-    tenant = getattr(connection, "tenant", None)
-    domains_manager = getattr(tenant, "domains", None) if tenant else None
-    if domains_manager is not None:
-        try:
-            api_domain_obj = (
-                domains_manager.filter(domain__istartswith="api")
-                .order_by("-is_primary")
-                .first()
-            )
-        except Exception:  # noqa: BLE001 — any failure falls through
-            api_domain_obj = None
-        if api_domain_obj and getattr(api_domain_obj, "domain", ""):
-            return f"https://{api_domain_obj.domain}"
-
-        try:
-            primary_domain_obj = domains_manager.filter(is_primary=True).first()
-        except Exception:  # noqa: BLE001 — any failure falls through
-            primary_domain_obj = None
-        if primary_domain_obj and getattr(primary_domain_obj, "domain", ""):
-            return f"https://api.{primary_domain_obj.domain}"
+    api_domain = resolve_tenant_api_domain(getattr(connection, "tenant", None))
+    if api_domain:
+        return f"https://{api_domain}"
 
     fallback = getattr(settings, "API_BASE_URL", "") or ""
     return fallback.rstrip("/")
+
+
+def resolve_tenant_api_domain(tenant) -> str:
+    """Return the bare API hostname for *tenant*, or ``""``.
+
+    Shared by :func:`get_tenant_api_base_url` (which reads
+    ``connection.tenant``) and ``TenantConfigSerializer.api_domain``
+    (which serializes an arbitrary tenant instance — the resolve
+    endpoint answers for whichever domain was queried, not the
+    request's own tenant).
+
+    Resolution order:
+    1. An explicit ``TenantDomain`` row whose ``domain`` starts with
+       ``"api"`` (case-insensitive) — covers both the production
+       convention (``api.<primary-domain>``) and shapes like
+       ``api-staging.webside.gr``.
+    2. ``api.<primary domain>`` derived from the primary domain — the
+       infra TEMPLATE provisions this subdomain for every tenant even
+       before an explicit row exists.
+
+    Defensive against tenants without ``.domains`` (test fakes,
+    transient creation states) — returns ``""`` rather than raising.
+    """
+    domains_manager = getattr(tenant, "domains", None) if tenant else None
+    if domains_manager is None:
+        return ""
+
+    try:
+        api_domain_obj = (
+            domains_manager.filter(domain__istartswith="api")
+            .order_by("-is_primary")
+            .first()
+        )
+    except Exception:  # noqa: BLE001 — any failure falls through
+        api_domain_obj = None
+    if api_domain_obj and getattr(api_domain_obj, "domain", ""):
+        return api_domain_obj.domain
+
+    try:
+        primary_domain_obj = domains_manager.filter(is_primary=True).first()
+    except Exception:  # noqa: BLE001 — any failure falls through
+        primary_domain_obj = None
+    if primary_domain_obj and getattr(primary_domain_obj, "domain", ""):
+        return f"api.{primary_domain_obj.domain}"
+
+    return ""

@@ -77,6 +77,44 @@ class TestTenantResolve:
         assert response.json()["primaryDomain"] == "resolve-secondary.example"
 
     @pytest.mark.django_db
+    def test_api_domain_prefers_explicit_api_row(
+        self, resolve_client, tenant_factory
+    ):
+        tenant = tenant_factory("resolve-apirow")
+        TenantDomain.objects.create(
+            tenant=tenant,
+            domain="resolve-apirow.example",
+            is_primary=True,
+        )
+        # Non-dotted shape (api-staging style) must be honoured as-is.
+        TenantDomain.objects.create(
+            tenant=tenant,
+            domain="api-resolve-apirow.example",
+            is_primary=False,
+        )
+        response = resolve_client.get(
+            "/api/v1/tenant/resolve?domain=resolve-apirow.example"
+        )
+        assert response.status_code == 200
+        assert response.json()["apiDomain"] == "api-resolve-apirow.example"
+
+    @pytest.mark.django_db
+    def test_api_domain_derives_from_primary_without_explicit_row(
+        self, resolve_client, tenant_factory
+    ):
+        tenant = tenant_factory("resolve-apider")
+        TenantDomain.objects.create(
+            tenant=tenant,
+            domain="resolve-apider.example",
+            is_primary=True,
+        )
+        response = resolve_client.get(
+            "/api/v1/tenant/resolve?domain=resolve-apider.example"
+        )
+        assert response.status_code == 200
+        assert response.json()["apiDomain"] == "api.resolve-apider.example"
+
+    @pytest.mark.django_db
     def test_returns_404_for_unknown_domain(self, resolve_client):
         response = resolve_client.get(
             "/api/v1/tenant/resolve?domain=nowhere.example"

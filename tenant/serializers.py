@@ -41,6 +41,12 @@ class TenantConfigSerializer(serializers.Serializer):
 
     # --- Domain ---
     primary_domain = serializers.SerializerMethodField()
+    # The tenant's API origin hostname (e.g. ``api.tenant.com``).
+    # Browser-side consumers (OAuth provider-redirect form action, the
+    # notifications WebSocket, CSP connect-src) MUST dial the tenant's
+    # own API host — the env-frozen platform host resolves to tenant
+    # #1's schema and carries the wrong session cookies.
+    api_domain = serializers.SerializerMethodField()
 
     # --- Feature flags ---
     loyalty_enabled = serializers.BooleanField(read_only=True)
@@ -99,6 +105,13 @@ class TenantConfigSerializer(serializers.Serializer):
     def get_primary_domain(self, obj: Tenant) -> str:
         domain = obj.domains.filter(is_primary=True).first()
         return domain.domain if domain else ""
+
+    def get_api_domain(self, obj: Tenant) -> str:
+        from core.utils.tenant_urls import (  # noqa: PLC0415
+            resolve_tenant_api_domain,
+        )
+
+        return resolve_tenant_api_domain(obj)
 
 
 class TenantDomainSerializer(serializers.ModelSerializer):

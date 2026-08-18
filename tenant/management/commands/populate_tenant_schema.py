@@ -146,6 +146,18 @@ class Command(BaseCommand):
         # also makes crashed runs cleanly re-runnable.
         with transaction.atomic(), connection.cursor() as cursor:
             for table in tables:
+                # Tenant-only apps (allauth account, knox, orders, …)
+                # have no public-schema tables on a fresh deployment —
+                # public only carries SHARED_APPS. Only the legacy
+                # single-tenant cutover database has every table in
+                # public. Skip anything with no source relation.
+                if not self._table_exists(cursor, "public", table):
+                    self.stdout.write(
+                        f"  SKIP {table} (not present in 'public')"
+                    )
+                    skipped += 1
+                    continue
+
                 # Always-overwrite tables: truncate first, then copy.
                 if table in _OVERWRITE_TABLES:
                     self.stdout.write(
@@ -224,6 +236,15 @@ class Command(BaseCommand):
                 [schema],
             )
             return [row[0] for row in cursor.fetchall()]
+
+    def _table_exists(self, cursor, schema: str, table: str) -> bool:
+        cursor.execute(
+            "SELECT EXISTS("
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = %s AND table_name = %s)",
+            [schema, table],
+        )
+        return cursor.fetchone()[0]
 
     def _table_has_data(self, cursor, schema: str, table: str) -> bool:
         cursor.execute(

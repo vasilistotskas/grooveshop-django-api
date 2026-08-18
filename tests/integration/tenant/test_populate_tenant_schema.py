@@ -254,6 +254,48 @@ class TestPopulateTenantSchemaRowCounts:
 
 
 # ---------------------------------------------------------------------------
+# Test: tenant-only tables (no public counterpart) are skipped
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+class TestTenantOnlyTableSkipped:
+    """A table that exists only in the tenant schema must be skipped.
+
+    On a fresh (non-cutover) deployment the public schema carries only
+    SHARED_APPS tables, while tenant schemas carry every TENANT_APPS
+    table (allauth account, knox, orders, …). The command used to crash
+    with ``relation "public.<table>" does not exist``; it must SKIP
+    such tables instead.
+    """
+
+    schema = f"{_P}_tenonly"
+    tenant_tbl = f"{_P}_tenant_only_tbl"
+
+    def setup_method(self, _method):
+        with connection.cursor() as cursor:
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.schema}")
+            # Deliberately NO public counterpart for this table.
+            cursor.execute(
+                f"CREATE TABLE IF NOT EXISTS {self.schema}.{self.tenant_tbl}"
+                " (id bigserial PRIMARY KEY, label text)"
+            )
+
+    def teardown_method(self, _method):
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP SCHEMA IF EXISTS {self.schema} CASCADE")
+
+    def test_tenant_only_table_is_skipped_not_crashed(self):
+        stdout, stderr = _run_command(self.schema, rebuild_mptt=False)
+        assert f"SKIP {self.tenant_tbl} (not present in 'public')" in stdout
+        assert "does not exist" not in stderr
+
+    def test_command_completes_with_summary(self):
+        stdout, _ = _run_command(self.schema, rebuild_mptt=False)
+        assert "Done:" in stdout
+
+
+# ---------------------------------------------------------------------------
 # Test: multi-sequence table (history_id via full command) (B1)
 # ---------------------------------------------------------------------------
 

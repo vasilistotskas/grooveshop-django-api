@@ -55,11 +55,13 @@ class AcsClient:
     """Thin RPC wrapper around the ACS REST API.
 
     One instance per consumer — do not instantiate at import time;
-    instantiate inside the call site so missing settings are surfaced
-    via :class:`AcsConfigError` only when the client is actually used.
+    instantiate inside the call site so missing credentials are
+    surfaced via :class:`AcsConfigError` only when the client is
+    actually used.
 
-    Credentials default to ``settings.ACS_*`` and can be overridden in
-    tests via constructor kwargs.
+    Credentials default to the active tenant's ``Tenant.acs_*`` fields
+    (via ``tenant.credentials.acs_credentials()`` — no platform-wide
+    fallback) and can be overridden in tests via constructor kwargs.
     """
 
     def __init__(
@@ -97,17 +99,17 @@ class AcsClient:
         missing = [
             name
             for name, value in [
-                ("ACS_API_KEY", self.api_key),
-                ("ACS_COMPANY_ID", self.company_id),
-                ("ACS_COMPANY_PASSWORD", self.company_password),
-                ("ACS_USER_ID", self.user_id),
-                ("ACS_USER_PASSWORD", self.user_password),
+                ("acs_api_key", self.api_key),
+                ("acs_company_id", self.company_id),
+                ("acs_company_password", self.company_password),
+                ("acs_user_id", self.user_id),
+                ("acs_user_password", self.user_password),
             ]
             if not value
         ]
         if missing:
             raise AcsConfigError(
-                f"Missing required ACS settings: {', '.join(missing)}"
+                f"Missing required Tenant ACS fields: {', '.join(missing)}"
             )
 
         if session is not None:

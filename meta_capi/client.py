@@ -81,9 +81,10 @@ class MetaCapiClient:
         test_event_code: str | None = None,
         partner_agent: str | None = None,
     ) -> None:
-        # Per-tenant credentials take priority over global settings.
-        # Explicit constructor args (used in tests and admin actions) win
-        # over both.
+        # Tenant-only credentials — no platform-wide fallback (an
+        # unconfigured tenant means CAPI is disabled for it, not
+        # "borrow the platform's token"). Explicit constructor args
+        # (used in tests and admin actions) still win.
         self.pixel_id = pixel_id or tenant_meta_pixel_id()
         self.access_token = access_token or tenant_meta_capi_access_token()
         self.api_version = api_version or settings.META_CAPI_API_VERSION
@@ -97,9 +98,13 @@ class MetaCapiClient:
 
     def _ensure_configured(self) -> None:
         if not self.pixel_id:
-            raise MetaCapiConfigError("META_PIXEL_ID is not set")
+            raise MetaCapiConfigError(
+                "Tenant.meta_pixel_id / meta_capi_dataset_id is not set"
+            )
         if not self.access_token:
-            raise MetaCapiConfigError("META_CAPI_ACCESS_TOKEN is not set")
+            raise MetaCapiConfigError(
+                "Tenant.meta_capi_access_token is not set"
+            )
 
     def send(self, events: list[Event]) -> MetaCapiResponse:
         """Dispatch ``events`` to Meta in a single batched POST.

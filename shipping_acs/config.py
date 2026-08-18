@@ -185,6 +185,31 @@ def print_type() -> int:
     return value
 
 
+def is_configured() -> bool:
+    """Return True when the active tenant has usable ACS API credentials.
+
+    Mirrors the required-field check in ``AcsClient.__init__`` — the
+    single source of truth for "can we actually call the ACS API".
+    ``billing_code``/``station_origin`` are NOT required here (they're
+    needed for specific calls like voucher creation / price quotes, not
+    for auth), matching ``AcsClient``'s own ``missing`` list.
+
+    Used by ``AcsCarrier.is_kind_enabled`` (hides ACS from checkout
+    entirely when False) and the ACS fanout Celery tasks (skip an
+    unconfigured tenant cleanly instead of raising ``AcsConfigError``).
+    """
+    from tenant.credentials import acs_credentials  # noqa: PLC0415
+
+    creds = acs_credentials()
+    return bool(
+        creds["api_key"]
+        and creds["company_id"]
+        and creds["company_password"]
+        and creds["user_id"]
+        and creds["user_password"]
+    )
+
+
 def station_origin() -> str | None:
     """Merchant pickup-station code for ``ACS_Price_Calculation``.
 

@@ -289,6 +289,38 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("pay_way_id", response.data)
 
+    @patch("order.services.OrderService.validate_cart_for_checkout")
+    @patch("order.services.OrderService.validate_shipping_address")
+    def test_unconfigured_viva_wallet_rejected_at_creation(
+        self, mock_validate_address, mock_validate_cart
+    ):
+        """An active Viva Wallet pay-way is still rejected at order
+        creation when the tenant holds no Viva credentials — tenant-only,
+        no settings fallback (see tenant/credentials.py). The GET
+        pay-way list already hides it via ``is_provider_configured``;
+        this pins the same gate at the create boundary for a direct
+        API call / stale client."""
+        mock_validate_cart.return_value = {"valid": True, "errors": []}
+        mock_validate_address.return_value = None
+
+        pay_way = PayWayFactory(
+            provider_code="viva_wallet",
+            is_online_payment=True,
+            active=True,
+        )
+        data = {**self._base_address(), "pay_way_id": pay_way.id}
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.post(
+            self.create_url,
+            data,
+            format="json",
+            HTTP_X_CART_ID=str(self.cart.uuid),
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pay_way_id", response.data)
+
     def test_carrier_excluded_pay_way_rejected_at_creation(self):
         """A pay-way excluded for the chosen (carrier, kind) via a
         PayWayShippingExclusion row is rejected at order creation — the

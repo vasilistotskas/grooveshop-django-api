@@ -36,8 +36,10 @@ class BoxNowClient:
     Thin HTTP client for the BoxNow Partner API (v1.65 / manual v7.2).
 
     One instance per consumer — do not instantiate at module import time.
-    All credentials default to ``settings.BOXNOW_*``; pass explicit values
-    to override (useful in tests).
+    All credentials default to the active tenant's ``Tenant.box_now_*``
+    fields (via ``tenant.credentials.box_now_credentials()`` — no
+    platform-wide fallback); pass explicit values to override (useful
+    in tests).
 
     OAuth tokens are cached in Django's cache backend (Redis in production)
     under ``boxnow:access_token:{partner_id}`` so that Daphne workers and
@@ -80,15 +82,15 @@ class BoxNowClient:
         missing = [
             name
             for name, value in [
-                ("BOXNOW_CLIENT_ID", self.client_id),
-                ("BOXNOW_CLIENT_SECRET", self.client_secret),
-                ("BOXNOW_PARTNER_ID", self.partner_id),
+                ("box_now_client_id", self.client_id),
+                ("box_now_client_secret", self.client_secret),
+                ("box_now_partner_id", self.partner_id),
             ]
             if not value
         ]
         if missing:
             raise BoxNowConfigError(
-                f"Missing required BoxNow settings: {', '.join(missing)}"
+                f"Missing required Tenant BoxNow fields: {', '.join(missing)}"
             )
 
         if session is not None:

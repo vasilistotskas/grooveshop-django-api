@@ -594,6 +594,112 @@ def _reseed_shipping_providers(request):
 
 
 @pytest.fixture
+def bind_tenant(monkeypatch):
+    """Attach a tenant (or a lightweight stand-in) to ``connection.tenant``
+    for the duration of a single test.
+
+    ``TenantMainMiddleware`` is stripped for tests (see above), so
+    ``connection.tenant`` is unset by default — the tenant credential
+    helpers (``tenant.credentials``) then treat every third-party
+    integration as unconfigured. Tests exercising tenant-scoped
+    behaviour bind a fake tenant here; ``monkeypatch`` unwinds it after
+    the test so parallel xdist workers never see leaked state. Several
+    test modules also declare their own local copy of this fixture
+    (same shape) — either is fine, the local one simply shadows this
+    one for that module.
+    """
+
+    def _bind(t):
+        monkeypatch.setattr(connection, "tenant", t, raising=False)
+
+    return _bind
+
+
+@pytest.fixture
+def acs_configured_tenant(bind_tenant):
+    """Bind a fake tenant with usable ACS credentials.
+
+    ACS credentials are tenant-only (no settings fallback — see
+    ``tenant/credentials.py:acs_credentials()``), so ``AcsCarrier.
+    is_kind_enabled()``, the ACS fanout Celery tasks, and any test
+    exercising ACS availability need an active tenant with
+    ``Tenant.acs_*`` fields set. A ``SimpleNamespace`` is enough — the
+    credential helper only ever ``getattr()``s the specific field
+    names off ``connection.tenant``.
+    """
+    from types import SimpleNamespace
+
+    tenant = SimpleNamespace(
+        schema_name="test-acs-tenant",
+        acs_api_key="TEST_ACS_KEY",
+        acs_company_id="TEST_ACS_COMPANY",
+        acs_company_password="TEST_ACS_PASSWORD",
+        acs_user_id="TEST_ACS_USER",
+        acs_user_password="TEST_ACS_USER_PASSWORD",
+        acs_billing_code="2ΑΚ89587",
+        acs_station_origin="",
+    )
+    bind_tenant(tenant)
+    return tenant
+
+
+_BOXNOW_TENANT_FIELDS: dict = {
+    "box_now_client_id": "TEST_BOXNOW_CLIENT",
+    "box_now_client_secret": "TEST_BOXNOW_SECRET",
+    "box_now_partner_id": "12345",
+    "box_now_warehouse_id": "2",
+    "box_now_notify_phone": "+302100000000",
+    "box_now_webhook_secret": "TEST_BOXNOW_WHS",
+}
+
+
+@pytest.fixture
+def boxnow_configured_tenant(bind_tenant):
+    """Bind a fake tenant with usable BoxNow credentials.
+
+    BoxNow credentials are tenant-only (no settings fallback — see
+    ``tenant/credentials.py:box_now_credentials()``), so ``BoxNowCarrier.
+    is_kind_enabled()``, the BoxNow fanout Celery tasks, and any test
+    exercising BoxNow availability need an active tenant with
+    ``Tenant.box_now_*`` fields set.
+    """
+    from types import SimpleNamespace
+
+    tenant = SimpleNamespace(
+        schema_name="test-boxnow-tenant", **_BOXNOW_TENANT_FIELDS
+    )
+    bind_tenant(tenant)
+    return tenant
+
+
+@pytest.fixture
+def acs_and_boxnow_configured_tenant(bind_tenant):
+    """Bind a single fake tenant with BOTH ACS and BoxNow credentials.
+
+    ``bind_tenant`` replaces ``connection.tenant`` wholesale, so a test
+    that needs both carriers available can't just request
+    ``acs_configured_tenant`` AND ``boxnow_configured_tenant`` — the
+    second call would clobber the first. Use this combined fixture
+    instead.
+    """
+    from types import SimpleNamespace
+
+    tenant = SimpleNamespace(
+        schema_name="test-acs-boxnow-tenant",
+        acs_api_key="TEST_ACS_KEY",
+        acs_company_id="TEST_ACS_COMPANY",
+        acs_company_password="TEST_ACS_PASSWORD",
+        acs_user_id="TEST_ACS_USER",
+        acs_user_password="TEST_ACS_USER_PASSWORD",
+        acs_billing_code="2ΑΚ89587",
+        acs_station_origin="",
+        **_BOXNOW_TENANT_FIELDS,
+    )
+    bind_tenant(tenant)
+    return tenant
+
+
+@pytest.fixture
 def count_queries():
     class QueryCounter:
         def __init__(self, max_queries=None):

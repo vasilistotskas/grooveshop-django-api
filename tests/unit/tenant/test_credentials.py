@@ -1,10 +1,21 @@
 """Unit tests for tenant/credentials.py helpers.
 
-Tests verify:
-- Tenant field value is returned when set (non-empty).
-- Falls back to the settings value when the tenant field is empty.
-- Falls back to the settings value when connection.tenant is None.
-- Returns "" when both are absent.
+Two contracts are covered here:
+
+1. **Fallback helpers** (email, site name, MFA TOTP issuer, Turnstile):
+   - Tenant field value is returned when set (non-empty).
+   - Falls back to the settings value when the tenant field is empty.
+   - Falls back to the settings value when connection.tenant is None.
+   - Returns "" when both are absent.
+
+2. **Third-party credential helpers** (Viva Wallet, ACS, BoxNow, Meta
+   CAPI/Pixel) — NO fallback:
+   - Tenant field value is returned when set (non-empty).
+   - Returns "" (or False for the nullable ``live_mode`` flag) when
+     the tenant field is empty or there is no active tenant — even
+     when the matching settings value IS populated (assert no
+     leakage via ``override_settings``/the ``settings`` fixture).
+
 - Greek strings (ACS billing codes) pass through unchanged.
 - Phase 2B: email, MFA TOTP issuer, Meta CAPI, and Turnstile helpers.
 """
@@ -112,34 +123,40 @@ class TestGetTenantField:
 
 
 class TestVivaWalletCredentials:
-    def test_returns_all_keys(self, monkeypatch, settings):
+    """No-fallback contract: tenant-only, settings are NEVER consulted."""
+
+    def test_returns_empty_when_no_active_tenant_even_if_settings_set(
+        self, monkeypatch, settings
+    ):
         monkeypatch.setattr(connection, "tenant", None, raising=False)
         settings.VIVA_WALLET_MERCHANT_ID = "m1"
         settings.VIVA_WALLET_API_KEY = "k1"
         settings.VIVA_WALLET_CLIENT_ID = "c1"
         settings.VIVA_WALLET_CLIENT_SECRET = "s1"
         settings.VIVA_WALLET_WEBHOOK_VERIFICATION_KEY = "v1"
+        settings.VIVA_WALLET_SOURCE_CODE = "s1"
+        settings.VIVA_WALLET_LIVE_MODE = True
 
         creds = viva_wallet_credentials()
-        assert creds["merchant_id"] == "m1"
-        assert creds["api_key"] == "k1"
-        assert creds["client_id"] == "c1"
-        assert creds["client_secret"] == "s1"
-        assert creds["webhook_verification_key"] == "v1"
+        assert creds["merchant_id"] == ""
+        assert creds["api_key"] == ""
+        assert creds["client_id"] == ""
+        assert creds["client_secret"] == ""
+        assert creds["webhook_verification_key"] == ""
+        assert creds["source_code"] == ""
+        assert creds["live_mode"] is False
 
-    def test_tenant_overrides_settings(
-        self, bind_tenant, tenant_factory, settings
-    ):
+    def test_returns_tenant_values_when_set(self, bind_tenant, tenant_factory):
         tenant = tenant_factory("viva-tenant")
         tenant.viva_wallet_merchant_id = "TENANT_MID"
         tenant.viva_wallet_api_key = "TENANT_APIKEY"
         tenant.viva_wallet_client_id = "TENANT_CID"
         tenant.viva_wallet_client_secret = "TENANT_CSECRET"
         tenant.viva_wallet_webhook_verification_key = "TENANT_VK"
+        tenant.viva_wallet_source_code = "TENANT_SRC"
+        tenant.viva_wallet_live_mode = True
         tenant.save()
         bind_tenant(tenant)
-        settings.VIVA_WALLET_MERCHANT_ID = "SETTINGS_MID"
-        settings.VIVA_WALLET_API_KEY = "SETTINGS_APIKEY"
 
         creds = viva_wallet_credentials()
         assert creds["merchant_id"] == "TENANT_MID"
@@ -147,41 +164,69 @@ class TestVivaWalletCredentials:
         assert creds["client_id"] == "TENANT_CID"
         assert creds["client_secret"] == "TENANT_CSECRET"
         assert creds["webhook_verification_key"] == "TENANT_VK"
+        assert creds["source_code"] == "TENANT_SRC"
+        assert creds["live_mode"] is True
 
-    def test_partial_tenant_override_falls_back_per_field(
+    def test_empty_tenant_fields_stay_empty_ignoring_settings(
         self, bind_tenant, tenant_factory, settings
     ):
-        """Tenant sets merchant_id but not api_key — api_key falls back."""
+        """Settings are populated but must NEVER be consulted (no leakage)."""
+        tenant = tenant_factory("viva-empty")
+        # All credential fields default to "" / None — don't override
+        bind_tenant(tenant)
+        settings.VIVA_WALLET_MERCHANT_ID = "SHOULD_NOT_BE_USED"
+        settings.VIVA_WALLET_API_KEY = "SHOULD_NOT_BE_USED"
+        settings.VIVA_WALLET_CLIENT_ID = "SHOULD_NOT_BE_USED"
+        settings.VIVA_WALLET_CLIENT_SECRET = "SHOULD_NOT_BE_USED"
+        settings.VIVA_WALLET_WEBHOOK_VERIFICATION_KEY = "SHOULD_NOT_BE_USED"
+        settings.VIVA_WALLET_SOURCE_CODE = "SHOULD_NOT_BE_USED"
+        settings.VIVA_WALLET_LIVE_MODE = True
+
+        creds = viva_wallet_credentials()
+        assert creds["merchant_id"] == ""
+        assert creds["api_key"] == ""
+        assert creds["client_id"] == ""
+        assert creds["client_secret"] == ""
+        assert creds["webhook_verification_key"] == ""
+        assert creds["source_code"] == ""
+        # Unset (None) nullable field → False, never "ask settings".
+        assert creds["live_mode"] is False
+
+    def test_partial_tenant_fields_do_not_leak_from_settings(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        """Tenant sets merchant_id but not api_key — api_key stays empty,
+        it does NOT fall back to settings on a per-field basis either."""
         tenant = tenant_factory("viva-partial")
         tenant.viva_wallet_merchant_id = "TENANT_MID"
         tenant.viva_wallet_api_key = ""
         tenant.save()
         bind_tenant(tenant)
-        settings.VIVA_WALLET_API_KEY = "SETTINGS_APIKEY"
+        settings.VIVA_WALLET_API_KEY = "SHOULD_NOT_BE_USED"
 
         creds = viva_wallet_credentials()
         assert creds["merchant_id"] == "TENANT_MID"
-        assert creds["api_key"] == "SETTINGS_APIKEY"
+        assert creds["api_key"] == ""
 
-    def test_webside_safety_empty_tenant_uses_settings(
+    def test_live_mode_true_is_a_plain_tenant_flag(
         self, bind_tenant, tenant_factory, settings
     ):
-        """webside.gr: all Tenant credential fields are empty — must fall back."""
-        tenant = tenant_factory("ws-viva-creds")
-        # All credential fields default to "" — don't override
+        settings.VIVA_WALLET_LIVE_MODE = False
+        tenant = tenant_factory("viva-live-mode")
+        tenant.viva_wallet_live_mode = True
+        tenant.save(update_fields=["viva_wallet_live_mode"])
         bind_tenant(tenant)
-        settings.VIVA_WALLET_MERCHANT_ID = "WEBSIDE_MID"
-        settings.VIVA_WALLET_API_KEY = "WEBSIDE_APIKEY"
-        settings.VIVA_WALLET_CLIENT_ID = "WEBSIDE_CID"
-        settings.VIVA_WALLET_CLIENT_SECRET = "WEBSIDE_CSECRET"
-        settings.VIVA_WALLET_WEBHOOK_VERIFICATION_KEY = "WEBSIDE_VK"
 
-        creds = viva_wallet_credentials()
-        assert creds["merchant_id"] == "WEBSIDE_MID"
-        assert creds["api_key"] == "WEBSIDE_APIKEY"
-        assert creds["client_id"] == "WEBSIDE_CID"
-        assert creds["client_secret"] == "WEBSIDE_CSECRET"
-        assert creds["webhook_verification_key"] == "WEBSIDE_VK"
+        assert viva_wallet_credentials()["live_mode"] is True
+
+    def test_live_mode_unset_resolves_to_false_ignoring_settings(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        settings.VIVA_WALLET_LIVE_MODE = True
+        tenant = tenant_factory("viva-live-mode-unset")
+        bind_tenant(tenant)
+
+        assert viva_wallet_credentials()["live_mode"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -190,7 +235,11 @@ class TestVivaWalletCredentials:
 
 
 class TestAcsCredentials:
-    def test_returns_all_keys(self, monkeypatch, settings):
+    """No-fallback contract: tenant-only, settings are NEVER consulted."""
+
+    def test_returns_empty_when_no_active_tenant_even_if_settings_set(
+        self, monkeypatch, settings
+    ):
         monkeypatch.setattr(connection, "tenant", None, raising=False)
         settings.ACS_API_KEY = "AKEY"
         settings.ACS_COMPANY_ID = "ACID"
@@ -198,20 +247,17 @@ class TestAcsCredentials:
         settings.ACS_USER_ID = "AUID"
         settings.ACS_USER_PASSWORD = "AUPW"
         settings.ACS_BILLING_CODE = "2ΑΚ89587"
-        settings.ACS_STATION_ORIGIN = "ΑΚ"
 
         creds = acs_credentials()
-        assert creds["api_key"] == "AKEY"
-        assert creds["company_id"] == "ACID"
-        assert creds["company_password"] == "ACPW"
-        assert creds["user_id"] == "AUID"
-        assert creds["user_password"] == "AUPW"
-        assert creds["billing_code"] == "2ΑΚ89587"
-        assert creds["station_origin"] == "ΑΚ"
+        assert creds["api_key"] == ""
+        assert creds["company_id"] == ""
+        assert creds["company_password"] == ""
+        assert creds["user_id"] == ""
+        assert creds["user_password"] == ""
+        assert creds["billing_code"] == ""
+        assert creds["station_origin"] == ""
 
-    def test_tenant_overrides_settings(
-        self, bind_tenant, tenant_factory, settings
-    ):
+    def test_returns_tenant_values_when_set(self, bind_tenant, tenant_factory):
         tenant = tenant_factory("acs-tenant")
         tenant.acs_api_key = "T_AKEY"
         tenant.acs_company_id = "T_ACID"
@@ -222,11 +268,13 @@ class TestAcsCredentials:
         tenant.acs_station_origin = "ΓΣ"
         tenant.save()
         bind_tenant(tenant)
-        settings.ACS_API_KEY = "S_AKEY"
-        settings.ACS_BILLING_CODE = "2ΑΚ89587"
 
         creds = acs_credentials()
         assert creds["api_key"] == "T_AKEY"
+        assert creds["company_id"] == "T_ACID"
+        assert creds["company_password"] == "T_ACPW"
+        assert creds["user_id"] == "T_AUID"
+        assert creds["user_password"] == "T_AUPW"
         assert creds["billing_code"] == "9ΓΣ11111"
         assert creds["station_origin"] == "ΓΣ"
 
@@ -239,21 +287,27 @@ class TestAcsCredentials:
         creds = acs_credentials()
         assert creds["billing_code"] == "2ΑΚ89587"
 
-    def test_webside_safety(self, bind_tenant, tenant_factory, settings):
+    def test_empty_tenant_fields_stay_empty_ignoring_settings(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        """Settings are populated but must NEVER be consulted (no leakage)."""
         tenant = tenant_factory("webside-acs")
         # All fields default to ""
         bind_tenant(tenant)
-        settings.ACS_API_KEY = "WS_AKEY"
-        settings.ACS_COMPANY_ID = "WS_ACID"
-        settings.ACS_COMPANY_PASSWORD = "WS_ACPW"
-        settings.ACS_USER_ID = "WS_AUID"
-        settings.ACS_USER_PASSWORD = "WS_AUPW"
-        settings.ACS_BILLING_CODE = "2ΑΚ89587"
+        settings.ACS_API_KEY = "SHOULD_NOT_BE_USED"
+        settings.ACS_COMPANY_ID = "SHOULD_NOT_BE_USED"
+        settings.ACS_COMPANY_PASSWORD = "SHOULD_NOT_BE_USED"
+        settings.ACS_USER_ID = "SHOULD_NOT_BE_USED"
+        settings.ACS_USER_PASSWORD = "SHOULD_NOT_BE_USED"
+        settings.ACS_BILLING_CODE = "SHOULD_NOT_BE_USED"
 
         creds = acs_credentials()
-        assert creds["api_key"] == "WS_AKEY"
-        assert creds["company_id"] == "WS_ACID"
-        assert creds["billing_code"] == "2ΑΚ89587"
+        assert creds["api_key"] == ""
+        assert creds["company_id"] == ""
+        assert creds["company_password"] == ""
+        assert creds["user_id"] == ""
+        assert creds["user_password"] == ""
+        assert creds["billing_code"] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +316,11 @@ class TestAcsCredentials:
 
 
 class TestBoxNowCredentials:
-    def test_returns_all_keys(self, monkeypatch, settings):
+    """No-fallback contract: tenant-only, settings are NEVER consulted."""
+
+    def test_returns_empty_when_no_active_tenant_even_if_settings_set(
+        self, monkeypatch, settings
+    ):
         monkeypatch.setattr(connection, "tenant", None, raising=False)
         settings.BOXNOW_CLIENT_ID = "BCL"
         settings.BOXNOW_CLIENT_SECRET = "BCS"
@@ -272,26 +330,23 @@ class TestBoxNowCredentials:
         settings.BOXNOW_WEBHOOK_SECRET = "WHS"
 
         creds = box_now_credentials()
-        assert creds["client_id"] == "BCL"
-        assert creds["client_secret"] == "BCS"
-        assert creds["partner_id"] == "999"
-        assert creds["warehouse_id"] == "2"
-        assert creds["notify_phone"] == "+30210000001"
-        assert creds["webhook_secret"] == "WHS"
+        assert creds["client_id"] == ""
+        assert creds["client_secret"] == ""
+        assert creds["partner_id"] == ""
+        assert creds["warehouse_id"] == ""
+        assert creds["notify_phone"] == ""
+        assert creds["webhook_secret"] == ""
 
-    def test_tenant_overrides_settings(
-        self, bind_tenant, tenant_factory, settings
-    ):
+    def test_returns_tenant_values_when_set(self, bind_tenant, tenant_factory):
         tenant = tenant_factory("bn-tenant")
         tenant.box_now_client_id = "T_BCL"
         tenant.box_now_client_secret = "T_BCS"
         tenant.box_now_partner_id = "12345"
         tenant.box_now_warehouse_id = "7"
         tenant.box_now_notify_phone = "+30690000001"
+        tenant.box_now_webhook_secret = "T_WHS"
         tenant.save()
         bind_tenant(tenant)
-        settings.BOXNOW_CLIENT_ID = "S_BCL"
-        settings.BOXNOW_PARTNER_ID = "99999"
 
         creds = box_now_credentials()
         assert creds["client_id"] == "T_BCL"
@@ -299,34 +354,39 @@ class TestBoxNowCredentials:
         assert creds["partner_id"] == "12345"
         assert creds["warehouse_id"] == "7"
         assert creds["notify_phone"] == "+30690000001"
+        assert creds["webhook_secret"] == "T_WHS"
 
-    def test_webhook_secret_falls_back_to_settings_only(
+    def test_webhook_secret_has_no_settings_fallback(
         self, bind_tenant, tenant_factory, settings
     ):
-        """Webhook secret has no Tenant field — always reads from settings."""
+        """Each tenant holds its own BoxNow contract — no shared platform
+        webhook secret."""
         tenant = tenant_factory("bn-whs")
         bind_tenant(tenant)
-        settings.BOXNOW_WEBHOOK_SECRET = "SETTINGS_WHS"
+        settings.BOXNOW_WEBHOOK_SECRET = "SHOULD_NOT_BE_USED"
 
         creds = box_now_credentials()
-        assert creds["webhook_secret"] == "SETTINGS_WHS"
+        assert creds["webhook_secret"] == ""
 
-    def test_webside_safety(self, bind_tenant, tenant_factory, settings):
+    def test_empty_tenant_fields_stay_empty_ignoring_settings(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        """Settings are populated but must NEVER be consulted (no leakage)."""
         tenant = tenant_factory("webside-bn")
         # All credential fields default to ""
         bind_tenant(tenant)
-        settings.BOXNOW_CLIENT_ID = "WS_BCL"
-        settings.BOXNOW_CLIENT_SECRET = "WS_BCS"
-        settings.BOXNOW_PARTNER_ID = "88888"
-        settings.BOXNOW_WAREHOUSE_ID = "3"
-        settings.BOXNOW_NOTIFY_PHONE = "+30210000000"
+        settings.BOXNOW_CLIENT_ID = "SHOULD_NOT_BE_USED"
+        settings.BOXNOW_CLIENT_SECRET = "SHOULD_NOT_BE_USED"
+        settings.BOXNOW_PARTNER_ID = "SHOULD_NOT_BE_USED"
+        settings.BOXNOW_WAREHOUSE_ID = "SHOULD_NOT_BE_USED"
+        settings.BOXNOW_NOTIFY_PHONE = "SHOULD_NOT_BE_USED"
 
         creds = box_now_credentials()
-        assert creds["client_id"] == "WS_BCL"
-        assert creds["client_secret"] == "WS_BCS"
-        assert creds["partner_id"] == "88888"
-        assert creds["warehouse_id"] == "3"
-        assert creds["notify_phone"] == "+30210000000"
+        assert creds["client_id"] == ""
+        assert creds["client_secret"] == ""
+        assert creds["partner_id"] == ""
+        assert creds["warehouse_id"] == ""
+        assert creds["notify_phone"] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -526,6 +586,8 @@ class TestTenantTotpIssuer:
 
 
 class TestTenantMetaCapiAccessToken:
+    """No-fallback contract: tenant-only, settings are NEVER consulted."""
+
     def test_returns_tenant_value(self, bind_tenant, tenant_factory):
         tenant = tenant_factory("capi-token-1")
         tenant.meta_capi_access_token = "EAAshoptoken"
@@ -533,24 +595,25 @@ class TestTenantMetaCapiAccessToken:
         bind_tenant(tenant)
         assert tenant_meta_capi_access_token() == "EAAshoptoken"
 
-    def test_falls_back_to_settings(
+    def test_empty_tenant_field_ignores_settings(
         self, bind_tenant, tenant_factory, settings
     ):
         tenant = tenant_factory("capi-token-2")
         tenant.meta_capi_access_token = ""
         tenant.save()
         bind_tenant(tenant)
-        settings.META_CAPI_ACCESS_TOKEN = "EAAplatform"
-        assert tenant_meta_capi_access_token() == "EAAplatform"
+        settings.META_CAPI_ACCESS_TOKEN = "SHOULD_NOT_BE_USED"
+        assert tenant_meta_capi_access_token() == ""
 
-    def test_webside_safety(self, bind_tenant, tenant_factory, settings):
-        tenant = tenant_factory("ws-capi-token")
-        bind_tenant(tenant)
-        settings.META_CAPI_ACCESS_TOKEN = "EAAglobal"
-        assert tenant_meta_capi_access_token() == "EAAglobal"
+    def test_no_active_tenant_ignores_settings(self, monkeypatch, settings):
+        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        settings.META_CAPI_ACCESS_TOKEN = "SHOULD_NOT_BE_USED"
+        assert tenant_meta_capi_access_token() == ""
 
 
 class TestTenantMetaCapiDatasetId:
+    """No-fallback contract: tenant-only, settings are NEVER consulted."""
+
     def test_returns_tenant_value(self, bind_tenant, tenant_factory):
         tenant = tenant_factory("capi-dsid-1")
         tenant.meta_capi_dataset_id = "9999888877776666"
@@ -558,18 +621,20 @@ class TestTenantMetaCapiDatasetId:
         bind_tenant(tenant)
         assert tenant_meta_capi_dataset_id() == "9999888877776666"
 
-    def test_falls_back_to_meta_pixel_id_setting(
+    def test_empty_tenant_field_ignores_meta_pixel_id_setting(
         self, bind_tenant, tenant_factory, settings
     ):
         tenant = tenant_factory("capi-dsid-2")
         tenant.meta_capi_dataset_id = ""
         tenant.save()
         bind_tenant(tenant)
-        settings.META_PIXEL_ID = "1111222233334444"
-        assert tenant_meta_capi_dataset_id() == "1111222233334444"
+        settings.META_PIXEL_ID = "SHOULD_NOT_BE_USED"
+        assert tenant_meta_capi_dataset_id() == ""
 
 
 class TestTenantMetaPixelId:
+    """No-fallback contract: tenant-only, settings are NEVER consulted."""
+
     def test_returns_tenant_value(self, bind_tenant, tenant_factory):
         tenant = tenant_factory("pixel-id-1")
         tenant.meta_pixel_id = "5555666677778888"
@@ -577,15 +642,15 @@ class TestTenantMetaPixelId:
         bind_tenant(tenant)
         assert tenant_meta_pixel_id() == "5555666677778888"
 
-    def test_falls_back_to_settings(
+    def test_empty_tenant_field_ignores_settings(
         self, bind_tenant, tenant_factory, settings
     ):
         tenant = tenant_factory("pixel-id-2")
         tenant.meta_pixel_id = ""
         tenant.save()
         bind_tenant(tenant)
-        settings.META_PIXEL_ID = "9999000011112222"
-        assert tenant_meta_pixel_id() == "9999000011112222"
+        settings.META_PIXEL_ID = "SHOULD_NOT_BE_USED"
+        assert tenant_meta_pixel_id() == ""
 
 
 # ---------------------------------------------------------------------------
@@ -699,7 +764,7 @@ class TestMetaCapiClientTenantCredentials:
         assert client.pixel_id == "111122223333"
         assert client.access_token == "EAAtoken"
 
-    def test_client_falls_back_to_settings_when_tenant_empty(
+    def test_client_stays_empty_when_tenant_empty_ignoring_settings(
         self, bind_tenant, tenant_factory, settings
     ):
         from meta_capi.client import MetaCapiClient
@@ -709,12 +774,12 @@ class TestMetaCapiClientTenantCredentials:
         tenant.meta_capi_access_token = ""
         tenant.save()
         bind_tenant(tenant)
-        settings.META_PIXEL_ID = "global_pixel"
-        settings.META_CAPI_ACCESS_TOKEN = "global_token"
+        settings.META_PIXEL_ID = "SHOULD_NOT_BE_USED"
+        settings.META_CAPI_ACCESS_TOKEN = "SHOULD_NOT_BE_USED"
 
         client = MetaCapiClient()
-        assert client.pixel_id == "global_pixel"
-        assert client.access_token == "global_token"
+        assert client.pixel_id == ""
+        assert client.access_token == ""
 
     def test_explicit_constructor_args_win_over_tenant(
         self, bind_tenant, tenant_factory
@@ -735,7 +800,7 @@ class TestMetaCapiClientTenantCredentials:
         assert client.pixel_id == "explicit_pixel"
         assert client.access_token == "explicit_token"
 
-    def test_webside_safety_empty_fields_use_settings(
+    def test_webside_safety_empty_fields_stay_empty(
         self, bind_tenant, tenant_factory, settings
     ):
         from meta_capi.client import MetaCapiClient
@@ -743,12 +808,12 @@ class TestMetaCapiClientTenantCredentials:
         tenant = tenant_factory("ws-capi-client")
         # All credential fields default to ""
         bind_tenant(tenant)
-        settings.META_PIXEL_ID = "ws_pixel"
-        settings.META_CAPI_ACCESS_TOKEN = "ws_token"
+        settings.META_PIXEL_ID = "SHOULD_NOT_BE_USED"
+        settings.META_CAPI_ACCESS_TOKEN = "SHOULD_NOT_BE_USED"
 
         client = MetaCapiClient()
-        assert client.pixel_id == "ws_pixel"
-        assert client.access_token == "ws_token"
+        assert client.pixel_id == ""
+        assert client.access_token == ""
 
 
 # ---------------------------------------------------------------------------
@@ -797,6 +862,8 @@ class TestIsCapiEnabledTenantAware:
     def test_disabled_when_credentials_empty_even_if_toggle_on(
         self, bind_tenant, tenant_factory, settings
     ):
+        """Empty tenant credentials + settings populated + kill switch ON
+        must STILL be disabled — settings are never a fallback source."""
         from extra_settings.models import Setting
 
         from meta_capi.services import is_capi_enabled
@@ -806,8 +873,8 @@ class TestIsCapiEnabledTenantAware:
         tenant.meta_capi_access_token = ""
         tenant.save()
         bind_tenant(tenant)
-        settings.META_PIXEL_ID = ""
-        settings.META_CAPI_ACCESS_TOKEN = ""
+        settings.META_PIXEL_ID = "SHOULD_NOT_BE_USED"
+        settings.META_CAPI_ACCESS_TOKEN = "SHOULD_NOT_BE_USED"
         Setting.objects.update_or_create(
             name="META_CAPI_ENABLED",
             defaults={"value": True, "value_type": "bool"},
@@ -977,10 +1044,14 @@ class TestStripeCredentials:
 
 
 class TestVivaWalletSourceAndMode:
+    """``VivaWalletPaymentProvider`` — ``source_code`` "Default" fallback
+    lives in ``order/payment.py`` (not ``credentials.py``), so an empty
+    tenant source_code still resolves through the provider, not here."""
+
     def test_source_code_and_live_mode_from_tenant(
         self, bind_tenant, tenant_factory, settings
     ):
-        settings.VIVA_WALLET_SOURCE_CODE = "PlatformSource"
+        settings.VIVA_WALLET_SOURCE_CODE = "SHOULD_NOT_BE_USED"
         settings.VIVA_WALLET_LIVE_MODE = False
         tenant = tenant_factory("viva-source")
         tenant.viva_wallet_source_code = "T1234"
@@ -997,14 +1068,14 @@ class TestVivaWalletSourceAndMode:
         assert creds["source_code"] == "T1234"
         assert creds["live_mode"] is True
 
-    def test_unset_live_mode_falls_back_to_settings(
+    def test_unset_source_code_and_live_mode_ignore_settings(
         self, bind_tenant, tenant_factory, settings
     ):
-        settings.VIVA_WALLET_SOURCE_CODE = "PlatformSource"
+        settings.VIVA_WALLET_SOURCE_CODE = "SHOULD_NOT_BE_USED"
         settings.VIVA_WALLET_LIVE_MODE = True
-        tenant = tenant_factory("viva-mode-fallback")
+        tenant = tenant_factory("viva-mode-no-fallback")
         bind_tenant(tenant)
 
         creds = viva_wallet_credentials()
-        assert creds["source_code"] == "PlatformSource"
-        assert creds["live_mode"] is True
+        assert creds["source_code"] == ""
+        assert creds["live_mode"] is False

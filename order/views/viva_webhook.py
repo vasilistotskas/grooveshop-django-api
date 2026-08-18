@@ -9,14 +9,17 @@ if TYPE_CHECKING:
     from tenant.credentials import VivaWalletCredentials
 
 import requests
-from django.conf import settings
 from django.core.cache import cache
 from django.db import connection, transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django_tenants.utils import get_public_schema_name, schema_context
+from django_tenants.utils import (
+    get_public_schema_name,
+    schema_context,
+    tenant_context,
+)
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models.history import OrderHistory
@@ -27,8 +30,8 @@ from order.tasks import (
 )
 
 
-def _resolve_tenant_for_order_code(order_code: str) -> str | None:
-    """Return the schema name of the tenant that owns ``order_code``.
+def _resolve_tenant_for_order_code(order_code: str):
+    """Return the ``Tenant`` row that owns ``order_code``.
 
     Viva webhooks land in the public schema (no tenant routing exists
     at the HTTP layer for machine-to-machine callers). We iterate
@@ -39,6 +42,15 @@ def _resolve_tenant_for_order_code(order_code: str) -> str | None:
     stale tab may pay an earlier one. First match wins. Returns
     ``None`` for an orphan order code (deleted order, wrong tenant,
     test webhook).
+
+    Returns the real ``Tenant`` model instance (not just the schema
+    name) so callers can enter it via ``tenant_context(tenant)`` —
+    ``schema_context(schema_name)`` only sets a bare ``FakeTenant``
+    stand-in on ``connection.tenant``, which breaks every downstream
+    ``viva_wallet_credentials()`` read (tenant-only, no settings
+    fallback) — including ``VivaWalletPaymentProvider.__init__``'s
+    Retrieve Transaction API call that authenticates this very
+    webhook.
     """
     if not order_code:
         return None
@@ -55,7 +67,7 @@ def _resolve_tenant_for_order_code(order_code: str) -> str | None:
     ).exclude(schema_name=public):
         with schema_context(tenant.schema_name):
             if Order.objects.filter(viva_order_code_q(order_code)).exists():
-                return tenant.schema_name
+                return tenant
     return None
 
 
@@ -252,8 +264,14 @@ def _check_source_ip(request) -> tuple[bool, str]:
     block every real webhook. The Retrieve Transaction API call is the
     real authentication: it requires our own OAuth2 credentials and
     confirms the transaction exists in Viva's system.
+
+    Caller must already be inside the resolved tenant's
+    ``schema_context`` so ``live_mode`` reflects THIS tenant's Viva
+    account — there is no platform-wide live/demo mode setting.
     """
-    live_mode = getattr(settings, "VIVA_WALLET_LIVE_MODE", False)
+    from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+
+    live_mode = viva_wallet_credentials()["live_mode"]
     allowed_networks = (
         VIVA_WEBHOOK_IPS_PRODUCTION if live_mode else VIVA_WEBHOOK_IPS_DEMO
     )
@@ -391,20 +409,6 @@ def _handle_webhook_event(request):
         request.META.get("HTTP_HOST", ""),
     )
 
-    # Best-effort IP check — informational only. Authentication of the
-    # webhook is done by the Retrieve Transaction API call inside
-    # _handle_payment_created, which uses our OAuth2 credentials and
-    # confirms the transaction exists in Viva's system.
-    ip_match, observed_ip = _check_source_ip(request)
-    if ip_match:
-        logger.info("Viva webhook IP %s matches Viva range", observed_ip)
-    else:
-        logger.info(
-            "Viva webhook from non-Viva IP %s — will rely on transaction API "
-            "verification (expected behind SNAT'd ingress)",
-            observed_ip,
-        )
-
     try:
         body = json.loads(request.body)
     except (json.JSONDecodeError, ValueError) as exc:
@@ -460,8 +464,8 @@ def _handle_webhook_event(request):
     # inside that tenant's schema_context — otherwise we'd query the
     # public schema (where Order rows do not live) and silently drop
     # the webhook on the floor.
-    tenant_schema = _resolve_tenant_for_order_code(order_code)
-    if not tenant_schema:
+    tenant = _resolve_tenant_for_order_code(order_code)
+    if not tenant:
         logger.error(
             "Order not found for Viva Wallet order code: %s | "
             "(no tenant matched metadata.viva_order_code + "
@@ -470,10 +474,33 @@ def _handle_webhook_event(request):
         )
         return JsonResponse({"status": "ok"})
 
-    # The rest of the handler runs inside the tenant's schema_context so
-    # SELECT FOR UPDATE, VivaWebhookEvent inserts, and downstream task
-    # dispatches all land in the correct schema.
-    with schema_context(tenant_schema):
+    # The rest of the handler runs inside the tenant's context — via
+    # ``tenant_context(tenant)`` rather than ``schema_context(schema_
+    # name)`` so ``connection.tenant`` is the REAL row, not a bare
+    # ``FakeTenant``. ``viva_wallet_credentials()`` (tenant-only, no
+    # settings fallback) needs the real fields — including inside
+    # ``VivaWalletPaymentProvider.__init__``, which authenticates this
+    # very webhook via the Retrieve Transaction API.
+    with tenant_context(tenant):
+        # Best-effort IP check — informational only. Authentication of
+        # the webhook is done by the Retrieve Transaction API call
+        # inside _handle_payment_created, which uses our OAuth2
+        # credentials and confirms the transaction exists in Viva's
+        # system. Runs inside the resolved tenant's schema_context so
+        # ``live_mode`` reflects THIS tenant's Viva account rather than
+        # always resolving to demo (no tenant is active before the
+        # order_code → tenant lookup above).
+        ip_match, observed_ip = _check_source_ip(request)
+        if ip_match:
+            logger.info("Viva webhook IP %s matches Viva range", observed_ip)
+        else:
+            logger.info(
+                "Viva webhook from non-Viva IP %s — will rely on "
+                "transaction API verification (expected behind SNAT'd "
+                "ingress)",
+                observed_ip,
+            )
+
         return _process_event_in_tenant(
             order_code=order_code,
             event_type_id=event_type_id,
@@ -495,7 +522,7 @@ def _process_event_in_tenant(
 ) -> JsonResponse:
     """Run the Viva webhook state-machine inside an active tenant schema.
 
-    Caller must already be inside ``schema_context(tenant_schema)``.
+    Caller must already be inside ``tenant_context(tenant)``.
     """
     order = Order.objects.filter(viva_order_code_q(order_code)).first()
 

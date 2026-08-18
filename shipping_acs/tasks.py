@@ -38,6 +38,29 @@ from tenant.credentials import (
 logger = logging.getLogger(__name__)
 
 
+def _skip_if_acs_unconfigured(task_name: str) -> bool:
+    """Return True (and log) when ACS has no credentials for this tenant.
+
+    Fanout tasks (``run_for_all_tenants``) dispatch to every active
+    tenant regardless of which carriers they've actually configured —
+    an unconfigured tenant must be skipped cleanly here rather than
+    letting ``AcsClient.__init__`` blow up with ``AcsConfigError``
+    partway through the task.
+    """
+    from django.db import connection
+
+    from shipping_acs import config as acs_config
+
+    if acs_config.is_configured():
+        return False
+    logger.info(
+        "%s: ACS not configured for tenant=%s — skipping",
+        task_name,
+        getattr(connection, "schema_name", "public"),
+    )
+    return True
+
+
 @shared_task(
     bind=True,
     base=TenantTask,
@@ -130,6 +153,9 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
 )
 def sync_acs_stations(self) -> dict[str, int]:
     """Refresh the local AcsStation cache (Phase 2)."""
+    if _skip_if_acs_unconfigured("sync_acs_stations"):
+        return {"upserted": 0, "deactivated": 0}
+
     from shipping_acs.services import AcsService
 
     countries = getattr(settings, "ACS_SUPPORTED_COUNTRIES", ["GR"]) or ["GR"]
@@ -152,6 +178,9 @@ def sync_acs_stations(self) -> dict[str, int]:
 )
 def issue_daily_acs_pickup_list(self) -> dict[str, Any]:
     """Issue the day's pickup list via ACS_Issue_Pickup_List."""
+    if _skip_if_acs_unconfigured("issue_daily_acs_pickup_list"):
+        return {"status": "skipped_unconfigured"}
+
     from shipping_acs.services import AcsService
 
     pickup_list = AcsService.issue_daily_pickup_list()
@@ -204,6 +233,9 @@ def poll_acs_tracking_batch(self, *, max_per_run: int = 200) -> dict[str, int]:
     ACS 10 req/sec cap. The mutex makes the batch single-flight
     cluster-wide.
     """
+    if _skip_if_acs_unconfigured("poll_acs_tracking_batch"):
+        return {"dispatched": 0, "skipped": True}
+
     from django.core.cache import cache
 
     from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -475,6 +507,9 @@ def reconcile_acs_cod_payouts(self) -> dict[str, int]:
     the beat schedule fires at 02:30 Europe/Athens, by which point
     yesterday's data is finalised on ACS' side.
     """
+    if _skip_if_acs_unconfigured("reconcile_acs_cod_payouts"):
+        return {"upserted": 0, "linked": 0, "skipped": 0}
+
     from datetime import timedelta
 
     from django.utils import timezone

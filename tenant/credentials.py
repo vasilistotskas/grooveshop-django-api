@@ -1,9 +1,20 @@
 """Per-tenant credential helpers.
 
-Each helper reads the named field from ``connection.tenant`` and falls
+Most helpers read the named field from ``connection.tenant`` and fall
 back to the matching global setting when the tenant field is empty (or
 when there is no active tenant — public schema, management commands,
 Celery workers without a TenantTask, tests).
+
+Third-party CREDENTIAL helpers are the deliberate exception: Viva
+Wallet, ACS, BoxNow, and Meta CAPI/Pixel values live ONLY on the
+``Tenant`` model — there is no platform-wide settings fallback for
+them. A merchant's payment/shipping/ad-tracking secrets must never
+silently leak across tenants (or resurrect a stale platform-wide env
+var) just because the operator hasn't pasted their own keys in yet.
+Empty means "not configured for this tenant", full stop — callers
+(``PayWayService.is_provider_configured``, the ACS/BoxNow shipping
+carrier adapters, ``meta_capi.services.is_capi_enabled``) treat that
+as "unavailable", not as "ask settings".
 
 Design rules:
 - Never import at module level from ``tenant.models`` — import inside
@@ -154,28 +165,29 @@ def tenant_totp_issuer() -> str:
 def tenant_meta_capi_access_token() -> str:
     """Return the Meta CAPI access token for the active tenant.
 
-    Priority:
-      ``Tenant.meta_capi_access_token`` → ``settings.META_CAPI_ACCESS_TOKEN``.
+    Tenant-only — no platform fallback. Empty means Meta CAPI is not
+    configured for this tenant; ``meta_capi.services.is_capi_enabled``
+    treats that as "disabled", not an error.
     """
-    return _get_tenant_field("meta_capi_access_token", "META_CAPI_ACCESS_TOKEN")
+    return _get_tenant_field("meta_capi_access_token")
 
 
 def tenant_meta_capi_dataset_id() -> str:
     """Return the Meta CAPI dataset ID for the active tenant.
 
     The dataset ID is the pixel ID used for server-side dedup.
-
-    Priority: ``Tenant.meta_capi_dataset_id`` → ``settings.META_PIXEL_ID``.
+    Tenant-only — no platform fallback.
     """
-    return _get_tenant_field("meta_capi_dataset_id", "META_PIXEL_ID")
+    return _get_tenant_field("meta_capi_dataset_id")
 
 
 def tenant_meta_pixel_id() -> str:
     """Return the browser-side Meta Pixel ID for the active tenant.
 
-    Priority: ``Tenant.meta_pixel_id`` → ``settings.META_PIXEL_ID``.
+    Tenant-only — no platform fallback. The storefront gets pixel IDs
+    exclusively from the tenant config (``TenantConfigSerializer``).
     """
-    return _get_tenant_field("meta_pixel_id", "META_PIXEL_ID")
+    return _get_tenant_field("meta_pixel_id")
 
 
 # ---------------------------------------------------------------------------
@@ -200,9 +212,23 @@ def tenant_turnstile_secret_key() -> str:
 def viva_wallet_credentials() -> VivaWalletCredentials:
     """Return all Viva Wallet credentials for the current tenant.
 
-    Resolution order per key:
-      1. ``Tenant.<field>`` (set by operator in Django admin)
-      2. ``settings.VIVA_WALLET_*`` (platform-wide env-var fallback)
+    Tenant-only — NO platform-wide fallback (removed: money must never
+    silently route through env-var credentials the operator did not
+    explicitly configure for THIS tenant; mirrors the ``stripe_
+    credentials()`` policy). Empty values mean Viva Wallet is NOT
+    configured for this tenant:
+
+    * ``PayWayService.is_provider_configured("viva_wallet")`` hides the
+      pay-way from the shopper-facing list and rejects checkout-session
+      creation.
+    * ``OrderViewSet._validate_pay_way_for_order`` rejects order
+      creation against an unconfigured Viva pay-way.
+    * ``VivaWalletPaymentProvider.__init__`` raises
+      ``ImproperlyConfigured`` if instantiated anyway.
+
+    ``live_mode`` is a plain nullable ``BooleanField`` on ``Tenant``:
+    unset (``None``) means "not configured", which resolves to
+    ``False`` here — never "ask settings".
 
     The token cache key in ``VivaWalletPaymentProvider`` is already
     tenant-scoped via ``tenant.cache.make_tenant_key``, so no extra
@@ -220,30 +246,16 @@ def viva_wallet_credentials() -> VivaWalletCredentials:
         }
     """
     tenant = getattr(connection, "tenant", None)
-    live_mode = getattr(tenant, "viva_wallet_live_mode", None)
-    if live_mode is None:
-        live_mode = bool(getattr(settings, "VIVA_WALLET_LIVE_MODE", False))
     return {
-        "merchant_id": _get_tenant_field(
-            "viva_wallet_merchant_id", "VIVA_WALLET_MERCHANT_ID"
-        ),
-        "api_key": _get_tenant_field(
-            "viva_wallet_api_key", "VIVA_WALLET_API_KEY"
-        ),
-        "client_id": _get_tenant_field(
-            "viva_wallet_client_id", "VIVA_WALLET_CLIENT_ID"
-        ),
-        "client_secret": _get_tenant_field(
-            "viva_wallet_client_secret", "VIVA_WALLET_CLIENT_SECRET"
-        ),
+        "merchant_id": _get_tenant_field("viva_wallet_merchant_id"),
+        "api_key": _get_tenant_field("viva_wallet_api_key"),
+        "client_id": _get_tenant_field("viva_wallet_client_id"),
+        "client_secret": _get_tenant_field("viva_wallet_client_secret"),
         "webhook_verification_key": _get_tenant_field(
-            "viva_wallet_webhook_verification_key",
-            "VIVA_WALLET_WEBHOOK_VERIFICATION_KEY",
+            "viva_wallet_webhook_verification_key"
         ),
-        "source_code": _get_tenant_field(
-            "viva_wallet_source_code", "VIVA_WALLET_SOURCE_CODE"
-        ),
-        "live_mode": live_mode,
+        "source_code": _get_tenant_field("viva_wallet_source_code"),
+        "live_mode": bool(getattr(tenant, "viva_wallet_live_mode", None)),
     }
 
 
@@ -314,6 +326,19 @@ def stripe_credentials() -> StripeCredentials:
 def acs_credentials() -> dict[str, str]:
     """Return all ACS courier credentials for the current tenant.
 
+    Tenant-only — NO platform-wide fallback. Empty means ACS is not
+    configured for this tenant: ``AcsClient.__init__`` raises
+    ``AcsConfigError`` if instantiated anyway, ``AcsCarrier.
+    is_kind_enabled`` disables both ACS kinds so checkout never offers
+    it, and the ACS fanout Celery tasks (poll tracking, pickup list,
+    station sync, COD reconcile) skip the tenant cleanly.
+
+    Platform-scoped transport config (``ACS_API_BASE_URL``,
+    ``ACS_HTTP_TIMEOUT``, ``ACS_SUPPORTED_COUNTRIES``,
+    ``ACS_STALE_SHIPMENT_DAYS``) is NOT per-merchant identity and stays
+    in ``settings`` — read directly by ``AcsClient`` / the tasks, not
+    through this helper.
+
     The raw strings are returned unchanged — Greek billing codes (e.g.
     ``ΑΚ12345678``) are preserved as-is. The locale-decimal conversion
     required by ACS numeric fields (``Cod_Ammount``, ``Weight``) is the
@@ -331,25 +356,16 @@ def acs_credentials() -> dict[str, str]:
         }
     """
     return {
-        "api_key": _get_tenant_field("acs_api_key", "ACS_API_KEY"),
-        "company_id": _get_tenant_field("acs_company_id", "ACS_COMPANY_ID"),
-        "company_password": _get_tenant_field(
-            "acs_company_password", "ACS_COMPANY_PASSWORD"
-        ),
-        "user_id": _get_tenant_field("acs_user_id", "ACS_USER_ID"),
-        "user_password": _get_tenant_field(
-            "acs_user_password", "ACS_USER_PASSWORD"
-        ),
-        "billing_code": _get_tenant_field(
-            "acs_billing_code", "ACS_BILLING_CODE"
-        ),
-        # ``ACS_STATION_ORIGIN`` has no model field before Phase 1 migration;
-        # ``shipping_acs/config.py:station_origin()`` derives this value from
-        # the billing code when the explicit field is empty — both this helper
-        # and that derivation path remain valid.
-        "station_origin": _get_tenant_field(
-            "acs_station_origin", "ACS_STATION_ORIGIN"
-        ),
+        "api_key": _get_tenant_field("acs_api_key"),
+        "company_id": _get_tenant_field("acs_company_id"),
+        "company_password": _get_tenant_field("acs_company_password"),
+        "user_id": _get_tenant_field("acs_user_id"),
+        "user_password": _get_tenant_field("acs_user_password"),
+        "billing_code": _get_tenant_field("acs_billing_code"),
+        # ``shipping_acs/config.py:station_origin()`` derives this value
+        # from the billing code when the explicit field is empty — both
+        # this helper and that derivation path remain valid.
+        "station_origin": _get_tenant_field("acs_station_origin"),
     }
 
 
@@ -361,13 +377,20 @@ def acs_credentials() -> dict[str, str]:
 def box_now_credentials() -> dict[str, str]:
     """Return all BoxNow credentials for the current tenant.
 
+    Tenant-only — NO platform-wide fallback. Empty means BoxNow is not
+    configured for this tenant: ``BoxNowClient.__init__`` raises
+    ``BoxNowConfigError`` if instantiated anyway, ``BoxNowCarrier.
+    is_kind_enabled`` disables pickup-point so checkout never offers
+    it, and the webhook view returns 503 when ``webhook_secret`` is
+    empty (it cannot verify a signature with no secret).
+
     ``partner_id`` is also surfaced via ``TenantConfigSerializer`` (public)
     for the storefront BoxNow widget, but it's included here so the
     ``BoxNowClient`` constructor receives a single source of truth.
 
-    ``webhook_secret`` resolves from ``Tenant.box_now_webhook_secret``
-    (each tenant holds their own BoxNow contract) with the platform
-    ``settings.BOXNOW_WEBHOOK_SECRET`` as fallback.
+    Platform-scoped transport config (``BOXNOW_API_BASE_URL``,
+    ``BOXNOW_LOCATION_API_BASE_URL``, ``BOXNOW_HTTP_TIMEOUT``) is NOT
+    per-merchant identity and stays in ``settings``.
 
     Returns:
         {
@@ -380,20 +403,10 @@ def box_now_credentials() -> dict[str, str]:
         }
     """
     return {
-        "client_id": _get_tenant_field("box_now_client_id", "BOXNOW_CLIENT_ID"),
-        "client_secret": _get_tenant_field(
-            "box_now_client_secret", "BOXNOW_CLIENT_SECRET"
-        ),
-        "partner_id": _get_tenant_field(
-            "box_now_partner_id", "BOXNOW_PARTNER_ID"
-        ),
-        "warehouse_id": _get_tenant_field(
-            "box_now_warehouse_id", "BOXNOW_WAREHOUSE_ID"
-        ),
-        "notify_phone": _get_tenant_field(
-            "box_now_notify_phone", "BOXNOW_NOTIFY_PHONE"
-        ),
-        "webhook_secret": _get_tenant_field(
-            "box_now_webhook_secret", "BOXNOW_WEBHOOK_SECRET"
-        ),
+        "client_id": _get_tenant_field("box_now_client_id"),
+        "client_secret": _get_tenant_field("box_now_client_secret"),
+        "partner_id": _get_tenant_field("box_now_partner_id"),
+        "warehouse_id": _get_tenant_field("box_now_warehouse_id"),
+        "notify_phone": _get_tenant_field("box_now_notify_phone"),
+        "webhook_secret": _get_tenant_field("box_now_webhook_secret"),
     }

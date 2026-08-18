@@ -579,11 +579,23 @@ class VivaWalletPaymentProvider(PaymentProvider):
         self.api_key = creds["api_key"]
         self.client_id = creds["client_id"]
         self.client_secret = creds["client_secret"]
-        # Both per-tenant with settings fallback: the source code is a
+        # Both tenant-only, no settings fallback: the source code is a
         # per-merchant Smart Checkout identifier, and live/demo mode
         # follows the tenant's own Viva account.
         self.source_code = creds["source_code"] or "Default"
         self.live_mode = creds["live_mode"]
+
+        if not (self.client_id and self.client_secret):
+            # No tenant OAuth2 credentials: Viva Wallet is unavailable
+            # for this tenant. Fail loudly — the pay-way availability
+            # gate (``PayWayService.is_provider_configured``) should
+            # have hidden the provider and order-create should have
+            # rejected it before this constructor ever runs.
+            raise ImproperlyConfigured(
+                "Viva Wallet is not configured for this tenant: no "
+                "viva_wallet_client_id/viva_wallet_client_secret set on "
+                "the Tenant."
+            )
 
         if self.live_mode:
             self.auth_url = self.LIVE_AUTH_URL
@@ -597,8 +609,8 @@ class VivaWalletPaymentProvider(PaymentProvider):
             self.transactions_url = self.DEMO_TRANSACTIONS_URL
 
         # Scope the token cache key by environment so switching
-        # VIVA_WALLET_LIVE_MODE does not leak a demo token into live calls
-        # (or vice versa) for the remaining TTL window.
+        # Tenant.viva_wallet_live_mode does not leak a demo token into
+        # live calls (or vice versa) for the remaining TTL window.
         self.token_cache_key = (
             f"viva_wallet_access_token_{'live' if self.live_mode else 'demo'}"
         )

@@ -35,9 +35,40 @@ class TenantTask(Task):
             self.request.get("_schema_name") if self.request else None
         ) or "public"
 
-        from django_tenants.utils import schema_context
+        from django_tenants.utils import (
+            get_public_schema_name,
+            schema_context,
+            tenant_context,
+        )
 
-        with schema_context(schema_name):
+        if schema_name == get_public_schema_name():
+            with schema_context(schema_name):
+                return super().__call__(*args, **kwargs)
+
+        # ``schema_context(schema_name)`` only sets ``connection.tenant``
+        # to a bare ``FakeTenant(schema_name=...)`` (django-tenants
+        # internal — carries no other field). Every ``tenant.credentials.*``
+        # helper reads real fields off ``connection.tenant``
+        # (``getattr(tenant, "acs_api_key", "")`` etc.), so a task running
+        # under a FakeTenant would see every per-tenant credential as
+        # unconfigured regardless of what the tenant actually has set.
+        # ``tenant_context(tenant)`` sets ``connection.tenant`` to the
+        # real row instead.
+        from tenant.models import Tenant
+
+        try:
+            tenant = Tenant.objects.get(schema_name=schema_name)
+        except Tenant.DoesNotExist:
+            logger.warning(
+                "TenantTask: no Tenant row for schema=%s — falling back to "
+                "a bare schema context (tenant.credentials.* will read as "
+                "unconfigured)",
+                schema_name,
+            )
+            with schema_context(schema_name):
+                return super().__call__(*args, **kwargs)
+
+        with tenant_context(tenant):
             return super().__call__(*args, **kwargs)
 
 

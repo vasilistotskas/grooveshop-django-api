@@ -23,7 +23,7 @@ from shipping_acs.tasks import poll_acs_tracking_batch
 pytestmark = pytest.mark.django_db
 
 
-def test_batch_skips_when_lock_held():
+def test_batch_skips_when_lock_held(acs_configured_tenant):
     """When ``cache.add`` returns False (another worker holds the
     lock), the task short-circuits without dispatching any sub-tasks
     and reports skipped=True."""
@@ -42,7 +42,7 @@ def test_batch_skips_when_lock_held():
     assert not mock_dispatch.called
 
 
-def test_batch_releases_lock_after_success():
+def test_batch_releases_lock_after_success(acs_configured_tenant):
     """When the task completes successfully it deletes the cache key
     so the next 15-min tick can acquire afresh."""
     with (

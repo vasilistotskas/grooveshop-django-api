@@ -126,6 +126,24 @@ def _format_parcel_weight_kg(weight_grams: int | None) -> float:
     return weight_kg
 
 
+def is_configured() -> bool:
+    """Return True when the active tenant has usable BoxNow API credentials.
+
+    Mirrors the required-field check in ``BoxNowClient.__init__`` — the
+    single source of truth for "can we actually call the BoxNow API".
+    Used by ``BoxNowCarrier.is_kind_enabled`` (hides BoxNow from
+    checkout entirely when False) and the BoxNow fanout Celery tasks
+    (skip an unconfigured tenant cleanly instead of raising
+    ``BoxNowConfigError``).
+    """
+    from tenant.credentials import box_now_credentials  # noqa: PLC0415
+
+    creds = box_now_credentials()
+    return bool(
+        creds["client_id"] and creds["client_secret"] and creds["partner_id"]
+    )
+
+
 class BoxNowService:
     """
     Application-level orchestration for BoxNow parcel deliveries.

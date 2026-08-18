@@ -23,7 +23,11 @@ import logging
 
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from django_tenants.utils import get_public_schema_name, schema_context
+from django_tenants.utils import (
+    get_public_schema_name,
+    schema_context,
+    tenant_context,
+)
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -45,12 +49,19 @@ from shipping_boxnow.webhook import (
 logger = logging.getLogger("shipping_boxnow.webhook")
 
 
-def _resolve_tenant_for_parcel(parcel_id: str) -> str | None:
-    """Return the schema name of the tenant that owns ``parcel_id``.
+def _resolve_tenant_for_parcel(parcel_id: str):
+    """Return the ``Tenant`` row that owns ``parcel_id``.
 
     Iterates active tenants and searches each schema's
     ``BoxNowShipment`` table for the parcel. First match wins.
     Returns ``None`` if no tenant owns the parcel (orphan webhook).
+
+    Returns the real ``Tenant`` model instance (not just the schema
+    name) so callers can enter it via ``tenant_context(tenant)`` —
+    ``schema_context(schema_name)`` only sets a bare ``FakeTenant``
+    stand-in on ``connection.tenant``, which ``tenant.credentials.*``
+    (tenant-only, no settings fallback) cannot read real field values
+    from.
     """
     if not parcel_id:
         return None
@@ -66,7 +77,7 @@ def _resolve_tenant_for_parcel(parcel_id: str) -> str | None:
     ).exclude(schema_name=public):
         with schema_context(tenant.schema_name):
             if BoxNowShipment.objects.filter(parcel_id=parcel_id).exists():
-                return tenant.schema_name
+                return tenant
     return None
 
 
@@ -79,9 +90,9 @@ class BoxNowWebhookView(APIView):
         - No DRF authentication or permission checks at the DRF layer
           (AllowAny + empty authentication_classes).
         - The only gate is the HMAC-SHA256 ``datasignature`` field, verified
-          against the resolved tenant's ``box_now_webhook_secret`` (each
-          tenant holds their own BoxNow contract; the platform
-          ``settings.BOXNOW_WEBHOOK_SECRET`` is the fallback).
+          against the resolved tenant's ``box_now_webhook_secret`` — each
+          tenant holds their own BoxNow contract; tenant-only, no
+          platform-wide fallback (an unconfigured tenant 503s).
 
     Response contract (per BoxNow docs — they retry until 200):
         - 200: event accepted (including no-op duplicates after wave-2 service
@@ -192,8 +203,8 @@ class BoxNowWebhookView(APIView):
         # 6. Resolve the owning tenant from the parcel.                       #
         # ------------------------------------------------------------------ #
         parcel_id = (envelope.get("data") or {}).get("parcelId") or ""
-        tenant_schema = _resolve_tenant_for_parcel(parcel_id)
-        if not tenant_schema:
+        tenant = _resolve_tenant_for_parcel(parcel_id)
+        if not tenant:
             logger.warning(
                 "BoxNow webhook: cannot resolve tenant for parcelId=%s id=%s",
                 parcel_id,
@@ -201,13 +212,14 @@ class BoxNowWebhookView(APIView):
             )
             # Acknowledge with 200 so BoxNow stops retrying an orphan parcel.
             return Response(status=200)
+        tenant_schema = tenant.schema_name
 
         # ------------------------------------------------------------------ #
         # 7. Verify signature inside the tenant schema (per-tenant secret).   #
         # ------------------------------------------------------------------ #
         from tenant.credentials import box_now_credentials  # noqa: PLC0415
 
-        with schema_context(tenant_schema):
+        with tenant_context(tenant):
             secret: str = box_now_credentials()["webhook_secret"]
 
         if not secret:

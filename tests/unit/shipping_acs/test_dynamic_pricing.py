@@ -456,22 +456,39 @@ def test_live_quote_business_error_falls_back_to_flat_rate(dynamic_pricing_on):
     assert quote == (3.5, "EUR")
 
 
-def test_station_origin_parses_from_billing_code(settings):
+def test_station_origin_parses_from_billing_code(monkeypatch):
     """Billing code format ``<category><station><customer>`` — the
     helper extracts positions 1-2 as the station code. Greek-locale
-    billing codes (``2ΑΚ89587``) are common in Greece."""
+    billing codes (``2ΑΚ89587``) are common in Greece.
+
+    ``acs_billing_code`` is tenant-only (no settings fallback), so the
+    fake tenant is bound directly on ``connection.tenant`` rather than
+    via ``override_settings``.
+    """
+    from types import SimpleNamespace
+
+    from django.db import connection
+
     from shipping_acs import config as acs_config
 
-    settings.ACS_BILLING_CODE = "2ΑΚ89587"
+    def _bind(billing_code: str) -> None:
+        monkeypatch.setattr(
+            connection,
+            "tenant",
+            SimpleNamespace(acs_billing_code=billing_code),
+            raising=False,
+        )
+
+    _bind("2ΑΚ89587")
     assert acs_config.station_origin() == "ΑΚ"
 
-    settings.ACS_BILLING_CODE = "2ΘΕ12345"
+    _bind("2ΘΕ12345")
     assert acs_config.station_origin() == "ΘΕ"
 
-    settings.ACS_BILLING_CODE = ""
+    _bind("")
     assert acs_config.station_origin() is None
 
-    settings.ACS_BILLING_CODE = "2"  # too short
+    _bind("2")  # too short
     assert acs_config.station_origin() is None
 
 

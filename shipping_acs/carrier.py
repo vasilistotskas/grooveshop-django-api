@@ -97,7 +97,11 @@ class AcsCarrier(ShippingCarrierInterface):
     # ------------------------------------------------------------------
 
     def is_kind_enabled(self, kind: ShippingKind) -> bool:
-        """Gate the Smartpoint locker option behind ACS_SMARTPOINT_ENABLED.
+        """Gate ACS availability on tenant credentials + per-kind flags.
+
+        An unconfigured tenant (no ``Tenant.acs_*`` credentials) gets
+        NEITHER kind — ACS is entirely unavailable, not just missing
+        Smartpoint. Beyond that:
 
         Home delivery rides on ``ShippingProvider.is_active`` only —
         the same master switch ops use to enable ACS overall.
@@ -106,6 +110,10 @@ class AcsCarrier(ShippingCarrierInterface):
         AcsStation cache is being seeded for the first time) without
         also taking home delivery offline.
         """
+        from shipping_acs import config as acs_config
+
+        if not acs_config.is_configured():
+            return False
         if kind == ShippingKind.PICKUP_POINT:
             from extra_settings.models import Setting
 

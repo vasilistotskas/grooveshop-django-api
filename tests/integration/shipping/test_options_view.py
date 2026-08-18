@@ -22,7 +22,7 @@ def test_options_lists_only_active_providers():
     assert response.json() == []
 
 
-def test_options_returns_active_provider_kinds():
+def test_options_returns_active_provider_kinds(boxnow_configured_tenant):
     # Use boxnow because its adapter is registered during Phase 0;
     # the acs adapter only registers once shipping_acs/ ships in Phase 1.
     ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
@@ -38,7 +38,7 @@ def test_options_returns_active_provider_kinds():
     )
 
 
-def test_options_filters_by_country_code():
+def test_options_filters_by_country_code(boxnow_configured_tenant):
     ShippingProvider.objects.filter(code="boxnow").update(is_active=True)
 
     client = APIClient()
@@ -76,7 +76,7 @@ def test_options_skips_provider_with_unregistered_adapter():
     )
 
 
-def test_options_forwards_weight_grams_to_adapter():
+def test_options_forwards_weight_grams_to_adapter(acs_configured_tenant):
     """Endpoint passes ``weight_grams`` through ``available_options``
     into the carrier adapter. Without this thread the ACS live quote
     would always price at the 0.5 kg floor, no matter how heavy the

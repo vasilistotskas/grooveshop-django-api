@@ -215,7 +215,7 @@ def test_reconcile_does_not_refire_order_paid_when_already_paid():
     assert fired == []
 
 
-def test_nightly_beat_task_is_silent_for_customers():
+def test_nightly_beat_task_is_silent_for_customers(acs_configured_tenant):
     """The beat wrapper must pass ``silent_for_customer=True`` — the
     COD reconcile never emails customers (site-owner decision
     2026-07-11)."""

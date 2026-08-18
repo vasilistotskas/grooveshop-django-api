@@ -7,9 +7,12 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from django_tenants.models import DomainMixin, TenantMixin
+from django_tenants.models import DomainMixin, TenantMixin, _check_schema_name
 
-from tenant.validators import validate_theme_metadata
+from tenant.validators import (
+    validate_reserved_schema_name,
+    validate_theme_metadata,
+)
 
 from core.models import TimeStampMixinModel, UUIDModel
 
@@ -61,6 +64,19 @@ hex_color_validator = RegexValidator(
 
 
 class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
+    # Redeclares ``TenantMixin.schema_name`` (abstract base — safe to
+    # override) to layer ``validate_reserved_schema_name`` on top of
+    # django-tenants' own PostgreSQL-identifier format check
+    # (``_check_schema_name``). Field shape (max_length, unique,
+    # db_index) mirrors the base field exactly; only the validators
+    # list changes.
+    schema_name = models.CharField(
+        max_length=63,
+        unique=True,
+        db_index=True,
+        validators=[_check_schema_name, validate_reserved_schema_name],
+    )
+
     name = models.CharField(_("Name"), max_length=100)
     slug = models.SlugField(_("Slug"), max_length=100, unique=True)
     owner_email = models.EmailField(_("Owner Email"))
@@ -750,6 +766,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
 
     def clean(self) -> None:
         super().clean()
+        self._validate_schema_name()
         self._validate_stripe_publishable_key()
         self._validate_stripe_secret_key()
         self._validate_theme_metadata()
@@ -759,6 +776,15 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         self._validate_ga_tracking_id()
         self._validate_social_urls()
         self._validate_box_now_partner_id()
+
+    def _validate_schema_name(self) -> None:
+        # Field validators only run in full_clean()/DRF; mirror the
+        # check here so admin actions and direct clean() calls get the
+        # same guarantee as the sibling validators.
+        try:
+            validate_reserved_schema_name(self.schema_name)
+        except ValidationError as exc:
+            raise ValidationError({"schema_name": exc.messages}) from exc
 
     def _validate_stripe_publishable_key(self) -> None:
         key = self.stripe_publishable_key

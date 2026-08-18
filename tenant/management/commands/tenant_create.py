@@ -27,11 +27,27 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        from django.core.exceptions import ValidationError
+
         from tenant.models import Tenant, TenantDomain
+        from tenant.validators import validate_reserved_schema_name
 
         schema_name = options["schema_name"]
         slug = options["slug"]
         domain = options["domain"]
+
+        # ``Tenant.objects.create()`` below bypasses ``full_clean()``
+        # (plain ``.save()``, no ModelForm/DRF serializer in the loop),
+        # so the field validator never runs for this command — check
+        # explicitly here for a clear, fail-fast error instead of a
+        # confusing downstream schema-creation failure.
+        try:
+            validate_reserved_schema_name(schema_name)
+        except ValidationError as exc:
+            raise CommandError(
+                f"Invalid schema name '{schema_name}': "
+                f"{'; '.join(exc.messages)}"
+            ) from exc
 
         if Tenant.objects.filter(schema_name=schema_name).exists():
             raise CommandError(

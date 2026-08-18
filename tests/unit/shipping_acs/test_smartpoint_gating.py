@@ -59,14 +59,30 @@ def test_pickup_point_disabled_when_setting_off(acs_setting_off):
     assert adapter.is_kind_enabled(ShippingKind.PICKUP_POINT) is False
 
 
-def test_home_delivery_always_enabled():
+def test_home_delivery_always_enabled(acs_configured_tenant):
     adapter = get_provider("acs")
     assert adapter.is_kind_enabled(ShippingKind.HOME_DELIVERY) is True
 
 
-def test_pickup_point_enabled_when_setting_on(acs_setting_on):
+def test_pickup_point_enabled_when_setting_on(
+    acs_setting_on, acs_configured_tenant
+):
     adapter = get_provider("acs")
     assert adapter.is_kind_enabled(ShippingKind.PICKUP_POINT) is True
+
+
+def test_pickup_point_disabled_without_acs_credentials(acs_setting_on):
+    """Even with the Smartpoint setting ON, an unconfigured tenant (no
+    Tenant.acs_* credentials) must see ACS entirely unavailable."""
+    adapter = get_provider("acs")
+    assert adapter.is_kind_enabled(ShippingKind.PICKUP_POINT) is False
+
+
+def test_home_delivery_disabled_without_acs_credentials():
+    """Home delivery also requires tenant ACS credentials, not just
+    ``ShippingProvider.is_active``."""
+    adapter = get_provider("acs")
+    assert adapter.is_kind_enabled(ShippingKind.HOME_DELIVERY) is False
 
 
 def test_validate_payload_blocks_when_locker_id_missing():

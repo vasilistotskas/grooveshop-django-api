@@ -140,7 +140,9 @@ def test_logo_for_kind_unknown_kind_falls_back_to_primary():
     "extra_settings.models.Setting.get",
     side_effect=_setting_get_with_smartpoint_enabled,
 )
-def test_options_endpoint_returns_null_logo_when_no_upload(_mock_setting):
+def test_options_endpoint_returns_null_logo_when_no_upload(
+    _mock_setting, acs_configured_tenant
+):
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
 
     client = APIClient()
@@ -159,7 +161,9 @@ def test_options_endpoint_returns_null_logo_when_no_upload(_mock_setting):
     "extra_settings.models.Setting.get",
     side_effect=_setting_get_with_smartpoint_enabled,
 )
-def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(_mock_setting):
+def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(
+    _mock_setting, acs_configured_tenant
+):
     """When ``logo_pickup_point`` is uploaded, the pickup_point
     option row carries IT as logoUrl while the home_delivery row
     keeps the primary ``logo``. Same ACS carrier, different image
@@ -199,7 +203,9 @@ def test_options_endpoint_pickup_kind_uses_pickup_logo_when_set(_mock_setting):
     "extra_settings.models.Setting.get",
     side_effect=_setting_get_with_smartpoint_enabled,
 )
-def test_options_endpoint_pickup_kind_falls_back_to_primary_logo(_mock_setting):
+def test_options_endpoint_pickup_kind_falls_back_to_primary_logo(
+    _mock_setting, acs_configured_tenant
+):
     """When only ``logo`` is uploaded (no pickup-specific variant),
     both home_delivery and pickup_point rows share the same URL —
     the existing single-logo behaviour, preserved by
@@ -227,7 +233,9 @@ def test_options_endpoint_pickup_kind_falls_back_to_primary_logo(_mock_setting):
     "extra_settings.models.Setting.get",
     side_effect=_setting_get_with_smartpoint_enabled,
 )
-def test_options_endpoint_surfaces_uploaded_logo_url(_mock_setting):
+def test_options_endpoint_surfaces_uploaded_logo_url(
+    _mock_setting, acs_configured_tenant
+):
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
     provider = ShippingProvider.objects.get(code="acs")
     provider.logo = _make_png_upload("acs-test.png")

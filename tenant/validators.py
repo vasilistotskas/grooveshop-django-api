@@ -116,3 +116,67 @@ def validate_theme_metadata(value: object) -> None:
             _("Invalid theme_metadata: %(details)s"),
             params={"details": "; ".join(errors)},
         )
+
+
+# ---------------------------------------------------------------------------
+# Reserved schema names
+# ---------------------------------------------------------------------------
+
+# django-tenants' own ``_check_schema_name`` field validator only checks
+# that the value is a syntactically valid PostgreSQL identifier — it does
+# NOT reject names that collide with special meanings elsewhere in this
+# codebase. Layered defense-in-depth on top of that check:
+#
+# * ``public`` / ``information_schema`` — reserved by Postgres itself
+#   (``information_schema``) or by django-tenants (``public`` is the
+#   shared schema; ``TenantMixin.save()`` would still create a
+#   colliding schema for a tenant literally named "public").
+# * ``global`` — special-cased by ``tenant/cache.py``'s tenant-scoped
+#   cache-key function as the platform-wide cache namespace; a tenant
+#   schema named "global" would silently share cache keys with the
+#   platform routines instead of getting its own isolated namespace.
+# * names starting with ``pg_`` — reserved prefix for PostgreSQL system
+#   schemas (``pg_catalog``, ``pg_toast``, …); Postgres itself rejects
+#   ``CREATE SCHEMA pg_*`` for a non-superuser, but failing here gives
+#   a much clearer error than a raw DB exception mid schema-creation.
+# * the media-stream image proxy's historic reserved-word list
+#   (``data``, ``file``, ``ftp``, ``about``, ``javascript``,
+#   ``vbscript``, ``expression``, ``eval``) — carried over here so a
+#   tenant schema name can never collide with a sanitizer edge case on
+#   that service.
+RESERVED_SCHEMA_NAMES = frozenset(
+    {
+        "public",
+        "global",
+        "information_schema",
+        # media-stream sanitizer's former reserved words
+        "data",
+        "file",
+        "ftp",
+        "about",
+        "javascript",
+        "vbscript",
+        "expression",
+        "eval",
+    }
+)
+
+
+def validate_reserved_schema_name(value: str) -> None:
+    """Field validator for ``Tenant.schema_name`` — reject reserved names.
+
+    Case-insensitive: ``Public`` / ``PUBLIC`` are rejected exactly like
+    ``public`` since PostgreSQL schema names are effectively
+    case-sensitive but a tenant named for confusion is still a footgun.
+    """
+    if not value:
+        return
+    normalized = value.strip().lower()
+    if normalized in RESERVED_SCHEMA_NAMES or normalized.startswith("pg_"):
+        raise ValidationError(
+            _(
+                "'%(value)s' is a reserved schema name and cannot be "
+                "used for a tenant."
+            ),
+            params={"value": value},
+        )

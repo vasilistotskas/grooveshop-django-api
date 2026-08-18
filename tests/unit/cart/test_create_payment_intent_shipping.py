@@ -76,13 +76,16 @@ def _build_fake_setting_get(overrides: dict[str, object]):
 
 
 @pytest.fixture
-def per_carrier_below_generic():
+def per_carrier_below_generic(acs_and_boxnow_configured_tenant):
     """Activate ACS+BoxNow providers and patch ``Setting.get`` to
     return the per-carrier 30€ thresholds (below the generic 50€).
 
     Yields the overrides dict so individual tests can mutate it
     before exercising the code path (e.g. switching CHECKOUT_SHIPPING_
-    PRICE to test a different fallback amount).
+    PRICE to test a different fallback amount). Also binds a tenant
+    with ACS+BoxNow credentials — both carriers are gated on tenant
+    credentials via ``is_kind_enabled`` (tenant-only, no settings
+    fallback), regardless of ``ShippingProvider.is_active``.
     """
     overrides = dict(_DEFAULT_OVERRIDES)
     # Activating the providers IS a DB write but only on

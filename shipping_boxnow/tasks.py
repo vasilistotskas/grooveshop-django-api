@@ -19,6 +19,29 @@ from tenant.credentials import (
 logger = logging.getLogger(__name__)
 
 
+def _skip_if_boxnow_unconfigured(task_name: str) -> bool:
+    """Return True (and log) when BoxNow has no credentials for this tenant.
+
+    Fanout tasks (``run_for_all_tenants``) dispatch to every active
+    tenant regardless of which carriers they've actually configured —
+    an unconfigured tenant must be skipped cleanly here rather than
+    letting ``BoxNowClient.__init__`` blow up with
+    ``BoxNowConfigError`` partway through the task.
+    """
+    from django.db import connection
+
+    from shipping_boxnow.services import is_configured
+
+    if is_configured():
+        return False
+    logger.info(
+        "%s: BoxNow not configured for tenant=%s — skipping",
+        task_name,
+        getattr(connection, "schema_name", "public"),
+    )
+    return True
+
+
 @shared_task(
     bind=True,
     base=TenantTask,
@@ -137,6 +160,9 @@ def sync_boxnow_lockers(self) -> dict[str, int]:
     ``sync-boxnow-lockers``). Upserts rows by external_id and marks any
     locker absent from the latest response as is_active=False.
     """
+    if _skip_if_boxnow_unconfigured("sync_boxnow_lockers"):
+        return {"created": 0, "updated": 0, "deactivated": 0}
+
     # Lazy import avoids circular dependency at startup.
     from shipping_boxnow.services import BoxNowService
 
@@ -378,6 +404,9 @@ def poll_boxnow_tracking_batch(
     keeps the dispatch single-flight across worker pods (the same
     pattern the ACS batch poll uses).
     """
+    if _skip_if_boxnow_unconfigured("poll_boxnow_tracking_batch"):
+        return {"dispatched": 0, "skipped": True}
+
     from datetime import timedelta
 
     from django.core.cache import cache

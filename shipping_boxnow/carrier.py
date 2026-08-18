@@ -86,6 +86,22 @@ class BoxNowCarrier(ShippingCarrierInterface):
     # <cod-pay-way>) from the Django admin — runtime-toggleable, no
     # redeploy required.
 
+    # ------------------------------------------------------------------
+    # Per-kind feature gating
+    # ------------------------------------------------------------------
+
+    def is_kind_enabled(self, kind: ShippingKind) -> bool:
+        """Gate BoxNow availability on tenant credentials.
+
+        An unconfigured tenant (no ``Tenant.box_now_*`` credentials)
+        gets no BoxNow kind at all — the locker widget and pickup-point
+        option must never be offered when we can't actually call the
+        BoxNow API on the tenant's behalf.
+        """
+        from shipping_boxnow.services import is_configured
+
+        return is_configured()
+
     def validate_order_payload(
         self,
         *,

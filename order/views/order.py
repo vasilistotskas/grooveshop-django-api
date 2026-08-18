@@ -487,7 +487,7 @@ class OrderViewSet(BaseModelViewSet):
             ) from e
 
     def _validate_pay_way_for_order(self, pay_way, validated_data):
-        """Reject an inactive or carrier-incompatible pay-way.
+        """Reject an inactive, carrier-incompatible, or unconfigured pay-way.
 
         The GET ``/api/v1/pay-way`` list already hides pay-ways that are
         inactive or excluded for the chosen carrier + kind, but order
@@ -503,6 +503,14 @@ class OrderViewSet(BaseModelViewSet):
         enforces the master switch. For home_delivery without an explicit
         provider code ``filter_by_carrier`` is a pass-through, so only the
         active check applies.
+
+        A second gate — ``PayWayService.is_provider_configured`` — rejects
+        a credentialed provider (Stripe, Viva Wallet) the tenant hasn't
+        actually configured: the pay-way list hides it, but a stale
+        client (or credentials removed mid-session) could still submit
+        it, and ``StripePaymentProvider``/``VivaWalletPaymentProvider``
+        would otherwise raise ``ImproperlyConfigured`` deep inside order
+        creation instead of a clean 400.
         """
         from pay_way.models import PayWay
         from pay_way.services import PayWayService
@@ -531,6 +539,26 @@ class OrderViewSet(BaseModelViewSet):
                         _(
                             "The selected payment method is not available "
                             "for this order."
+                        )
+                    ]
+                }
+            )
+
+        if pay_way.provider_code and not PayWayService.is_provider_configured(
+            pay_way.provider_code
+        ):
+            logger.info(
+                "Order create rejected: pay_way=%s (provider=%s) has no "
+                "tenant credentials configured",
+                pay_way.id,
+                pay_way.provider_code,
+            )
+            raise ValidationError(
+                {
+                    "pay_way_id": [
+                        _(
+                            "This payment method is not available for "
+                            "this store."
                         )
                     ]
                 }

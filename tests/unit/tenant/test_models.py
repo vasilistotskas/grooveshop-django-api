@@ -479,3 +479,49 @@ def test_theme_metadata_bad_scale_hex_raises():
     )
     with pytest.raises(ValidationError):
         t.clean()
+
+
+# ---------------------------------------------------------------------------
+# Tenant.clean() / field validator — reserved schema_name
+# ---------------------------------------------------------------------------
+
+
+def test_schema_name_ordinary_value_is_valid():
+    t = _unsaved_tenant(schema_name="acme_store")
+    t.clean()  # must not raise
+
+
+@pytest.mark.parametrize(
+    "reserved",
+    [
+        "public",
+        "PUBLIC",
+        "global",
+        "Global",
+        "information_schema",
+        "data",
+        "file",
+        "ftp",
+        "about",
+        "javascript",
+        "vbscript",
+        "expression",
+        "eval",
+        "pg_catalog",
+        "pg_toast",
+    ],
+)
+def test_schema_name_reserved_value_raises(reserved):
+    t = _unsaved_tenant(schema_name=reserved)
+    with pytest.raises(ValidationError) as exc_info:
+        t.clean()
+    assert "schema_name" in exc_info.value.message_dict
+
+
+def test_schema_name_reserved_value_rejected_by_field_validator_too():
+    """Field-level validator (``full_clean()``) catches it too — not
+    only the mirrored ``clean()`` check."""
+    from tenant.validators import validate_reserved_schema_name
+
+    with pytest.raises(ValidationError):
+        validate_reserved_schema_name("public")

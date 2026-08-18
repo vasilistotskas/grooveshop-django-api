@@ -158,7 +158,21 @@ class PaymentModuleTestCase(TestCase):
             self.assertEqual(status, PaymentStatus.COMPLETED)
             self.assertEqual(status_data["payment_id"], payment_id)
 
-    def test_get_payment_provider(self):
+    @mock.patch("tenant.credentials.viva_wallet_credentials")
+    def test_get_payment_provider(self, mock_viva_creds):
+        # Viva Wallet has no settings fallback — mock tenant credentials
+        # so resolving the provider by name doesn't raise
+        # ImproperlyConfigured in this no-active-tenant test context.
+        mock_viva_creds.return_value = {
+            "merchant_id": "m1",
+            "api_key": "k1",
+            "client_id": "c1",
+            "client_secret": "s1",
+            "webhook_verification_key": "",
+            "source_code": "",
+            "live_mode": False,
+        }
+
         provider = get_payment_provider("stripe")
         self.assertIsInstance(provider, StripePaymentProvider)
 
@@ -173,6 +187,48 @@ class PaymentModuleTestCase(TestCase):
 
         with self.assertRaises(ValueError):
             get_payment_provider("invalid_provider")
+
+    @mock.patch("tenant.credentials.viva_wallet_credentials")
+    def test_viva_wallet_payment_provider_init(self, mock_creds):
+        mock_creds.return_value = {
+            "merchant_id": "m1",
+            "api_key": "k1",
+            "client_id": "c1",
+            "client_secret": "s1",
+            "webhook_verification_key": "",
+            "source_code": "SRC1",
+            "live_mode": True,
+        }
+
+        provider = VivaWalletPaymentProvider()
+
+        self.assertEqual(provider.merchant_id, "m1")
+        self.assertEqual(provider.api_key, "k1")
+        self.assertEqual(provider.client_id, "c1")
+        self.assertEqual(provider.client_secret, "s1")
+        self.assertEqual(provider.source_code, "SRC1")
+        self.assertTrue(provider.live_mode)
+
+    @mock.patch("tenant.credentials.viva_wallet_credentials")
+    def test_viva_wallet_payment_provider_init_unconfigured_raises(
+        self, mock_creds
+    ):
+        # No tenant OAuth2 credentials: constructing the provider must
+        # fail loudly instead of silently proceeding with empty auth.
+        from django.core.exceptions import ImproperlyConfigured
+
+        mock_creds.return_value = {
+            "merchant_id": "",
+            "api_key": "",
+            "client_id": "",
+            "client_secret": "",
+            "webhook_verification_key": "",
+            "source_code": "",
+            "live_mode": False,
+        }
+
+        with self.assertRaises(ImproperlyConfigured):
+            VivaWalletPaymentProvider()
 
 
 class StripePaymentIntentMetadataTestCase(TestCase):

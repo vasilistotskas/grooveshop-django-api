@@ -130,7 +130,8 @@ def is_capi_enabled() -> bool:
     """
     if not bool(Setting.get("META_CAPI_ENABLED", default=False)):
         return False
-    # Check per-tenant credentials (falls back to global settings).
+    # Tenant-only credentials, no platform fallback — an unconfigured
+    # tenant is simply "disabled", not an error.
     if not (tenant_meta_pixel_id() and tenant_meta_capi_access_token()):
         return False
     return True

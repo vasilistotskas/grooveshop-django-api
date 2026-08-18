@@ -1380,12 +1380,13 @@ EXTRA_SETTINGS_DEFAULTS = [
         "description": (
             "Master kill switch for the server-side Meta Conversions "
             "API dispatcher. Defaults False so a fresh deploy doesn't "
-            "leak unintended events when ``META_PIXEL_ID`` / "
-            "``META_CAPI_ACCESS_TOKEN`` are still placeholders. Flip "
-            "to True in Django admin once Meta credentials are in "
-            "place and the Test Events feed in Events Manager looks "
-            "right. The browser pixel is independent — it gates on "
-            "the ``ad_storage`` cookie consent on the storefront."
+            "leak unintended events when the Tenant's "
+            "``meta_pixel_id``/``meta_capi_dataset_id`` and "
+            "``meta_capi_access_token`` are still unset. Flip to True "
+            "in Django admin once Meta credentials are in place and "
+            "the Test Events feed in Events Manager looks right. The "
+            "browser pixel is independent — it gates on the "
+            "``ad_storage`` cookie consent on the storefront."
         ),
     },
     # Storefront UI toggles
@@ -3355,21 +3356,12 @@ DJSTRIPE_WEBHOOK_SECRET = (
 STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 
 # Viva Wallet Configuration
-VIVA_WALLET_MERCHANT_ID = getenv("VIVA_WALLET_MERCHANT_ID", "")
-VIVA_WALLET_API_KEY = getenv("VIVA_WALLET_API_KEY", "")
-VIVA_WALLET_CLIENT_ID = getenv("VIVA_WALLET_CLIENT_ID", "")
-VIVA_WALLET_CLIENT_SECRET = getenv("VIVA_WALLET_CLIENT_SECRET", "")
-VIVA_WALLET_SOURCE_CODE = getenv("VIVA_WALLET_SOURCE_CODE", "Default")
-VIVA_WALLET_LIVE_MODE = getenv(
-    "VIVA_WALLET_LIVE_MODE", str(not DEBUG)
-).lower() in (
-    "true",
-    "1",
-    "yes",
-)
-VIVA_WALLET_WEBHOOK_VERIFICATION_KEY = getenv(
-    "VIVA_WALLET_WEBHOOK_VERIFICATION_KEY", ""
-)
+# Per-merchant identity (merchant ID, API key, OAuth2 client id/secret,
+# webhook verification key, source code, live/demo mode) lives ONLY on
+# the ``Tenant`` model (see ``tenant/credentials.py:viva_wallet_
+# credentials()``) — there is no platform-wide env-var fallback. Money
+# must never silently route through credentials the operator did not
+# explicitly configure for THIS tenant.
 
 
 # SHIPPING SETTINGS
@@ -3379,11 +3371,10 @@ UPS_API_KEY = getenv("UPS_API_KEY", "")
 UPS_ACCOUNT_NUMBER = getenv("UPS_ACCOUNT_NUMBER", "")
 
 # ---------- BoxNow Shipping ----------
-BOXNOW_CLIENT_ID = getenv("BOXNOW_CLIENT_ID", "")
-BOXNOW_CLIENT_SECRET = getenv("BOXNOW_CLIENT_SECRET", "")
-BOXNOW_PARTNER_ID = getenv("BOXNOW_PARTNER_ID", "")
-BOXNOW_WAREHOUSE_ID = getenv("BOXNOW_WAREHOUSE_ID", "2")
-BOXNOW_WEBHOOK_SECRET = getenv("BOXNOW_WEBHOOK_SECRET", "")
+# Per-merchant identity (OAuth2 client id/secret, partner ID, warehouse
+# ID, notify phone, webhook secret) lives ONLY on the ``Tenant`` model
+# (see ``tenant/credentials.py:box_now_credentials()``) — no platform
+# fallback. Only transport/platform config stays here.
 BOXNOW_API_BASE_URL = getenv(
     "BOXNOW_API_BASE_URL", "https://api-stage.boxnow.gr"
 )
@@ -3391,7 +3382,6 @@ BOXNOW_LOCATION_API_BASE_URL = getenv(
     "BOXNOW_LOCATION_API_BASE_URL",
     "https://locationapi-stage.boxnow.gr",
 )
-BOXNOW_LIVE_MODE = getenv("BOXNOW_LIVE_MODE", "False").lower() == "true"
 BOXNOW_DEFAULT_COMPARTMENT_SIZE = int(
     getenv("BOXNOW_DEFAULT_COMPARTMENT_SIZE", "1")
 )
@@ -3401,22 +3391,13 @@ BOXNOW_DEFAULT_COMPARTMENT_SIZE = int(
 # and Nuxt (`/api/settings/get`) read from there so an admin can retune the
 # rate without a redeploy.
 BOXNOW_HTTP_TIMEOUT = int(getenv("BOXNOW_HTTP_TIMEOUT", "10"))
-# Operations phone BoxNow calls about pickup issues at the origin warehouse.
-# Per BoxNow API §3.4 must be a real number in full international format
-# (P405 rejects malformed phones). Stage placeholder by default.
-BOXNOW_NOTIFY_PHONE = getenv("BOXNOW_NOTIFY_PHONE", "+302100000000")
 
 # ---------- ACS Shipping ----------
-# Single static API key in the AcsApiKey header + per-call body
-# credentials (Company_*, User_*) plus the partner Billing_Code.  See
-# docs/acs-web-services.pdf.  Note: ACS_BILLING_CODE may contain Greek
-# characters (e.g. "2ΑΚ89587"); the env file must be UTF-8.
-ACS_API_KEY = getenv("ACS_API_KEY", "")
-ACS_COMPANY_ID = getenv("ACS_COMPANY_ID", "")
-ACS_COMPANY_PASSWORD = getenv("ACS_COMPANY_PASSWORD", "")
-ACS_USER_ID = getenv("ACS_USER_ID", "")
-ACS_USER_PASSWORD = getenv("ACS_USER_PASSWORD", "")
-ACS_BILLING_CODE = getenv("ACS_BILLING_CODE", "")
+# Per-merchant identity (API key, Company_*/User_* credentials, billing
+# code, station origin) lives ONLY on the ``Tenant`` model (see
+# ``tenant/credentials.py:acs_credentials()``) — no platform fallback.
+# Only transport/platform config (base URL, timeout, supported
+# countries, stale-shipment threshold) stays here.
 ACS_API_BASE_URL = getenv(
     "ACS_API_BASE_URL",
     "https://webservices.acscourier.net/ACSRestServices/api/ACSAutoRest",
@@ -3425,7 +3406,6 @@ ACS_HTTP_TIMEOUT = int(getenv("ACS_HTTP_TIMEOUT", "15"))
 # Days without a tracking event before a non-terminal shipment is
 # reported to ADMINS by check_stale_acs_shipments.
 ACS_STALE_SHIPMENT_DAYS = int(getenv("ACS_STALE_SHIPMENT_DAYS", "3"))
-ACS_LIVE_MODE = getenv("ACS_LIVE_MODE", "False").lower() == "true"
 ACS_PICKUP_LIST_TIMEZONE = getenv("ACS_PICKUP_LIST_TIMEZONE", "Europe/Athens")
 ACS_SUPPORTED_COUNTRIES = [
     code.strip().upper()
@@ -3439,15 +3419,14 @@ ACS_SUPPORTED_COUNTRIES = [
 # (shipping/migrations/0002_seed_providers.py).
 
 # ---------- Meta Conversions API ----------
-# Pixel ID is public (rendered in the browser pixel tag) but kept in
-# settings here so the Django side can stamp it on every server-side
-# event. The access token is a server-only secret; never echo it back
-# to the frontend or include it in error responses. ``META_CAPI_ENABLED``
-# in extra_settings.Setting is the master kill switch — flipping it
-# False stops the Celery dispatcher from posting to Meta without any
-# code changes (lets ops shut traffic off during an incident).
-META_PIXEL_ID = getenv("META_PIXEL_ID", "")
-META_CAPI_ACCESS_TOKEN = getenv("META_CAPI_ACCESS_TOKEN", "")
+# Pixel ID / dataset ID and the access token are per-tenant secrets —
+# they live ONLY on the ``Tenant`` model (see ``tenant/credentials.py:
+# tenant_meta_pixel_id()`` / ``tenant_meta_capi_access_token()``), no
+# platform fallback. The storefront gets pixel IDs from the tenant
+# config (``TenantConfigSerializer``). ``META_CAPI_ENABLED`` in
+# extra_settings.Setting is the master kill switch — flipping it False
+# stops the Celery dispatcher from posting to Meta without any code
+# changes (lets ops shut traffic off during an incident).
 META_CAPI_API_VERSION = getenv("META_CAPI_API_VERSION", "v22.0")
 # Optional Meta-issued code that flags every event as a test event.
 # Set during integration testing so events surface under "Test Events"

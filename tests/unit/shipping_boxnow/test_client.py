@@ -379,13 +379,14 @@ class TestFetchParcelLabel:
 class TestConfigError:
     """Test BoxNowConfigError raised when credentials missing."""
 
-    def test_config_error_when_credentials_missing(self, settings):
-        """Instantiating without credentials raises BoxNowConfigError."""
-        settings.BOXNOW_CLIENT_ID = ""
-        settings.BOXNOW_CLIENT_SECRET = ""
-        settings.BOXNOW_PARTNER_ID = ""
+    def test_config_error_when_credentials_missing(self):
+        """Instantiating without credentials raises BoxNowConfigError.
 
+        No settings fallback exists — the tenant-only credentials
+        resolve to "" with no active tenant, so passing no explicit
+        kwargs is enough to trigger the missing-field check.
+        """
         with pytest.raises(BoxNowConfigError) as exc_info:
             BoxNowClient()
 
-        assert "BOXNOW_CLIENT_ID" in str(exc_info.value)
+        assert "box_now_client_id" in str(exc_info.value)

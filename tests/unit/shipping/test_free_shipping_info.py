@@ -92,13 +92,15 @@ def cleanup_no_threshold():
 
 
 @pytest.fixture
-def _activate_acs_only():
+def _activate_acs_only(acs_configured_tenant):
     """Make ACS the sole active provider with both kinds enabled.
 
     Mirrors a real deploy where ops have flipped ACS on but BoxNow
     is still off (BoxNow ships disabled by default per the seed).
     Yields the Setting overrides dict so individual tests can mutate
-    it (e.g. flipping ``ACS_SMARTPOINT_ENABLED`` to False).
+    it (e.g. flipping ``ACS_SMARTPOINT_ENABLED`` to False). Also binds
+    a tenant with ACS credentials — ``is_kind_enabled`` hides ACS
+    entirely for an unconfigured tenant regardless of ``is_active``.
     """
     ShippingProvider.objects.filter(code="acs").update(is_active=True)
     ShippingProvider.objects.filter(code="boxnow").update(is_active=False)
@@ -111,11 +113,14 @@ def _activate_acs_only():
 
 
 @pytest.fixture
-def _activate_both():
+def _activate_both(acs_and_boxnow_configured_tenant):
     """Activate both ACS and BoxNow with Smartpoint enabled.
 
     Yields the Setting overrides dict so individual tests can mutate
-    per-carrier thresholds before exercising the code path.
+    per-carrier thresholds before exercising the code path. Binds a
+    tenant with BOTH ACS and BoxNow credentials configured — both
+    carriers are now gated on tenant credentials via ``is_kind_
+    enabled``, regardless of ``ShippingProvider.is_active``.
     """
     ShippingProvider.objects.filter(code__in=["acs", "boxnow"]).update(
         is_active=True

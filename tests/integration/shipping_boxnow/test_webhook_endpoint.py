@@ -103,6 +103,30 @@ def _noop_schema(_schema):
     yield
 
 
+@contextmanager
+def _noop_tenant_context(tenant):
+    """Drop-in replacement for ``tenant_context`` that sets
+    ``connection.tenant`` directly without switching the real Postgres
+    search_path (the per-tenant test schema doesn't physically exist).
+
+    The webhook view and ``TenantTask.__call__`` enter the resolved
+    tenant via ``tenant_context(tenant)`` (not ``schema_context(schema_
+    name)``) precisely so ``connection.tenant`` is the real row —
+    required for ``tenant.credentials.*`` (tenant-only, no settings
+    fallback) to read the tenant's actual ``box_now_webhook_secret``.
+    A pure no-op (like ``_noop_schema``) would leave ``connection.
+    tenant`` unset and every credential read empty.
+    """
+    from django.db import connection
+
+    previous = getattr(connection, "tenant", None)
+    connection.tenant = tenant
+    try:
+        yield
+    finally:
+        connection.tenant = previous
+
+
 @pytest.fixture
 def _tenant_setup(db):
     """Provision a single non-public tenant + no-op ``schema_context``.
@@ -116,6 +140,17 @@ def _tenant_setup(db):
     inherits ``TenantTask`` and would also enter the schema — we patch
     its ``schema_context`` too so the eager-mode execution doesn't trip
     on the missing schema.
+
+    ``box_now_webhook_secret`` is set to the same value on EVERY
+    non-public tenant (including any pre-existing seed rows, e.g.
+    ``webside``) — BoxNow credentials are tenant-only (no settings
+    fallback), and ``_resolve_tenant_for_parcel``'s iteration order
+    over ``Tenant.objects.filter(...)`` is not something this test
+    controls (nor should it — resolution correctness is
+    ``test_duplicate_data_key_cannot_steer_tenant_resolution``'s job,
+    not this fixture's). Whichever tenant wins must have a matching
+    secret. ``test_missing_secret_returns_503`` clears all of them
+    back to "" to exercise the unconfigured path.
     """
     # ``auto_create_schema`` is a django-tenants class attribute, not a
     # model field — set after __init__, before save(), so the row lands
@@ -127,15 +162,20 @@ def _tenant_setup(db):
         owner_email="owner-boxnow-webhook-test@example.com",
         is_active=True,
         suspended_at=None,
+        box_now_webhook_secret=_WEBHOOK_SECRET,
     )
     t.auto_create_schema = False
     t.save()
-    # The webhook view imports ``schema_context`` at module scope, so
-    # patch its bound reference. ``TenantTask.__call__`` (the Celery
-    # base class used by ``process_boxnow_webhook_event``) imports
-    # ``schema_context`` lazily inside the call, so patch the canonical
-    # ``django_tenants.utils`` reference too — that catches the lazy
-    # import on first execution under ``CELERY_TASK_ALWAYS_EAGER``.
+    Tenant.objects.exclude(schema_name__in=["public", t.schema_name]).update(
+        box_now_webhook_secret=_WEBHOOK_SECRET
+    )
+    # The webhook view imports ``schema_context``/``tenant_context`` at
+    # module scope, so patch their bound references. ``TenantTask.
+    # __call__`` (the Celery base class used by
+    # ``process_boxnow_webhook_event``) imports both lazily inside the
+    # call, so patch the canonical ``django_tenants.utils`` references
+    # too — that catches the lazy import on first execution under
+    # ``CELERY_TASK_ALWAYS_EAGER``.
     with (
         patch(
             "shipping_boxnow.views.webhook.schema_context",
@@ -145,8 +185,16 @@ def _tenant_setup(db):
             "django_tenants.utils.schema_context",
             _noop_schema,
         ),
+        patch(
+            "shipping_boxnow.views.webhook.tenant_context",
+            _noop_tenant_context,
+        ),
+        patch(
+            "django_tenants.utils.tenant_context",
+            _noop_tenant_context,
+        ),
     ):
-        yield
+        yield t
 
 
 @pytest.mark.django_db
@@ -156,11 +204,12 @@ class TestWebhookEndpoint:
         """Autouse fixture so every test in this class gets the
         tenant + no-op ``schema_context`` patch without an explicit
         argument."""
+        self.tenant = _tenant_setup
 
     def setup_method(self):
         self.client = APIClient()
 
-    def test_duplicate_data_key_cannot_steer_tenant_resolution(self, settings):
+    def test_duplicate_data_key_cannot_steer_tenant_resolution(self):
         """Appending a second, unsigned ``data`` object must not steer
         tenant resolution. ``json.loads(raw_body)`` resolves duplicate
         keys to the LAST occurrence, but the signature covers the FIRST
@@ -168,8 +217,6 @@ class TestWebhookEndpoint:
         from the signed bytes BEFORE resolving the tenant, so the
         resolver must see the signed parcelId, never the appended one.
         """
-        settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET
-
         raw = _build_raw_body(parcel_id="signed-parcel", event="in-depot")
         # Append an unsigned duplicate "data" object before the final
         # closing brace — the raw-body parse would take this one.
@@ -194,10 +241,8 @@ class TestWebhookEndpoint:
         assert response.status_code == status.HTTP_200_OK
         assert captured["parcel_id"] == "signed-parcel"
 
-    def test_invalid_signature_returns_401(self, settings):
+    def test_invalid_signature_returns_401(self):
         """Tampered body or wrong signature → 401."""
-        settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET
-
         shipment = BoxNowShipmentFactory(with_parcel=True)
         raw = _build_raw_body(parcel_id=shipment.parcel_id, event="in-depot")
 
@@ -215,10 +260,8 @@ class TestWebhookEndpoint:
         )
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_valid_signature_returns_200_and_creates_event(self, settings):
+    def test_valid_signature_returns_200_and_creates_event(self):
         """Valid signature with known shipment → 200 + BoxNowParcelEvent."""
-        settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET
-
         from shipping_boxnow.models import BoxNowParcelEvent
 
         shipment = BoxNowShipmentFactory(with_parcel=True)
@@ -244,15 +287,13 @@ class TestWebhookEndpoint:
             webhook_message_id=message_id
         ).exists()
 
-    def test_duplicate_data_key_processes_signed_object_only(self, settings):
+    def test_duplicate_data_key_processes_signed_object_only(self):
         """A smuggled second "data" object must not be acted on.
 
         The HMAC covers the FIRST top-level "data"; json.loads takes the LAST
         on a duplicate-key body. The worker must process the signed (first)
         object, not the attacker's unsigned second one (forgery).
         """
-        settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET
-
         from shipping_boxnow.models import BoxNowParcelEvent
 
         shipment = BoxNowShipmentFactory(with_parcel=True)
@@ -309,12 +350,8 @@ class TestWebhookEndpoint:
         # The signed "in-depot" state was recorded, not the forged "delivered".
         assert event.parcel_state == "in-depot"
 
-    def test_duplicate_message_id_returns_200_no_duplicate_event(
-        self, settings
-    ):
+    def test_duplicate_message_id_returns_200_no_duplicate_event(self):
         """Sending the same message_id twice → 200 both times, one event row."""
-        settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET
-
         from shipping_boxnow.models import BoxNowParcelEvent
 
         shipment = BoxNowShipmentFactory(with_parcel=True)
@@ -349,8 +386,8 @@ class TestWebhookEndpoint:
             == 1
         )
 
-    def test_missing_secret_returns_503(self, settings):
-        """When BOXNOW_WEBHOOK_SECRET is not configured → 503.
+    def test_missing_secret_returns_503(self):
+        """When Tenant.box_now_webhook_secret is not configured → 503.
 
         Post-multi-tenant: the secret check runs INSIDE the resolved
         tenant's schema_context, so the parcel must first be findable
@@ -359,8 +396,15 @@ class TestWebhookEndpoint:
         webhook short-circuits with 200 (orphan parcel) before ever
         reaching the secret lookup. Seed a shipment so the test
         actually exercises the 503 path it claims to.
+
+        BoxNow credentials are tenant-only (no settings fallback) —
+        clear the field on every non-public tenant the
+        ``_tenant_setup`` fixture pre-populated (resolution order isn't
+        under this test's control — see that fixture's docstring).
         """
-        settings.BOXNOW_WEBHOOK_SECRET = ""
+        Tenant.objects.exclude(schema_name="public").update(
+            box_now_webhook_secret=""
+        )
 
         shipment = BoxNowShipmentFactory(with_parcel=True)
         raw = _build_raw_body(parcel_id=shipment.parcel_id, event="new")
@@ -372,10 +416,8 @@ class TestWebhookEndpoint:
         )
         assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
 
-    def test_invalid_envelope_returns_400(self, settings):
+    def test_invalid_envelope_returns_400(self):
         """Bad JSON or wrong specversion → 400."""
-        settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET
-
         bad_body = b'{"specversion":"99","type":"wrong","id":"x","data":{}}'
         response = self.client.post(
             _webhook_url(),
@@ -384,10 +426,8 @@ class TestWebhookEndpoint:
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_malformed_json_returns_400(self, settings):
+    def test_malformed_json_returns_400(self):
         """Non-JSON body returns 400."""
-        settings.BOXNOW_WEBHOOK_SECRET = _WEBHOOK_SECRET
-
         response = self.client.post(
             _webhook_url(),
             data=b"not-json-at-all",

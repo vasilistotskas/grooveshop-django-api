@@ -32,8 +32,9 @@ class VivaWebhookMoneyPathTestCase(TestCase):
         # tests/integration/tenant/test_multi_tenant_invariants.py: the
         # webhook resolves the owning tenant by iterating non-public
         # Tenant rows and entering each schema. Provision one row
-        # (auto_create_schema=False) and no-op schema_context so the
-        # lookup runs against the test's public schema.
+        # (auto_create_schema=False) and no-op schema_context/
+        # tenant_context so the lookup runs against the test's public
+        # schema.
         from contextlib import contextmanager
 
         from tenant.models import Tenant
@@ -53,11 +54,28 @@ class VivaWebhookMoneyPathTestCase(TestCase):
         def _noop(_schema):
             yield
 
+        @contextmanager
+        def _noop_tenant(_tenant):
+            yield
+
         for target in (
             "order.views.viva_webhook.schema_context",
             "django_tenants.utils.schema_context",
         ):
             patcher = patch(target, _noop)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        # ``_handle_webhook_event`` now enters the resolved tenant via
+        # ``tenant_context(tenant)`` (not ``schema_context(schema_name)``)
+        # so ``connection.tenant`` is the real Tenant row — see
+        # ``tenant.credentials`` no-fallback contract. Same no-op
+        # treatment is needed here for the same reason.
+        for target in (
+            "order.views.viva_webhook.tenant_context",
+            "django_tenants.utils.tenant_context",
+        ):
+            patcher = patch(target, _noop_tenant)
             patcher.start()
             self.addCleanup(patcher.stop)
 

@@ -4,7 +4,7 @@ import logging
 import sys
 
 from django.core.management.base import BaseCommand
-from django.db import connection
+from django.db import connection, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -135,47 +135,49 @@ class Command(BaseCommand):
         copied_tables: list[str] = []
         reset_sequences: list[tuple[str, str, str, str]] = []
 
-        with connection.cursor() as cursor:
-            cursor.execute("SET session_replication_role = 'replica'")
-
-            try:
-                for table in tables:
-                    # Always-overwrite tables: truncate first, then copy.
-                    if table in _OVERWRITE_TABLES:
-                        self.stdout.write(
-                            f"  OVERWRITE {table} (always-replace table)"
-                        )
-                        cursor.execute(f'TRUNCATE {schema}."{table}" CASCADE')
-                    elif self._table_has_data(cursor, schema, table):
-                        self.stdout.write(
-                            f"  SKIP {table} (already has data in '{schema}')"
-                        )
-                        skipped += 1
-                        continue
-
-                    public_count = self._get_count(cursor, "public", table)
-                    if public_count == 0:
-                        self.stdout.write(f"  SKIP {table} (empty in 'public')")
-                        skipped += 1
-                        continue
-
-                    cursor.execute(
-                        f'INSERT INTO {schema}."{table}" '
-                        f'SELECT * FROM public."{table}"'
-                    )
-
-                    seqs = self._fix_sequences(cursor, schema, table)
-                    reset_sequences.extend(seqs)
-
+        # One transaction for the whole copy loop: Django creates every
+        # FK constraint as DEFERRABLE INITIALLY DEFERRED, so validation
+        # happens once at COMMIT and the (alphabetical) table order is
+        # irrelevant. This deliberately replaces the old
+        # ``SET session_replication_role = 'replica'`` trick — that
+        # parameter is superuser-only (the cluster app user gets
+        # ``permission denied``) and, worse, it *skips* FK validation
+        # entirely; deferral still enforces it. All-or-nothing commit
+        # also makes crashed runs cleanly re-runnable.
+        with transaction.atomic(), connection.cursor() as cursor:
+            for table in tables:
+                # Always-overwrite tables: truncate first, then copy.
+                if table in _OVERWRITE_TABLES:
                     self.stdout.write(
-                        self.style.SUCCESS(
-                            f"  COPY {table} ({public_count} rows)"
-                        )
+                        f"  OVERWRITE {table} (always-replace table)"
                     )
-                    copied += 1
-                    copied_tables.append(table)
-            finally:
-                cursor.execute("SET session_replication_role = 'origin'")
+                    cursor.execute(f'TRUNCATE {schema}."{table}" CASCADE')
+                elif self._table_has_data(cursor, schema, table):
+                    self.stdout.write(
+                        f"  SKIP {table} (already has data in '{schema}')"
+                    )
+                    skipped += 1
+                    continue
+
+                public_count = self._get_count(cursor, "public", table)
+                if public_count == 0:
+                    self.stdout.write(f"  SKIP {table} (empty in 'public')")
+                    skipped += 1
+                    continue
+
+                cursor.execute(
+                    f'INSERT INTO {schema}."{table}" '
+                    f'SELECT * FROM public."{table}"'
+                )
+
+                seqs = self._fix_sequences(cursor, schema, table)
+                reset_sequences.extend(seqs)
+
+                self.stdout.write(
+                    self.style.SUCCESS(f"  COPY {table} ({public_count} rows)")
+                )
+                copied += 1
+                copied_tables.append(table)
 
         self.stdout.write(
             self.style.SUCCESS(

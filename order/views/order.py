@@ -1361,7 +1361,17 @@ class OrderViewSet(BaseModelViewSet):
         """
         from order.enum.status import PaymentStatus
 
-        if not settings.AGENT_STRIPE_DELEGATED_ENABLED:
+        # Per-store commercial capability: the Tenant flag enables the
+        # SPT flow for THIS store; the platform env stays as a legacy
+        # enable-all switch for the pre-multi-tenant deployment.
+        from django.db import connection as _connection
+
+        tenant_enabled = getattr(
+            getattr(_connection, "tenant", None),
+            "agent_stripe_delegated_enabled",
+            False,
+        )
+        if not (tenant_enabled or settings.AGENT_STRIPE_DELEGATED_ENABLED):
             return Response(
                 {
                     "detail": _(

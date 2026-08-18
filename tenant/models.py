@@ -666,6 +666,30 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
 
     # === Agentic Commerce (secret) ===
 
+    acp_bearer_token = models.CharField(
+        _("ACP Bearer Token"),
+        max_length=255,
+        blank=True,
+        default="",
+        help_text=_(
+            "Bearer token the agent platform uses on this tenant's "
+            "/acp/* checkout surface (served to the agent gateway only "
+            "via the internal-token-gated tenant resolve endpoint). "
+            "Per-tenant — a token minted for one store must never "
+            "drive another store's checkout. Empty disables ACP for "
+            "this tenant."
+        ),
+    )
+    agent_stripe_delegated_enabled = models.BooleanField(
+        _("Agent Stripe Delegated Payments"),
+        default=False,
+        help_text=_(
+            "Allow AI-agent platforms to complete Stripe payments "
+            "server-side with SharedPaymentTokens on this store. "
+            "Requires the tenant's Stripe account to be enrolled in "
+            "Stripe Agentic Commerce."
+        ),
+    )
     chat_api_key = models.CharField(
         _("Chat API Key"),
         max_length=255,

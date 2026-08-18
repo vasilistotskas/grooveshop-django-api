@@ -81,13 +81,55 @@ def tenant_resolve(request: Request) -> Response:
     # Secrets ride only on internally-authenticated responses and are
     # never cached — the cache holds exactly the public payload.
     if _is_gateway(request):
-        chat_api_key = (
+        secrets = (
             TenantDomain.objects.filter(domain=domain, tenant__is_active=True)
-            .values_list("tenant__chat_api_key", flat=True)
+            .values_list("tenant__chat_api_key", "tenant__acp_bearer_token")
             .first()
         )
-        data = {**data, "chat_api_key": chat_api_key or ""}
+        chat_api_key, acp_bearer_token = secrets or ("", "")
+        data = {
+            **data,
+            "chat_api_key": chat_api_key or "",
+            "acp_bearer_token": acp_bearer_token or "",
+        }
     return Response(data)
+
+
+@extend_schema(exclude=True)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def internal_domains(request: Request) -> Response:
+    """All active tenants' domains — for internal services only.
+
+    The media-stream service refreshes its CORS / upstream-validation
+    allowlists from this payload instead of a frozen env var, so
+    onboarding a tenant domain needs no media-stream restart. Gated by
+    the internal-services token (same header contract as the gateway's
+    tenant-resolve secret channel); anonymous callers get 404 so the
+    endpoint's existence is not advertised.
+
+    Payload: registered TenantDomain rows of active, non-suspended
+    tenants PLUS the derived ``api.`` / ``assets.`` / ``static.``
+    service subdomains of each primary domain (the infra TEMPLATE
+    provisions those for every tenant).
+    """
+    if not _is_gateway(request):
+        from django.http import Http404
+
+        raise Http404
+
+    rows = TenantDomain.objects.filter(
+        tenant__is_active=True, tenant__suspended_at__isnull=True
+    ).values_list("domain", "is_primary")
+
+    domains: set[str] = set()
+    for domain, is_primary in rows:
+        domains.add(domain)
+        if is_primary:
+            domains.update(
+                {f"api.{domain}", f"assets.{domain}", f"static.{domain}"}
+            )
+    return Response({"domains": sorted(domains)})
 
 
 @extend_schema(

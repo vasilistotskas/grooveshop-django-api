@@ -206,6 +206,10 @@ MIDDLEWARE = [
     # carry the pod IP as Host, which no TenantDomain row can match.
     "core.middleware.health_probe.HealthProbeMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
+    # Response phase runs in reverse: placed here, it rewrites the
+    # session/CSRF cookie Domain AFTER Session/Csrf middleware set them
+    # — the static *_COOKIE_DOMAIN settings only fit the platform apex.
+    "tenant.middleware.TenantCookieDomainMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "core.middleware.correlation_id.CorrelationIdMiddleware",
@@ -1681,6 +1685,10 @@ KNOX_TOKEN_MODEL = "knox.AuthToken"
 MEASUREMENT_BIDIMENSIONAL_SEPARATOR = "/"
 
 MFA_ADAPTER = "core.adapter.MFAAdapter"
+# Platform fallback for Tenant.totp_issuer (tenant/credentials.py::
+# tenant_totp_issuer). Empty means "no issuer branding" until a tenant
+# sets one.
+MFA_TOTP_ISSUER = getenv("MFA_TOTP_ISSUER", "")
 MFA_RECOVERY_CODE_COUNT = 10
 MFA_TOTP_PERIOD = 30
 MFA_TOTP_DIGITS = 6
@@ -3290,6 +3298,12 @@ else:
 STRIPE_LIVE_SECRET_KEY = getenv("STRIPE_LIVE_SECRET_KEY", "")
 STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "")
 STRIPE_LIVE_MODE = not DEBUG
+# Platform fallback for Tenant.stripe_publishable_key — the pk_* key the
+# storefront renders when the tenant hasn't set their own.
+STRIPE_PUBLISHABLE_KEY = getenv("STRIPE_PUBLISHABLE_KEY", "")
+# Platform fallback for Tenant.turnstile_secret_key (server-side
+# Cloudflare Turnstile validation).
+TURNSTILE_SECRET_KEY = getenv("TURNSTILE_SECRET_KEY", "")
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
 DJSTRIPE_WEBHOOK_VALIDATION = "verify_signature"
 # Webhook verification is per-schema: dj-stripe's UUID-routed webhook

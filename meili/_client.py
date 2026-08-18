@@ -29,8 +29,76 @@ class Client:
             settings.search_key,
             timeout=settings.timeout,
         )
+        self._base_url = base_url
+        self._search_key_uid: str | None = None
+        # schema -> (client, expiry-timestamp) for tenant-token clients.
+        self._tenant_search_clients: dict[str, tuple[_Client, float]] = {}
         self.is_sync = settings.sync
         self.tasks: list[Task | TaskInfo] = []
+
+    # Tenant tokens live 1 hour; clients are re-minted after 50 minutes
+    # so a request never rides a token that expires mid-flight.
+    _TENANT_TOKEN_TTL_SECONDS = 3600
+    _TENANT_CLIENT_REFRESH_SECONDS = 3000
+
+    def search_client_for_schema(self, schema_name: str) -> _Client:
+        """Read-only client whose key is SCOPED to one tenant's indexes.
+
+        Uses Meilisearch tenant tokens: a JWT minted from the search
+        API key with search rules ``{"{schema}__*": {}}``, so even a
+        tenant-context bug in query-building code cannot read another
+        tenant's indexes — the engine itself refuses.
+
+        Fallbacks (both documented, not silent):
+        - public schema → the unscoped search client (platform admin
+          surfaces search across shared data only).
+        - no dedicated search key provisioned (dev/CI, where the search
+          key falls back to the master key — tenant tokens cannot be
+          minted from a master key) → the unscoped search client.
+        """
+        if not schema_name or schema_name == "public":
+            return self.search_client
+        if self.settings.search_key == self.settings.master_key:
+            return self.search_client
+
+        # OFFLINE mode (tests/CI without a live engine): minting a
+        # tenant token needs a key-metadata round trip — serve the
+        # unscoped client instead of dialing a server that isn't there.
+        from django.conf import settings as django_settings
+
+        if django_settings.MEILISEARCH.get("OFFLINE", False):
+            return self.search_client
+
+        import time
+
+        cached = self._tenant_search_clients.get(schema_name)
+        if cached is not None and cached[1] > time.monotonic():
+            return cached[0]
+
+        from datetime import datetime, timedelta, timezone
+
+        if self._search_key_uid is None:
+            # The /keys/{key} endpoint accepts the key value itself and
+            # needs key-management rights — use the master client once.
+            self._search_key_uid = self.client.get_key(
+                self.settings.search_key
+            ).uid
+
+        token = self.client.generate_tenant_token(
+            self._search_key_uid,
+            {f"{schema_name}__*": {}},
+            api_key=self.settings.search_key,
+            expires_at=datetime.now(tz=timezone.utc)
+            + timedelta(seconds=self._TENANT_TOKEN_TTL_SECONDS),
+        )
+        tenant_client = _Client(
+            self._base_url, token, timeout=self.settings.timeout
+        )
+        self._tenant_search_clients[schema_name] = (
+            tenant_client,
+            time.monotonic() + self._TENANT_CLIENT_REFRESH_SECONDS,
+        )
+        return tenant_client
 
     def flush_tasks(self):
         self.tasks = []

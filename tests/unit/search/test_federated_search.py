@@ -44,6 +44,12 @@ def mock_meili_client():
             "hits": [],
             "estimatedTotalHits": 0,
         }
+        # The view resolves its client through the tenant-scoping
+        # helper; route it back to the same mock so assertions on
+        # ``search_client.multi_search`` keep observing the calls.
+        mock_client.search_client_for_schema.return_value = (
+            mock_client.search_client
+        )
         yield mock_client
 
 

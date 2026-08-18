@@ -45,6 +45,7 @@ class TenantConfigSerializer(serializers.Serializer):
     # --- Feature flags ---
     loyalty_enabled = serializers.BooleanField(read_only=True)
     blog_enabled = serializers.BooleanField(read_only=True)
+    agent_stripe_delegated_enabled = serializers.BooleanField(read_only=True)
 
     # --- Payments (public key only) ---
     # Public Stripe publishable key — pk_test_* / pk_live_* only.
@@ -171,6 +172,8 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "turnstile_secret_key",
             # --- Agentic Commerce ---
             "chat_api_key",
+            "acp_bearer_token",
+            "agent_stripe_delegated_enabled",
             # --- Social Links ---
             "socials_discord",
             "socials_facebook",

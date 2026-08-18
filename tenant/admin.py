@@ -182,7 +182,11 @@ class TenantAdmin(ModelAdmin):
         (
             "Agentic Commerce",
             {
-                "fields": ["chat_api_key"],
+                "fields": [
+                    "chat_api_key",
+                    "acp_bearer_token",
+                    "agent_stripe_delegated_enabled",
+                ],
                 "classes": ["collapse"],
             },
         ),

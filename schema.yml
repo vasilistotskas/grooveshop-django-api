@@ -41226,6 +41226,9 @@ components:
         blogEnabled:
           type: boolean
           readOnly: true
+        agentStripeDelegatedEnabled:
+          type: boolean
+          readOnly: true
         stripePublishableKey:
           type: string
           readOnly: true
@@ -41278,6 +41281,7 @@ components:
           readOnly: true
       required:
       - accentHex
+      - agentStripeDelegatedEnabled
       - allowedCspSources
       - blogEnabled
       - boxNowPartnerId

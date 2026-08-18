@@ -243,7 +243,8 @@ class TestTenantResolveChatApiKey:
     def _tenant_with_key(self, tenant_factory, slug, domain):
         tenant = tenant_factory(slug)
         tenant.chat_api_key = "tenant-chat-key"
-        tenant.save(update_fields=["chat_api_key"])
+        tenant.acp_bearer_token = "tenant-acp-token"
+        tenant.save(update_fields=["chat_api_key", "acp_bearer_token"])
         TenantDomain.objects.create(
             tenant=tenant, domain=domain, is_primary=True
         )
@@ -267,15 +268,18 @@ class TestTenantResolveChatApiKey:
 
         gateway = resolve_client.get(url, HTTP_X_INTERNAL_TOKEN="gw-secret")
         assert gateway.json()["chatApiKey"] == "tenant-chat-key"
+        assert gateway.json()["acpBearerToken"] == "tenant-acp-token"
 
         # The gateway request must not have poisoned the public cache.
         from django.core.cache import cache
 
         after = resolve_client.get(url)
         assert "chatApiKey" not in after.json()
+        assert "acpBearerToken" not in after.json()
         cached = cache.get("tenant_resolve:chat-key.example")
         assert cached is not None
         assert "chat_api_key" not in cached
+        assert "acp_bearer_token" not in cached
 
     @pytest.mark.django_db
     def test_chat_api_key_withheld_when_no_internal_secret_configured(
@@ -307,3 +311,61 @@ class TestTenantResolveChatApiKey:
             HTTP_X_INTERNAL_TOKEN="gw-secret",
         )
         assert response.json()["chatApiKey"] == ""
+
+
+class TestInternalDomains:
+    """Internal-token-gated domain feed for the media-stream service."""
+
+    @pytest.mark.django_db
+    def test_anonymous_gets_404(self, resolve_client, settings):
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
+        response = resolve_client.get("/api/v1/tenant/internal/domains")
+        assert response.status_code == 404
+
+    @pytest.mark.django_db
+    def test_internal_token_returns_domains_with_service_subdomains(
+        self, resolve_client, tenant_factory, settings
+    ):
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
+        tenant = tenant_factory("domains-feed")
+        TenantDomain.objects.create(
+            tenant=tenant, domain="feed.example", is_primary=True
+        )
+        TenantDomain.objects.create(
+            tenant=tenant, domain="alias.feed.example", is_primary=False
+        )
+
+        response = resolve_client.get(
+            "/api/v1/tenant/internal/domains",
+            HTTP_X_INTERNAL_TOKEN="gw-secret",
+        )
+        assert response.status_code == 200
+        domains = set(response.json()["domains"])
+        # Primary domain + derived service subdomains; aliases verbatim.
+        assert {
+            "feed.example",
+            "api.feed.example",
+            "assets.feed.example",
+            "static.feed.example",
+            "alias.feed.example",
+        } <= domains
+
+    @pytest.mark.django_db
+    def test_suspended_tenants_excluded(
+        self, resolve_client, tenant_factory, settings
+    ):
+        from django.utils import timezone
+
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
+        tenant = tenant_factory("domains-suspended")
+        tenant.suspended_at = timezone.now()
+        tenant.save(update_fields=["suspended_at"])
+        TenantDomain.objects.create(
+            tenant=tenant, domain="suspended.example", is_primary=True
+        )
+
+        response = resolve_client.get(
+            "/api/v1/tenant/internal/domains",
+            HTTP_X_INTERNAL_TOKEN="gw-secret",
+        )
+        assert "suspended.example" not in response.json()["domains"]

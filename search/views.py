@@ -629,8 +629,16 @@ def federated_search(request):
             ],
         }
 
-        # Execute multi_search with federation via the read-only search client
-        results = meili_client.search_client.multi_search(
+        # Execute multi_search with federation via the read-only search
+        # client SCOPED to this tenant's indexes (Meilisearch tenant
+        # token) — the engine refuses cross-tenant index access even if
+        # query-building code ever mis-prefixes an index name.
+        from django.db import connection as _connection
+
+        scoped_search = meili_client.search_client_for_schema(
+            getattr(_connection, "schema_name", "public")
+        )
+        results = scoped_search.multi_search(
             queries=multi_search_params["queries"],
             federation=multi_search_params["federation"],
         )
@@ -645,7 +653,7 @@ def federated_search(request):
                 {**search_query, "q": relaxed}
                 for search_query in multi_search_params["queries"]
             ]
-            results = meili_client.search_client.multi_search(
+            results = scoped_search.multi_search(
                 queries=retry_queries,
                 federation=multi_search_params["federation"],
             )

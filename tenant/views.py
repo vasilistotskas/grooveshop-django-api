@@ -118,18 +118,9 @@ def internal_domains(request: Request) -> Response:
 
         raise Http404
 
-    rows = TenantDomain.objects.filter(
-        tenant__is_active=True, tenant__suspended_at__isnull=True
-    ).values_list("domain", "is_primary")
+    from tenant.internal import build_domains_payload  # noqa: PLC0415
 
-    domains: set[str] = set()
-    for domain, is_primary in rows:
-        domains.add(domain)
-        if is_primary:
-            domains.update(
-                {f"api.{domain}", f"assets.{domain}", f"static.{domain}"}
-            )
-    return Response({"domains": sorted(domains)})
+    return Response(build_domains_payload())
 
 
 @extend_schema(

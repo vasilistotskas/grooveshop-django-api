@@ -205,6 +205,10 @@ MIDDLEWARE = [
     # Probe bypass MUST precede TenantMainMiddleware — kubelet probes
     # carry the pod IP as Host, which no TenantDomain row can match.
     "core.middleware.health_probe.HealthProbeMiddleware",
+    # Internal-token-gated domains feed for cluster-internal services
+    # dialing backend-service directly (no resolvable tenant Host) —
+    # must answer BEFORE tenant resolution.
+    "tenant.internal.InternalDomainsMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
     # Response phase runs in reverse: placed here, it rewrites the
     # session/CSRF cookie Domain AFTER Session/Csrf middleware set them

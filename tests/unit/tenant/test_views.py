@@ -369,3 +369,46 @@ class TestInternalDomains:
             HTTP_X_INTERNAL_TOKEN="gw-secret",
         )
         assert "suspended.example" not in response.json()["domains"]
+
+    @pytest.mark.django_db
+    def test_middleware_serves_feed_on_unresolvable_host(
+        self, tenant_factory, settings
+    ):
+        # Cluster-internal callers dial backend-service directly — a
+        # Host no TenantDomain matches. The pre-tenant-resolution
+        # middleware must answer anyway.
+        from django.http import HttpResponse
+        from django.test import RequestFactory
+
+        from tenant.internal import InternalDomainsMiddleware
+
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
+        tenant = tenant_factory("domains-mw")
+        TenantDomain.objects.create(
+            tenant=tenant, domain="mw-feed.example", is_primary=True
+        )
+
+        middleware = InternalDomainsMiddleware(
+            lambda _request: HttpResponse(status=500)
+        )
+        factory = RequestFactory()
+
+        denied = middleware(
+            factory.get(
+                "/api/v1/tenant/internal/domains",
+                HTTP_HOST="backend-service",
+            )
+        )
+        assert denied.status_code == 404
+
+        allowed = middleware(
+            factory.get(
+                "/api/v1/tenant/internal/domains",
+                HTTP_HOST="backend-service",
+                HTTP_X_INTERNAL_TOKEN="gw-secret",
+            )
+        )
+        assert allowed.status_code == 200
+        import json
+
+        assert "mw-feed.example" in json.loads(allowed.content)["domains"]

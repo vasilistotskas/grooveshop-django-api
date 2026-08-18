@@ -35,6 +35,9 @@ class TestTenantConfigSerializer:
             "default_locale",
             "default_currency",
             "primary_domain",
+            "api_domain",
+            "assets_domain",
+            "static_domain",
             "loyalty_enabled",
             "blog_enabled",
             # public-safe fields added for Nuxt consumers

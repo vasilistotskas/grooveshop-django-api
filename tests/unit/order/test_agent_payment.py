@@ -34,6 +34,21 @@ SPT = "spt_test_123"
 
 
 class ConfirmDelegatedPaymentProviderTestCase(TestCase):
+    def setUp(self):
+        # These tests run outside any tenant context (public schema),
+        # where stripe_credentials() has no fallback at all — provide a
+        # stand-in tenant key so StripePaymentProvider() constructs.
+        patcher = mock.patch(
+            "tenant.credentials.stripe_credentials",
+            return_value={
+                "secret_key": "sk_test_dummy_tenant_key",
+                "publishable_key": "pk_test_dummy_tenant_key",
+                "live_mode": False,
+            },
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     def test_charges_token_with_confirmed_payment_intent(
         self, mock_create
@@ -88,6 +103,23 @@ class ConfirmDelegatedPaymentProviderTestCase(TestCase):
 
 
 class ConfirmAgentPaymentEndpointTestCase(APITestCase):
+    def setUp(self):
+        # These tests run outside any tenant context (public schema),
+        # where stripe_credentials() has no fallback at all —
+        # PayWayService.is_provider_configured("stripe") needs a
+        # stand-in tenant key so the endpoint doesn't 400 before
+        # reaching the behaviour under test.
+        patcher = mock.patch(
+            "tenant.credentials.stripe_credentials",
+            return_value={
+                "secret_key": "sk_test_dummy_tenant_key",
+                "publishable_key": "pk_test_dummy_tenant_key",
+                "live_mode": False,
+            },
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _guest_stripe_order(self) -> Order:
         pay_way = PayWayFactory.create_online_payment(provider_code="stripe")
         order = OrderFactory(

@@ -15,6 +15,24 @@ from order.payment import (
 
 
 class PaymentModuleTestCase(TestCase):
+    def setUp(self):
+        # Deterministic Stripe identity for provider construction: these
+        # tests run outside any tenant context (public schema), where
+        # ``stripe_credentials()`` now has no fallback at all — tests
+        # that only care about Stripe API call behaviour (not credential
+        # resolution) need a stand-in tenant key. Tests that DO exercise
+        # credential resolution re-patch this target explicitly.
+        patcher = mock.patch(
+            "tenant.credentials.stripe_credentials",
+            return_value={
+                "secret_key": "sk_test_dummy_tenant_key",
+                "publishable_key": "pk_test_dummy_tenant_key",
+                "live_mode": False,
+            },
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_payment_status_enum(self):
         self.assertEqual(PaymentStatus.PENDING.value, "PENDING")
         self.assertEqual(PaymentStatus.PROCESSING.value, "PROCESSING")
@@ -235,6 +253,20 @@ class StripePaymentIntentMetadataTestCase(TestCase):
     """
     Test enhanced payment intent creation with metadata and idempotency.
     """
+
+    def setUp(self):
+        # See PaymentModuleTestCase.setUp — these tests construct
+        # StripePaymentProvider() outside any tenant context.
+        patcher = mock.patch(
+            "tenant.credentials.stripe_credentials",
+            return_value={
+                "secret_key": "sk_test_dummy_tenant_key",
+                "publishable_key": "pk_test_dummy_tenant_key",
+                "live_mode": False,
+            },
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")

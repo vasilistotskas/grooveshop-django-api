@@ -103,7 +103,6 @@ def export_user_data_task(self, export_id: int) -> dict:
     import json
     import os
 
-    from django.conf import settings
     from django.core.files.storage import FileSystemStorage
     from django.core.mail import EmailMultiAlternatives
     from django.template.loader import render_to_string
@@ -115,6 +114,7 @@ def export_user_data_task(self, export_id: int) -> dict:
     from core.utils.tenant_urls import (
         get_tenant_base_url,
         get_tenant_frontend_url,
+        get_tenant_static_base_url,
     )
     from tenant.credentials import (
         tenant_contact_email,
@@ -187,7 +187,7 @@ def export_user_data_task(self, export_id: int) -> dict:
             "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
         }
 
         with override(get_user_language(user)):

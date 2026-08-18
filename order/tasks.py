@@ -19,7 +19,11 @@ from extra_settings.models import Setting
 from core import celery_app
 from core.tasks import MonitoredTask
 from core.utils.i18n import get_order_language, get_user_language
-from core.utils.tenant_urls import get_tenant_base_url, get_tenant_frontend_url
+from core.utils.tenant_urls import (
+    get_tenant_base_url,
+    get_tenant_frontend_url,
+    get_tenant_static_base_url,
+)
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
@@ -242,7 +246,7 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                 "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+                "STATIC_BASE_URL": get_tenant_static_base_url(),
             }
 
             text_content = render_to_string(f"{template_base}.txt", context)
@@ -392,7 +396,7 @@ def send_dispute_notification_email(
             "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
         }
 
         subject = (
@@ -499,7 +503,7 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": staff_email,
             "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
         }
 
         text_content = render_to_string(
@@ -604,7 +608,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
             "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
         }
 
         with translation.override(get_order_language(order)):
@@ -753,7 +757,7 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
         }
 
         with translation.override(get_order_language(order)):
@@ -882,7 +886,7 @@ def send_order_status_update_email(
             "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
         }
 
         template_base = f"emails/order/order_{status.lower()}"
@@ -1049,7 +1053,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             "SITE_NAME": tenant_site_name(),
             "INFO_EMAIL": tenant_contact_email(),
             "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
         }
 
         with translation.override(get_order_language(order)):
@@ -1254,7 +1258,7 @@ def send_invoice_email(self, order_id: int) -> bool:
                 "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+                "STATIC_BASE_URL": get_tenant_static_base_url(),
             }
             text_content = render_to_string(
                 "emails/order/invoice_issued.txt", context
@@ -1582,7 +1586,7 @@ def check_pending_orders() -> int:
                 "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+                "STATIC_BASE_URL": get_tenant_static_base_url(),
             }
 
             with translation.override(get_order_language(order)):
@@ -1884,7 +1888,7 @@ def send_checkout_abandonment_emails() -> int:
                 "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+                "STATIC_BASE_URL": get_tenant_static_base_url(),
             }
             with translation.override(get_user_language(cart.user)):
                 subject = _("Did you forget something? — {site_name}").format(

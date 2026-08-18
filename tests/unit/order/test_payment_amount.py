@@ -10,6 +10,21 @@ from order.payment import StripePaymentProvider
 class StripePaymentAmountTestCase(TestCase):
     """Test that Stripe receives correct payment amounts."""
 
+    def setUp(self):
+        # These tests run outside any tenant context (public schema),
+        # where stripe_credentials() has no fallback at all — provide a
+        # stand-in tenant key so StripePaymentProvider() constructs.
+        patcher = mock.patch(
+            "tenant.credentials.stripe_credentials",
+            return_value={
+                "secret_key": "sk_test_dummy_tenant_key",
+                "publishable_key": "pk_test_dummy_tenant_key",
+                "live_mode": False,
+            },
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.logger")
     def test_process_payment_converts_to_cents(

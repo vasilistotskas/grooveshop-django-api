@@ -2,14 +2,14 @@
 
 Two contracts are covered here:
 
-1. **Fallback helpers** (email, site name, MFA TOTP issuer, Turnstile):
+1. **Fallback helpers** (email, site name, MFA TOTP issuer):
    - Tenant field value is returned when set (non-empty).
    - Falls back to the settings value when the tenant field is empty.
    - Falls back to the settings value when connection.tenant is None.
    - Returns "" when both are absent.
 
-2. **Third-party credential helpers** (Viva Wallet, ACS, BoxNow, Meta
-   CAPI/Pixel) — NO fallback:
+2. **Third-party credential helpers** (Stripe, Viva Wallet, ACS,
+   BoxNow, Meta CAPI/Pixel) — NO fallback:
    - Tenant field value is returned when set (non-empty).
    - Returns "" (or False for the nullable ``live_mode`` flag) when
      the tenant field is empty or there is no active tenant — even
@@ -17,7 +17,7 @@ Two contracts are covered here:
      leakage via ``override_settings``/the ``settings`` fixture).
 
 - Greek strings (ACS billing codes) pass through unchanged.
-- Phase 2B: email, MFA TOTP issuer, Meta CAPI, and Turnstile helpers.
+- Phase 2B: email, MFA TOTP issuer, and Meta CAPI helpers.
 """
 
 from __future__ import annotations
@@ -36,7 +36,6 @@ from tenant.credentials import (
     tenant_meta_pixel_id,
     tenant_site_name,
     tenant_totp_issuer,
-    tenant_turnstile_secret_key,
     viva_wallet_credentials,
 )
 
@@ -654,42 +653,6 @@ class TestTenantMetaPixelId:
 
 
 # ---------------------------------------------------------------------------
-# Phase 2B: Turnstile secret key
-# ---------------------------------------------------------------------------
-
-
-class TestTenantTurnstileSecretKey:
-    def test_returns_tenant_value(self, bind_tenant, tenant_factory):
-        tenant = tenant_factory("ts-secret-1")
-        tenant.turnstile_secret_key = "0xTenantSecret"
-        tenant.save()
-        bind_tenant(tenant)
-        assert tenant_turnstile_secret_key() == "0xTenantSecret"
-
-    def test_falls_back_to_settings(
-        self, bind_tenant, tenant_factory, settings
-    ):
-        tenant = tenant_factory("ts-secret-2")
-        tenant.turnstile_secret_key = ""
-        tenant.save()
-        bind_tenant(tenant)
-        settings.TURNSTILE_SECRET_KEY = "0xGlobalSecret"
-        assert tenant_turnstile_secret_key() == "0xGlobalSecret"
-
-    def test_no_tenant_uses_settings(self, monkeypatch, settings):
-        monkeypatch.setattr(connection, "tenant", None, raising=False)
-        settings.TURNSTILE_SECRET_KEY = "0xPlatformSecret"
-        assert tenant_turnstile_secret_key() == "0xPlatformSecret"
-
-    def test_webside_safety(self, bind_tenant, tenant_factory, settings):
-        """webside.gr: Tenant.turnstile_secret_key empty → falls back cleanly."""
-        tenant = tenant_factory("ws-turnstile")
-        bind_tenant(tenant)
-        settings.TURNSTILE_SECRET_KEY = "0xWebsideSecret"
-        assert tenant_turnstile_secret_key() == "0xWebsideSecret"
-
-
-# ---------------------------------------------------------------------------
 # Phase 2B: MFA adapter — get_totp_issuer
 # ---------------------------------------------------------------------------
 
@@ -988,59 +951,72 @@ class TestGetBaseEmailContext:
 
 
 class TestStripeCredentials:
-    def test_tenant_key_wins(self, bind_tenant, tenant_factory, settings):
+    """No-fallback contract: tenant-only, settings are NEVER consulted.
+
+    The platform-account concept is gone entirely (there is no
+    ``stripe_use_platform_account`` field, and no ``STRIPE_LIVE_
+    SECRET_KEY``/``STRIPE_TEST_SECRET_KEY``/``STRIPE_LIVE_MODE``/
+    ``STRIPE_PUBLISHABLE_KEY`` settings) — mirrors ``viva_wallet_
+    credentials()``/``acs_credentials()``/``box_now_credentials()``.
+    """
+
+    def test_tenant_key_wins(self, bind_tenant, tenant_factory):
         from tenant.credentials import stripe_credentials
 
-        settings.STRIPE_LIVE_MODE = False
-        settings.STRIPE_TEST_SECRET_KEY = "sk_test_platform"
         tenant = tenant_factory("stripe-own-key")
         tenant.stripe_secret_key = "sk_live_tenant"
-        tenant.save(update_fields=["stripe_secret_key"])
+        tenant.stripe_publishable_key = "pk_live_tenant"
+        tenant.save(
+            update_fields=["stripe_secret_key", "stripe_publishable_key"]
+        )
         bind_tenant(tenant)
 
         creds = stripe_credentials()
         assert creds["secret_key"] == "sk_live_tenant"
+        assert creds["publishable_key"] == "pk_live_tenant"
         assert creds["live_mode"] is True
 
-    def test_keyless_tenant_gets_no_platform_fallback(
+    def test_keyless_tenant_gets_no_fallback(
         self, bind_tenant, tenant_factory, settings
     ):
-        # The deliberate break from the unconditional-fallback pattern:
-        # money must never silently route to the platform account.
+        # There is no fallback source left at all — money must never
+        # silently route through anything the operator didn't paste
+        # into THIS tenant's row.
         from tenant.credentials import stripe_credentials
 
-        settings.STRIPE_LIVE_MODE = False
-        settings.STRIPE_TEST_SECRET_KEY = "sk_test_platform"
         tenant = tenant_factory("stripe-keyless")
         bind_tenant(tenant)
 
-        assert stripe_credentials()["secret_key"] == ""
-
-    def test_platform_account_opt_in_restores_fallback(
-        self, bind_tenant, tenant_factory, settings
-    ):
-        from tenant.credentials import stripe_credentials
-
-        settings.STRIPE_LIVE_MODE = False
-        settings.STRIPE_TEST_SECRET_KEY = "sk_test_platform"
-        tenant = tenant_factory("stripe-platform-optin")
-        tenant.stripe_use_platform_account = True
-        tenant.save(update_fields=["stripe_use_platform_account"])
-        bind_tenant(tenant)
-
         creds = stripe_credentials()
-        assert creds["secret_key"] == "sk_test_platform"
+        assert creds["secret_key"] == ""
+        assert creds["publishable_key"] == ""
         assert creds["live_mode"] is False
 
-    def test_public_schema_uses_platform_keys(self, monkeypatch, settings):
-        # No active tenant (management commands, platform routines).
+    def test_returns_empty_when_no_active_tenant(self, monkeypatch):
+        # Public schema — management commands, platform routines. No
+        # tenant row means no Stripe identity, full stop.
         from tenant.credentials import stripe_credentials
 
         monkeypatch.setattr(connection, "tenant", None, raising=False)
-        settings.STRIPE_LIVE_MODE = True
-        settings.STRIPE_LIVE_SECRET_KEY = "sk_live_platform"
 
-        assert stripe_credentials()["secret_key"] == "sk_live_platform"
+        creds = stripe_credentials()
+        assert creds["secret_key"] == ""
+        assert creds["publishable_key"] == ""
+        assert creds["live_mode"] is False
+
+    def test_test_mode_key_resolves_live_mode_false(
+        self, bind_tenant, tenant_factory
+    ):
+        from tenant.credentials import stripe_credentials
+
+        tenant = tenant_factory("stripe-test-mode")
+        tenant.stripe_secret_key = "sk_test_tenant"
+        tenant.save(update_fields=["stripe_secret_key"])
+        bind_tenant(tenant)
+
+        creds = stripe_credentials()
+        assert creds["secret_key"] == "sk_test_tenant"
+        assert creds["live_mode"] is False
 
 
 class TestVivaWalletSourceAndMode:

@@ -78,8 +78,16 @@ def generate_bank_transfer_config():
 
 
 def generate_provider_data():
+    # "stripe" (and "viva_wallet") are deliberately EXCLUDED from this
+    # random pool: PayWayService.is_provider_configured() gates those
+    # two codes on tenant-only credentials with no platform fallback,
+    # so a randomly-drawn "stripe" row is invisible to anonymous
+    # list/retrieve queries unless a tenant Stripe key happens to be
+    # bound — a call site that just wants "some usable pay-way" must
+    # not flake depending on the random seed. Tests that specifically
+    # want Stripe (or Viva Wallet) pass ``provider_code="stripe"``
+    # explicitly and mock ``tenant.credentials.stripe_credentials``.
     providers = [
-        ("stripe", True, False, generate_stripe_config),
         ("paypal", True, False, generate_paypal_config),
         ("bank_transfer", False, True, generate_bank_transfer_config),
         ("cash", False, False, lambda: None),

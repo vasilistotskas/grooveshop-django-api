@@ -17,8 +17,9 @@ from pay_way.managers import PayWayManager
 from shipping.enum import ShippingKind
 
 # Per M15 in MULTI_TENANT_AUDIT.md, secrets MUST live on the Tenant
-# model (viva_wallet_*, acs_*, box_now_*, turnstile_*, meta_capi_*,
-# etc.) rather than in the unencrypted PayWay.configuration JSONField.
+# model (stripe_secret_key, viva_wallet_*, acs_*, box_now_*,
+# meta_capi_*, etc.) rather than in the unencrypted
+# PayWay.configuration JSONField.
 # ``clean()`` rejects keys whose name matches a secret-shaped pattern
 # so misconfiguration via admin or fixtures is caught at save time.
 _SECRET_KEY_PATTERN = re.compile(
@@ -78,9 +79,9 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             "Provider-specific non-secret configuration only "
             "(display options, callback URLs, feature flags). "
             "Secrets — API keys, webhook secrets, OAuth client_secrets — "
-            "live on the Tenant model fields (viva_wallet_*, acs_*, "
-            "box_now_*, turnstile_*, meta_capi_*) so they can be "
-            "scoped per-tenant and rotated independently. Keys "
+            "live on the Tenant model fields (stripe_secret_key, "
+            "viva_wallet_*, acs_*, box_now_*, meta_capi_*) so they can "
+            "be scoped per-tenant and rotated independently. Keys "
             "matching common secret patterns are rejected at save time."
         ),
     )

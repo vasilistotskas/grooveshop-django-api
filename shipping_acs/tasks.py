@@ -27,7 +27,10 @@ from django.db import transaction
 from django.utils import timezone
 
 from shipping_acs.exceptions import AcsAPIError, AcsRetryableError
-from core.utils.tenant_urls import get_tenant_base_url
+from core.utils.tenant_urls import (
+    get_tenant_base_url,
+    get_tenant_static_base_url,
+)
 from tenant.celery import TenantTask
 from tenant.credentials import (
     tenant_contact_email,
@@ -414,7 +417,6 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         tenant_from_email,
         tenant_site_name,
     )
-    from core.utils.tenant_urls import get_tenant_base_url  # noqa: PLC0415
 
     recipients = tenant_admin_recipients()
     if not recipients:
@@ -447,7 +449,7 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         "SITE_NAME": tenant_site_name(),
         "INFO_EMAIL": tenant_contact_email(),
         "SITE_URL": get_tenant_base_url(),
-        "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+        "STATIC_BASE_URL": get_tenant_static_base_url(),
     }
     from django.utils.translation import gettext as _
 
@@ -598,7 +600,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
             "voucher_no": shipment.voucher_no,
             "SITE_NAME": tenant_site_name(),
             "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": getattr(settings, "STATIC_BASE_URL", ""),
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
         }
         text_body = render_to_string(
             "emails/order/acs_out_for_delivery.txt", context

@@ -169,6 +169,21 @@ class TestOrderCreateBothFlowsViaSerializer(APITestCase):
 
     def setUp(self):
         super().setUp()
+        # These tests run outside any tenant context (public schema),
+        # where stripe_credentials() has no fallback at all — provide a
+        # stand-in tenant key so a "stripe" pay-way is treated as
+        # configured (this suite tests serializer routing, not Stripe
+        # credential resolution).
+        patcher = patch(
+            "tenant.credentials.stripe_credentials",
+            return_value={
+                "secret_key": "sk_test_dummy_tenant_key",
+                "publishable_key": "pk_test_dummy_tenant_key",
+                "live_mode": False,
+            },
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.user = UserAccountFactory()
         self.country = CountryFactory()
         self.region = RegionFactory(country=self.country)

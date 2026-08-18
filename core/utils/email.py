@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.conf import settings
 from django.db import connection
 from disposable_email_domains import blocklist as DISPOSABLE_BLOCKLIST
 
-from core.utils.tenant_urls import get_tenant_base_url
+from core.utils.tenant_urls import (
+    get_tenant_base_url,
+    get_tenant_static_base_url,
+)
 from tenant.credentials import tenant_contact_email, tenant_site_name
 
 
@@ -41,13 +43,14 @@ def get_base_email_context() -> dict[str, Any]:
     default) with a fallback to the static ``logo-dark.svg`` asset.
     """
     tenant = getattr(connection, "tenant", None)
+    static_base_url = get_tenant_static_base_url()
     logo_url = getattr(tenant, "logo_light_url", "") or ""
     if not logo_url:
-        logo_url = f"{settings.STATIC_BASE_URL}/static/logo-dark.svg"
+        logo_url = f"{static_base_url}/static/logo-dark.svg"
     return {
         "SITE_NAME": tenant_site_name(),
         "SITE_URL": get_tenant_base_url(),
         "INFO_EMAIL": tenant_contact_email(),
-        "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+        "STATIC_BASE_URL": static_base_url,
         "SITE_LOGO_URL": logo_url,
     }

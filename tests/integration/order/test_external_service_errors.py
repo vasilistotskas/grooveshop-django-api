@@ -23,6 +23,21 @@ class TestExternalServiceErrorsAreLogged:
     each carrier in ``tests/{unit,integration}/shipping_*/``.
     """
 
+    @pytest.fixture(autouse=True)
+    def _stripe_tenant_credentials(self):
+        # These tests run outside any tenant context (public schema),
+        # where stripe_credentials() has no fallback at all — provide a
+        # stand-in tenant key so StripePaymentProvider() constructs.
+        with patch(
+            "tenant.credentials.stripe_credentials",
+            return_value={
+                "secret_key": "sk_test_dummy_tenant_key",
+                "publishable_key": "pk_test_dummy_tenant_key",
+                "live_mode": False,
+            },
+        ):
+            yield
+
     @pytest.mark.parametrize(
         "method_name,method_args",
         [

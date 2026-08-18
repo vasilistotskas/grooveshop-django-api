@@ -3,9 +3,9 @@
 Each tenant schema carries its own dj-stripe tables (djstripe is in
 TENANT_APPS), so Stripe identity is per-schema by construction:
 
-1. ``APIKey`` row from ``Tenant.stripe_secret_key`` (or the platform
-   settings key when ``stripe_use_platform_account`` is enabled) — the
-   owner ``Account`` is resolved from Stripe and linked.
+1. ``APIKey`` row from ``Tenant.stripe_secret_key`` — no platform-wide
+   settings fallback — the owner ``Account`` is resolved from Stripe
+   and linked.
 2. ``WebhookEndpoint`` row: created ON Stripe pointing at the tenant's
    own API domain (``https://api.<primary-domain>/stripe/webhook/<uuid>/``)
    and synced back INCLUDING its signing secret. dj-stripe's UUID-routed
@@ -93,8 +93,8 @@ class Command(BaseCommand):
             if not secret_key:
                 self.stdout.write(
                     self.style.WARNING(
-                        f"[{tenant.schema_name}] no Stripe key (and no "
-                        "platform-account opt-in) — skipped."
+                        f"[{tenant.schema_name}] no Stripe key configured "
+                        "— skipped."
                     )
                 )
                 return

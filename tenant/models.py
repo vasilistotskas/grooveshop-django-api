@@ -211,27 +211,14 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "The tenant's OWN Stripe secret key (sk_live_*, sk_test_* "
             "or a restricted rk_* key). Secret — never expose to the "
             "browser. Empty means Stripe is unavailable for this "
-            "tenant unless 'use platform account' is enabled."
-        ),
-    )
-    # Safety switch: money must never silently route to the platform's
-    # Stripe account. Only the webside tenant flips this during the
-    # migration window — every other tenant either brings its own key
-    # or has no Stripe.
-    stripe_use_platform_account = models.BooleanField(
-        _("Use platform Stripe account"),
-        default=False,
-        help_text=_(
-            "When enabled AND no per-tenant secret key is set, Stripe "
-            "calls fall back to the platform-wide settings keys. "
-            "Intended only for the founding tenant during migration."
+            "tenant — there is no platform-wide fallback."
         ),
     )
 
     # Public Stripe key — safe to expose to unauthenticated callers.
     # Use the per-tenant ``pk_live_*`` / ``pk_test_*`` key here.
-    # Empty string means "fall back to the platform-wide key from
-    # settings.STRIPE_PUBLISHABLE_KEY (NUXT_PUBLIC_STRIPE_KEY)."
+    # Empty string means Stripe is unconfigured for this tenant — there
+    # is no platform-wide fallback (mirrors stripe_secret_key).
     stripe_publishable_key = models.CharField(
         _("Stripe publishable key"),
         max_length=255,
@@ -240,7 +227,8 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         help_text=_(
             "Per-tenant Stripe publishable key (pk_live_* or pk_test_*). "
             "This value is public by design and is safe to expose to "
-            "unauthenticated callers. Leave blank to use the platform-wide key."
+            "unauthenticated callers. Leave blank if Stripe is not "
+            "configured for this tenant."
         ),
     )
 
@@ -306,20 +294,6 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "Issuer name shown in authenticator apps when the user "
             "scans the TOTP QR code (e.g. 'MyShop'). "
             "Empty falls back to settings.MFA_TOTP_ISSUER."
-        ),
-    )
-
-    # === Bot Protection ===
-
-    turnstile_site_key = models.CharField(
-        _("Turnstile Site Key"),
-        max_length=64,
-        blank=True,
-        default="",
-        help_text=_(
-            "Cloudflare Turnstile site key (public). "
-            "Shown to browsers for the CAPTCHA widget. "
-            "Empty → Turnstile widget is disabled for this tenant."
         ),
     )
 
@@ -663,20 +637,6 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "per-tenant, since each tenant holds their own BoxNow "
             "contract. Empty falls back to "
             "settings.BOXNOW_WEBHOOK_SECRET."
-        ),
-    )
-
-    # === Bot Protection (secret) ===
-
-    turnstile_secret_key = models.CharField(
-        _("Turnstile Secret Key"),
-        max_length=64,
-        blank=True,
-        default="",
-        help_text=_(
-            "Cloudflare Turnstile secret key (server-side validation). "
-            "Never expose to the browser. "
-            "Empty falls back to settings.TURNSTILE_SECRET_KEY."
         ),
     )
 

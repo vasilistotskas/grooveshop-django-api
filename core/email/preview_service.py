@@ -8,6 +8,7 @@ from django.conf import settings
 from django.template.loader import render_to_string
 
 from core.email.config import EmailTemplateConfig
+from core.utils.tenant_urls import get_tenant_static_base_url
 from tenant.credentials import tenant_contact_email, tenant_site_name
 from core.email.sample_data import SampleOrderDataGenerator
 from order.models import Order
@@ -270,7 +271,7 @@ class EmailTemplatePreviewService:
         # These match what's provided by core.context_processors.metadata
         context = {
             **context,
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
             "SITE_NAME": tenant_site_name(),
             "SITE_URL": settings.NUXT_BASE_URL,
             "INFO_EMAIL": tenant_contact_email(),

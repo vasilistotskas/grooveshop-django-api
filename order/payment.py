@@ -57,13 +57,12 @@ class StripePaymentProvider(PaymentProvider):
         creds = stripe_credentials()
         self.api_key: str = creds["secret_key"]
         if not self.api_key:
-            # No tenant key and no platform-account opt-in: Stripe is
-            # unavailable for this tenant. Fail loudly — the pay-way
+            # No tenant key — Stripe is unavailable for this tenant,
+            # no platform-wide fallback. Fail loudly — the pay-way
             # availability gate should have hidden the provider.
             raise ImproperlyConfigured(
                 "Stripe is not configured for this tenant: no "
-                "stripe_secret_key on the Tenant and "
-                "stripe_use_platform_account is disabled."
+                "stripe_secret_key on the Tenant."
             )
 
     def _map_stripe_status(self, stripe_status: str) -> PaymentStatus:

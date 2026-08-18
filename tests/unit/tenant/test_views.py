@@ -115,6 +115,53 @@ class TestTenantResolve:
         assert response.json()["apiDomain"] == "api.resolve-apider.example"
 
     @pytest.mark.django_db
+    def test_assets_and_static_domain_derive_from_primary(
+        self, resolve_client, tenant_factory
+    ):
+        tenant = tenant_factory("resolve-assetsder")
+        TenantDomain.objects.create(
+            tenant=tenant,
+            domain="resolve-assetsder.example",
+            is_primary=True,
+        )
+        response = resolve_client.get(
+            "/api/v1/tenant/resolve?domain=resolve-assetsder.example"
+        )
+        assert response.status_code == 200
+        assert (
+            response.json()["assetsDomain"]
+            == "assets.resolve-assetsder.example"
+        )
+        assert (
+            response.json()["staticDomain"]
+            == "static.resolve-assetsder.example"
+        )
+
+    @pytest.mark.django_db
+    def test_assets_and_static_domain_prefer_explicit_rows(
+        self, resolve_client, tenant_factory
+    ):
+        tenant = tenant_factory("resolve-assetsrow")
+        TenantDomain.objects.create(
+            tenant=tenant,
+            domain="resolve-assetsrow.example",
+            is_primary=True,
+        )
+        TenantDomain.objects.create(
+            tenant=tenant,
+            domain="assets-cdn.resolve-assetsrow.example",
+            is_primary=False,
+        )
+        response = resolve_client.get(
+            "/api/v1/tenant/resolve?domain=resolve-assetsrow.example"
+        )
+        assert response.status_code == 200
+        assert (
+            response.json()["assetsDomain"]
+            == "assets-cdn.resolve-assetsrow.example"
+        )
+
+    @pytest.mark.django_db
     def test_returns_404_for_unknown_domain(self, resolve_client):
         response = resolve_client.get(
             "/api/v1/tenant/resolve?domain=nowhere.example"

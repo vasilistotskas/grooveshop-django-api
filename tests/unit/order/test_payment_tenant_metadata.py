@@ -63,9 +63,9 @@ def _fake_tenant(schema_name: str = "webside", connect_id: str | None = None):
         schema_name=schema_name,
         stripe_connect_account_id=connect_id or "",
         # Providers now construct against the tenant's OWN Stripe
-        # identity — a keyless tenant raises ImproperlyConfigured.
+        # identity — a keyless tenant raises ImproperlyConfigured. No
+        # platform-account fallback exists anymore.
         stripe_secret_key="sk_test_fake_tenant_key",
-        stripe_use_platform_account=False,
     )
 
 
@@ -125,11 +125,20 @@ class TestProcessPaymentMetadata:
 
     @mock.patch("order.payment.PaymentIntent.sync_from_stripe_data")
     @mock.patch("order.payment.stripe.PaymentIntent.create")
+    @mock.patch("tenant.credentials.stripe_credentials")
     def test_defaults_to_public_when_no_tenant(
-        self, mock_create, _mock_sync, amount, bind_tenant
+        self, mock_creds, mock_create, _mock_sync, amount, bind_tenant
     ):
         # When Celery / tests run outside a tenant request the schema
         # falls back to "public" so finance still has a value to key on.
+        # stripe_credentials() has no fallback for the no-tenant case —
+        # mock it so the provider still constructs; the test is about
+        # the tenant_schema metadata value, not credential resolution.
+        mock_creds.return_value = {
+            "secret_key": "sk_test_dummy_tenant_key",
+            "publishable_key": "pk_test_dummy_tenant_key",
+            "live_mode": False,
+        }
         bind_tenant(None)
         mock_create.return_value = _stub_stripe_payment_intent()
 

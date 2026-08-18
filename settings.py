@@ -3324,26 +3324,28 @@ else:
 
 # PAYMENT SETTINGS
 # Stripe Configuration (dj-stripe format)
-STRIPE_LIVE_SECRET_KEY = getenv("STRIPE_LIVE_SECRET_KEY", "")
-STRIPE_TEST_SECRET_KEY = getenv("STRIPE_TEST_SECRET_KEY", "")
-STRIPE_LIVE_MODE = not DEBUG
-# Platform fallback for Tenant.stripe_publishable_key — the pk_* key the
-# storefront renders when the tenant hasn't set their own.
-STRIPE_PUBLISHABLE_KEY = getenv("STRIPE_PUBLISHABLE_KEY", "")
-# Platform fallback for Tenant.turnstile_secret_key (server-side
-# Cloudflare Turnstile validation).
-TURNSTILE_SECRET_KEY = getenv("TURNSTILE_SECRET_KEY", "")
+# NOTE: there is deliberately NO STRIPE_LIVE_SECRET_KEY /
+# STRIPE_TEST_SECRET_KEY / STRIPE_LIVE_MODE / STRIPE_PUBLISHABLE_KEY
+# here — the platform-account concept is gone. Every tenant's Stripe
+# identity (secret + publishable key) lives ONLY on the ``Tenant`` row
+# (see ``tenant/credentials.py:stripe_credentials()``), and each
+# tenant schema carries its own dj-stripe ``APIKey``/``WebhookEndpoint``
+# rows provisioned by ``manage.py bootstrap_stripe`` — those per-schema
+# rows are the real key source, not a Django setting. dj-stripe itself
+# tolerates the absence of these settings names entirely (verified
+# against the installed 2.11.0: every read is a bare
+# ``getattr(settings, "...", default)``, never a hard ``hasattr``
+# requirement), so there is nothing to define here even as an
+# always-empty placeholder.
 DJSTRIPE_FOREIGN_KEY_TO_FIELD = "id"
 DJSTRIPE_WEBHOOK_VALIDATION = "verify_signature"
 # Webhook verification is per-schema: dj-stripe's UUID-routed webhook
 # view verifies each delivery against the ``WebhookEndpoint`` ROW secret
-# provisioned by ``manage.py bootstrap_stripe`` — this settings value is
-# only dj-stripe's legacy fallback and no code path depends on it, so a
-# missing env var must not block startup.
-DJSTRIPE_WEBHOOK_SECRET = (
-    getenv("DJSTRIPE_WEBHOOK_SECRET", "")
-    or "whsec_dev_placeholder_not_used_for_verification"
-)
+# provisioned by ``manage.py bootstrap_stripe``. ``DJSTRIPE_WEBHOOK_SECRET``
+# is NOT defined here — dj-stripe 2.11.0 never reads that setting name
+# anywhere in its source (confirmed by inspection); it only appears in
+# an informational system-check hint string. Fully vestigial — no code
+# path depends on it.
 
 # STRIPE_API_VERSION is intentionally NOT set. dj-stripe pins its own
 # DEFAULT_STRIPE_API_VERSION to match its Django model schema and uses that

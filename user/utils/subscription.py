@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING, Any
 from datetime import timedelta
 
 from extra_settings.models import Setting
-from django.conf import settings
 
 from core.utils.tenant_urls import (
     get_tenant_api_base_url,
     get_tenant_base_url,
     get_tenant_frontend_url,
+    get_tenant_static_base_url,
 )
 from tenant.credentials import (
     tenant_contact_email,
@@ -110,7 +110,7 @@ def send_subscription_confirmation(
             "SITE_NAME": tenant_site_name(),
             "SITE_URL": get_tenant_base_url(),
             "INFO_EMAIL": tenant_contact_email(),
-            "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+            "STATIC_BASE_URL": get_tenant_static_base_url(),
             "LANGUAGE_CODE": language,
         }
 
@@ -304,7 +304,7 @@ def send_newsletter(
                 "SITE_NAME": tenant_site_name(),
                 "SITE_URL": get_tenant_base_url(),
                 "INFO_EMAIL": tenant_contact_email(),
-                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+                "STATIC_BASE_URL": get_tenant_static_base_url(),
             }
         )
 

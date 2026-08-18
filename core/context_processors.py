@@ -5,10 +5,12 @@ import tomllib
 from functools import lru_cache
 from typing import Any
 
-from django.conf import settings
 from django.http import HttpRequest
 
-from core.utils.tenant_urls import get_tenant_base_url
+from core.utils.tenant_urls import (
+    get_tenant_base_url,
+    get_tenant_static_base_url,
+)
 from tenant.credentials import tenant_contact_email, tenant_site_name
 
 
@@ -73,6 +75,6 @@ def metadata(request: HttpRequest) -> dict[str, Any]:
         "SITE_AUTHOR": site_author,
         "SITE_URL": get_tenant_base_url(),
         "INFO_EMAIL": tenant_contact_email(),
-        "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+        "STATIC_BASE_URL": get_tenant_static_base_url(),
         "REQUEST_DETAILS": request_details,
     }

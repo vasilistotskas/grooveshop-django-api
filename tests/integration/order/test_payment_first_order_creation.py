@@ -31,6 +31,22 @@ class TestPaymentFirstOrderCreation(APITestCase):
         """Set up test fixtures."""
         super().setUp()
 
+        # These tests run outside any tenant context (public schema),
+        # where stripe_credentials() has no fallback at all — provide a
+        # stand-in tenant key so the "stripe" pay-way below is treated
+        # as configured (this suite tests order-creation flow, not
+        # Stripe credential resolution).
+        patcher = patch(
+            "tenant.credentials.stripe_credentials",
+            return_value={
+                "secret_key": "sk_test_dummy_tenant_key",
+                "publishable_key": "pk_test_dummy_tenant_key",
+                "live_mode": False,
+            },
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
         # Create users
         self.user = UserAccountFactory()
         self.guest_user = None

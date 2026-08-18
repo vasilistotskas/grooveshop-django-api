@@ -29,8 +29,7 @@ class PayWayService:
         Only the two credentialed charge providers are gated:
 
         - ``stripe``: requires ``stripe_credentials()["secret_key"]`` —
-          the tenant's own key, or the platform key behind the explicit
-          ``stripe_use_platform_account`` opt-in.
+          the tenant's own key. No platform-wide fallback.
         - ``viva_wallet``: requires the Smart Checkout OAuth pair
           (client id + secret).
 

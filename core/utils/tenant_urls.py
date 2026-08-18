@@ -15,6 +15,21 @@ URL.
 ``get_tenant_api_base_url`` is the API-origin sibling: for links that
 target a Django endpoint directly (no Nuxt proxy), e.g. unsubscribe /
 subscription-confirmation. Falls back to ``settings.API_BASE_URL``.
+
+``get_tenant_assets_base_url``/``get_tenant_static_base_url`` are the
+media-processing (``assets.``) and static-file (``static.``) origin
+siblings — used for absolute media/static URLs in transactional emails
+and other tenant-scoped, non-browser contexts. Unlike the merchant
+CREDENTIAL helpers in ``tenant/credentials.py`` (Stripe, Viva Wallet,
+ACS, BoxNow, Meta CAPI — tenant-only, no fallback, because those are
+money/secrets), these two fall back to
+``settings.MEDIA_STREAM_BASE_URL``/``settings.STATIC_BASE_URL`` when
+there is no active tenant (public schema, management commands, Celery
+workers without a TenantTask). That fallback is deliberate: the
+media-stream/static services are shared PLATFORM INFRASTRUCTURE
+endpoints, not per-merchant credentials — the platform origin is a
+valid, safe answer for public-schema/admin contexts, unlike a
+platform Stripe key which must never silently bill the wrong account.
 """
 
 from __future__ import annotations
@@ -102,23 +117,22 @@ def get_tenant_api_base_url() -> str:
     return fallback.rstrip("/")
 
 
-def resolve_tenant_api_domain(tenant) -> str:
-    """Return the bare API hostname for *tenant*, or ``""``.
-
-    Shared by :func:`get_tenant_api_base_url` (which reads
-    ``connection.tenant``) and ``TenantConfigSerializer.api_domain``
-    (which serializes an arbitrary tenant instance — the resolve
-    endpoint answers for whichever domain was queried, not the
-    request's own tenant).
+def _resolve_prefixed_service_domain(tenant, prefix: str) -> str:
+    """Return the bare ``<prefix>.<primary-domain>``-shaped hostname for
+    *tenant*, or ``""``. Shared implementation behind
+    :func:`resolve_tenant_api_domain`, :func:`resolve_tenant_assets_domain`,
+    and :func:`resolve_tenant_static_domain`.
 
     Resolution order:
     1. An explicit ``TenantDomain`` row whose ``domain`` starts with
-       ``"api"`` (case-insensitive) — covers both the production
-       convention (``api.<primary-domain>``) and shapes like
-       ``api-staging.webside.gr``.
-    2. ``api.<primary domain>`` derived from the primary domain — the
-       infra TEMPLATE provisions this subdomain for every tenant even
-       before an explicit row exists.
+       *prefix* (case-insensitive) — covers both the production
+       convention (``<prefix>.<primary-domain>``) and shapes like
+       ``api-staging.webside.gr`` that don't follow the
+       ``<prefix>.<primary>`` pattern.
+    2. ``<prefix>.<primary domain>`` derived from the tenant's primary
+       domain — the infra TEMPLATE provisions ``api.``/``assets.``/
+       ``static.`` subdomains for every tenant even before an explicit
+       row exists.
 
     Defensive against tenants without ``.domains`` (test fakes,
     transient creation states) — returns ``""`` rather than raising.
@@ -128,21 +142,104 @@ def resolve_tenant_api_domain(tenant) -> str:
         return ""
 
     try:
-        api_domain_obj = (
-            domains_manager.filter(domain__istartswith="api")
+        prefixed_domain_obj = (
+            domains_manager.filter(domain__istartswith=prefix)
             .order_by("-is_primary")
             .first()
         )
     except Exception:  # noqa: BLE001 — any failure falls through
-        api_domain_obj = None
-    if api_domain_obj and getattr(api_domain_obj, "domain", ""):
-        return api_domain_obj.domain
+        prefixed_domain_obj = None
+    if prefixed_domain_obj and getattr(prefixed_domain_obj, "domain", ""):
+        return prefixed_domain_obj.domain
 
     try:
         primary_domain_obj = domains_manager.filter(is_primary=True).first()
     except Exception:  # noqa: BLE001 — any failure falls through
         primary_domain_obj = None
     if primary_domain_obj and getattr(primary_domain_obj, "domain", ""):
-        return f"api.{primary_domain_obj.domain}"
+        return f"{prefix}.{primary_domain_obj.domain}"
 
     return ""
+
+
+def resolve_tenant_api_domain(tenant) -> str:
+    """Return the bare API hostname for *tenant*, or ``""``.
+
+    Shared by :func:`get_tenant_api_base_url` (which reads
+    ``connection.tenant``) and ``TenantConfigSerializer.api_domain``
+    (which serializes an arbitrary tenant instance — the resolve
+    endpoint answers for whichever domain was queried, not the
+    request's own tenant).
+    """
+    return _resolve_prefixed_service_domain(tenant, "api")
+
+
+def resolve_tenant_assets_domain(tenant) -> str:
+    """Return the bare media/image-processing hostname for *tenant*, or
+    ``""``.
+
+    Shared by :func:`get_tenant_assets_base_url` and
+    ``TenantConfigSerializer.assets_domain``. Mirrors
+    :func:`resolve_tenant_api_domain` with the ``assets.`` prefix — the
+    infra TEMPLATE provisions an ``assets.<primary-domain>`` subdomain
+    for every tenant, routed at the media-stream image-processing
+    service.
+    """
+    return _resolve_prefixed_service_domain(tenant, "assets")
+
+
+def resolve_tenant_static_domain(tenant) -> str:
+    """Return the bare static-file hostname for *tenant*, or ``""``.
+
+    Shared by :func:`get_tenant_static_base_url` and
+    ``TenantConfigSerializer.static_domain``. Mirrors
+    :func:`resolve_tenant_api_domain` with the ``static.`` prefix — the
+    infra TEMPLATE provisions a ``static.<primary-domain>`` subdomain
+    for every tenant, routed at the static/media file server.
+    """
+    return _resolve_prefixed_service_domain(tenant, "static")
+
+
+def get_tenant_assets_base_url() -> str:
+    """Return the base URL for the current tenant's media/image origin.
+
+    Used to build absolute media-processing URLs (e.g. the
+    ``media_stream-image`` suffix product/user images resolve through)
+    in tenant-scoped, non-browser contexts such as transactional
+    emails. Falls back to ``settings.MEDIA_STREAM_BASE_URL`` when there
+    is no active tenant — see the module docstring for why that
+    fallback is safe here (platform infra endpoint, not a merchant
+    credential).
+
+    Always returns a URL without trailing slash.
+    """
+    assets_domain = resolve_tenant_assets_domain(
+        getattr(connection, "tenant", None)
+    )
+    if assets_domain:
+        return f"https://{assets_domain}"
+
+    fallback = getattr(settings, "MEDIA_STREAM_BASE_URL", "") or ""
+    return fallback.rstrip("/")
+
+
+def get_tenant_static_base_url() -> str:
+    """Return the base URL for the current tenant's static-file origin.
+
+    Used to build absolute static-asset URLs (e.g. the fallback email
+    logo, static icons referenced in transactional email templates) in
+    tenant-scoped, non-browser contexts. Falls back to
+    ``settings.STATIC_BASE_URL`` when there is no active tenant — see
+    the module docstring for why that fallback is safe here (platform
+    infra endpoint, not a merchant credential).
+
+    Always returns a URL without trailing slash.
+    """
+    static_domain = resolve_tenant_static_domain(
+        getattr(connection, "tenant", None)
+    )
+    if static_domain:
+        return f"https://{static_domain}"
+
+    fallback = getattr(settings, "STATIC_BASE_URL", "") or ""
+    return fallback.rstrip("/")

@@ -20,7 +20,10 @@ from django.utils import translation
 from django.utils.translation import gettext as _
 
 from core.utils.i18n import get_user_language
-from core.utils.tenant_urls import get_tenant_base_url
+from core.utils.tenant_urls import (
+    get_tenant_base_url,
+    get_tenant_static_base_url,
+)
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
@@ -521,7 +524,7 @@ def send_inactive_user_notifications() -> dict[str, Any]:
                 "SITE_NAME": tenant_site_name(),
                 "INFO_EMAIL": tenant_contact_email(),
                 "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": settings.STATIC_BASE_URL,
+                "STATIC_BASE_URL": get_tenant_static_base_url(),
             }
 
             with translation.override(get_user_language(user)):

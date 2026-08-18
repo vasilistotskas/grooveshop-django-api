@@ -18,8 +18,10 @@ from django.test import override_settings
 
 from core.utils.tenant_urls import (
     get_tenant_api_base_url,
+    get_tenant_assets_base_url,
     get_tenant_base_url,
     get_tenant_frontend_url,
+    get_tenant_static_base_url,
 )
 
 
@@ -203,3 +205,76 @@ class TestGetTenantApiBaseUrl:
         )
         second = get_tenant_api_base_url()
         assert second == "https://api.tenant-b.example"
+
+
+class TestGetTenantAssetsBaseUrl:
+    """Media/image-processing origin — mirrors ``get_tenant_api_base_url``
+    with the ``assets.`` prefix. Unlike the merchant CREDENTIAL helpers,
+    this one DOES fall back to ``settings.MEDIA_STREAM_BASE_URL`` for
+    the no-tenant case — it's platform infrastructure, not a secret."""
+
+    def test_prefers_explicit_assets_domain_row(self, bind_tenant):
+        bind_tenant(
+            _fake_tenant_with_rows(
+                [
+                    ("webside.gr", True),
+                    ("assets.webside.gr", False),
+                ]
+            )
+        )
+        assert get_tenant_assets_base_url() == "https://assets.webside.gr"
+
+    def test_falls_back_to_derived_assets_subdomain(self, bind_tenant):
+        bind_tenant(_fake_tenant_with_rows([("tenant-b.com", True)]))
+        assert get_tenant_assets_base_url() == "https://assets.tenant-b.com"
+
+    @override_settings(MEDIA_STREAM_BASE_URL="https://fallback-media.example")
+    def test_falls_back_to_settings_when_no_tenant(self, bind_tenant):
+        bind_tenant(None)
+        assert get_tenant_assets_base_url() == "https://fallback-media.example"
+
+    @override_settings(MEDIA_STREAM_BASE_URL="https://fallback-media.example/")
+    def test_fallback_strips_trailing_slash(self, bind_tenant):
+        bind_tenant(None)
+        assert get_tenant_assets_base_url() == "https://fallback-media.example"
+
+    @override_settings(MEDIA_STREAM_BASE_URL="https://fallback-media.example")
+    def test_falls_back_when_no_domains_at_all(self, bind_tenant):
+        bind_tenant(_fake_tenant_with_rows([]))
+        assert get_tenant_assets_base_url() == "https://fallback-media.example"
+
+
+class TestGetTenantStaticBaseUrl:
+    """Static-file origin — mirrors ``get_tenant_api_base_url`` with the
+    ``static.`` prefix. Falls back to ``settings.STATIC_BASE_URL`` for
+    the no-tenant case (platform infrastructure, not a secret)."""
+
+    def test_prefers_explicit_static_domain_row(self, bind_tenant):
+        bind_tenant(
+            _fake_tenant_with_rows(
+                [
+                    ("webside.gr", True),
+                    ("static.webside.gr", False),
+                ]
+            )
+        )
+        assert get_tenant_static_base_url() == "https://static.webside.gr"
+
+    def test_falls_back_to_derived_static_subdomain(self, bind_tenant):
+        bind_tenant(_fake_tenant_with_rows([("tenant-b.com", True)]))
+        assert get_tenant_static_base_url() == "https://static.tenant-b.com"
+
+    @override_settings(STATIC_BASE_URL="https://fallback-static.example")
+    def test_falls_back_to_settings_when_no_tenant(self, bind_tenant):
+        bind_tenant(None)
+        assert get_tenant_static_base_url() == "https://fallback-static.example"
+
+    @override_settings(STATIC_BASE_URL="https://fallback-static.example/")
+    def test_fallback_strips_trailing_slash(self, bind_tenant):
+        bind_tenant(None)
+        assert get_tenant_static_base_url() == "https://fallback-static.example"
+
+    @override_settings(STATIC_BASE_URL="https://fallback-static.example")
+    def test_falls_back_when_no_domains_at_all(self, bind_tenant):
+        bind_tenant(_fake_tenant_with_rows([]))
+        assert get_tenant_static_base_url() == "https://fallback-static.example"

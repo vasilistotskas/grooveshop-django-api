@@ -5,8 +5,8 @@ back to the matching global setting when the tenant field is empty (or
 when there is no active tenant — public schema, management commands,
 Celery workers without a TenantTask, tests).
 
-Third-party CREDENTIAL helpers are the deliberate exception: Viva
-Wallet, ACS, BoxNow, and Meta CAPI/Pixel values live ONLY on the
+Third-party CREDENTIAL helpers are the deliberate exception: Stripe,
+Viva Wallet, ACS, BoxNow, and Meta CAPI/Pixel values live ONLY on the
 ``Tenant`` model — there is no platform-wide settings fallback for
 them. A merchant's payment/shipping/ad-tracking secrets must never
 silently leak across tenants (or resurrect a stale platform-wide env
@@ -191,20 +191,6 @@ def tenant_meta_pixel_id() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Bot Protection — Turnstile
-# ---------------------------------------------------------------------------
-
-
-def tenant_turnstile_secret_key() -> str:
-    """Return the Cloudflare Turnstile secret key for the active tenant.
-
-    Priority:
-      ``Tenant.turnstile_secret_key`` → ``settings.TURNSTILE_SECRET_KEY``.
-    """
-    return _get_tenant_field("turnstile_secret_key", "TURNSTILE_SECRET_KEY")
-
-
-# ---------------------------------------------------------------------------
 # Payments — Viva Wallet
 # ---------------------------------------------------------------------------
 
@@ -267,18 +253,21 @@ def viva_wallet_credentials() -> VivaWalletCredentials:
 def stripe_credentials() -> StripeCredentials:
     """Return the Stripe identity for the current tenant.
 
-    Resolution — deliberately NOT the unconditional-fallback pattern the
-    other helpers use, because money must never silently route to the
-    platform's Stripe account:
+    Tenant-only — NO platform-wide fallback (mirrors ``viva_wallet_
+    credentials()``/``acs_credentials()``/``box_now_credentials()``):
+    money must never silently route through a platform Stripe account.
+    The "current webside.gr account is just webside's" — there is no
+    platform-account concept left to fall back to.
 
       1. ``Tenant.stripe_secret_key`` when set — the tenant's own
          account.
-      2. The platform ``STRIPE_LIVE/TEST_SECRET_KEY`` settings ONLY when
-         ``Tenant.stripe_use_platform_account`` is True (the founding
-         tenant during migration), or when there is no active tenant at
-         all (public schema — management commands, platform routines).
-      3. Otherwise ``""`` — Stripe is unavailable for this tenant and
-         callers must treat the provider as unconfigured.
+      2. Otherwise ``""`` — Stripe is unavailable for this tenant (or
+         for the public schema, where there is no tenant row at all)
+         and callers must treat the provider as unconfigured:
+         ``PayWayService.is_provider_configured("stripe")`` hides the
+         pay-way, ``OrderViewSet._validate_pay_way_for_order`` rejects
+         order creation, and ``StripePaymentProvider.__init__`` raises
+         ``ImproperlyConfigured`` if instantiated anyway.
 
     Returns:
         {
@@ -287,29 +276,8 @@ def stripe_credentials() -> StripeCredentials:
             "live_mode":       bool,
         }
     """
-    tenant = getattr(connection, "tenant", None)
-    in_tenant = (
-        tenant is not None
-        and getattr(tenant, "schema_name", "public") != "public"
-    )
-
-    secret_key = ""
-    if in_tenant:
-        secret_key = getattr(tenant, "stripe_secret_key", "") or ""
-
-    if not secret_key and (
-        not in_tenant or getattr(tenant, "stripe_use_platform_account", False)
-    ):
-        live = bool(getattr(settings, "STRIPE_LIVE_MODE", False))
-        secret_key = (
-            getattr(settings, "STRIPE_LIVE_SECRET_KEY", "")
-            if live
-            else getattr(settings, "STRIPE_TEST_SECRET_KEY", "")
-        ) or ""
-
-    publishable_key = _get_tenant_field(
-        "stripe_publishable_key", "STRIPE_PUBLISHABLE_KEY"
-    )
+    secret_key = _get_tenant_field("stripe_secret_key")
+    publishable_key = _get_tenant_field("stripe_publishable_key")
     live_mode = secret_key.startswith(("sk_live_", "rk_live_"))
     return {
         "secret_key": secret_key,

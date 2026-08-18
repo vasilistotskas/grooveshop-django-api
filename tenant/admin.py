@@ -170,16 +170,6 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Bot Protection",
-            {
-                "fields": [
-                    "turnstile_site_key",
-                    "turnstile_secret_key",
-                ],
-                "classes": ["collapse"],
-            },
-        ),
-        (
             "Agentic Commerce",
             {
                 "fields": [
@@ -247,7 +237,6 @@ class TenantAdmin(ModelAdmin):
                 "fields": [
                     "stripe_publishable_key",
                     "stripe_secret_key",
-                    "stripe_use_platform_account",
                 ],
                 "classes": ["collapse"],
             },

@@ -95,17 +95,18 @@ accounts:
   TENANT_APPS (per-schema tables); `StripePaymentProvider` resolves the
   key via `tenant.credentials.stripe_credentials()` and passes it per
   call (`api_key=`, never the `stripe.api_key` module global). A tenant
-  with no `stripe_secret_key` has Stripe unavailable unless
-  `stripe_use_platform_account` is enabled (founding-tenant migration
-  switch). Webhooks are HOST-ROUTED per tenant:
+  with no `stripe_secret_key` simply has Stripe unavailable — there is
+  no platform-account concept or fallback of any kind (the "platform"
+  account was always just webside's own account). Webhooks are
+  HOST-ROUTED per tenant:
   `https://api.<tenant-domain>/stripe/webhook/<uuid>/` — django-tenants
   selects the schema, then dj-stripe's UUID view verifies against the
   per-schema `WebhookEndpoint` row secret. Provisioning (APIKey row +
   Stripe endpoint incl. secret): `manage.py bootstrap_stripe
-  --schema=<schema>` (idempotent; `--rotate-endpoint` to re-mint).
-  Migration for the founding tenant: enable
-  `stripe_use_platform_account`, run `bootstrap_stripe`, disable the old
-  dashboard-configured endpoint.
+  --schema=<schema>` (idempotent; `--rotate-endpoint` to re-mint). Every
+  tenant, including webside, backfills its own `stripe_secret_key` +
+  `stripe_publishable_key` on the Tenant row before running
+  `bootstrap_stripe`.
 - **Viva Wallet** — all credentials incl. `source_code` and `live_mode`
   per-tenant (settings fallback). The webhook route on the tenant's own
   API host resolves the tenant BEFORE the GET verification challenge,

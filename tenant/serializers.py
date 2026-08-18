@@ -47,6 +47,15 @@ class TenantConfigSerializer(serializers.Serializer):
     # own API host — the env-frozen platform host resolves to tenant
     # #1's schema and carries the wrong session cookies.
     api_domain = serializers.SerializerMethodField()
+    # The tenant's media/image-processing origin hostname (e.g.
+    # ``assets.tenant.com``) and static-file origin hostname (e.g.
+    # ``static.tenant.com``). Consumers building absolute media/static
+    # URLs (the Nuxt ``mediaStream`` image provider, transactional
+    # email templates) MUST dial the tenant's own asset hosts — the
+    # env-frozen platform ``MEDIA_STREAM_BASE_URL``/``STATIC_BASE_URL``
+    # resolve to tenant #1's asset origin.
+    assets_domain = serializers.SerializerMethodField()
+    static_domain = serializers.SerializerMethodField()
 
     # --- Feature flags ---
     loyalty_enabled = serializers.BooleanField(read_only=True)
@@ -55,7 +64,8 @@ class TenantConfigSerializer(serializers.Serializer):
 
     # --- Payments (public key only) ---
     # Public Stripe publishable key — pk_test_* / pk_live_* only.
-    # Empty string means "use the platform-wide key from settings."
+    # Empty string means Stripe is not configured for this tenant —
+    # there is no platform-wide fallback.
     stripe_publishable_key = serializers.CharField(read_only=True)
 
     # --- CSP ---
@@ -71,9 +81,6 @@ class TenantConfigSerializer(serializers.Serializer):
 
     # --- Authentication ---
     totp_issuer = serializers.CharField(read_only=True)
-
-    # --- Bot Protection (site key only) ---
-    turnstile_site_key = serializers.CharField(read_only=True)
 
     # --- Social Links ---
     socials_discord = serializers.CharField(read_only=True, allow_blank=True)
@@ -95,7 +102,7 @@ class TenantConfigSerializer(serializers.Serializer):
     # NOTE: ``from_email``, ``contact_email``, ``meta_capi_access_token``,
     # ``meta_capi_dataset_id``, all Viva Wallet keys, all ACS credentials,
     # ``box_now_client_id``, ``box_now_client_secret``, ``box_now_warehouse_id``,
-    # ``box_now_notify_phone``, ``turnstile_secret_key``, and
+    # ``box_now_notify_phone``, ``stripe_secret_key``, and
     # ``chat_api_key`` are intentionally excluded — they are secrets or
     # internal config that must never be served to anonymous callers.
     # Only available via TenantAdminSerializer (``chat_api_key`` is
@@ -112,6 +119,20 @@ class TenantConfigSerializer(serializers.Serializer):
         )
 
         return resolve_tenant_api_domain(obj)
+
+    def get_assets_domain(self, obj: Tenant) -> str:
+        from core.utils.tenant_urls import (  # noqa: PLC0415
+            resolve_tenant_assets_domain,
+        )
+
+        return resolve_tenant_assets_domain(obj)
+
+    def get_static_domain(self, obj: Tenant) -> str:
+        from core.utils.tenant_urls import (  # noqa: PLC0415
+            resolve_tenant_static_domain,
+        )
+
+        return resolve_tenant_static_domain(obj)
 
 
 class TenantDomainSerializer(serializers.ModelSerializer):
@@ -180,9 +201,6 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "meta_capi_dataset_id",
             # --- Authentication ---
             "totp_issuer",
-            # --- Bot Protection ---
-            "turnstile_site_key",
-            "turnstile_secret_key",
             # --- Agentic Commerce ---
             "chat_api_key",
             "acp_bearer_token",
@@ -209,7 +227,6 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "viva_wallet_live_mode",
             # --- Payments — Stripe (secrets) ---
             "stripe_secret_key",
-            "stripe_use_platform_account",
             # --- Shipping — ACS ---
             "acs_api_key",
             "acs_company_id",

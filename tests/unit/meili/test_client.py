@@ -280,6 +280,39 @@ class TestMeiliClient:
         assert len(client.tasks) == 0
 
     @patch("meili._client._Client")
+    def test_create_index_existing_without_primary_key_self_heals(
+        self, mock_client_class
+    ):
+        """A pk-less index (auto-created by a settings task) gets its
+        primaryKey patched in place instead of being skipped — otherwise
+        every document addition fails with
+        index_primary_key_multiple_candidates_found."""
+        mock_client_instance = MagicMock()
+        damaged_index = MagicMock()
+        damaged_index.uid = "webside__ProductTranslation"
+        damaged_index.primary_key = None
+        mock_index_handle = MagicMock()
+
+        mock_client_class.return_value = mock_client_instance
+        mock_client_instance.get_indexes.return_value = {
+            "results": [damaged_index]
+        }
+        mock_client_instance.index.return_value = mock_index_handle
+
+        client = Client(self.settings)
+
+        result = client.create_index("webside__ProductTranslation", "pk")
+
+        assert result == client
+
+        mock_client_instance.create_index.assert_not_called()
+        mock_client_instance.index.assert_called_once_with(
+            "webside__ProductTranslation"
+        )
+        mock_index_handle.update.assert_called_once_with(primary_key="pk")
+        assert len(client.tasks) == 1
+
+    @patch("meili._client._Client")
     def test_get_index(self, mock_client_class):
         mock_client_instance = MagicMock()
         mock_index = MagicMock()

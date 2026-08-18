@@ -159,6 +159,33 @@ class TestSignalInvalidationUsesGlobalKeys:
 
         assert cache.get(cache_key) is None
 
+    def test_domain_save_signal_clears_sibling_domain_resolve_caches(
+        self, tenant_factory
+    ):
+        """Adding a prefixed service row (assets./static./api.) changes
+        the ``assetsDomain``/… derivations EMBEDDED in every sibling
+        domain's cached resolve payload — most importantly the primary
+        domain's. Observed on staging 2026-08-19: a new
+        assets-staging row left the primary's cached payload pointing
+        at the derived dot-host for the full TTL."""
+        tenant = tenant_factory("cache-invalidate-sib")
+        primary = TenantDomain.objects.create(
+            tenant=tenant,
+            domain="cache-invalidate-sib.example",
+            is_primary=True,
+        )
+        primary_key = f"global:tenant_resolve:{primary.domain}"
+        cache.set(primary_key, {"schemaName": tenant.schema_name}, 3600)
+        assert cache.get(primary_key) is not None
+
+        TenantDomain.objects.create(
+            tenant=tenant,
+            domain="assets.cache-invalidate-sib.example",
+            is_primary=False,
+        )
+
+        assert cache.get(primary_key) is None
+
     def test_domain_delete_signal_clears_resolve_cache_written_elsewhere(
         self, tenant_factory
     ):

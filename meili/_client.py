@@ -150,11 +150,27 @@ class Client:
         return self
 
     def create_index(self, index_name: str, primary_key: str):
-        if index_name not in [i.uid for i in self.get_indexes()]:
+        existing = {i.uid: i for i in self.get_indexes()}
+        if index_name not in existing:
             self.tasks.append(
                 self._handle_sync(
                     self.client.create_index(
                         index_name, {"primaryKey": primary_key}
+                    )
+                )
+            )
+        elif existing[index_name].primary_key is None:
+            # Self-heal an index that was auto-created by a settings task
+            # (e.g. ``meilisearch_apply_settings`` running before any sync
+            # on a brand-new tenant): such indexes have no primaryKey, and
+            # every document addition then fails with
+            # ``index_primary_key_multiple_candidates_found``. The engine
+            # allows setting the primaryKey in place while the index is
+            # empty — which it must be, since additions were rejected.
+            self.tasks.append(
+                self._handle_sync(
+                    self.client.index(index_name).update(
+                        primary_key=primary_key
                     )
                 )
             )

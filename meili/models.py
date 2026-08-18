@@ -176,6 +176,16 @@ class IndexMixin(models.Model):
         index_name = cls.get_meili_index_name()
         index_settings = cls.get_meili_settings()
 
+        # Ensure the index exists WITH its primary key before the settings
+        # call — Meilisearch auto-creates a missing index on a settings
+        # task with no primaryKey, after which every document addition is
+        # rejected with ``index_primary_key_multiple_candidates_found``.
+        # This is exactly the order of events on a brand-new tenant, where
+        # ``meilisearch_apply_settings`` (PreSync hook) runs before any
+        # sync. ``create_index`` also self-heals an already-damaged,
+        # pk-less index.
+        _client.create_index(index_name, cls._meilisearch["primary_key"])
+
         _client.with_settings(
             index_name=index_name,
             index_settings=index_settings,

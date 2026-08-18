@@ -14,7 +14,7 @@ class TestClearMeiliSearchCommand(TestCase):
     def test_help_message(self):
         assert (
             self.command.help
-            == "Clears all MeiliSearch indexes and data (equivalent to clearing the MeiliSearch database)"
+            == "Clears the active schema's MeiliSearch indexes and data (tenant schemas own {schema}__*, public owns the unprefixed names)"
         )
 
     @patch("meili.management.commands.meilisearch_drop._client")

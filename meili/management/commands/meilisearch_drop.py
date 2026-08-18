@@ -9,7 +9,7 @@ from meili.models import IndexMixin
 
 
 class Command(TenantCommandMixin, BaseCommand):
-    help = "Clears all MeiliSearch indexes and data (equivalent to clearing the MeiliSearch database)"
+    help = "Clears the active schema's MeiliSearch indexes and data (tenant schemas own {schema}__*, public owns the unprefixed names)"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -38,15 +38,32 @@ class Command(TenantCommandMixin, BaseCommand):
     def _handle_for_schema(self, *args, **options):
         if not options["force"]:
             confirm = input(
-                "This will delete ALL MeiliSearch indexes and data. "
-                "Are you sure? (yes/no): "
+                "This will delete the active schema's MeiliSearch indexes "
+                "and data. Are you sure? (yes/no): "
             )
             if confirm.lower() not in ["yes", "y"]:
                 self.stdout.write(self.style.WARNING("Operation cancelled"))
                 return
 
         try:
-            indexes = _client.get_indexes()
+            from django.db import connection
+
+            # Scope deletion to the ACTIVE schema's indexes: tenant
+            # schemas own ``{schema}__*``, the public schema owns the
+            # unprefixed names. Deleting the raw instance-wide listing
+            # (the old behavior) nuked every other tenant's indexes on
+            # each iteration — ``--all-tenants`` would leave only the
+            # last schema's indexes alive.
+            schema = getattr(connection, "schema_name", "public")
+            indexes = [
+                idx
+                for idx in _client.get_indexes()
+                if (
+                    idx.uid.startswith(f"{schema}__")
+                    if schema and schema != "public"
+                    else "__" not in idx.uid
+                )
+            ]
 
             if not indexes:
                 self.stdout.write(

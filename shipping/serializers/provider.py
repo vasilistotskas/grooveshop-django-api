@@ -28,9 +28,10 @@ class ShippingProviderSerializer(serializers.ModelSerializer[ShippingProvider]):
     )
     main_image_path = serializers.SerializerMethodField(
         help_text=(
-            "Relative ``media/uploads/shipping/<filename>`` path for "
-            "the primary logo; empty string when no logo is uploaded. "
-            "Mirrors the PayWay.icon contract."
+            "Relative ``media/{schema}/uploads/shipping/<filename>`` "
+            "path for the primary logo (schema-prefixed to the active "
+            "tenant); empty string when no logo is uploaded. Mirrors "
+            "the PayWay.icon contract."
         ),
     )
     logo_filename = serializers.SerializerMethodField(

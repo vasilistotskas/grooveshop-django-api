@@ -144,6 +144,20 @@ def tenant_site_name() -> str:
     )
 
 
+def tenant_logo_url() -> str:
+    """Return the tenant's light-mode logo URL for email branding.
+
+    Priority: ``Tenant.logo_light_url`` → ``""``. Tenant-only — no
+    platform-wide fallback, because there IS no platform logo asset;
+    ``core.utils.email_context.build_email_context`` treats an empty
+    value as "no tenant logo configured" and the ``email_base.html``
+    template falls back to the static ``logo-dark.svg`` asset, so an
+    empty string here is a normal, expected state rather than an
+    error.
+    """
+    return _get_tenant_field("logo_light_url")
+
+
 # ---------------------------------------------------------------------------
 # Authentication — MFA
 # ---------------------------------------------------------------------------

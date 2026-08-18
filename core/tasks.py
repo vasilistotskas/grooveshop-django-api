@@ -19,16 +19,9 @@ from django.utils import timezone
 from django.utils import translation
 from django.utils.translation import gettext as _
 
+from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
-from core.utils.tenant_urls import (
-    get_tenant_base_url,
-    get_tenant_static_base_url,
-)
-from tenant.credentials import (
-    tenant_contact_email,
-    tenant_from_email,
-    tenant_site_name,
-)
+from tenant.credentials import tenant_contact_email, tenant_from_email
 
 from extra_settings.models import Setting
 
@@ -513,19 +506,15 @@ def send_inactive_user_notifications() -> dict[str, Any]:
 
             unsubscribe_url = generate_blanket_unsubscribe_link(user)
 
-            context = {
-                "user": {
+            context = build_email_context(
+                user={
                     "id": user.id,
                     "first_name": user.first_name,
                     "username": user.username,
                     "email": user.email,
                 },
-                "unsubscribe_url": unsubscribe_url,
-                "SITE_NAME": tenant_site_name(),
-                "INFO_EMAIL": tenant_contact_email(),
-                "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": get_tenant_static_base_url(),
-            }
+                unsubscribe_url=unsubscribe_url,
+            )
 
             with translation.override(get_user_language(user)):
                 mail_subject = _("We miss you!")

@@ -18,12 +18,9 @@ from extra_settings.models import Setting
 
 from core import celery_app
 from core.tasks import MonitoredTask
+from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language, get_user_language
-from core.utils.tenant_urls import (
-    get_tenant_base_url,
-    get_tenant_frontend_url,
-    get_tenant_static_base_url,
-)
+from core.utils.tenant_urls import get_tenant_frontend_url
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
@@ -236,18 +233,14 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
                     strip_tags(payment_instructions)
                 ).strip()
 
-            context = {
-                "order": order,
-                "items": order.items.all(),
-                "pay_way": pay_way,
-                "payment_instructions": payment_instructions,
-                "payment_instructions_text": payment_instructions_text,
-                "is_paid": is_paid,
-                "SITE_NAME": tenant_site_name(),
-                "INFO_EMAIL": tenant_contact_email(),
-                "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": get_tenant_static_base_url(),
-            }
+            context = build_email_context(
+                order=order,
+                items=order.items.all(),
+                pay_way=pay_way,
+                payment_instructions=payment_instructions,
+                payment_instructions_text=payment_instructions_text,
+                is_paid=is_paid,
+            )
 
             text_content = render_to_string(f"{template_base}.txt", context)
             html_content = render_to_string(f"{template_base}.html", context)
@@ -386,15 +379,11 @@ def send_dispute_notification_email(
 
         reason = (order.metadata or {}).get("dispute_reason", "unknown")
 
-        context = {
-            "order": order,
-            "dispute_id": dispute_id,
-            "reason": reason,
-            "SITE_NAME": tenant_site_name(),
-            "INFO_EMAIL": tenant_contact_email(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-        }
+        context = build_email_context(
+            order=order,
+            dispute_id=dispute_id,
+            reason=reason,
+        )
 
         subject = (
             f"[{tenant_site_name()}] Stripe dispute opened — Order #{order_id}"
@@ -493,15 +482,12 @@ def send_admin_new_order_email(self, order_id: int) -> bool:
             )
             return False
 
-        context = {
-            "order": order,
-            "items": order.items.all(),
-            "pay_way": order.pay_way,
-            "SITE_NAME": tenant_site_name(),
-            "INFO_EMAIL": staff_email,
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-        }
+        context = build_email_context(
+            order=order,
+            items=order.items.all(),
+            pay_way=order.pay_way,
+            INFO_EMAIL=staff_email,
+        )
 
         text_content = render_to_string(
             "emails/order/admin_new_order.txt", context
@@ -599,14 +585,10 @@ def send_payment_failed_email(self, order_id: int) -> bool:
 
         retry_url = get_tenant_frontend_url(f"/account/orders/{order.id}")
 
-        context = {
-            "order": order,
-            "retry_url": retry_url,
-            "SITE_NAME": tenant_site_name(),
-            "INFO_EMAIL": tenant_contact_email(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-        }
+        context = build_email_context(
+            order=order,
+            retry_url=retry_url,
+        )
 
         with translation.override(get_order_language(order)):
             subject = _("Payment Failed - Order #{order_id}").format(
@@ -744,18 +726,14 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             "user", "country", "region", "pay_way"
         ).get(id=order_id)
 
-        context = {
-            "order": order,
-            "status": "REFUNDED",
-            "status_display": order.get_payment_status_display()
+        context = build_email_context(
+            order=order,
+            status="REFUNDED",
+            status_display=order.get_payment_status_display()
             if order.payment_status
             else "Refunded",
-            "items": order.items.all(),
-            "SITE_NAME": tenant_site_name(),
-            "INFO_EMAIL": tenant_contact_email(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-        }
+            items=order.items.all(),
+        )
 
         with translation.override(get_order_language(order)):
             subject = _("Refund Processed - Order #{order_id}").format(
@@ -875,16 +853,12 @@ def send_order_status_update_email(
         ):
             return True
 
-        context = {
-            "order": order,
-            "items": order.items.select_related("product").all(),
-            "status": status,
-            "status_display": OrderStatus(status).label,
-            "SITE_NAME": tenant_site_name(),
-            "INFO_EMAIL": tenant_contact_email(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-        }
+        context = build_email_context(
+            order=order,
+            items=order.items.select_related("product").all(),
+            status=status,
+            status_display=OrderStatus(status).label,
+        )
 
         template_base = f"emails/order/order_{status.lower()}"
 
@@ -1043,15 +1017,11 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
                 )
                 return True
 
-        context = {
-            "order": order,
-            "tracking_number": order.tracking_number,
-            "carrier": order.shipping_carrier,
-            "SITE_NAME": tenant_site_name(),
-            "INFO_EMAIL": tenant_contact_email(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-        }
+        context = build_email_context(
+            order=order,
+            tracking_number=order.tracking_number,
+            carrier=order.shipping_carrier,
+        )
 
         with translation.override(get_order_language(order)):
             subject = _("Your Order #{order_id} Has Shipped").format(
@@ -1249,14 +1219,10 @@ def send_invoice_email(self, order_id: int) -> bool:
             subject = _(
                 "Invoice {invoice_number} for your order #{order_id}"
             ).format(invoice_number=invoice.invoice_number, order_id=order.id)
-            context = {
-                "order": order,
-                "invoice": invoice,
-                "SITE_NAME": tenant_site_name(),
-                "INFO_EMAIL": tenant_contact_email(),
-                "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": get_tenant_static_base_url(),
-            }
+            context = build_email_context(
+                order=order,
+                invoice=invoice,
+            )
             text_content = render_to_string(
                 "emails/order/invoice_issued.txt", context
             )
@@ -1578,13 +1544,7 @@ def check_pending_orders() -> int:
         # try/except also swallowed setup errors, defeating the
         # task-level autoretry).
         try:
-            context = {
-                "order": order,
-                "SITE_NAME": tenant_site_name(),
-                "INFO_EMAIL": tenant_contact_email(),
-                "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": get_tenant_static_base_url(),
-            }
+            context = build_email_context(order=order)
 
             with translation.override(get_order_language(order)):
                 subject = _("Reminder: Complete Your Order #{order_id}").format(
@@ -1866,27 +1826,21 @@ def send_checkout_abandonment_emails() -> int:
                 else ""
             )
 
-            context = {
-                "cart": cart,
-                "items": list(cart.items.all()),
+            context = build_email_context(
+                cart=cart,
+                items=list(cart.items.all()),
                 # Point the CTA at the recovery route — the Nuxt page
                 # there re-attaches the cart to the session (including
                 # the logged-out → login → back round-trip via the
                 # global auth middleware) and forwards to /cart with a
                 # ``recovered=1`` flag so the shopper sees a welcome
                 # banner instead of landing silently on their items.
-                "cart_url": get_tenant_frontend_url(
-                    f"/cart/recover/{cart.uuid}"
-                ),
-                "preferences_url": get_tenant_frontend_url(
+                cart_url=get_tenant_frontend_url(f"/cart/recover/{cart.uuid}"),
+                preferences_url=get_tenant_frontend_url(
                     "/account/subscriptions/"
                 ),
-                "unsubscribe_url": unsubscribe_url,
-                "SITE_NAME": tenant_site_name(),
-                "INFO_EMAIL": tenant_contact_email(),
-                "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": get_tenant_static_base_url(),
-            }
+                unsubscribe_url=unsubscribe_url,
+            )
             with translation.override(get_user_language(cart.user)):
                 subject = _("Did you forget something? — {site_name}").format(
                     site_name=tenant_site_name()

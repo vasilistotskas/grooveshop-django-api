@@ -8,16 +8,9 @@ from django.conf import settings
 from django.utils import translation
 
 from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowRetryableError
-from core.utils.tenant_urls import (
-    get_tenant_base_url,
-    get_tenant_static_base_url,
-)
+from core.utils.email_context import build_email_context
 from tenant.celery import TenantTask
-from tenant.credentials import (
-    tenant_contact_email,
-    tenant_from_email,
-    tenant_site_name,
-)
+from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
 
@@ -310,16 +303,13 @@ def boxnow_send_arrival_notification(
     )
     with translation.override(lang):
         subject = _("Your BOX NOW parcel arrived at the locker")
-        context = {
-            "order": order,
-            "shipment": shipment,
-            "locker": locker,
-            "locker_address": locker_address,
-            "parcel_id": shipment.parcel_id,
-            "SITE_NAME": tenant_site_name(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-        }
+        context = build_email_context(
+            order=order,
+            shipment=shipment,
+            locker=locker,
+            locker_address=locker_address,
+            parcel_id=shipment.parcel_id,
+        )
         text_body = render_to_string(
             "emails/order/boxnow_parcel_at_locker.txt", context
         )

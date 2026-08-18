@@ -31,6 +31,7 @@ from tenant.credentials import (
     box_now_credentials,
     tenant_contact_email,
     tenant_from_email,
+    tenant_logo_url,
     tenant_meta_capi_access_token,
     tenant_meta_capi_dataset_id,
     tenant_meta_pixel_id,
@@ -541,6 +542,30 @@ class TestTenantSiteName:
         bind_tenant(tenant)
         settings.SITE_NAME = "Webside"
         assert tenant_site_name() == "Webside"
+
+
+class TestTenantLogoUrl:
+    """``tenant_logo_url()`` — Tenant.logo_light_url, no platform
+    fallback (there is no platform logo asset; empty means "render
+    the template's static fallback logo")."""
+
+    def test_returns_tenant_logo_when_set(self, bind_tenant, tenant_factory):
+        tenant = tenant_factory("logo-url-1")
+        tenant.logo_light_url = "https://cdn.example.com/logo.svg"
+        tenant.save()
+        bind_tenant(tenant)
+        assert tenant_logo_url() == "https://cdn.example.com/logo.svg"
+
+    def test_empty_when_tenant_has_no_logo(self, bind_tenant, tenant_factory):
+        tenant = tenant_factory("logo-url-2")
+        tenant.logo_light_url = ""
+        tenant.save()
+        bind_tenant(tenant)
+        assert tenant_logo_url() == ""
+
+    def test_empty_with_no_active_tenant(self, monkeypatch):
+        monkeypatch.setattr(connection, "tenant", None, raising=False)
+        assert tenant_logo_url() == ""
 
 
 # ---------------------------------------------------------------------------

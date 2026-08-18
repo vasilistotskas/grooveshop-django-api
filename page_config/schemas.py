@@ -139,6 +139,10 @@ _VALIDATORS: dict[str, dict] = {
     "divider": {},
     "loyalty_hero": {},
     "search_bar": {},
+    "about_content": {},
+    "vision_content": {},
+    "what_is_microlearning": {},
+    "why_microlearning": {},
 }
 
 

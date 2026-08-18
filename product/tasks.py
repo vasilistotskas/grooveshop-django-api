@@ -12,12 +12,9 @@ from django.utils.translation import override as translation_override
 
 from core import celery_app
 from core.tasks import MonitoredTask
+from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
-from core.utils.tenant_urls import (
-    get_tenant_base_url,
-    get_tenant_frontend_url,
-    get_tenant_static_base_url,
-)
+from core.utils.tenant_urls import get_tenant_frontend_url
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
@@ -288,13 +285,7 @@ def check_low_stock_products() -> dict:
         for p in products_to_alert
     ]
 
-    context = {
-        "products": rows,
-        "SITE_NAME": tenant_site_name(),
-        "INFO_EMAIL": tenant_contact_email(),
-        "SITE_URL": get_tenant_base_url(),
-        "STATIC_BASE_URL": get_tenant_static_base_url(),
-    }
+    context = build_email_context(products=rows)
     subject = _("[{site}] Low stock alert — {n} product(s)").format(
         site=tenant_site_name(), n=len(rows)
     )
@@ -452,14 +443,10 @@ def send_product_alert_restock(product_id: int) -> dict:
                 product.safe_translation_getter("name", any_language=True)
                 or f"Product {product.slug or product.id}"
             )
-            context = {
-                "product_name": product_name,
-                "product_url": product_url,
-                "SITE_NAME": tenant_site_name(),
-                "INFO_EMAIL": tenant_contact_email(),
-                "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": get_tenant_static_base_url(),
-            }
+            context = build_email_context(
+                product_name=product_name,
+                product_url=product_url,
+            )
             subject = _("[{site}] {name} is back in stock").format(
                 site=tenant_site_name(), name=product_name
             )
@@ -531,16 +518,12 @@ def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
                 product.safe_translation_getter("name", any_language=True)
                 or f"Product {product.slug or product.id}"
             )
-            context = {
-                "product_name": product_name,
-                "product_url": product_url,
-                "new_price": new_price,
-                "target_price": str(alert.target_price.amount),
-                "SITE_NAME": tenant_site_name(),
-                "INFO_EMAIL": tenant_contact_email(),
-                "SITE_URL": get_tenant_base_url(),
-                "STATIC_BASE_URL": get_tenant_static_base_url(),
-            }
+            context = build_email_context(
+                product_name=product_name,
+                product_url=product_url,
+                new_price=new_price,
+                target_price=str(alert.target_price.amount),
+            )
             subject = _(
                 "[{site}] Price drop: {name} is now at your target"
             ).format(site=tenant_site_name(), name=product_name)

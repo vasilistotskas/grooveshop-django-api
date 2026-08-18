@@ -7,11 +7,10 @@ from datetime import timedelta
 
 from extra_settings.models import Setting
 
+from core.utils.email_context import build_email_context
 from core.utils.tenant_urls import (
     get_tenant_api_base_url,
-    get_tenant_base_url,
     get_tenant_frontend_url,
-    get_tenant_static_base_url,
 )
 from tenant.credentials import (
     tenant_contact_email,
@@ -102,17 +101,13 @@ def send_subscription_confirmation(
         user = subscription.user
         language = get_user_language(user)
 
-        context = {
-            "user": user,
-            "topic": subscription.topic,
-            "subscription": subscription,
-            "confirmation_url": confirmation_url,
-            "SITE_NAME": tenant_site_name(),
-            "SITE_URL": get_tenant_base_url(),
-            "INFO_EMAIL": tenant_contact_email(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-            "LANGUAGE_CODE": language,
-        }
+        context = build_email_context(
+            user=user,
+            topic=subscription.topic,
+            subscription=subscription,
+            confirmation_url=confirmation_url,
+            LANGUAGE_CODE=language,
+        )
 
         with translation.override(language):
             subject = _("Confirm your subscription to {topic}").format(
@@ -291,9 +286,9 @@ def send_newsletter(
             continue
 
         unsubscribe_url = generate_unsubscribe_link(user, topic)
-        user_context = context.copy()
-        user_context.update(
-            {
+        user_context = build_email_context(
+            **{
+                **context,
                 "user": user,
                 "topic": topic,
                 "subscription": subscription,
@@ -301,10 +296,6 @@ def send_newsletter(
                 "preferences_url": get_tenant_frontend_url(
                     "/account/subscriptions/"
                 ),
-                "SITE_NAME": tenant_site_name(),
-                "SITE_URL": get_tenant_base_url(),
-                "INFO_EMAIL": tenant_contact_email(),
-                "STATIC_BASE_URL": get_tenant_static_base_url(),
             }
         )
 

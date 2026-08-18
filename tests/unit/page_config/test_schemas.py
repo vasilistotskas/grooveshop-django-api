@@ -76,6 +76,24 @@ def test_spacer_height_enum():
         validate_section_props("spacer", {"height": "huge"})
 
 
+@pytest.mark.parametrize(
+    "component_type",
+    [
+        "about_content",
+        "vision_content",
+        "what_is_microlearning",
+        "why_microlearning",
+    ],
+)
+def test_brand_content_blocks_take_no_props(component_type):
+    # Same shape as divider/loyalty_hero/search_bar: rendering is a
+    # per-tenant Nuxt variant component with no configurable props.
+    validate_section_props(component_type, {})
+    validate_section_props(component_type, None)
+    with pytest.raises(ValidationError):
+        validate_section_props(component_type, {"heading": "Not allowed"})
+
+
 # ---------------------------------------------------------------------------
 # Navigation items validation
 # ---------------------------------------------------------------------------

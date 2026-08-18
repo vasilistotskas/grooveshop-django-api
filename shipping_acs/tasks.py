@@ -27,16 +27,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from shipping_acs.exceptions import AcsAPIError, AcsRetryableError
-from core.utils.tenant_urls import (
-    get_tenant_base_url,
-    get_tenant_static_base_url,
-)
+from core.utils.email_context import build_email_context
 from tenant.celery import TenantTask
-from tenant.credentials import (
-    tenant_contact_email,
-    tenant_from_email,
-    tenant_site_name,
-)
+from tenant.credentials import tenant_contact_email, tenant_from_email
 
 logger = logging.getLogger(__name__)
 
@@ -413,7 +406,6 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
 
     from tenant.credentials import (  # noqa: PLC0415
         tenant_admin_recipients,
-        tenant_contact_email,
         tenant_from_email,
         tenant_site_name,
     )
@@ -443,14 +435,10 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
         for s in shipments
     ]
 
-    context = {
-        "shipments": rows,
-        "threshold_days": threshold_days,
-        "SITE_NAME": tenant_site_name(),
-        "INFO_EMAIL": tenant_contact_email(),
-        "SITE_URL": get_tenant_base_url(),
-        "STATIC_BASE_URL": get_tenant_static_base_url(),
-    }
+    context = build_email_context(
+        shipments=rows,
+        threshold_days=threshold_days,
+    )
     from django.utils.translation import gettext as _
 
     subject = _("Stale ACS shipment alert — {n} shipment(s)").format(
@@ -594,14 +582,11 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
     )
     with translation.override(lang):
         subject = _("Your ACS parcel is out for delivery")
-        context = {
-            "order": order,
-            "shipment": shipment,
-            "voucher_no": shipment.voucher_no,
-            "SITE_NAME": tenant_site_name(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-        }
+        context = build_email_context(
+            order=order,
+            shipment=shipment,
+            voucher_no=shipment.voucher_no,
+        )
         text_body = render_to_string(
             "emails/order/acs_out_for_delivery.txt", context
         )

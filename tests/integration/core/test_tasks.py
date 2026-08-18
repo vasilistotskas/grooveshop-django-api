@@ -569,6 +569,59 @@ class TestSendInactiveUserNotificationsTask:
     @patch("core.tasks.EmailMultiAlternatives")
     @patch("core.tasks.render_to_string")
     @patch("core.tasks.logger")
+    @patch(
+        "core.utils.email_context.tenant_logo_url",
+        return_value="https://cdn.example.com/tenant-logo.svg",
+    )
+    def test_send_inactive_user_notifications_includes_tenant_logo(
+        self, _mock_logo_url, mock_logger, mock_render, mock_email_cls, db
+    ):
+        """``build_email_context`` (routed through by every email task,
+        including this re-engagement send) must surface the active
+        tenant's logo as ``SITE_LOGO_URL`` in the render context."""
+        UserAccountFactory(
+            last_login=timezone.now() - timedelta(days=70),
+            is_active=True,
+            email="inactive@example.com",
+            language_code="en",
+        )
+        mock_render.return_value = "<html>Test email</html>"
+
+        result = send_inactive_user_notifications()
+
+        assert result["emails_sent"] == 1
+        rendered_context = mock_render.call_args_list[0][0][1]
+        assert (
+            rendered_context["SITE_LOGO_URL"]
+            == "https://cdn.example.com/tenant-logo.svg"
+        )
+
+    @patch("core.tasks.EmailMultiAlternatives")
+    @patch("core.tasks.render_to_string")
+    @patch("core.tasks.logger")
+    def test_send_inactive_user_notifications_no_tenant_logo_falls_back(
+        self, mock_logger, mock_render, mock_email_cls, db
+    ):
+        """Byte-parity guard: without an active tenant configuring a
+        logo (the default in this test), ``SITE_LOGO_URL`` stays empty
+        so the template renders its static fallback logo unchanged."""
+        UserAccountFactory(
+            last_login=timezone.now() - timedelta(days=70),
+            is_active=True,
+            email="inactive@example.com",
+            language_code="en",
+        )
+        mock_render.return_value = "<html>Test email</html>"
+
+        result = send_inactive_user_notifications()
+
+        assert result["emails_sent"] == 1
+        rendered_context = mock_render.call_args_list[0][0][1]
+        assert rendered_context["SITE_LOGO_URL"] == ""
+
+    @patch("core.tasks.EmailMultiAlternatives")
+    @patch("core.tasks.render_to_string")
+    @patch("core.tasks.logger")
     def test_send_inactive_user_notifications_with_failures(
         self, mock_logger, mock_render, mock_email_cls, db
     ):

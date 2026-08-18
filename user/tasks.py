@@ -110,17 +110,10 @@ def export_user_data_task(self, export_id: int) -> dict:
     from django.utils.translation import gettext as _
     from django.utils.translation import override
 
+    from core.utils.email_context import build_email_context
     from core.utils.i18n import get_user_language
-    from core.utils.tenant_urls import (
-        get_tenant_base_url,
-        get_tenant_frontend_url,
-        get_tenant_static_base_url,
-    )
-    from tenant.credentials import (
-        tenant_contact_email,
-        tenant_from_email,
-        tenant_site_name,
-    )
+    from core.utils.tenant_urls import get_tenant_frontend_url
+    from tenant.credentials import tenant_contact_email, tenant_from_email
     from user.models.data_export import UserDataExport
     from user.services.gdpr import (
         EXPORT_TTL,
@@ -179,16 +172,12 @@ def export_user_data_task(self, export_id: int) -> dict:
             f"/account/settings/privacy?export={export.token}"
         )
 
-        context = {
-            "user": user,
-            "download_url": download_url,
-            "expires_at": export.expires_at,
-            "file_size_kb": round(export.file_size / 1024, 1),
-            "SITE_NAME": tenant_site_name(),
-            "INFO_EMAIL": tenant_contact_email(),
-            "SITE_URL": get_tenant_base_url(),
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-        }
+        context = build_email_context(
+            user=user,
+            download_url=download_url,
+            expires_at=export.expires_at,
+            file_size_kb=round(export.file_size / 1024, 1),
+        )
 
         with override(get_user_language(user)):
             subject = _("Your data export is ready")

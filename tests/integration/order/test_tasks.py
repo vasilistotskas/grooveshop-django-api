@@ -136,9 +136,12 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
     @patch(
         "user.utils.subscription.tenant_site_name", return_value="Branded Store"
     )
-    @patch("order.tasks.tenant_site_name", return_value="Branded Store")
+    @patch(
+        "core.utils.email_context.tenant_site_name",
+        return_value="Branded Store",
+    )
     def test_order_confirmation_uses_tenant_store_name(
-        self, mock_tasks_site_name, mock_subscription_site_name
+        self, mock_context_site_name, mock_subscription_site_name
     ):
         """``SITE_NAME`` context / ``List-ID`` header must come from
         ``tenant_site_name()`` (the active tenant's ``store_name``), not
@@ -151,7 +154,10 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         binding a fake ``connection.tenant`` before the call would be
         silently overridden for the task's duration. Patching
         ``tenant_site_name`` at each call site instead exercises exactly
-        what TASK A changed — the call sites in ``order.tasks`` and
+        what TASK A changed — the ``SITE_NAME`` context key is now built
+        centrally by ``core.utils.email_context.build_email_context``
+        (every email task routes through it), while the ``List-ID``
+        header still calls ``tenant_site_name`` directly in
         ``user.utils.subscription.build_transactional_list_headers`` —
         without fighting the schema-switch machinery.
 
@@ -179,6 +185,58 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertEqual(
             headers.get("List-ID"), "order_confirmation.Branded Store"
         )
+
+    @patch(
+        "core.utils.email_context.tenant_logo_url",
+        return_value="https://cdn.example.com/tenant-logo.svg",
+    )
+    def test_order_confirmation_email_includes_tenant_logo(
+        self, _mock_logo_url
+    ):
+        """``build_email_context`` (used by every email task, including
+        ``send_order_confirmation_email``) must surface the active
+        tenant's ``logo_light_url`` as ``SITE_LOGO_URL`` — previously no
+        live send included that key, so the template's per-tenant logo
+        branch was dead code (see ``core/utils/email_context.py``).
+        """
+        order = OrderFactory.create(
+            email="logo-tenant@example.com",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        _release_confirmation_email(order.id)
+
+        with patch("order.tasks.EmailMultiAlternatives") as mock_email:
+            instance = MagicMock()
+            mock_email.return_value = instance
+            result = send_order_confirmation_email(order.id)
+
+        self.assertTrue(result)
+        html_body = instance.attach_alternative.call_args.args[0]
+        self.assertIn("https://cdn.example.com/tenant-logo.svg", html_body)
+        self.assertNotIn("logo-dark.svg", html_body)
+
+    def test_order_confirmation_email_falls_back_without_tenant_logo(self):
+        """Byte-parity guard: a tenant with no ``logo_light_url``
+        configured (the default — no tenant bound at all in this test)
+        must still render the platform's static fallback logo exactly
+        as before this change.
+        """
+        order = OrderFactory.create(
+            email="no-logo-tenant@example.com",
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+        )
+        _release_confirmation_email(order.id)
+
+        with patch("order.tasks.EmailMultiAlternatives") as mock_email:
+            instance = MagicMock()
+            mock_email.return_value = instance
+            result = send_order_confirmation_email(order.id)
+
+        self.assertTrue(result)
+        html_body = instance.attach_alternative.call_args.args[0]
+        self.assertIn("logo-dark.svg", html_body)
 
     @patch("order.tasks.EmailMultiAlternatives")
     @patch("order.tasks.render_to_string")

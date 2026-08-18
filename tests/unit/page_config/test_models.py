@@ -12,7 +12,9 @@ class TestComponentType(TestCase):
         assert ComponentType.SPACER == "spacer"
 
     def test_choices_count(self):
-        assert len(ComponentType.choices) == 19
+        # 19 original + 4 brand content blocks (about/vision/
+        # what-is-microlearning/why-microlearning).
+        assert len(ComponentType.choices) == 23
 
 
 class TestPageLayout(TestCase):

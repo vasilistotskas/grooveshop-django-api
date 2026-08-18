@@ -48,6 +48,17 @@ class ComponentType(models.TextChoices):
         _("Newsletter Signup"),
     )
     TESTIMONIALS = "testimonials", _("Testimonials")
+    # Brand marketing content blocks: each renders through a
+    # per-tenant Nuxt variant component with no props — the markup
+    # itself stays in the frontend, this row only carries the section
+    # slot in the layout.
+    ABOUT_CONTENT = "about_content", _("About Content")
+    VISION_CONTENT = "vision_content", _("Vision Content")
+    WHAT_IS_MICROLEARNING = (
+        "what_is_microlearning",
+        _("What Is Microlearning"),
+    )
+    WHY_MICROLEARNING = "why_microlearning", _("Why Microlearning")
 
     # Layout
     SPACER = "spacer", _("Spacer")

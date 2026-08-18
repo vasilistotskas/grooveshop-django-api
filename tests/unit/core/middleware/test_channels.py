@@ -9,6 +9,7 @@ These tests cover:
 - ``TokenAuthMiddlewareStack``.
 """
 
+import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from channels.db import database_sync_to_async
@@ -30,6 +31,29 @@ Token = get_token_model()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _fresh_default_cache():
+    """Drop the THREAD-LOCAL default-cache instance before each test.
+
+    ``cache._cache.get_client`` below assumes the Redis-backed
+    ``CustomCache``. These tests are async — they resolve the cache
+    proxy on the event-loop thread, whose thread-local ``CacheHandler``
+    entry may have been materialized while ANOTHER test on this xdist
+    worker held an ``override_settings(CACHES=LocMem)`` window (the
+    dashboard caching tests do exactly that). A leaked LocMem backend
+    has ``_cache`` = OrderedDict → ``get_client`` AttributeError, a
+    7-test flake. Deleting the cached instance forces re-resolution
+    from the CURRENT settings.
+    """
+    from django.core.cache import caches
+
+    try:
+        del caches._connections.default
+    except AttributeError:
+        pass
+    yield
 
 
 def _make_getdel_patcher(return_value):

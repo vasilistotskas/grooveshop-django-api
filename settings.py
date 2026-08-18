@@ -267,6 +267,14 @@ LOGIN_URL = "/accounts/login/"
 AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
     "django.contrib.auth.backends.ModelBackend",
+    # Platform-staff-only backend for the admin login (see
+    # tenant.auth_backends.PlatformStaffBackend). Its authenticate()
+    # always returns None, so it is inert for the storefront's normal
+    # login dispatch above — it is listed here ONLY because Django's
+    # session-based get_user() requires the backend path recorded in
+    # the session to be a member of this setting, or it silently logs
+    # the user out on the very next request.
+    "tenant.auth_backends.PlatformStaffBackend",
 ]
 
 WSGI_APPLICATION = "wsgi.application"
@@ -3172,11 +3180,11 @@ if IS_KUBERNETES:
         "disable_existing_loggers": False,
         "formatters": {
             "json": {
-                "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d, "process": "%(process)d", "thread": "%(thread)d", "pod": "%(hostname)s", "correlation_id": "%(correlation_id)s", "message": "%(message)s"}',
+                "format": '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "module": "%(module)s", "function": "%(funcName)s", "line": %(lineno)d, "process": "%(process)d", "thread": "%(thread)d", "pod": "%(hostname)s", "correlation_id": "%(correlation_id)s", "schema": "%(schema_name)s", "domain": "%(domain_url)s", "message": "%(message)s"}',
                 "datefmt": "%Y-%m-%dT%H:%M:%S",
             },
             "console": {
-                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] %(funcName)s: %(message)s",
+                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] [schema=%(schema_name)s] %(funcName)s: %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
         },
@@ -3186,6 +3194,9 @@ if IS_KUBERNETES:
             },
             "add_correlation_id": {
                 "()": "core.logging.CorrelationIdFilter",
+            },
+            "add_tenant_context": {
+                "()": "core.logging.TenantContextFilter",
             },
             "drop_asyncio_cancelled": {
                 "()": "core.logging.DropAsyncioCancelledError",
@@ -3198,7 +3209,11 @@ if IS_KUBERNETES:
                 if SYSTEM_ENV == "production"
                 else "console",
                 "level": logging_level,
-                "filters": ["add_hostname", "add_correlation_id"],
+                "filters": [
+                    "add_hostname",
+                    "add_correlation_id",
+                    "add_tenant_context",
+                ],
             },
         },
         "root": {
@@ -3238,7 +3253,7 @@ elif IS_DOCKER or IS_DEVELOPMENT:
         "disable_existing_loggers": False,
         "formatters": {
             "verbose": {
-                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] %(funcName)s: %(message)s",
+                "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] [cid=%(correlation_id)s] [schema=%(schema_name)s] %(funcName)s: %(message)s",
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
             "simple": {
@@ -3249,6 +3264,9 @@ elif IS_DOCKER or IS_DEVELOPMENT:
         "filters": {
             "add_correlation_id": {
                 "()": "core.logging.CorrelationIdFilter",
+            },
+            "add_tenant_context": {
+                "()": "core.logging.TenantContextFilter",
             },
             "drop_asyncio_cancelled": {
                 "()": "core.logging.DropAsyncioCancelledError",
@@ -3267,7 +3285,7 @@ elif IS_DOCKER or IS_DEVELOPMENT:
                 "backupCount": backup_count,
                 "level": logging_level,
                 "formatter": "verbose",
-                "filters": ["add_correlation_id"],
+                "filters": ["add_correlation_id", "add_tenant_context"],
             },
         },
         "root": {
@@ -3302,10 +3320,16 @@ else:
                 "datefmt": "%Y-%m-%d %H:%M:%S",
             },
         },
+        "filters": {
+            "add_tenant_context": {
+                "()": "core.logging.TenantContextFilter",
+            },
+        },
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
                 "formatter": "simple",
+                "filters": ["add_tenant_context"],
             },
         },
         "root": {

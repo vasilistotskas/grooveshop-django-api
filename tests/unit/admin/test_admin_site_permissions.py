@@ -9,11 +9,14 @@ from the public-schema admin and may need to enter any tenant's).
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from django.contrib.admin import site as admin_site
 from django.db import connection
 from django.test import RequestFactory
 
+from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
 from tenant.models import (
     Tenant,
     TenantMembershipRole,
@@ -44,9 +47,25 @@ def bind_tenant(monkeypatch):
     return _bind
 
 
-def _request_for(user):
+def _request_for(user, *, platform_session=True):
+    """Build a request with a session mimicking a real admin login.
+
+    ``platform_session=True`` (the default) sets the session's
+    ``_auth_user_backend`` to ``PlatformStaffBackend``'s dotted path —
+    matching what ``django.contrib.auth.login()`` records for every
+    admin login (see ``admin.forms.PlatformAdminAuthenticationForm``).
+    Pass ``False`` to simulate a session authenticated by a DIFFERENT
+    backend (e.g. a tenant-schema/storefront session), which
+    ``has_permission()`` must now reject regardless of role/superuser
+    status.
+    """
     request = RequestFactory().get("/admin/")
     request.user = user
+    request.session = (
+        {"_auth_user_backend": PLATFORM_STAFF_BACKEND_PATH}
+        if platform_session
+        else {"_auth_user_backend": "django.contrib.auth.backends.ModelBackend"}
+    )
     return request
 
 
@@ -114,6 +133,59 @@ class TestAdminSitePermission:
         bind_tenant(tenant)
         # Django's base check (is_active AND is_staff) still applies.
         assert admin_site.has_permission(_request_for(shopper)) is False
+
+
+@pytest.mark.django_db
+class TestAdminSitePlatformSessionGuard:
+    """``has_permission`` additionally requires the session to have
+    been authenticated via ``PlatformStaffBackend`` — closes a
+    pk-collision ambiguity where a tenant-schema user's pk could
+    coincidentally match a public-schema membership's user_id.
+    """
+
+    def test_staff_role_denied_when_session_backend_differs(
+        self, tenant, bind_tenant
+    ):
+        staff = UserAccountFactory(is_staff=True)
+        UserTenantMembership.objects.create(
+            user=staff,
+            tenant=tenant,
+            role=TenantMembershipRole.STAFF,
+            is_active=True,
+        )
+        bind_tenant(tenant)
+        request = _request_for(staff, platform_session=False)
+        assert admin_site.has_permission(request) is False
+
+    def test_superuser_denied_when_session_backend_differs(
+        self, tenant, bind_tenant
+    ):
+        superuser = UserAccountFactory(is_staff=True, is_superuser=True)
+        bind_tenant(tenant)
+        request = _request_for(superuser, platform_session=False)
+        assert admin_site.has_permission(request) is False
+
+    def test_colliding_pk_tenant_user_denied(self, tenant, bind_tenant):
+        """A tenant-schema user whose pk happens to collide with a
+        public-schema membership's user_id must still be denied when
+        the session was not minted by PlatformStaffBackend — the
+        backend-session guard, not the pk, is authoritative."""
+        staff = UserAccountFactory(is_staff=True)
+        UserTenantMembership.objects.create(
+            user=staff,
+            tenant=tenant,
+            role=TenantMembershipRole.OWNER,
+            is_active=True,
+        )
+        # Simulate a colliding tenant-schema identity: same pk, but the
+        # object stands in for a row that lives in a DIFFERENT schema
+        # and was authenticated by a different backend entirely.
+        colliding_user = SimpleNamespace(
+            pk=staff.pk, is_active=True, is_staff=True, is_superuser=True
+        )
+        bind_tenant(tenant)
+        request = _request_for(colliding_user, platform_session=False)
+        assert admin_site.has_permission(request) is False
 
 
 @pytest.mark.django_db

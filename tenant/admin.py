@@ -459,3 +459,34 @@ class UserTenantMembershipAdmin(ModelAdmin):
         # Membership admin is a platform-wide surface — like Tenant and
         # TenantDomain, it must not leak into tenant-scoped admin.
         return connection.schema_name == "public"
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Pin the ``user`` FK choices to the PUBLIC schema.
+
+        ``UserAccount`` is mirrored per-schema — an unqualified
+        ``UserAccount.objects.all()`` resolves against whatever schema
+        the connection is currently pinned to. Membership rows only
+        ever reference PUBLIC-schema users (platform identities), so
+        the pks captured here are evaluated eagerly, inside
+        ``schema_context(public)``, rather than left as a lazy
+        queryset that could be (re-)evaluated later against a
+        different schema.
+        """
+        if db_field.name == "user":
+            from django.contrib.auth import get_user_model
+            from django_tenants.utils import (
+                get_public_schema_name,
+                schema_context,
+            )
+
+            user_model = get_user_model()
+            with schema_context(get_public_schema_name()):
+                public_user_ids = list(
+                    user_model.objects.order_by(
+                        user_model.USERNAME_FIELD
+                    ).values_list("pk", flat=True)
+                )
+            kwargs["queryset"] = user_model.objects.filter(
+                pk__in=public_user_ids
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)

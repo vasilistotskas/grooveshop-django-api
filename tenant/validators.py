@@ -14,6 +14,7 @@ import re
 
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
+from django_tenants.utils import get_public_schema_name
 
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -168,10 +169,21 @@ def validate_reserved_schema_name(value: str) -> None:
     Case-insensitive: ``Public`` / ``PUBLIC`` are rejected exactly like
     ``public`` since PostgreSQL schema names are effectively
     case-sensitive but a tenant named for confusion is still a footgun.
+
+    Carve-out: the literal ``get_public_schema_name()`` value (``public``
+    by default) is exempt. The framework *requires* exactly one Tenant
+    row with that schema_name (see ``bootstrap_platform``) — without
+    this carve-out, ``full_clean()``/``ModelForm`` validation (e.g.
+    editing that row in ``TenantAdmin`` on the public-schema host) would
+    reject the one legitimate use of the name. ``schema_name`` is
+    ``unique=True`` so this cannot be abused to create a second row
+    claiming the public schema.
     """
     if not value:
         return
     normalized = value.strip().lower()
+    if normalized == get_public_schema_name().strip().lower():
+        return
     if normalized in RESERVED_SCHEMA_NAMES or normalized.startswith("pg_"):
         raise ValidationError(
             _(

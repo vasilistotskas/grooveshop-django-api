@@ -71,7 +71,14 @@ def superuser():
 @pytest.fixture
 def logged_in_client(superuser):
     client = Client()
-    client.force_login(superuser)
+    # Admin sessions are platform-staff-only — has_permission() requires
+    # the session to have been authenticated via PlatformStaffBackend
+    # (see admin.forms.PlatformAdminAuthenticationForm). force_login()
+    # defaults to the FIRST entry in AUTHENTICATION_BACKENDS (allauth's),
+    # which has_permission() would now reject.
+    client.force_login(
+        superuser, backend="tenant.auth_backends.PlatformStaffBackend"
+    )
     return client
 
 

@@ -494,8 +494,11 @@ def test_schema_name_ordinary_value_is_valid():
 @pytest.mark.parametrize(
     "reserved",
     [
-        "public",
-        "PUBLIC",
+        # NOTE: "public"/"PUBLIC" are intentionally NOT here — see
+        # test_schema_name_public_schema_name_is_valid below. The
+        # PUBLIC schema name is carved out of this validator because
+        # the framework requires exactly one Tenant row with that
+        # schema_name (bootstrap_platform).
         "global",
         "Global",
         "information_schema",
@@ -524,4 +527,18 @@ def test_schema_name_reserved_value_rejected_by_field_validator_too():
     from tenant.validators import validate_reserved_schema_name
 
     with pytest.raises(ValidationError):
-        validate_reserved_schema_name("public")
+        validate_reserved_schema_name("global")
+
+
+@pytest.mark.parametrize("value", ["public", "PUBLIC", "Public"])
+def test_schema_name_public_schema_name_is_valid(value):
+    """The literal public schema name is carved out (case-insensitively)
+    — it's the ONE legitimate value for the platform tenant row created
+    by ``bootstrap_platform``. ``schema_name`` is ``unique=True`` so
+    this cannot be abused to create a second row claiming it."""
+    from tenant.validators import validate_reserved_schema_name
+
+    validate_reserved_schema_name(value)  # must not raise
+
+    t = _unsaved_tenant(schema_name=value)
+    t.clean()  # must not raise

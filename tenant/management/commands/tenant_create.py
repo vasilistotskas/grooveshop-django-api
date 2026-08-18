@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from django.core.management.base import BaseCommand, CommandError
-from django_tenants.utils import schema_context
+from django_tenants.utils import get_public_schema_name, schema_context
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,21 @@ class Command(BaseCommand):
         schema_name = options["schema_name"]
         slug = options["slug"]
         domain = options["domain"]
+
+        # ``validate_reserved_schema_name`` carves out
+        # ``get_public_schema_name()`` (see tenant/validators.py) so the
+        # ONE legitimate public-tenant row — created exclusively by
+        # ``bootstrap_platform`` — can pass full_clean()/ModelForm
+        # validation later. This command is for ordinary tenants only,
+        # so it re-asserts the rejection independently rather than
+        # relying on the (now permissive) shared validator for this
+        # one value.
+        if schema_name == get_public_schema_name():
+            raise CommandError(
+                f"'{schema_name}' is a reserved schema name and cannot "
+                "be used for a tenant — it is managed exclusively by "
+                "`manage.py bootstrap_platform`."
+            )
 
         # ``Tenant.objects.create()`` below bypasses ``full_clean()``
         # (plain ``.save()``, no ModelForm/DRF serializer in the loop),
@@ -105,6 +120,7 @@ class Command(BaseCommand):
 
     def _provision_owner_membership(self, tenant, owner_email: str):
         from django.contrib.auth import get_user_model
+        from django_tenants.utils import get_public_schema_name, schema_context
 
         from tenant.models import (
             TenantMembershipRole,
@@ -112,7 +128,13 @@ class Command(BaseCommand):
         )
 
         User = get_user_model()
-        user = User.objects.filter(email__iexact=owner_email).first()
+        # Owner/staff identities are platform accounts — the lookup
+        # must always resolve the PUBLIC-schema row, not whichever
+        # schema happens to be active when this command runs (this
+        # command creates the tenant schema earlier in handle(), so
+        # the connection can be pinned to it by the time we get here).
+        with schema_context(get_public_schema_name()):
+            user = User.objects.filter(email__iexact=owner_email).first()
         if user is None:
             # Owner hasn't registered yet; emit a hint and move on. A
             # follow-up membership will be created when they first log
@@ -190,7 +212,11 @@ class Command(BaseCommand):
 
         for model in IndexMixin.__subclasses__():
             index_name = model.get_meili_index_name()
-            pk = getattr(model.MeiliMeta, "primary_key", "id")
+            # Default must match meili's own ("pk" — see
+            # meili/apps.py::_initialize_meilisearch_config); an "id"
+            # default here gave tenant_create-provisioned indexes a
+            # different primaryKey than every other creation path.
+            pk = getattr(model.MeiliMeta, "primary_key", "pk")
             try:
                 meili_client.create_index(index_name, pk)
                 logger.info(f"Created Meilisearch index: {index_name}")

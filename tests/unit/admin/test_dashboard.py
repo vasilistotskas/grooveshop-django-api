@@ -216,7 +216,12 @@ class DashboardRenderTests(TestCase):
             username="boss", email="boss@example.com", password="x"
         )
         client = Client()
-        client.force_login(admin_user)
+        # has_permission() now requires a PlatformStaffBackend session
+        # (see admin.forms.PlatformAdminAuthenticationForm) — force_login()
+        # otherwise defaults to the first AUTHENTICATION_BACKENDS entry.
+        client.force_login(
+            admin_user, backend="tenant.auth_backends.PlatformStaffBackend"
+        )
 
         response = client.get(reverse("admin:index"))
 

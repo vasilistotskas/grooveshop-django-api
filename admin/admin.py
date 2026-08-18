@@ -9,6 +9,7 @@ from django.urls import path
 from django.utils.translation import gettext_lazy as _
 from unfold.sites import UnfoldAdminSite
 
+from admin.forms import PlatformAdminAuthenticationForm
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
 from core.cache.registry import iter_surfaces
@@ -19,6 +20,12 @@ class MyAdminSite(UnfoldAdminSite):
     site_title = getenv("UNFOLD_SITE_TITLE", "Webside Admin")
     index_title = _("Dashboard")
 
+    # Admin sessions are platform-staff-only — no legacy tenant-schema
+    # login path. UnfoldAdminSite.__init__ only overrides this when it
+    # is still None (or when UNFOLD["LOGIN"]["form"] is configured, which
+    # it isn't here), so setting it as a class attribute wins.
+    login_form = PlatformAdminAuthenticationForm
+
     def has_permission(self, request) -> bool:
         """Membership-gate the tenant admin.
 
@@ -26,7 +33,13 @@ class MyAdminSite(UnfoldAdminSite):
         without this override, staff granted for one store could open
         every other store's ``/admin/``. Rules:
 
-        - Platform superusers pass everywhere (they manage all tenants).
+        - The session MUST have been authenticated via
+          ``PlatformStaffBackend`` (checked first — closes a
+          pk-collision ambiguity where a tenant-schema user's pk could
+          coincidentally match a public-schema membership's user_id).
+        - Platform superusers pass everywhere (they manage all tenants;
+          they are platform identities too, authenticated by the same
+          backend).
         - On the PUBLIC schema (platform admin): Django's default
           ``is_active and is_staff``.
         - On a TENANT schema: additionally require an active
@@ -35,6 +48,14 @@ class MyAdminSite(UnfoldAdminSite):
         """
         if not super().has_permission(request):
             return False
+
+        from tenant.auth_backends import (  # noqa: PLC0415
+            is_platform_staff_session,
+        )
+
+        if not is_platform_staff_session(request):
+            return False
+
         user = request.user
         if user.is_superuser:
             return True
@@ -50,6 +71,30 @@ class MyAdminSite(UnfoldAdminSite):
             return True
         membership = get_membership(user, tenant)
         return membership is not None and membership.is_tenant_staff
+
+    def password_change(self, request, extra_context=None):
+        """Run the admin's own password-change view against the PUBLIC schema.
+
+        ``request.user`` for a platform-staff session is always the
+        public-schema row (see ``PlatformStaffBackend``), but the view
+        runs under whatever schema the current HOST resolved to — on a
+        tenant host that's the tenant schema, where the staff user's
+        row does not exist. ``PasswordChangeForm.save()`` would try to
+        UPDATE the wrong (or a missing) row.
+        """
+        from tenant.auth_backends import (  # noqa: PLC0415
+            is_platform_staff_session,
+        )
+
+        if is_platform_staff_session(request):
+            from django_tenants.utils import (  # noqa: PLC0415
+                get_public_schema_name,
+                schema_context,
+            )
+
+            with schema_context(get_public_schema_name()):
+                return super().password_change(request, extra_context)
+        return super().password_change(request, extra_context)
 
     def each_context(self, request):
         """Per-tenant admin branding.

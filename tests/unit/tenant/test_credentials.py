@@ -587,7 +587,7 @@ class TestMFAAdapterTotpIssuer:
         assert adapter.get_totp_issuer() == "BrandShop"
 
     def test_falls_back_to_allauth_app_settings_when_tenant_field_empty(
-        self, bind_tenant, tenant_factory, monkeypatch
+        self, bind_tenant, tenant_factory, monkeypatch, settings
     ):
         import allauth.mfa.app_settings as allauth_mfa_settings
 
@@ -598,18 +598,24 @@ class TestMFAAdapterTotpIssuer:
         tenant.save()
         bind_tenant(tenant)
 
+        # The env-backed platform fallback must be EMPTY for the
+        # allauth app_settings fallback below to be reachable.
+        settings.MFA_TOTP_ISSUER = ""
         monkeypatch.setattr(
             allauth_mfa_settings, "TOTP_ISSUER", "PlatformIssuer"
         )
         adapter = MFAAdapter()
         assert adapter.get_totp_issuer() == "PlatformIssuer"
 
-    def test_no_tenant_uses_allauth_app_settings(self, monkeypatch):
+    def test_no_tenant_uses_allauth_app_settings(
+        self, monkeypatch, settings
+    ):
         import allauth.mfa.app_settings as allauth_mfa_settings
 
         from core.adapter import MFAAdapter
 
         monkeypatch.setattr(connection, "tenant", None, raising=False)
+        settings.MFA_TOTP_ISSUER = ""
         monkeypatch.setattr(allauth_mfa_settings, "TOTP_ISSUER", "FallbackSite")
         adapter = MFAAdapter()
         assert adapter.get_totp_issuer() == "FallbackSite"

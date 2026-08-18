@@ -166,3 +166,81 @@ def validate_section_props(component_type: str, props: object) -> None:
         raise ValidationError(
             f"Invalid props for {component_type}: " + "; ".join(errors)
         )
+
+
+_ICON_RE = re.compile(r"^i-[a-z0-9:-]+$")
+
+
+def _check_nav_link(prefix: str, item: object) -> list[str]:
+    if not isinstance(item, dict):
+        return [f"{prefix}: must be an object"]
+    errors: list[str] = []
+    entry = {str(k): v for k, v in item.items()}
+    label = entry.get("label")
+    if not _is_str(label or "", 100) or not label:
+        errors.append(f"{prefix}.label: required string ≤100")
+    to = entry.get("to")
+    href = entry.get("href")
+    if bool(to) == bool(href):
+        errors.append(f"{prefix}: exactly one of 'to' or 'href' required")
+    if to is not None and (
+        not _is_str(to, 1000) or not str(to).startswith("/")
+    ):
+        errors.append(f"{prefix}.to: must be an internal path")
+    if href is not None and (
+        not _is_str(href, 1000) or not str(href).startswith("https://")
+    ):
+        errors.append(f"{prefix}.href: must be an https URL")
+    icon = entry.get("icon")
+    if icon is not None and (
+        not isinstance(icon, str) or not _ICON_RE.match(icon)
+    ):
+        errors.append(f"{prefix}.icon: must be an i-* icon name")
+    unknown = set(entry) - {"label", "to", "href", "icon"}
+    if unknown:
+        errors.append(f"{prefix}: unknown keys {sorted(unknown)}")
+    return errors
+
+
+def validate_navigation_items(slot: str, items: object) -> None:
+    """Raise ``ValidationError`` when a NavigationMenu payload doesn't
+    fit its slot's shape."""
+    if items in (None, []):
+        return
+    if not isinstance(items, list) or len(items) > 50:
+        raise ValidationError("items must be a list of at most 50 entries.")
+
+    errors: list[str] = []
+    if slot == "footer":
+        for i, raw in enumerate(items):
+            if not isinstance(raw, dict):
+                errors.append(f"[{i}]: must be an object")
+                continue
+            column = {str(k): v for k, v in raw.items()}
+            label = column.get("label")
+            if not _is_str(label or "", 100) or not label:
+                errors.append(f"[{i}].label: required string ≤100")
+            icon = column.get("icon")
+            if icon is not None and (
+                not isinstance(icon, str) or not _ICON_RE.match(icon)
+            ):
+                errors.append(f"[{i}].icon: must be an i-* icon name")
+            children = column.get("children")
+            if not isinstance(children, list) or not children:
+                errors.append(f"[{i}].children: required non-empty list")
+            else:
+                for j, child in enumerate(children):
+                    errors.extend(
+                        _check_nav_link(f"[{i}].children[{j}]", child)
+                    )
+            unknown = set(column) - {"label", "icon", "children"}
+            if unknown:
+                errors.append(f"[{i}]: unknown keys {sorted(unknown)}")
+    else:
+        for i, item in enumerate(items):
+            errors.extend(_check_nav_link(f"[{i}]", item))
+
+    if errors:
+        raise ValidationError(
+            f"Invalid {slot} navigation: " + "; ".join(errors)
+        )

@@ -9,8 +9,9 @@ from rest_framework.response import Response
 
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import ActionConfig
-from page_config.models import PageLayout, PageSection
+from page_config.models import NavigationMenu, PageLayout, PageSection
 from page_config.serializers import (
+    NavigationMenuSerializer,
     PageLayoutAdminSerializer,
     PageLayoutSerializer,
 )
@@ -37,6 +38,46 @@ def public_page_config(request, page_type):
     )
     serializer = PageLayoutSerializer(layout)
     return Response(serializer.data)
+
+
+@extend_schema(
+    responses={
+        200: {
+            "type": "object",
+            "additionalProperties": {"type": "array", "items": {}},
+            "description": "Navigation items keyed by slot "
+            "(header/footer/mobile). Missing slots mean 'use the "
+            "storefront's built-in menu'.",
+        }
+    },
+    tags=["Page Config"],
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def public_navigation(request):
+    """All configured navigation menus for the current tenant, keyed by
+    slot. Slots without a row are OMITTED — the storefront renders its
+    code-level menus for those, so an unconfigured tenant keeps the
+    platform chrome untouched."""
+    return Response(
+        {
+            menu.slot: menu.items
+            for menu in NavigationMenu.objects.all()
+            if menu.items
+        }
+    )
+
+
+class NavigationMenuAdminViewSet(BaseModelViewSet):
+    queryset = NavigationMenu.objects.all()
+    # Same pairing rationale as PageLayoutAdminViewSet (H22).
+    permission_classes = [IsAdminUser, HasTenantAccess]
+    serializers_config = {
+        "default": ActionConfig(
+            request=NavigationMenuSerializer,
+            response=NavigationMenuSerializer,
+        ),
+    }
 
 
 class PageLayoutAdminViewSet(BaseModelViewSet):

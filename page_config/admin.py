@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 
-from page_config.models import PageLayout, PageSection
+from page_config.models import NavigationMenu, PageLayout, PageSection
 
 
 class PageSectionInline(TabularInline):
@@ -67,3 +67,20 @@ class PageLayoutAdmin(ModelAdmin):
     )
 
     inlines = [PageSectionInline]
+
+
+@admin.register(NavigationMenu)
+class NavigationMenuAdmin(ModelAdmin):
+    compressed_fields = True
+    warn_unsaved_form = True
+    list_display = ("slot", "updated_at")
+    fields = ("slot", "items")
+
+    def save_model(self, request, obj, form, change):
+        # Field-level JSON validation mirrors the storefront contract.
+        from page_config.schemas import (  # noqa: PLC0415
+            validate_navigation_items,
+        )
+
+        validate_navigation_items(obj.slot, obj.items)
+        super().save_model(request, obj, form, change)

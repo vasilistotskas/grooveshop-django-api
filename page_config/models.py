@@ -144,3 +144,51 @@ class PageSection(
 
     def get_ordering_queryset(self):
         return PageSection.objects.filter(layout=self.layout)
+
+
+class NavigationSlot(models.TextChoices):
+    HEADER = "header", _("Header")
+    FOOTER = "footer", _("Footer")
+    MOBILE = "mobile", _("Mobile")
+
+
+class NavigationMenu(TimeStampMixinModel, UUIDModel):
+    """Per-tenant navigation for the app chrome (navbar/footer/mobile).
+
+    Chrome stays OUT of the page builder — it persists across routes
+    and owns auth/cart state — but its LINKS are tenant data. One row
+    per slot; the storefront falls back to its code-level menus when a
+    slot has no row (so webside keeps today's chrome untouched until an
+    operator publishes menus).
+
+    ``items`` shape per slot (validated in ``page_config/schemas.py``):
+    - header/mobile: ``[{label, to|href, icon?}]``
+    - footer: ``[{label, icon?, children: [{label, to|href}]}]``
+    """
+
+    slot = models.CharField(
+        _("Slot"),
+        max_length=20,
+        choices=NavigationSlot.choices,
+        unique=True,
+    )
+    items = models.JSONField(
+        _("Items"),
+        blank=True,
+        default=list,
+        encoder=DjangoJSONEncoder,
+        help_text=_(
+            "header/mobile: [{label, to|href, icon?}]; "
+            "footer: [{label, icon?, children: [{label, to|href}]}]. "
+            "'to' must be an internal path starting with '/', 'href' "
+            "an https URL."
+        ),
+    )
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Navigation Menu")
+        verbose_name_plural = _("Navigation Menus")
+        ordering = ["slot"]
+
+    def __str__(self) -> str:
+        return f"{self.get_slot_display()} navigation"

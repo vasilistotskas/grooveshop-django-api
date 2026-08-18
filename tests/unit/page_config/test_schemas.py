@@ -74,3 +74,65 @@ def test_spacer_height_enum():
     validate_section_props("spacer", {"height": "lg"})
     with pytest.raises(ValidationError):
         validate_section_props("spacer", {"height": "huge"})
+
+
+# ---------------------------------------------------------------------------
+# Navigation items validation
+# ---------------------------------------------------------------------------
+
+
+def test_navigation_header_flat_links_valid():
+    from page_config.schemas import validate_navigation_items
+
+    validate_navigation_items(
+        "header",
+        [
+            {"label": "Home", "to": "/", "icon": "i-heroicons-home"},
+            {"label": "Docs", "href": "https://docs.example"},
+        ],
+    )
+
+
+def test_navigation_link_requires_exactly_one_target():
+    from page_config.schemas import validate_navigation_items
+
+    with pytest.raises(ValidationError):
+        validate_navigation_items("header", [{"label": "X"}])
+    with pytest.raises(ValidationError):
+        validate_navigation_items(
+            "header",
+            [{"label": "X", "to": "/a", "href": "https://b.example"}],
+        )
+
+
+def test_navigation_rejects_bad_schemes_and_icons():
+    from page_config.schemas import validate_navigation_items
+
+    with pytest.raises(ValidationError):
+        validate_navigation_items(
+            "header", [{"label": "X", "href": "javascript:alert(1)"}]
+        )
+    with pytest.raises(ValidationError):
+        validate_navigation_items(
+            "header",
+            [{"label": "X", "to": "/a", "icon": "<svg onload=x>"}],
+        )
+
+
+def test_navigation_footer_columns_shape():
+    from page_config.schemas import validate_navigation_items
+
+    validate_navigation_items(
+        "footer",
+        [
+            {
+                "label": "Help",
+                "icon": "i-heroicons-chat-bubble-left-right",
+                "children": [{"label": "Contact", "to": "/contact"}],
+            }
+        ],
+    )
+    with pytest.raises(ValidationError):
+        validate_navigation_items(
+            "footer", [{"label": "Help", "children": []}]
+        )

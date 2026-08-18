@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from page_config.models import PageLayout, PageSection
+from page_config.models import NavigationMenu, PageLayout, PageSection
 
 
 class PageSectionSerializer(serializers.ModelSerializer):
@@ -109,3 +109,27 @@ class PageLayoutAdminSerializer(serializers.ModelSerializer):
                     layout=instance, sort_order=idx, **section_data
                 )
         return instance
+
+
+class NavigationMenuSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NavigationMenu
+        fields = ("slot", "items")
+
+    def validate(self, attrs):
+        from django.core.exceptions import (  # noqa: PLC0415
+            ValidationError as DjangoValidationError,
+        )
+
+        from page_config.schemas import (  # noqa: PLC0415
+            validate_navigation_items,
+        )
+
+        try:
+            validate_navigation_items(
+                attrs.get("slot", getattr(self.instance, "slot", "")),
+                attrs.get("items"),
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"items": exc.messages}) from exc
+        return attrs

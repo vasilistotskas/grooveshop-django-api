@@ -296,6 +296,93 @@ class TestTenantOnlyTableSkipped:
 
 
 # ---------------------------------------------------------------------------
+# Test: legacy-database drift — type and column-order divergence
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+class TestLegacySchemaDrift:
+    """The copy must survive a restored legacy public schema.
+
+    Two real drift classes (both hit or nearly hit the cutover dry-run):
+
+    - TYPE drift: a third-party app changed a column type between
+      releases without the legacy table being altered (observed:
+      django-extra-settings ``value_json`` text in prod vs jsonb on a
+      fresh replay). ``SELECT *`` crashes on the type mismatch.
+    - ORDER drift: a legacy table that accreted ALTERs has a different
+      physical column order than a fresh ``CREATE TABLE``; positional
+      ``SELECT *`` would swap same-typed columns SILENTLY.
+    """
+
+    schema = f"{_P}_drift"
+    type_tbl = f"{_P}_drift_type_tbl"
+    order_tbl = f"{_P}_drift_order_tbl"
+
+    def setup_method(self, _method):
+        with connection.cursor() as cursor:
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.schema}")
+            # Type drift: text in public, jsonb in the tenant schema.
+            cursor.execute(
+                f"CREATE TABLE IF NOT EXISTS public.{self.type_tbl}"
+                " (id bigserial PRIMARY KEY, payload text)"
+            )
+            cursor.execute(
+                f"INSERT INTO public.{self.type_tbl} (payload)"
+                """ VALUES ('{"a": 1}'), (NULL)"""
+            )
+            cursor.execute(
+                f"CREATE TABLE IF NOT EXISTS {self.schema}.{self.type_tbl}"
+                " (id bigserial PRIMARY KEY, payload jsonb)"
+            )
+            # Order drift: same columns, opposite physical order, same
+            # types — the silent-corruption case for positional copy.
+            cursor.execute(
+                f"CREATE TABLE IF NOT EXISTS public.{self.order_tbl}"
+                " (id bigserial PRIMARY KEY, alpha text, beta text)"
+            )
+            cursor.execute(
+                f"INSERT INTO public.{self.order_tbl} (alpha, beta)"
+                " VALUES ('A-value', 'B-value')"
+            )
+            cursor.execute(
+                f"CREATE TABLE IF NOT EXISTS {self.schema}.{self.order_tbl}"
+                " (beta text, alpha text, id bigserial PRIMARY KEY)"
+            )
+
+    def teardown_method(self, _method):
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP SCHEMA IF EXISTS {self.schema} CASCADE")
+            cursor.execute(
+                f"DROP TABLE IF EXISTS public.{self.type_tbl} CASCADE"
+            )
+            cursor.execute(
+                f"DROP TABLE IF EXISTS public.{self.order_tbl} CASCADE"
+            )
+
+    def test_type_drift_is_cast_not_crashed(self):
+        stdout, stderr = _run_command(self.schema, rebuild_mptt=False)
+        assert f"COPY {self.type_tbl}" in stdout
+        assert "is of type" not in stderr
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT payload->>'a' FROM {self.schema}.{self.type_tbl}"
+                " WHERE payload IS NOT NULL"
+            )
+            assert cursor.fetchone()[0] == "1"
+
+    def test_column_order_drift_copies_by_name(self):
+        _run_command(self.schema, rebuild_mptt=False)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT alpha, beta FROM {self.schema}.{self.order_tbl}"
+            )
+            alpha, beta = cursor.fetchone()
+        assert alpha == "A-value"
+        assert beta == "B-value"
+
+
+# ---------------------------------------------------------------------------
 # Test: multi-sequence table (history_id via full command) (B1)
 # ---------------------------------------------------------------------------
 

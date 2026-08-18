@@ -177,9 +177,12 @@ class Command(BaseCommand):
                     skipped += 1
                     continue
 
+                target_cols, select_exprs = self._copy_column_lists(
+                    cursor, schema, table
+                )
                 cursor.execute(
-                    f'INSERT INTO {schema}."{table}" '
-                    f'SELECT * FROM public."{table}"'
+                    f'INSERT INTO {schema}."{table}" ({target_cols}) '
+                    f'SELECT {select_exprs} FROM public."{table}"'
                 )
 
                 seqs = self._fix_sequences(cursor, schema, table)
@@ -236,6 +239,56 @@ class Command(BaseCommand):
                 [schema],
             )
             return [row[0] for row in cursor.fetchall()]
+
+    def _copy_column_lists(
+        self, cursor, schema: str, table: str
+    ) -> tuple[str, str]:
+        """Build explicit (target, select) column lists for the copy.
+
+        ``INSERT INTO tgt SELECT * FROM src`` maps columns POSITIONALLY
+        and assumes identical types — both break against a restored
+        legacy database: a table that accreted ALTERs over years can
+        have a different physical column order than a fresh migration
+        replay (same-typed columns would swap SILENTLY), and third-party
+        apps change column types between releases without a migration
+        reaching the legacy table (observed: django-extra-settings
+        ``value_json`` text → jsonb, which crashed the cutover dry-run).
+
+        Copy by NAME over the intersection of both schemas' columns,
+        casting any source column whose type differs from the target's.
+        Target-only columns fall back to their defaults; source-only
+        (dropped) columns are ignored.
+        """
+        cursor.execute(
+            """
+            SELECT
+                c_tgt.column_name,
+                c_tgt.udt_name AS tgt_type,
+                c_src.udt_name AS src_type
+            FROM information_schema.columns c_tgt
+            JOIN information_schema.columns c_src
+              ON c_src.table_schema = 'public'
+             AND c_src.table_name  = c_tgt.table_name
+             AND c_src.column_name = c_tgt.column_name
+            WHERE c_tgt.table_schema = %s
+              AND c_tgt.table_name = %s
+            ORDER BY c_tgt.ordinal_position
+            """,
+            [schema, table],
+        )
+        rows = cursor.fetchall()
+
+        def sql_type(udt: str) -> str:
+            # information_schema reports array types as ``_elem``;
+            # cast syntax needs ``elem[]``.
+            return f"{udt[1:]}[]" if udt.startswith("_") else udt
+
+        target_cols = ", ".join(f'"{name}"' for name, _, _ in rows)
+        select_exprs = ", ".join(
+            f'"{name}"' if tgt == src else f'"{name}"::{sql_type(tgt)}'
+            for name, tgt, src in rows
+        )
+        return target_cols, select_exprs
 
     def _table_exists(self, cursor, schema: str, table: str) -> bool:
         cursor.execute(

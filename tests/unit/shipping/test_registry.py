@@ -14,7 +14,6 @@ from shipping.interfaces import (
     get_provider,
     is_registered,
     register_provider,
-    registered_codes,
 )
 
 
@@ -76,12 +75,6 @@ def test_register_provider_rejects_empty_code():
 
     with pytest.raises(ValueError):
         register_provider(_NoCode)
-
-
-def test_registered_codes_contains_boxnow():
-    # BoxNow registers itself in AppConfig.ready(). Sanity check that
-    # the live test environment sees the boxnow adapter.
-    assert "boxnow" in registered_codes()
 
 
 def test_default_calculate_shipping_cost_returns_none(cleanup_dummy):

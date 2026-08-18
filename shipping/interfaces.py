@@ -248,11 +248,6 @@ def is_registered(code: str) -> bool:
     return code in _REGISTRY
 
 
-def registered_codes() -> list[str]:
-    """Return the list of registered provider codes (for diagnostics)."""
-    return sorted(_REGISTRY.keys())
-
-
 def all_payload_keys() -> tuple[str, ...]:
     """Return the union of every registered carrier's ``payload_keys``.
 

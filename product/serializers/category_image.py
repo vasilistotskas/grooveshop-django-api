@@ -101,12 +101,6 @@ class ProductCategoryImageWriteSerializer(
         return super().validate(attrs)
 
 
-class ProductCategoryImageResponseSerializer(serializers.Serializer):
-    success = serializers.BooleanField()
-    message = serializers.CharField()
-    data = ProductCategoryImageDetailSerializer()
-
-
 class ProductCategoryImageBulkUpdateSerializer(serializers.Serializer):
     image_ids = serializers.ListField(
         child=serializers.IntegerField(), allow_empty=False

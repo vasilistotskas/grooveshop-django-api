@@ -17,7 +17,6 @@ from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateFilter,
     RangeDateTimeFilter,
-    RangeNumericListFilter,
     RelatedDropdownFilter,
     SliderNumericFilter,
 )
@@ -212,20 +211,6 @@ class DocumentTypeFilter(DropdownFilter):
                 return queryset
 
         return queryset.filter(**filter_kwargs)
-
-
-class OrderValueFilter(RangeNumericListFilter):
-    title = _("Order Value")
-    parameter_name = "order_value"
-
-    def queryset(self, request, queryset):
-        return queryset
-
-    def expected_parameters(self):
-        return [
-            f"{self.parameter_name}_from",
-            f"{self.parameter_name}_to",
-        ]
 
 
 class RecentOrdersFilter(DropdownFilter):

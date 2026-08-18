@@ -14,29 +14,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-from typing import TypedDict
 
 
 class BoxNowWebhookError(Exception):
     """Raised when the BoxNow webhook envelope is malformed."""
-
-
-class BoxNowWebhookEnvelope(TypedDict):
-    """Type alias for the parsed top-level CloudEvents envelope.
-
-    The ``data`` value is the **parsed** dict; the raw bytes are extracted
-    separately via :func:`extract_data_substring`.
-    """
-
-    specversion: str
-    type: str
-    source: str
-    subject: str
-    id: str
-    time: str
-    datacontenttype: str
-    datasignature: str
-    data: dict
 
 
 # ---------------------------------------------------------------------------

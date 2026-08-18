@@ -10,11 +10,6 @@ logger = logging.getLogger(__name__)
 
 ONE_HOUR = 60 * 60
 ONE_DAY = ONE_HOUR * 24
-ONE_WEEK = ONE_DAY * 7
-ONE_MONTH = ONE_DAY * 30
-ONE_YEAR = ONE_DAY * 365
-
-SESSION_PREFIX = "session:"
 
 _SCAN_BATCH_SIZE = 500
 

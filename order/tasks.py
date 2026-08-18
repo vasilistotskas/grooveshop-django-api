@@ -320,9 +320,6 @@ def send_order_confirmation_email(self, order_id: int) -> bool:
 
 
 STATUS_UPDATE_EMAIL_SENT_FLAG = "status_update_email_sent"
-# TTL to hold the reservation after a successful send, so retry cycles
-# triggered by transient ack failures don't re-send to the customer.
-FINAL_RESERVATION_TTL = 86_400  # 24 hours
 
 
 def _status_update_reservation_key(order_id: int, new_status: str) -> str:

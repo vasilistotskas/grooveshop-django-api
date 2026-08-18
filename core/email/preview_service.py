@@ -257,7 +257,6 @@ class EmailTemplatePreviewService:
             "order_canceled": "CANCELED",
             "order_returned": "RETURNED",
             "order_refunded": "REFUNDED",
-            "order_confirmation": "PENDING",
             "order_status_generic": "PROCESSING",
         }
         return status_map.get(template_name, "PENDING")

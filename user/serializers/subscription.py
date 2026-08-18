@@ -250,18 +250,3 @@ class BulkSubscriptionResultSerializer(serializers.Serializer):
     already_processed = serializers.ListField(
         child=serializers.CharField(), read_only=True
     )
-
-
-class UserSubscriptionStatusSerializer(serializers.Serializer):
-    subscribed = serializers.ListField(
-        child=SubscriptionTopicSerializer(), read_only=True, required=False
-    )
-    available = serializers.ListField(
-        child=SubscriptionTopicSerializer(), read_only=True, required=False
-    )
-
-    def create(self, validated_data):
-        pass
-
-    def update(self, instance, validated_data):
-        pass

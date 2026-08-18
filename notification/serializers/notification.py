@@ -1,6 +1,3 @@
-from datetime import datetime
-
-from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
@@ -53,45 +50,4 @@ class NotificationSerializer(
             "created_at",
             "updated_at",
             "uuid",
-        )
-
-
-class NotificationDetailSerializer(NotificationSerializer):
-    class Meta(NotificationSerializer.Meta):
-        fields = (*NotificationSerializer.Meta.fields,)
-
-
-class NotificationWriteSerializer(
-    TranslatableModelSerializer, serializers.ModelSerializer[Notification]
-):
-    translations = TranslatedFieldsFieldExtend(shared_model=Notification)
-
-    def validate_expiry_date(self, value: datetime) -> datetime:
-        if value and value <= timezone.now():
-            raise serializers.ValidationError(
-                _("Expiry date must be in the future.")
-            )
-        return value
-
-    def validate_link(self, value: str) -> str:
-        if value and not (
-            value.startswith("http://")
-            or value.startswith("https://")
-            or value.startswith("/")
-        ):
-            raise serializers.ValidationError(
-                _("Link must be a valid URL or relative path.")
-            )
-        return value
-
-    class Meta:
-        model = Notification
-        fields = (
-            "translations",
-            "link",
-            "kind",
-            "category",
-            "priority",
-            "notification_type",
-            "expiry_date",
         )

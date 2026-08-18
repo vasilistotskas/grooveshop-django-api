@@ -1105,7 +1105,6 @@ MAX_FAVOURITES_PER_USER = int(getenv("MAX_FAVOURITES_PER_USER", "500"))
 
 CONN_HEALTH_CHECKS = True
 ATOMIC_REQUESTS = False
-INDEX_MAXIMUM_EXPR_COUNT = 8000
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 DATA_UPLOAD_MAX_MEMORY_SIZE = 2621440  # 2.5 MB (Django default, made explicit)
 
@@ -3047,8 +3046,6 @@ if USE_AWS:
             "BACKEND": "core.storages.StaticStorage",
         },
     }
-    COMPRESS_STORAGE = "core.storages.StaticStorage"
-    COMPRESS_OFFLINE_MANIFEST_STORAGE = "core.storages.StaticStorage"
     # No ``TINYMCE_JS_URL`` override here. The previous value pointed
     # at ``{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js`` — missing
     # the ``/static/`` prefix that ``StaticStorage(location="static")``
@@ -3094,11 +3091,6 @@ else:
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
-
-# Django Compressor
-COMPRESS_ENABLED = True
-COMPRESS_ROOT = STATIC_ROOT
-COMPRESS_URL = STATIC_URL
 
 TINYMCE_DEFAULT_CONFIG = {
     "theme": "silver",
@@ -3365,12 +3357,6 @@ STRIPE_WEBHOOK_DEBUG = getenv("STRIPE_WEBHOOK_DEBUG", "false").lower() == "true"
 # must never silently route through credentials the operator did not
 # explicitly configure for THIS tenant.
 
-
-# SHIPPING SETTINGS
-FEDEX_API_KEY = getenv("FEDEX_API_KEY", "")
-FEDEX_ACCOUNT_NUMBER = getenv("FEDEX_ACCOUNT_NUMBER", "")
-UPS_API_KEY = getenv("UPS_API_KEY", "")
-UPS_ACCOUNT_NUMBER = getenv("UPS_ACCOUNT_NUMBER", "")
 
 # ---------- BoxNow Shipping ----------
 # Per-merchant identity (OAuth2 client id/secret, partner ID, warehouse

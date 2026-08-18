@@ -74,15 +74,6 @@ class EmailTemplateConfig:
     # Template configurations
     TEMPLATES: dict[str, TemplateConfig] = {
         # Order templates
-        "order_confirmation": TemplateConfig(
-            name="order_confirmation",
-            category_name="Order Lifecycle",
-            description="Sent when a new order is created",
-            subject_template="Order Confirmation - #{order[id]}",
-            order_statuses=[OrderStatus.PENDING],
-            is_used=True,
-            context_keys=["order", "items"],
-        ),
         "order_shipped": TemplateConfig(
             name="order_shipped",
             category_name="Order Lifecycle",
@@ -208,19 +199,6 @@ class EmailTemplateConfig:
             context_keys=["user", "activation_link"],
         ),
         # Marketing templates
-        "newsletter": TemplateConfig(
-            name="newsletter",
-            category_name="Marketing",
-            description="Newsletter template",
-            subject_template="Weekly Newsletter - {user[first_name]}",
-            is_used=True,
-            context_keys=[
-                "user",
-                "week_start",
-                "week_end",
-                "featured_articles",
-            ],
-        ),
         "promotion": TemplateConfig(
             name="promotion",
             category_name="Marketing",

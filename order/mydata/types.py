@@ -17,10 +17,6 @@ from __future__ import annotations
 # notes), 13.x (expense documents), 17.x (depreciation).
 INVOICE_TYPE_B2C_RETAIL = "11.1"  # Α.Λ.Π. — retail sales receipt
 INVOICE_TYPE_B2B_SALES = "1.1"  # Τιμολόγιο Πώλησης — domestic B2B
-INVOICE_TYPE_B2B_INTRA_EU = "1.2"  # Intra-EU supply (Tier C)
-INVOICE_TYPE_B2B_THIRD_COUNTRY = "1.3"  # Export (Tier C)
-INVOICE_TYPE_CREDIT_LINKED = "5.1"  # Linked credit note
-INVOICE_TYPE_RETAIL_CREDIT = "11.4"  # Retail return / credit element
 
 # ── paymentMethodDetails.type ────────────────────────────────────
 #
@@ -29,14 +25,9 @@ INVOICE_TYPE_RETAIL_CREDIT = "11.4"  # Retail return / credit element
 # module had every code shifted by one, which silently sent
 # "Μετρητά" (cash) for every card payment and "POS" for every COD
 # order. The spec table is the only source of truth.
-PAYMENT_METHOD_DOMESTIC_BANK = 1  # Επαγ. Λογ. Πληρωμών Ημεδαπής
-PAYMENT_METHOD_FOREIGN_BANK = 2  # Επαγ. Λογ. Πληρωμών Αλλοδαπής
 PAYMENT_METHOD_CASH = 3  # Μετρητά — cash / cash on delivery
-PAYMENT_METHOD_CHEQUE = 4  # Επιταγή
-PAYMENT_METHOD_ON_CREDIT = 5  # Επί Πιστώσει
 PAYMENT_METHOD_WEB_BANKING = 6  # Web Banking
 PAYMENT_METHOD_POS_CARD = 7  # POS / e-POS — card online & terminals
-PAYMENT_METHOD_IRIS = 8  # Άμεσες Πληρωμές IRIS (SEPA Instant)
 
 # ── vatCategory: AADE code for each rate band ────────────────────
 # Standard mainland rates 1–3; island-discount rates 4–6; zero /
@@ -48,9 +39,7 @@ VAT_CATEGORY_17 = 4  # 17 % (island discount)
 VAT_CATEGORY_9 = 5  # 9 % (island discount)
 VAT_CATEGORY_4 = 6  # 4 % (island discount)
 VAT_CATEGORY_0 = 7  # 0 %
-VAT_CATEGORY_EXEMPT = 8  # Exempt (requires vatExemptionCategory)
 VAT_CATEGORY_3 = 9  # 3 % (law 5057/2023)
-VAT_CATEGORY_4_NEW = 10  # 4 % (law 5057/2023)
 
 
 # ── vatExemptionCategory ─────────────────────────────────────────
@@ -87,7 +76,3 @@ CLASSIFICATION_CATEGORY_B2B_MERCHANDISE = "category1_1"
 # terminal ``ValidationError``.
 ERROR_DUPLICATE_UID = "228"  # uid already registered under another MARK
 ERROR_INACTIVE_VAT = "102"  # counterpart VAT is not on AADE's registry
-ERROR_XML_SYNTAX = "101"
-ERROR_WRONG_VAT_CATEGORY = "216"
-ERROR_MISSING_VAT_EXEMPTION = "217"
-ERROR_MISSING_CLASSIFICATION = "314"  # income or expenses required

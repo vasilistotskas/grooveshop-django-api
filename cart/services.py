@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from enum import Enum, unique
 from typing import TYPE_CHECKING
 
 from django.db import transaction
@@ -24,17 +23,6 @@ class CartServiceInitException(Exception):
 
 class CartNotSetException(Exception):
     pass
-
-
-class InvalidProcessCartOptionException(Exception):
-    pass
-
-
-@unique
-class ProcessCartOption(Enum):
-    MERGE = "merge"
-    CLEAN = "clean"
-    KEEP = "keep"
 
 
 class CartService:

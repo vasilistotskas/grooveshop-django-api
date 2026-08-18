@@ -22,11 +22,11 @@ class TestEmailTemplatePreviewService:
     def test_generate_preview_with_sample_data(self, service):
         """Test generating preview with sample data."""
         preview = service.generate_preview(
-            template_name="order_confirmation", order_id=None
+            template_name="order_completed", order_id=None
         )
 
         assert isinstance(preview, EmailPreview)
-        assert preview.template_name == "order_confirmation"
+        assert preview.template_name == "order_completed"
         assert preview.html_content is not None
         assert preview.text_content is not None
         assert preview.error is None
@@ -46,7 +46,7 @@ class TestEmailTemplatePreviewService:
             }
 
             preview = service.generate_preview(
-                template_name="order_confirmation", order_id=1
+                template_name="order_completed", order_id=1
             )
 
             assert isinstance(preview, EmailPreview)
@@ -71,7 +71,7 @@ class TestEmailTemplatePreviewService:
             mock_get.side_effect = Order.DoesNotExist()
 
             preview = service.generate_preview(
-                template_name="order_confirmation", order_id=99999
+                template_name="order_completed", order_id=99999
             )
 
             # Should fall back to sample data
@@ -82,7 +82,7 @@ class TestEmailTemplatePreviewService:
     def test_preview_contains_html_content(self, service):
         """Test that preview contains HTML content."""
         preview = service.generate_preview(
-            template_name="order_confirmation", order_id=None
+            template_name="order_completed", order_id=None
         )
 
         if preview.error is None:
@@ -96,7 +96,7 @@ class TestEmailTemplatePreviewService:
     def test_preview_contains_text_content(self, service):
         """Test that preview contains text content."""
         preview = service.generate_preview(
-            template_name="order_confirmation", order_id=None
+            template_name="order_completed", order_id=None
         )
 
         if preview.error is None:
@@ -106,7 +106,7 @@ class TestEmailTemplatePreviewService:
     def test_preview_context_data_is_dict(self, service):
         """Test that preview context data is a dictionary."""
         preview = service.generate_preview(
-            template_name="order_confirmation", order_id=None
+            template_name="order_completed", order_id=None
         )
 
         if preview.error is None:
@@ -127,7 +127,7 @@ class TestEmailTemplatePreviewService:
 
         # _render_template returns a single string, not a tuple
         result = service._render_template(
-            "emails/order/order_confirmation.html", context
+            "emails/order/order_completed.html", context
         )
 
         assert result is not None
@@ -142,7 +142,7 @@ class TestEmailTemplatePreviewService:
             mock_render.side_effect = Exception("Template error")
 
             preview = service.generate_preview(
-                template_name="order_confirmation", order_id=None
+                template_name="order_completed", order_id=None
             )
 
             # When rendering fails, error message should be in the content

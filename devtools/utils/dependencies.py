@@ -497,14 +497,6 @@ class FactoryOrchestrator:
         return self.analyzer.get_dependency_report()
 
 
-def get_factory_execution_order[F: factory.django.DjangoModelFactory](
-    factory_classes: list[type[F]],
-) -> list[type[F]]:
-    """Get factories in dependency order"""
-    orchestrator = FactoryOrchestrator()
-    return orchestrator.get_execution_order(factory_classes)
-
-
 def analyze_factory_dependencies[F: factory.django.DjangoModelFactory](
     factory_classes: list[type[F]],
 ) -> str:

@@ -18,25 +18,6 @@ ACS error semantics (per PDF):
 
 from __future__ import annotations
 
-# Common ACS business-error messages we have seen in the wild.  The
-# wire returns plain Greek strings in ``ACSExecutionErrorMessage``;
-# this map is for admin debugging hints only — never compared against
-# the raw value at runtime.
-ACS_ERROR_HINTS: dict[str, str] = {
-    "voucher_already_in_pickup_list": (
-        "Voucher cannot be deleted because it has already been issued in"
-        " a pickup list. Issue a new voucher and contact ACS support."
-    ),
-    "duplicate_voucher": (
-        "Order number conflict — a voucher already exists for this order."
-        " Check AcsShipment.voucher_no in admin."
-    ),
-    "invalid_billing_code": (
-        "Billing_Code is not recognised by ACS. Verify settings.ACS_BILLING_CODE"
-        " (Greek characters are case-sensitive)."
-    ),
-}
-
 
 class AcsError(Exception):
     """Base class for ACS-related errors."""

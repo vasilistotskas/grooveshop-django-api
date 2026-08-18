@@ -10,7 +10,6 @@ from devtools.utils.dependencies import (
     CircularDependencyError,
     DependencyAnalyzer,
     FactoryOrchestrator,
-    get_factory_execution_order,
     analyze_factory_dependencies,
 )
 
@@ -472,19 +471,6 @@ class TestFactoryOrchestrator(TestCase):
 
 
 class TestModuleFunctions(TestCase):
-    @patch(
-        "devtools.utils.dependencies.FactoryOrchestrator.get_execution_order"
-    )
-    def test_get_factory_execution_order(self, mock_get_order):
-        factory_classes = [MockUserFactory, MockProfileFactory]
-        expected_order = [MockUserFactory, MockProfileFactory]
-        mock_get_order.return_value = expected_order
-
-        result = get_factory_execution_order(factory_classes)
-
-        self.assertEqual(result, expected_order)
-        mock_get_order.assert_called_once_with(factory_classes)
-
     @patch(
         "devtools.utils.dependencies.FactoryOrchestrator.get_dependency_report"
     )

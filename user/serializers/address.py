@@ -98,24 +98,3 @@ class UserAddressWriteSerializer(serializers.ModelSerializer[UserAddress]):
             "country",
             "region",
         )
-
-
-class ValidateAddressResponseSerializer(serializers.Serializer):
-    valid = serializers.BooleanField()
-    errors = serializers.DictField(child=serializers.CharField())
-    suggestions = serializers.ListField(
-        child=serializers.DictField(child=serializers.CharField())
-    )
-
-
-class BulkDeleteAddressesRequestSerializer(serializers.Serializer):
-    address_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        allow_empty=False,
-        help_text=_("List of address IDs to delete"),
-    )
-
-
-class BulkDeleteAddressesResponseSerializer(serializers.Serializer):
-    deleted_count = serializers.IntegerField()
-    deleted_ids = serializers.ListField(child=serializers.IntegerField())

@@ -28,10 +28,10 @@ class TestEmailTemplateRegistry:
 
     def test_get_template_by_name(self, registry):
         """Test getting a specific template by name."""
-        template = registry.get_template("order_confirmation")
+        template = registry.get_template("order_shipped")
         assert template is not None
         assert isinstance(template, EmailTemplateInfo)
-        assert template.name == "order_confirmation"
+        assert template.name == "order_shipped"
 
     def test_get_nonexistent_template(self, registry):
         """Test getting a template that doesn't exist."""

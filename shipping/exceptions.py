@@ -15,14 +15,3 @@ class ShippingProviderNotFoundError(ShippingError):
             "Make sure its app is in INSTALLED_APPS and AppConfig.ready() "
             "calls register_provider()."
         )
-
-
-class ShippingKindNotSupportedError(ShippingError):
-    """Raised when a provider does not support the requested kind."""
-
-    def __init__(self, code: str, kind: str) -> None:
-        self.code = code
-        self.kind = kind
-        super().__init__(
-            f"Shipping provider '{code}' does not support kind '{kind}'."
-        )

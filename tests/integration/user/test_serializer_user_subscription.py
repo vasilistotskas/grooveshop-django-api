@@ -8,7 +8,6 @@ from user.serializers.subscription import (
     BulkSubscriptionSerializer,
     SubscriptionTopicSerializer,
     UserSubscriptionSerializer,
-    UserSubscriptionStatusSerializer,
 )
 
 User = get_user_model()
@@ -359,75 +358,3 @@ class BulkSubscriptionSerializerTest(TestCase):
         serializer = BulkSubscriptionSerializer(data=data)
         self.assertTrue(serializer.is_valid())
         self.assertEqual(len(serializer.validated_data["topic_ids"]), 3)
-
-
-class UserSubscriptionStatusSerializerTest(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            email="test@example.com", password="testpass123"
-        )
-
-        self.subscribed_topics = []
-        self.available_topics = []
-
-        for i in range(3):
-            topic = SubscriptionTopic.objects.create(
-                slug=f"subscribed-{i}",
-                name=f"Subscribed Topic {i}",
-                category=SubscriptionTopic.TopicCategory.NEWSLETTER,
-            )
-            self.subscribed_topics.append(topic)
-
-            UserSubscription.objects.create(
-                user=self.user,
-                topic=topic,
-                status=UserSubscription.SubscriptionStatus.ACTIVE,
-            )
-
-        for i in range(2):
-            topic = SubscriptionTopic.objects.create(
-                slug=f"available-{i}",
-                name=f"Available Topic {i}",
-                category=SubscriptionTopic.TopicCategory.PRODUCT,
-            )
-            self.available_topics.append(topic)
-
-    def test_serializer_structure(self):
-        class MockSubscriptionStatus:
-            def __init__(self, subscribed_topics, available_topics):
-                self.subscribed = subscribed_topics
-                self.available = available_topics
-
-        mock_data = MockSubscriptionStatus(
-            subscribed_topics=self.subscribed_topics,
-            available_topics=self.available_topics,
-        )
-
-        serializer = UserSubscriptionStatusSerializer(mock_data)
-        data = serializer.data
-
-        self.assertIn("subscribed", data)
-        self.assertIn("available", data)
-
-        self.assertEqual(len(data["subscribed"]), 3)
-        self.assertEqual(len(data["available"]), 2)
-
-        for topic_data in data["subscribed"]:
-            self.assertIn("id", topic_data)
-            self.assertIn("slug", topic_data)
-            self.assertIn("category", topic_data)
-
-        for topic_data in data["available"]:
-            self.assertIn("id", topic_data)
-            self.assertIn("slug", topic_data)
-            self.assertIn("category", topic_data)
-
-    def test_read_only_fields(self):
-        serializer = UserSubscriptionStatusSerializer()
-
-        self.assertTrue(serializer.fields["subscribed"].read_only)
-        self.assertTrue(serializer.fields["available"].read_only)
-
-    def tearDown(self):
-        UserSubscription.objects.all().delete()
-        SubscriptionTopic.objects.all().delete()

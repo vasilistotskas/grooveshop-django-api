@@ -13,8 +13,6 @@ from devtools.utils.profiler import (
     ProfilerConfig,
     FactoryProfiler,
     ReportBuilder,
-    profile_factory_execution,
-    benchmark_factories,
 )
 
 
@@ -517,66 +515,6 @@ class TestReportBuilder(TestCase):
         self.assertIn("Factory Execution Profiling Report", report)
         self.assertIn("Session Summary", report)
         self.assertIn("Factory Performance", report)
-
-
-class TestModuleFunctions(TestCase):
-    @patch("devtools.utils.profiler.FactoryProfiler")
-    def test_profile_factory_execution(self, mock_profiler_class):
-        mock_metrics = FactoryExecutionMetrics(
-            factory_name="TestFactory",
-            model_name="TestModel",
-            count=10,
-            start_time=1000.0,
-            end_time=1001.0,
-        )
-        mock_metrics.success_count = 0
-        mock_metrics.error_count = 0
-        mock_metrics.errors = []
-
-        mock_profiler = Mock()
-        mock_profiler_class.return_value = mock_profiler
-
-        mock_context = MagicMock()
-        mock_context.__enter__.return_value = mock_metrics
-        mock_context.__exit__.return_value = None
-        mock_profiler.profile_factory.return_value = mock_context
-
-        mock_factory = Mock()
-        mock_factory.create.return_value = Mock()
-
-        result = profile_factory_execution(mock_factory, 10)
-
-        self.assertEqual(result, mock_metrics)
-        mock_profiler.profile_factory.assert_called_once_with(mock_factory, 10)
-
-    @patch("devtools.utils.profiler.FactoryProfiler")
-    def test_benchmark_factories(self, mock_profiler_class):
-        mock_profiler = Mock()
-        mock_profiler_class.return_value = mock_profiler
-        mock_profiler.generate_report.return_value = "Benchmark Report"
-
-        mock_metrics = Mock()
-        mock_metrics.success_count = 0
-        mock_metrics.error_count = 0
-        mock_metrics.errors = []
-
-        mock_context = MagicMock()
-        mock_context.__enter__.return_value = mock_metrics
-        mock_context.__exit__.return_value = None
-        mock_profiler.profile_factory.return_value = mock_context
-
-        mock_factory_1 = Mock()
-        mock_factory_1.create.return_value = Mock()
-        mock_factory_2 = Mock()
-        mock_factory_2.create.return_value = Mock()
-        factory_classes = [mock_factory_1, mock_factory_2]
-
-        result = benchmark_factories(factory_classes, count=5)
-
-        self.assertEqual(result, "Benchmark Report")
-        mock_profiler.start_session.assert_called_once()
-        self.assertEqual(mock_profiler.profile_factory.call_count, 2)
-        mock_profiler.generate_report.assert_called_once()
 
 
 class TestErrorHandling(TestCase):

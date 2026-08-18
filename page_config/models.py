@@ -29,11 +29,16 @@ class ComponentType(models.TextChoices):
     )
 
     # Blog
+    BLOG_CATEGORIES = "blog_categories", _("Blog Categories Rail")
     BLOG_POSTS_CAROUSEL = (
         "blog_posts_carousel",
         _("Blog Posts Carousel"),
     )
     BLOG_POSTS_GRID = "blog_posts_grid", _("Blog Posts Grid")
+    BLOG_POSTS_LIST = "blog_posts_list", _("Blog Posts List")
+
+    # Product rails
+    RECENTLY_VIEWED = "recently_viewed", _("Recently Viewed Rail")
 
     # Content
     RICH_TEXT = "rich_text", _("Rich Text Block")

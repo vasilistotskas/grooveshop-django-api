@@ -7,33 +7,34 @@ from page_config.models import PageLayout, PageSection
 logger = logging.getLogger(__name__)
 
 DEFAULT_PAGE_LAYOUTS: dict[str, dict] = {
+    # Mirrors the platform homepage (and the Nuxt FALLBACK_LAYOUTS.home
+    # safety net) exactly: blog categories rail → main banner carousel →
+    # recently-viewed rail → blog posts list. Seeding the real page —
+    # instead of a generic marketing shape — means a freshly provisioned
+    # tenant (and webside at cutover) starts from today's proven layout
+    # and customizes from there.
     "home": {
         "title": "Homepage",
         "sections": [
+            {
+                "component_type": "blog_categories",
+                "title": "",
+                "props": {},
+            },
             {
                 "component_type": "hero_carousel",
                 "title": "",
                 "props": {},
             },
             {
-                "component_type": "featured_products",
-                "title": "Featured Products",
-                "props": {"columns": 4, "page_size": 8},
-            },
-            {
-                "component_type": "product_categories",
-                "title": "Shop by Category",
+                "component_type": "recently_viewed",
+                "title": "",
                 "props": {},
             },
             {
-                "component_type": "blog_posts_carousel",
-                "title": "From Our Blog",
-                "props": {"count": 4},
-            },
-            {
-                "component_type": "newsletter_signup",
+                "component_type": "blog_posts_list",
                 "title": "",
-                "props": {"heading": "Stay Updated"},
+                "props": {},
             },
         ],
     },

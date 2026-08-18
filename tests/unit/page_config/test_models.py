@@ -12,7 +12,7 @@ class TestComponentType(TestCase):
         assert ComponentType.SPACER == "spacer"
 
     def test_choices_count(self):
-        assert len(ComponentType.choices) == 16
+        assert len(ComponentType.choices) == 19
 
 
 class TestPageLayout(TestCase):

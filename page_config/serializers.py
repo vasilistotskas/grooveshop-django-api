@@ -52,6 +52,25 @@ class PageSectionWriteSerializer(serializers.ModelSerializer):
             "props",
         )
 
+    def validate(self, attrs):
+        # Mirror of the storefront's render-time props contracts
+        # (shared/pageSections.ts): typos and out-of-range values fail
+        # HERE with a readable error instead of silently rendering
+        # component defaults.
+        from django.core.exceptions import (  # noqa: PLC0415
+            ValidationError as DjangoValidationError,
+        )
+
+        from page_config.schemas import validate_section_props  # noqa: PLC0415
+
+        try:
+            validate_section_props(
+                attrs.get("component_type", ""), attrs.get("props")
+            )
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({"props": exc.messages}) from exc
+        return attrs
+
 
 class PageLayoutAdminSerializer(serializers.ModelSerializer):
     sections = PageSectionWriteSerializer(many=True, required=False)

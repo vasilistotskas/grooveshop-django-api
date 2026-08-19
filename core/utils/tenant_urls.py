@@ -117,7 +117,9 @@ def get_tenant_api_base_url() -> str:
     return fallback.rstrip("/")
 
 
-def _resolve_prefixed_service_domain(tenant, prefix: str) -> str:
+def _resolve_prefixed_service_domain(
+    tenant, prefix: str, *, derive: bool = True
+) -> str:
     """Return the bare ``<prefix>.<primary-domain>``-shaped hostname for
     *tenant*, or ``""``. Shared implementation behind
     :func:`resolve_tenant_api_domain`, :func:`resolve_tenant_assets_domain`,
@@ -129,10 +131,14 @@ def _resolve_prefixed_service_domain(tenant, prefix: str) -> str:
        convention (``<prefix>.<primary-domain>``) and shapes like
        ``api-staging.webside.gr`` that don't follow the
        ``<prefix>.<primary>`` pattern.
-    2. ``<prefix>.<primary domain>`` derived from the tenant's primary
-       domain — the infra TEMPLATE provisions ``api.``/``assets.``/
-       ``static.`` subdomains for every tenant even before an explicit
-       row exists.
+    2. Only when ``derive`` is True: ``<prefix>.<primary domain>``
+       derived from the tenant's primary domain. The API host is the
+       only prefix that derives — every tenant MUST have its own api
+       origin (browser-facing auth/WebSocket/OAuth surfaces), so its
+       DNS is a mandatory onboarding step. Asset/static hosts are
+       platform-shared by default (tenancy is enforced at the PATH
+       level — ``media/{schema}/…``); a dedicated asset origin is a
+       white-label OPT-IN via an explicit prefixed row.
 
     Defensive against tenants without ``.domains`` (test fakes,
     transient creation states) — returns ``""`` rather than raising.
@@ -151,6 +157,9 @@ def _resolve_prefixed_service_domain(tenant, prefix: str) -> str:
         prefixed_domain_obj = None
     if prefixed_domain_obj and getattr(prefixed_domain_obj, "domain", ""):
         return prefixed_domain_obj.domain
+
+    if not derive:
+        return ""
 
     try:
         primary_domain_obj = domains_manager.filter(is_primary=True).first()
@@ -179,25 +188,24 @@ def resolve_tenant_assets_domain(tenant) -> str:
     ``""``.
 
     Shared by :func:`get_tenant_assets_base_url` and
-    ``TenantConfigSerializer.assets_domain``. Mirrors
-    :func:`resolve_tenant_api_domain` with the ``assets.`` prefix — the
-    infra TEMPLATE provisions an ``assets.<primary-domain>`` subdomain
-    for every tenant, routed at the media-stream image-processing
-    service.
+    ``TenantConfigSerializer.assets_domain``. Explicit-row ONLY (no
+    derivation): the media service is platform infrastructure and
+    tenancy is enforced at the path level, so tenants share the
+    platform asset origin unless a dedicated white-label host was
+    provisioned as an ``assets*`` ``TenantDomain`` row.
     """
-    return _resolve_prefixed_service_domain(tenant, "assets")
+    return _resolve_prefixed_service_domain(tenant, "assets", derive=False)
 
 
 def resolve_tenant_static_domain(tenant) -> str:
     """Return the bare static-file hostname for *tenant*, or ``""``.
 
     Shared by :func:`get_tenant_static_base_url` and
-    ``TenantConfigSerializer.static_domain``. Mirrors
-    :func:`resolve_tenant_api_domain` with the ``static.`` prefix — the
-    infra TEMPLATE provisions a ``static.<primary-domain>`` subdomain
-    for every tenant, routed at the static/media file server.
+    ``TenantConfigSerializer.static_domain``. Explicit-row ONLY (no
+    derivation) — same platform-shared-by-default policy as
+    :func:`resolve_tenant_assets_domain`.
     """
-    return _resolve_prefixed_service_domain(tenant, "static")
+    return _resolve_prefixed_service_domain(tenant, "static", derive=False)
 
 
 def get_tenant_assets_base_url() -> str:

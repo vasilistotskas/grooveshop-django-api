@@ -395,22 +395,33 @@ class TestBoxNowCredentials:
 
 
 class TestTenantFromEmail:
-    def test_returns_tenant_value(self, bind_tenant, tenant_factory, settings):
+    def test_tenant_from_email_never_uses_merchant_address_as_from(
+        self, bind_tenant, tenant_factory, settings
+    ):
+        """DMARC safety: mail leaves through the platform relay, so a
+        merchant address in From would fail the merchant domain's
+        SPF/DKIM alignment. The tenant brand rides the DISPLAY NAME on
+        the platform-authenticated address; Tenant.from_email is
+        reserved for a future per-tenant transport."""
         tenant = tenant_factory("email-from-1")
         tenant.from_email = "shop@brand.com"
+        tenant.store_name = "Brand Shop"
         tenant.save()
         bind_tenant(tenant)
-        assert tenant_from_email() == "shop@brand.com"
+        settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
+        assert tenant_from_email() == "Brand Shop <noreply@platform.com>"
+        assert "shop@brand.com" not in tenant_from_email()
 
     def test_falls_back_to_settings(
         self, bind_tenant, tenant_factory, settings
     ):
         tenant = tenant_factory("email-from-2")
         tenant.from_email = ""
+        tenant.store_name = "Fallback Store"
         tenant.save()
         bind_tenant(tenant)
         settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
-        assert tenant_from_email() == "noreply@platform.com"
+        assert tenant_from_email() == "Fallback Store <noreply@platform.com>"
 
     def test_no_tenant_uses_settings(self, monkeypatch, settings):
         monkeypatch.setattr(connection, "tenant", None, raising=False)
@@ -420,11 +431,14 @@ class TestTenantFromEmail:
     def test_webside_safety_empty_tenant_field(
         self, bind_tenant, tenant_factory, settings
     ):
-        """webside.gr: Tenant.from_email is empty → falls back cleanly."""
+        """webside.gr: empty from_email → platform address with the
+        store display name (envelope/domain unchanged)."""
         tenant = tenant_factory("ws-from-email")
+        tenant.store_name = "Webside"
+        tenant.save()
         bind_tenant(tenant)
         settings.DEFAULT_FROM_EMAIL = "noreply@webside.gr"
-        assert tenant_from_email() == "noreply@webside.gr"
+        assert tenant_from_email() == "Webside <noreply@webside.gr>"
 
 
 class TestTenantContactEmail:

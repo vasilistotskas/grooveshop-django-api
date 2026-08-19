@@ -564,7 +564,7 @@ class TestSendInactiveUserNotificationsTask:
         assert mock_email_cls.call_count == 2
         kwargs = mock_email_cls.call_args_list[0][1]
         assert "We miss you!" in kwargs["subject"]
-        assert kwargs["from_email"] == "noreply@example.com"
+        assert kwargs["from_email"].endswith("<noreply@example.com>")
 
     @patch("core.tasks.EmailMultiAlternatives")
     @patch("core.tasks.render_to_string")

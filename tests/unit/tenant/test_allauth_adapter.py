@@ -329,11 +329,17 @@ class TestTenantAwareEmailFormatting:
     ):
         tenant = tenant_factory("adapter-from-1")
         tenant.from_email = "shop@brand.com"
+        tenant.store_name = "Brand Shop"
         tenant.save()
         bind_tenant(tenant)
 
         adapter = TenantAccountAdapter()
-        assert adapter.get_from_email() == "shop@brand.com"
+        # DMARC safety: platform-authenticated address + tenant display
+        # name; the merchant address is never the From on the platform
+        # relay (see tenant_from_email).
+        assert adapter.get_from_email().endswith(">")
+        assert "Brand Shop" in adapter.get_from_email()
+        assert "shop@brand.com" not in adapter.get_from_email()
 
     @pytest.mark.django_db
     def test_get_from_email_falls_back_to_default_from_email(
@@ -341,12 +347,15 @@ class TestTenantAwareEmailFormatting:
     ):
         tenant = tenant_factory("adapter-from-2")
         tenant.from_email = ""
+        tenant.store_name = "Adapter Store"
         tenant.save()
         bind_tenant(tenant)
         settings.DEFAULT_FROM_EMAIL = "noreply@platform.com"
 
         adapter = TenantAccountAdapter()
-        assert adapter.get_from_email() == "noreply@platform.com"
+        assert (
+            adapter.get_from_email() == "Adapter Store <noreply@platform.com>"
+        )
 
 
 class TestSaveUserInPublicSchema:

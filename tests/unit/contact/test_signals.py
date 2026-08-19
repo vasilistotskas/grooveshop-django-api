@@ -43,7 +43,9 @@ class TestContactSignals(TestCase):
         assert contact.name in email.body
         assert contact.email in email.body
         assert contact.message in email.body
-        assert email.from_email == "noreply@example.com"
+        # DMARC-safe From: platform-authenticated address, tenant brand
+        # in the display name (see tenant_from_email).
+        assert email.from_email.endswith("<noreply@example.com>")
         assert _INFO_EMAIL in email.to
 
     @override_settings(
@@ -225,6 +227,8 @@ class TestContactSignals(TestCase):
 
         assert len(mail.outbox) == 1
         email = mail.outbox[0]
+        # Empty DEFAULT_FROM_EMAIL: never emit an invalid "Name <>" —
+        # the sender stays empty (backend default applies).
         assert email.from_email == ""
 
     @override_settings(
@@ -237,13 +241,20 @@ class TestContactSignals(TestCase):
 
         # Celery task (running eagerly in tests) invokes send_mail with the
         # rendered subject/body using the contact's own name/email/message.
-        mock_send_mail.assert_called_once_with(
-            subject=f"New Contact Form Submission from {contact.name}",
-            message=f"Name: {contact.name}\nEmail: {contact.email}\nMessage: {contact.message}",
-            from_email="noreply@example.com",
-            recipient_list=[_INFO_EMAIL],
-            fail_silently=False,
+        # From is the DMARC-safe display-name form (tenant_from_email).
+        mock_send_mail.assert_called_once()
+        kwargs = mock_send_mail.call_args.kwargs
+        assert (
+            kwargs["subject"]
+            == f"New Contact Form Submission from {contact.name}"
         )
+        assert kwargs["message"] == (
+            f"Name: {contact.name}\nEmail: {contact.email}"
+            f"\nMessage: {contact.message}"
+        )
+        assert kwargs["from_email"].endswith("<noreply@example.com>")
+        assert kwargs["recipient_list"] == [_INFO_EMAIL]
+        assert kwargs["fail_silently"] is False
 
     @override_settings(
         INFO_EMAIL=_INFO_EMAIL,

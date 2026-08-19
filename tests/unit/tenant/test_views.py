@@ -115,9 +115,14 @@ class TestTenantResolve:
         assert response.json()["apiDomain"] == "api.resolve-apider.example"
 
     @pytest.mark.django_db
-    def test_assets_and_static_domain_derive_from_primary(
+    def test_assets_and_static_domain_empty_without_explicit_rows(
         self, resolve_client, tenant_factory
     ):
+        """Asset/static hosts are platform-shared by default — they do
+        NOT derive from the primary domain (a derived host pointed at
+        DNS that need not exist). Empty means "use the platform
+        origin"; a dedicated white-label host is an explicit
+        ``assets*``/``static*`` TenantDomain row (next test)."""
         tenant = tenant_factory("resolve-assetsder")
         TenantDomain.objects.create(
             tenant=tenant,
@@ -128,14 +133,8 @@ class TestTenantResolve:
             "/api/v1/tenant/resolve?domain=resolve-assetsder.example"
         )
         assert response.status_code == 200
-        assert (
-            response.json()["assetsDomain"]
-            == "assets.resolve-assetsder.example"
-        )
-        assert (
-            response.json()["staticDomain"]
-            == "static.resolve-assetsder.example"
-        )
+        assert response.json()["assetsDomain"] == ""
+        assert response.json()["staticDomain"] == ""
 
     @pytest.mark.django_db
     def test_assets_and_static_domain_prefer_explicit_rows(

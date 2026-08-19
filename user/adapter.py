@@ -56,10 +56,10 @@ class UserAccountAdapter(DefaultAccountAdapter):
         return prefix + force_str(subject)
 
     def get_from_email(self) -> str:
-        """Return the active tenant's outbound sender address.
-
-        Priority: ``Tenant.from_email`` → ``settings.DEFAULT_FROM_EMAIL``
-        (see ``tenant.credentials.tenant_from_email``).
+        """Return the deliverability-safe outbound sender for the
+        active tenant: ``"{store name}" <DEFAULT_FROM_EMAIL>`` — see
+        ``tenant.credentials.tenant_from_email`` for the DMARC
+        rationale.
         """
         return tenant_from_email()
 

@@ -224,9 +224,15 @@ class TestGetTenantAssetsBaseUrl:
         )
         assert get_tenant_assets_base_url() == "https://assets.webside.gr"
 
-    def test_falls_back_to_derived_assets_subdomain(self, bind_tenant):
+    @override_settings(MEDIA_STREAM_BASE_URL="https://platform-media.example")
+    def test_no_explicit_row_uses_platform_origin(self, bind_tenant):
+        # Asset hosts do NOT derive from the primary domain: the media
+        # service is platform infrastructure (tenancy enforced at the
+        # path level), so a tenant without a dedicated assets* row
+        # shares the platform origin. A derived assets.<primary> host
+        # pointed at DNS that need not exist (observed live on staging).
         bind_tenant(_fake_tenant_with_rows([("tenant-b.com", True)]))
-        assert get_tenant_assets_base_url() == "https://assets.tenant-b.com"
+        assert get_tenant_assets_base_url() == "https://platform-media.example"
 
     @override_settings(MEDIA_STREAM_BASE_URL="https://fallback-media.example")
     def test_falls_back_to_settings_when_no_tenant(self, bind_tenant):
@@ -260,9 +266,10 @@ class TestGetTenantStaticBaseUrl:
         )
         assert get_tenant_static_base_url() == "https://static.webside.gr"
 
-    def test_falls_back_to_derived_static_subdomain(self, bind_tenant):
+    @override_settings(STATIC_BASE_URL="https://platform-static.example")
+    def test_no_explicit_row_uses_platform_origin(self, bind_tenant):
         bind_tenant(_fake_tenant_with_rows([("tenant-b.com", True)]))
-        assert get_tenant_static_base_url() == "https://static.tenant-b.com"
+        assert get_tenant_static_base_url() == "https://platform-static.example"
 
     @override_settings(STATIC_BASE_URL="https://fallback-static.example")
     def test_falls_back_to_settings_when_no_tenant(self, bind_tenant):

@@ -74,11 +74,40 @@ def _get_tenant_field(
 
 
 def tenant_from_email() -> str:
-    """Return the outbound sender address for the active tenant.
+    """Return the outbound ``From`` header for the active tenant,
+    deliverability-safe.
 
-    Priority: ``Tenant.from_email`` → ``settings.DEFAULT_FROM_EMAIL``.
+    All mail leaves through the PLATFORM transport, whose sending
+    domain is the only one SPF/DKIM-authorized for that relay. Putting
+    a merchant's own address in ``From`` (``orders@their-domain.com``)
+    would fail the merchant domain's DMARC alignment — mail lands in
+    spam or bounces outright. Policy:
+
+    - Tenant context: RFC 5322 display-name form
+      ``"{store name}" <DEFAULT_FROM_EMAIL>`` — authenticated platform
+      envelope, tenant brand in the inbox sender line. The tenant's own
+      address belongs in ``Reply-To`` (send sites already pass
+      ``tenant_contact_email()``).
+    - No tenant context (public/admin sends): bare
+      ``DEFAULT_FROM_EMAIL``.
+
+    ``Tenant.from_email`` is reserved for a future per-tenant transport
+    feature (merchant-provided SMTP with their own domain's SPF/DKIM);
+    it is deliberately NOT used as ``From`` on the platform relay.
     """
-    return _get_tenant_field("from_email", "DEFAULT_FROM_EMAIL")
+    from email.utils import formataddr
+
+    from django.conf import settings
+
+    default = getattr(settings, "DEFAULT_FROM_EMAIL", "") or ""
+    if not default:
+        # No platform sender configured — an empty address inside a
+        # display-name form ("Store <>") would be invalid RFC 5322.
+        return ""
+    name = tenant_site_name()
+    if name and getattr(connection, "tenant", None) is not None:
+        return formataddr((name, default))
+    return default
 
 
 def tenant_contact_email() -> str:

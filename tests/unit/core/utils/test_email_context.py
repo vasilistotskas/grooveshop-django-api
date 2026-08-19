@@ -16,7 +16,14 @@ from types import SimpleNamespace
 from core.utils.email_context import build_email_context
 
 
-def _fake_tenant(**overrides):
+def _domains(domain: str):
+    """Minimal stand-in for the TenantDomain related manager."""
+    primary = SimpleNamespace(domain=domain, is_primary=True)
+    query = SimpleNamespace(first=lambda: primary)
+    return SimpleNamespace(filter=lambda **kw: query)
+
+
+def _fake_tenant(domain: str | None = None, **overrides):
     defaults = {
         "schema_name": "email-ctx-tenant",
         "store_name": "",
@@ -25,7 +32,10 @@ def _fake_tenant(**overrides):
         "logo_light_url": "",
     }
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+    tenant = SimpleNamespace(**defaults)
+    if domain is not None:
+        tenant.domains = _domains(domain)
+    return tenant
 
 
 class TestBuildEmailContext:
@@ -69,19 +79,34 @@ class TestBuildEmailContext:
 
         assert context["SITE_LOGO_URL"] == "https://cdn.example.com/logo.svg"
 
-    def test_site_logo_url_empty_when_tenant_has_no_logo(self, bind_tenant):
-        bind_tenant(_fake_tenant(logo_light_url=""))
+    def test_unbranded_non_platform_tenant_gets_no_logo(self, bind_tenant):
+        # An unbranded tenant's emails must never wear the platform's
+        # brand — empty makes email_base.html render the store name as
+        # a text wordmark instead.
+        bind_tenant(
+            _fake_tenant(domain="shop.acme.example", logo_light_url="")
+        )
 
         context = build_email_context()
 
-        # The template's fallback branch (STATIC_BASE_URL + the
-        # platform's logo-dark.svg) is what renders when this is
-        # empty — the byte-parity guard for tenants without a logo.
         assert context["SITE_LOGO_URL"] == ""
 
-    def test_site_logo_url_empty_with_no_active_tenant(self, bind_tenant):
+    def test_platform_tenant_falls_back_to_platform_logo(
+        self, bind_tenant, settings
+    ):
+        settings.NUXT_BASE_URL = "https://platform.example"
+        bind_tenant(
+            _fake_tenant(domain="platform.example", logo_light_url="")
+        )
+
+        context = build_email_context()
+
+        assert context["SITE_LOGO_URL"].endswith("/static/logo-dark.svg")
+
+    def test_no_active_tenant_counts_as_platform(self, bind_tenant):
+        # Public-schema/admin contexts keep the platform logo.
         bind_tenant(None)
 
         context = build_email_context()
 
-        assert context["SITE_LOGO_URL"] == ""
+        assert context["SITE_LOGO_URL"].endswith("/static/logo-dark.svg")

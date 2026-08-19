@@ -160,3 +160,29 @@ class TestSeedBrandPagesFooter(TestCase):
         from page_config.schemas import validate_navigation_items
 
         validate_navigation_items("footer", BRAND_FOOTER_COLUMNS)
+
+
+class TestBrandHeroKeepsItsLink(TestCase):
+    def test_hero_props_carry_the_product_link(self):
+        """The banner is a traffic path, not decoration.
+
+        HeroCarousel only renders the wrapping NuxtLink when a ``link``
+        prop is present, so omitting it turned the homepage promo into a
+        dead image and removed the route to the promoted product.
+        """
+        from page_config.defaults import BRAND_HOME_HERO_PROPS
+        from page_config.schemas import validate_section_props
+
+        assert BRAND_HOME_HERO_PROPS.get("link")
+        # Must also satisfy the prop contract an operator edits against.
+        validate_section_props("hero_carousel", BRAND_HOME_HERO_PROPS)
+
+    def test_seeded_home_hero_gets_the_link(self):
+        from page_config.defaults import seed_brand_pages
+        from page_config.models import PageLayout
+
+        seed_brand_pages()
+
+        home = PageLayout.objects.get(page_type="home")
+        hero = home.sections.get(component_type="hero_carousel")
+        assert hero.props.get("link")

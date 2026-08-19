@@ -99,6 +99,11 @@ def seed_page_layouts() -> None:
 BRAND_HOME_HERO_PROPS: dict = {
     "images": ["/img/main-banner.png"],
     "mobile_images": ["/img/main-banner-mobile.png"],
+    # The banner is a traffic path, not decoration: it linked to this
+    # product before the homepage moved onto the builder, and
+    # HeroCarousel only renders the wrapping link when a ``link`` prop is
+    # present — without it the promo became a dead image.
+    "link": "/products/2/mini-powerbank-5000mah",
 }
 
 # Footer navigation for the brand store, published alongside the pages

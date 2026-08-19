@@ -655,6 +655,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         """Main command handler"""
+        from django.core.management.base import CommandError
+
         schema = options.get("schema")
         if schema:
             from django_tenants.utils import schema_context
@@ -662,11 +664,35 @@ class Command(BaseCommand):
             from tenant.models import Tenant
 
             if not Tenant.objects.filter(schema_name=schema).exists():
-                from django.core.management.base import CommandError
-
                 raise CommandError(f"Tenant schema {schema!r} not found.")
             with schema_context(schema):
                 return self._handle_seed(*args, **options)
+
+        # No --schema: seed whatever schema the connection is on. That is
+        # correct on a single-tenant dev database, and a silent mistake
+        # once tenants exist — everything this command writes is a
+        # TENANT_APPS model, so a bare run fills the PUBLIC copies of
+        # those tables. Those copies are exactly what
+        # ``prune_public_legacy_data`` TRUNCATES after cutover, so the
+        # work is invisible and then deleted. Refuse rather than guess.
+        from django.db import connection as db_connection
+
+        from tenant.models import Tenant
+
+        current = getattr(db_connection, "schema_name", "public")
+        if current == "public":
+            tenants = list(
+                Tenant.objects.filter(is_active=True)
+                .exclude(schema_name="public")
+                .values_list("schema_name", flat=True)[:10]
+            )
+            if tenants:
+                raise CommandError(
+                    "Refusing to seed the public schema: this command "
+                    "writes tenant-scoped models, and the public copies "
+                    "are truncated after cutover. Pass --schema with one "
+                    f"of: {', '.join(sorted(tenants))}"
+                )
         return self._handle_seed(*args, **options)
 
     def _handle_seed(self, *args, **options):

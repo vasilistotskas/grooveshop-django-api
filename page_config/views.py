@@ -72,11 +72,28 @@ class NavigationMenuAdminViewSet(BaseModelViewSet):
     queryset = NavigationMenu.objects.all()
     # Same pairing rationale as PageLayoutAdminViewSet (H22).
     permission_classes = [IsAdminUser, HasTenantAccess]
+    # One entry per ACTION. ``BaseModelViewSet.get_serializer_class``
+    # looks the current action up by name (core/api/views.py) — there is
+    # no "default" key anywhere in the codebase, so every one of these
+    # six routes raised ImproperlyConfigured and 500'd, and schema
+    # generation emitted an error per action instead of a request body.
+    # Nothing consumes them yet, which is why it went unnoticed.
     serializers_config = {
-        "default": ActionConfig(
+        "list": ActionConfig(response=NavigationMenuSerializer),
+        "retrieve": ActionConfig(response=NavigationMenuSerializer),
+        "create": ActionConfig(
             request=NavigationMenuSerializer,
             response=NavigationMenuSerializer,
         ),
+        "update": ActionConfig(
+            request=NavigationMenuSerializer,
+            response=NavigationMenuSerializer,
+        ),
+        "partial_update": ActionConfig(
+            request=NavigationMenuSerializer,
+            response=NavigationMenuSerializer,
+        ),
+        "destroy": ActionConfig(response=NavigationMenuSerializer),
     }
 
 

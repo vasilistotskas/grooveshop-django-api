@@ -44,10 +44,11 @@ def _fake_tenant(primary_domain: str, schema_name: str = "tenant_a"):
 def _fake_tenant_with_rows(
     rows: list[tuple[str, bool]], schema_name="tenant_a"
 ):
-    """Build a tenant whose ``.domains`` manager answers both the
-    ``domain__istartswith="api"`` and ``is_primary=True`` filter shapes
-    ``get_tenant_api_base_url`` issues, backed by a real (small) list
-    instead of a single canned MagicMock return value.
+    """Build a tenant whose ``.domains`` manager answers the filter
+    shapes ``get_tenant_api_base_url`` issues — ``domain__istartswith``
+    and ``is_primary=True`` — backed by a real (small) list instead of a
+    single canned MagicMock return value. The prefix lookup iterates its
+    result, so the ordered queryset is iterable too.
 
     ``rows`` is a list of ``(domain, is_primary)`` tuples.
     """
@@ -76,6 +77,11 @@ def _fake_tenant_with_rows(
         ordered.first.return_value = (
             ordered_results[0] if ordered_results else None
         )
+        # The prefix lookup ITERATES the ordered queryset (it needs every
+        # candidate so it can require a separator after the prefix — see
+        # ``_has_prefix_boundary``), so the double has to be iterable and
+        # not just answer .first().
+        ordered.__iter__ = lambda _self: iter(ordered_results)
         filtered.order_by.return_value = ordered
         return filtered
 
@@ -285,3 +291,44 @@ class TestGetTenantStaticBaseUrl:
     def test_falls_back_when_no_domains_at_all(self, bind_tenant):
         bind_tenant(_fake_tenant_with_rows([]))
         assert get_tenant_static_base_url() == "https://fallback-static.example"
+
+
+class TestPrefixRequiresASeparator:
+    """``istartswith`` alone matched any domain beginning with those
+    letters, so a tenant whose own storefront is ``apiary.gr`` resolved
+    that domain as its API host — and every link, WebSocket URL and CSP
+    entry built from it pointed at the storefront instead."""
+
+    def test_bare_prefix_match_is_not_treated_as_the_service_host(
+        self, bind_tenant
+    ):
+        bind_tenant(
+            _fake_tenant_with_rows(
+                [
+                    ("apiary.gr", True),
+                ]
+            )
+        )
+        # Falls through to the derived form rather than claiming
+        # apiary.gr is the API host.
+        assert get_tenant_api_base_url() == "https://api.apiary.gr"
+
+    def test_static_prefix_needs_a_separator_too(self, bind_tenant):
+        bind_tenant(
+            _fake_tenant_with_rows(
+                [
+                    ("staticshop.com", True),
+                ]
+            )
+        )
+        # No explicit static* row, and assets/static do NOT derive —
+        # a white-label origin is an opt-in, so this is the platform one.
+        assert get_tenant_static_base_url() != "https://staticshop.com"
+
+    def test_both_real_separators_still_match(self, bind_tenant):
+        # Production uses a dot, staging uses a dash.
+        for host in ("api.example.gr", "api-staging.example.gr"):
+            bind_tenant(
+                _fake_tenant_with_rows([("example.gr", True), (host, False)])
+            )
+            assert get_tenant_api_base_url() == f"https://{host}"

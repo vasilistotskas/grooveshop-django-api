@@ -33,7 +33,6 @@ fully accessible.
 
 from __future__ import annotations
 
-from django.db import connection
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import BasePermission
 
@@ -53,7 +52,16 @@ class IsTenantFeatureEnabled(BasePermission):
     feature_flag: str = ""
 
     def has_permission(self, request, view) -> bool:
-        tenant = getattr(connection, "tenant", None)
+        # get_current_tenant() — not connection.tenant — because the
+        # latter is the PUBLIC Tenant row on the platform host once
+        # bootstrap_platform has provisioned one, not None. The early
+        # return below then never fired, and that row carries
+        # loyalty_enabled=False by default, so every loyalty endpoint
+        # 404'd on the control-plane host. The helper returns None for
+        # the public schema, which is what "no tenant to gate on" means.
+        from tenant.membership import get_current_tenant  # noqa: PLC0415
+
+        tenant = get_current_tenant()
         if tenant is None:
             # Public schema — platform operator, never gated.
             return True

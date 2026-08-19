@@ -148,13 +148,29 @@ def _resolve_prefixed_service_domain(
         return ""
 
     try:
-        prefixed_domain_obj = (
-            domains_manager.filter(domain__istartswith=prefix)
-            .order_by("-is_primary")
-            .first()
+        candidates = list(
+            domains_manager.filter(domain__istartswith=prefix).order_by(
+                "-is_primary"
+            )
         )
     except Exception:  # noqa: BLE001 — any failure falls through
-        prefixed_domain_obj = None
+        candidates = []
+
+    # Require a SEPARATOR after the prefix. ``istartswith`` alone matched
+    # any domain merely beginning with those letters, so a tenant on
+    # ``apiary.gr`` resolved its own storefront domain as its API host.
+    # Both separators are in real use: production runs ``api.webside.gr``
+    # while staging runs ``api-staging.webside.gr``. Filtered here rather
+    # than in SQL because a tenant has a handful of domains and this
+    # keeps the query one shape.
+    prefixed_domain_obj = next(
+        (
+            row
+            for row in candidates
+            if _has_prefix_boundary(getattr(row, "domain", ""), prefix)
+        ),
+        None,
+    )
     if prefixed_domain_obj and getattr(prefixed_domain_obj, "domain", ""):
         return prefixed_domain_obj.domain
 
@@ -169,6 +185,20 @@ def _resolve_prefixed_service_domain(
         return f"{prefix}.{primary_domain_obj.domain}"
 
     return ""
+
+
+def _has_prefix_boundary(domain: str, prefix: str) -> bool:
+    """True when *domain* starts with *prefix* followed by a separator.
+
+    ``api.webside.gr`` and ``api-staging.webside.gr`` qualify;
+    ``apiary.gr`` does not.
+    """
+    lowered = (domain or "").lower()
+    prefix = prefix.lower()
+    if not lowered.startswith(prefix):
+        return False
+    rest = lowered[len(prefix) :]
+    return rest[:1] in (".", "-")
 
 
 def resolve_tenant_api_domain(tenant) -> str:

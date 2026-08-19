@@ -14,8 +14,21 @@ class TestSeedPageLayouts(TestCase):
         seed_page_layouts()
         assert PageLayout.objects.count() == len(DEFAULT_PAGE_LAYOUTS)
         assert PageLayout.objects.filter(page_type="home").exists()
-        assert PageLayout.objects.filter(page_type="products").exists()
-        assert PageLayout.objects.filter(page_type="blog").exists()
+
+    def test_seeds_no_products_or_blog_layout(self):
+        """Those pages render their own listings.
+
+        The storefront treats a published products/blog layout as an
+        optional branded band ABOVE the page content, with an empty
+        fallback. Seeding one with listing sections duplicated the page:
+        products_grid mounts its own ProductsList, so a freshly
+        provisioned tenant got a search bar and an unfiltered grid, then
+        the real sidebar and product list — two lists competing over the
+        same URL filter state.
+        """
+        seed_page_layouts()
+        assert not PageLayout.objects.filter(page_type="products").exists()
+        assert not PageLayout.objects.filter(page_type="blog").exists()
 
     def test_creates_sections(self):
         seed_page_layouts()
@@ -95,5 +108,55 @@ class TestSeedBrandPages(TestCase):
 
     def test_returns_created_map(self):
         result = seed_brand_pages()
-        assert set(result) == set(BRAND_PAGE_LAYOUTS) | {"home"}
+        # The footer navigation is seeded alongside the pages it links
+        # to, so it reports in the same map.
+        assert set(result) == (
+            set(BRAND_PAGE_LAYOUTS) | {"home", "footer_navigation"}
+        )
         assert all(created is True for created in result.values())
+
+
+class TestSeedBrandPagesFooter(TestCase):
+    """The brand footer ships with the pages it points at.
+
+    Those columns used to live in the storefront's code-level fallback,
+    so EVERY tenant's footer advertised this store's product concept and
+    linked to /vision, /what-is-microlearning and /why-microlearning —
+    pages that render an empty body for any tenant without a published
+    layout, i.e. crawlable soft-404s under another company's heading.
+    """
+
+    def test_seeds_the_footer_navigation(self):
+        from page_config.defaults import seed_brand_pages
+        from page_config.models import NavigationMenu, NavigationSlot
+
+        seed_brand_pages()
+
+        menu = NavigationMenu.objects.get(slot=NavigationSlot.FOOTER)
+        labels = [column["label"] for column in menu.items]
+        assert "Microlearning" in labels
+
+        targets = [
+            child["to"] for column in menu.items for child in column["children"]
+        ]
+        # The links the universal fallback no longer carries.
+        assert "/vision" in targets
+        assert "/what-is-microlearning" in targets
+        assert "/why-microlearning" in targets
+
+    def test_footer_seed_is_idempotent(self):
+        from page_config.defaults import seed_brand_pages
+        from page_config.models import NavigationMenu
+
+        seed_brand_pages()
+        seed_brand_pages()
+
+        assert NavigationMenu.objects.filter(slot="footer").count() == 1
+
+    def test_seeded_footer_passes_its_own_validator(self):
+        """An operator editing it in the admin must not hit a rejection
+        the seed itself would fail."""
+        from page_config.defaults import BRAND_FOOTER_COLUMNS
+        from page_config.schemas import validate_navigation_items
+
+        validate_navigation_items("footer", BRAND_FOOTER_COLUMNS)

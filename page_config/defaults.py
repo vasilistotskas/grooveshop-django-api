@@ -38,31 +38,21 @@ DEFAULT_PAGE_LAYOUTS: dict[str, dict] = {
             },
         ],
     },
-    "products": {
-        "title": "Products Page",
-        "sections": [
-            {
-                "component_type": "search_bar",
-                "title": "",
-                "props": {},
-            },
-            {
-                "component_type": "products_grid",
-                "title": "",
-                "props": {"page_size": 12},
-            },
-        ],
-    },
-    "blog": {
-        "title": "Blog Page",
-        "sections": [
-            {
-                "component_type": "blog_posts_grid",
-                "title": "Latest Posts",
-                "props": {"count": 12},
-            },
-        ],
-    },
+    # products/blog deliberately have NO default layout.
+    #
+    # The storefront treats a published layout for these page types as an
+    # optional BRANDED BAND rendered above the page's own content, with
+    # an empty fallback so a tenant without one renders exactly as it
+    # does today (app/pages/products/index.vue, app/pages/blog/index.vue).
+    # Seeding them with full listing sections therefore duplicated the
+    # page: products_grid mounts its own <ProductsList>, so a freshly
+    # provisioned tenant showed a search bar and an unfiltered grid, THEN
+    # the real breadcrumb, sidebar and product list — two lists competing
+    # over the same URL filter state. The blog page got two post grids.
+    #
+    # A band is for brand content (a hero, an announcement), not a second
+    # copy of the listing the page already renders. Operators can publish
+    # one from the admin when they actually want it.
 }
 
 
@@ -110,6 +100,57 @@ BRAND_HOME_HERO_PROPS: dict = {
     "images": ["/img/main-banner.png"],
     "mobile_images": ["/img/main-banner-mobile.png"],
 }
+
+# Footer navigation for the brand store, published alongside the pages
+# it points at.
+#
+# The storefront's code-level footer fallback carries only links every
+# store has (about, legal, contact). These brand-specific columns used to
+# live in that fallback, so EVERY tenant's footer advertised this store's
+# product concept and linked to /vision, /what-is-microlearning and
+# /why-microlearning — pages that render an empty body for any tenant
+# without a published layout. Seeding them here keeps this store's
+# chrome identical while leaving other tenants' footers clean.
+#
+# Labels are literals, not translation keys: a NavigationMenu row IS the
+# operator's content, and the admin edits it as such.
+BRAND_FOOTER_COLUMNS: list[dict] = [
+    {
+        "label": "Σχετικά με εμάς",
+        "icon": "i-heroicons-information-circle",
+        "children": [
+            {"label": "Σχετικά με το Webside", "to": "/about"},
+            {"label": "Όραμα", "to": "/vision"},
+        ],
+    },
+    {
+        "label": "Microlearning",
+        "icon": "i-heroicons-light-bulb",
+        "children": [
+            {
+                "label": "Τι είναι το Microlearning",
+                "to": "/what-is-microlearning",
+            },
+            {"label": "Γιατί Microlearning", "to": "/why-microlearning"},
+        ],
+    },
+    {
+        "label": "Όροι & Προϋποθέσεις",
+        "icon": "i-heroicons-rectangle-group",
+        "children": [
+            {"label": "Όροι Χρήσης", "to": "/terms-of-use"},
+            {"label": "Πολιτική Απορρήτου", "to": "/privacy-policy"},
+            {"label": "Πολιτική Cookies", "to": "/cookies-policy"},
+        ],
+    },
+    {
+        "label": "Κέντρο Βοήθειας",
+        "icon": "i-heroicons-chat-bubble-left-right",
+        "children": [
+            {"label": "Επικοινωνία", "to": "/contact"},
+        ],
+    },
+]
 
 BRAND_PAGE_LAYOUTS: dict[str, dict] = {
     "about": {
@@ -165,6 +206,20 @@ def seed_brand_pages() -> dict[str, bool]:
     function itself has no notion of which schema it's running in.
     """
     created_map: dict[str, bool] = {}
+
+    # Publish the footer that points at these pages. Without it the
+    # storefront falls back to its universal columns and this store
+    # silently loses its Vision and Microlearning links.
+    from page_config.models import NavigationMenu, NavigationSlot
+
+    _, footer_created = NavigationMenu.objects.get_or_create(
+        slot=NavigationSlot.FOOTER,
+        defaults={"items": BRAND_FOOTER_COLUMNS},
+    )
+    if footer_created:
+        logger.info("Seeded brand footer navigation")
+    created_map["footer_navigation"] = footer_created
+
     for page_type, config in BRAND_PAGE_LAYOUTS.items():
         layout, created = PageLayout.objects.get_or_create(
             page_type=page_type,

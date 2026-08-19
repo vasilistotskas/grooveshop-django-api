@@ -1,10 +1,23 @@
 """Tenant membership helpers.
 
-Checks that bridge django-tenants' schema awareness with the
-``UserTenantMembership`` table. Pattern: every tenant-scoped API view
-and signal path calls ``require_tenant_access`` (or the DRF permission
-below) to refuse requests where the authenticated user has no active
-membership in the current ``connection.tenant``.
+``UserTenantMembership`` grants a PLATFORM-PUBLIC identity operator or
+staff access over a tenant. It is NOT how customers are scoped to a
+store: shoppers live in their tenant's own schema (``user`` is in both
+SHARED_APPS and TENANT_APPS, and the tenant copy wins on the search
+path), so a shopper registered at tenant A has no row, no allauth
+records and no Knox token in tenant B. That separation is structural
+and needs no check.
+
+Requiring membership of customers was actively harmful: the table lives
+in the public schema with an FK to ``public.user_useraccount``, so a
+shopper created in a tenant schema could not have one — the grant that
+tried to create it raised ForeignKeyViolation and made signup 500,
+leaving orphaned accounts that could never log in.
+
+So: use ``HasTenantAccess``/``get_membership`` on STAFF surfaces (the
+admin site, tenant management). For ordinary authenticated endpoints
+use DRF's ``IsAuthenticated``/``IsAuthenticatedOrReadOnly`` — being
+authenticated in this schema is the authorization.
 """
 
 from __future__ import annotations
@@ -74,43 +87,3 @@ class HasTenantAccess(permissions.BasePermission):
 
     def has_permission(self, request, view):
         return user_has_tenant_access(request.user)
-
-
-class IsTenantMemberOrReadOnly(permissions.BasePermission):
-    """Drop-in replacement for ``IsAuthenticatedOrReadOnly`` that also
-    validates tenant membership for authenticated requests.
-
-    Rules:
-    - Anonymous requests on SAFE_METHODS (GET, HEAD, OPTIONS): allowed.
-    - Authenticated requests: user must have an active ``UserTenantMembership``
-      for the current ``connection.tenant``.  If the connection is in the
-      public schema (no tenant attached) the membership check is skipped
-      and the request is allowed — this preserves correct behaviour for
-      platform-admin and health-check paths that run in the public schema.
-
-    This permission is used as the global default in ``DEFAULT_PERMISSION_CLASSES``
-    so that every new ViewSet inherits secure-by-default behaviour without
-    requiring explicit per-viewset annotations.  ViewSets that need fully
-    anonymous write access (e.g. guest checkout, contact form) must override
-    ``permission_classes = [AllowAny]`` explicitly.
-    """
-
-    message = "You do not have access to this store."
-
-    def has_permission(self, request, view):
-        # Allow all safe (read-only) requests from anonymous users.
-        if request.method in permissions.SAFE_METHODS:
-            return True
-
-        # Unauthenticated write attempt — deny.
-        if not getattr(request.user, "is_authenticated", False):
-            return False
-
-        # Authenticated request — require tenant membership when a tenant
-        # is active on this connection.
-        tenant = get_current_tenant()
-        if tenant is None:
-            # Public-schema path (admin, health, platform routines).
-            return True
-
-        return user_has_tenant_access(request.user, tenant)

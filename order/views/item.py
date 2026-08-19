@@ -13,7 +13,6 @@ from rest_framework.permissions import IsAuthenticated
 
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from tenant.membership import IsTenantMemberOrReadOnly
 
 from core.utils.serializers import (
     ActionConfig,
@@ -62,14 +61,10 @@ serializers_config: SerializersConfig = {
 class OrderItemViewSet(BaseModelViewSet):
     queryset = OrderItem.objects.none()
     serializers_config = serializers_config
-    # Match the global ``IsTenantMemberOrReadOnly`` default that
-    # ``permission_classes = [IsAuthenticated]`` would otherwise drop.
-    # ``IsTenantMemberOrReadOnly`` lets authenticated users issue safe
-    # reads (the queryset itself is user-scoped + schema-isolated, so
-    # cross-tenant data can't leak via GETs) while requiring an active
-    # membership for writes. Switching to ``HasTenantAccess`` blanket
-    # was over-strict — own-order reads were never a tenancy concern.
-    permission_classes = [IsAuthenticated, IsTenantMemberOrReadOnly]
+    # The queryset is user-scoped and schema-isolated, so an
+    # authenticated caller is by construction a customer of THIS store.
+    # Tenancy is not an extra permission here (see tenant/membership.py).
+    permission_classes = [IsAuthenticated]
     filterset_class = OrderItemFilter
     ordering_fields = [
         "id",

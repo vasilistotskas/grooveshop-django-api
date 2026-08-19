@@ -152,6 +152,18 @@ TENANT_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
     # User & Auth (isolated per-tenant)
+    #
+    # Sessions must be per-schema for the same reason ``user`` is.
+    # ``_auth_user_id`` is resolved against whatever schema serves the
+    # request, so ONE shared session table means a cookie minted on one
+    # host is accepted on another and resolved against a different
+    # user table — where the same id is a different person. The cookie
+    # Domain is not a boundary: TenantCookieDomainMiddleware scopes it
+    # to the registrable domain, so every host under it receives it,
+    # including the platform control-plane host. Kept in SHARED_APPS
+    # too, so the public schema retains its own table for platform
+    # staff.
+    "django.contrib.sessions",
     "user",
     "allauth",
     "allauth.account",
@@ -336,13 +348,19 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": [
-        # IsTenantMemberOrReadOnly is a drop-in for IsAuthenticatedOrReadOnly
-        # that additionally validates tenant membership for authenticated
-        # requests.  Anonymous GET/HEAD/OPTIONS are still allowed so public
-        # catalog endpoints keep working without explicit overrides.
-        # ViewSets that need anonymous write access (guest checkout, contact)
-        # must set permission_classes = [AllowAny] explicitly.
-        "tenant.membership.IsTenantMemberOrReadOnly",
+        # Anonymous GET/HEAD/OPTIONS stay allowed so public catalog
+        # endpoints work without per-viewset overrides; writes require
+        # authentication. ViewSets needing anonymous writes (guest
+        # checkout, contact form) set permission_classes = [AllowAny].
+        #
+        # Tenant scoping is NOT enforced here. Customers live in their
+        # tenant's own schema, so an authenticated request on this host
+        # is by construction a customer of THIS store — see
+        # tenant/membership.py. The previous default additionally
+        # required a UserTenantMembership, which no shopper can hold
+        # (public-schema table, FK to the public user table), so every
+        # authenticated write was refused.
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",

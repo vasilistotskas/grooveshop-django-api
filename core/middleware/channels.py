@@ -15,8 +15,20 @@ User = get_user_model()
 
 
 @database_sync_to_async
-def authenticate_ticket(ticket: str):
+def authenticate_ticket(ticket: str, tenant=None):
     """Consume a single-use WebSocket ticket and return the owning user.
+
+    Runs inside ``tenant_context(tenant)``. ``TenantWebsocketMiddleware``
+    resolves the tenant into ``scope`` but deliberately does not touch
+    the DB connection, and ``database_sync_to_async`` hands this body to
+    asgiref's process-wide executor thread — whose ``connection.tenant``
+    is whatever the last request on that thread left behind. Without the
+    binding the cache key is built with the wrong schema prefix (the
+    ticket was written under the requesting tenant's), so the GETDEL
+    misses and a legitimate connection is closed as anonymous; when it
+    does hit, the user row is read from whichever schema happened to be
+    active, which decides whether the connection joins the tenant's
+    staff broadcast group.
 
     The ticket is deleted on first read so intercepted values can't be
     replayed — a legitimate client never sends the same ticket twice
@@ -31,11 +43,21 @@ def authenticate_ticket(ticket: str):
     ticket minting and WS connect, the connection is denied even though
     the ticket itself is still valid.
     """
+    from django_tenants.utils import tenant_context  # noqa: PLC0415
     from knox.models import get_token_model  # noqa: PLC0415
 
     if not ticket:
         return AnonymousUser()
 
+    if tenant is None:
+        return _authenticate_ticket_inner(ticket, get_token_model())
+    with tenant_context(tenant):
+        return _authenticate_ticket_inner(ticket, get_token_model())
+
+
+def _authenticate_ticket_inner(ticket: str, token_model):
+    """Ticket consumption proper — always called with the tenant's
+    schema already bound by the caller."""
     raw_key = build_ticket_cache_key(ticket)
     # Resolve the Django-prefixed Redis key that the cache layer stored.
     prefixed_key = cache.make_and_validate_key(raw_key)
@@ -71,21 +93,13 @@ def authenticate_ticket(ticket: str):
     # Deny connections if all Knox tokens have been revoked — e.g. because
     # the user changed their password between minting the ticket and
     # opening the WebSocket.
-    if not get_token_model().objects.filter(user=user).exists():
+    if not token_model.objects.filter(user=user).exists():
         logger.info(
             "WS ticket rejected: no live Knox tokens for user %s", user.pk
         )
         return AnonymousUser()
 
     return user
-
-
-@database_sync_to_async
-def _user_has_tenant_access_async(user, tenant) -> bool:
-    """Sync membership check wrapped for the ASGI middleware."""
-    from tenant.membership import user_has_tenant_access  # noqa: PLC0415
-
-    return user_has_tenant_access(user, tenant)
 
 
 class TokenAuthMiddleware(BaseMiddleware):
@@ -95,29 +109,16 @@ class TokenAuthMiddleware(BaseMiddleware):
 
         ticket = query_params.get("ticket", [None])[0]
 
-        if ticket:
-            user = await authenticate_ticket(ticket)
-        else:
-            user = AnonymousUser()
-
-        # Tenant binding (H3 in MULTI_TENANT_AUDIT.md): a Knox ticket
-        # minted on tenant A must not authenticate a WebSocket on
-        # tenant B. ``TenantWebsocketMiddleware`` runs outside this one
-        # and has already set ``scope["tenant"]``; we drop the user
-        # back to AnonymousUser when membership is missing so the
-        # consumer enforces its anonymous policy (deny + close).
+        # Resolve the ticket in the CONNECTING tenant's schema.
+        # ``TenantWebsocketMiddleware`` runs outside this one and has
+        # already put the tenant in the scope. Cross-tenant replay is
+        # structural: the ticket cache key and the knox token table are
+        # both schema-scoped, so a ticket minted on one tenant finds
+        # nothing on another and the connection stays anonymous.
         tenant = scope.get("tenant")
-        if (
-            user.is_authenticated
-            and tenant is not None
-            and getattr(tenant, "schema_name", "public") != "public"
-            and not await _user_has_tenant_access_async(user, tenant)
-        ):
-            logger.warning(
-                "WS auth: rejecting user %s on tenant %s — no membership",
-                getattr(user, "pk", "?"),
-                getattr(tenant, "schema_name", "?"),
-            )
+        if ticket:
+            user = await authenticate_ticket(ticket, tenant)
+        else:
             user = AnonymousUser()
 
         scope["user"] = user

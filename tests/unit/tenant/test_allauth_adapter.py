@@ -17,7 +17,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django import forms
 from django.contrib.auth import get_user_model
 
 from tenant.allauth_adapter import (
@@ -43,73 +42,48 @@ def user(db):
     )
 
 
-class TestPreLoginMembershipGate:
-    """``pre_login`` now resolves the active tenant from
-    ``request.get_host()`` rather than ``connection.tenant`` (H7 in
-    MULTI_TENANT_AUDIT.md — thread-local reuse under
-    ``database_sync_to_async`` could serve a stale tenant). The tests
-    patch ``_resolve_tenant_from_request`` so the per-test fixture
-    tenant is returned regardless of the mocked request host.
+class TestPreLoginHasNoMembershipGate:
+    """Login must not require a ``UserTenantMembership``.
+
+    Customers are per-schema: ``user`` sits in both SHARED_APPS and
+    TENANT_APPS and the tenant copy wins on the search path, so a
+    shopper registered at tenant A has no row, no allauth records and no
+    Knox token in tenant B — credential lookup fails there before any
+    gate would run. The membership table meanwhile lives in the public
+    schema with an FK to the public user table, so a tenant-schema
+    shopper cannot hold one at all: the old gate rejected every
+    legitimate customer, and the signup-time grant that tried to satisfy
+    it raised ForeignKeyViolation.
     """
 
-    @staticmethod
-    def _stub_resolver(tenant):
-        """Patch the tenant resolver to return ``tenant`` for any request."""
-        from unittest.mock import patch as _patch
-
-        return _patch(
-            "tenant.allauth_adapter._resolve_tenant_from_request",
-            return_value=tenant,
-        )
-
     @pytest.mark.django_db
-    def test_allows_login_with_active_membership(self, tenant_factory, user):
-        tenant = tenant_factory("prelogin-allow")
-        UserTenantMembership.objects.create(
-            user=user,
-            tenant=tenant,
-            role=TenantMembershipRole.MEMBER,
-            is_active=True,
-        )
+    def test_allows_login_without_any_membership(self, tenant_factory, user):
+        tenant = tenant_factory("prelogin-nomembership")
+        # No membership row exists for this user anywhere.
+        assert not UserTenantMembership.objects.filter(user=user).exists()
 
         adapter = TenantAccountAdapter()
-        request = MagicMock()
-
-        # Should not raise
-        with self._stub_resolver(tenant):
+        # Must not raise — the old implementation raised ValidationError
+        # with "You do not have access to this store."
+        with patch(
+            "tenant.allauth_adapter._resolve_tenant_from_request",
+            return_value=tenant,
+        ):
             adapter.pre_login(
-                request,
+                MagicMock(),
                 user,
                 email_verification=None,
                 signal_kwargs=None,
-                email="bob-adapter@example.com",
+                email=user.email,
                 signup=False,
                 redirect_url=None,
             )
 
     @pytest.mark.django_db
-    def test_rejects_login_without_membership(self, tenant_factory, user):
-        tenant = tenant_factory("prelogin-reject")
-
-        adapter = TenantAccountAdapter()
-        request = MagicMock()
-
-        with self._stub_resolver(tenant):
-            with pytest.raises(forms.ValidationError) as exc:
-                adapter.pre_login(
-                    request,
-                    user,
-                    email_verification=None,
-                    signal_kwargs=None,
-                    email="bob-adapter@example.com",
-                    signup=False,
-                    redirect_url=None,
-                )
-        # The code is what the storefront i18n pack keys on — preserve it
-        assert exc.value.code == "no_tenant_membership"
-
-    @pytest.mark.django_db
-    def test_rejects_login_with_inactive_membership(self, tenant_factory, user):
+    def test_allows_login_with_inactive_membership(
+        self, tenant_factory, user
+    ):
+        """An inactive STAFF grant is irrelevant to shopper login."""
         tenant = tenant_factory("prelogin-inactive")
         UserTenantMembership.objects.create(
             user=user,
@@ -117,90 +91,36 @@ class TestPreLoginMembershipGate:
             role=TenantMembershipRole.MEMBER,
             is_active=False,
         )
+        with patch(
+            "tenant.allauth_adapter._resolve_tenant_from_request",
+            return_value=tenant,
+        ):
+            TenantAccountAdapter().pre_login(
+                MagicMock(),
+                user,
+                email_verification=None,
+                signal_kwargs=None,
+                email=user.email,
+                signup=False,
+                redirect_url=None,
+            )
 
-        adapter = TenantAccountAdapter()
-        request = MagicMock()
 
-        with self._stub_resolver(tenant):
-            with pytest.raises(forms.ValidationError):
-                adapter.pre_login(
-                    request,
-                    user,
-                    email_verification=None,
-                    signal_kwargs=None,
-                    email="bob-adapter@example.com",
-                    signup=False,
-                    redirect_url=None,
-                )
+class TestSignupGrantsNoMembership:
+    """Signup creates the shopper in the tenant schema and stops there.
 
-    @pytest.mark.django_db
-    def test_skips_check_on_public_schema(self, user):
-        # Platform admin paths (/admin/login/ on the public schema) must
-        # still work. The gate short-circuits when schema_name == "public".
-        public_marker = SimpleNamespace(schema_name="public")
-
-        adapter = TenantAccountAdapter()
-        request = MagicMock()
-
-        # Will call super().pre_login which expects more context; just
-        # verify we don't raise ValidationError for missing membership.
-        with self._stub_resolver(public_marker):
-            try:
-                adapter.pre_login(
-                    request,
-                    user,
-                    email_verification=None,
-                    signal_kwargs=None,
-                    email="bob-adapter@example.com",
-                    signup=False,
-                    redirect_url=None,
-                )
-            except forms.ValidationError:
-                pytest.fail(
-                    "public schema should skip the tenant membership gate"
-                )
-            except Exception:
-                # Super's pre_login may raise for unrelated reasons given
-                # our mock request; that's not what this test covers.
-                pass
+    The grant this replaces is the exact statement that 500'd: it
+    inserted into a public-schema table keyed by a public user id, for a
+    user that exists only in the tenant schema.
+    """
 
     @pytest.mark.django_db
-    def test_skips_check_when_no_tenant(self, user):
-        """When the resolver returns None (request host did not match
-        any TenantDomain row) the gate is skipped — platform paths
-        like /admin/login/ on the public hostname still work.
-        """
-        adapter = TenantAccountAdapter()
-        request = MagicMock()
-
-        with self._stub_resolver(None):
-            try:
-                adapter.pre_login(
-                    request,
-                    user,
-                    email_verification=None,
-                    signal_kwargs=None,
-                    email="bob-adapter@example.com",
-                    signup=False,
-                    redirect_url=None,
-                )
-            except forms.ValidationError:
-                pytest.fail("no tenant should skip the membership gate")
-            except Exception:
-                pass
-
-
-class TestSaveUserCreatesMembership:
-    @pytest.mark.django_db
-    def test_email_signup_creates_member_membership(
+    def test_email_signup_creates_no_membership(
         self, tenant_factory, bind_tenant, monkeypatch
     ):
         tenant = tenant_factory("signup-email")
         bind_tenant(tenant)
 
-        # Short-circuit the super().save_user call since it depends on
-        # a real allauth form; we only want to test the membership side
-        # effect in ``TenantAccountAdapter.save_user``.
         adapter = TenantAccountAdapter()
         new_user = User.objects.create_user(
             username="new-signup",
@@ -221,44 +141,15 @@ class TestSaveUserCreatesMembership:
         )
 
         assert returned.pk == new_user.pk
-        membership = UserTenantMembership.objects.get(
+        assert not UserTenantMembership.objects.filter(
             user=new_user, tenant=tenant
-        )
-        assert membership.role == TenantMembershipRole.MEMBER
-        assert membership.is_active is True
+        ).exists()
 
     @pytest.mark.django_db
-    def test_email_signup_noop_when_commit_false(
+    def test_social_signup_creates_no_membership(
         self, tenant_factory, bind_tenant, monkeypatch
     ):
-        tenant = tenant_factory("signup-nocommit")
-        bind_tenant(tenant)
-
-        adapter = TenantAccountAdapter()
-        new_user = User(
-            username="transient",
-            email="transient@example.com",
-        )
-
-        monkeypatch.setattr(
-            "user.adapter.UserAccountAdapter.save_user",
-            lambda self, request, user, form, commit=True: user,
-        )
-
-        adapter.save_user(
-            request=MagicMock(),
-            user=new_user,
-            form=MagicMock(),
-            commit=False,
-        )
-
-        assert UserTenantMembership.objects.filter(tenant=tenant).count() == 0
-
-    @pytest.mark.django_db
-    def test_social_signup_creates_member_membership(
-        self, tenant_factory, bind_tenant, monkeypatch
-    ):
-        tenant = tenant_factory("social-signup")
+        tenant = tenant_factory("signup-social")
         bind_tenant(tenant)
 
         new_user = User.objects.create_user(
@@ -266,19 +157,17 @@ class TestSaveUserCreatesMembership:
             email="social-new@example.com",
             password="p",  # noqa: S106
         )
-
         monkeypatch.setattr(
             "user.adapter.SocialAccountAdapter.save_user",
             lambda self, request, sociallogin, form=None: new_user,
         )
 
-        adapter = TenantSocialAccountAdapter()
-        returned = adapter.save_user(
+        returned = TenantSocialAccountAdapter().save_user(
             request=MagicMock(), sociallogin=MagicMock()
         )
 
         assert returned.pk == new_user.pk
-        assert UserTenantMembership.objects.filter(
+        assert not UserTenantMembership.objects.filter(
             user=new_user, tenant=tenant
         ).exists()
 

@@ -22,7 +22,6 @@ from loyalty.services import LoyaltyService
 from order.serializers.order import OrderSerializer
 from order.services import OrderService
 from product.models.favourite import ProductFavourite
-from tenant.membership import HasTenantAccess
 
 # Agents want "my recent items", not a paginated browse — cap the lists.
 AGENT_ORDERS_LIMIT = 20
@@ -50,12 +49,17 @@ class AgentAPIView(APIView):
     stack, so a linked agent can reach exactly the scoped resources
     below and nothing else.
 
-    Every subclass pairs its scope permission with ``HasTenantAccess``:
-    the data served here (orders, favourites, loyalty) is tenant-schema
-    data, and a valid token must not unlock it for a shopper whose
-    membership in THIS store was deactivated (or on a host where they
-    never had one — defense in depth on top of the per-schema OIDC
-    token tables).
+    Tenant scoping is structural rather than a permission: the OIDC
+    token tables live in the tenant schema (``allauth.idp.oidc`` is in
+    TENANT_APPS), so a token issued by one store cannot be found — let
+    alone validated — on another's host, and the resources below are
+    read from the same schema.
+
+    These views used to add ``HasTenantAccess`` on top. That required a
+    ``UserTenantMembership``, which is a public-schema row keyed to a
+    public user id; shoppers are created in the tenant schema and can
+    hold none, so the check denied every legitimate customer.
+    Membership is a staff concept (see ``tenant/membership.py``).
     """
 
     authentication_classes = [AgentTokenAuthentication]
@@ -64,7 +68,6 @@ class AgentAPIView(APIView):
 class AgentMeView(AgentAPIView):
     permission_classes = [
         TokenPermission.has_scope("profile"),
-        HasTenantAccess,
     ]
 
     @extend_schema(
@@ -94,7 +97,6 @@ class AgentMeView(AgentAPIView):
 class AgentOrdersView(AgentAPIView):
     permission_classes = [
         TokenPermission.has_scope(SCOPE_ORDERS_READ),
-        HasTenantAccess,
     ]
 
     @extend_schema(
@@ -123,7 +125,6 @@ class AgentOrdersView(AgentAPIView):
 class AgentFavouritesView(AgentAPIView):
     permission_classes = [
         TokenPermission.has_scope(SCOPE_FAVOURITES_READ),
-        HasTenantAccess,
     ]
 
     @extend_schema(
@@ -171,7 +172,6 @@ class AgentFavouritesView(AgentAPIView):
 class AgentLoyaltyView(AgentAPIView):
     permission_classes = [
         TokenPermission.has_scope(SCOPE_LOYALTY_READ),
-        HasTenantAccess,
     ]
 
     @extend_schema(

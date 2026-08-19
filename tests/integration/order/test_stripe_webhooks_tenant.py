@@ -1,8 +1,9 @@
-"""Integration tests for Stripe webhook tenant re-entry (FIX 1).
+"""Integration tests for Stripe webhook tenant re-entry.
 
-Verifies that the ``@with_tenant_schema_from_event`` decorator correctly
-routes webhook processing into the right tenant schema — or falls back to
-the public schema when the tenant metadata is absent or invalid.
+Verifies that ``@with_tenant_schema_from_event`` routes webhook
+processing into the schema the event ARRIVED ON, and that
+``metadata.tenant_schema`` — which the sending merchant controls — can
+never redirect an event into another tenant's data.
 """
 
 from __future__ import annotations
@@ -12,7 +13,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from order.signals._tenant import (
-    _tenant_schema_from_event,
+    _claimed_schema_from_event,
+    _resolve_event_schema,
     with_tenant_schema_from_event,
 )
 
@@ -36,31 +38,44 @@ def _make_event(metadata=None, event_id="evt_test"):
 
 
 # ---------------------------------------------------------------------------
-# Unit tests for _tenant_schema_from_event
+# Unit tests for _claimed_schema_from_event / _resolve_event_schema
 # ---------------------------------------------------------------------------
 
 
-class TestTenantSchemaFromEvent:
-    def test_extracts_schema_from_payment_intent_metadata(self):
+class TestClaimedSchemaFromEvent:
+    def test_reads_claim_from_payment_intent_metadata(self):
         event = _make_event(metadata={"tenant_schema": "webside"})
-        assert _tenant_schema_from_event(event) == "webside"
+        assert _claimed_schema_from_event(event) == "webside"
 
-    def test_falls_back_to_public_when_no_metadata(self):
-        from django_tenants.utils import get_public_schema_name
-
+    def test_returns_empty_when_no_metadata(self):
         event = _make_event(metadata={})
-        assert _tenant_schema_from_event(event) == get_public_schema_name()
+        assert _claimed_schema_from_event(event) == ""
 
-    def test_falls_back_to_public_on_malformed_event(self):
-        from django_tenants.utils import get_public_schema_name
-
+    def test_returns_empty_on_malformed_event(self):
         event = MagicMock()
         event.id = "evt_bad"
         # data is not a dict-like object
         del event.data
-        assert _tenant_schema_from_event(event) == get_public_schema_name()
+        assert _claimed_schema_from_event(event) == ""
 
-    def test_extracts_schema_from_nested_payment_intent(self):
+    @pytest.mark.django_db
+    def test_resolve_falls_back_to_claim_in_public_schema(self):
+        """No host to trust in the public schema, so the claim is used.
+
+        A request that arrived on a tenant's own webhook endpoint never
+        resolves to public, so this path cannot cross tenants.
+        """
+        event = _make_event(metadata={"tenant_schema": "webside"})
+        assert _resolve_event_schema(event) == "webside"
+
+    @pytest.mark.django_db
+    def test_resolve_returns_public_when_nothing_claimed(self):
+        from django_tenants.utils import get_public_schema_name
+
+        event = _make_event(metadata={})
+        assert _resolve_event_schema(event) == get_public_schema_name()
+
+    def test_reads_claim_from_nested_payment_intent(self):
         """charge.refunded / charge.dispute.created embed the PI as a dict."""
         event = MagicMock()
         event.id = "evt_charge"
@@ -73,11 +88,11 @@ class TestTenantSchemaFromEvent:
                 },
             }
         }
-        assert _tenant_schema_from_event(event) == "tenant_b"
+        assert _claimed_schema_from_event(event) == "tenant_b"
 
     def test_strips_whitespace_from_schema_name(self):
         event = _make_event(metadata={"tenant_schema": "  webside  "})
-        assert _tenant_schema_from_event(event) == "webside"
+        assert _claimed_schema_from_event(event) == "webside"
 
 
 # ---------------------------------------------------------------------------
@@ -152,3 +167,65 @@ class TestWithTenantSchemaFromEvent:
         event = _make_event(metadata={})
         _handler(sender=None, event=event)
         assert received["event"] is event
+
+
+# ---------------------------------------------------------------------------
+# Security regression: metadata must never redirect an event across tenants
+# ---------------------------------------------------------------------------
+
+
+class TestMetadataCannotCrossTenants:
+    """``metadata.tenant_schema`` is set by whoever created the Stripe
+    object. For a merchant with their own Stripe account that is the
+    merchant. Selecting the schema from it let one merchant mark another
+    merchant's orders paid: create a cheap Checkout Session in your own
+    account stamped with a rival's schema and order id, pay it, and the
+    event arrives validly signed by YOUR endpoint secret.
+
+    The schema the event ARRIVED on is the one fact the sender cannot
+    influence, so it wins whenever it is a real tenant.
+    """
+
+    @staticmethod
+    def _on_tenant_host(monkeypatch, schema="tenant_b"):
+        from django.db import connection
+
+        monkeypatch.setattr(connection, "schema_name", schema, raising=False)
+
+    @pytest.mark.django_db
+    def test_mismatched_claim_is_refused(self, monkeypatch, caplog):
+        import logging
+
+        self._on_tenant_host(monkeypatch)
+        event = _make_event(metadata={"tenant_schema": "webside"})
+
+        with caplog.at_level(logging.ERROR, logger="order.signals._tenant"):
+            assert _resolve_event_schema(event) is None
+
+        assert any("claims" in r.message for r in caplog.records)
+
+    @pytest.mark.django_db
+    def test_matching_claim_is_allowed(self, monkeypatch):
+        self._on_tenant_host(monkeypatch)
+        event = _make_event(metadata={"tenant_schema": "tenant_b"})
+        assert _resolve_event_schema(event) == "tenant_b"
+
+    @pytest.mark.django_db
+    def test_absent_claim_uses_the_host_schema(self, monkeypatch):
+        """Dashboard-initiated refunds and disputes carry no metadata."""
+        self._on_tenant_host(monkeypatch)
+        event = _make_event(metadata={})
+        assert _resolve_event_schema(event) == "tenant_b"
+
+    @pytest.mark.django_db
+    def test_decorator_skips_the_handler_on_mismatch(self, monkeypatch):
+        self._on_tenant_host(monkeypatch)
+        handler_ran = {}
+
+        @with_tenant_schema_from_event
+        def _handler(sender, **kwargs):
+            handler_ran["yes"] = True
+
+        event = _make_event(metadata={"tenant_schema": "webside"})
+        assert _handler(sender=None, event=event) is None
+        assert not handler_ran

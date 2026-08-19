@@ -4,11 +4,8 @@ import logging
 from urllib.parse import urlsplit, urlunsplit
 
 from allauth.headless.adapter import DefaultHeadlessAdapter
-from django import forms
 from django.db import connection
-from django.utils.translation import gettext_lazy as _
 
-from tenant.membership import user_has_tenant_access
 from user.adapter import SocialAccountAdapter, UserAccountAdapter
 
 logger = logging.getLogger(__name__)
@@ -30,14 +27,12 @@ def _default_url_scheme() -> str:
 def _resolve_tenant_from_request(request):
     """Return the Tenant for ``request.get_host()`` or ``None``.
 
-    The login gate in ``pre_login`` previously read
-    ``connection.tenant`` from a thread-local. Under Daphne/Channels
-    ``database_sync_to_async`` reuses threads across requests — a
-    pooled worker thread can hold a stale ``connection.tenant`` from
-    an earlier request and grant access to the wrong tenant (H7 in
-    MULTI_TENANT_AUDIT.md). Resolving from the request host bypasses
-    the thread-local entirely so the gate is correct regardless of
-    pool state.
+    Resolves from the request host rather than ``connection.tenant``.
+    Under Daphne/Channels ``database_sync_to_async`` reuses threads
+    across requests, so a pooled worker can hold a stale
+    ``connection.tenant`` from an earlier request and hand back another
+    tenant's OAuth app config (H7 in MULTI_TENANT_AUDIT.md). Reading the
+    host bypasses the thread-local entirely.
     """
     if request is None:
         return None
@@ -63,42 +58,16 @@ def _resolve_tenant_from_request(request):
     return getattr(domain, "tenant", None) if domain else None
 
 
-def _ensure_member_membership(user) -> None:
-    """Grant a MEMBER membership in the active tenant, if any.
-
-    Called from both the email signup adapter and the social signup
-    adapter so either path produces a usable login. No-op when the
-    request is in the public schema (admin, platform routines).
-    """
-    tenant = getattr(connection, "tenant", None)
-    if tenant is None or getattr(tenant, "schema_name", "public") == "public":
-        return
-    from tenant.models import TenantMembershipRole, UserTenantMembership
-
-    UserTenantMembership.objects.get_or_create(
-        user=user,
-        tenant=tenant,
-        defaults={
-            "role": TenantMembershipRole.MEMBER,
-            "is_active": True,
-        },
-    )
-
-
 class TenantAccountAdapter(UserAccountAdapter):
-    """Dynamic frontend URLs + per-tenant login gating.
+    """Dynamic frontend URLs for tenant-scoped account emails.
 
-    Two responsibilities:
+    Email links (confirmation, password reset) use the tenant's primary
+    domain so a tenant-B user never clicks a link that takes them to
+    another store.
 
-    1. Email links (confirmation, password reset) use the tenant's
-       primary domain so a tenant-B user never clicks a link that takes
-       them to webside.gr.
-
-    2. Login is refused if the authenticated user has no active
-       ``UserTenantMembership`` for the current tenant. Without this
-       gate, a user registered on tenant A could log into tenant B's
-       storefront (same global ``UserAccount``, different domain) and
-       read tenant B's data.
+    Login needs no tenant gate: customers are per-schema, so a shopper
+    registered at tenant A simply does not exist in tenant B's user
+    table. See ``pre_login``.
     """
 
     def _get_tenant_domain(self):
@@ -128,60 +97,35 @@ class TenantAccountAdapter(UserAccountAdapter):
         return super().get_email_confirmation_url(request, emailconfirmation)
 
     def pre_login(self, request, user, **kwargs):
-        """Block login when the user has no membership in this tenant.
+        """No tenant gate here — per-schema user tables ARE the gate.
 
-        Runs after credential validation but before the session cookie
-        is issued / the Knox token is minted. Raising
-        ``forms.ValidationError`` surfaces as a 400 with a localizable
-        message the storefront can show the user ("You don't have
-        access to this store — contact support or register here.").
+        Customers live in their tenant's own schema: ``user`` is in both
+        SHARED_APPS and TENANT_APPS, and with ``search_path =
+        "<tenant>", public`` the tenant copy always wins. A shopper who
+        registered at tenant A therefore has no row, no allauth records
+        and no Knox token in tenant B, so credential lookup on B's host
+        fails before any gate would run.
 
-        Resolves the tenant from the request host (NOT
-        ``connection.tenant``) so a stale thread-local cannot let a
-        user authenticated on tenant A pass the gate on tenant B's
-        domain.
+        This used to require a ``UserTenantMembership``, which is a
+        PUBLIC-schema table whose FK targets ``public.user_useraccount``.
+        A shopper created in a tenant schema has no public row, so the
+        grant that accompanied signup raised ForeignKeyViolation — the
+        signup 500'd with the account already written, and every later
+        login 500'd here. Membership is now what its name says: a STAFF
+        grant over a tenant, held by platform-public identities only
+        (see ``admin.admin.MyAdminSite.has_permission``).
         """
-        tenant = _resolve_tenant_from_request(request)
-        # No tenant attached (public schema, admin login, health probes)
-        # — nothing to gate on, fall through to the default.
-        if (
-            tenant is not None
-            and getattr(tenant, "schema_name", "public") != "public"
-        ):
-            if not user_has_tenant_access(user, tenant):
-                raise forms.ValidationError(
-                    _("You do not have access to this store."),
-                    code="no_tenant_membership",
-                )
         return super().pre_login(request, user, **kwargs)
-
-    def save_user(self, request, user, form, commit=True):
-        """Create a MEMBER membership alongside the new user account.
-
-        Signup requests arrive on a tenant domain, so the TenantMiddleware
-        has already pointed ``connection`` at that tenant by the time
-        this runs. Creating the membership here means a user can
-        sign up and immediately log in on the same tenant without a
-        separate admin step.
-        """
-        user = super().save_user(request, user, form, commit=commit)
-        if commit:
-            _ensure_member_membership(user)
-        return user
 
 
 class TenantSocialAccountAdapter(SocialAccountAdapter):
     """Social-login sibling of ``TenantAccountAdapter``.
 
-    The email-signup adapter handles memberships for password signups,
-    but a first-time Google / Facebook / GitHub login skips that path
-    entirely and runs through the social adapter instead. Without this
-    override, a new social user would log in, pass credentials, then
-    hit ``pre_login`` (which runs for both flows) and get rejected with
-    "You do not have access to this store" — even though the signup
-    just succeeded on the same tenant.
+    A first-time Google / Facebook / GitHub login creates the shopper in
+    the tenant's own schema, which is what scopes them to this store —
+    no membership grant is involved for either signup path.
 
-    Additionally overrides ``get_app`` to look for a per-tenant
+    Overrides ``get_app`` to look for a per-tenant
     ``SocialApp`` row (linked to the tenant's primary domain via the Sites
     framework) before falling back to the global ``SOCIALACCOUNT_PROVIDERS``
     settings config.  This enables tenants to use their own OAuth app
@@ -254,9 +198,10 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
         return super().get_app(request, provider, client_id=client_id)
 
     def save_user(self, request, sociallogin, form=None):
-        user = super().save_user(request, sociallogin, form=form)
-        _ensure_member_membership(user)
-        return user
+        # No membership grant: a social signup creates the shopper in the
+        # tenant's own schema, which is what scopes them to this store.
+        # Membership is a staff grant held by platform-public identities.
+        return super().save_user(request, sociallogin, form=form)
 
 
 class TenantHeadlessAdapter(DefaultHeadlessAdapter):

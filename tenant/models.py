@@ -939,7 +939,10 @@ class TenantMembershipRole(models.TextChoices):
     the public-schema admin). These per-tenant roles govern what a user
     can do *inside* a tenant they belong to:
 
-    - MEMBER  — ordinary shopper, no admin surface.
+    - MEMBER  — RESERVED, no longer issued. Customers are scoped to a
+                store by living in that store's schema, not by a
+                membership row; the rows this role once carried were
+                removed in migration 0015. See tenant/membership.py.
     - STAFF   — can view the tenant's operational admin (orders,
                 products) but cannot change tenant settings or invite
                 other staff.
@@ -955,7 +958,13 @@ class TenantMembershipRole(models.TextChoices):
 
 
 class UserTenantMembership(TimeStampMixinModel):
-    """Join between a global user and a tenant they can access.
+    """Join between a PLATFORM-PUBLIC staff identity and a tenant.
+
+    This table is a STAFF grant, not a customer roster. It lives in the
+    public schema and its ``user`` FK targets ``public.user_useraccount``,
+    so only a public identity can hold a row — which is exactly the set
+    of people who operate stores. Shoppers live in their tenant's own
+    schema and hold nothing here.
 
     ``UserAccount`` lives in SHARED_APPS — there is one platform-wide
     identity per email. Membership in a tenant is an explicit row here,

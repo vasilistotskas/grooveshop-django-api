@@ -17,6 +17,7 @@ from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from tenant.membership import get_current_tenant
 from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tenant.serializers import (
     TenantAdminSerializer,
@@ -152,14 +153,22 @@ def internal_domains(request: Request) -> Response:
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def my_memberships(request: Request) -> Response:
-    """List the tenants the authenticated user has active access to.
+    """List the tenants the authenticated STAFF user has access to.
 
-    The storefront uses this to decide which tenant admin links to
-    render (OWNER/ADMIN/STAFF roles unlock different surfaces) and to
-    build a tenant switcher for users who belong to multiple stores.
-    Always queried from the public schema — memberships are platform-
-    wide data.
+    Used to build the operator's tenant switcher and decide which admin
+    links to render (OWNER/ADMIN/STAFF unlock different surfaces).
+
+    Answers only in the public schema. Memberships are a platform-wide
+    table keyed by a PUBLIC user id, while a request on a tenant host
+    authenticates against that tenant's OWN user table — where the same
+    id belongs to a different person. Filtering by that id would list
+    stores the caller has nothing to do with. Customers hold no
+    memberships at all (see ``tenant/membership.py``), so an empty list
+    is the correct answer for every shopper.
     """
+    if get_current_tenant() is not None:
+        return Response([])
+
     # Prefetch ONLY the primary domain so the inline loop doesn't
     # re-query — ``.filter(is_primary=True).first()`` on a prefetched
     # related manager triggers a fresh query and discards the prefetch.
@@ -193,10 +202,44 @@ def my_memberships(request: Request) -> Response:
     return Response(out)
 
 
+class IsPlatformOperator(IsAdminUser):
+    """Superuser, authenticated through the platform staff backend.
+
+    ``TenantAdminSerializer`` returns EVERY tenant's Stripe secret key,
+    Viva and ACS credentials, BoxNow secrets, Meta CAPI token and the
+    chat/ACP bearer tokens. ``IsAdminUser`` alone gated that on
+    ``is_staff``, which is:
+
+    - ambiguous across schemas — ``is_staff`` is an attribute of
+      whichever user table served the request, and pks are not unique
+      between schemas; and
+    - far too broad — onboarding a tenant requires giving its operator a
+      public ``is_staff`` account (that is how ``PlatformStaffBackend``
+      lets them into their own admin), and that same account could then
+      read every OTHER merchant's payment credentials.
+
+    Reading the whole platform's credential set is an owner operation,
+    so require a superuser whose session was minted by
+    ``PlatformStaffBackend`` — the same gate ``MyAdminSite`` uses, for
+    the same pk-collision reason.
+    """
+
+    def has_permission(self, request, view):
+        if not super().has_permission(request, view):
+            return False
+        if not getattr(request.user, "is_superuser", False):
+            return False
+        from tenant.auth_backends import (  # noqa: PLC0415
+            is_platform_staff_session,
+        )
+
+        return is_platform_staff_session(request)
+
+
 class TenantAdminViewSet(viewsets.ModelViewSet):
     queryset = Tenant.objects.all()
     serializer_class = TenantAdminSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsPlatformOperator]
 
     def _require_public_schema(self):
         if connection.schema_name != "public":

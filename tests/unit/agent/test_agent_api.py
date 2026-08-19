@@ -179,20 +179,23 @@ class AgentAPITestCase(APITestCase):
         ):
             self.assertIn(key, response.data)
 
-    def test_valid_token_without_membership_is_403(self) -> None:
-        # A token that authenticates fine must still be refused when the
-        # shopper's membership in THIS store is deactivated — the agent
-        # surface serves tenant-schema data (defense in depth on top of
-        # the per-schema OIDC token tables).
+    def test_valid_token_needs_no_membership(self) -> None:
+        # Membership is a STAFF grant held by platform-public
+        # identities; shoppers hold none and cannot (the table is in the
+        # public schema with an FK to the public user table, while
+        # shoppers live in the tenant schema). Requiring one here denied
+        # every legitimate customer.
+        #
+        # Isolation is structural instead: allauth.idp.oidc is in
+        # TENANT_APPS, so a token issued by one store does not exist in
+        # another's tables and cannot authenticate there at all.
         UserTenantMembership.objects.filter(
             user=self.user, tenant=self.tenant
         ).update(is_active=False)
         self._bearer(["profile", "orders:read"])
         for name in ("agent-me", "agent-orders"):
             response = self.client.get(reverse(name))
-            self.assertEqual(
-                response.status_code, status.HTTP_403_FORBIDDEN, name
-            )
+            self.assertEqual(response.status_code, status.HTTP_200_OK, name)
 
 
 class AuthorizeLoginRedirectTestCase(APITestCase):

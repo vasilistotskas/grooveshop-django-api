@@ -22,19 +22,21 @@ from django_tenants.utils import get_public_schema_name, schema_context
 logger = logging.getLogger(__name__)
 
 
-def _tenant_schema_from_event(event) -> str:
-    """Extract the target tenant schema from a dj-stripe Event.
+def _claimed_schema_from_event(event) -> str:
+    """Read the tenant schema CLAIMED by the event's Stripe metadata.
+
+    This is untrusted input. ``metadata`` is set by whoever created the
+    Stripe object, which for a tenant's own account is that tenant's
+    operator — so the value proves only what the sender asserts, never
+    which tenant the event belongs to. Use it to cross-check the
+    host-routed schema (see ``_resolve_event_schema``), never to select
+    one.
 
     Search order (first non-empty wins):
     1. ``event.data.object.metadata.tenant_schema``  — PaymentIntent events
     2. ``event.data.object.payment_intent.metadata.tenant_schema``  — expanded
        PI on Charge/Dispute events where the PI is embedded
     3. ``event.data.metadata.tenant_schema`` — top-level fallback
-    4. The CURRENT connection schema — dashboard-initiated objects
-       (manual refunds, disputes) carry no tenant_schema metadata, but
-       the webhook arrived on the tenant's own host-routed endpoint, so
-       the schema the middleware already selected is authoritative.
-       Bouncing these to public would silently skip the handler.
     """
     try:
         data = event.data if hasattr(event, "data") else {}
@@ -59,20 +61,64 @@ def _tenant_schema_from_event(event) -> str:
             if schema:
                 return schema.strip()
 
-        # 4. Host-routed fallback: trust the schema the middleware
-        # selected for this request.
-        return getattr(connection, "schema_name", None) or (
-            get_public_schema_name()
-        )
+        return ""
     except Exception:
         logger.warning(
-            "Could not extract tenant_schema from Stripe event %s",
+            "Could not read tenant_schema metadata from Stripe event %s",
             getattr(event, "id", "unknown"),
             exc_info=True,
         )
-        return getattr(connection, "schema_name", None) or (
-            get_public_schema_name()
-        )
+        return ""
+
+
+def _resolve_event_schema(event) -> str | None:
+    """Decide which schema a Stripe event may act on, or ``None`` to skip.
+
+    Stripe webhooks are HOST-ROUTED: every tenant owns a
+    ``WebhookEndpoint`` row on its own API domain, with its own signing
+    secret, and ``TenantMainMiddleware`` selects the schema from that
+    host before dj-stripe verifies the signature. The receiving schema
+    is therefore the one fact about an event that the sender cannot
+    influence, and it is authoritative.
+
+    ``metadata.tenant_schema`` is NOT. It is attacker-controlled for any
+    merchant holding their own Stripe account: create a €0.50 Checkout
+    Session in your own account carrying another tenant's schema and
+    order id, pay it, and the event arrives validly signed by YOUR
+    endpoint secret. Selecting the schema from that field let one
+    merchant mark another merchant's orders paid — and the commit hooks
+    would mint a real courier shipment for goods nobody paid for.
+
+    Rules:
+    - Tenant host (non-public schema): that schema wins. If metadata
+      claims a different one, the event is refused and logged at ERROR —
+      a mismatch is either an attack or a genuinely mis-stamped object,
+      and neither should mutate data.
+    - Public schema (platform host, replay outside a request, or an
+      event processed before the per-tenant endpoints were cut over):
+      there is no host to trust, so fall back to the claimed schema.
+      This cannot be abused to cross tenants, because a request that
+      arrived on a tenant's own endpoint never resolves to public.
+    """
+    request_schema = getattr(connection, "schema_name", None) or (
+        get_public_schema_name()
+    )
+    claimed = _claimed_schema_from_event(event)
+
+    if request_schema != get_public_schema_name():
+        if claimed and claimed != request_schema:
+            logger.error(
+                "Stripe event %s arrived on schema %r but its metadata "
+                "claims %r — refusing to process. A merchant cannot act "
+                "on another tenant's data via metadata.",
+                getattr(event, "id", "unknown"),
+                request_schema,
+                claimed,
+            )
+            return None
+        return request_schema
+
+    return claimed or request_schema
 
 
 def with_tenant_schema_from_event(func: Callable) -> Callable:
@@ -98,7 +144,12 @@ def with_tenant_schema_from_event(func: Callable) -> Callable:
         if event is None:
             return func(sender, **kwargs)
 
-        schema_name = _tenant_schema_from_event(event)
+        schema_name = _resolve_event_schema(event)
+
+        # None means the event's metadata contradicted the host it
+        # arrived on — already logged at ERROR. Skip rather than guess.
+        if schema_name is None:
+            return None
 
         # Validate that the schema exists before entering it.  An unknown
         # schema_context raises a ProgrammingError which would bubble up as
@@ -111,15 +162,15 @@ def with_tenant_schema_from_event(func: Callable) -> Callable:
                 # Stripe events must not mutate its frozen data. Stripe
                 # will redeliver until the operator reactivates or the
                 # event ages out.
-                exists = Tenant.objects.filter(
+                tenant = Tenant.objects.filter(
                     schema_name=schema_name,
                     is_active=True,
                     suspended_at__isnull=True,
-                ).exists()
+                ).first()
             except Exception:
-                exists = False
+                tenant = None
 
-            if not exists:
+            if tenant is None:
                 logger.warning(
                     "Stripe event %s references unknown/inactive tenant "
                     "schema %r — skipping handler %s",
@@ -128,6 +179,19 @@ def with_tenant_schema_from_event(func: Callable) -> Callable:
                     func.__name__,
                 )
                 return None
+
+            # tenant_context (not schema_context): the latter binds a
+            # bare FakeTenant to the connection, and every helper in
+            # tenant/credentials.py reads real fields off
+            # ``connection.tenant`` — under a FakeTenant they all return
+            # "", so a handler that instantiates a payment provider
+            # would raise ImproperlyConfigured. The Viva and Celery
+            # resolvers already do this deliberately; this path was the
+            # odd one out.
+            from django_tenants.utils import tenant_context  # noqa: PLC0415
+
+            with tenant_context(tenant):
+                return func(sender, **kwargs)
 
         with schema_context(schema_name):
             return func(sender, **kwargs)

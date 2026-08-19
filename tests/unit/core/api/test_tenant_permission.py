@@ -1,105 +1,24 @@
-"""Unit tests for IsTenantMemberOrReadOnly and HasTenantAccess (FIX 3).
+"""Unit tests for the staff-only ``HasTenantAccess`` permission.
 
-Tests the new global default permission class behaviour.
+``UserTenantMembership`` grants a PLATFORM-PUBLIC identity operator
+access over a tenant. It is not how customers are scoped to a store —
+shoppers live in their tenant's own schema, so being authenticated on
+this host already means "customer of this store". The former
+``IsTenantMemberOrReadOnly`` global default additionally demanded a
+membership from every authenticated writer, which no shopper can hold
+(public-schema table, FK to the public user table), so it refused every
+customer write. It is gone; DRF's ``IsAuthenticatedOrReadOnly`` is the
+default now, and this module covers what remains.
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-
-from tenant.membership import HasTenantAccess, IsTenantMemberOrReadOnly
-
-
-def _make_request(method="GET", is_authenticated=False, user=None):
-    req = MagicMock()
-    req.method = method
-    if user is None:
-        user = MagicMock()
-        user.is_authenticated = is_authenticated
-    req.user = user
-    return req
+from tenant.membership import HasTenantAccess
 
 
-class TestIsTenantMemberOrReadOnly:
-    """Permission behaves like IsAuthenticatedOrReadOnly but also validates
-    tenant membership for authenticated requests."""
-
-    def test_anonymous_get_allowed(self):
-        perm = IsTenantMemberOrReadOnly()
-        request = _make_request("GET", is_authenticated=False)
-        assert perm.has_permission(request, None) is True
-
-    def test_anonymous_head_allowed(self):
-        perm = IsTenantMemberOrReadOnly()
-        request = _make_request("HEAD", is_authenticated=False)
-        assert perm.has_permission(request, None) is True
-
-    def test_anonymous_options_allowed(self):
-        perm = IsTenantMemberOrReadOnly()
-        request = _make_request("OPTIONS", is_authenticated=False)
-        assert perm.has_permission(request, None) is True
-
-    def test_anonymous_post_denied(self):
-        perm = IsTenantMemberOrReadOnly()
-        request = _make_request("POST", is_authenticated=False)
-        assert perm.has_permission(request, None) is False
-
-    def test_anonymous_put_denied(self):
-        perm = IsTenantMemberOrReadOnly()
-        request = _make_request("PUT", is_authenticated=False)
-        assert perm.has_permission(request, None) is False
-
-    def test_authenticated_post_no_tenant_allowed(self):
-        """In public schema, tenant check is skipped — authenticated write
-        allowed (admin/platform paths)."""
-        perm = IsTenantMemberOrReadOnly()
-        request = _make_request("POST", is_authenticated=True)
-        with patch("tenant.membership.get_current_tenant", return_value=None):
-            assert perm.has_permission(request, None) is True
-
-    def test_authenticated_post_with_tenant_membership(self):
-        """Authenticated user with membership can write on tenant schema."""
-        perm = IsTenantMemberOrReadOnly()
-        request = _make_request("POST", is_authenticated=True)
-        mock_tenant = MagicMock()
-        with patch(
-            "tenant.membership.get_current_tenant", return_value=mock_tenant
-        ):
-            with patch(
-                "tenant.membership.user_has_tenant_access", return_value=True
-            ):
-                assert perm.has_permission(request, None) is True
-
-    def test_authenticated_post_without_tenant_membership(self):
-        """Authenticated user without membership cannot write on tenant schema."""
-        perm = IsTenantMemberOrReadOnly()
-        request = _make_request("POST", is_authenticated=True)
-        mock_tenant = MagicMock()
-        with patch(
-            "tenant.membership.get_current_tenant", return_value=mock_tenant
-        ):
-            with patch(
-                "tenant.membership.user_has_tenant_access", return_value=False
-            ):
-                assert perm.has_permission(request, None) is False
-
-    def test_safe_methods_bypass_tenant_check(self):
-        """GET by a user without tenant membership still passes (public catalog)."""
-        perm = IsTenantMemberOrReadOnly()
-        request = _make_request("GET", is_authenticated=True)
-        # Even if get_current_tenant returns a tenant and user has no membership:
-        mock_tenant = MagicMock()
-        with patch(
-            "tenant.membership.get_current_tenant", return_value=mock_tenant
-        ):
-            with patch(
-                "tenant.membership.user_has_tenant_access", return_value=False
-            ):
-                assert perm.has_permission(request, None) is True
-
-
-class TestHastenantAccess:
+class TestHasTenantAccess:
     def test_unauthenticated_user_denied(self):
         perm = HasTenantAccess()
         user = MagicMock()
@@ -119,3 +38,37 @@ class TestHastenantAccess:
             "tenant.membership.user_has_tenant_access", return_value=True
         ):
             assert perm.has_permission(request, None) is True
+
+    def test_authenticated_user_without_membership_denied(self):
+        """A staff surface must stay closed to a shopper who happens to
+        be authenticated on this host."""
+        perm = HasTenantAccess()
+        user = MagicMock()
+        user.is_authenticated = True
+        request = MagicMock()
+        request.user = user
+        with patch(
+            "tenant.membership.user_has_tenant_access", return_value=False
+        ):
+            assert perm.has_permission(request, None) is False
+
+
+class TestGlobalDefaultIsNotMembershipGated:
+    """Regression: the DRF default must not require a membership.
+
+    Requiring one made every authenticated customer write a 403, and the
+    signup-time grant that tried to satisfy it raised ForeignKeyViolation
+    — signup 500'd with the account already written.
+    """
+
+    def test_default_permission_is_drf_builtin(self):
+        from django.conf import settings
+
+        assert settings.REST_FRAMEWORK["DEFAULT_PERMISSION_CLASSES"] == [
+            "rest_framework.permissions.IsAuthenticatedOrReadOnly"
+        ]
+
+    def test_membership_permission_class_is_gone(self):
+        import tenant.membership as membership
+
+        assert not hasattr(membership, "IsTenantMemberOrReadOnly")

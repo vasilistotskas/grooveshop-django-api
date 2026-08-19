@@ -30,24 +30,16 @@ KNOX_ABSOLUTE_MAX_AGE: timedelta = getattr(
 
 
 class BoundedTokenAuthentication(KnoxTokenAuthentication):
-    """Knox TokenAuthentication with an absolute per-token lifetime cap and
-    tenant-binding check.
+    """Knox TokenAuthentication with an absolute per-token lifetime cap.
 
-    Two defences layered on top of stock Knox authentication:
+    Rejects tokens older than ``KNOX_ABSOLUTE_MAX_AGE`` regardless of
+    their ``expiry`` field (see the module docstring) — a rolling
+    ``AUTO_REFRESH`` window otherwise lets a single token live forever.
 
-    1. **Absolute age cap** — rejects tokens older than KNOX_ABSOLUTE_MAX_AGE
-       regardless of their ``expiry`` field (see module-level docstring).
-
-    2. **Tenant binding** — after Knox validates the token, verifies that the
-       authenticated user has an active ``UserTenantMembership`` for the
-       current ``connection.tenant``.  Knox already isolates token tables per
-       schema (TENANT_APPS placement), but this defence-in-depth check at the
-       authentication layer ensures that even if a future code-path changes
-       the Knox configuration, a token from tenant-A is still rejected on
-       tenant-B's domain before it reaches any permission class.
-
-       The check is skipped when the connection is in the public schema
-       (admin paths, health probes) so platform-level tooling keeps working.
+    Cross-tenant replay needs no check here: knox sits in TENANT_APPS
+    only, so ``knox_authtoken`` is a per-schema table and a token minted
+    on one tenant does not exist in another's. That is structural, not
+    defence in depth.
 
     Wired into ``REST_FRAMEWORK.DEFAULT_AUTHENTICATION_CLASSES`` in settings
     in place of ``knox.auth.TokenAuthentication``.
@@ -67,19 +59,21 @@ class BoundedTokenAuthentication(KnoxTokenAuthentication):
                 )
             )
 
-        # 2. Tenant binding — only enforced when a non-public tenant is active.
-
-        from tenant.membership import (  # noqa: PLC0415
-            get_current_tenant,
-            user_has_tenant_access,
-        )
-
-        tenant = get_current_tenant()
-        if tenant is not None and not user_has_tenant_access(user, tenant):
-            raise exceptions.PermissionDenied(
-                _("You do not have access to this store.")
-            )
-
+        # 2. Tenant binding needs no check here: knox is in TENANT_APPS
+        # only, so ``knox_authtoken`` is a per-schema table and a token
+        # minted on tenant A literally does not exist in tenant B's
+        # table — ``authenticate_credentials`` above fails to find it and
+        # raises before reaching this point. Verified on staging: a
+        # webside token returns 401 on another tenant's API host.
+        #
+        # This used to additionally require a ``UserTenantMembership``.
+        # That table lives in the public schema with an FK to
+        # ``public.user_useraccount``, while shoppers are created in
+        # their tenant's schema — so the check rejected every ordinary
+        # customer, and the grant that tried to satisfy it made signup
+        # 500. Membership is now a staff-only concept (see
+        # ``admin.admin.MyAdminSite.has_permission``), and gating
+        # customer API access on it was never what isolated them.
         return user, auth_token
 
 

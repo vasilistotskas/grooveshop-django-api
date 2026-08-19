@@ -222,7 +222,12 @@ class TestTokenAuthMiddleware(TransactionTestCase):
         ) as mock_auth:
             await middleware(scope, AsyncMock(), AsyncMock())
 
-        mock_auth.assert_called_once_with("myticket")
+        # The tenant is passed so the lookup runs in the connecting
+        # tenant's schema — the ticket cache key and the knox token
+        # table are both schema-scoped, and database_sync_to_async
+        # would otherwise run on a thread bound to whatever schema the
+        # previous request left behind.
+        mock_auth.assert_called_once_with("myticket", scope.get("tenant"))
         self.assertEqual(scope["user"], mock_user)
 
     async def test_no_ticket_produces_anonymous(self):

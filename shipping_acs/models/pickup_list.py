@@ -36,9 +36,19 @@ class AcsPickupList(TimeStampMixinModel):
         blank=True,
         related_name="acs_pickup_lists_issued",
         verbose_name=_("Issued by"),
+        # ORM-only, like UserAccount.loyalty_tier. This row lives in the
+        # tenant schema, but the admin who triggers a manual issue is a
+        # PLATFORM-PUBLIC identity by construction (PlatformStaffBackend
+        # is the only backend that opens a tenant's admin). A real FK
+        # would point that public id at the TENANT's user table: a
+        # ForeignKeyViolation when no such id exists there, or a silent
+        # match attributing the action to an unrelated shopper with the
+        # same pk. PostgreSQL cannot express a cross-schema FK anyway.
+        db_constraint=False,
         help_text=_(
             "Admin who triggered the manual issue. Null when the daily "
-            "Celery beat task issued the list."
+            "Celery beat task issued the list. Stores a PLATFORM-schema "
+            "user id; not FK-enforced (see db_constraint above)."
         ),
     )
     billing_code = models.CharField(

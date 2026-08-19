@@ -138,6 +138,14 @@ SHARED_APPS = [
     # User model must be in SHARED for AUTH_USER_MODEL FK resolution
     # in public-schema auth migrations. Tenant schemas have their own copy.
     "user",
+    # Session tracking rows must exist where the session's USER row
+    # lives: platform staff are public-schema identities, so their
+    # UserSession rows are written to the public schema (see
+    # tenant.middleware.TenantAwareUserSessionsMiddleware) — without
+    # this app in SHARED, a fresh (non-clone) database has no
+    # usersessions table in public and every platform-admin request
+    # crashes. Also in TENANT_APPS for per-schema customer sessions.
+    "allauth.usersessions",
 ]
 
 TENANT_APPS = [
@@ -231,7 +239,11 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
-    "allauth.usersessions.middleware.UserSessionsMiddleware",
+    # Schema-correct stand-in for allauth.usersessions.middleware
+    # .UserSessionsMiddleware — platform-staff session rows go to the
+    # public schema (their user row lives there, not in the tenant's
+    # user table).
+    "tenant.middleware.TenantAwareUserSessionsMiddleware",
     "djangorestframework_camel_case.middleware.CamelCaseMiddleWare",
     "simple_history.middleware.HistoryRequestMiddleware",
     "core.middleware.asgi_compat.ASGICompatMiddleware",  # ASGI compatibility for Rosetta

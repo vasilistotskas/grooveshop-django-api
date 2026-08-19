@@ -98,3 +98,45 @@ class TenantCookieDomainMiddleware:
             if name in rewrite_names:
                 morsel["domain"] = cookie_domain
         return response
+
+
+class TenantAwareUserSessionsMiddleware:
+    """Schema-correct replacement for allauth's ``UserSessionsMiddleware``.
+
+    ``UserSession`` rows carry an FK to the user table of whatever
+    schema the request runs in. Platform staff are PUBLIC-schema
+    identities (``tenant.auth_backends.PlatformStaffBackend``): on a
+    tenant host their pk does not exist in that tenant's user table, so
+    the stock middleware's insert dies with a ForeignKeyViolation on
+    every authenticated admin request (observed live on staging
+    2026-08-19). Their session rows are therefore written to the public
+    schema — where their user row lives. Customer sessions keep the
+    stock per-tenant behavior.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from allauth.usersessions import app_settings
+        from allauth.usersessions.models import UserSession
+        from django_tenants.utils import (
+            get_public_schema_name,
+            schema_context,
+        )
+
+        from tenant.auth_backends import is_platform_staff_session
+
+        if (
+            app_settings.TRACK_ACTIVITY
+            and hasattr(request, "session")
+            and request.session.session_key
+            and hasattr(request, "user")
+            and request.user.is_authenticated
+        ):
+            if is_platform_staff_session(request):
+                with schema_context(get_public_schema_name()):
+                    UserSession.objects.create_from_request(request)
+            else:
+                UserSession.objects.create_from_request(request)
+        return self.get_response(request)

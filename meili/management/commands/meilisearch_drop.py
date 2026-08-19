@@ -4,7 +4,7 @@ from django.apps import apps
 from django.core.management.base import BaseCommand
 
 from meili._client import client as _client
-from meili.management.tenant_mixin import TenantCommandMixin
+from core.management.tenant_mixin import TenantCommandMixin
 from meili.models import IndexMixin
 
 

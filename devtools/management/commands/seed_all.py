@@ -643,9 +643,33 @@ class Command(BaseCommand):
             action="store_true",
             help="Show detailed error information",
         )
+        # Dev tool: seeded models are TENANT_APPS models, so multi-tenant
+        # dev setups must name the target schema (omitting it seeds
+        # whatever schema the connection is on — public on a bare run).
+        parser.add_argument(
+            "--schema",
+            type=str,
+            default=None,
+            help="Tenant schema to seed (default: current connection context)",
+        )
 
     def handle(self, *args, **options):
         """Main command handler"""
+        schema = options.get("schema")
+        if schema:
+            from django_tenants.utils import schema_context
+
+            from tenant.models import Tenant
+
+            if not Tenant.objects.filter(schema_name=schema).exists():
+                from django.core.management.base import CommandError
+
+                raise CommandError(f"Tenant schema {schema!r} not found.")
+            with schema_context(schema):
+                return self._handle_seed(*args, **options)
+        return self._handle_seed(*args, **options)
+
+    def _handle_seed(self, *args, **options):
         try:
             self.session_start_time = time.time()
             seeding_options = SeedingOptions.from_dict(options)

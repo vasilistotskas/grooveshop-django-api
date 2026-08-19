@@ -12,7 +12,7 @@ from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
 from meili._client import client as meili_client
-from meili.management.tenant_mixin import TenantCommandMixin
+from core.management.tenant_mixin import TenantCommandMixin
 from product.models.product import ProductTranslation
 
 

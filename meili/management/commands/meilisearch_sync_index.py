@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from meili._client import client as _client
-from meili.management.tenant_mixin import TenantCommandMixin
+from core.management.tenant_mixin import TenantCommandMixin
 from meili.models import IndexMixin
 
 DEFAULT_BATCH_SIZE = settings.MEILISEARCH.get("DEFAULT_BATCH_SIZE", 1000)

@@ -22,17 +22,27 @@ state (order_paid signal, status transition, history) still flows.
 
 from datetime import timedelta
 
+from contextlib import nullcontext as _nullcontext
+
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from core.management.tenant_mixin import TenantCommandMixin
 from shipping_acs.services import AcsService
 
 
-class Command(BaseCommand):
+class Command(TenantCommandMixin, BaseCommand):
     help = (
         "Reconcile ACS COD payouts for the last N days "
         "(ACS_COD_Beneficiary_Info is queried once per date)."
     )
+
+    # Orders/shipments AND the ACS credentials are per-tenant — running
+    # from the public context would read clone-legacy rows with NO
+    # credentials. The scheduled path
+    # (fanout_reconcile_acs_cod_payouts -> reconcile_acs_cod_payouts
+    # under TenantTask) is already tenant-scoped.
+    require_tenant_scope = True
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -50,7 +60,20 @@ class Command(BaseCommand):
             ),
         )
 
+        self.add_tenant_arguments(parser)
+
     def handle(self, *args, **options):
+        from django_tenants.utils import schema_context
+
+        for schema in self.get_tenant_schemas(options):
+            if schema:
+                self.stdout.write(
+                    self.style.MIGRATE_HEADING(f"\n>>> Tenant: {schema}")
+                )
+            with schema_context(schema) if schema else _nullcontext():
+                self._handle_for_schema(*args, **options)
+
+    def _handle_for_schema(self, *args, **options):
         days: int = options["days"]
         silent: bool = options["silent"]
         if days < 1:

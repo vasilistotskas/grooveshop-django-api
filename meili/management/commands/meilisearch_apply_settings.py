@@ -18,7 +18,7 @@ from django.core.management.base import BaseCommand
 from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
-from meili.management.tenant_mixin import TenantCommandMixin
+from core.management.tenant_mixin import TenantCommandMixin
 from product.models.product import ProductTranslation
 
 

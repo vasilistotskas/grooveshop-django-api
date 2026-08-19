@@ -9,7 +9,7 @@ from meilisearch.errors import MeilisearchApiError
 
 from blog.models.post import BlogPostTranslation
 from meili._client import client
-from meili.management.tenant_mixin import TenantCommandMixin
+from core.management.tenant_mixin import TenantCommandMixin
 from product.models.product import ProductTranslation
 
 

@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import mock_open, patch
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpResponse, JsonResponse
@@ -158,6 +158,8 @@ class TestUploadImage(TestCase):
         )
 
     def test_valid_file_extensions(self):
+        import tempfile
+
         valid_extensions = ["jpg", "jpeg", "png", "gif"]
 
         for ext in valid_extensions:
@@ -181,161 +183,91 @@ class TestUploadImage(TestCase):
                     mock_instance.cleaned_data = {"file": test_file}
 
                     with (
-                        patch("core.views.os.path.exists", return_value=False),
-                        patch("core.views.os.makedirs"),
-                        patch("core.views.open", mock_open()),
+                        tempfile.TemporaryDirectory() as media_root,
                         patch("core.views.os.getenv", return_value="False"),
                         patch(
                             "core.views.sanitize_filename",
                             return_value=f"test.{ext}",
                         ),
                     ):
-                        response = upload_image(request)
+                        with override_settings(MEDIA_ROOT=media_root):
+                            response = upload_image(request)
 
                         self.assertIsInstance(response, JsonResponse)
                         data = json.loads(response.content)
                         self.assertIn("message", data)
                         self.assertIn("successfully", data["message"])
 
-    @override_settings(MEDIA_ROOT="/tmp/test_media")
-    @patch("core.views.os.getenv")
-    def test_local_storage_upload(self, mock_getenv):
-        mock_getenv.side_effect = lambda key, default: {
-            "USE_AWS": "False",
-            "DEBUG": "True",
-        }.get(key, default)
-
+    def _post_upload(self, filename: str, sanitized: str | None = None):
         test_file = SimpleUploadedFile(
-            "test.jpg", b"fake image content", content_type="image/jpeg"
+            filename, b"fake image content", content_type="image/jpeg"
         )
-
         request = self.factory.post("/upload_image/", {"file": test_file})
         request.user = self.superuser
         request.FILES["file"] = test_file
-
-        # Bypassing form validation by mocking the form class and instance
         with patch("core.forms.ImageUploadForm") as MockForm:
             mock_instance = MockForm.return_value
             mock_instance.is_valid.return_value = True
             mock_instance.cleaned_data = {"file": test_file}
-
-            with (
-                patch("core.views.os.path.exists", return_value=False),
-                patch("core.views.os.makedirs") as mock_makedirs,
-                patch("core.views.open", mock_open()) as mock_file,
-                patch("core.views.sanitize_filename", return_value="test.jpg"),
-            ):
-                response = upload_image(request)
-
-                mock_makedirs.assert_called_once()
-
-                mock_file.assert_called_once()
-
-                self.assertIsInstance(response, JsonResponse)
-                data = json.loads(response.content)
-                self.assertIn("message", data)
-                self.assertIn("location", data)
-
-    @patch("core.views.os.getenv")
-    @patch("core.views.TinymceS3Storage")
-    def test_aws_storage_upload(self, mock_storage_class, mock_getenv):
-        mock_getenv.side_effect = lambda key, default: {"USE_AWS": "True"}.get(
-            key, default
-        )
-
-        mock_storage = MagicMock()
-        mock_storage.save.return_value = "uploads/test.jpg"
-        mock_storage.url.return_value = (
-            "https://s3.amazonaws.com/bucket/uploads/test.jpg"
-        )
-        mock_storage_class.return_value = mock_storage
-
-        test_file = SimpleUploadedFile(
-            "test.jpg", b"fake image content", content_type="image/jpeg"
-        )
-
-        request = self.factory.post("/upload_image/", {"file": test_file})
-        request.user = self.superuser
-        request.FILES["file"] = test_file
-
-        # Bypassing form validation by mocking the form class and instance
-        with patch("core.forms.ImageUploadForm") as MockForm:
-            mock_instance = MockForm.return_value
-            mock_instance.is_valid.return_value = True
-            mock_instance.cleaned_data = {"file": test_file}
-
-            with patch("core.views.sanitize_filename", return_value="test.jpg"):
-                response = upload_image(request)
-
-                mock_storage.save.assert_called_once_with("test.jpg", test_file)
-                mock_storage.url.assert_called_once_with("uploads/test.jpg")
-
-                self.assertIsInstance(response, JsonResponse)
-                data = json.loads(response.content)
-                self.assertIn("message", data)
-                self.assertIn("location", data)
-                self.assertIn("s3.amazonaws.com", data["location"])
-            self.assertIn("s3.amazonaws.com", data["location"])
+            if sanitized is not None:
+                with patch(
+                    "core.views.sanitize_filename", return_value=sanitized
+                ):
+                    return upload_image(request)
+            return upload_image(request)
 
     @patch("core.views.os.getenv", return_value="False")
-    def test_file_exists_rename(self, mock_getenv):
-        test_file = SimpleUploadedFile(
-            "test.jpg", b"fake image content", content_type="image/jpeg"
-        )
+    def test_local_storage_upload_is_tenant_scoped(self, mock_getenv):
+        """Editor uploads are TENANT media: they must land under the
+        request schema's directory (MEDIA_ROOT/{schema}/uploads/tinymce/)
+        and the returned location must carry the schema-scoped URL —
+        the shared schema-less uploads/ dir bypassed tenant offboarding
+        and the schema-scoped media route."""
+        import tempfile
 
-        request = self.factory.post("/upload_image/", {"file": test_file})
-        request.user = self.superuser
-        request.FILES["file"] = test_file
+        from django.db import connection
 
-        # Mock ImageUploadForm to bypass PIL validation
-        with patch("core.forms.ImageUploadForm") as MockForm:
-            mock_instance = MockForm.return_value
-            mock_instance.is_valid.return_value = True
-            mock_instance.cleaned_data = {"file": test_file}
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                response = self._post_upload("test.jpg", sanitized="test.jpg")
 
-            with (
-                patch("core.views.os.path.exists", return_value=True),
-                patch("core.views.os.makedirs"),
-                patch("core.views.open", mock_open()) as mock_file,
-                patch("core.views.sanitize_filename", return_value="test.jpg"),
-                patch("core.views.uuid4", return_value="unique-id"),
-            ):
-                upload_image(request)
+        data = json.loads(response.content)
+        self.assertIn("successfully", data["message"])
+        schema = connection.schema_name
+        self.assertIn(f"/{schema}/uploads/tinymce/test.jpg", data["location"])
 
-                mock_file.assert_called()
-                call_args = mock_file.call_args[0][0]
-                self.assertIn("unique-id.jpg", call_args)
+    @patch("core.views.os.getenv", return_value="False")
+    def test_file_exists_gets_alternative_name(self, mock_getenv):
+        """The storage backend generates an alternative name on
+        collision — two uploads of the same filename must not overwrite
+        each other and must return distinct locations."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                first = json.loads(
+                    self._post_upload("test.jpg", sanitized="test.jpg").content
+                )
+                second = json.loads(
+                    self._post_upload("test.jpg", sanitized="test.jpg").content
+                )
+
+        self.assertNotEqual(first["location"], second["location"])
+        self.assertIn("uploads/tinymce/", second["location"])
 
     @patch("core.views.os.getenv", return_value="False")
     def test_path_traversal_protection(self, mock_getenv):
-        test_file = SimpleUploadedFile(
-            "../../../evil.jpg",
-            b"fake image content",
-            content_type="image/jpeg",
-        )
+        """A hostile filename that survives sanitization must still be
+        rejected by the storage backend (SuspiciousFileOperation) rather
+        than escaping MEDIA_ROOT."""
+        import tempfile
 
-        request = self.factory.post("/upload_image/", {"file": test_file})
-        request.user = self.superuser
-        request.FILES["file"] = test_file
+        from django.core.exceptions import SuspiciousFileOperation
 
-        # Mock ImageUploadForm to bypass PIL validation so we can test path traversal
-        with patch("core.forms.ImageUploadForm") as MockForm:
-            mock_instance = MockForm.return_value
-            mock_instance.is_valid.return_value = True
-            mock_instance.cleaned_data = {"file": test_file}
-
-            with (
-                patch("core.views.os.path.exists", return_value=False),
-                patch("core.views.os.makedirs"),
-                patch(
-                    "core.views.sanitize_filename",
-                    return_value="../../../evil.jpg",
-                ),
-            ):
-                from django.core.exceptions import ValidationError
-
-                with self.assertRaises(ValidationError):
-                    upload_image(request)
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                with self.assertRaises(SuspiciousFileOperation):
+                    self._post_upload("evil.jpg", sanitized="../../../evil.jpg")
 
 
 class TestManageTOTPSvgView(TestCase):

@@ -1,6 +1,5 @@
 import logging
 import os
-from uuid import uuid4
 
 from allauth.headless.base.response import APIResponse
 from allauth.headless.mfa import response
@@ -9,10 +8,8 @@ from allauth.mfa.adapter import DefaultMFAAdapter, get_adapter
 from allauth.mfa.totp.internal.auth import get_totp_secret
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
-from django.utils.translation import gettext_lazy as _
 from django.views import View
 from core.storages import TinymceS3Storage
 from core.utils.files import sanitize_filename
@@ -78,42 +75,34 @@ def upload_image(request):
             {"message": "Image uploaded successfully", "location": image_url}
         )
 
-    upload_dir = os.path.normpath(
-        os.path.join(settings.MEDIA_ROOT, "uploads/tinymce")
-    )
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
+    # Editor images are TENANT media: store them under the requesting
+    # tenant's schema directory (MEDIA_ROOT/{schema}/uploads/tinymce/)
+    # via TenantFileSystemStorage — the schema-scoped media route is
+    # the only one the media service serves, and offboarding a tenant
+    # must take its editor images with it. The storage's save() handles
+    # name collisions (alternative-name generation) and rejects path
+    # traversal itself.
+    from tenant.storage import TenantFileSystemStorage
 
+    storage = TenantFileSystemStorage()
     sanitized_name = sanitize_filename(file_obj.name)
-    file_path = os.path.join(upload_dir, sanitized_name)
-    file_path = os.path.normpath(file_path)
+    # POSIX join on purpose — storage names are /-separated on every
+    # platform; os.path.join would smuggle a backslash into the name on
+    # Windows.
+    saved_path = storage.save(f"uploads/tinymce/{sanitized_name}", file_obj)
+    saved_url = storage.url(saved_path.replace(os.sep, "/"))
 
-    if not file_path.startswith(upload_dir):
-        raise ValidationError(_("Invalid file path"))
+    debug = os.getenv("DEBUG", "False") == "True"
+    location = (
+        f"{settings.API_BASE_URL}{saved_url}" if debug else saved_url
+    )
 
-    if os.path.exists(file_path):
-        file_name_suffix = os.path.splitext(file_obj.name)[1].lower()
-        sanitized_name = str(uuid4()) + file_name_suffix
-        file_path = os.path.join(upload_dir, sanitized_name)
-
-    with open(file_path, "wb+") as f:
-        for chunk in file_obj.chunks():
-            f.write(chunk)
-
-        debug = os.getenv("DEBUG", "False") == "True"
-        location = (
-            f"{settings.API_BASE_URL}{settings.MEDIA_URL}uploads/tinymce/"
-            f"{sanitized_name}"
-            if debug
-            else f"{settings.MEDIA_URL}uploads/tinymce/{sanitized_name}"
-        )
-
-        return JsonResponse(
-            {
-                "message": "Image uploaded successfully",
-                "location": location,
-            }
-        )
+    return JsonResponse(
+        {
+            "message": "Image uploaded successfully",
+            "location": location,
+        }
+    )
 
 
 class TOTPSvgNotFoundResponse(APIResponse):

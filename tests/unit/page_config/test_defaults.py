@@ -59,9 +59,13 @@ class TestSeedPageLayouts(TestCase):
 class TestSeedBrandPages(TestCase):
     def test_creates_brand_layouts(self):
         seed_brand_pages()
-        assert PageLayout.objects.count() == len(BRAND_PAGE_LAYOUTS)
+        # +1: brand seeding also ensures the home layout exists (it
+        # carries the brand banner props on its hero — see
+        # BRAND_HOME_HERO_PROPS).
+        assert PageLayout.objects.count() == len(BRAND_PAGE_LAYOUTS) + 1
         for page_type in BRAND_PAGE_LAYOUTS:
             assert PageLayout.objects.filter(page_type=page_type).exists()
+        assert PageLayout.objects.filter(page_type="home").exists()
 
     def test_created_layouts_are_published(self):
         seed_brand_pages()
@@ -91,5 +95,5 @@ class TestSeedBrandPages(TestCase):
 
     def test_returns_created_map(self):
         result = seed_brand_pages()
-        assert set(result) == set(BRAND_PAGE_LAYOUTS)
+        assert set(result) == set(BRAND_PAGE_LAYOUTS) | {"home"}
         assert all(created is True for created in result.values())

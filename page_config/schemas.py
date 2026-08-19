@@ -79,6 +79,15 @@ _VALIDATORS: dict[str, dict] = {
             and all(_is_str(s, 1000) for s in v)
             else "list of ≤10 strings"
         ),
+        # Mobile/tablet variants (matching indices); Nuxt falls back to
+        # ``images`` when absent. Serialized to camelCase mobileImages.
+        "mobile_images": lambda v: (
+            None
+            if isinstance(v, list)
+            and len(v) <= 10
+            and all(_is_str(s, 1000) for s in v)
+            else "list of ≤10 strings"
+        ),
         "link": lambda v: (
             None
             if _is_str(v, 1000) and _LINK_RE.match(v)

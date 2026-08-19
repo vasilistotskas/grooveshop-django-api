@@ -6,7 +6,11 @@ provisioning). The four layouts this command seeds — about / vision /
 what-is-microlearning / why-microlearning — render through per-tenant
 Nuxt variant components with no props, so they are NOT part of the
 universal default set: only tenants that actually ship these specific
-pages should get them.
+pages should get them. It also ensures the home layout exists and
+fills a prop-less hero_carousel with the brand banner artwork
+(``BRAND_HOME_HERO_PROPS``) — the shared component deliberately has no
+built-in banner, so without this step the brand homepage renders no
+hero at all.
 
 No tenant name is hardcoded here — pass whichever schema needs them.
 Referenced from ``MULTI_TENANT_CUTOVER.md`` §0.3/§6 as a webside

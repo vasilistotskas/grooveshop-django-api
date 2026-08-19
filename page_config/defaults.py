@@ -99,6 +99,18 @@ def seed_page_layouts() -> None:
 # MULTI_TENANT_CUTOVER.md §0.3/§6 for the webside cutover step). No
 # tenant name is hardcoded here or in the command — the caller picks
 # the schema.
+# Banner artwork for the brand store's homepage hero, applied by
+# ``seed_brand_pages()``. The shared HeroCarousel component deliberately
+# has no built-in banner (a hardcoded default would put this store's
+# promo on every tenant whose layout carries a prop-less hero_carousel —
+# observed live on the staging tenant #2), so the artwork lives here as
+# SECTION DATA and the universal default seed's prop-less hero renders
+# nothing.
+BRAND_HOME_HERO_PROPS: dict = {
+    "images": ["/img/main-banner.png"],
+    "mobile_images": ["/img/main-banner-mobile.png"],
+}
+
 BRAND_PAGE_LAYOUTS: dict[str, dict] = {
     "about": {
         "title": "About",
@@ -169,4 +181,27 @@ def seed_brand_pages() -> dict[str, bool]:
                 )
             logger.info("Seeded brand page layout: %s", page_type)
         created_map[page_type] = created
+
+    # Home hero artwork: ensure the home layout exists (create it from
+    # the universal default when absent) and fill a PROP-LESS
+    # hero_carousel with the brand banner props. A hero that already
+    # carries props was customized by the merchant — left untouched.
+    home_config = DEFAULT_PAGE_LAYOUTS["home"]
+    home, home_created = PageLayout.objects.get_or_create(
+        page_type="home",
+        defaults={
+            "title": home_config["title"],
+            "is_published": True,
+        },
+    )
+    if home_created:
+        for section_data in home_config["sections"]:
+            PageSection.objects.create(layout=home, **section_data)
+        logger.info("Seeded page layout: home (via brand seeding)")
+    hero = home.sections.filter(component_type="hero_carousel").first()
+    if hero is not None and not hero.props:
+        hero.props = dict(BRAND_HOME_HERO_PROPS)
+        hero.save(update_fields=["props"])
+        logger.info("Applied brand banner props to the home hero")
+    created_map["home"] = home_created
     return created_map

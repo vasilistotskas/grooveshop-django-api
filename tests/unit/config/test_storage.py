@@ -2,7 +2,6 @@ import os
 import sys
 import unittest
 from importlib import reload
-from os import getenv
 from unittest.mock import patch
 
 # Each test reloads the ``settings`` module inside an
@@ -34,29 +33,3 @@ class TestStorage(unittest.TestCase):
         # shipping logos, ...). ``STATIC_BASE_URL`` defaults to
         # ``http://localhost:8000``; devs override via env var.
         self.assertEqual(MEDIA_URL, f"{STATIC_BASE_URL}/media/")
-
-    @patch.object(
-        sys.modules["__main__"], "__file__", "config/storage.py", create=True
-    )
-    @patch.dict(
-        os.environ,
-        {
-            "USE_AWS": "True",
-            "AWS_STORAGE_BUCKET_NAME": "grooveshop-static",
-            "AWS_ACCESS_KEY_ID": "fake_access_key",
-            "AWS_SECRET_ACCESS_KEY": "fake_secret_key",
-        },
-    )
-    def test_aws(self):
-        reload(sys.modules["settings"])
-        from settings import MEDIA_URL, STATIC_URL
-
-        AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME")
-        AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
-        PUBLIC_MEDIA_LOCATION = "media"
-
-        self.assertEqual(STATIC_URL, f"https://{AWS_S3_CUSTOM_DOMAIN}/")
-        self.assertEqual(
-            MEDIA_URL,
-            f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/",
-        )

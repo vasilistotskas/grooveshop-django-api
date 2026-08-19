@@ -83,9 +83,7 @@ class TestBuildEmailContext:
         # An unbranded tenant's emails must never wear the platform's
         # brand — empty makes email_base.html render the store name as
         # a text wordmark instead.
-        bind_tenant(
-            _fake_tenant(domain="shop.acme.example", logo_light_url="")
-        )
+        bind_tenant(_fake_tenant(domain="shop.acme.example", logo_light_url=""))
 
         context = build_email_context()
 
@@ -95,9 +93,7 @@ class TestBuildEmailContext:
         self, bind_tenant, settings
     ):
         settings.NUXT_BASE_URL = "https://platform.example"
-        bind_tenant(
-            _fake_tenant(domain="platform.example", logo_light_url="")
-        )
+        bind_tenant(_fake_tenant(domain="platform.example", logo_light_url=""))
 
         context = build_email_context()
 

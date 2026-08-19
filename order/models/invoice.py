@@ -67,20 +67,11 @@ class MyDataStatus(models.TextChoices):
 def _private_invoice_storage() -> Any:
     """Resolve the per-tenant private storage backend for invoice files.
 
-    On AWS-backed deployments this is ``TenantPrivateMediaStorage``
-    (``location='media/{schema}/private'`` resolved lazily from
-    ``connection.schema_name`` at every read, plus
-    ``default_acl='private'`` + ``custom_domain=False`` so downloads
-    require a signed URL). In DEBUG / self-hosted setups the private
+    In DEBUG / self-hosted setups the private
     tree is partitioned by schema too — ``{MEDIA_ROOT}_private/{schema}/``
     — so a misconfigured webserver cannot serve another tenant's
     invoices.
     """
-    if getattr(settings, "USE_AWS", False):
-        from core.storages import TenantPrivateMediaStorage
-
-        return TenantPrivateMediaStorage()
-
     from django.db import connection
 
     base_location = getattr(
@@ -183,10 +174,10 @@ class Invoice(TimeStampMixinModel, UUIDModel):
         blank=True,
         null=True,
         help_text=_(
-            "The rendered PDF. Stored in private storage — customer "
-            "access goes through ``OrderViewSet.invoice_download`` "
-            "(streamed through Django auth); direct storage URLs are "
-            "signed via ``PrivateMediaStorage`` as a defence in depth."
+            "The rendered PDF. Stored in per-tenant private storage — "
+            "customer access goes through ``OrderViewSet.invoice_download`` "
+            "(streamed through Django auth); the private tree lives "
+            "outside every public web root as a defence in depth."
         ),
     )
     subtotal = MoneyField(

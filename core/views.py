@@ -11,7 +11,6 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views import View
-from core.storages import TinymceS3Storage
 from core.utils.files import sanitize_filename
 
 logger = logging.getLogger(__name__)
@@ -46,8 +45,6 @@ class HomeView(View):
 
 @login_required
 def upload_image(request):
-    USE_AWS = os.getenv("USE_AWS", "False") == "True"
-
     if not request.user.is_superuser:
         return JsonResponse(
             {"Error Message": "You are not authorized to upload images"},
@@ -65,15 +62,6 @@ def upload_image(request):
         return JsonResponse({"Error Message": form.errors["file"][0]})
 
     file_obj = form.cleaned_data["file"]
-
-    if USE_AWS:
-        storage = TinymceS3Storage()
-        sanitized_name = sanitize_filename(file_obj.name)
-        image_path = storage.save(sanitized_name, file_obj)
-        image_url = storage.url(image_path)
-        return JsonResponse(
-            {"message": "Image uploaded successfully", "location": image_url}
-        )
 
     # Editor images are TENANT media: store them under the requesting
     # tenant's schema directory (MEDIA_ROOT/{schema}/uploads/tinymce/)
@@ -93,9 +81,7 @@ def upload_image(request):
     saved_url = storage.url(saved_path.replace(os.sep, "/"))
 
     debug = os.getenv("DEBUG", "False") == "True"
-    location = (
-        f"{settings.API_BASE_URL}{saved_url}" if debug else saved_url
-    )
+    location = f"{settings.API_BASE_URL}{saved_url}" if debug else saved_url
 
     return JsonResponse(
         {

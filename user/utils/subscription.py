@@ -87,14 +87,12 @@ def send_subscription_confirmation(
         # build against the tenant's API origin — a platform-wide
         # ``API_BASE_URL`` would 404 for every non-platform tenant.
         api_base = get_tenant_api_base_url()
-        # If the stored value already looks like an absolute URL (legacy
-        # rows from before this fix), respect it as-is so existing tenants
-        # aren't broken until they run backfill_extra_settings_defaults.
-        if url_path_template and url_path_template.startswith("http"):
-            raw_confirmation_url = url_path_template
-        else:
-            raw_confirmation_url = f"{api_base}{url_path_template}"
-        confirmation_url = raw_confirmation_url.format(
+        # SUBSCRIPTION_CONFIRMATION_URL is a RELATIVE path template by
+        # contract (see EXTRA_SETTINGS_DEFAULTS) — an absolute value
+        # stored per-tenant would pin every tenant's confirmation links
+        # to one host. Cutover normalizes any absolute rows
+        # (MULTI_TENANT_CUTOVER.md §0.3).
+        confirmation_url = f"{api_base}{url_path_template}".format(
             token=subscription.confirmation_token
         )
 

@@ -602,9 +602,10 @@ class TestSendInactiveUserNotificationsTask:
     def test_send_inactive_user_notifications_no_tenant_logo_falls_back(
         self, mock_logger, mock_render, mock_email_cls, db
     ):
-        """Byte-parity guard: without an active tenant configuring a
-        logo (the default in this test), ``SITE_LOGO_URL`` stays empty
-        so the template renders its static fallback logo unchanged."""
+        """Byte-parity guard: without an active tenant (this test's
+        default context counts as PLATFORM), ``SITE_LOGO_URL`` resolves
+        to the platform logo — only an unbranded NON-platform tenant
+        gets an empty value (text wordmark)."""
         UserAccountFactory(
             last_login=timezone.now() - timedelta(days=70),
             is_active=True,
@@ -617,7 +618,9 @@ class TestSendInactiveUserNotificationsTask:
 
         assert result["emails_sent"] == 1
         rendered_context = mock_render.call_args_list[0][0][1]
-        assert rendered_context["SITE_LOGO_URL"] == ""
+        assert rendered_context["SITE_LOGO_URL"].endswith(
+            "/static/logo-dark.svg"
+        )
 
     @patch("core.tasks.EmailMultiAlternatives")
     @patch("core.tasks.render_to_string")

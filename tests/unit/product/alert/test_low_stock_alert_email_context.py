@@ -63,4 +63,9 @@ class TestLowStockAlertEmailContext:
 
         assert result["alerted"] == 1
         rendered_context = mock_render.call_args_list[0][0][1]
-        assert rendered_context["SITE_LOGO_URL"] == ""
+        # No tenant bound in this test — that context counts as PLATFORM
+        # (see build_email_context._is_platform_tenant), so the platform
+        # logo is used. Only an unbranded NON-platform tenant gets "".
+        assert rendered_context["SITE_LOGO_URL"].endswith(
+            "/static/logo-dark.svg"
+        )

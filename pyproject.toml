@@ -14,7 +14,6 @@ classifiers = [
 ]
 dependencies = [
   "asgiref==3.12.1",
-  "boto3==1.43.71",
   "charset_normalizer==3.5.0",
   "channels[daphne]==4.3.2",
   "channels-redis==4.3.0",
@@ -36,7 +35,6 @@ dependencies = [
   "django-phonenumber-field==8.5.0",
   "django-rosetta==0.10.3",
   "django-rest-knox==5.1.0",
-  "django-storages==1.14.6",
   "django-tinymce==5.0.0",
   "djangorestframework==3.18.0",
   "djangorestframework-camel-case==1.4.2",
@@ -128,7 +126,6 @@ omit = [
     "*/factories.py",
     "*/setup.py",
     "gunicorn_worker.py",
-    "core/storages.py",
     "*/wsgi/*",
 ]
 source = ["."]

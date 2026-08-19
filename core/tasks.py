@@ -627,7 +627,7 @@ def monitor_system_health():
 
     try:
         # Probe the configured default storage backend end-to-end
-        # (write → delete). With ``USE_AWS=False`` this is a
+        # (write → delete). The default storage is a
         # ``FileSystemStorage`` rooted at ``MEDIA_ROOT`` — in K8s that
         # is the shared RWX media PVC, which must be mounted read-write
         # on every pod that runs this task (backend AND celery

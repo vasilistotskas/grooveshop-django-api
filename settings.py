@@ -119,7 +119,6 @@ SHARED_APPS = [
     # unused and only widened the schema-endpoint auth surface (G0358).
     "drf_spectacular",
     "rosetta",
-    "storages",
     "core",
     "devtools",
     # Celery infrastructure — beat scheduler runs in public schema
@@ -579,7 +578,6 @@ HEADLESS_FRONTEND_URLS = {
     "socialaccount_login_error": f"{NUXT_BASE_URL}/account/provider/callback",
 }
 
-USE_AWS = getenv("USE_AWS", "False") == "True"
 
 REDIS_HOST = getenv("REDIS_HOST", "localhost")
 REDIS_PORT = getenv("REDIS_PORT", "6379")
@@ -1019,15 +1017,6 @@ CHANNEL_LAYERS = {
 
 APP_BASE_URL = getenv("APP_BASE_URL", "http://localhost:8000")
 API_BASE_URL = getenv("API_BASE_URL", "http://localhost:8000")
-AWS_STORAGE_BUCKET_NAME = getenv("AWS_STORAGE_BUCKET_NAME", "changeme")
-if AWS_STORAGE_BUCKET_NAME == "changeme" and SYSTEM_ENV == "production":
-    from django.core.exceptions import ImproperlyConfigured
-
-    raise ImproperlyConfigured(
-        "AWS_STORAGE_BUCKET_NAME must be set in production "
-        "(current value is the insecure default 'changeme')."
-    )
-AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 
 CORS_EXPOSE_HEADERS = [
     *default_headers,
@@ -1040,7 +1029,6 @@ CORS_ALLOWED_ORIGINS = [
     NUXT_BASE_URL,
     MEDIA_STREAM_BASE_URL,
     STATIC_BASE_URL,
-    f"https://{AWS_S3_CUSTOM_DOMAIN}",
 ]
 # All origins allowed — django-tenants validates domains at middleware level.
 # Each tenant domain is a distinct origin; static CORS list can't cover them.
@@ -1089,7 +1077,6 @@ CSRF_TRUSTED_ORIGINS = [
     NUXT_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     MEDIA_STREAM_BASE_URL.replace("http://", "https://"),  # Force HTTPS
     STATIC_BASE_URL.replace("http://", "https://"),  # Force HTTPS
-    f"https://{AWS_S3_CUSTOM_DOMAIN}",
 ]
 
 # Internal K8s service URLs and local dev origins are only valid in non-production
@@ -3042,38 +3029,7 @@ STATICFILES_DIRS = [
     path.join(BASE_DIR, "static"),
 ]
 
-if USE_AWS:
-    # aws settings
-    AWS_ACCESS_KEY_ID = getenv("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = getenv("AWS_SECRET_ACCESS_KEY")
-    AWS_DEFAULT_ACL = None
-    AWS_QUERYSTRING_AUTH = False
-    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
-    # s3 static settings
-    STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"
-    STATIC_ROOT = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
-    # s3 public media settings
-    PUBLIC_MEDIA_LOCATION = "media"
-    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
-    # s3 private media settings
-    PRIVATE_MEDIA_LOCATION = "private"
-    PRIVATE_FILE_STORAGE = "core.storages.TenantPrivateMediaStorage"
-    STORAGES = {
-        "default": {
-            "BACKEND": "core.storages.TenantPublicMediaStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "core.storages.StaticStorage",
-        },
-    }
-    # No ``TINYMCE_JS_URL`` override here. The previous value pointed
-    # at ``{AWS_S3_CUSTOM_DOMAIN}/tinymce/tinymce.min.js`` — missing
-    # the ``/static/`` prefix that ``StaticStorage(location="static")``
-    # writes the asset under — so the script 404'd in production. The
-    # django-tinymce default (``staticfiles_storage.url(...)``) returns
-    # the correctly prefixed URL through the active static storage.
-    # ``TINYMCE_JS_ROOT`` was never read by django-tinymce.
-elif not DEBUG:
+if not DEBUG:
     STATIC_URL = f"{STATIC_BASE_URL}/static/"
     STATIC_ROOT = path.join(BASE_DIR, "web", "staticfiles")
     MEDIA_URL = f"{STATIC_BASE_URL}/media/"

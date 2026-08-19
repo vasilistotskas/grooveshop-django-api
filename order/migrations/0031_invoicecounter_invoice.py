@@ -20,10 +20,6 @@ from django.utils import timezone as tz
 
 def _private_invoice_storage():
     """Minimal inline copy of order.models.invoice._private_invoice_storage."""
-    if getattr(settings, "USE_AWS", False):
-        from core.storages import PrivateMediaStorage  # noqa: PLC0415
-
-        return PrivateMediaStorage()
     location = getattr(
         settings,
         "PRIVATE_MEDIA_ROOT",

@@ -140,11 +140,17 @@ class PayWayService:
         pay_way: PayWay, order: Order, **kwargs
     ) -> tuple[bool, dict[str, Any]]:
         if not pay_way.is_online_payment:
+            # Amount owed, not the raw total: a loyalty redemption is
+            # deducted by calculate_order_total_amount(). Cash on
+            # delivery already collected the discounted figure via
+            # paid_amount, so reporting total_price here contradicted
+            # the amount actually due.
+            amount_due = order.calculate_order_total_amount()
             payment_data = {
                 "payment_id": f"OFFLINE_{order.id}",
                 "status": PaymentStatus.PENDING,
-                "amount": str(order.total_price.amount),
-                "currency": order.total_price.currency,
+                "amount": str(amount_due.amount),
+                "currency": amount_due.currency,
                 "provider": pay_way.provider_code or "offline",
             }
 
@@ -170,7 +176,11 @@ class PayWayService:
             return False, {"error": _("Payment provider not available")}
 
         success, payment_data = provider.process_payment(
-            amount=order.total_price, order_id=str(order.id), **kwargs
+            # Amount owed, not the raw total — a loyalty redemption is
+            # deducted by calculate_order_total_amount().
+            amount=order.calculate_order_total_amount(),
+            order_id=str(order.id),
+            **kwargs,
         )
 
         if success:

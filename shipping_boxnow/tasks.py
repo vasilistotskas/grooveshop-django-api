@@ -7,7 +7,11 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import translation
 
-from shipping_boxnow.exceptions import BoxNowAPIError, BoxNowRetryableError
+from shipping_boxnow.exceptions import (
+    BoxNowAPIError,
+    BoxNowConfigError,
+    BoxNowRetryableError,
+)
 from core.utils.email_context import build_email_context
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
@@ -89,6 +93,35 @@ def create_boxnow_shipment_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         shipment = BoxNowService.create_shipment_for_order(order)
+    except BoxNowConfigError as exc:
+        # The tenant has no BoxNow credentials. BoxNowConfigError is a
+        # SIBLING of BoxNowAPIError, not a subclass, so it matched
+        # neither the retry policy nor the alert branch below and the
+        # task died unhandled: confirmed order, stock decremented, no
+        # parcel, and nothing anywhere says so.
+        #
+        # Retrying cannot help — credentials do not appear on their own
+        # — so alert and stop. This is what a tenant hits when payment
+        # credentials were backfilled but carrier ones were not.
+        from shipping.alerts import alert_admins_shipment_creation_failed
+
+        logger.error(
+            "BoxNow not configured for this tenant — order %s has no "
+            "shipment and no retry is possible: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id},
+        )
+        alert_admins_shipment_creation_failed(
+            order_id=order_id,
+            carrier="BoxNow",
+            error=f"BoxNow credentials missing for this tenant: {exc}",
+        )
+        return {
+            "status": "boxnow_not_configured",
+            "order_id": order_id,
+            "message": str(exc),
+        }
     except BoxNowRetryableError:
         # Transient (HTTP 5xx / connection). Re-raise so Celery's autoretry_for
         # handles it — BoxNowRetryableError subclasses BoxNowAPIError, so the

@@ -1312,10 +1312,13 @@ class OrderViewSet(BaseModelViewSet):
         provider_code = order.pay_way.provider_code
         provider = get_payment_provider(provider_code)
 
-        # Pass the full order total for all providers.
-        # Stripe also receives shipping_price separately for
-        # a proper line-item breakdown on the checkout page.
-        amount = order.total_price
+        # Charge what the customer actually owes — line items + extras
+        # minus any loyalty redemption. Reading order.total_price here
+        # billed the UNDISCOUNTED figure while the shopper's points had
+        # already been burnt and the sidebar showed the discounted one.
+        # Stripe also receives shipping_price separately for a proper
+        # line-item breakdown on the checkout page.
+        amount = order.calculate_order_total_amount()
 
         if provider_code == "stripe":
             checkout_params["shipping_price"] = order.shipping_price
@@ -1443,8 +1446,9 @@ class OrderViewSet(BaseModelViewSet):
         request_serializer.is_valid(raise_exception=True)
 
         provider = get_payment_provider("stripe")
+        # Amount owed, not the raw total — see create_checkout_session.
         success, payment_response = provider.confirm_delegated_payment(
-            amount=order.total_price,
+            amount=order.calculate_order_total_amount(),
             order_id=str(order.id),
             order_uuid=str(order.uuid),
             token=request_serializer.validated_data["shared_payment_token"],

@@ -200,10 +200,36 @@ class OrderModelTestCase(TestCase):
             self.order.total_price_extra = shipping_total
 
             self.order.total_price = expected_total
+            self.order.loyalty_discount = Money(
+                "0.00", settings.DEFAULT_CURRENCY
+            )
 
             result = Order.calculate_order_total_amount(self.order)
 
             self.assertEqual(result, expected_total)
+
+    def test_calculate_order_total_amount_subtracts_loyalty_discount(self):
+        """The charged amount must be what the shopper was shown.
+
+        The redemption used to land only on ``paid_amount`` while every
+        online charge site read the undiscounted ``total_price``, so the
+        points were burnt AND the full amount was charged.
+        """
+        expected_total = Money("140.00", settings.DEFAULT_CURRENCY)
+
+        with patch.object(
+            Order, "total_price", new_callable=PropertyMock
+        ) as mock_total_price:
+            mock_total_price.__get__ = Mock(return_value=expected_total)
+
+            self.order.total_price = expected_total
+            self.order.loyalty_discount = Money(
+                "5.00", settings.DEFAULT_CURRENCY
+            )
+
+            result = Order.calculate_order_total_amount(self.order)
+
+            self.assertEqual(result, Money("135.00", settings.DEFAULT_CURRENCY))
 
     @patch("django.utils.timezone.now")
     def test_mark_as_paid(self, mock_timezone_now):

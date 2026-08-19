@@ -71,6 +71,40 @@ def _resolve_tenant_for_order_code(order_code: str):
     return None
 
 
+def _order_exists_on_unavailable_tenant(order_code: object) -> bool:
+    """True when the order lives on a suspended/inactive tenant.
+
+    Separates "come back later" from "this code means nothing here".
+    The caller must NOT acknowledge the first case: Viva only redelivers
+    on a non-2xx, so a 200 drops the event permanently — the shopper has
+    paid, the order stays PENDING, and 24h later
+    ``auto_cancel_stuck_pending_orders`` cancels it with
+    ``refund_payment=False``, restores stock and emails the customer
+    that their order was cancelled. The money sits in the merchant's
+    Viva account with no order and no alert. Unlike BoxNow there is no
+    polling job to rescue it.
+    """
+    if not order_code:
+        return False
+
+    from tenant.models import Tenant  # noqa: PLC0415
+
+    public = get_public_schema_name()
+    unavailable = Tenant.objects.filter(
+        is_active=False
+    ) | Tenant.objects.filter(suspended_at__isnull=False)
+    for tenant in unavailable.exclude(schema_name=public).distinct():
+        try:
+            with schema_context(tenant.schema_name):
+                if Order.objects.filter(viva_order_code_q(order_code)).exists():
+                    return True
+        except Exception:
+            # A destroyed tenant's schema may be gone already; that is
+            # not a "retry later" case.
+            continue
+    return False
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -466,6 +500,21 @@ def _handle_webhook_event(request):
     # the webhook on the floor.
     tenant = _resolve_tenant_for_order_code(order_code)
     if not tenant:
+        if _order_exists_on_unavailable_tenant(order_code):
+            # Refuse to acknowledge so Viva redelivers once the operator
+            # reactivates the tenant. Acknowledging would drop a PAID
+            # order on the floor — see the helper's docstring.
+            logger.error(
+                "Viva webhook for order code %s belongs to a suspended or "
+                "inactive tenant — refusing to acknowledge so Viva "
+                "redelivers. Reactivate the tenant within 24h or the "
+                "order is auto-cancelled WITHOUT refund.",
+                order_code,
+            )
+            return JsonResponse(
+                {"status": "tenant_unavailable"},
+                status=503,
+            )
         logger.error(
             "Order not found for Viva Wallet order code: %s | "
             "(no tenant matched metadata.viva_order_code + "

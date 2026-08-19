@@ -163,6 +163,16 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         null=True,
         default=0,
     )
+    loyalty_discount = MoneyField(
+        _("Loyalty Discount"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        help_text=_(
+            "Amount deducted from the order total in exchange for loyalty "
+            "points. Deducted by calculate_order_total_amount()."
+        ),
+    )
     status_updated_at = models.DateTimeField(
         _("Status Updated At"), auto_now=False, null=True, blank=True
     )
@@ -507,7 +517,29 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         )
 
     def calculate_order_total_amount(self) -> Money:
-        return self.total_price
+        """What the customer actually owes: line items + extras, minus
+        any loyalty redemption.
+
+        This is the ONE amount the shopper is charged, the order-create
+        verification compares against, and the payment webhooks check.
+        The discount used to live only in ``paid_amount`` while every
+        charge site read the undiscounted ``total_price``: a shopper who
+        spent 500 points for EUR 5 off a EUR 50 cart saw EUR 45 in the
+        sidebar, had the points burnt, and was charged EUR 50 by both
+        Stripe and Viva — and the webhook amount guard, reading the same
+        undiscounted figure, endorsed the overcharge instead of catching
+        it. Cash on delivery disagreed and collected the discounted
+        figure, which is what made it a bug rather than a pricing
+        policy.
+
+        Kept separate from ``total_price`` so the discount stays a
+        visible line rather than being folded into the subtotal.
+        """
+        total = self.total_price
+        discount = self.loyalty_discount
+        if not discount or discount.amount <= 0:
+            return total
+        return Money(max(0, total.amount - discount.amount), total.currency)
 
     def mark_as_paid(
         self,

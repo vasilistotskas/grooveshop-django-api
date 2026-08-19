@@ -91,11 +91,32 @@ class Command(BaseCommand):
             is_primary=True,
         )
 
-        for extra in options["extra_domains"]:
-            TenantDomain.objects.create(
+        # The API host is not optional. Django's resolver DERIVES
+        # ``apiDomain`` as ``api.<primary>`` when no explicit ``api*``
+        # row exists, and the storefront dials that value for the
+        # WebSocket connection, the social-login redirect and CSP
+        # connect-src. But request routing matches TenantDomain rows
+        # EXACTLY, so a derived host with no row is a host Django
+        # refuses to serve: the storefront looks perfectly healthy while
+        # real-time notifications close 4004 on every attempt and every
+        # social login 404s at the form POST.
+        #
+        # Creating it here rather than trusting the operator to pass
+        # --extra-domains keeps the derivation and the routing in
+        # agreement by construction. Explicit --extra-domains entries
+        # still win (get_or_create below is a no-op if it is listed).
+        extras = list(options["extra_domains"])
+        api_domain = f"api.{domain}"
+        if not any(
+            e.lower() == api_domain for e in (x.lower() for x in extras)
+        ):
+            extras.append(api_domain)
+
+        for extra in extras:
+            TenantDomain.objects.get_or_create(
                 domain=extra,
                 tenant=tenant,
-                is_primary=False,
+                defaults={"is_primary": False},
             )
 
         self.stdout.write(

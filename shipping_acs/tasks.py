@@ -26,7 +26,11 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from shipping_acs.exceptions import AcsAPIError, AcsRetryableError
+from shipping_acs.exceptions import (
+    AcsAPIError,
+    AcsConfigError,
+    AcsRetryableError,
+)
 from core.utils.email_context import build_email_context
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
@@ -94,6 +98,38 @@ def create_acs_voucher_for_order(self, order_id: int) -> dict[str, Any]:
 
     try:
         shipment = AcsService.create_voucher_for_order(order)
+    except AcsConfigError as exc:
+        # The tenant has no ACS credentials. AcsConfigError is a SIBLING
+        # of AcsAPIError, not a subclass, so it matched neither the
+        # retry policy nor the alert branch below and the task simply
+        # died: the customer has a confirmed order with stock already
+        # decremented, no parcel, and nothing anywhere says so.
+        # check_stale_acs_shipments cannot surface it either — it keys
+        # off shipments that already have tracking events.
+        #
+        # Retrying is pointless (credentials do not appear on their own),
+        # so alert loudly and stop. This is the failure mode a tenant
+        # hits when payment credentials were backfilled but carrier ones
+        # were not.
+        from shipping.alerts import alert_admins_shipment_creation_failed
+
+        logger.error(
+            "ACS not configured for this tenant — order %s has no "
+            "voucher and no retry is possible: %s",
+            order_id,
+            exc,
+            extra={"order_id": order_id},
+        )
+        alert_admins_shipment_creation_failed(
+            order_id=order_id,
+            carrier="ACS",
+            error=f"ACS credentials missing for this tenant: {exc}",
+        )
+        return {
+            "status": "acs_not_configured",
+            "order_id": order_id,
+            "message": str(exc),
+        }
     except AcsRetryableError:
         # Transient (HTTP 5xx / 403 / 406 / connection). Re-raise so Celery's
         # autoretry_for handles it — AcsRetryableError subclasses AcsAPIError,

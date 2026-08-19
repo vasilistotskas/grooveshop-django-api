@@ -754,14 +754,17 @@ class OrderService:
                     # Don't fail the order creation, just log the error
                     # The points won't be redeemed if this fails
 
-            # Calculate and set paid amount (subtract loyalty discount)
-            order_total = order.calculate_order_total_amount()
-            order.paid_amount = Money(
-                max(0, order_total.amount - loyalty_discount.amount),
-                order_total.currency,
-            )
+            # Persist the discount so it survives on the order, then let
+            # calculate_order_total_amount() be the single authority on
+            # what the customer owes. Subtracting here and leaving the
+            # order's own total undiscounted is what let every charge
+            # site bill the full amount while the points were burnt.
+            order.loyalty_discount = loyalty_discount
+            order.paid_amount = order.calculate_order_total_amount()
             order.save(
                 update_fields=[
+                    "loyalty_discount",
+                    "loyalty_discount_currency",
                     "paid_amount",
                     "paid_amount_currency",
                     "metadata",
@@ -1128,14 +1131,17 @@ class OrderService:
                     # Don't fail the order creation, just log the error
                     # The points won't be redeemed if this fails
 
-            # Calculate and set paid amount (subtract loyalty discount)
-            order_total = order.calculate_order_total_amount()
-            order.paid_amount = Money(
-                max(0, order_total.amount - loyalty_discount.amount),
-                order_total.currency,
-            )
+            # Persist the discount so it survives on the order, then let
+            # calculate_order_total_amount() be the single authority on
+            # what the customer owes. Subtracting here and leaving the
+            # order's own total undiscounted is what let every charge
+            # site bill the full amount while the points were burnt.
+            order.loyalty_discount = loyalty_discount
+            order.paid_amount = order.calculate_order_total_amount()
             order.save(
                 update_fields=[
+                    "loyalty_discount",
+                    "loyalty_discount_currency",
                     "paid_amount",
                     "paid_amount_currency",
                     "metadata",

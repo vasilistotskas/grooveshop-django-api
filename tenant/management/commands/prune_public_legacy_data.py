@@ -72,6 +72,68 @@ class Command(BaseCommand):
         # can surface twice via include_auto_created).
         return sorted(set(tables))
 
+    def _neutralize_legacy_inbound_fks(self, targets: list[str]) -> None:
+        """Null + drop DB-level FKs pointing INTO the target set from
+        outside it.
+
+        The only sanctioned cross-boundary relation is
+        ``UserAccount.loyalty_tier``, declared ``db_constraint=False``
+        (an ORM-only relation — PostgreSQL cannot enforce it across
+        tenant schemas). Pre-multi-tenant databases created a REAL
+        constraint for it, and that debris survives in cloned public
+        schemas, blocking the truncate. For each such inbound
+        constraint: verify the referencing column is nullable (abort
+        loudly otherwise — that would be a genuine modeling error, not
+        debris), null the column, and drop the constraint so the
+        schema finally matches the model definition.
+        """
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT con.conname,
+                       src.relname AS src_table,
+                       att.attname AS src_column,
+                       att.attnotnull,
+                       tgt.relname AS tgt_table
+                FROM pg_constraint con
+                JOIN pg_class src ON src.oid = con.conrelid
+                JOIN pg_class tgt ON tgt.oid = con.confrelid
+                JOIN pg_namespace nsp ON nsp.oid = src.relnamespace
+                JOIN pg_attribute att
+                  ON att.attrelid = con.conrelid
+                 AND att.attnum = ANY (con.conkey)
+                WHERE con.contype = 'f'
+                  AND nsp.nspname = 'public'
+                  AND tgt.relname = ANY (%s)
+                  AND NOT (src.relname = ANY (%s))
+                """,
+                [targets, targets],
+            )
+            inbound = cur.fetchall()
+
+            for conname, src_table, src_column, notnull, tgt_table in inbound:
+                if notnull:
+                    raise CommandError(
+                        f"public.{src_table}.{src_column} (NOT NULL) "
+                        f"references target table {tgt_table} via "
+                        f"{conname} — refusing to touch a non-nullable "
+                        "cross-boundary reference; resolve it manually."
+                    )
+                self.stdout.write(
+                    f"Neutralizing legacy constraint {conname}: "
+                    f"public.{src_table}.{src_column} → {tgt_table} "
+                    "(nulling column, dropping constraint — the model "
+                    "declares this relation db_constraint=False)."
+                )
+                cur.execute(
+                    f'UPDATE public."{src_table}" SET "{src_column}" = NULL '
+                    f'WHERE "{src_column}" IS NOT NULL'
+                )
+                cur.execute(
+                    f'ALTER TABLE public."{src_table}" '
+                    f'DROP CONSTRAINT "{conname}"'
+                )
+
     def handle(self, *args, **options):
         schema = getattr(connection, "schema_name", "public")
         if schema != "public":
@@ -126,6 +188,7 @@ class Command(BaseCommand):
 
         to_truncate = [table for table, _count in existing]
         if to_truncate:
+            self._neutralize_legacy_inbound_fks(to_truncate)
             joined = ", ".join(f'public."{t}"' for t in to_truncate)
             with connection.cursor() as cur:
                 # Flush any deferred FK triggers first — TRUNCATE

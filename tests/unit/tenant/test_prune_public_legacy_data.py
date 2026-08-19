@@ -74,6 +74,51 @@ class TestPrunePublicLegacyData:
 
         assert Product.objects.count() == before
 
+    def test_neutralizes_legacy_inbound_fk_constraint(self):
+        """Pre-multi-tenant databases carry a REAL FK for
+        UserAccount.loyalty_tier (the model declares db_constraint=False
+        — ORM-only across schemas). The prune must null the column,
+        drop the debris constraint, and keep every user row — CASCADE
+        here would have truncated the shared user table (observed on
+        the staging clone)."""
+        from django.contrib.auth import get_user_model
+        from django.db import connection as db_conn
+
+        from loyalty.factories import LoyaltyTierFactory
+        from loyalty.models.tier import LoyaltyTier
+
+        _make_active_tenant("prune-fk")
+        tier = LoyaltyTierFactory()
+        User = get_user_model()
+        user = User.objects.create_user(
+            email="prune-fk@example.com", password="x"
+        )
+        User.objects.filter(pk=user.pk).update(loyalty_tier=tier)
+        users_before = User.objects.count()
+
+        # Recreate the legacy debris constraint the clone carries.
+        with db_conn.cursor() as cur:
+            cur.execute(
+                "ALTER TABLE public.user_useraccount "
+                "ADD CONSTRAINT legacy_user_tier_fk "
+                "FOREIGN KEY (loyalty_tier_id) "
+                "REFERENCES public.loyalty_tier (id)"
+            )
+
+        with schema_context("public"):
+            call_command("prune_public_legacy_data", "--yes")
+
+        assert User.objects.count() == users_before
+        user.refresh_from_db()
+        assert user.loyalty_tier_id is None
+        assert LoyaltyTier.objects.count() == 0
+        with db_conn.cursor() as cur:
+            cur.execute(
+                "SELECT count(*) FROM pg_constraint "
+                "WHERE conname = 'legacy_user_tier_fk'"
+            )
+            assert cur.fetchone()[0] == 0
+
     def test_yes_truncates_tenant_only_tables(self):
         _make_active_tenant("prune-go")
         from product.factories.product import ProductFactory

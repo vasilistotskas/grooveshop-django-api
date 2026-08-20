@@ -641,3 +641,95 @@ class TestVerificationOutput:
     def test_no_fail_in_stderr_on_clean_copy(self):
         _, stderr = _run_command(self.schema, rebuild_mptt=False)
         assert "FAILED" not in stderr
+
+
+# ---------------------------------------------------------------------------
+# Test: target-only NOT NULL columns (the production cutover failure)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+class TestTargetOnlyNotNullColumns:
+    """Columns the tenant schema has and legacy ``public`` does not.
+
+    This is the normal shape of a cutover: ``TENANT_APPS`` migrations
+    only ever ran against tenant schemas, so any field added after the
+    legacy database was last migrated is missing from the source. The
+    production cutover died here — ``order_order.loyalty_discount`` was
+    added by ``order.0045`` (a TENANT_APPS migration that never touched
+    ``public``) and is NOT NULL with no DB default, because Django's
+    ``AddField`` adds with a default and then drops it. The copy omitted
+    the column, inserted NULL, and hit the constraint.
+    """
+
+    schema = f"{_P}_tgtonly"
+    # A real model whose table gains a defaultless NOT NULL column.
+    real_tbl = "order_order"
+    plain_tbl = f"{_P}_tgtonly_plain"
+
+    def setup_method(self, _method):
+        with connection.cursor() as cursor:
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.schema}")
+            # No model backs this table, so no field default can be
+            # resolved -> the command must refuse loudly.
+            cursor.execute(
+                f"CREATE TABLE IF NOT EXISTS public.{self.plain_tbl}"
+                " (id bigserial PRIMARY KEY, alpha text)"
+            )
+            cursor.execute(
+                f"INSERT INTO public.{self.plain_tbl} (alpha)"
+                " VALUES ('A-value')"
+            )
+            cursor.execute(
+                f"CREATE TABLE IF NOT EXISTS {self.schema}.{self.plain_tbl}"
+                " (id bigserial PRIMARY KEY, alpha text,"
+                " needs_value numeric(11,2) NOT NULL)"
+            )
+
+    def teardown_method(self, _method):
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP SCHEMA IF EXISTS {self.schema} CASCADE")
+            cursor.execute(
+                f"DROP TABLE IF EXISTS public.{self.plain_tbl} CASCADE"
+            )
+
+    def test_defaultless_not_null_without_model_default_is_refused(self):
+        """Never insert NULL into a NOT NULL column — fail loudly."""
+        from django.core.management.base import CommandError
+
+        with pytest.raises(CommandError) as exc:
+            _run_command(self.schema, rebuild_mptt=False)
+        message = str(exc.value)
+        assert "needs_value" in message
+        assert "NOT NULL" in message
+
+    def test_model_field_default_is_resolved(self):
+        """A real MoneyField default resolves to its bare amount."""
+        from tenant.management.commands.populate_tenant_schema import (
+            Command,
+            _NO_DEFAULT,
+        )
+
+        cmd = Command()
+        default = cmd._model_field_default(self.real_tbl, "loyalty_discount")
+        assert default is not _NO_DEFAULT
+        # MoneyField(default=0) -> Money(0, 'EUR'); the column takes the
+        # bare amount, never the Money wrapper.
+        assert default == 0
+        assert not hasattr(default, "amount")
+
+        currency = cmd._model_field_default(
+            self.real_tbl, "loyalty_discount_currency"
+        )
+        assert currency == "EUR"
+
+    def test_unknown_table_column_yields_sentinel(self):
+        from tenant.management.commands.populate_tenant_schema import (
+            Command,
+            _NO_DEFAULT,
+        )
+
+        cmd = Command()
+        assert (
+            cmd._model_field_default("no_such_table_xyz", "nope") is _NO_DEFAULT
+        )

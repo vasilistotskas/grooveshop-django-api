@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 # The truncate is CASCADE-safe: extra_settings_setting is never referenced
 # by a FK from another table so the cascade never deletes anything extra.
 _OVERWRITE_TABLES: frozenset[str] = frozenset({"extra_settings_setting"})
+
+# Sentinel: distinguishes "no default could be resolved" from a field
+# whose default legitimately IS None.
+_NO_DEFAULT = object()
 
 # MPTT models that need a tree rebuild after copy.
 # Stored as ``"app_label.ModelName"`` strings so we can import them lazily
@@ -177,12 +181,13 @@ class Command(BaseCommand):
                     skipped += 1
                     continue
 
-                target_cols, select_exprs = self._copy_column_lists(
+                target_cols, select_exprs, params = self._copy_column_lists(
                     cursor, schema, table
                 )
                 cursor.execute(
                     f'INSERT INTO {schema}."{table}" ({target_cols}) '
-                    f'SELECT {select_exprs} FROM public."{table}"'
+                    f'SELECT {select_exprs} FROM public."{table}"',
+                    params,
                 )
 
                 seqs = self._fix_sequences(cursor, schema, table)
@@ -242,8 +247,8 @@ class Command(BaseCommand):
 
     def _copy_column_lists(
         self, cursor, schema: str, table: str
-    ) -> tuple[str, str]:
-        """Build explicit (target, select) column lists for the copy.
+    ) -> tuple[str, str, list]:
+        """Build explicit (target, select, params) lists for the copy.
 
         ``INSERT INTO tgt SELECT * FROM src`` maps columns POSITIONALLY
         and assumes identical types — both break against a restored
@@ -256,8 +261,26 @@ class Command(BaseCommand):
 
         Copy by NAME over the intersection of both schemas' columns,
         casting any source column whose type differs from the target's.
-        Target-only columns fall back to their defaults; source-only
-        (dropped) columns are ignored.
+        Source-only (dropped) columns are ignored.
+
+        TARGET-ONLY columns need care. A column the tenant schema has and
+        legacy ``public`` does not is the normal shape of a cutover:
+        ``TENANT_APPS`` migrations only ever ran against tenant schemas,
+        so any field added after the legacy database was last migrated is
+        missing from the source. Three cases:
+
+        - nullable            → omit; the copy leaves it NULL.
+        - NOT NULL w/ default → omit; Postgres applies the default.
+        - NOT NULL, NO default → MUST be supplied. Django's standard
+          ``AddField`` pattern adds the column with a default and then
+          drops it, so the finished column is NOT NULL with no DB
+          default. Omitting it inserts NULL and the copy dies on the
+          constraint — which is exactly how the production cutover
+          failed on ``order_order.loyalty_discount`` (added by
+          ``order.0045``, a TENANT_APPS migration that never touched
+          ``public``). Take the value from the Django model field's own
+          default, and refuse to continue if there isn't one rather than
+          inserting a NULL that violates the constraint.
         """
         cursor.execute(
             """
@@ -283,12 +306,75 @@ class Command(BaseCommand):
             # cast syntax needs ``elem[]``.
             return f"{udt[1:]}[]" if udt.startswith("_") else udt
 
-        target_cols = ", ".join(f'"{name}"' for name, _, _ in rows)
-        select_exprs = ", ".join(
+        cols = [f'"{name}"' for name, _, _ in rows]
+        exprs = [
             f'"{name}"' if tgt == src else f'"{name}"::{sql_type(tgt)}'
             for name, tgt, src in rows
+        ]
+        params: list = []
+
+        for name, udt in self._required_target_only_columns(
+            cursor, schema, table
+        ):
+            default = self._model_field_default(table, name)
+            if default is _NO_DEFAULT:
+                raise CommandError(
+                    f'{schema}."{table}".{name} is NOT NULL with no '
+                    "database default and no source column in 'public', "
+                    "and no Django model field default could be resolved "
+                    "for it. Copying would insert NULL and violate the "
+                    "constraint. Add the column to the source table with "
+                    "an appropriate default, or give the model field a "
+                    "default, then re-run."
+                )
+            cols.append(f'"{name}"')
+            exprs.append(f"CAST(%s AS {sql_type(udt)})")
+            params.append(default)
+
+        return ", ".join(cols), ", ".join(exprs), params
+
+    def _required_target_only_columns(
+        self, cursor, schema: str, table: str
+    ) -> list[tuple[str, str]]:
+        """Target columns that are NOT NULL, defaultless and unsourced."""
+        cursor.execute(
+            """
+            SELECT c_tgt.column_name, c_tgt.udt_name
+            FROM information_schema.columns c_tgt
+            WHERE c_tgt.table_schema = %s
+              AND c_tgt.table_name = %s
+              AND c_tgt.is_nullable = 'NO'
+              AND c_tgt.column_default IS NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM information_schema.columns c_src
+                  WHERE c_src.table_schema = 'public'
+                    AND c_src.table_name = c_tgt.table_name
+                    AND c_src.column_name = c_tgt.column_name
+              )
+            ORDER BY c_tgt.ordinal_position
+            """,
+            [schema, table],
         )
-        return target_cols, select_exprs
+        return list(cursor.fetchall())
+
+    def _model_field_default(self, table: str, column: str):
+        """Resolve a Django field default for ``table.column``.
+
+        ``include_auto_created`` catches M2M through tables, which have
+        no hand-written model but do have concrete fields. Money fields
+        return a ``Money``; the column stores the bare amount.
+        """
+        from django.apps import apps  # noqa: PLC0415
+
+        for model in apps.get_models(include_auto_created=True):
+            if model._meta.db_table != table:
+                continue
+            for field in model._meta.concrete_fields:
+                if field.column != column or not field.has_default():
+                    continue
+                default = field.get_default()
+                return getattr(default, "amount", default)
+        return _NO_DEFAULT
 
     def _table_exists(self, cursor, schema: str, table: str) -> bool:
         cursor.execute(

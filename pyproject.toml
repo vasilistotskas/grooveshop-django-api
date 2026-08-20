@@ -264,6 +264,11 @@ override-dependencies = [
     # pointer chains; fixed in 26.4.0 (stable since 2026-08).
     # Extras kept inline so the resolver preserves pyopenssl/h2 etc.
     "twisted[http2,tls]>=26.4.0",
+    # CVE-2026-71491, CVE-2026-59893, CVE-2026-54284 (HIGH) — three
+    # quadratic-CPU paths in grouping/lexer/TokenList reachable from
+    # sqlparse.parse/format/split; all fixed in 0.6.0. Transitive via
+    # django and django-debug-toolbar, both of which floor at >=0.3.1.
+    "sqlparse>=0.6.0",
 ]
 
 # ─────────────────────────────────────────────────────────

@@ -82,12 +82,20 @@ class TenantCookieDomainMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
 
-        from django.db import connection as _connection
-
-        tenant = getattr(_connection, "tenant", None)
-        if tenant is None or not response.cookies:
+        if not response.cookies:
             return response
 
+        # Derive from the REQUEST HOST alone — deliberately not from
+        # ``connection.tenant``. Cookie scope is a property of the host
+        # the browser talked to, and the connection's tenant is not
+        # reliable here: several code paths enter and exit
+        # ``schema_context``/``tenant_context`` during the request, and
+        # by the time the response phase unwinds ``connection.tenant``
+        # may be a bare FakeTenant or None. Gating on it made this
+        # middleware silently no-op on the platform console — the cookie
+        # kept the settings default (``.webside.gr``) on a
+        # grooveshop.space host, the browser dropped it as cross-domain,
+        # and every admin POST answered 403.
         host = request.get_host().split(":")[0]
         # Internal service names carry no registrable domain.
         if "." not in host:

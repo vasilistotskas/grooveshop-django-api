@@ -60,18 +60,32 @@ def test_rewrites_session_and_csrf_domains(
     assert response.cookies["unrelated"]["domain"] == ".webside.gr"
 
 
-def test_no_tenant_on_the_connection_keeps_configured_domains(
-    middleware, monkeypatch
+@pytest.mark.parametrize("tenant_state", [None, "public", "tenant"])
+def test_scope_follows_the_host_whatever_the_connection_holds(
+    middleware, monkeypatch, tenant_state
 ):
-    """Nothing resolved — leave whatever the settings configured."""
-    monkeypatch.setattr(connection, "tenant", None, raising=False)
+    """Cookie scope is a property of the HOST, not of connection.tenant.
 
-    request = RequestFactory().get("/", HTTP_HOST="api.webside.gr")
+    Gating on the connection is what broke the platform console: by the
+    time the response phase unwinds, the schema_context/tenant_context
+    wrappers used during the request may have left connection.tenant as
+    a bare FakeTenant or None, so the rewrite silently did not happen
+    and the cookie kept the settings default on a foreign apex.
+    """
+    if tenant_state is None:
+        monkeypatch.setattr(connection, "tenant", None, raising=False)
+    else:
+        obj = type("_T", (), {"schema_name": tenant_state})()
+        monkeypatch.setattr(connection, "tenant", obj, raising=False)
+
+    request = RequestFactory().get(
+        "/admin/login/", HTTP_HOST="platform.grooveshop.space"
+    )
     response = middleware(_tenant_response())(request)
 
     assert (
-        response.cookies[django_settings.SESSION_COOKIE_NAME]["domain"]
-        == ".webside.gr"
+        response.cookies[django_settings.CSRF_COOKIE_NAME]["domain"]
+        == ".platform.grooveshop.space"
     )
 
 

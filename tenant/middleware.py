@@ -55,8 +55,19 @@ class TenantCookieDomainMiddleware:
     scope — including nested setups like ``shop.webside.gr`` →
     ``.shop.webside.gr`` staying isolated from the platform apex.
 
-    Public-schema requests (platform admin on the platform API host)
-    keep the configured settings values untouched.
+    The PUBLIC schema needs this too. The platform console used to live
+    under the platform apex (``platform.webside.gr``), where the static
+    ``CSRF_COOKIE_DOMAIN=.webside.gr`` happened to match — so skipping
+    public looked harmless. It is not: once the console moved to its own
+    domain (``platform.grooveshop.space`` — the control plane must not
+    sit under tenant #1's apex), Django kept stamping ``Domain=.webside
+    .gr`` on the CSRF cookie, browsers discarded it as cross-domain, and
+    admin login became impossible. Derive from the request host for
+    public as well.
+
+    Hosts with no dot are internal service names (``backend-service``)
+    reached by in-cluster callers; a ``Domain`` attribute is meaningless
+    there, so those keep the configured value.
 
     MIDDLEWARE placement: directly after ``TenantMainMiddleware`` — the
     response phase runs in reverse order, so this rewrites cookies
@@ -74,14 +85,13 @@ class TenantCookieDomainMiddleware:
         from django.db import connection as _connection
 
         tenant = getattr(_connection, "tenant", None)
-        if (
-            tenant is None
-            or getattr(tenant, "schema_name", "public") == "public"
-            or not response.cookies
-        ):
+        if tenant is None or not response.cookies:
             return response
 
         host = request.get_host().split(":")[0]
+        # Internal service names carry no registrable domain.
+        if "." not in host:
+            return response
         for label in self._STRIP_LABELS:
             if host.startswith(label):
                 host = host[len(label) :]

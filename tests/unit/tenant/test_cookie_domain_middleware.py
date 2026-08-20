@@ -60,7 +60,10 @@ def test_rewrites_session_and_csrf_domains(
     assert response.cookies["unrelated"]["domain"] == ".webside.gr"
 
 
-def test_public_schema_keeps_configured_domains(middleware, monkeypatch):
+def test_no_tenant_on_the_connection_keeps_configured_domains(
+    middleware, monkeypatch
+):
+    """Nothing resolved — leave whatever the settings configured."""
     monkeypatch.setattr(connection, "tenant", None, raising=False)
 
     request = RequestFactory().get("/", HTTP_HOST="api.webside.gr")
@@ -68,5 +71,51 @@ def test_public_schema_keeps_configured_domains(middleware, monkeypatch):
 
     assert (
         response.cookies[django_settings.SESSION_COOKIE_NAME]["domain"]
+        == ".webside.gr"
+    )
+
+
+class _PublicTenant:
+    schema_name = "public"
+
+
+def test_public_schema_derives_from_its_own_host(middleware, monkeypatch):
+    """The platform console is not exempt.
+
+    It used to live under the platform apex, where the static
+    ``CSRF_COOKIE_DOMAIN=.webside.gr`` happened to match, so skipping
+    public looked free. Once the console moved to its own domain the
+    static value was cross-domain, browsers dropped the CSRF cookie and
+    admin login returned 403 on every POST — observed live on
+    platform-staging.grooveshop.space.
+    """
+    monkeypatch.setattr(connection, "tenant", _PublicTenant(), raising=False)
+
+    request = RequestFactory().get(
+        "/admin/login/", HTTP_HOST="platform-staging.grooveshop.space"
+    )
+    response = middleware(_tenant_response())(request)
+
+    expected = ".platform-staging.grooveshop.space"
+    assert (
+        response.cookies[django_settings.CSRF_COOKIE_NAME]["domain"] == expected
+    )
+    assert (
+        response.cookies[django_settings.SESSION_COOKIE_NAME]["domain"]
+        == expected
+    )
+
+
+def test_internal_service_host_keeps_configured_domains(
+    middleware, monkeypatch
+):
+    """``backend-service`` has no registrable domain to scope to."""
+    monkeypatch.setattr(connection, "tenant", _PublicTenant(), raising=False)
+
+    request = RequestFactory().get("/", HTTP_HOST="backend-service")
+    response = middleware(_tenant_response())(request)
+
+    assert (
+        response.cookies[django_settings.CSRF_COOKIE_NAME]["domain"]
         == ".webside.gr"
     )

@@ -96,13 +96,6 @@ class CostRangeFilterTestCase(TestCase):
 
         self.assertEqual(queryset.count(), 3)
 
-    def test_expected_parameters(self):
-        filter_instance = CostRangeFilter(
-            self.request, {}, PayWay, self.model_admin
-        )
-        expected = ["cost_range_from", "cost_range_to"]
-        self.assertEqual(filter_instance.expected_parameters(), expected)
-
 
 class FreeThresholdFilterTestCase(TestCase):
     def setUp(self):

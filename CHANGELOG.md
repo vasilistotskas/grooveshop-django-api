@@ -3,6 +3,69 @@
 
 
 
+## v2.0.1 (2026-08-20)
+
+### Bug fixes
+
+* fix(tenant): return JSON-serializable records from the tenant fanout
+
+run_for_all_tenants returned AsyncResult objects. Celery encodes a
+task's return value into the result backend with the configured
+serializer (JSON), and AsyncResult is not JSON-serializable, so every
+tenant.tasks.fanout_* task raised
+
+EncodeError(TypeError('Object of type AsyncResult is not JSON
+serializable'))
+
+The encode happens AFTER the task body, so the fan-out had already
+dispatched every subtask and the scheduled work ran correctly —
+confirmed in production: poll_acs_tracking_one, poll_boxnow_tracking,
+cleanup_expired_stock_reservations and auto_cancel_stuck_pending_orders
+all executed. TenantTask sets no autoretry_for, so there was no retry
+loop and no duplicate dispatch either.
+
+What broke was observability: every beat tick recorded a FAILURE for
+work that succeeded, so a genuine failure was indistinguishable from
+the permanent noise. Return {"schema_name", "task_id"} records instead.
+
+The guard runs the same kombu JSON encoder Celery uses, not just
+json.dumps. Existing tests move from send.mock_calls to
+send.call_args_list: reading result.id makes the mock record child
+calls, which carry no "headers" kwarg.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`eb0ee62`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb0ee62a69f41f96eab93453c610833a55083236))
+
+* fix(tenant): supply model defaults for target-only NOT NULL columns
+
+populate_tenant_schema copies public -> tenant over the INTERSECTION of
+both schemas' columns. Its docstring claimed target-only columns "fall
+back to their defaults", which only holds when a DB default exists.
+Django's AddField adds a column WITH a default and then drops it, so the
+finished column is NOT NULL with no default: the copy omitted it,
+inserted NULL, and died on the constraint.
+
+This took down the production cutover on order_order.loyalty_discount,
+added by order.0045 — a TENANT_APPS migration that never touched public,
+leaving the legacy table 46 columns against the tenant copy's 48.
+
+Resolve such columns from the Django model field's own default (Money
+yields the bare amount) and bind them as query params. When no default
+can be resolved, raise CommandError naming the column instead of
+inserting a NULL that is guaranteed to violate the constraint.
+
+Not reachable via tenant_create: on a fresh schema public holds only
+SHARED_APPS tables, so the copy skips them entirely. Only a legacy
+single-tenant cutover puts a populated source table beside a newer
+tenant copy.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`8973064`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89730641974fa3c9399ff77016f95b7257a25498))
+
+### Chores
+
+* chore(deps): sync uv.lock to 2.0.0 [skip ci] ([`3362b29`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3362b298787746d7a92e72db22baa304cebeb105))
+
 ## v2.0.0 (2026-08-20)
 
 ### Bug fixes

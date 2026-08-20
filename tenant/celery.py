@@ -72,11 +72,22 @@ class TenantTask(Task):
             return super().__call__(*args, **kwargs)
 
 
-def run_for_all_tenants(task_name: str, **kwargs: Any) -> list:
-    """Fan-out a task to all active tenant schemas."""
+def run_for_all_tenants(task_name: str, **kwargs: Any) -> list[dict[str, str]]:
+    """Fan-out a task to all active tenant schemas.
+
+    Returns JSON-serializable dispatch records, NOT ``AsyncResult``
+    objects. Celery encodes a task's return value into the result
+    backend using the configured serializer (JSON here), and an
+    ``AsyncResult`` is not JSON-serializable — so returning them raised
+    ``EncodeError`` *after* the fan-out had already dispatched every
+    subtask. The scheduled work ran fine, but each fanout task was
+    recorded as FAILED, so every beat tick produced a failure and real
+    failures were indistinguishable from the noise. Observed in
+    production 2026-08-21 across all six beat-driven fanouts.
+    """
     from tenant.models import Tenant
 
-    results = []
+    results: list[dict[str, str]] = []
     # Skip suspended tenants — a suspended operator's beat-driven work
     # (poll carriers, reconcile payouts, sync lockers/stations) must not
     # fire: it would burn the carrier API budget and mutate a frozen
@@ -91,5 +102,7 @@ def run_for_all_tenants(task_name: str, **kwargs: Any) -> list:
             kwargs=kwargs,
             headers={"_schema_name": tenant.schema_name},
         )
-        results.append(result)
+        results.append(
+            {"schema_name": tenant.schema_name, "task_id": str(result.id)}
+        )
     return results

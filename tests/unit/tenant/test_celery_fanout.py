@@ -28,7 +28,8 @@ class TestRunForAllTenants:
 
         # At least these two tenants (backfill 0004 also seeds webside)
         schemas = {
-            call.kwargs["headers"]["_schema_name"] for call in send.mock_calls
+            call.kwargs["headers"]["_schema_name"]
+            for call in send.call_args_list
         }
         assert "fanout_active_a" in schemas
         assert "fanout_active_b" in schemas
@@ -44,7 +45,8 @@ class TestRunForAllTenants:
             run_for_all_tenants("order.tasks.check_pending_orders")
 
         schemas = {
-            call.kwargs["headers"]["_schema_name"] for call in send.mock_calls
+            call.kwargs["headers"]["_schema_name"]
+            for call in send.call_args_list
         }
         assert active.schema_name in schemas
         assert inactive.schema_name not in schemas
@@ -57,7 +59,8 @@ class TestRunForAllTenants:
             run_for_all_tenants("order.tasks.check_pending_orders")
 
         schemas = {
-            call.kwargs["headers"]["_schema_name"] for call in send.mock_calls
+            call.kwargs["headers"]["_schema_name"]
+            for call in send.call_args_list
         }
         assert "public" not in schemas
 
@@ -70,7 +73,7 @@ class TestRunForAllTenants:
 
         # Every call must target the requested task and carry the kwargs
         # intact (they're what the underlying task accepts as arguments).
-        for call in send.mock_calls:
+        for call in send.call_args_list:
             args, kwargs = call.args, call.kwargs
             assert args[0] == "core.tasks.clear_old_history_task"
             assert kwargs["kwargs"] == {"days": 90}
@@ -217,3 +220,39 @@ class TestBeatScheduleTenantCoverage:
             and not hasattr(tenant_tasks, entry["task"].rsplit(".", 1)[1])
         ]
         assert not missing, f"Beat points at missing fanout tasks: {missing}"
+
+
+class TestFanoutReturnIsSerializable:
+    """The fan-out return value must survive Celery's result encoder.
+
+    Celery encodes a task's return value into the result backend with
+    the configured serializer (JSON). Returning ``AsyncResult`` objects
+    raised ``EncodeError`` *after* every subtask had already been
+    dispatched: the scheduled work ran, but the fanout task itself was
+    recorded FAILED on every beat tick, so genuine failures were
+    indistinguishable from the constant noise. Observed in production
+    2026-08-21 across all six beat-driven fanouts.
+    """
+
+    @pytest.mark.django_db
+    def test_return_value_is_json_serializable(self, tenant_factory):
+        import json
+
+        from kombu.serialization import dumps
+
+        tenant_factory("fanout-json-a")
+
+        with patch("core.celery_app.send_task") as send:
+            send.return_value.id = "00000000-0000-0000-0000-000000000001"
+            result = run_for_all_tenants("order.tasks.check_pending_orders")
+
+        # Plain json first — the readable assertion.
+        json.dumps(result)
+        # Then the encoder Celery actually uses for the result backend.
+        dumps(result, serializer="json")
+
+        assert result, "expected at least one dispatch record"
+        for record in result:
+            assert set(record) == {"schema_name", "task_id"}
+            assert isinstance(record["schema_name"], str)
+            assert isinstance(record["task_id"], str)

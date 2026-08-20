@@ -14,8 +14,8 @@ class Command(BaseCommand):
         "and its primary domain — the host platform staff use to reach "
         "/admin/ as platform identities (see tenant.auth_backends."
         "PlatformStaffBackend). Run once per environment: "
-        "`manage.py bootstrap_platform --domain platform.webside.gr` "
-        "(staging: `platform-staging.webside.gr`). Safe to re-run: "
+        "`manage.py bootstrap_platform --domain platform.grooveshop.space` "
+        "(staging: `platform-staging.grooveshop.space`). Safe to re-run: "
         "re-running with the SAME --domain is a no-op beyond confirming "
         "the row/domain exist. Re-running with a DIFFERENT --domain adds "
         "it as the new primary domain and demotes the previous one "
@@ -28,7 +28,7 @@ class Command(BaseCommand):
             required=True,
             help=(
                 "Domain that resolves to the PUBLIC schema — the "
-                "platform admin host (e.g. platform.webside.gr)."
+                "platform admin host (e.g. platform.grooveshop.space)."
             ),
         )
 

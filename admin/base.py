@@ -59,6 +59,66 @@ class BaseModelAdmin(ModelAdmin):
         will have 1000s). Override per-admin where needed.
     """
 
+    def _withheld_on_public(self, request) -> bool:
+        """True when this tenant-only model has no table in this schema.
+
+        Gated on ``request.tenant`` (set by django-tenants'
+        TenantMainMiddleware), and it only withholds when it POSITIVELY
+        knows the request is on the public schema. An earlier attempt
+        keyed on ``connection.tenant``/``get_current_tenant()`` instead
+        and defaulted to withholding when they were empty — which is the
+        state during tests, management commands and Celery work, so it
+        denied 35 perfectly valid admin changelists.
+
+        Without this, opening one of these on the platform console does
+        not 404 cleanly: the pre-multi-tenant public schema still holds
+        same-named legacy tables that TENANT_APPS migrations never touch,
+        so Django queried ``public.order_order`` and raised
+        ``column order_order.loyalty_discount_currency does not exist``.
+        Pruning that debris would not help — it would then fail on a
+        missing relation. Returning "no permission" turns a 500 into a
+        403, which is the honest answer: that model does not belong to
+        this host.
+        """
+        from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+
+        tenant = getattr(request, "tenant", None)
+        if tenant is None:
+            return False
+        if getattr(tenant, "schema_name", None) != get_public_schema_name():
+            return False
+
+        from tenant.app_labels import tenant_only_app_labels  # noqa: PLC0415
+
+        return self.model._meta.app_label in set(tenant_only_app_labels())
+
+    def has_module_permission(self, request) -> bool:
+        if self._withheld_on_public(request):
+            return False
+        return super().has_module_permission(request)
+
+    def has_view_permission(self, request, obj=None) -> bool:
+        # Also covers a changelist reached by typing the URL directly,
+        # which has_module_permission alone does not gate.
+        if self._withheld_on_public(request):
+            return False
+        return super().has_view_permission(request, obj)
+
+    def has_add_permission(self, request) -> bool:
+        if self._withheld_on_public(request):
+            return False
+        return super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None) -> bool:
+        if self._withheld_on_public(request):
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None) -> bool:
+        if self._withheld_on_public(request):
+            return False
+        return super().has_delete_permission(request, obj)
+
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True

@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from redis.exceptions import ConnectionError as RedisConnectionError
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import caches
@@ -34,6 +35,18 @@ settings.PASSWORD_HASHERS = [
 
 settings.DISABLE_CACHE = True
 settings.MEILISEARCH["OFFLINE"] = True
+
+# ``@requires_meilisearch`` tests talk to a REAL engine when one is
+# reachable, and under ``-n auto`` every worker queries the same single
+# instance at once. The repo's .env pins MEILI_TIMEOUT=10, which is a
+# sensible production value but too tight for that burst: the suite
+# failed with "Read timed out. (read timeout=10)" on
+# /indexes/BlogPostTranslation/search purely from contention, with the
+# same tests green at -n0. Raise it for tests only — the assertions are
+# about search RESULTS, never latency, so a longer ceiling weakens
+# nothing and removes a whole class of parallel-only failures.
+MEILI_TEST_TIMEOUT = max(int(settings.MEILISEARCH.get("TIMEOUT") or 0), 60)
+settings.MEILISEARCH["TIMEOUT"] = MEILI_TEST_TIMEOUT
 settings.SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 # Deterministic Stripe identity for provider construction: unit tests run
@@ -83,6 +96,11 @@ CACHE_WORKER_PREFIX = "test_%s" % os.environ.get(
     "PYTEST_XDIST_WORKER", "master"
 )
 caches["default"].key_prefix = CACHE_WORKER_PREFIX
+
+# The Redis-backed instance the whole suite is meant to use. Captured
+# here, while it is still the one built at app-load, so it can be put
+# back after any test that swapped it out.
+_ORIGINAL_DEFAULT_CACHE = caches["default"]
 
 
 # Route django-extra-settings through a DummyCache so every ``Setting.get``
@@ -227,6 +245,8 @@ requires_meilisearch = pytest.mark.skipif(
 def _reset_worker_cache():
     """Clear only THIS worker's cache namespace after each test.
 
+    Best-effort by design: see the ConnectionError handling at the end.
+
     A blanket ``cache.clear()`` is a Redis ``FLUSHDB``; on the shared test
     Redis that wipes other workers' live keys mid-test, turning their
     ``assertNumQueries`` cache-hit assertions into flaky misses. Deleting
@@ -249,11 +269,27 @@ def _reset_worker_cache():
         f"{backend.key_prefix}:*",  # non-tenant layouts (safety net)
         f"*:{backend.key_prefix}:*",  # {schema}:{prefix}:… tenant layout
     )
-    keys: list = []
-    for pattern in patterns:
-        keys.extend(client.scan_iter(match=pattern, count=1000))
-    if keys:
-        client.delete(*keys)
+    # Redis connection errors here must not fail the test that just
+    # passed. Under -n auto every worker holds pooled connections to the
+    # same localhost Redis, and one occasionally comes back dead —
+    # observed once as "ConnectionResetError [WinError 10054] ... while
+    # reading from localhost:6379" raised at TEARDOWN of a channels test
+    # whose assertions had all succeeded. Retry once (a fresh connection
+    # is drawn from the pool), then give up: the only cost of skipping a
+    # cleanup pass is that this worker's keys live until its next
+    # teardown, and they are namespaced to this worker anyway.
+    for attempt in (1, 2):
+        try:
+            keys: list = []
+            for pattern in patterns:
+                keys.extend(client.scan_iter(match=pattern, count=1000))
+            if keys:
+                client.delete(*keys)
+            return
+        except RedisConnectionError:
+            if attempt == 2:
+                return
+            client = get_client(None, write=True)
 
 
 @pytest.fixture(autouse=True)
@@ -758,3 +794,110 @@ class QueryCountAssertionMixin:
 
 
 pytest.QueryCountAssertionMixin = QueryCountAssertionMixin
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _widen_meilisearch_timeout():
+    """Apply the test timeout to the LIVE Meilisearch clients.
+
+    Setting ``settings.MEILISEARCH["TIMEOUT"]`` is not enough on its
+    own: ``meili._client.client`` is a module-level singleton built
+    during ``django.setup()`` — i.e. BEFORE this conftest runs — so it
+    and its inner ``meilisearch.Client`` have already captured the old
+    value on ``config.timeout``. Verified by probe: settings said 60
+    while ``client.settings.timeout`` was still 10.
+    """
+    try:
+        from meili._client import client as meili_client
+    except Exception:  # pragma: no cover - meili not importable
+        yield
+        return
+
+    _retry_meili_connection_errors()
+
+    targets = [meili_client, getattr(meili_client, "client", None)]
+    targets.append(getattr(meili_client, "search_client", None))
+    for obj in targets:
+        if obj is None:
+            continue
+        cfg = getattr(obj, "config", None)
+        if cfg is not None and hasattr(cfg, "timeout"):
+            cfg.timeout = MEILI_TEST_TIMEOUT
+        st = getattr(obj, "settings", None)
+        if st is not None and hasattr(st, "timeout"):
+            # _MeiliSettings is a frozen dataclass — normal assignment
+            # raises FrozenInstanceError. config.timeout above is the
+            # value that actually reaches the HTTP layer (it is the one
+            # quoted in "Read timed out. (read timeout=N)"); this is
+            # kept in step only so the two cannot disagree.
+            try:
+                object.__setattr__(st, "timeout", MEILI_TEST_TIMEOUT)
+            except Exception:  # pragma: no cover - defensive
+                pass
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _restore_default_cache_backend():
+    """Undo cache-backend leakage between tests.
+
+    ``override_settings(CACHES=LocMem)`` (the dashboard caching tests)
+    makes ``CacheHandler`` resolve and CACHE a LocMemCache. Django
+    restores the *settings* when the override exits, but the resolved
+    instance stays in ``caches._connections``, so later tests on the
+    same worker keep getting LocMem. Anything expecting the Redis API
+    then dies on an attribute that backend does not have —
+    ``'LocMemCache' object has no attribute 'keys'`` in
+    core/cache/service.py, and ``OrderedDict has no attribute
+    'get_client'`` in the channels middleware. Both were reproducible by
+    running tests/unit/admin/test_dashboard.py immediately before the
+    affected file.
+
+    Deleting the entry is NOT a fix: tests/conftest.py deliberately
+    leaves ``settings.CACHES`` pointing at LocMem, so a rebuild would
+    hand back LocMem again. Restore the captured Redis instance instead.
+    """
+    yield
+    try:
+        if caches._connections.default is not _ORIGINAL_DEFAULT_CACHE:
+            caches._connections.default = _ORIGINAL_DEFAULT_CACHE
+    except AttributeError:
+        caches._connections.default = _ORIGINAL_DEFAULT_CACHE
+
+
+def _retry_meili_connection_errors(attempts: int = 3) -> None:
+    """Retry Meilisearch calls that fail with a dropped connection.
+
+    ``@requires_meilisearch`` tests talk to a real local engine, and the
+    client uses module-level ``requests.get``/``requests.post`` — no
+    Session, so every call opens a fresh connection. Under ``-n auto``
+    that connection churn occasionally loses one:
+
+        MeilisearchCommunicationError, ('Connection aborted.',
+        ConnectionResetError(10054, 'An existing connection was
+        forcibly closed by the remote host'))
+
+    Seen once in five full parallel runs, on a test that is green at
+    -n0. Only ``MeilisearchCommunicationError`` is retried — that maps
+    to ``requests.exceptions.ConnectionError``, i.e. the request did not
+    complete, so replaying it cannot double-apply anything. Timeouts are
+    deliberately NOT retried: there the server may already have acted.
+    """
+    from meilisearch import _httprequests
+    from meilisearch.errors import MeilisearchCommunicationError
+
+    original = _httprequests.HttpRequests.send_request
+    if getattr(original, "_retry_wrapped", False):
+        return
+
+    def send_request(self, *args, **kwargs):
+        for remaining in range(attempts - 1, -1, -1):
+            try:
+                return original(self, *args, **kwargs)
+            except MeilisearchCommunicationError:
+                if remaining == 0:
+                    raise
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    send_request._retry_wrapped = True  # type: ignore[attr-defined]
+    _httprequests.HttpRequests.send_request = send_request

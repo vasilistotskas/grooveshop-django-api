@@ -37,15 +37,19 @@ Token = get_token_model()
 def _fresh_default_cache():
     """Drop the THREAD-LOCAL default-cache instance before each test.
 
-    ``cache._cache.get_client`` below assumes the Redis-backed
-    ``CustomCache``. These tests are async — they resolve the cache
-    proxy on the event-loop thread, whose thread-local ``CacheHandler``
-    entry may have been materialized while ANOTHER test on this xdist
-    worker held an ``override_settings(CACHES=LocMem)`` window (the
-    dashboard caching tests do exactly that). A leaked LocMem backend
-    has ``_cache`` = OrderedDict → ``get_client`` AttributeError, a
-    7-test flake. Deleting the cached instance forces re-resolution
-    from the CURRENT settings.
+    These tests are async, so they resolve the cache proxy on the
+    event-loop thread, whose thread-local ``CacheHandler`` entry may
+    have been materialized inside another test's
+    ``override_settings(CACHES=LocMem)`` window (the dashboard caching
+    tests do exactly that). Dropping it forces re-resolution.
+
+    Re-resolution alone is NOT enough, which is why this used to flake
+    7 tests: ``tests/conftest.py`` sets ``settings.CACHES`` to LocMem,
+    so whatever gets rebuilt here is LocMem too — and LocMem's
+    ``_cache`` is a plain ``OrderedDict`` with no ``get_client``. Pass
+    or fail then depended on whether a thread-local entry happened to
+    exist, i.e. on which other tests shared the xdist worker. The
+    patcher below no longer depends on the concrete backend.
     """
     from django.core.cache import caches
 
@@ -60,9 +64,17 @@ def _make_getdel_patcher(return_value):
     """Return a context manager that patches the raw Redis GETDEL call."""
     mock_redis = MagicMock()
     mock_redis.getdel.return_value = return_value
+    # ``create=True`` because the attribute only exists on the
+    # Redis-backed CustomCache. Under the test settings the resolved
+    # backend may be LocMem, where ``_cache`` is an OrderedDict and the
+    # attribute is absent — patching then raised AttributeError instead
+    # of testing anything. What is under test is the middleware's use of
+    # the getdel round-trip, which the mock provides either way, so the
+    # concrete backend is irrelevant here.
     return patch(
         "core.middleware.channels.cache._cache.get_client",
         return_value=mock_redis,
+        create=True,
     )
 
 
@@ -191,6 +203,10 @@ class TestAuthenticateTicket(TransactionTestCase):
             with patch(
                 "core.middleware.channels.cache._cache.get_client",
                 return_value=mock_redis,
+                # See _make_getdel_patcher: the attribute exists only on
+                # the Redis-backed CustomCache, and the resolved backend
+                # here may be LocMem.
+                create=True,
             ):
                 await authenticate_ticket("myticket")
 

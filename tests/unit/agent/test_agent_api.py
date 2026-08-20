@@ -72,18 +72,28 @@ class AgentAPITestCase(APITestCase):
     def setUp(self) -> None:
         from django.db import connection
 
-        self._had_tenant = hasattr(connection, "tenant")
+        # Use set_tenant(), NOT ``connection.tenant = …``.
+        # ``connection.tenant`` and ``connection.schema_name`` are two
+        # independent attributes on django-tenants' DatabaseWrapper,
+        # kept in step only by set_tenant(). Assigning the first
+        # directly left schema_name pointing at this class's tenant for
+        # the rest of the worker's session: the cleanup restored
+        # ``tenant`` to public while ``schema_name`` stayed
+        # "agent_test_tenant", and every later test that saved a Tenant
+        # died with "Can't create tenant outside the public schema"
+        # (10 errors in tests/unit/tenant/test_membership.py, reproducible
+        # by running that file after this one).
         self._prev_tenant = getattr(connection, "tenant", None)
-        connection.tenant = self.tenant
+        connection.set_tenant(self.tenant)
         self.addCleanup(self._restore_connection_tenant)
 
     def _restore_connection_tenant(self) -> None:
         from django.db import connection
 
-        if self._had_tenant:
-            connection.tenant = self._prev_tenant
-        elif hasattr(connection, "tenant"):
-            del connection.tenant
+        if self._prev_tenant is not None:
+            connection.set_tenant(self._prev_tenant)
+        else:
+            connection.set_schema_to_public()
 
     def _bearer(self, scopes: list[str], **kwargs) -> None:
         raw = _mint_token(self.user, self.oidc_client, scopes, **kwargs)

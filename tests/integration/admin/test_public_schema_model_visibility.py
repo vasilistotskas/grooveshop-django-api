@@ -83,3 +83,61 @@ class TestPublicSchemaAdminAppList(TestCase):
         control plane the operator actually needs."""
         shown = self._app_labels_for(get_public_schema_name())
         assert "tenant" in shown, "platform admin must still manage tenants"
+
+
+class TestWithheldOnPublicIsRequestGated(TestCase):
+    """The withholding must key on the REQUEST, not on ambient state.
+
+    Keying on ``connection.tenant``/``get_current_tenant()`` and
+    defaulting to "withhold when unknown" denied 35 valid admin
+    changelists, because that is the state during tests, management
+    commands and Celery work. Only positive knowledge that the request
+    is on the public schema may withhold.
+    """
+
+    def _order_admin(self):
+        from order.models.order import Order
+
+        model_admin = django_admin.site._registry.get(Order)
+        assert model_admin is not None, "Order admin must be registered"
+        return model_admin
+
+    def _request(self, tenant):
+        request = RequestFactory().get("/admin/order/order/")
+        if tenant is not None:
+            request.tenant = tenant
+        return request
+
+    def test_public_request_withholds_a_tenant_only_model(self):
+        public = type("_T", (), {"schema_name": get_public_schema_name()})()
+        assert self._order_admin()._withheld_on_public(self._request(public))
+
+    def test_tenant_request_does_not_withhold(self):
+        tenant = type("_T", (), {"schema_name": "webside"})()
+        assert not self._order_admin()._withheld_on_public(
+            self._request(tenant)
+        )
+
+    def test_request_without_a_tenant_does_not_withhold(self):
+        """Tests / commands / Celery — unknown is not public."""
+        assert not self._order_admin()._withheld_on_public(self._request(None))
+
+    def test_shared_model_is_never_withheld_even_on_public(self):
+        """Hiding platform models would empty the control plane.
+
+        ``tenant`` is in SHARED_APPS, so it is not in the tenant-only
+        set at all. TenantAdmin does not even inherit the base carrying
+        the guard — assert both facts, since either one alone would keep
+        it visible.
+        """
+        from tenant.models import Tenant as TenantModel
+
+        assert "tenant" not in set(tenant_only_app_labels())
+
+        model_admin = django_admin.site._registry.get(TenantModel)
+        assert model_admin is not None
+        guard = getattr(model_admin, "_withheld_on_public", None)
+        if guard is None:
+            return  # no guard to apply -> never withheld
+        public = type("_T", (), {"schema_name": get_public_schema_name()})()
+        assert not guard(self._request(public))

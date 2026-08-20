@@ -509,8 +509,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         default=None,
         help_text=_(
             "Whether this tenant's Viva credentials are live (demo "
-            "otherwise). Unset falls back to "
-            "settings.VIVA_WALLET_LIVE_MODE."
+            "otherwise). There is NO settings fallback: unset is read as "
+            "demo, so a live merchant MUST set this explicitly or real "
+            "payments are sent to the Viva demo environment."
         ),
     )
 

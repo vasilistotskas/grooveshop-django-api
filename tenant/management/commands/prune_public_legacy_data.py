@@ -29,18 +29,11 @@ fresh off-cluster dump in hand.
 from __future__ import annotations
 
 from django.apps import apps
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 
 
-def _tenant_only_app_labels() -> list[str]:
-    shared = set(settings.SHARED_APPS)
-    return [
-        app.split(".")[-1] if "." in app else app
-        for app in settings.TENANT_APPS
-        if app not in shared
-    ]
+from tenant.app_labels import tenant_only_app_labels as _tenant_only_app_labels
 
 
 class Command(BaseCommand):

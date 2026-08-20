@@ -80,9 +80,7 @@ class TestPreLoginHasNoMembershipGate:
             )
 
     @pytest.mark.django_db
-    def test_allows_login_with_inactive_membership(
-        self, tenant_factory, user
-    ):
+    def test_allows_login_with_inactive_membership(self, tenant_factory, user):
         """An inactive STAFF grant is irrelevant to shopper login."""
         tenant = tenant_factory("prelogin-inactive")
         UserTenantMembership.objects.create(

@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import TabularInline
+
+from admin.base import BaseModelAdmin
 
 from page_config.models import NavigationMenu, PageLayout, PageSection
 
@@ -20,7 +22,7 @@ class PageSectionInline(TabularInline):
 
 
 @admin.register(PageLayout)
-class PageLayoutAdmin(ModelAdmin):
+class PageLayoutAdmin(BaseModelAdmin):
     compressed_fields = True
     warn_unsaved_form = True
     list_fullwidth = True
@@ -70,7 +72,7 @@ class PageLayoutAdmin(ModelAdmin):
 
 
 @admin.register(NavigationMenu)
-class NavigationMenuAdmin(ModelAdmin):
+class NavigationMenuAdmin(BaseModelAdmin):
     compressed_fields = True
     warn_unsaved_form = True
     list_display = ("slot", "updated_at")

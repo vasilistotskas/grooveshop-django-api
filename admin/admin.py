@@ -96,6 +96,45 @@ class MyAdminSite(UnfoldAdminSite):
                 return super().password_change(request, extra_context)
         return super().password_change(request, extra_context)
 
+    def get_app_list(self, request, app_label=None):
+        """Hide tenant-only models while serving the PUBLIC schema.
+
+        Their tables exist only inside tenant schemas, so opening one on
+        the platform host is always an error — and not a clean 404: the
+        pre-multi-tenant public schema still carries same-named legacy
+        tables that newer migrations never touch (they are TENANT_APPS
+        migrations), so Django queried ``public.order_order`` and got
+        ``column order_order.loyalty_discount does not exist`` — a 500
+        on the platform operator's own control plane. Pruning that
+        legacy debris does not fix it either; the query would then fail
+        on a missing relation instead.
+
+        Public is the control plane: tenants, users, platform settings.
+        Per-store data is edited on that store's own admin host.
+
+        Scope note: this removes every in-app path to those pages, which
+        is the failure mode that actually bites (an operator clicking a
+        link on their own control plane). It deliberately does NOT deny
+        the model permissions themselves — that was tried and is wrong:
+        the check has to be "am I serving public", but outside a request
+        there is no tenant on the connection at all, so the same test
+        fires during tests, management commands and Celery work and
+        denied 35 admin changelists that were perfectly valid. Typing a
+        tenant-only admin URL directly on the platform host therefore
+        still errors; it is an operator asking for a model that does not
+        belong to that host.
+        """
+        app_list = super().get_app_list(request, app_label)
+        from tenant.membership import get_current_tenant  # noqa: PLC0415
+
+        if get_current_tenant() is not None:
+            return app_list
+
+        from tenant.app_labels import tenant_only_app_labels  # noqa: PLC0415
+
+        hidden = set(tenant_only_app_labels())
+        return [app for app in app_list if app.get("app_label") not in hidden]
+
     def each_context(self, request):
         """Per-tenant admin branding.
 

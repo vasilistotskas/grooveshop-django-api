@@ -32,7 +32,7 @@ from urllib.parse import urljoin
 
 from django.core.management.base import BaseCommand, CommandError
 from django.urls import reverse
-from django_tenants.utils import schema_context
+from django_tenants.utils import tenant_context
 
 from tenant.models import Tenant
 
@@ -83,7 +83,18 @@ class Command(BaseCommand):
             self._provision(tenant, options)
 
     def _provision(self, tenant: Tenant, options) -> None:
-        with schema_context(tenant.schema_name):
+        # ``tenant_context(tenant)``, NOT ``schema_context(schema_name)``.
+        # schema_context sets ``connection.tenant`` to a bare
+        # ``FakeTenant`` carrying only ``schema_name``, and every
+        # ``tenant.credentials.*`` helper reads real fields off
+        # ``connection.tenant`` — so ``stripe_credentials()`` below would
+        # read the key as EMPTY no matter what the row holds, and this
+        # command would report the tenant unconfigured and skip it.
+        # That lands exactly on the cutover path: §0.3 says to run
+        # ``bootstrap_stripe --schema=webside`` immediately after
+        # backfilling the Stripe key, so the webhook endpoint would
+        # never be provisioned and nobody would see an error.
+        with tenant_context(tenant):
             from tenant.credentials import (  # noqa: PLC0415
                 stripe_credentials,
             )

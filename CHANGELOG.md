@@ -3,6 +3,40 @@
 
 
 
+## v2.0.2 (2026-08-21)
+
+### Bug fixes
+
+* fix(tenant): overwrite seeded shipping providers on tenant populate
+
+populate_tenant_schema skips any table that already has rows. For a
+table seeded at migrate time that is ALSO operator-editable, the tenant
+silently keeps the seeded DEFAULTS and production's configuration never
+arrives.
+
+That shipped a broken checkout on 2026-08-20. shipping_shippingprovider
+is seeded is_active=false by its data migration, the copy skipped it, so
+both carriers stayed inactive with live_mode=false in the webside
+schema. /api/v1/shipping/options returned [] and the delivery-method
+step of the checkout rendered empty — no shipping could be selected.
+
+- add shipping_shippingprovider to _OVERWRITE_TABLES (CASCADE-safe: not
+  referenced by any FK), and record why the list exists at all
+- make the skip LOUD: when a skipped table's contents diverge from
+  public, warn inline and list it under REVIEW REQUIRED naming the fix.
+  A single SKIP line in a 200-table log is how this reached production.
+
+Django-derived tables (django_content_type, auth_permission) still skip
+and are expected in that report; they are self-consistent within the
+tenant schema.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`8b28135`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8b2813562bd27d183f94872496d0392886238b66))
+
+### Chores
+
+* chore(deps): sync uv.lock to 2.0.1 [skip ci] ([`ed90a5c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ed90a5c8e87cc4ed4a5e2dfd5b844c902c912694))
+
 ## v2.0.1 (2026-08-20)
 
 ### Bug fixes

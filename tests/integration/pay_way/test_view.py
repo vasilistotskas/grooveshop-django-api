@@ -18,10 +18,15 @@ class PayWayViewSetTestCase(APITestCase):
         from django.contrib.auth import get_user_model
 
         User = get_user_model()
+        # PayWay writes are ``IsPlatformSuperuser``: pay-way config is
+        # platform-scoped, and ``is_staff`` on an API session is a flag
+        # on a TENANT-schema customer row, not a staff grant. See
+        # docs/api-staff-identity.md.
         self.staff_user = User.objects.create_user(
             email="staff@test.com",
             password="testpass123",
             is_staff=True,
+            is_superuser=True,
         )
         self.pay_way = PayWayFactory(
             active=True,

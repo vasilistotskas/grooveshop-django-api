@@ -21,13 +21,18 @@ class TaggedItemViewSetTestCase(TestURLFixerMixin, APITestCase):
         cls.tagged_item = TaggedProductFactory(
             tag=cls.tag, content_object=cls.product
         )
-        # TaggedItem writes are admin-only (G0391), so the default test user
-        # is staff; the non-admin forbidden path is covered separately below.
+        # TaggedItem writes are administrative (G0391) and therefore
+        # ``IsPlatformSuperuser``: on an API session ``is_staff`` is a
+        # flag on a TENANT-schema customer row, not a staff grant, so it
+        # cannot authorize administration. See
+        # docs/api-staff-identity.md. The non-admin forbidden path is
+        # covered separately below.
         cls.user = User.objects.create_user(
             email="taggeditemtest@example.com",
             username="taggeditemtester",
             password="testpass123",
             is_staff=True,
+            is_superuser=True,
         )
         cls.regular_user = User.objects.create_user(
             email="taggeditem-regular@example.com",

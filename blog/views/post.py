@@ -14,9 +14,10 @@ from drf_spectacular.utils import (
 )
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from core.api.permissions import IsPlatformSuperuser
 from blog.filters.comment import BlogCommentFilter
 from blog.filters.post import BlogPostFilter
 from blog.models.post import BlogPost
@@ -189,7 +190,7 @@ class BlogPostViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsBlogEnabled(), IsAdminUser()]
+            return [IsBlogEnabled(), IsPlatformSuperuser()]
         return [IsBlogEnabled(), AllowAny()]
 
     search_fields = [

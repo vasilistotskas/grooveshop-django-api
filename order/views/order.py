@@ -23,11 +23,15 @@ from rest_framework.exceptions import (
     PermissionDenied,
     ValidationError,
 )
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from core.api.permissions import IsOwnerOrAdmin, IsOwnerOrAdminOrGuest
+from core.api.permissions import (
+    IsOwnerOrAdmin,
+    IsOwnerOrAdminOrGuest,
+    IsPlatformSuperuser,
+)
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
     PaymentAttemptAnonThrottle,
@@ -402,11 +406,11 @@ class OrderViewSet(BaseModelViewSet):
         elif self.action in guest_allowed_actions:
             self.permission_classes = [IsOwnerOrAdminOrGuest]
         elif self.action in admin_only_actions:
-            self.permission_classes = [IsAdminUser]
+            self.permission_classes = [IsPlatformSuperuser]
         elif self.action in public_actions:
             self.permission_classes = []
         else:
-            self.permission_classes = [IsAdminUser]
+            self.permission_classes = [IsPlatformSuperuser]
 
         return super().get_permissions()
 
@@ -2048,7 +2052,7 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["post"],
         url_path="boxnow_cancel",
-        permission_classes=[IsAdminUser],
+        permission_classes=[IsPlatformSuperuser],
     )
     def boxnow_cancel(self, request, pk=None):
         """Cancel the BoxNow shipment for an order (admin-only)."""
@@ -2124,7 +2128,7 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["post"],
         url_path="acs_cancel",
-        permission_classes=[IsAdminUser],
+        permission_classes=[IsPlatformSuperuser],
     )
     def acs_cancel(self, request, pk=None):
         """Cancel the ACS shipment for an order (admin-only)."""
@@ -2232,7 +2236,7 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["post"],
         url_path="shipment_cancel",
-        permission_classes=[IsAdminUser],
+        permission_classes=[IsPlatformSuperuser],
     )
     def shipment_cancel(self, request, pk=None):
         """Cancel the carrier shipment — provider-agnostic.

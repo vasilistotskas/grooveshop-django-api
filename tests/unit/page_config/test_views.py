@@ -69,14 +69,20 @@ class TestPublicPageConfig(TestCase):
 class TestPageLayoutAdminViewSet(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.admin = UserAccountFactory(is_staff=True)
+        self.admin = UserAccountFactory(is_staff=True, is_superuser=True)
         self.client.force_authenticate(user=self.admin)
 
-        # Page-layout admin now requires both ``IsAdminUser`` AND
-        # ``HasTenantAccess`` (H22 in MULTI_TENANT_AUDIT.md). The test
-        # client hits the API under the public schema, so we attach a
-        # tenant + membership for the duration of each test rather than
-        # routing requests through a real tenant domain.
+        # Page-layout admin is ``IsPlatformSuperuser``. It previously
+        # paired ``IsAdminUser`` with ``HasTenantAccess`` (H22 in
+        # MULTI_TENANT_AUDIT.md), but that membership lookup compared
+        # primary keys ACROSS schemas on an API request — see
+        # ``docs/api-staff-identity.md``. A store operator administering
+        # their store through the API is deliberately NOT supported yet;
+        # they use the Django admin, where role-derived permissions
+        # apply.
+        #
+        # The tenant + membership below are kept because the layouts
+        # themselves are tenant-scoped data.
         self.tenant = Tenant(
             schema_name="page_admin_test",
             name="Page Admin Test",
@@ -109,6 +115,31 @@ class TestPageLayoutAdminViewSet(TestCase):
         PageLayout.objects.create(page_type="home", title="Homepage")
         response = self.client.get("/api/v1/page-config/admin")
         assert response.status_code == 200
+
+    def test_a_store_operator_is_refused(self):
+        """Administrative API routes are platform-only.
+
+        A store ADMIN with an active membership — the strongest
+        non-platform identity there is — must still be refused. The API
+        has no sound notion of store staff (an API session
+        authenticates against the TENANT schema, so membership would be
+        matched by pk across schemas); granting it needs the design in
+        ``docs/api-staff-identity.md``.
+
+        Pinned as a test so the deferral is enforced rather than
+        remembered.
+        """
+        operator = UserAccountFactory(is_staff=True, is_superuser=False)
+        UserTenantMembership.objects.create(
+            user=operator,
+            tenant=self.tenant,
+            role=TenantMembershipRole.ADMIN,
+            is_active=True,
+        )
+        client = APIClient()
+        client.force_authenticate(user=operator)
+        response = client.get("/api/v1/page-config/admin")
+        assert response.status_code == 403
 
     def test_create_with_sections(self):
         data = {

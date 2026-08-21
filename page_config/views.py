@@ -4,9 +4,10 @@ from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from core.api.permissions import IsPlatformSuperuser
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import ActionConfig
 from page_config.models import NavigationMenu, PageLayout, PageSection
@@ -15,7 +16,6 @@ from page_config.serializers import (
     PageLayoutAdminSerializer,
     PageLayoutSerializer,
 )
-from tenant.membership import HasTenantAccess
 
 
 @extend_schema(
@@ -70,8 +70,8 @@ def public_navigation(request):
 
 class NavigationMenuAdminViewSet(BaseModelViewSet):
     queryset = NavigationMenu.objects.all()
-    # Same pairing rationale as PageLayoutAdminViewSet (H22).
-    permission_classes = [IsAdminUser, HasTenantAccess]
+    # Platform-only, same rationale as PageLayoutAdminViewSet below.
+    permission_classes = [IsPlatformSuperuser]
     # One entry per ACTION. ``BaseModelViewSet.get_serializer_class``
     # looks the current action up by name (core/api/views.py) — there is
     # no "default" key anywhere in the codebase, so every one of these
@@ -99,12 +99,19 @@ class NavigationMenuAdminViewSet(BaseModelViewSet):
 
 class PageLayoutAdminViewSet(BaseModelViewSet):
     queryset = PageLayout.objects.prefetch_related("sections")
-    # ``IsAdminUser`` alone lets any platform-staff user mutate any
-    # tenant's page layout (H22 in MULTI_TENANT_AUDIT.md). Pair it
-    # with ``HasTenantAccess`` so the requester must also be a member
-    # of the current tenant — platform owners onboarding a new tenant
-    # get a membership provisioned through the standard flow.
-    permission_classes = [IsAdminUser, HasTenantAccess]
+    # H22 (MULTI_TENANT_AUDIT.md) paired ``IsAdminUser`` with
+    # ``HasTenantAccess`` so a platform-staff user could not mutate any
+    # tenant's layout. That pairing was unsound on an API request:
+    # ``UserTenantMembership.user`` is an FK to
+    # ``public.user_useraccount``, but an API session authenticates
+    # against the TENANT schema (knox is TENANT_APPS only), so the
+    # membership lookup compared primary keys ACROSS schemas and
+    # matched whichever public row happened to share the pk. It only
+    # ever "worked" because the cutover copied users id-preserving.
+    #
+    # ``IsPlatformSuperuser`` closes H22 directly and soundly: is_staff
+    # is no longer the gate at all.
+    permission_classes = [IsPlatformSuperuser]
     serializers_config = {
         "list": ActionConfig(response=PageLayoutSerializer),
         "retrieve": ActionConfig(response=PageLayoutSerializer),

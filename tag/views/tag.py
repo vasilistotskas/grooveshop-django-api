@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 
+from core.api.permissions import IsPlatformSuperuser
 from tag.filters.tag import TagFilter
 from tag.models.tag import Tag
 from tag.serializers.tag import (
@@ -53,7 +54,7 @@ class TagViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsAdminUser()]
+            return [IsPlatformSuperuser()]
         return [AllowAny()]
 
     ordering_fields = [

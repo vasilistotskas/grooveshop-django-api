@@ -3,9 +3,10 @@ from __future__ import annotations
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -65,7 +66,7 @@ class ProductCategoryViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsAdminUser()]
+            return [IsPlatformSuperuser()]
         return [AllowAny()]
 
     ordering_fields = [

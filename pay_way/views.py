@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 
+from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -63,7 +64,6 @@ class PayWayViewSet(BaseModelViewSet):
     ]
 
     def get_permissions(self):
-        from rest_framework.permissions import IsAdminUser
 
         if self.action in [
             "create",
@@ -71,7 +71,7 @@ class PayWayViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ]:
-            return [IsAdminUser()]
+            return [IsPlatformSuperuser()]
         return super().get_permissions()
 
     def get_queryset(self):

@@ -18,11 +18,12 @@ from rest_framework.decorators import (
     permission_classes,
     throttle_classes,
 )
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
+from core.api.permissions import IsPlatformSuperuser
 from blog.models.post import BlogPostTranslation
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
@@ -839,7 +840,7 @@ def search_click(request):
     ],
 )
 @api_view(["GET"])
-@permission_classes([IsAdminUser])
+@permission_classes([IsPlatformSuperuser])
 def search_analytics(request):
     """
     Aggregate and return search analytics metrics.

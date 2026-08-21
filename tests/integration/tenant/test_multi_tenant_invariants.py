@@ -319,24 +319,56 @@ class TestWebSocketGroupIsolation:
 
 @pytest.mark.django_db
 class TestPageConfigTenantPermission:
-    """``PageLayoutAdminViewSet`` requires both ``IsAdminUser`` and
-    ``HasTenantAccess``. Platform-staff without a tenant membership
-    must be rejected (H22 in MULTI_TENANT_AUDIT.md).
+    """``PageLayoutAdminViewSet`` must not be reachable by store staff.
+
+    H22 (MULTI_TENANT_AUDIT.md): platform-staff without a membership in
+    the current tenant must not mutate that tenant's layout.
+
+    The original guard required ``IsAdminUser`` PAIRED with
+    ``HasTenantAccess``. That pairing was unsound on an API request:
+    ``UserTenantMembership.user`` is an FK to
+    ``public.user_useraccount``, but an API session authenticates
+    against the TENANT schema (knox is TENANT_APPS only), so the
+    membership lookup compared primary keys ACROSS schemas and matched
+    whichever public row shared the pk. It held only because the
+    cutover copied users id-preserving.
+
+    H22 is now closed at the root instead: ``is_staff`` is not the gate
+    at all. See ``docs/api-staff-identity.md`` for why the API has no
+    sound notion of store staff, and what granting it would require.
     """
 
-    def test_admin_viewset_requires_both_permissions(self) -> None:
-        """Static check that the regression — dropping
-        ``HasTenantAccess`` and leaving only ``IsAdminUser`` — would
-        fail this test. The runtime path is covered by the existing
-        ``tests/unit/tenant/test_membership.py`` suite.
+    def test_admin_viewset_is_platform_only(self) -> None:
+        from page_config.views import PageLayoutAdminViewSet
+
+        permission_names = {
+            cls.__name__ for cls in PageLayoutAdminViewSet.permission_classes
+        }
+        assert "IsPlatformSuperuser" in permission_names
+
+    def test_admin_viewset_does_not_rely_on_is_staff(self) -> None:
+        """``IsAdminUser`` is literally ``is_staff`` — the H22 hole."""
+        from page_config.views import PageLayoutAdminViewSet
+
+        permission_names = {
+            cls.__name__ for cls in PageLayoutAdminViewSet.permission_classes
+        }
+        assert "IsAdminUser" not in permission_names
+
+    def test_admin_viewset_does_not_match_membership_across_schemas(
+        self,
+    ) -> None:
+        """``HasTenantAccess`` compares pks across schemas on the API.
+
+        Re-adding it here would reintroduce that comparison, so this
+        pins its absence rather than leaving it to review.
         """
         from page_config.views import PageLayoutAdminViewSet
 
         permission_names = {
             cls.__name__ for cls in PageLayoutAdminViewSet.permission_classes
         }
-        assert "HasTenantAccess" in permission_names
-        assert "IsAdminUser" in permission_names
+        assert "HasTenantAccess" not in permission_names
 
 
 # ---------------------------------------------------------------------------

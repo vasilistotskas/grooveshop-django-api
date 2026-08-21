@@ -15,12 +15,11 @@ import logging
 from django.http import FileResponse
 from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import NotFound
-from rest_framework.permissions import IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.api.permissions import IsOwnerOrAdminOrGuest
+from core.api.permissions import IsOwnerOrAdminOrGuest, IsPlatformSuperuser
 from shipping_acs.models import AcsShipment
 from shipping_acs.serializers import AcsShipmentDetailSerializer
 
@@ -75,7 +74,7 @@ class AcsLabelView(APIView):
 class AcsCancelView(APIView):
     """Cancel an ACS voucher (admin-only)."""
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsPlatformSuperuser]
     serializer_class = AcsShipmentDetailSerializer
 
     @extend_schema(

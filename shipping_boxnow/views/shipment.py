@@ -14,12 +14,11 @@ import logging
 
 from django.http import FileResponse
 from drf_spectacular.utils import extend_schema
-from rest_framework.permissions import IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.api.permissions import IsOwnerOrAdminOrGuest
+from core.api.permissions import IsOwnerOrAdminOrGuest, IsPlatformSuperuser
 from shipping_boxnow.models import BoxNowShipment
 from shipping_boxnow.serializers import BoxNowShipmentSerializer
 
@@ -86,7 +85,7 @@ class BoxNowCancelView(APIView):
     parcel is in ``NEW`` state per BoxNow docs.
     """
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsPlatformSuperuser]
     serializer_class = BoxNowShipmentSerializer
 
     @extend_schema(

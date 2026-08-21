@@ -14,11 +14,11 @@ import logging
 from django.http import FileResponse
 from drf_spectacular.utils import extend_schema
 from rest_framework.exceptions import NotFound
-from rest_framework.permissions import IsAdminUser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.api.permissions import IsPlatformSuperuser
 from shipping_acs.models import AcsPickupList
 from shipping_acs.serializers import AcsPickupListSerializer
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class AcsPickupListIssueView(APIView):
     """Issue today's ACS pickup list on demand."""
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsPlatformSuperuser]
 
     @extend_schema(
         operation_id="issueAcsPickupList",
@@ -63,7 +63,7 @@ class AcsPickupListIssueView(APIView):
 class AcsPickupListManifestView(APIView):
     """Download the manifest PDF for a specific pickup list."""
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsPlatformSuperuser]
 
     @extend_schema(
         operation_id="getAcsPickupListManifest",

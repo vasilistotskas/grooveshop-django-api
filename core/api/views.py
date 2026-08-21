@@ -1,6 +1,7 @@
 import logging
 from django.core.exceptions import ImproperlyConfigured
 from celery.exceptions import CeleryError
+from core.api.permissions import IsPlatformSuperuser
 from core.celery import celery_app
 from django.conf import settings
 from django.db import DatabaseError, connection
@@ -20,7 +21,7 @@ from rest_framework.decorators import (
     permission_classes,
     throttle_classes,
 )
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 from rest_framework.metadata import SimpleMetadata
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
@@ -490,7 +491,7 @@ def health_live(request):
     },
 )
 @api_view(["GET"])
-@permission_classes([IsAdminUser])
+@permission_classes([IsPlatformSuperuser])
 def list_settings(request):
     """List all available settings with their values."""
     try:

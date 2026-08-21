@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 
+from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 
@@ -53,7 +54,7 @@ class CountryViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsAdminUser()]
+            return [IsPlatformSuperuser()]
         return [AllowAny()]
 
     ordering_fields = [

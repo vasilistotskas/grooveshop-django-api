@@ -9,9 +9,10 @@ from drf_spectacular.utils import (
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import ViewCountThrottle
 from core.api.views import BaseModelViewSet
@@ -186,7 +187,7 @@ class ProductViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsAdminUser()]
+            return [IsPlatformSuperuser()]
         return [AllowAny()]
 
     ordering_fields = [

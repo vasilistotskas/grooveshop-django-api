@@ -13,11 +13,12 @@ from __future__ import annotations
 
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import generics
-from rest_framework.permissions import AllowAny, IsAdminUser
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from core.api.permissions import IsPlatformSuperuser
 from shipping.models import ShippingProvider
 from shipping.serializers import (
     FreeShippingInfoQuerySerializer,
@@ -158,7 +159,7 @@ class FreeShippingInfoView(APIView):
 class ShippingProviderListView(generics.ListAPIView):
     """Admin-only list of registered providers for diagnostics."""
 
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsPlatformSuperuser]
     serializer_class = ShippingProviderSerializer
     queryset = ShippingProvider.objects.all().order_by("priority", "name")
     pagination_class = None

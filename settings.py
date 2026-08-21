@@ -122,10 +122,17 @@ SHARED_APPS = [
     "core",
     "devtools",
     # Celery infrastructure — beat scheduler runs in public schema
-    # (DatabaseScheduler reads PeriodicTask from public). Task results
-    # use CELERY_RESULT_BACKEND="django-db"; results are written in
-    # whichever schema the task runs in, so django_celery_results is
-    # also in TENANT_APPS to ensure its tables exist there too.
+    # (DatabaseScheduler reads PeriodicTask from public).
+    #
+    # Task results: the DEFAULT below is "django-db", which writes into
+    # whichever schema the task ran in — hence django_celery_results is
+    # in TENANT_APPS too, so those tables exist per tenant. Production
+    # OVERRIDES this to a Redis backend (Redis DB 1) for throughput, so
+    # the per-schema tables stay empty there. Do not read task history
+    # out of django_celery_results without first checking which backend
+    # the environment actually uses; on 2026-08-21 an audit queried
+    # those tables in production, found 0 rows, and nearly concluded no
+    # tasks were running.
     "django_celery_beat",
     "django_celery_results",
     # Platform-wide Setting table — read by admin dashboard in public

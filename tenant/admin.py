@@ -24,9 +24,11 @@ from datetime import timedelta
 from django.contrib import admin, messages
 from django.db import connection
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
-from unfold.decorators import action
+from unfold.contrib.filters.admin import ChoicesRadioFilter
+from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from tenant.models import (
@@ -74,18 +76,46 @@ def self_service_tenant(request):
     return get_current_tenant()
 
 
+# Plan presentation: an icon and a colour per tier, so the estate reads
+# at a glance instead of as a column of lowercase words.
+#
+# Rendered through Unfold's own ``label.html`` rather than hand-written
+# markup: that template already accepts ``icon`` (``@display(label=...)``
+# does NOT — the decorator only carries a value->colour map, verified
+# against unfold 0.104.1), and reusing it means the badges inherit
+# Unfold's palette and dark-mode classes instead of duplicating them
+# here where they would silently drift on upgrade.
+_PLAN_BADGES: dict[str, tuple[str, str]] = {
+    "trial": ("schedule", "warning"),
+    "basic": ("storefront", "info"),
+    "pro": ("rocket_launch", "primary"),
+    "enterprise": ("workspace_premium", "success"),
+}
+
+
+def _unfold_label(text, tone: str, icon: str | None = None) -> str:
+    from django.template.loader import render_to_string  # noqa: PLC0415
+
+    return render_to_string(
+        "unfold/helpers/label.html",
+        {"text": text, "type": tone, "icon": icon},
+    )
+
+
 @admin.register(Tenant)
 class TenantAdmin(ModelAdmin):
     list_display = [
-        "name",
-        "slug",
+        "display_store",
+        "display_plan",
+        "display_status",
         "schema_name",
-        "plan",
-        "is_active",
-        "suspended_at",
         "created_at",
     ]
-    list_filter = ["is_active", "plan"]
+    list_display_links = ["display_store"]
+    list_filter = [
+        ("plan", ChoicesRadioFilter),
+        "is_active",
+    ]
     search_fields = ["name", "slug", "owner_email"]
     readonly_fields = [
         "schema_name",
@@ -99,6 +129,56 @@ class TenantAdmin(ModelAdmin):
     # Disable the default bulk-delete action — use our explicit
     # suspend / destroy actions instead so safety checks always run.
     actions = ["suspend_tenants", "activate_tenants", "destroy_tenants"]
+
+    @display(description=_("Store"), ordering="name", header=True)
+    def display_store(self, obj):
+        """Store name over its primary domain, with the store's own mark.
+
+        ``header=True`` renders two lines plus a leading avatar — the
+        store's logo when it has one, otherwise its initials. On a
+        control plane listing every merchant, the logo is the fastest
+        way to identify a row.
+        """
+        primary = obj.domains.filter(is_primary=True).first()
+        name = obj.store_name or obj.name
+        avatar = (
+            {"path": obj.logo_light_url, "squared": True}
+            if obj.logo_light_url
+            else None
+        )
+        return [
+            name,
+            primary.domain if primary else obj.schema_name,
+            "".join(word[:1] for word in name.split()[:2]).upper(),
+            avatar,
+        ]
+
+    @display(description=_("Plan"), ordering="plan")
+    def display_plan(self, obj):
+        icon, tone = _PLAN_BADGES.get(obj.plan, ("help", "info"))
+        return mark_safe(  # noqa: S308 - fixed strings, no user input
+            _unfold_label(obj.get_plan_display(), tone, icon)
+        )
+
+    @display(description=_("Status"), ordering="is_active")
+    def display_status(self, obj):
+        """Suspended is distinct from inactive — different operations.
+
+        A suspended store is mid-lifecycle (24h cooldown before it can
+        be destroyed); an inactive one was simply switched off. Showing
+        both as a bare boolean hid that difference.
+        """
+        if obj.suspended_at is not None:
+            return mark_safe(  # noqa: S308 - fixed strings
+                _unfold_label(_("Suspended"), "danger", "pause_circle")
+            )
+        if not obj.is_active:
+            return mark_safe(  # noqa: S308 - fixed strings
+                _unfold_label(_("Inactive"), "warning", "visibility_off")
+            )
+        return mark_safe(  # noqa: S308 - fixed strings
+            _unfold_label(_("Live"), "success", "check_circle")
+        )
 
     def get_queryset(self, request):
         """A store operator sees only their own row."""

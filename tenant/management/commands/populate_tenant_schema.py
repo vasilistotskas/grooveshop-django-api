@@ -8,14 +8,26 @@ from django.db import connection, transaction
 
 logger = logging.getLogger(__name__)
 
-# Tables that are seeded automatically by post_migrate signals (or other
-# bootstrap hooks) when ``migrate_schemas`` creates a fresh tenant schema.
-# For these tables the freshly-seeded rows must be discarded and replaced
-# with the production-tuned values that live in the public schema.
+# Tables that are seeded automatically by post_migrate signals, data
+# migrations, or other bootstrap hooks when ``migrate_schemas`` creates a
+# fresh tenant schema. For these tables the freshly-seeded rows must be
+# discarded and replaced with the production-tuned values that live in
+# the public schema.
 #
-# The truncate is CASCADE-safe: extra_settings_setting is never referenced
-# by a FK from another table so the cascade never deletes anything extra.
-_OVERWRITE_TABLES: frozenset[str] = frozenset({"extra_settings_setting"})
+# WHY THIS LIST MATTERS: the copy skips any table that already has rows,
+# so a seeded table silently keeps its DEFAULTS and the operator's real
+# configuration never arrives. This shipped a broken checkout to
+# production on 2026-08-20 — ``shipping_shippingprovider`` is seeded
+# inactive by its data migration, the copy skipped it, and every carrier
+# stayed ``is_active=false``, so ``/api/v1/shipping/options`` returned
+# ``[]`` and the delivery-method step rendered empty. Any table that is
+# both seeded at migrate time AND operator-editable belongs here.
+#
+# The truncate is CASCADE-safe for both entries: neither is referenced by
+# a FK from another table, so the cascade never deletes anything extra.
+_OVERWRITE_TABLES: frozenset[str] = frozenset(
+    {"extra_settings_setting", "shipping_shippingprovider"}
+)
 
 # Sentinel: distinguishes "no default could be resolved" from a field
 # whose default legitimately IS None.
@@ -137,6 +149,7 @@ class Command(BaseCommand):
         # Track (schema, table, seq_name, col_name) for post-copy
         # verification.
         copied_tables: list[str] = []
+        diverged_skips: list[str] = []
         reset_sequences: list[tuple[str, str, str, str]] = []
 
         # One transaction for the whole copy loop: Django creates every
@@ -169,9 +182,25 @@ class Command(BaseCommand):
                     )
                     cursor.execute(f'TRUNCATE {schema}."{table}" CASCADE')
                 elif self._table_has_data(cursor, schema, table):
-                    self.stdout.write(
-                        f"  SKIP {table} (already has data in '{schema}')"
-                    )
+                    # Seeded tables keep their DEFAULTS when skipped, so
+                    # the operator's real config never arrives. Say so
+                    # loudly when the contents actually diverge — a
+                    # silent SKIP line in a 200-table log is how the
+                    # broken-checkout regression reached production.
+                    tenant_count = self._get_count(cursor, schema, table)
+                    public_count = self._get_count(cursor, "public", table)
+                    note = f"  SKIP {table} (already has data in '{schema}')"
+                    if tenant_count != public_count:
+                        note = self.style.WARNING(
+                            f"{note} — DIVERGES: public has "
+                            f"{public_count} rows, {schema} has "
+                            f"{tenant_count}. If this table is "
+                            "operator-editable, add it to "
+                            "_OVERWRITE_TABLES; its seeded defaults are "
+                            "being kept instead of production's values."
+                        )
+                        diverged_skips.append(table)
+                    self.stdout.write(note)
                     skipped += 1
                     continue
 
@@ -204,6 +233,20 @@ class Command(BaseCommand):
                 f"\nDone: {copied} tables copied, {skipped} skipped."
             )
         )
+
+        if diverged_skips:
+            self.stdout.write(
+                self.style.WARNING(
+                    "\nREVIEW REQUIRED — these tables were skipped but "
+                    "their contents differ from 'public', so the tenant "
+                    "kept seeded defaults instead of production values:\n"
+                    + "".join(f"  - {t}\n" for t in diverged_skips)
+                    + "Django-derived tables (django_content_type, "
+                    "auth_permission) are expected here and are "
+                    "self-consistent. Anything operator-editable is a "
+                    "REGRESSION — add it to _OVERWRITE_TABLES and re-run."
+                )
+            )
 
         if rebuild_mptt and copied_tables:
             self._rebuild_mptt_trees(schema)

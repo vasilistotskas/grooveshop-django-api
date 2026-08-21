@@ -733,3 +733,75 @@ class TestTargetOnlyNotNullColumns:
         assert (
             cmd._model_field_default("no_such_table_xyz", "nope") is _NO_DEFAULT
         )
+
+
+# ---------------------------------------------------------------------------
+# Test: seeded tables must be overwritten, not skipped
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+class TestSeededTablesAreOverwritten:
+    """A migration-seeded table must take production's values.
+
+    The copy skips any table that already has rows. For a table seeded
+    at migrate time that is ALSO operator-editable, that means the
+    tenant silently keeps the seeded DEFAULTS and the operator's real
+    configuration never arrives.
+
+    This shipped a broken checkout on 2026-08-20:
+    ``shipping_shippingprovider`` is seeded ``is_active=false`` by its
+    data migration, the copy skipped it, every carrier stayed inactive,
+    and ``/api/v1/shipping/options`` returned ``[]`` so the
+    delivery-method step rendered empty.
+    """
+
+    def test_shipping_provider_is_in_overwrite_tables(self):
+        from tenant.management.commands.populate_tenant_schema import (
+            _OVERWRITE_TABLES,
+        )
+
+        assert "shipping_shippingprovider" in _OVERWRITE_TABLES
+        assert "extra_settings_setting" in _OVERWRITE_TABLES
+
+    def test_overwrite_table_takes_public_values_over_seeded_rows(self):
+        """Seeded tenant rows are replaced by public's, not kept."""
+        schema = f"{_P}_overwrite"
+        table = "extra_settings_setting"
+        with connection.cursor() as cursor:
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
+            cursor.execute(
+                f"CREATE TABLE IF NOT EXISTS {schema}.{table} "
+                f"(LIKE public.{table} INCLUDING ALL)"
+            )
+            # Seeded default row that must NOT survive the copy.
+            cursor.execute(
+                f"INSERT INTO {schema}.{table} (name, value_type, value_bool, value_decimal, value_email, value_file, value_float, value_image, value_int, value_string, value_text, value_url, value_json) "
+                "VALUES ('POP_TEST_SEEDED', 'string', false, 0, '', '', 0, '', 0, 'seeded-default', '', '', '{}'::jsonb)"
+            )
+            cursor.execute(
+                f"INSERT INTO public.{table} (name, value_type, value_bool, value_decimal, value_email, value_file, value_float, value_image, value_int, value_string, value_text, value_url, value_json) "
+                "VALUES ('POP_TEST_REAL', 'string', false, 0, '', '', 0, '', 0, 'production-value', '', '', '{}'::jsonb)"
+            )
+        try:
+            stdout, _ = _run_command(schema, rebuild_mptt=False)
+            assert f"OVERWRITE {table}" in stdout
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {schema}.{table} "
+                    "WHERE name = 'POP_TEST_SEEDED'"
+                )
+                assert cursor.fetchone()[0] == 0, (
+                    "seeded row survived an OVERWRITE table copy"
+                )
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {schema}.{table} "
+                    "WHERE name = 'POP_TEST_REAL'"
+                )
+                assert cursor.fetchone()[0] == 1
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(f"DROP SCHEMA IF EXISTS {schema} CASCADE")
+                cursor.execute(
+                    f"DELETE FROM public.{table} WHERE name LIKE 'POP_TEST_%'"
+                )

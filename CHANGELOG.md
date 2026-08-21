@@ -3,6 +3,170 @@
 
 
 
+## v3.1.0 (2026-08-21)
+
+### Bug fixes
+
+* fix(test): make the platform estate assertion self-contained
+
+test_shows_the_tenant_estate asserted on the estate table, which the
+template renders only when at least one store exists -- otherwise the
+page shows "No stores yet." It passed locally purely because the shared
+xdist database held tenants created by other files, and failed on CI's
+clean database.
+
+Creates its own store, and asserts on that store's name and schema
+rather than on column headers: header text goes through gettext, so a
+label assertion is a bet on the translation catalogue.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`a00165c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a00165c9757cb92c7300c07ce4e10e9bbe2188ee))
+
+* fix(cache): survive a dropped Redis connection instead of 500ing
+
+redis-py ships every resilience feature off by default -- the sync
+Connection defaults are retry=None, health_check_interval=0 and
+socket_keepalive=False -- and Django never overrides them. With no
+OPTIONS on CACHES, a pooled connection that died while idle (Redis
+`timeout`, a pod rollover, a NAT/conntrack eviction) was handed back
+out and the next command raised ConnectionResetError at the call site.
+
+Surfaced as an intermittent test_cache_add failure, but the exposure
+was production's too: the same reset became a 500 rather than a
+retried command.
+
+The defaults live on the backend rather than in CACHES["OPTIONS"]
+because CustomCache is also instantiated directly -- tests, and any
+caller building a cache against a specific Redis DB, pass params={} --
+so a settings-only fix would have been a no-op for exactly the path
+that was failing. Explicit OPTIONS still win.
+
+Verified against a live connection: health_check_interval=30,
+socket_keepalive=True, and a Retry whose supported_errors include
+redis.exceptions.ConnectionError, which is what a socket reset becomes.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`9c12655`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9c126559a1c03424e19eb079eaa057fa60212fe0))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.0.1 [skip ci] ([`d4ea084`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d4ea0842c44cffb712f96f5e08ed4f0dc426d18b))
+
+### Features
+
+* feat(tenant): derive admin permissions from a store operator's role
+
+A store owner could open /admin/ and then got 403 on every model page.
+Reported from production by tenant #1's owner, 2026-08-21.
+
+Cause: nothing ever mapped UserTenantMembership roles onto Django model
+permissions. tenant_create provisions a membership and only a
+membership, and no Group is created anywhere in the codebase. So the
+membership gate admitted an operator to the admin while every
+ModelAdmin permission check failed -- the tenant admin has only ever
+been usable by platform superusers, who bypass permission checks
+entirely (User.has_perm short-circuits on is_superuser). It surfaced
+now because pruning the platform superusers removed the flag that had
+been masking it; every non-superuser operator was already affected.
+
+Roles were already specified -- STAFF operational, ADMIN full within
+the tenant including settings and team, OWNER as ADMIN plus
+undemotable. This implements that text.
+
+Permissions are COMPUTED, not stored as Group rows. has_perm is a
+string check, so no auth_permission row need exist -- which matters
+because auth is in BOTH SHARED_APPS and TENANT_APPS: a Group row would
+land in whichever schema the connection happened to be pinned to and
+then be matched by ID across schemas. Nothing to provision also means
+onboarding a store cannot forget it.
+
+The grant is gated on PROVENANCE, not on the user's pk. UserAccount is
+mirrored per schema, so a tenant-schema CUSTOMER can share a pk with a
+public-schema staff identity -- the pks line up today only because the
+cutover copied users id-preserving, and post-cutover signups diverge.
+Email is no safer: a shopper can register a tenant-schema account with
+an operator's address. So PlatformStaffBackend stamps the objects it
+loads from the public schema, and the role backend grants only to
+those. Admin sessions qualify; storefront/API sessions never do.
+
+Scope is derived from TENANT_APPS so a new store app is covered
+automatically; only the PLATFORM set is enumerated, because that is
+where a forgotten entry is a privilege escalation rather than a missing
+feature.
+
+Two gates had to be opened for any of this to be reachable: both
+TenantAdmin.has_module_permission and
+UserTenantMembershipAdmin.has_module_permission were hard-locked to the
+public schema, so a merchant could never reach their own settings or
+their own team no matter what they held. Both now allow a tenant host
+gated on the role-derived permission.
+
+Because a Django permission is per-model and not per-object, the admin
+adds the object half: own row only, an allowlist of self-editable
+fields (so a field added to Tenant later is read-only until someone
+decides it is the merchant's), no domains, no suspend/destroy, team
+scoped to their own store, OWNER rows safe from ADMIN, and an ADMIN
+cannot mint an OWNER.
+
+Also closes an escalation the admin left open regardless of tenancy:
+UserAdmin exposed is_staff/is_superuser/groups/user_permissions to
+anyone holding change_useraccount. On a tenant host that admin edits
+that store's CUSTOMERS, and DRF's IsAdminUser is literally is_staff --
+so ticking it was an API-admin grant. Now superuser-only.
+
+Verified against the real scenario: a non-superuser OWNER loaded the
+way an admin request loads them resolves order.view_order and
+tenant.change_tenant true, and tenant.add_tenant and
+country.change_country false.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`b0e61d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0e61d9d8c702ae4a97c0458d8467f48ede883af))
+
+* feat(admin): serve the platform control plane on its own admin site
+
+platform.grooveshop.space manages the platform -- tenants, domains,
+memberships, staff, shared reference data, the scheduler. That is a
+different job from a merchant's admin, so it is now a different site
+rather than the same one with sections hidden.
+
+Hiding sections was the wrong shape: the control plane rendered ~30
+per-store links that all answered 403, and it wore tenant #1's name
+and logo. Per-store models are simply not registered here, so they are
+structurally absent rather than reachable-but-denied. The 403 guard in
+BaseModelAdmin stays as defence in depth for the shared site.
+
+PlatformAdminSite sets settings_name = "UNFOLD_PLATFORM";
+unfold.settings.get_config() resolves that name and merges it over
+CONFIG_DEFAULTS, so the site gets its own branding, sidebar, dashboard
+and "Control plane" badge without touching the tenant admin's UNFOLD
+block. Registrations are copied from the default registry, so the two
+sites cannot drift as fields and inlines change.
+
+Two defects found while validating this, neither of which the suite
+would have caught:
+
+- PlatformAdminSite extends UnfoldAdminSite, not MyAdminSite, so its
+  login() resolved to plain AdminSite.login -- without the next fix
+  added in 2cf9744a. The control plane would have shipped with the
+  same storefront-redirect bug it was built to fix. That fix now lives
+  in AdminSiteLoginNextMixin, which both sites consume, plus a
+  regression test that fails if either drops it.
+
+- AdminSite.index() resolves "admin/index.html" globally, and this
+  project overrides that with the MERCHANT dashboard (revenue, pending
+  orders, product shortcuts). The control plane would have rendered
+  tenant #1's dashboard while its own figures rendered nowhere. Added
+  admin/platform_index.html -- estate counters plus a store table --
+  wired via index_template.
+
+Dashboard figures are read inside each tenant's schema via
+tenant_context, and a schema that is missing (mid-provision) reports
+blank rather than 0, because "0 orders" reads as a real figure for a
+store that is merely half-provisioned.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`dd6bab5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dd6bab583e76135d8c34b630d675907b1e3f2fed))
+
 ## v3.0.1 (2026-08-21)
 
 ### Bug fixes

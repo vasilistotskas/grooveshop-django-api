@@ -36,6 +36,28 @@ settings.PASSWORD_HASHERS = [
 settings.DISABLE_CACHE = True
 settings.MEILISEARCH["OFFLINE"] = True
 
+# Never talk to a real Redis channel layer in tests.
+#
+# Any code path that emits a websocket notification calls
+# ``async_to_sync(channel_layer.group_send)`` — e.g.
+# ``notification.tasks.send_notification_task``, reached indirectly by
+# order/loyalty flows. With the production RedisChannelLayer that is a
+# live async Redis round-trip per test, and under ``-n auto`` every
+# worker hammers the same local instance at once. Connections get reset
+# mid-command and the test dies with
+# ``ConnectionResetError: [WinError 10054]`` wrapped in
+# ``redis.exceptions.ConnectionError`` — a failure with nothing to do
+# with the behaviour under test, in a DIFFERENT test on each run.
+#
+# Observed on
+# ``test_idempotency_guard_prevents_double_award``: 2 failures in 3
+# full-suite runs, always green in isolation. InMemoryChannelLayer keeps
+# group_send working (so the calls are still exercised) without leaving
+# the process.
+settings.CHANNEL_LAYERS = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+}
+
 # ``@requires_meilisearch`` tests talk to a REAL engine when one is
 # reachable, and under ``-n auto`` every worker queries the same single
 # instance at once. The repo's .env pins MEILI_TIMEOUT=10, which is a

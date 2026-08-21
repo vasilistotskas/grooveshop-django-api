@@ -3,6 +3,41 @@
 
 
 
+## v2.0.3 (2026-08-21)
+
+### Bug fixes
+
+* fix(order): keep the cart until a hosted payment completes
+
+Hosted providers (Viva, Stripe) mint the Order FIRST and only then
+redirect the shopper off-site to pay. The cart was cleared at creation,
+so between those two moments the basket was already gone: abandoning the
+hosted page — or simply pressing Back — returned the shopper to an empty
+cart and a stranded PENDING order, and the next checkout attempt died on
+"Cart is empty. Cannot reserve stock for empty cart."
+
+Production data for the five months to 2026-08-08: 35 Viva orders ended
+CANCELED with payment still PENDING against 27 COMPLETED, so the
+abandoned path was the COMMON one and every one of those shoppers
+silently lost their basket.
+
+New Order.awaits_online_payment gates all three clearing sites — the
+order_created signal handler and the two inline clears in
+create_order_from_cart / create_order_from_cart_offline (the offline one
+is the path Viva actually takes). Carts now clear on order_paid instead.
+Cash-on-delivery is unaffected: nothing is owed online, so those carts
+still clear the moment the order is placed.
+
+Stock was never at risk — auto_cancel_stuck_pending_orders cancels
+unpaid PENDING orders and restores stock via increment_stock.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`793bc38`](https://github.com/vasilistotskas/grooveshop-django-api/commit/793bc3883b31e8c1fa12409760d7728effc859b5))
+
+### Chores
+
+* chore(deps): sync uv.lock to 2.0.2 [skip ci] ([`eb5aafa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eb5aafa61d821723a3912faaf45a01d783d07fef))
+
 ## v2.0.2 (2026-08-21)
 
 ### Bug fixes

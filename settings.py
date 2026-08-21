@@ -2155,6 +2155,9 @@ UNFOLD = {
             # ── Catalog (catalog management) ──────────────────────────
             {
                 "title": _("Catalog"),
+                # Per-store section: hidden on the platform console, whose
+                # schema holds none of these models (they 403 there).
+                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -2214,6 +2217,9 @@ UNFOLD = {
             # ── Blog (content management) ─────────────────────────────
             {
                 "title": _("Blog"),
+                # Per-store section: hidden on the platform console, whose
+                # schema holds none of these models (they 403 there).
+                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -2257,6 +2263,9 @@ UNFOLD = {
             # ── Sales (day-to-day order operations) ───────────────────
             {
                 "title": _("Sales"),
+                # Per-store section: hidden on the platform console, whose
+                # schema holds none of these models (they 403 there).
+                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -2310,6 +2319,9 @@ UNFOLD = {
             # ── Shipping (carrier-facing fulfilment) ─────────────────
             {
                 "title": _("Shipping"),
+                # Per-store section: hidden on the platform console, whose
+                # schema holds none of these models (they 403 there).
+                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [
@@ -2382,6 +2394,9 @@ UNFOLD = {
             # ── Loyalty ──────────────────────────────────────────────
             {
                 "title": _("Loyalty"),
+                # Per-store section: hidden on the platform console, whose
+                # schema holds none of these models (they 403 there).
+                "permission": "admin.permissions.is_store_section",
                 "separator": True,
                 "collapsible": True,
                 "items": [

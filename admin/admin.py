@@ -5,7 +5,7 @@ from os import getenv
 from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import path
+from django.urls import path, reverse
 from django.utils.translation import gettext_lazy as _
 from unfold.sites import UnfoldAdminSite
 
@@ -13,6 +13,14 @@ from admin.forms import PlatformAdminAuthenticationForm
 from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
 from core.cache.registry import iter_surfaces
+
+
+# Platform console identity. Deliberately NOT the UNFOLD_SITE_HEADER
+# defaults: those are tenant #1's ("Webside"), and the control plane must
+# not wear a merchant's name.
+PLATFORM_SITE_HEADER = "Grooveshop Platform"
+PLATFORM_SITE_TITLE = _("Platform Admin")
+PLATFORM_SITE_SUBHEADER = _("Control plane")
 
 
 class MyAdminSite(UnfoldAdminSite):
@@ -136,14 +144,36 @@ class MyAdminSite(UnfoldAdminSite):
         return [app for app in app_list if app.get("app_label") not in hidden]
 
     def each_context(self, request):
-        """Per-tenant admin branding.
+        """Brand the admin for whichever console is being served.
 
-        The class attributes are the platform defaults (public-schema
-        admin); on a tenant host the header/title show that store's
-        name so operators always know which store they're editing.
+        Three cases, and the third is the one that bit us:
+
+        - TENANT host: show that store's name, so an operator always
+          knows which store they are editing.
+        - PLATFORM host (public schema): show the platform's own
+          identity. ``get_current_tenant()`` returns None on public, so
+          this used to fall through to the class attributes — which
+          default to ``UNFOLD_SITE_HEADER``/"Webside". The control plane
+          therefore wore tenant #1's name and logo: the sidebar said
+          "Webside" and the login page read "Welcome back to Webside
+          Admin". Reported from production 2026-08-21.
+        - Unknown schema (management command, Celery, tests): leave the
+          defaults alone. Same positive-knowledge rule as
+          ``BaseModelAdmin._withheld_on_public``.
         """
         context = super().each_context(request)
+        from tenant.console import is_platform_console  # noqa: PLC0415
         from tenant.membership import get_current_tenant  # noqa: PLC0415
+
+        if is_platform_console(request):
+            context["site_header"] = PLATFORM_SITE_HEADER
+            context["site_title"] = PLATFORM_SITE_TITLE
+            context["site_subheader"] = PLATFORM_SITE_SUBHEADER
+            # The tenant logo/icon lambdas resolve to webside's assets;
+            # the control plane must not display a merchant's mark.
+            context["site_logo"] = None
+            context["site_icon"] = None
+            return context
 
         tenant = get_current_tenant()
         if tenant is not None:
@@ -151,6 +181,40 @@ class MyAdminSite(UnfoldAdminSite):
             context["site_header"] = name
             context["site_title"] = _("%(name)s Admin") % {"name": name}
         return context
+
+    def login(self, request, extra_context=None):
+        """Ensure a successful admin login lands back in the admin.
+
+        Django's ``LoginView.get_success_url()`` uses the ``next``
+        parameter and falls back to ``settings.LOGIN_REDIRECT_URL``,
+        which is the STOREFRONT account page — correct for shoppers,
+        wrong for staff. ``AdminSite.login`` does put ``next`` in the
+        template context, but Unfold's ``admin/login.html`` renders
+        ``<form action="{{ app_path }}">`` and never emits it as a
+        hidden field, so a POST from ``/admin/login`` carries no
+        ``next`` at all.
+
+        Reaching ``/admin/`` first is fine — that redirect appends
+        ``?next=/admin/``, which rides along in ``app_path``. Opening
+        ``/admin/login`` directly is what broke: production sent staff
+        to ``https://webside.gr/account`` on 2026-08-21.
+
+        Unfold documents ``UNFOLD["LOGIN"]["redirect_after"]`` for this,
+        but 0.104.1 (the current release) only DECLARES the key — the
+        single occurrence in the package is its ``None`` default, and
+        nothing reads it. So put ``next`` on the URL instead, which every
+        layer below already understands.
+        """
+        from django.contrib.auth import REDIRECT_FIELD_NAME  # noqa: PLC0415
+
+        if (
+            request.method == "GET"
+            and REDIRECT_FIELD_NAME not in request.GET
+            and REDIRECT_FIELD_NAME not in request.POST
+        ):
+            index = reverse("admin:index", current_app=self.name)
+            return redirect(f"{request.path}?{REDIRECT_FIELD_NAME}={index}")
+        return super().login(request, extra_context)
 
     def get_urls(self):
         urls = super().get_urls()

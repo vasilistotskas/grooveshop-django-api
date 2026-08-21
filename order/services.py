@@ -772,8 +772,18 @@ class OrderService:
             )
 
             # Step 8: Clear cart
-            cart.items.all().delete()
-            logger.info("Cleared cart %s after order creation", cart.uuid)
+            # Keep the cart while the shopper still owes a hosted
+            # payment — see Order.awaits_online_payment. It clears on
+            # ``order_paid`` instead.
+            if order.awaits_online_payment:
+                logger.info(
+                    "Kept cart %s — order %s awaits online payment",
+                    cart.uuid,
+                    order.id,
+                )
+            else:
+                cart.items.all().delete()
+                logger.info("Cleared cart %s after order creation", cart.uuid)
 
             # Step 9: Return order in PENDING status
             # Note: Webhook will move order to PROCESSING when payment is confirmed
@@ -1149,8 +1159,18 @@ class OrderService:
             )
 
             # Step 7: Clear cart
-            cart.items.all().delete()
-            logger.info("Cleared cart %s after order creation", cart.uuid)
+            # Keep the cart while the shopper still owes a hosted
+            # payment — see Order.awaits_online_payment. It clears on
+            # ``order_paid`` instead.
+            if order.awaits_online_payment:
+                logger.info(
+                    "Kept cart %s — order %s awaits online payment",
+                    cart.uuid,
+                    order.id,
+                )
+            else:
+                cart.items.all().delete()
+                logger.info("Cleared cart %s after order creation", cart.uuid)
 
             # Step 8: Dispatch shipment creation for true offline payments
             # (COD, Bank Transfer). Online providers that route through

@@ -189,6 +189,61 @@ def handle_order_post_save(
         )
 
 
+def _clear_cart_for_order(order: Order) -> None:
+    """Delete the cart the order was built from, if it still exists."""
+    from cart.models import Cart  # noqa: PLC0415
+
+    try:
+        if order.user:
+            cart = Cart.objects.filter(user=order.user).first()
+            if cart:
+                cart.delete()  # Delete entire cart, not just items
+                logger.debug(
+                    "Cleared cart for user %s after order %s",
+                    order.user.id,
+                    order.id,
+                )
+            return
+
+        # For guest orders, read the cart UUID from the cart snapshot
+        # both creation paths write into order metadata
+        # (OrderService.create_order_from_cart[_offline]). The integer
+        # PK is internal only (M18 in MULTI_TENANT_AUDIT.md), so the
+        # lookup uses the UUID.
+        cart_uuid = (
+            order.metadata.get("cart_snapshot", {}).get("cart_uuid")
+            if order.metadata
+            else None
+        )
+        if not cart_uuid:
+            logger.debug("Guest order %s - no cart_uuid in metadata", order.id)
+            return
+        cart = Cart.objects.filter(uuid=cart_uuid, user__isnull=True).first()
+        if cart:
+            cart.delete()  # Delete entire cart
+            logger.info(
+                "Cleared guest cart %s after order %s", cart_uuid, order.id
+            )
+    except Exception as e:
+        logger.error(
+            "Error clearing cart for order %s: %s", order.id, e, exc_info=True
+        )
+
+
+@receiver(order_paid, dispatch_uid="order.clear_cart_on_paid")
+def handle_order_paid_clear_cart(
+    sender: type[Order], order: Order, **kwargs: Any
+) -> None:
+    """Clear the cart once a hosted payment actually completes.
+
+    Counterpart to the ``Order.awaits_online_payment`` skip in
+    ``handle_order_created``. Idempotent: cash-on-delivery orders have
+    already had their cart removed at creation, so this is a no-op for
+    them.
+    """
+    transaction.on_commit(lambda o=order: _clear_cart_for_order(o))
+
+
 @receiver(order_created, dispatch_uid="order.handle_order_created")
 def handle_order_created(
     sender: type[Order], order: Order, **kwargs: Any
@@ -226,59 +281,10 @@ def handle_order_created(
             )
         )
 
-    # Clear cart after successful order creation (both user and guest)
-    from cart.models import Cart
-
-    def clear_cart():
-        """Clear cart after transaction commits."""
-        try:
-            if order.user:
-                # For authenticated users, clear their cart
-                cart = Cart.objects.filter(user=order.user).first()
-                if cart:
-                    cart.delete()  # Delete entire cart, not just items
-                    logger.debug(
-                        "Cleared cart for user %s after order %s creation",
-                        order.user.id,
-                        order.id,
-                    )
-            else:
-                # For guest orders, read the cart UUID from the cart
-                # snapshot both creation paths write into order metadata
-                # (OrderService.create_order_from_cart[_offline]). The
-                # integer PK is internal only (M18 in
-                # MULTI_TENANT_AUDIT.md), so the lookup uses the UUID.
-                cart_uuid = (
-                    order.metadata.get("cart_snapshot", {}).get("cart_uuid")
-                    if order.metadata
-                    else None
-                )
-                if cart_uuid:
-                    cart = Cart.objects.filter(
-                        uuid=cart_uuid, user__isnull=True
-                    ).first()
-                    if cart:
-                        cart.delete()  # Delete entire cart
-                        logger.info(
-                            "Cleared guest cart %s after order %s creation",
-                            cart_uuid,
-                            order.id,
-                        )
-                else:
-                    logger.debug(
-                        "Guest order %s created - no cart_id in metadata",
-                        order.id,
-                    )
-        except Exception as e:
-            logger.error(
-                "Error clearing cart for order %s: %s",
-                order.id,
-                e,
-                exc_info=True,
-            )
-
-    # Clear cart after transaction commits
-    transaction.on_commit(clear_cart)
+    # Clear the cart — but NOT while the shopper still owes an online
+    # payment. See ``Order.awaits_online_payment``.
+    if not order.awaits_online_payment:
+        transaction.on_commit(lambda o=order: _clear_cart_for_order(o))
 
 
 @receiver(

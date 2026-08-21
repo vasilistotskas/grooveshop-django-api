@@ -266,11 +266,13 @@ class TestOrderServiceCreateOrderFromCart:
         assert self.product2.stock == 14  # 15 - 1 = 14
 
     @patch("order.payment.get_payment_provider")
-    def test_cart_clearing(self, mock_get_provider):
-        """
-        Test that cart is cleared after successful order creation.
+    def test_cart_clearing_for_offline_pay_way(self, mock_get_provider):
+        """Cart clears at creation when nothing is owed online.
 
-        Validates: Cart items are deleted after order is created
+        Pins ``is_online_payment=False`` deliberately. The pay-way
+        factory randomises that flag, and cart clearing now depends on
+        it (hosted flows keep the cart until ``order_paid``), so an
+        unpinned pay-way makes this assertion a coin flip.
         """
         # Mock payment provider
         mock_provider = Mock()
@@ -280,6 +282,10 @@ class TestOrderServiceCreateOrderFromCart:
         )
         mock_get_provider.return_value = mock_provider
 
+        offline_pay_way = PayWayFactory.create(
+            provider_code="cash_on_delivery", is_online_payment=False
+        )
+
         # Verify cart has items before
         assert self.cart.items.count() == 2
 
@@ -288,7 +294,7 @@ class TestOrderServiceCreateOrderFromCart:
             cart=self.cart,
             shipping_address=self.shipping_address,
             payment_intent_id=self.payment_intent_id,
-            pay_way=self.pay_way,
+            pay_way=offline_pay_way,
             user=self.user,
         )
 
@@ -297,6 +303,71 @@ class TestOrderServiceCreateOrderFromCart:
 
         # Verify order still has items
         assert order.items.count() == 2
+
+    @patch("order.payment.get_payment_provider")
+    def test_cart_survives_unpaid_hosted_checkout(self, mock_get_provider):
+        """A hosted flow must NOT destroy the cart before payment.
+
+        Viva and Stripe mint the Order first and then redirect off-site.
+        Clearing at creation meant abandoning that page — or pressing
+        Back — silently emptied the shopper's basket and stranded a
+        PENDING order. Production data to 2026-08-08: 35 Viva orders
+        ended CANCELED with payment PENDING against 27 COMPLETED.
+        """
+        mock_provider = Mock()
+        mock_provider.get_payment_status.return_value = (
+            PaymentStatus.PENDING,
+            {"status": "requires_payment_method"},
+        )
+        mock_get_provider.return_value = mock_provider
+
+        hosted_pay_way = PayWayFactory.create(
+            provider_code="viva_wallet", is_online_payment=True
+        )
+
+        assert self.cart.items.count() == 2
+
+        order = OrderService.create_order_from_cart(
+            cart=self.cart,
+            shipping_address=self.shipping_address,
+            payment_intent_id=self.payment_intent_id,
+            pay_way=hosted_pay_way,
+            user=self.user,
+        )
+
+        assert not order.is_paid
+        assert self.cart.items.count() == 2, (
+            "cart was destroyed before the shopper paid"
+        )
+
+    @patch("order.payment.get_payment_provider")
+    def test_cart_clears_once_hosted_payment_completes(self, mock_get_provider):
+        """``order_paid`` is what clears the cart for hosted flows."""
+        from order.signals import order_paid
+
+        mock_provider = Mock()
+        mock_provider.get_payment_status.return_value = (
+            PaymentStatus.PENDING,
+            {"status": "requires_payment_method"},
+        )
+        mock_get_provider.return_value = mock_provider
+
+        hosted_pay_way = PayWayFactory.create(
+            provider_code="viva_wallet", is_online_payment=True
+        )
+        order = OrderService.create_order_from_cart(
+            cart=self.cart,
+            shipping_address=self.shipping_address,
+            payment_intent_id=self.payment_intent_id,
+            pay_way=hosted_pay_way,
+            user=self.user,
+        )
+        # Still there — the shopper has not paid yet.
+        assert self.cart.items.count() == 2
+
+        order_paid.send(sender=type(order), order=order)
+
+        assert self.cart.items.count() == 0
 
     @patch("order.payment.get_payment_provider")
     def test_order_creation_without_reservations_uses_direct_decrement(

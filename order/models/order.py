@@ -487,6 +487,28 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         )
 
     @property
+    def awaits_online_payment(self) -> bool:
+        """True when the shopper still owes money through a hosted flow.
+
+        Hosted providers (Viva, Stripe) mint the Order FIRST and only
+        then redirect the shopper off-site to pay, so between those two
+        moments the order exists but nothing has been charged. The cart
+        must survive that window: clearing it at creation meant a
+        shopper who abandoned the hosted page — or simply pressed Back —
+        came back to an empty basket and a stranded PENDING order.
+        Production data for the five months to 2026-08-08: 35 Viva
+        orders ended CANCELED with payment still PENDING against 27
+        COMPLETED, so the abandoned path was the common one.
+
+        Cash-on-delivery is never "awaiting" — nothing is owed online,
+        so those carts still clear the moment the order is placed.
+        """
+        pay_way = self.pay_way
+        if pay_way is None or not pay_way.is_online_payment:
+            return False
+        return not self.is_paid
+
+    @property
     def can_be_canceled(self) -> bool:
         cancellable_statuses = [
             OrderStatus.PENDING,

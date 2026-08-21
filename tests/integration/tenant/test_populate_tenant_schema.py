@@ -21,6 +21,7 @@ All cleanup runs in ``teardown_method`` to keep each class isolated.
 from __future__ import annotations
 
 import io
+from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
@@ -756,13 +757,23 @@ class TestSeededTablesAreOverwritten:
     delivery-method step rendered empty.
     """
 
-    def test_shipping_provider_is_in_overwrite_tables(self):
+    def test_operator_editable_tables_are_not_overwritten(self):
+        """Overwrite entries are re-copied on EVERY deploy.
+
+        The PreSync hook runs this command (default --schema=webside) on
+        every release, so anything listed is truncated and re-seeded from
+        public each time — silently reverting operator edits made in
+        Django admin. shipping_shippingprovider was briefly listed to fix
+        the 2026-08-20 cutover, but carrier rows are operator-editable
+        (priority, is_active, metadata['station_origin'], logos), so the
+        divergence warning guards that case instead.
+        """
         from tenant.management.commands.populate_tenant_schema import (
             _OVERWRITE_TABLES,
         )
 
-        assert "shipping_shippingprovider" in _OVERWRITE_TABLES
         assert "extra_settings_setting" in _OVERWRITE_TABLES
+        assert "shipping_shippingprovider" not in _OVERWRITE_TABLES
 
     def test_overwrite_table_takes_public_values_over_seeded_rows(self):
         """Seeded tenant rows are replaced by public's, not kept."""
@@ -805,3 +816,95 @@ class TestSeededTablesAreOverwritten:
                 cursor.execute(
                     f"DELETE FROM public.{table} WHERE name LIKE 'POP_TEST_%'"
                 )
+
+
+# ---------------------------------------------------------------------------
+# Test: _OVERWRITE_TABLES must never truncate an FK target
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+class TestOverwriteRefusesFkTargets:
+    """A TRUNCATE ... CASCADE on an FK target destroys referencing rows.
+
+    On 2026-08-21 ``shipping_shippingprovider`` was added to
+    ``_OVERWRITE_TABLES`` with a comment asserting nothing referenced it.
+    Two tables did — ``order_order`` and
+    ``pay_way_paywayshippingexclusion`` — so the PreSync hook's
+    ``TRUNCATE ... CASCADE`` emptied 15 tables in production, every order
+    included. The safety property is now read from the live catalog, so
+    a wrong comment cannot cause it again.
+    """
+
+    schema = f"{_P}_fkguard"
+    parent = f"{_P}_fkguard_parent"
+    child = f"{_P}_fkguard_child"
+
+    def setup_method(self, _method):
+        with connection.cursor() as cursor:
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.schema}")
+            for sch in ("public", self.schema):
+                cursor.execute(
+                    f"CREATE TABLE IF NOT EXISTS {sch}.{self.parent}"
+                    " (id bigint PRIMARY KEY, label text)"
+                )
+                cursor.execute(
+                    f"CREATE TABLE IF NOT EXISTS {sch}.{self.child}"
+                    " (id bigint PRIMARY KEY, parent_id bigint"
+                    f" REFERENCES {sch}.{self.parent}(id))"
+                )
+            cursor.execute(
+                f"INSERT INTO public.{self.parent} (id, label)"
+                " VALUES (1, 'from-public')"
+            )
+            cursor.execute(
+                f"INSERT INTO {self.schema}.{self.parent} (id, label)"
+                " VALUES (1, 'seeded')"
+            )
+            # The row that CASCADE would silently destroy.
+            cursor.execute(
+                f"INSERT INTO {self.schema}.{self.child} (id, parent_id)"
+                " VALUES (99, 1)"
+            )
+
+    def teardown_method(self, _method):
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP SCHEMA IF EXISTS {self.schema} CASCADE")
+            cursor.execute(f"DROP TABLE IF EXISTS public.{self.child} CASCADE")
+            cursor.execute(f"DROP TABLE IF EXISTS public.{self.parent} CASCADE")
+
+    def test_refuses_to_truncate_a_table_other_rows_point_at(self):
+        from django.core.management.base import CommandError
+
+        import tenant.management.commands.populate_tenant_schema as mod
+
+        with patch.object(mod, "_OVERWRITE_TABLES", frozenset({self.parent})):
+            with pytest.raises(CommandError) as exc:
+                _run_command(self.schema, rebuild_mptt=False)
+
+        message = str(exc.value)
+        assert self.parent in message
+        assert "FOREIGN KEY" in message
+
+        # The referencing row must still be there — nothing was cascaded.
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT COUNT(*) FROM {self.schema}.{self.child}")
+            assert cursor.fetchone()[0] == 1, (
+                "CASCADE destroyed the referencing row"
+            )
+
+    def test_detects_the_inbound_foreign_key(self):
+        from tenant.management.commands.populate_tenant_schema import Command
+
+        cmd = Command()
+        with connection.cursor() as cursor:
+            refs = cmd._inbound_foreign_keys(cursor, self.schema, self.parent)
+        assert refs == [f"{self.child}.parent_id"]
+
+    def test_a_table_with_no_inbound_fks_reports_none(self):
+        from tenant.management.commands.populate_tenant_schema import Command
+
+        cmd = Command()
+        with connection.cursor() as cursor:
+            refs = cmd._inbound_foreign_keys(cursor, self.schema, self.child)
+        assert refs == []

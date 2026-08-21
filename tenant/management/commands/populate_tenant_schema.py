@@ -10,24 +10,30 @@ logger = logging.getLogger(__name__)
 
 # Tables that are seeded automatically by post_migrate signals, data
 # migrations, or other bootstrap hooks when ``migrate_schemas`` creates a
-# fresh tenant schema. For these tables the freshly-seeded rows must be
-# discarded and replaced with the production-tuned values that live in
-# the public schema.
+# fresh tenant schema. For these tables the freshly-seeded rows are
+# discarded and replaced with the values that live in the public schema.
 #
-# WHY THIS LIST MATTERS: the copy skips any table that already has rows,
-# so a seeded table silently keeps its DEFAULTS and the operator's real
-# configuration never arrives. This shipped a broken checkout to
-# production on 2026-08-20 — ``shipping_shippingprovider`` is seeded
-# inactive by its data migration, the copy skipped it, and every carrier
-# stayed ``is_active=false``, so ``/api/v1/shipping/options`` returned
-# ``[]`` and the delivery-method step rendered empty. Any table that is
-# both seeded at migrate time AND operator-editable belongs here.
+# ONLY add a table here when public is genuinely its source of truth.
+# The PreSync hook runs ``populate_tenant_schema`` (defaulting to
+# ``--schema=webside``) on EVERY deploy, so an entry in this set is
+# truncated and re-copied every time: any edit an operator makes to that
+# table through Django admin is silently reverted on the next release.
 #
-# The truncate is CASCADE-safe for both entries: neither is referenced by
-# a FK from another table, so the cascade never deletes anything extra.
-_OVERWRITE_TABLES: frozenset[str] = frozenset(
-    {"extra_settings_setting", "shipping_shippingprovider"}
-)
+# ``shipping_shippingprovider`` was briefly added here to fix the
+# cutover — it is seeded ``is_active=false`` by its data migration, the
+# copy skipped it as "already has data", every carrier stayed inactive
+# and ``/api/v1/shipping/options`` returned ``[]`` so the checkout's
+# delivery step rendered empty (production, 2026-08-20). But carrier
+# rows ARE operator-editable (priority, is_active, the
+# ``metadata['station_origin']`` override, logos), so overwriting them
+# every deploy trades a one-time cutover bug for a permanent one. The
+# divergence WARNING below is the correct guard: it surfaces the same
+# problem loudly, once, and leaves the fix to a human.
+#
+# The truncate is CASCADE-safe for this entry: extra_settings_setting is
+# not referenced by a FK from any other table, so the cascade never
+# deletes anything extra.
+_OVERWRITE_TABLES: frozenset[str] = frozenset({"extra_settings_setting"})
 
 # Sentinel: distinguishes "no default could be resolved" from a field
 # whose default legitimately IS None.
@@ -177,6 +183,32 @@ class Command(BaseCommand):
 
                 # Always-overwrite tables: truncate first, then copy.
                 if table in _OVERWRITE_TABLES:
+                    # REFUSE to truncate anything another table points at.
+                    # TRUNCATE ... CASCADE silently deletes every
+                    # referencing row, so one wrong entry in
+                    # _OVERWRITE_TABLES destroys unrelated business data.
+                    # This is not hypothetical: shipping_shippingprovider
+                    # was added to that set on 2026-08-21 with a comment
+                    # asserting it had no inbound FKs. It had two —
+                    # order_order and pay_way_paywayshippingexclusion —
+                    # and the PreSync hook wiped 15 tables in production,
+                    # including every order. The invariant is now checked
+                    # against the live catalog instead of trusted to a
+                    # comment.
+                    referencing = self._inbound_foreign_keys(
+                        cursor, schema, table
+                    )
+                    if referencing:
+                        raise CommandError(
+                            f'{schema}."{table}" is listed in '
+                            "_OVERWRITE_TABLES but is referenced by a "
+                            "FOREIGN KEY from: "
+                            + ", ".join(referencing)
+                            + ". TRUNCATE ... CASCADE would delete those "
+                            "rows too. Remove it from _OVERWRITE_TABLES — "
+                            "the divergence warning is the correct guard "
+                            "for a table that cannot be safely replaced."
+                        )
                     self.stdout.write(
                         f"  OVERWRITE {table} (always-replace table)"
                     )
@@ -375,6 +407,34 @@ class Command(BaseCommand):
             params.append(default)
 
         return ", ".join(cols), ", ".join(exprs), params
+
+    def _inbound_foreign_keys(
+        self, cursor, schema: str, table: str
+    ) -> list[str]:
+        """Return ``other_table.column`` for every FK pointing at *table*.
+
+        Read from the live catalog rather than assumed, because this is
+        the guard that decides whether a TRUNCATE ... CASCADE is safe.
+        """
+        cursor.execute(
+            """
+            SELECT tc.table_name || '.' || kcu.column_name
+              FROM information_schema.table_constraints tc
+              JOIN information_schema.key_column_usage kcu
+                ON kcu.constraint_name = tc.constraint_name
+               AND kcu.table_schema = tc.table_schema
+              JOIN information_schema.constraint_column_usage ccu
+                ON ccu.constraint_name = tc.constraint_name
+               AND ccu.table_schema = tc.table_schema
+             WHERE tc.constraint_type = 'FOREIGN KEY'
+               AND tc.table_schema = %s
+               AND ccu.table_name = %s
+               AND tc.table_name <> %s
+             ORDER BY 1
+            """,
+            [schema, table, table],
+        )
+        return [row[0] for row in cursor.fetchall()]
 
     def _required_target_only_columns(
         self, cursor, schema: str, table: str

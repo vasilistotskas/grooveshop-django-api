@@ -2034,6 +2034,123 @@ ROSETTA_ACCESS_CONTROL_FUNCTION = (
     "core.rosetta_access.tenant_scoped_rosetta_access"
 )
 
+# ─────────────────────────────────────────────────────────────────────
+# Platform control-plane admin (platform.grooveshop.space).
+#
+# A SEPARATE Unfold config, selected by
+# ``PlatformAdminSite.settings_name``. ``unfold.settings.get_config()``
+# merges this over ``CONFIG_DEFAULTS``, so only the differences from a
+# stock Unfold install are declared here — everything absent falls back
+# to Unfold's own defaults.
+#
+# Deliberately does NOT reuse UNFOLD above: that block carries tenant
+# #1's branding and a sidebar of per-store sections, neither of which
+# belongs on the control plane.
+# ─────────────────────────────────────────────────────────────────────
+UNFOLD_PLATFORM = {
+    "SITE_TITLE": _("Platform Admin"),
+    "SITE_HEADER": "Grooveshop Platform",
+    "SITE_SUBHEADER": _("Control plane"),
+    "SITE_SYMBOL": "hub",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": False,
+    "ENVIRONMENT": "admin.permissions.platform_environment",
+    "DASHBOARD_CALLBACK": "admin.platform_dashboard.dashboard_callback",
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": _("Control plane"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Dashboard"),
+                        "icon": "hub",
+                        "link": reverse_lazy("platform_admin:index"),
+                    },
+                    {
+                        "title": _("Tenants"),
+                        "icon": "storefront",
+                        "link": reverse_lazy(
+                            "platform_admin:tenant_tenant_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Tenant Domains"),
+                        "icon": "dns",
+                        "link": reverse_lazy(
+                            "platform_admin:tenant_tenantdomain_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Memberships"),
+                        "icon": "badge",
+                        "link": reverse_lazy(
+                            "platform_admin:tenant_usertenantmembership_changelist"
+                        ),
+                    },
+                ],
+            },
+            {
+                "title": _("Identity"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Platform Staff"),
+                        "icon": "manage_accounts",
+                        "link": reverse_lazy(
+                            "platform_admin:user_useraccount_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Groups"),
+                        "icon": "group",
+                        "link": reverse_lazy(
+                            "platform_admin:auth_group_changelist"
+                        ),
+                    },
+                ],
+            },
+            {
+                "title": _("Platform"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Settings"),
+                        "icon": "settings",
+                        "link": reverse_lazy(
+                            "platform_admin:extra_settings_setting_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Scheduled Tasks"),
+                        "icon": "schedule",
+                        "link": reverse_lazy(
+                            "platform_admin:django_celery_beat_periodictask_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Countries"),
+                        "icon": "public",
+                        "link": reverse_lazy(
+                            "platform_admin:country_country_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Regions"),
+                        "icon": "map",
+                        "link": reverse_lazy(
+                            "platform_admin:region_region_changelist"
+                        ),
+                    },
+                ],
+            },
+        ],
+    },
+}
+
+
 UNFOLD = {
     "SITE_TITLE": getenv("UNFOLD_SITE_TITLE", "Webside Admin"),
     "SITE_HEADER": getenv("UNFOLD_SITE_HEADER", "Webside"),

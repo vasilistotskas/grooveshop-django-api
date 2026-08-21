@@ -1,0 +1,117 @@
+{% extends "admin/base.html" %}
+
+{% comment %}
+The CONTROL PLANE dashboard.
+
+A separate template from admin/index.html because that one is a
+merchant's dashboard (revenue, pending orders, product shortcuts) and
+AdminSite.index() resolves "admin/index.html" globally, so without this
+file the platform console rendered tenant #1's dashboard and none of
+its own figures. Selected via PlatformAdminSite.index_template.
+
+Context comes from admin.platform_dashboard.dashboard_callback.
+
+Note: {# #} is SINGLE-LINE in Django templates — a multi-line one is
+emitted verbatim into the page. Use {% comment %} for prose like this.
+{% endcomment %}
+{% load i18n unfold %}
+
+{% block title %}{% trans "Control plane" %} | {{ site_title }}{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">{{ site_title }}</a>
+</h1>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6">
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# Header                                                          #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {% url 'admin:tenant_tenant_add' as new_tenant_url %}
+    {% url 'admin:tenant_tenant_changelist' as tenants_url %}
+    {% url 'admin:tenant_tenantdomain_changelist' as domains_url %}
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+            {% component "unfold/components/title.html" %}{% trans "Control plane" %}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Stores on this platform, their domains and provisioning state." %}{% endcomponent %}
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% if new_tenant_url %}
+                {% component "unfold/components/button.html" with href=new_tenant_url icon="add_circle" variant="default" %}{% trans "New Store" %}{% endcomponent %}
+            {% endif %}
+            {% if domains_url %}
+                {% component "unfold/components/button.html" with href=domains_url icon="dns" variant="default" %}{% trans "Domains" %}{% endcomponent %}
+            {% endif %}
+        </div>
+    </div>
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# Estate counters                                                 #}
+    {# ────────────────────────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+        {% component "unfold/components/card.html" with href=tenants_url %}
+            <div class="flex items-start justify-between">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-950 text-primary-600 dark:text-primary-300">
+                    {% component "unfold/components/icon.html" %}storefront{% endcomponent %}
+                </div>
+            </div>
+            <div class="font-semibold mt-4 text-2xl text-important">{{ platform_tenant_count }}</div>
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Stores" %}{% endcomponent %}
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" %}
+            <div class="flex items-start justify-between">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-300">
+                    {% component "unfold/components/icon.html" %}check_circle{% endcomponent %}
+                </div>
+            </div>
+            <div class="font-semibold mt-4 text-2xl text-important">{{ platform_active_count }}</div>
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Live" %}{% endcomponent %}
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" %}
+            <div class="flex items-start justify-between">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-300">
+                    {% component "unfold/components/icon.html" %}pause_circle{% endcomponent %}
+                </div>
+            </div>
+            <div class="font-semibold mt-4 text-2xl text-important">{{ platform_suspended_count }}</div>
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Suspended" %}{% endcomponent %}
+        {% endcomponent %}
+
+        {% comment %}
+        A stalled beat stops every store's carrier polling at once, so
+        it belongs on the platform's own dashboard.
+        {% endcomment %}
+        {% component "unfold/components/card.html" %}
+            <div class="flex items-start justify-between">
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 dark:bg-orange-950 text-orange-600 dark:text-orange-300">
+                    {% component "unfold/components/icon.html" %}schedule{% endcomponent %}
+                </div>
+            </div>
+            <div class="font-semibold mt-4 text-2xl text-important">
+                {% if platform_periodic_tasks is None %}—{% else %}{{ platform_periodic_tasks }}{% endif %}
+            </div>
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Scheduled tasks" %}{% endcomponent %}
+        {% endcomponent %}
+
+    </div>
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# The estate                                                      #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {% trans "Stores" as stores_title %}
+    {% component "unfold/components/card.html" with title=stores_title %}
+        {% if platform_tenants_table.rows %}
+            {% component "unfold/components/table.html" with table=platform_tenants_table card_included=1 striped=1 %}{% endcomponent %}
+        {% else %}
+            {% component "unfold/components/text.html" %}{% trans "No stores yet." %}{% endcomponent %}
+        {% endif %}
+    {% endcomponent %}
+
+</div>
+{% endblock %}

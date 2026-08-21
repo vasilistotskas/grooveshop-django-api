@@ -15,6 +15,7 @@ instead of using ``include("core.urls")`` because ``core.urls`` uses
 
 from django.urls import path
 
+from admin.platform_site import platform_admin_site
 from core.urls import urlpatterns as core_urlpatterns
 from tenant.views import TenantAdminViewSet
 
@@ -31,6 +32,12 @@ _admin_detail = TenantAdminViewSet.as_view(
 )
 
 urlpatterns = [
+    # The control-plane admin. Listed BEFORE ``core_urlpatterns`` so it
+    # shadows the shared tenant admin that ``core.urls`` mounts at the
+    # same path: Django resolves in order, and on the public schema the
+    # platform site is the one that should answer. Tenant hosts never
+    # reach this module — it is only loaded via PUBLIC_SCHEMA_URLCONF.
+    path("admin/", platform_admin_site.urls),
     path("api/v1/tenant/admin/", _admin_list, name="tenant-admin-list"),
     path(
         "api/v1/tenant/admin/<int:pk>/",

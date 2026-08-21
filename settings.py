@@ -305,6 +305,14 @@ AUTHENTICATION_BACKENDS = [
     # the session to be a member of this setting, or it silently logs
     # the user out on the very next request.
     "tenant.auth_backends.PlatformStaffBackend",
+    # Turns a UserTenantMembership role into Django model permissions
+    # for the tenant currently on the connection. Answers permissions
+    # only (its authenticate() returns None) and grants nothing unless
+    # the user object was loaded from the PUBLIC schema by
+    # PlatformStaffBackend — so it is confined to admin sessions and
+    # cannot be reached by a tenant-schema customer whose pk or email
+    # happens to collide with a platform identity.
+    "tenant.auth_backends.TenantRolePermissionBackend",
 ]
 
 WSGI_APPLICATION = "wsgi.application"

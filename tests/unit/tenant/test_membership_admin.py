@@ -48,8 +48,14 @@ class TestUserFieldQueryset:
         assert field.queryset.model is UserAccountFactory._meta.model
 
     def test_other_fk_fields_use_default_behaviour(self):
-        """Only ``user`` gets the schema pin — ``tenant`` keeps the
-        default ``formfield_for_foreignkey`` behaviour."""
+        """Only ``user`` gets the schema pin.
+
+        ``tenant`` keeps the default behaviour on the PLATFORM console,
+        which is what this request represents. It IS narrowed to the
+        operator's own store on a tenant host — see
+        ``test_admin_self_service.py`` — so that a store ADMIN cannot
+        grant themselves membership in someone else's store.
+        """
         request = RequestFactory().get(
             "/admin/tenant/usertenantmembership/add/"
         )

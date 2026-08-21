@@ -29,7 +29,12 @@ from unfold.admin import ModelAdmin
 from unfold.decorators import action
 from unfold.enums import ActionVariant
 
-from tenant.models import Tenant, TenantDomain, UserTenantMembership
+from tenant.models import (
+    Tenant,
+    TenantDomain,
+    TenantMembershipRole,
+    UserTenantMembership,
+)
 
 # Schemas that can never be suspended, activated, or destroyed via the
 # admin. Destroying these would break the platform.
@@ -42,6 +47,31 @@ _SUSPEND_COOLDOWN = timedelta(hours=24)
 class TenantDomainInline(admin.TabularInline):
     model = TenantDomain
     extra = 1
+
+
+def self_service_tenant(request):
+    """The store a non-platform operator is administering, else None.
+
+    Returns None for platform superusers (who are unrestricted, and
+    bypass permission checks anyway) and on the public schema, so every
+    caller can read a non-None result as "restrict to this one store".
+
+    This is the object-scoping half of role-derived permissions:
+    ``TenantRolePermissionBackend`` decides that a store ADMIN/OWNER may
+    reach ``Tenant`` at all, and this decides that they may only reach
+    THEIR row. Without it, ``change_tenant`` would be a licence to edit
+    every merchant's payment credentials.
+    """
+    # ``request.user`` is guaranteed on any real admin request
+    # (AuthenticationMiddleware), but not on a bare RequestFactory one —
+    # and a missing user must not raise from inside a formfield hook.
+    user = getattr(request, "user", None)
+    if getattr(user, "is_superuser", False):
+        return None
+
+    from tenant.membership import get_current_tenant  # noqa: PLC0415
+
+    return get_current_tenant()
 
 
 @admin.register(Tenant)
@@ -69,6 +99,53 @@ class TenantAdmin(ModelAdmin):
     # Disable the default bulk-delete action — use our explicit
     # suspend / destroy actions instead so safety checks always run.
     actions = ["suspend_tenants", "activate_tenants", "destroy_tenants"]
+
+    def get_queryset(self, request):
+        """A store operator sees only their own row."""
+        qs = super().get_queryset(request)
+        scope = self_service_tenant(request)
+        if scope is None:
+            return qs
+        return qs.filter(pk=scope.pk)
+
+    def get_readonly_fields(self, request, obj=None):
+        """Everything except the merchant's own settings.
+
+        An ALLOWLIST (``TENANT_SELF_EDITABLE_FIELDS``), so a field added
+        to ``Tenant`` later is read-only until someone decides it is the
+        merchant's to change. A denylist would silently expose it.
+        """
+        readonly = super().get_readonly_fields(request, obj)
+        if self_service_tenant(request) is None:
+            return readonly
+
+        from tenant.role_scopes import (  # noqa: PLC0415
+            TENANT_SELF_EDITABLE_FIELDS,
+        )
+
+        return tuple(
+            field.name
+            for field in self.model._meta.fields
+            if field.name not in TENANT_SELF_EDITABLE_FIELDS
+        )
+
+    def has_add_permission(self, request):
+        """Only the platform creates stores."""
+        if self_service_tenant(request) is not None:
+            return False
+        return super().has_add_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        """Only the platform destroys stores."""
+        if self_service_tenant(request) is not None:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def get_inlines(self, request, obj):
+        """Domains are platform-controlled — they steer routing and TLS."""
+        if self_service_tenant(request) is not None:
+            return []
+        return super().get_inlines(request, obj)
 
     fieldsets = [
         (
@@ -251,12 +328,35 @@ class TenantAdmin(ModelAdmin):
     ]
 
     def has_module_permission(self, request):
-        return connection.schema_name == "public"
+        """Public always; a tenant host only for its own ADMIN/OWNER.
+
+        This was public-only, which made "ADMIN — full admin within the
+        tenant (settings, team)" unreachable: a merchant could not edit
+        their own store name, branding or payment credentials. The grant
+        comes from the role (``TenantRolePermissionBackend`` withholds
+        it from STAFF), and ``get_queryset`` plus ``get_readonly_fields``
+        confine it to their own row and their own fields.
+        """
+        if connection.schema_name == "public":
+            return True
+        return request.user.has_perm("tenant.change_tenant")
 
     def get_actions(self, request):
-        """Remove the default delete_selected action entirely."""
+        """Drop delete_selected, and platform lifecycle for merchants.
+
+        Suspend/activate/destroy are the platform's levers; leaving them
+        exposed would let a merchant suspend — or destroy — their own
+        store from the store admin.
+        """
         actions = super().get_actions(request)
         actions.pop("delete_selected", None)
+        if self_service_tenant(request) is not None:
+            for name in (
+                "suspend_tenants",
+                "activate_tenants",
+                "destroy_tenants",
+            ):
+                actions.pop(name, None)
         return actions
 
     # ------------------------------------------------------------------
@@ -456,9 +556,77 @@ class UserTenantMembershipAdmin(ModelAdmin):
     readonly_fields = ["created_at", "updated_at"]
 
     def has_module_permission(self, request):
-        # Membership admin is a platform-wide surface — like Tenant and
-        # TenantDomain, it must not leak into tenant-scoped admin.
-        return connection.schema_name == "public"
+        """Public always; a tenant host only for its own ADMIN/OWNER.
+
+        This used to be public-only, which made "ADMIN — full admin
+        within the tenant (settings, team)" unimplementable: a store
+        owner could not add or remove their own staff. The grant now
+        comes from the role (``TenantRolePermissionBackend`` withholds
+        it from STAFF), and ``get_queryset`` confines it to that store's
+        own rows.
+        """
+        if connection.schema_name == "public":
+            return True
+        return request.user.has_perm("tenant.view_usertenantmembership")
+
+    def get_queryset(self, request):
+        """A store operator sees only their own store's team."""
+        qs = super().get_queryset(request)
+        scope = self_service_tenant(request)
+        if scope is None:
+            return qs
+        return qs.filter(tenant=scope)
+
+    def has_change_permission(self, request, obj=None):
+        """Only an OWNER may edit an OWNER row.
+
+        "OWNER — same as ADMIN plus cannot be demoted/removed by other
+        admins" (TenantMembershipRole). Without this an ADMIN could
+        demote the owner and take the store.
+        """
+        if not super().has_change_permission(request, obj):
+            return False
+        return self._may_act_on(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if not super().has_delete_permission(request, obj):
+            return False
+        return self._may_act_on(request, obj)
+
+    def _may_act_on(self, request, obj) -> bool:
+        scope = self_service_tenant(request)
+        if scope is None or obj is None:
+            return True
+        if obj.role != TenantMembershipRole.OWNER:
+            return True
+
+        from tenant.membership import get_membership  # noqa: PLC0415
+
+        membership = get_membership(request.user, scope)
+        return (
+            membership is not None
+            and membership.role == TenantMembershipRole.OWNER
+        )
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        """An ADMIN cannot mint an OWNER — only an OWNER can."""
+        if db_field.name == "role":
+            scope = self_service_tenant(request)
+            if scope is not None:
+                from tenant.membership import get_membership  # noqa: PLC0415
+
+                membership = get_membership(request.user, scope)
+                is_owner = (
+                    membership is not None
+                    and membership.role == TenantMembershipRole.OWNER
+                )
+                if not is_owner:
+                    kwargs["choices"] = [
+                        (value, label)
+                        for value, label in db_field.choices
+                        if value != TenantMembershipRole.OWNER
+                    ]
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """Pin the ``user`` FK choices to the PUBLIC schema.
@@ -489,4 +657,11 @@ class UserTenantMembershipAdmin(ModelAdmin):
             kwargs["queryset"] = user_model.objects.filter(
                 pk__in=public_user_ids
             )
+        elif db_field.name == "tenant":
+            # A store operator may only grant membership in THEIR store.
+            # Without this the dropdown lists every tenant, and saving
+            # one would hand them a foothold in another merchant's admin.
+            scope = self_service_tenant(request)
+            if scope is not None:
+                kwargs["queryset"] = Tenant.objects.filter(pk=scope.pk)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)

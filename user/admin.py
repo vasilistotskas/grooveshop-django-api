@@ -284,6 +284,29 @@ class UserAdmin(ExportActionMixin, BaseModelAdmin):
         "loyalty_tier_name",
     ]
 
+    # Fields that hand out privilege. Only a superuser may set them.
+    #
+    # On a tenant host this admin edits that store's CUSTOMERS (``user``
+    # is in both SHARED_APPS and TENANT_APPS, and the tenant copy wins
+    # on the search path). A store operator holding
+    # ``user.change_useraccount`` could otherwise tick ``is_staff`` on
+    # any customer — and DRF's ``IsAdminUser`` is exactly
+    # ``user.is_staff``, so that is an API-admin grant, not a cosmetic
+    # flag. ``groups``/``user_permissions`` are listed for the same
+    # reason: they are the other route to the same privilege.
+    PRIVILEGE_FIELDS = (
+        "is_staff",
+        "is_superuser",
+        "groups",
+        "user_permissions",
+    )
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = tuple(super().get_readonly_fields(request, obj))
+        if getattr(request.user, "is_superuser", False):
+            return readonly
+        return readonly + self.PRIVILEGE_FIELDS
+
     ordering = ["-created_at"]
     date_hierarchy = "created_at"
 

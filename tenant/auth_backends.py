@@ -32,10 +32,18 @@ standard backend chain.
 from __future__ import annotations
 
 from django.contrib.auth import BACKEND_SESSION_KEY
-from django.contrib.auth.backends import ModelBackend
+from django.contrib.auth.backends import BaseBackend, ModelBackend
 from django_tenants.utils import get_public_schema_name, schema_context
 
 PLATFORM_STAFF_BACKEND_PATH = "tenant.auth_backends.PlatformStaffBackend"
+
+# Marks a user object as having been loaded from the PUBLIC schema by
+# this backend — i.e. a platform identity rather than a tenant-schema
+# customer that merely shares its primary key (or its email).
+#
+# ``TenantRolePermissionBackend`` grants nothing without it. See that
+# class for why this attribute, and not the pk, is the safe signal.
+PLATFORM_IDENTITY_ATTR = "_is_platform_identity"
 
 
 class PlatformStaffBackend(ModelBackend):
@@ -63,11 +71,184 @@ class PlatformStaffBackend(ModelBackend):
             return None
         if not (user.is_active and user.is_staff):
             return None
+        setattr(user, PLATFORM_IDENTITY_ATTR, True)
         return user
 
     def get_user(self, user_id):
         with schema_context(get_public_schema_name()):
-            return super().get_user(user_id)
+            user = super().get_user(user_id)
+        if user is not None:
+            setattr(user, PLATFORM_IDENTITY_ATTR, True)
+        return user
+
+
+class TenantRolePermissionBackend(BaseBackend):
+    """Derives model permissions from a user's role in the CURRENT tenant.
+
+    ``UserTenantMembership`` has always described what each role may do,
+    but nothing turned that into Django permissions: ``tenant_create``
+    issues a membership and no Group exists anywhere. So the membership
+    gate admitted a store operator to ``/admin/`` while every model page
+    answered 403 — the tenant admin worked only for platform
+    superusers, who bypass permission checks entirely. Reported from
+    production 2026-08-21 by tenant #1's owner.
+
+    Why permissions are COMPUTED rather than stored as Group rows:
+
+    - ``has_perm`` is a plain string check, so no ``auth_permission``
+      row needs to exist. That matters here because ``auth`` is in BOTH
+      SHARED_APPS and TENANT_APPS: a Group row would live in whichever
+      schema the connection happened to be pinned to, and the lookup
+      would then match by ID across schemas.
+    - Nothing to provision, so onboarding a store cannot forget it, and
+      nothing drifts as models are added.
+
+    Why ``PLATFORM_IDENTITY_ATTR`` and not the user's pk:
+
+      ``UserAccount`` is mirrored per schema. A tenant-schema CUSTOMER
+      can share a pk with a public-schema staff identity — the pks only
+      line up today because the cutover copied users id-preserving, and
+      post-cutover signups get per-schema ids. Matching on email is no
+      safer: a shopper can register a tenant-schema account with a
+      platform operator's address. The only sound signal is provenance,
+      so this backend grants exclusively to user objects that
+      ``PlatformStaffBackend`` loaded from the public schema. Admin
+      sessions qualify; storefront/API sessions never do, which also
+      keeps this out of the DRF permission path where authorization is
+      ``HasTenantAccess`` plus role, not Django model permissions.
+
+    Platform-scope apps are never granted, at any role — see
+    ``tenant.role_scopes.PLATFORM_ONLY_APP_LABELS``. The narrow grants
+    ADMIN/OWNER receive over their own Tenant row and their own team are
+    object-scoped in the ModelAdmin, not here; this layer only decides
+    that the model class is reachable at all.
+    """
+
+    def authenticate(self, request, **kwargs):
+        """Never authenticates — this backend only answers permissions."""
+        return None
+
+    def get_all_permissions(self, user_obj, obj=None) -> set[str]:
+        # Object-level permissions are not modelled here; returning an
+        # empty set lets other backends answer object checks.
+        if obj is not None:
+            return set()
+        if not getattr(user_obj, "is_active", False):
+            return set()
+        # Provenance gate — see class docstring.
+        if not getattr(user_obj, PLATFORM_IDENTITY_ATTR, False):
+            return set()
+
+        from tenant.membership import (  # noqa: PLC0415
+            get_current_tenant,
+            get_membership,
+        )
+
+        tenant = get_current_tenant()
+        if tenant is None:
+            return set()
+
+        # Cache per (user object, tenant). Keyed by tenant because one
+        # process serves many tenants and a user may hold different
+        # roles in each; an unkeyed cache would leak the first tenant's
+        # answer into the next request handled on the same object.
+        cache_attr = f"_tenant_role_perms_{tenant.pk}"
+        cached = getattr(user_obj, cache_attr, None)
+        if cached is not None:
+            return cached
+
+        membership = get_membership(user_obj, tenant)
+        perms = (
+            _permissions_for_role(membership.role)
+            if membership is not None
+            else set()
+        )
+        setattr(user_obj, cache_attr, perms)
+        return perms
+
+    def has_perm(self, user_obj, perm, obj=None) -> bool:
+        return perm in self.get_all_permissions(user_obj, obj)
+
+    def has_module_perms(self, user_obj, app_label) -> bool:
+        prefix = f"{app_label}."
+        return any(
+            perm.startswith(prefix)
+            for perm in self.get_all_permissions(user_obj)
+        )
+
+
+def _permissions_for_apps(
+    app_labels: frozenset[str] | set[str],
+    actions: tuple[str, ...] | None = None,
+) -> set[str]:
+    """Every permission codename owned by *app_labels*.
+
+    Built from the app registry rather than the ``auth_permission``
+    table so the result does not depend on which schema is on the
+    search path — and so a model added later is covered without a
+    migration or a data fixture.
+    """
+    from django.apps import apps as django_apps  # noqa: PLC0415
+    from django.contrib.auth import get_permission_codename  # noqa: PLC0415
+
+    perms: set[str] = set()
+    for model in django_apps.get_models():
+        opts = model._meta
+        if opts.app_label not in app_labels:
+            continue
+        allowed = actions or opts.default_permissions
+        for action in opts.default_permissions:
+            if action not in allowed:
+                continue
+            perms.add(
+                f"{opts.app_label}.{get_permission_codename(action, opts)}"
+            )
+        # Custom Meta.permissions are store-scope too, but only for
+        # roles that get the full action set — a custom permission has
+        # no action to compare against, so it cannot be filtered.
+        if actions is None:
+            for codename, _label in opts.permissions:
+                perms.add(f"{opts.app_label}.{codename}")
+    return perms
+
+
+def _permissions_for_role(role: str) -> set[str]:
+    """The permission set a role grants inside its tenant."""
+    from tenant.models import TenantMembershipRole  # noqa: PLC0415
+    from tenant.role_scopes import (  # noqa: PLC0415
+        operational_app_labels,
+        store_app_labels,
+    )
+
+    if role == TenantMembershipRole.STAFF:
+        # "can view the tenant's operational admin (orders, products)
+        # but cannot change tenant settings or invite other staff"
+        # (TenantMembershipRole). Delete is withheld as well: it is the
+        # irreversible action, and nothing in that description implies
+        # it.
+        return _permissions_for_apps(
+            operational_app_labels(), actions=("view", "add", "change")
+        )
+
+    if role in (TenantMembershipRole.ADMIN, TenantMembershipRole.OWNER):
+        perms = _permissions_for_apps(store_app_labels())
+        # Narrow, deliberate exceptions to "platform scope is never
+        # granted": a store's own row and its own team. Object scoping
+        # (own tenant only) is enforced in the ModelAdmin — this only
+        # makes the pages reachable. add/delete Tenant and anything on
+        # TenantDomain stay platform-only.
+        perms |= {
+            "tenant.view_tenant",
+            "tenant.change_tenant",
+            "tenant.view_usertenantmembership",
+            "tenant.add_usertenantmembership",
+            "tenant.change_usertenantmembership",
+            "tenant.delete_usertenantmembership",
+        }
+        return perms
+
+    # MEMBER (retired) and anything unrecognised grant nothing.
+    return set()
 
 
 def is_platform_staff_session(request) -> bool:

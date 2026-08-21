@@ -3,6 +3,64 @@
 
 
 
+## v3.2.0 (2026-08-21)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.1.0 [skip ci] ([`7c600ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7c600ca8e2f955a0c9f7d2b06c5866b904f300d2))
+
+### Features
+
+* feat(api): gate administrative API routes on platform superuser
+
+DRF's IsAdminUser is literally request.user.is_staff, and on an API
+request that flag lives on a TENANT-schema row: knox is in TENANT_APPS
+only, so a token is per-schema and request.user is always a user from
+that store's schema. Those rows are the store's CUSTOMERS. The
+multi-tenant cutover copied users id-preserving, so several customer
+rows carried is_staff purely as residue -- and IsAdminUser handed those
+accounts administrative rights over the catalogue.
+
+Membership cannot authorize an API request either, which is why this is
+not simply "use HasTenantAccess like the admin does".
+UserTenantMembership.user is an FK to public.user_useraccount, so
+matching it against a tenant-schema user compares primary keys ACROSS
+schemas and matches whichever public row shares the pk. The admin closes
+that with a provenance stamp set when PlatformStaffBackend loads a user
+from public; an API session can never carry it. page_config had exactly
+this pairing (audit H22) and it held only because the cutover aligned
+the ids.
+
+So the API has no sound notion of "store staff", and these routes have
+no first-party consumer: the storefront never writes catalogue
+resources (its writes are comments, likes, view counts) and the agent
+gateway only reads them -- verified path by path, including that
+GET /cart maps to retrieve, not the IsAdminUser-gated list at
+/cart/list. Administrative routes are therefore platform-only, and
+store operators administer their store through the Django admin where
+role-derived permissions apply properly.
+
+Granting store operators programmatic access needs a real staff
+identity for the API: public-schema authentication, the provenance
+stamp instead of pk matching, and authorization reusing
+tenant.role_scopes so the admin and API cannot drift. That design is
+recorded in docs/api-staff-identity.md with its revisit triggers rather
+than built speculatively for an API with no caller.
+
+The H22 static guard is rewritten rather than deleted: it still guards
+the concern (platform-staff must not mutate another tenant's layout)
+but through the new mechanism, and pins the absence of the unsound
+membership check so it cannot return unnoticed. A store ADMIN being
+refused is pinned as a test so the deferral is enforced, not
+remembered.
+
+Note IsPlatformOperator (tenant/views.py) is deliberately unchanged --
+it already requires superuser AND a platform-staff session, which is
+stricter.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`1b86d27`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b86d2788a8d6ef4ac7e307aebdd453de3d3b301))
+
 ## v3.1.0 (2026-08-21)
 
 ### Bug fixes

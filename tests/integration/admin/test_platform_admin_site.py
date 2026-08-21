@@ -178,6 +178,7 @@ class TestPlatformDashboardPage(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        from tenant.models import Tenant
         from user.models import UserAccount
 
         cls.user = UserAccount.objects.create_superuser(
@@ -185,6 +186,19 @@ class TestPlatformDashboardPage(TestCase):
             username="platformdashboard",
             password="testpass123",
         )
+        # The estate table renders only when a store exists — otherwise
+        # the page shows "No stores yet." and asserting on the table's
+        # contents passes or fails on whatever other tests left in the
+        # shared xdist database. CI's clean database caught exactly that.
+        cls.store = Tenant(
+            schema_name="dashboard_estate_tenant",
+            name="Dashboard Estate Tenant",
+            slug="dashboard-estate-tenant",
+            owner_email="owner-dashboard-estate@example.com",
+            store_name="Dashboard Estate Store",
+        )
+        cls.store.auto_create_schema = False
+        cls.store.save()
 
     def _render(self) -> str:
         """Render the control-plane index for a real platform-staff session.
@@ -239,9 +253,16 @@ class TestPlatformDashboardPage(TestCase):
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_shows_the_tenant_estate(self):
+        """Assert on DATA, not on labels.
+
+        Header text goes through gettext and the admin renders in the
+        default locale, so a label assertion turns into a bet on the
+        translation catalogue. A store's own name and schema are
+        neither translated nor collated.
+        """
         html = self._render()
-        assert "Schema" in html
-        assert "Scheduled tasks" in html
+        assert self.store.store_name in html
+        assert self.store.schema_name in html
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_renders_the_curated_sidebar(self):

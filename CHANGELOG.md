@@ -3,6 +3,128 @@
 
 
 
+## v3.0.0 (2026-08-21)
+
+### Bug fixes
+
+* fix(tenant)!: never TRUNCATE a table other rows reference
+
+_OVERWRITE_TABLES entries are TRUNCATE ... CASCADE'd on every run, and
+the PreSync hook runs populate_tenant_schema (default --schema=webside)
+on every deploy. shipping_shippingprovider was added to that set with a
+comment asserting nothing referenced it. Two tables did —
+order_order.shipping_provider_id and
+pay_way_paywayshippingexclusion.shipping_provider_id — so the CASCADE
+emptied 15 tables in production: 228 orders, 231 order items, 1943
+history rows, 159 ACS shipments, 42 BoxNow shipments, 607 stock logs,
+250 reservations and more. Recovered from the public schema; the two
+orders created after the cutover existed only in the tenant schema and
+are unrecoverable.
+
+Two independent guards, because the comment was the only thing standing
+between a config list and a destructive TRUNCATE:
+
+1. shipping_shippingprovider is removed from _OVERWRITE_TABLES. Carrier
+   rows are operator-editable (priority, is_active,
+   metadata['station_origin'], logos), so re-seeding them from public
+   every deploy would revert admin edits even when it is not destroying
+   orders. The divergence WARNING added alongside is the correct guard:
+   it surfaced this exact table loudly and once.
+
+2. The command now reads information_schema before any TRUNCATE and
+   raises CommandError naming the referencing columns if anything points
+   at the table. The invariant is checked against the live catalog
+   instead of trusted to a comment.
+
+Both guards are verified by removing them: without (1) the list test
+fails; without (2) the truncate proceeds and the test's referencing row
+is destroyed.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`0289873`](https://github.com/vasilistotskas/grooveshop-django-api/commit/02898733dd8b3ae42fe0c1aaa4bb5208390d08fa))
+
+### Chores
+
+* chore(deps): bump runtime dependencies and refresh uv.lock
+
+pyproject.toml carried bumps with an untouched uv.lock, so
+`uv sync --locked` — which CI uses — would have failed, and the venv
+still held the previous versions.
+
+flower 2.0.1 -> 2.1.0
+gunicorn 26.0.0 -> 26.1.0
+uvicorn 0.52.3 -> 0.52.4
+python-dotenv 1.2.2 -> 1.2.3
+charset_normalizer 3.5.0 -> 3.5.1
+disposable-email-domains 0.0.237 -> 0.0.241
+
+All patch/minor, no majors. gunicorn 26.1.0 adds glob support in
+reload_extra_files and raises dependency floors past known advisories —
+including tornado>=6.5.7, which the existing CVE override (tornado
+>=6.5.6, see [tool.uv] override-dependencies) already satisfies;
+resolved tornado is 6.5.7. flower 2.1.0 is UI work plus a read-only
+mode, with no breaking changes.
+
+Validated: ruff format/check, ty, `manage.py check --deploy` and two
+consecutive full parallel suites (5659 passed) all clean.
+
+NOT validated locally: gunicorn and flower cannot run on Windows —
+gunicorn is POSIX-only (ModuleNotFoundError: fcntl) and flower blocks on
+a broker connection. Both are exercised only in the Linux container, so
+the Docker build and deploy are where they are actually proven.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`78f521e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/78f521e1f9e3eb7d6a2cf6890b4c2b9f9b4bc41b))
+
+* chore(deps): sync uv.lock to 2.0.3 [skip ci] ([`c09f07f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c09f07fd85955463a508ed965c3ce96d12d631f5))
+
+### Documentation
+
+* docs(settings): correct the Celery result-backend comment
+
+The comment stated task results use CELERY_RESULT_BACKEND="django-db"
+and that django_celery_results sits in TENANT_APPS so per-schema tables
+exist. The first half is only the DEFAULT: production overrides the
+backend to Redis, so those per-schema tables stay empty there.
+
+On 2026-08-21 a production audit queried
+django_celery_results_taskresult in both the webside and public
+schemas, found 0 rows, and nearly concluded no Celery tasks were
+running at all — they were, with results in Redis.
+
+Records which half is the default, which is overridden, and to check
+the environment's actual backend before reading task history.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`4fdeb22`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4fdeb223ced3ec04eeb7fc62e29a9799794b53c2))
+
+### Testing
+
+* test(conftest): use an in-memory channel layer instead of real Redis
+
+CHANNEL_LAYERS had no test override, so the suite ran against the
+production RedisChannelLayer. Any path emitting a websocket notification
+— notification.tasks.send_notification_task, reached indirectly by
+order and loyalty flows — therefore made a live async Redis round-trip
+per test, and under `-n auto` every worker hit the same local instance
+at once. Connections were reset mid-command and the test died with
+
+ConnectionResetError: [WinError 10054]
+-> redis.exceptions.ConnectionError
+
+which has nothing to do with the behaviour under test, and surfaced in a
+DIFFERENT test on each run. test_idempotency_guard_prevents_double_award
+failed 2 of 3 full-suite runs while passing every time in isolation,
+which is what made it look like an unrelated flake.
+
+InMemoryChannelLayer keeps group_send working — the calls are still
+exercised — without leaving the process. Two consecutive full parallel
+runs: 5659 passed, zero connection errors in either log. The suite also
+runs ~90s faster, which is the Redis round-trips no longer happening.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`4be2fe5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4be2fe5e54e48d659e15c898d701aa694b1e8596))
+
 ## v2.0.3 (2026-08-21)
 
 ### Bug fixes

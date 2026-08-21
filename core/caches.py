@@ -5,6 +5,8 @@ from typing import Any, Awaitable, cast
 
 from django.conf import settings
 from django.core.cache.backends.redis import RedisCache, RedisCacheClient
+from redis.backoff import ExponentialBackoff
+from redis.retry import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +14,33 @@ ONE_HOUR = 60 * 60
 ONE_DAY = ONE_HOUR * 24
 
 _SCAN_BATCH_SIZE = 500
+
+# redis-py ships every resilience feature OFF by default: the sync
+# Connection defaults are ``retry=None``, ``health_check_interval=0``
+# and ``socket_keepalive=False``. Django never overrides them, so a
+# pooled connection that died while idle — Redis ``timeout``, a pod
+# rollover, a NAT/conntrack eviction — is handed straight back out and
+# the next command raises ConnectionResetError at the call site.
+#
+# That is not a test-only concern: with no OPTIONS on ``CACHES`` the
+# production cache had exactly the same exposure, so a single reset
+# surfaced as a 500 rather than a retried command.
+#
+# - ``health_check_interval`` PINGs a connection idle longer than N
+#   seconds before reuse and transparently reconnects a dead one.
+# - ``socket_keepalive`` lets the OS notice a peer that vanished
+#   without a FIN.
+# - ``retry`` re-runs the command on ConnectionError/TimeoutError
+#   (redis-py's default ``supported_errors``); the backoff is
+#   sub-second in total, so a request never visibly stalls.
+#
+# The Retry template is shared, which is safe: redis-py deep-copies it
+# per connection (``AbstractConnection.__init__``).
+_RESILIENCE_OPTIONS: dict[str, Any] = {
+    "health_check_interval": 30,
+    "socket_keepalive": True,
+    "retry": Retry(ExponentialBackoff(), retries=3),
+}
 
 
 class CustomCache(RedisCache):
@@ -35,6 +64,28 @@ class CustomCache(RedisCache):
     """
 
     _cache: RedisCacheClient
+
+    def __init__(self, server: Any, params: dict[str, Any]) -> None:
+        """Apply the connection-resilience defaults.
+
+        Set here rather than in ``CACHES["default"]["OPTIONS"]`` because
+        this backend is also instantiated directly (tests, and any
+        caller building a cache for a specific Redis DB), and those
+        paths pass ``params={}`` — a settings-only fix would leave them
+        on redis-py's bare defaults.
+
+        Anything explicitly configured in ``OPTIONS`` still wins.
+        ``params`` is copied, never mutated: Django hands us the live
+        ``settings.CACHES`` entry.
+        """
+        params = {
+            **params,
+            "OPTIONS": {
+                **_RESILIENCE_OPTIONS,
+                **(params.get("OPTIONS") or {}),
+            },
+        }
+        super().__init__(server, params)
 
     def keys(self, search: str | None = None) -> list[str]:
         """

@@ -3,6 +3,56 @@
 
 
 
+## v3.0.1 (2026-08-21)
+
+### Bug fixes
+
+* fix(admin): stop the platform console wearing tenant #1's identity
+
+Three defects reported from production on 2026-08-21, all the same root
+cause: platform-wide settings carry webside's identity, and the public
+schema has no tenant to override them.
+
+1. Branding. get_current_tenant() returns None on the public schema, so
+   each_context fell through to the class attributes — which default to
+   UNFOLD_SITE_HEADER/"Webside". The control plane showed a merchant's
+   name and logo: the sidebar read "Webside" and the login page
+   "Welcome back to Webside Admin". The platform host now renders its
+   own identity and no merchant logo.
+
+2. Login redirect. Django's LoginView.get_success_url() uses `next` and
+   falls back to settings.LOGIN_REDIRECT_URL, which is the STOREFRONT
+   account page. AdminSite.login does put `next` in the context, but
+   Unfold's admin/login.html renders <form action="{{ app_path }}"> and
+   never emits it as a hidden field — so a POST from /admin/login
+   carried no `next` and staff landed on https://webside.gr/account.
+   Reaching /admin/ first worked, because that redirect appends
+   ?next=/admin/ which rides along in app_path.
+
+Unfold documents UNFOLD["LOGIN"]["redirect_after"] for exactly this,
+but 0.104.1 — the current release — only DECLARES the key: its single
+occurrence in the package is the None default and nothing reads it.
+So put `next` on the URL instead, which every layer already honours.
+
+3. Sidebar. 30 of 40 sidebar items are per-store sections whose models
+   answer 403 on the platform console (BaseModelAdmin._withheld_on_public).
+   The five store-only groups — Catalog, Blog, Sales, Shipping, Loyalty —
+   now carry a permission callback and disappear there. Customers stays:
+   the `user` app is in both SHARED and TENANT apps and works on both.
+
+Detection lives in tenant.console and follows the same positive-knowledge
+rule as the model guard: an unknown schema (management command, Celery,
+tests) is neither platform nor tenant, so nothing is reshaped for them.
+
+14 tests, each verified to fail with its fix reverted.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`2cf9744`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2cf9744a7fa126374448c47323a33c0ad56df1bf))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.0.0 [skip ci] ([`8314ef7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8314ef79c8c5d3592f05cb368f5b2603ef1fc665))
+
 ## v3.0.0 (2026-08-21)
 
 ### Bug fixes

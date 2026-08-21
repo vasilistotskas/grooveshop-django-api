@@ -3,6 +3,42 @@
 
 
 
+## v3.3.0 (2026-08-21)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.2.0 [skip ci] ([`915d61d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/915d61d0c1230cfda3d3a8b8fe0ccb91ef2e27b9))
+
+### Features
+
+* feat(admin): make the tenant estate readable at a glance
+
+The control plane listed every store as name / slug / schema_name /
+plan / is_active / suspended_at — a column of lowercase words and two
+booleans that had to be read together to work out what a store's
+actual state was.
+
+- Plan is now an icon + colour per tier (trial, basic, pro,
+  enterprise) instead of a bare string.
+- Status collapses is_active and suspended_at into one badge that
+  distinguishes Suspended from Inactive. They are genuinely different
+  operations: a suspended store is mid-lifecycle and cannot be
+  destroyed until a 24h cooldown elapses, whereas an inactive one was
+  simply switched off. A single boolean column hid that.
+- The store column carries the merchant's own logo (initials when it
+  has none) over its primary domain, which is how an operator actually
+  recognises a row.
+- Plan gets a ChoicesRadioFilter rather than a dropdown.
+
+Badges render through Unfold's own ``label.html``. ``@display(label=)``
+carries only a value->colour map and has no icon argument (verified
+against unfold 0.104.1), and hand-writing the markup would duplicate
+Unfold's palette and dark-mode classes where they would drift on the
+next upgrade. The template already accepts ``icon``, so it is reused.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`fbffcf2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fbffcf210f4c237584310d6c5525a2e663da5385))
+
 ## v3.2.0 (2026-08-21)
 
 ### Chores

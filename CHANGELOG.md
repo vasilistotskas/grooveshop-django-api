@@ -3,6 +3,75 @@
 
 
 
+## v3.5.0 (2026-08-22)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.4.0 [skip ci] ([`1985bd0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1985bd018622975c942c744a05e19b360c0ba969))
+
+### Features
+
+* feat(settings): per-tenant ACCOUNT_REVIEWS_ENABLED toggle
+
+The storefront's "My reviews" account page was hidden behind the
+superuser-only preview mode because webside's owner wanted it hidden.
+That mechanism was wrong twice over: preview mode is a platform debug
+flag keyed to is_superuser (which the flag cleanup removed from the
+owner), and it only ever hid the MENU LINK -- the route stayed
+reachable by URL for any logged-in customer.
+
+The correct shape for a store preference is a per-tenant extra-setting
+(the RECENTLY_VIEWED_ENABLED pattern): per-schema by construction,
+editable by the store operator through their own settings admin, on
+the public allowlist so the storefront can read it. Product-page
+reviews are deliberately unaffected -- they are live on webside today;
+only the account surface is governed.
+
+Default True (reviews are standard); webside gets False set once,
+preserving the owner's standing wish -- which the owner can now change
+himself.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`423cc4c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/423cc4cf3e0be3bfde9ce8337107364c3446276d))
+
+### Refactoring
+
+* refactor(tenant): remove the spent cutover machinery and dead access class
+
+Post-cutover cleanup. Everything removed here was one-shot scaffolding
+whose shot has been fired, or code with zero remaining consumers:
+
+- populate_tenant_schema: a one-time bootstrap the PreSync hook was
+  re-running on EVERY deploy. After the public prune it copied nothing
+  -- except extra_settings_setting, which it TRUNCATED and re-copied
+  from public each release, silently reverting any setting a store
+  operator changed through the admin (an active bug now that
+  ADMIN/OWNER roles can edit settings). Tenant provisioning is
+  tenant_create, which seeds its own defaults and never used this.
+- prune_public_legacy_data: executed in production 2026-08-22 (145
+  tables, 83,903 rows) and previously on staging. Fresh post-cutover
+  databases never create tenant-only tables in public at all, so there
+  is nothing left for it to ever do.
+- HasTenantAccess / user_has_tenant_access: zero consumers since the
+  role-derived permission classes landed, and the membership lookup it
+  performed compared primary keys across schemas on API requests --
+  the exact unsoundness docs/api-staff-identity.md documents. The
+  membership-isolation invariant its tests carried now pins
+  get_membership directly, which is what every staff surface actually
+  consults.
+
+MULTI_TENANT_AUDIT.md moves into docs/ (force-added; /docs/ is
+gitignored by mkdocs residue): code comments cite its finding numbers
+(H3, H22, H23, M18, ...), so the reference belongs in the repo rather
+than loose on a workstation.
+
+Stale cross-references updated: tenant/app_labels.py and seed_all.py no
+longer point at the deleted commands, and the auth-backends provenance
+note now reflects that staff API tokens stamp identities too.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`567a295`](https://github.com/vasilistotskas/grooveshop-django-api/commit/567a295bf6ccfbbfe5d35b16d54ae1a32fcf8274))
+
 ## v3.4.0 (2026-08-22)
 
 ### Bug fixes

@@ -414,6 +414,116 @@ class TestPlatformDashboardTable(TestCase):
         assert table["rows"][0][-1] == "—"
 
 
+class TestCommandPalette(TestCase):
+    """The ⌘K palette must find RECORDS, and its config must not drift.
+
+    Without a ``COMMAND`` block, ``UNFOLD_PLATFORM`` fell back to
+    unfold's defaults (``search_models: False``): every keystroke still
+    cost a 500ms-debounced round trip to ``/admin/search/``, but only
+    sidebar APP TITLES were matched — typing a tenant's name, domain or
+    a user's email returned nothing, and Enter on the empty result list
+    hit django-unfold 0.104.1's unguarded ``selectItem`` (client-side
+    TypeError; guarded by ``unfold_command_palette_fix.js``).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from tenant.models import Tenant
+        from user.models import UserAccount
+
+        cls.operator = UserAccount.objects.create_superuser(
+            email="palette-operator@example.com",
+            username="paletteoperator",
+            password="testpass123",
+        )
+        cls.store = Tenant(
+            schema_name="palette_search_tenant",
+            name="Palette Search Tenant",
+            slug="palette-search-tenant",
+            owner_email="owner-palette@example.com",
+        )
+        cls.store.auto_create_schema = False
+        cls.store.save()
+
+    def _search(self, term: str):
+        from importlib import import_module
+
+        from django.conf import settings
+        from django.contrib.auth import BACKEND_SESSION_KEY
+
+        from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
+
+        session_store = import_module(settings.SESSION_ENGINE).SessionStore
+        request = RequestFactory().get("/admin/search/", {"s": term})
+        request.urlconf = "tenant.urls_public"
+        request.user = self.operator
+        request.session = session_store()
+        request.session[BACKEND_SESSION_KEY] = PLATFORM_STAFF_BACKEND_PATH
+        return platform_admin_site.search(request)
+
+    @override_settings(ROOT_URLCONF="tenant.urls_public")
+    def test_finds_a_tenant_by_name(self):
+        """Records, not app titles — the whole point of the block."""
+        response = self._search("palette search")
+        response.render()
+        assert self.store.name in response.content.decode()
+
+    @override_settings(ROOT_URLCONF="tenant.urls_public")
+    def test_an_empty_term_is_an_empty_200(self):
+        """The server contract behind the client-side crash guard:
+        an empty palette is a legitimate state the JS must survive."""
+        response = self._search("")
+        assert response.status_code == 200
+        assert response.content == b""
+
+    def test_both_sites_share_the_schema_aware_search_callable(self):
+        """One callable, two sites — scoping rules cannot drift.
+
+        On a tenant schema it returns True (search everything); on the
+        public schema it returns the SHARED_APPS whitelist, because
+        every other registered model's table exists only inside tenant
+        schemas and would raise ProgrammingError per keystroke.
+        """
+        from unfold.settings import get_config
+
+        callable_path = "core.utils.admin.command_search_models"
+        for settings_name in ("UNFOLD", "UNFOLD_PLATFORM"):
+            command = get_config(settings_name)["COMMAND"]
+            assert command["search_models"] == callable_path, settings_name
+
+    def test_the_whitelist_covers_only_registered_platform_models(self):
+        """Every whitelisted model must be ON the platform site — a
+        result row links to ``platform_admin:<app>_<model>_change``,
+        which 404s (NoReverseMatch → 500) for unregistered models."""
+        from core.utils.admin import command_search_models
+
+        registered = {
+            model._meta.label for model in platform_admin_site._registry
+        }
+        request = RequestFactory().get("/admin/search/")
+        whitelist = command_search_models(request)
+        assert isinstance(whitelist, list)
+        missing = set(whitelist) - registered
+        assert not missing, f"whitelisted but not registered: {missing}"
+
+    def test_the_palette_crash_guard_ships_on_both_sites(self):
+        """django-unfold 0.104.1's ``selectItem`` dereferences the
+        highlighted row without checking one exists; the guard script
+        must load wherever the palette renders."""
+        from unfold.settings import get_config
+
+        request = RequestFactory().get("/admin/")
+        for settings_name in ("UNFOLD", "UNFOLD_PLATFORM"):
+            scripts = [
+                script(request) if callable(script) else script
+                for script in get_config(settings_name)["SCRIPTS"]
+            ]
+            assert any(
+                str(script).endswith("unfold_command_palette_fix.js")
+                for script in scripts
+            ), f"{settings_name} dropped the palette crash guard"
+
+
 class TestAdminLoginLandsInTheAdmin(TestCase):
     """A staff login must not end up on the storefront.
 

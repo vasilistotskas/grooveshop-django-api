@@ -2084,6 +2084,25 @@ UNFOLD_PLATFORM = {
     "SHOW_VIEW_ON_SITE": False,
     "ENVIRONMENT": "admin.permissions.platform_environment",
     "DASHBOARD_CALLBACK": "admin.platform_dashboard.dashboard_callback",
+    # ⌘K command palette. Without this block the palette falls back to
+    # unfold's defaults (``search_models: False``) and only matches
+    # sidebar APP TITLES — typing a tenant name, domain or user email
+    # returned nothing, and Enter on the empty result list hit the
+    # unguarded ``selectItem`` upstream crash (see
+    # ``unfold_command_palette_fix.js``). The callable is the same
+    # schema-aware one the merchant admin uses: on the public schema it
+    # returns the SHARED_APPS whitelist, which is exactly the model set
+    # this site registers.
+    "COMMAND": {
+        "search_models": "core.utils.admin.command_search_models",
+        "show_history": True,
+    },
+    # The palette crash guard only — the TinyMCE save-sync script the
+    # merchant admin also carries has no target here (no HTMLField
+    # models are registered on the control plane).
+    "SCRIPTS": [
+        lambda request: static("admin/js/unfold_command_palette_fix.js"),
+    ],
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": False,
@@ -2277,8 +2296,13 @@ UNFOLD = {
     # 302 success and django-simple-history writes a row, but the field
     # value is unchanged because the form body has the page-load
     # textarea value, not the edited iframe content.
+    #
+    # ``unfold_command_palette_fix.js`` guards the ⌘K palette's
+    # ``selectItem`` against Enter-with-no-results (upstream crash in
+    # django-unfold 0.104.1 — see the file header).
     "SCRIPTS": [
         lambda request: static("admin/js/tinymce_save_sync.js"),
+        lambda request: static("admin/js/unfold_command_palette_fix.js"),
     ],
     "DASHBOARD_CALLBACK": "admin.dashboard.dashboard_callback",
     "SIDEBAR": {

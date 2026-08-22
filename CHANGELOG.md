@@ -3,6 +3,41 @@
 
 
 
+## v3.5.1 (2026-08-22)
+
+### Bug fixes
+
+* fix(versions): PG 18.6 in CI+compose, python 3.14.7, uv 0.12.5, rabbit 4.3.5
+
+Alignment sweep after production moved to PostgreSQL 18 (spilo-18,
+pg_upgrade verified, data intact):
+
+- CI: postgres becomes a docker-run STEP at 18.6 instead of a service
+  container. PG18 needs max_locks_per_transaction raised for this
+  suite's parallel DDL — empirically isolated: defaults exhaust the
+  lock table under xdist, shm-size alone does NOT fix it — and GitHub
+  service containers cannot pass server arguments. tmpfs mounts the
+  PARENT path: 18+ images use major-versioned data subdirectories and
+  refuse the legacy .../data mount (found by the local rehearsal, not
+  in CI).
+- infra.compose: postgres 17.10 -> 18.6 on a NEW volume
+  (postgres18_data; the PG17 volume stays as instant rollback), same
+  lock tuning, parent-path mount; validated by dump/restore of the
+  local dev DB and a green 2805-test run against it.
+  rabbitmq 4.3.2 -> 4.3.5, matching the upgraded prod broker.
+- python 3.14.6 -> 3.14.7 (.python-version + Dockerfile), uv 0.12.3 ->
+  0.12.5 (Dockerfile + CI).
+
+Full validation behind the PG major: 5,766 tests green against
+postgres:18.6 before prod moved.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`d6364f2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d6364f2f87708741f1e0987575c5548e7b9a5d28))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.5.0 [skip ci] ([`c03bca4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c03bca4ad5abded6c6883f3e523e13402b4f0dca))
+
 ## v3.5.0 (2026-08-22)
 
 ### Chores

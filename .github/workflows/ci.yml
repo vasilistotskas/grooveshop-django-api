@@ -28,7 +28,7 @@ env:
   SYSTEM_ENV: ci
   DEBUG: 'True'
   MEILI_HOST: 127.0.0.1
-  UV_VERSION: '0.12.3'
+  UV_VERSION: '0.12.5'
   FORCE_COLOR: 1
 
 jobs:
@@ -122,16 +122,15 @@ jobs:
     name: Testing
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # PostgreSQL runs as a docker-run STEP, not a service container:
+    # PG18 needs max_locks_per_transaction raised for this suite's
+    # parallel DDL (validated: defaults exhaust the lock table under
+    # xdist; shm-size alone does not fix it), and GitHub service
+    # containers cannot pass server arguments. The step form also keeps
+    # CI aligned with infra.compose.yml, which sets the same knob.
+    # tmpfs mounts the PARENT path — 18+ images use major-versioned
+    # data subdirectories and refuse the legacy .../data mount.
     services:
-      db:
-        image: postgres:17.10
-        env:
-          POSTGRES_DB: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        options: --mount type=tmpfs,destination=/var/lib/postgresql/data --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-        ports:
-          - 5432:5432
       redis:
         image: redis:8-alpine
         options: >-
@@ -162,6 +161,26 @@ jobs:
       MEILI_ENV: production
 
     steps:
+      - name: Start PostgreSQL
+        # See the comment on `services:` — a step, not a service, so the
+        # server args can be passed. Matches prod's major and
+        # infra.compose.yml's tuning.
+        run: |
+          docker run -d --name ci-postgres \
+            -e POSTGRES_DB=postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            --shm-size=512m \
+            --mount type=tmpfs,destination=/var/lib/postgresql \
+            postgres:18.6-alpine3.23 \
+            -c max_locks_per_transaction=256 -c max_connections=200
+          for i in $(seq 1 30); do
+            docker exec ci-postgres pg_isready -U postgres && exit 0
+            sleep 2
+          done
+          echo "PostgreSQL failed to become ready" >&2
+          docker logs ci-postgres >&2
+          exit 1
+
       - name: Checkout code
         uses: actions/checkout@v6
 

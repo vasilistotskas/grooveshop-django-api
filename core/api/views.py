@@ -551,6 +551,13 @@ PUBLIC_SETTING_KEYS = frozenset(
         # Chat-widget kill switch — admin hides the storefront launcher
         # per tenant without a deploy; the gateway /chat stays up.
         "CHAT_WIDGET_ENABLED",
+        # "My reviews" account page toggle. A STORE preference, not a
+        # plan flag: product-page reviews stay live regardless; this
+        # only governs the account surface. Previously (mis)implemented
+        # as the storefront's superuser-only preview mode — webside's
+        # owner wanted the page hidden, and a per-tenant setting the
+        # owner edits himself is the correct shape for that wish.
+        "ACCOUNT_REVIEWS_ENABLED",
     }
 )
 

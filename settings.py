@@ -1450,6 +1450,16 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "ACCOUNT_REVIEWS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            'Show the "My reviews" page in the storefront account '
+            "area. A store preference — product-page reviews are "
+            "unaffected. Off hides the menu entry and 404s the page."
+        ),
+    },
+    {
         "name": "CHAT_WIDGET_ENABLED",
         "type": "bool",
         "value": True,

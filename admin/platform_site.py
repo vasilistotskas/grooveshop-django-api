@@ -79,6 +79,29 @@ class PlatformAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
     # always checked against the PUBLIC schema's user table.
     login_form = PlatformAdminAuthenticationForm
 
+    def get_urls(self):
+        """Mount the control plane's custom pages.
+
+        Prepended, not appended: ``AdminSite.get_urls`` ends with the
+        ``<app_label>/`` catch-all, which would swallow ``plan-billing/``
+        and answer 404 before our pattern is ever tried.
+
+        The view import is local so this module keeps importing before
+        the app registry is ready (it is pulled in from AppConfig).
+        """
+        from django.urls import path  # noqa: PLC0415
+
+        from admin.platform_billing import PlanBillingView  # noqa: PLC0415
+
+        return [
+            path(
+                "plan-billing/",
+                self.admin_view(PlanBillingView.as_view(admin_site=self)),
+                name="plan_billing",
+            ),
+            *super().get_urls(),
+        ]
+
     def has_permission(self, request) -> bool:
         """Platform staff only.
 

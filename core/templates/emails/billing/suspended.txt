@@ -1,0 +1,11 @@
+{% load i18n %}{% blocktrans with store=store_name %}Your store {{ store }} has been suspended{% endblocktrans %}
+
+{% blocktrans with date=paid_until|date:"DATE_FORMAT" grace=grace_days %}Your store has been suspended: its term ended on {{ date }} and no renewal was recorded within the {{ grace }}-day grace period. The storefront is offline and no orders can be placed.{% endblocktrans %}
+
+{% trans "Nothing has been deleted — your products, orders, and settings are all intact." %}
+
+{% blocktrans with email=INFO_EMAIL %}To bring your store back, arrange the renewal by replying to this email or contacting us at {{ email }}. The moment it is recorded, your store reactivates automatically.{% endblocktrans %}
+
+---
+{{ SITE_NAME }}
+{{ SITE_URL }}

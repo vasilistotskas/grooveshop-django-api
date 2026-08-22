@@ -795,6 +795,19 @@ SCHEDULE_PRESETS = {
 }
 
 
+# Tenant billing dunning (tenant/billing.py). WARN_DAYS before the
+# term end the owner gets an expiry warning; GRACE_DAYS after it the
+# store is suspended — but only once AUTO_SUSPEND is switched on
+# (rollout default is notify-only: warnings and expired notices flow,
+# nothing is suspended, and no email claims a suspension that did not
+# happen). The platform admin's Plan & Billing page renders these live.
+TENANT_BILLING = {
+    "WARN_DAYS": int(getenv("TENANT_BILLING_WARN_DAYS", "14")),
+    "GRACE_DAYS": int(getenv("TENANT_BILLING_GRACE_DAYS", "7")),
+    "AUTO_SUSPEND": getenv("TENANT_BILLING_AUTO_SUSPEND", "False") == "True",
+}
+
+
 def get_celery_beat_schedule():
     base_schedule = {
         "monitor-system-health": {
@@ -896,6 +909,14 @@ def get_celery_beat_schedule():
         "cleanup-expired-stock-reservations": {
             "task": "tenant.tasks.fanout_cleanup_expired_stock_reservations",
             "schedule": SCHEDULE_PRESETS["every_hour"],
+        },
+        "process-tenant-billing": {
+            # NOT a fanout: billing terms and dunning bookkeeping are
+            # public-schema Tenant rows — one pass covers the estate.
+            "task": "tenant.tasks.process_tenant_billing",
+            "schedule": SCHEDULE_PRESETS["daily_6am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
         },
         # All five scheduled domain tasks below run via tenant fanout
         # wrappers — the beat scheduler dispatches once against public,
@@ -2122,6 +2143,11 @@ UNFOLD_PLATFORM = {
                         "link": reverse_lazy(
                             "platform_admin:tenant_tenant_changelist"
                         ),
+                    },
+                    {
+                        "title": _("Plan & Billing"),
+                        "icon": "payments",
+                        "link": reverse_lazy("platform_admin:plan_billing"),
                     },
                     {
                         "title": _("Tenant Domains"),

@@ -1,0 +1,18 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% if is_trial %}{% trans "Your trial is ending" %}{% else %}{% trans "Your plan is expiring" %}{% endif %} - {{ store_name }}{% endblock %}
+
+{% block email_content %}
+<h1>{% blocktrans with store=store_name %}Hi — about {{ store }},{% endblocktrans %}</h1>
+
+{% if is_trial %}
+<p>{% blocktrans with date=paid_until|date:"DATE_FORMAT" %}Your trial ends on {{ date }} (inclusive). To keep your store running without interruption, pick a plan and arrange the renewal before then.{% endblocktrans %}</p>
+{% else %}
+<p>{% blocktrans with plan=plan_display date=paid_until|date:"DATE_FORMAT" %}Your {{ plan }} plan term ends on {{ date }} (inclusive). To keep your store running without interruption, arrange the renewal before then.{% endblocktrans %}</p>
+{% endif %}
+
+<p>{% blocktrans with grace=grace_days %}If the term lapses, your store keeps running for a grace period of {{ grace }} days before it is suspended.{% endblocktrans %}</p>
+
+<p>{% blocktrans with email=INFO_EMAIL %}Questions or already renewed? Reply to this email or contact us at {{ email }}.{% endblocktrans %}</p>
+{% endblock %}

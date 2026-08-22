@@ -1,0 +1,11 @@
+{% load i18n %}{% if is_trial %}{% blocktrans with store=store_name %}Your trial for {{ store }} has ended{% endblocktrans %}{% else %}{% blocktrans with store=store_name %}Your plan for {{ store }} has expired{% endblocktrans %}{% endif %}
+
+{% if is_trial %}{% blocktrans with date=paid_until|date:"DATE_FORMAT" %}Your trial ended on {{ date }}. Your store is still running, but not for long.{% endblocktrans %}{% else %}{% blocktrans with plan=plan_display date=paid_until|date:"DATE_FORMAT" %}Your {{ plan }} plan term ended on {{ date }}. Your store is still running, but not for long.{% endblocktrans %}{% endif %}
+
+{% blocktrans with grace=grace_days %}Unless a renewal is recorded within {{ grace }} days of the term end, your store will be suspended: the storefront goes offline and stops taking orders. Your data stays intact.{% endblocktrans %}
+
+{% blocktrans with email=INFO_EMAIL %}To renew, reply to this email or contact us at {{ email }}. As soon as the renewal is recorded, everything continues as normal.{% endblocktrans %}
+
+---
+{{ SITE_NAME }}
+{{ SITE_URL }}

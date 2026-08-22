@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from django.core.management.base import BaseCommand, CommandError
 from django_tenants.utils import get_public_schema_name, schema_context
@@ -12,12 +13,32 @@ class Command(BaseCommand):
     help = "Create a new tenant with schema, domains, and seed data."
 
     def add_arguments(self, parser):
+        # ``Tenant.objects.create()`` in handle() bypasses full_clean(),
+        # so an unknown plan would be stored silently — reject it at the
+        # parser instead (argparse choices; call_command surfaces the
+        # violation as CommandError).
+        from tenant.models import TenantPlan  # noqa: PLC0415
+
         parser.add_argument("--name", required=True)
         parser.add_argument("--slug", required=True)
         parser.add_argument("--schema", required=True, dest="schema_name")
         parser.add_argument("--domain", required=True)
         parser.add_argument("--owner-email", required=True)
-        parser.add_argument("--plan", default="trial")
+        parser.add_argument(
+            "--plan",
+            default=TenantPlan.TRIAL.value,
+            choices=list(TenantPlan.values),
+        )
+        parser.add_argument(
+            "--trial-days",
+            type=int,
+            default=30,
+            help=(
+                "Trial length in days — sets paid_until so the billing "
+                "dunning cycle covers the trial. Only applies when "
+                "--plan is 'trial'; pass 0 for a never-expiring trial."
+            ),
+        )
         parser.add_argument("--store-name", default="")
         parser.add_argument(
             "--extra-domains",
@@ -29,12 +50,22 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from django.core.exceptions import ValidationError
 
-        from tenant.models import Tenant, TenantDomain
+        from tenant.models import Tenant, TenantDomain, TenantPlan
         from tenant.validators import validate_reserved_schema_name
 
         schema_name = options["schema_name"]
         slug = options["slug"]
         domain = options["domain"]
+
+        # Re-asserted despite the argparse ``choices``: ``call_command``
+        # only round-trips REQUIRED options through the parser, so a
+        # programmatic ``call_command(..., plan="gold")`` would skip the
+        # CLI validation and be stored verbatim by ``objects.create()``.
+        if options["plan"] not in TenantPlan.values:
+            raise CommandError(
+                f"Invalid plan '{options['plan']}'. "
+                f"Valid plans: {', '.join(TenantPlan.values)}."
+            )
 
         # ``validate_reserved_schema_name`` carves out
         # ``get_public_schema_name()`` (see tenant/validators.py) so the
@@ -74,12 +105,25 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Creating tenant '{options['name']}'...")
 
+        # A trial gets a real term end so the billing dunning cycle
+        # covers it from day one; 0 keeps the legacy never-expiring
+        # behaviour. Paid plans start with no term — paid_until is
+        # recorded by platform staff when the first payment lands.
+        paid_until = None
+        if options["plan"] == TenantPlan.TRIAL and options["trial_days"] > 0:
+            from django.utils import timezone  # noqa: PLC0415
+
+            paid_until = timezone.localdate() + timedelta(
+                days=options["trial_days"]
+            )
+
         tenant = Tenant.objects.create(
             schema_name=schema_name,
             name=options["name"],
             slug=slug,
             owner_email=options["owner_email"],
             plan=options["plan"],
+            paid_until=paid_until,
             store_name=options["store_name"] or options["name"],
             is_active=True,
             suspended_at=None,

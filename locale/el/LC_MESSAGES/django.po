@@ -14450,3 +14450,316 @@ msgstr "ΦΠΑ"
 
 #~ msgid "Place or district (optional)"
 #~ msgstr "Τόπος ή περιοχή (προαιρετικό)"
+
+#: .\admin\platform_billing.py:39 .\core\templates\admin\platform_index.html:83 #: .\tenant\admin.py:184
+msgid "Suspended"
+msgstr "Σε αναστολή"
+
+#: .\admin\platform_billing.py:40
+msgid "Past due"
+msgstr "Ληξιπρόθεσμο"
+
+#: .\admin\platform_billing.py:41
+msgid "Expires soon"
+msgstr "Λήγει σύντομα"
+
+#: .\admin\platform_billing.py:42 #: .\core\templates\admin\platform_billing.html:106 .\tenant\models.py:22
+msgid "Trial"
+msgstr "Δοκιμαστικό"
+
+#: .\admin\platform_billing.py:43
+msgid "No term recorded"
+msgstr "Χωρίς καταχωρημένη περίοδο"
+
+#: .\admin\platform_billing.py:112 .\tenant\admin.py:144
+msgid "Store"
+msgstr "Κατάστημα"
+
+#: .\admin\platform_billing.py:113
+msgid "Domain"
+msgstr "Domain"
+
+#: .\admin\platform_billing.py:114 .\tenant\admin.py:167 .\tenant\models.py:128
+msgid "Plan"
+msgstr "Πλάνο"
+
+#: .\admin\platform_billing.py:115
+msgid "Paid until"
+msgstr "Πληρωμένο έως"
+
+#: .\admin\platform_billing.py:116 #: .\core\templates\admin\platform_billing.html:85
+msgid "Billing status"
+msgstr "Κατάσταση χρέωσης"
+
+#: .\admin\platform_billing.py:129 #: .\core\templates\admin\platform_billing.html:16 #: .\core\templates\admin\platform_billing.html:33 .\settings.py:2148
+msgid "Plan & Billing"
+msgstr "Πλάνο & Χρεώσεις"
+
+#: .\core\templates\admin\platform_billing.html:34
+msgid "Each store's commercial terms, and how the platform records and enforces them."
+msgstr "Οι εμπορικοί όροι κάθε καταστήματος και πώς η πλατφόρμα τους καταχωρεί και τους επιβάλλει."
+
+#: .\core\templates\admin\platform_billing.html:53
+msgid "Trials"
+msgstr "Δοκιμαστικά"
+
+#: .\core\templates\admin\platform_billing.html:61
+msgid "Paid & current"
+msgstr "Πληρωμένα & ενεργά"
+
+#: .\core\templates\admin\platform_billing.html:69
+#, python-format
+msgid "Expiring within %(days)s days"
+msgstr "Λήγουν εντός %(days)s ημερών"
+
+#: .\core\templates\admin\platform_billing.html:77
+msgid "Past due / no term"
+msgstr "Ληξιπρόθεσμα / χωρίς περίοδο"
+
+#: .\core\templates\admin\platform_billing.html:90 #: .\core\templates\admin\platform_index.html:113
+msgid "No stores yet."
+msgstr "Δεν υπάρχουν καταστήματα ακόμα."
+
+#: .\core\templates\admin\platform_billing.html:97
+msgid "How it works"
+msgstr "Πώς λειτουργεί"
+
+#: .\core\templates\admin\platform_billing.html:101
+msgid "Plans"
+msgstr "Πλάνα"
+
+#: .\core\templates\admin\platform_billing.html:104
+msgid "Every store carries exactly one plan — a commercial label set by platform staff, here on the tenant's Plan & Billing section or at provisioning (tenant_create --plan). New stores start on Trial."
+msgstr "Κάθε κατάστημα έχει ακριβώς ένα πλάνο — μια εμπορική ετικέτα που ορίζεται από το προσωπικό της πλατφόρμας, εδώ στην ενότητα Plan & Billing του tenant ή κατά την αρχική δημιουργία (tenant_create --plan). Τα νέα καταστήματα ξεκινούν σε Δοκιμαστικό."
+
+#: .\core\templates\admin\platform_billing.html:107 .\tenant\models.py:23
+msgid "Basic"
+msgstr "Basic"
+
+#: .\core\templates\admin\platform_billing.html:108 .\tenant\models.py:24
+msgid "Pro"
+msgstr "Pro"
+
+#: .\core\templates\admin\platform_billing.html:109 .\tenant\models.py:25
+msgid "Enterprise"
+msgstr "Enterprise"
+
+#: .\core\templates\admin\platform_billing.html:111
+msgid "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else."
+msgstr "Το πλάνο δεν ενεργοποιεί ούτε απενεργοποιεί καμία λειτουργία από μόνο του: οι διακόπτες loyalty και blog είναι ξεχωριστά flags ανά κατάστημα, επίσης ελεγχόμενα από την πλατφόρμα. Η αλλαγή πλάνου αλλάζει την ετικέτα και τίποτα άλλο."
+
+#: .\core\templates\admin\platform_billing.html:115
+msgid "Recording payment"
+msgstr "Καταχώρηση πληρωμής"
+
+#: .\core\templates\admin\platform_billing.html:118
+msgid "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires."
+msgstr "Δεν υπάρχει ακόμη αυτοματοποιημένο κανάλι χρέωσης της πλατφόρμας. Οι έμποροι πληρώνουν την πλατφόρμα εκτός συστήματος (τιμολόγιο / τραπεζική μεταφορά) και το προσωπικό καταχωρεί το αποτέλεσμα ορίζοντας την ημερομηνία «Πληρωμένο έως» του tenant — επεκτείνετέ την κατά την πληρωμένη περίοδο σε κάθε ανανέωση. Τα δοκιμαστικά αποκτούν περίοδο κατά τη δημιουργία (tenant_create --trial-days, προεπιλογή 30)· κενό «Πληρωμένο έως» σημαίνει ότι η περίοδος δεν λήγει ποτέ."
+
+#: .\core\templates\admin\platform_billing.html:119
+msgid "Paid Until is a date, read as inclusive: the term covers that day and lapses the day after. Moving it forward resets the dunning pipeline for the new term — and immediately reactivates a store the billing task had suspended."
+msgstr "Το «Πληρωμένο έως» είναι ημερομηνία, συμπεριλαμβανομένης της ίδιας: η περίοδος καλύπτει εκείνη την ημέρα και λήγει την επομένη. Η μετακίνησή της μπροστά μηδενίζει τη ροή ειδοποιήσεων για τη νέα περίοδο — και επανενεργοποιεί άμεσα κατάστημα που είχε ανασταλεί από την εργασία χρέωσης."
+
+#: .\core\templates\admin\platform_billing.html:123
+msgid "What is enforced"
+msgstr "Τι επιβάλλεται αυτόματα"
+
+#: .\core\templates\admin\platform_billing.html:126
+#, python-format
+msgid "A daily billing task walks the estate and notifies the store owner at three points: an expiry warning %(warn)s days before the term ends, an expired notice the day after it lapses, and — %(grace)s days past the term end — suspension. Each stage is sent at most once per term; the expired and suspension notices also copy the platform admins."
+msgstr "Μια ημερήσια εργασία χρέωσης διατρέχει όλα τα καταστήματα και ειδοποιεί τον ιδιοκτήτη σε τρία σημεία: προειδοποίηση λήξης %(warn)s ημέρες πριν τη λήξη της περιόδου, ειδοποίηση λήξης την επομένη της εκπνοής και — %(grace)s ημέρες μετά τη λήξη — αναστολή. Κάθε στάδιο αποστέλλεται το πολύ μία φορά ανά περίοδο· οι ειδοποιήσεις λήξης και αναστολής κοινοποιούνται και στους διαχειριστές της πλατφόρμας."
+
+#: .\core\templates\admin\platform_billing.html:128
+msgid "Auto-suspend is ON: stores past the grace period are suspended by the task (reason: billing) and reactivate automatically the moment a renewal is recorded."
+msgstr "Η αυτόματη αναστολή είναι ΕΝΕΡΓΗ: καταστήματα πέρα από την περίοδο χάριτος αναστέλλονται από την εργασία (αιτία: billing) και επανενεργοποιούνται αυτόματα μόλις καταχωρηθεί ανανέωση."
+
+#: .\core\templates\admin\platform_billing.html:130
+msgid "Auto-suspend is OFF (notify-only rollout): warnings and expired notices are sent, but nothing is suspended automatically — follow-up is the Suspend action on the Tenants list. Flip TENANT_BILLING_AUTO_SUSPEND to enable enforcement."
+msgstr "Η αυτόματη αναστολή είναι ΑΝΕΝΕΡΓΗ (φάση μόνο ειδοποιήσεων): αποστέλλονται προειδοποιήσεις και ειδοποιήσεις λήξης, αλλά τίποτα δεν αναστέλλεται αυτόματα — η συνέχεια είναι η ενέργεια Suspend στη λίστα Tenants. Ενεργοποιήστε το TENANT_BILLING_AUTO_SUSPEND για επιβολή."
+
+#: .\core\templates\admin\platform_billing.html:135
+msgid "Handling non-payment"
+msgstr "Διαχείριση μη πληρωμής"
+
+#: .\core\templates\admin\platform_billing.html:138
+msgid "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything."
+msgstr "Η αναστολή (η ενέργεια στη λίστα Tenants ή η εργασία χρέωσης) σημειώνει το κατάστημα ως ανενεργό και καταγράφει πότε και γιατί: 'manual' για ενέργεια χειριστή, 'billing' για την αυτόματη διαδικασία. Το storefront σταματά να αποκρίνεται άμεσα (οι επισκέπτες βλέπουν ότι το κατάστημα δεν βρέθηκε), οι συνδέσεις WebSocket απορρίπτονται, οι προγραμματισμένες εργασίες παρακάμπτουν το κατάστημα και το agent gateway δεν το εξυπηρετεί πλέον. Τα δεδομένα μένουν ανέπαφα· η ενέργεια Activate επαναφέρει τα πάντα."
+
+#: .\core\templates\admin\platform_billing.html:139
+msgid "Recording a renewal auto-reactivates billing suspensions only — a manual suspension (abuse, legal) is never lifted by bookkeeping. Destroy is separate and irreversible: it drops the store's schema, and only works after 24 hours of suspension. The public and webside tenants are protected from all of it."
+msgstr "Η καταχώρηση ανανέωσης επανενεργοποιεί αυτόματα μόνο αναστολές χρέωσης — μια χειροκίνητη αναστολή (κατάχρηση, νομικοί λόγοι) δεν αίρεται ποτέ μέσω λογιστικής. Η καταστροφή (Destroy) είναι ξεχωριστή και μη αναστρέψιμη: διαγράφει το schema του καταστήματος και λειτουργεί μόνο μετά από 24 ώρες αναστολής. Οι tenants public και webside προστατεύονται από όλα τα παραπάνω."
+
+#: .\core\templates\admin\platform_billing.html:140
+msgid "Caveat: suspension takes the storefront down but is not a network cutoff — direct calls to the store's API host still resolve the schema."
+msgstr "Προσοχή: η αναστολή ρίχνει το storefront αλλά δεν είναι αποκοπή δικτύου — απευθείας κλήσεις στο API host του καταστήματος εξακολουθούν να επιλύουν το schema."
+
+#: .\core\templates\admin\platform_billing.html:144
+msgid "Who sees what"
+msgstr "Ποιος βλέπει τι"
+
+#: .\core\templates\admin\platform_billing.html:147
+msgid "Plan and Paid Until are platform-only. They are excluded from the public tenant-resolve payload, and the merchant self-service allowlist withholds every commercial term — a store admin can edit branding and their own credentials, never their plan, term, flags or lifecycle state."
+msgstr "Το Πλάνο και το «Πληρωμένο έως» είναι ορατά μόνο στην πλατφόρμα. Εξαιρούνται από το δημόσιο payload του tenant-resolve, και η λίστα self-service του εμπόρου παρακρατεί κάθε εμπορικό όρο — ο διαχειριστής καταστήματος μπορεί να επεξεργαστεί branding και τα δικά του διαπιστευτήρια, ποτέ το πλάνο, την περίοδο, τα flags ή την κατάσταση κύκλου ζωής."
+
+#: .\core\templates\admin\platform_billing.html:151
+msgid "Payment rails"
+msgstr "Κανάλια πληρωμών"
+
+#: .\core\templates\admin\platform_billing.html:154
+msgid "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today."
+msgstr "Τα διαπιστευτήρια Viva Wallet και Stripe κάθε tenant είναι οι δικοί του λογαριασμοί εμπόρου για το checkout των πελατών του — άσχετα με το τι οφείλει ο έμπορος στην πλατφόρμα. Το Stripe Connect Account ID είναι δεσμευμένο για μελλοντικό κανάλι χρέωσης της πλατφόρμας και παραμένει αδρανές σήμερα."
+
+#: .\core\templates\emails\billing\expired.html:4
+msgid "Your trial has ended"
+msgstr "Η δοκιμαστική σας περίοδος έληξε"
+
+#: .\core\templates\emails\billing\expired.html:4
+msgid "Your plan has expired"
+msgstr "Το πλάνο σας έληξε"
+
+#: .\core\templates\emails\billing\expired.html:7 #: .\core\templates\emails\billing\expiring.html:7 #: .\core\templates\emails\billing\suspended.html:7
+#, python-format
+msgid "Hi — about %(store)s,"
+msgstr "Γεια σας — σχετικά με το %(store)s,"
+
+#: .\core\templates\emails\billing\expired.html:10 #: .\core\templates\emails\billing\expired.txt:3
+#, python-format
+msgid "Your trial ended on %(date)s. Your store is still running, but not for long."
+msgstr "Η δοκιμαστική σας περίοδος έληξε στις %(date)s. Το κατάστημά σας λειτουργεί ακόμη, αλλά όχι για πολύ."
+
+#: .\core\templates\emails\billing\expired.html:12 #: .\core\templates\emails\billing\expired.txt:3
+#, python-format
+msgid "Your %(plan)s plan term ended on %(date)s. Your store is still running, but not for long."
+msgstr "Η περίοδος του πλάνου %(plan)s έληξε στις %(date)s. Το κατάστημά σας λειτουργεί ακόμη, αλλά όχι για πολύ."
+
+#: .\core\templates\emails\billing\expired.html:15 #: .\core\templates\emails\billing\expired.txt:5
+#, python-format
+msgid "Unless a renewal is recorded within %(grace)s days of the term end, your store will be suspended: the storefront goes offline and stops taking orders. Your data stays intact."
+msgstr "Αν δεν καταχωρηθεί ανανέωση εντός %(grace)s ημερών από τη λήξη της περιόδου, το κατάστημά σας θα ανασταλεί: το storefront βγαίνει εκτός λειτουργίας και σταματά να δέχεται παραγγελίες. Τα δεδομένα σας μένουν ανέπαφα."
+
+#: .\core\templates\emails\billing\expired.html:17 #: .\core\templates\emails\billing\expired.txt:7
+#, python-format
+msgid "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
+msgstr "Για ανανέωση, απαντήστε σε αυτό το email ή επικοινωνήστε μαζί μας στο %(email)s. Μόλις καταχωρηθεί η ανανέωση, όλα συνεχίζουν κανονικά."
+
+#: .\core\templates\emails\billing\expired.txt:1
+#, python-format
+msgid "Your trial for %(store)s has ended"
+msgstr "Η δοκιμαστική περίοδος για το %(store)s έληξε"
+
+#: .\core\templates\emails\billing\expired.txt:1
+#, python-format
+msgid "Your plan for %(store)s has expired"
+msgstr "Το πλάνο για το %(store)s έληξε"
+
+#: .\core\templates\emails\billing\expiring.html:4
+msgid "Your trial is ending"
+msgstr "Η δοκιμαστική σας περίοδος λήγει"
+
+#: .\core\templates\emails\billing\expiring.html:4
+msgid "Your plan is expiring"
+msgstr "Το πλάνο σας λήγει"
+
+#: .\core\templates\emails\billing\expiring.html:10 #: .\core\templates\emails\billing\expiring.txt:3
+#, python-format
+msgid "Your trial ends on %(date)s (inclusive). To keep your store running without interruption, pick a plan and arrange the renewal before then."
+msgstr "Η δοκιμαστική σας περίοδος λήγει στις %(date)s (συμπεριλαμβανομένης). Για να συνεχίσει το κατάστημά σας χωρίς διακοπή, επιλέξτε πλάνο και κανονίστε την ανανέωση πριν από τότε."
+
+#: .\core\templates\emails\billing\expiring.html:12 #: .\core\templates\emails\billing\expiring.txt:3
+#, python-format
+msgid "Your %(plan)s plan term ends on %(date)s (inclusive). To keep your store running without interruption, arrange the renewal before then."
+msgstr "Η περίοδος του πλάνου %(plan)s λήγει στις %(date)s (συμπεριλαμβανομένης). Για να συνεχίσει το κατάστημά σας χωρίς διακοπή, κανονίστε την ανανέωση πριν από τότε."
+
+#: .\core\templates\emails\billing\expiring.html:15 #: .\core\templates\emails\billing\expiring.txt:5
+#, python-format
+msgid "If the term lapses, your store keeps running for a grace period of %(grace)s days before it is suspended."
+msgstr "Αν η περίοδος εκπνεύσει, το κατάστημά σας συνεχίζει να λειτουργεί για περίοδο χάριτος %(grace)s ημερών πριν ανασταλεί."
+
+#: .\core\templates\emails\billing\expiring.html:17 #: .\core\templates\emails\billing\expiring.txt:7
+#, python-format
+msgid "Questions or already renewed? Reply to this email or contact us at %(email)s."
+msgstr "Απορίες ή έχετε ήδη ανανεώσει; Απαντήστε σε αυτό το email ή επικοινωνήστε μαζί μας στο %(email)s."
+
+#: .\core\templates\emails\billing\expiring.txt:1
+#, python-format
+msgid "Your trial for %(store)s is ending"
+msgstr "Η δοκιμαστική περίοδος για το %(store)s λήγει"
+
+#: .\core\templates\emails\billing\expiring.txt:1
+#, python-format
+msgid "Your plan for %(store)s is expiring"
+msgstr "Το πλάνο για το %(store)s λήγει"
+
+#: .\core\templates\emails\billing\suspended.html:4
+msgid "Your store has been suspended"
+msgstr "Το κατάστημά σας έχει ανασταλεί"
+
+#: .\core\templates\emails\billing\suspended.html:9 #: .\core\templates\emails\billing\suspended.txt:3
+#, python-format
+msgid "Your store has been suspended: its term ended on %(date)s and no renewal was recorded within the %(grace)s-day grace period. The storefront is offline and no orders can be placed."
+msgstr "Το κατάστημά σας έχει ανασταλεί: η περίοδός του έληξε στις %(date)s και δεν καταχωρήθηκε ανανέωση εντός της περιόδου χάριτος των %(grace)s ημερών. Το storefront είναι εκτός λειτουργίας και δεν μπορούν να γίνουν παραγγελίες."
+
+#: .\core\templates\emails\billing\suspended.html:11 #: .\core\templates\emails\billing\suspended.txt:5
+msgid "Nothing has been deleted — your products, orders, and settings are all intact."
+msgstr "Τίποτα δεν έχει διαγραφεί — τα προϊόντα, οι παραγγελίες και οι ρυθμίσεις σας είναι όλα ανέπαφα."
+
+#: .\core\templates\emails\billing\suspended.html:13 #: .\core\templates\emails\billing\suspended.txt:7
+#, python-format
+msgid "To bring your store back, arrange the renewal by replying to this email or contacting us at %(email)s. The moment it is recorded, your store reactivates automatically."
+msgstr "Για να επανέλθει το κατάστημά σας, κανονίστε την ανανέωση απαντώντας σε αυτό το email ή επικοινωνώντας μαζί μας στο %(email)s. Μόλις καταχωρηθεί, το κατάστημά σας επανενεργοποιείται αυτόματα."
+
+#: .\core\templates\emails\billing\suspended.txt:1
+#, python-format
+msgid "Your store %(store)s has been suspended"
+msgstr "Το κατάστημά σας %(store)s έχει ανασταλεί"
+
+#: .\tenant\billing.py:111
+#, python-format
+msgid "%(store)s — your plan expires on %(date)s"
+msgstr "%(store)s — το πλάνο σας λήγει στις %(date)s"
+
+#: .\tenant\billing.py:116
+#, python-format
+msgid "%(store)s — your plan has expired"
+msgstr "%(store)s — το πλάνο σας έληξε"
+
+#: .\tenant\billing.py:117
+#, python-format
+msgid "%(store)s — your store has been suspended"
+msgstr "%(store)s — το κατάστημά σας έχει ανασταλεί"
+
+#: .\tenant\models.py:39
+msgid "Manual"
+msgstr "Χειροκίνητη"
+
+#: .\tenant\models.py:40
+msgid "Billing"
+msgstr "Χρέωση"
+
+#: .\tenant\models.py:113
+msgid "Suspended Reason"
+msgstr "Αιτία Αναστολής"
+
+#: .\tenant\models.py:119
+msgid "Why this tenant is suspended: 'manual' for operator action, 'billing' for the automated dunning task. Empty when not suspended. Renewal-driven auto-reactivation applies to 'billing' suspensions only."
+msgstr "Γιατί έχει ανασταλεί αυτός ο tenant: 'manual' για ενέργεια χειριστή, 'billing' για την αυτόματη διαδικασία ειδοποιήσεων. Κενό όταν δεν είναι σε αναστολή. Η αυτόματη επανενεργοποίηση μέσω ανανέωσης ισχύει μόνο για αναστολές 'billing'."
+
+#: .\tenant\models.py:138
+msgid "Last day (inclusive) of the current term — trial or paid. Empty means the term never expires (legacy rows, the platform row). The daily billing task warns, dunns, and optionally suspends from this date."
+msgstr "Τελευταία ημέρα (συμπεριλαμβανομένης) της τρέχουσας περιόδου — δοκιμαστικής ή πληρωμένης. Κενό σημαίνει ότι η περίοδος δεν λήγει ποτέ (παλαιές εγγραφές, η εγγραφή της πλατφόρμας). Η ημερήσια εργασία χρέωσης προειδοποιεί, ειδοποιεί και προαιρετικά αναστέλλει με βάση αυτή την ημερομηνία."
+
+#: .\tenant\models.py:150
+msgid "Billing Notice Stage"
+msgstr "Στάδιο Ειδοποίησης Χρέωσης"
+
+#: .\tenant\models.py:153
+msgid "Highest dunning stage already notified for the current term (0 none, 1 expiry warning, 2 expired, 3 suspended)."
+msgstr "Το υψηλότερο στάδιο ειδοποίησης που έχει ήδη σταλεί για την τρέχουσα περίοδο (0 κανένα, 1 προειδοποίηση λήξης, 2 έληξε, 3 ανεστάλη)."
+
+#: .\tenant\models.py:158
+msgid "Billing Notice Term"
+msgstr "Περίοδος Ειδοποίησης Χρέωσης"
+
+#: .\tenant\models.py:162
+msgid "The paid_until value the notice stage refers to. A mismatch with the current paid_until means the stage is stale and resets to 0 on the next billing run."
+msgstr "Η τιμή paid_until στην οποία αναφέρεται το στάδιο ειδοποίησης. Ασυμφωνία με το τρέχον paid_until σημαίνει ότι το στάδιο είναι παρωχημένο και μηδενίζεται στην επόμενη εκτέλεση χρέωσης."

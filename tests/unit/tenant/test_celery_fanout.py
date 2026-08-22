@@ -177,6 +177,9 @@ class TestBeatScheduleTenantCoverage:
         "core.tasks.clear_expired_sessions_task",
         "core.tasks.clear_all_cache_task",
         "core.tasks.clear_development_log_files_task",
+        # Billing terms + dunning bookkeeping are public-schema Tenant
+        # rows; the cycle never enters a tenant schema (tenant/billing.py).
+        "tenant.tasks.process_tenant_billing",
     }
 
     def test_every_tenant_scoped_beat_entry_uses_fanout(self):

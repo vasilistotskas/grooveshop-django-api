@@ -25,6 +25,21 @@ class TenantPlan(models.TextChoices):
     ENTERPRISE = "enterprise", _("Enterprise")
 
 
+class SuspendedReason(models.TextChoices):
+    """Why a tenant is suspended — abuse and non-payment are different.
+
+    ``MANUAL`` is any operator-initiated suspension (abuse, legal,
+    operator judgement); ``BILLING`` is the dunning task acting on a
+    lapsed term. The distinction is load-bearing: renewal-driven
+    auto-reactivation (tenant/signals.py) is scoped to BILLING only, so
+    recording a payment can never resurrect a store an operator took
+    down on purpose.
+    """
+
+    MANUAL = "manual", _("Manual")
+    BILLING = "billing", _("Billing")
+
+
 class ThemePreset(models.TextChoices):
     DEFAULT = "default", _("Default")
     MINIMAL = "minimal", _("Minimal")
@@ -94,6 +109,20 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         ),
     )
 
+    suspended_reason = models.CharField(
+        _("Suspended Reason"),
+        max_length=20,
+        choices=SuspendedReason.choices,
+        blank=True,
+        default="",
+        help_text=_(
+            "Why this tenant is suspended: 'manual' for operator "
+            "action, 'billing' for the automated dunning task. Empty "
+            "when not suspended. Renewal-driven auto-reactivation "
+            "applies to 'billing' suspensions only."
+        ),
+    )
+
     # Plan / billing
     plan = models.CharField(
         _("Plan"),
@@ -101,7 +130,40 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         choices=TenantPlan.choices,
         default=TenantPlan.TRIAL,
     )
-    paid_until = models.DateField(_("Paid Until"), null=True, blank=True)
+    paid_until = models.DateField(
+        _("Paid Until"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Last day (inclusive) of the current term — trial or paid. "
+            "Empty means the term never expires (legacy rows, the "
+            "platform row). The daily billing task warns, dunns, and "
+            "optionally suspends from this date."
+        ),
+    )
+
+    # Dunning bookkeeping — written only by the billing task. The pair
+    # makes the pipeline idempotent AND self-resetting: a stage is only
+    # valid for the term it was recorded against, so moving paid_until
+    # forward implicitly resets the dunning state with no signal.
+    billing_notice_stage = models.PositiveSmallIntegerField(
+        _("Billing Notice Stage"),
+        default=0,
+        help_text=_(
+            "Highest dunning stage already notified for the current "
+            "term (0 none, 1 expiry warning, 2 expired, 3 suspended)."
+        ),
+    )
+    billing_notice_term = models.DateField(
+        _("Billing Notice Term"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "The paid_until value the notice stage refers to. A "
+            "mismatch with the current paid_until means the stage is "
+            "stale and resets to 0 on the next billing run."
+        ),
+    )
 
     # Branding
     store_name = models.CharField(

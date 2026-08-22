@@ -50,3 +50,41 @@ def test_reserved_schema_name_check_runs_before_db_writes():
     assert not TenantDomain.objects.filter(
         domain="blocked-store.example.com"
     ).exists()
+
+
+def test_unknown_plan_is_rejected_via_cli_args():
+    """Argparse ``choices`` guards the real CLI path."""
+    with pytest.raises(CommandError):
+        call_command(
+            "tenant_create",
+            "--name",
+            "Bad Plan Store",
+            "--slug",
+            "bad-plan-store",
+            "--schema",
+            "bad_plan_store",
+            "--domain",
+            "bad-plan-store.example.com",
+            "--owner-email",
+            "owner@bad-plan-store.example.com",
+            "--plan",
+            "gold",
+        )
+    assert not Tenant.objects.filter(schema_name="bad_plan_store").exists()
+
+
+def test_unknown_plan_is_rejected_via_call_command_kwargs():
+    """``call_command`` only round-trips REQUIRED options through the
+    parser, so keyword usage skips the argparse ``choices`` — the
+    command re-asserts in ``handle()`` before any write."""
+    with pytest.raises(CommandError, match="Invalid plan"):
+        call_command(
+            "tenant_create",
+            name="Bad Plan Kw Store",
+            slug="bad-plan-kw-store",
+            schema_name="bad_plan_kw_store",
+            domain="bad-plan-kw-store.example.com",
+            owner_email="owner@bad-plan-kw-store.example.com",
+            plan="gold",
+        )
+    assert not Tenant.objects.filter(schema_name="bad_plan_kw_store").exists()

@@ -39,3 +39,33 @@ def invalidate_tenant_caches(sender, instance, **kwargs):
     for domain in instance.domains.values_list("domain", flat=True):
         cache.delete(f"global:tenant_resolve:{domain}")
     cache.delete(f"global:tenant_domains:{instance.schema_name}")
+
+
+@receiver(post_save, sender=Tenant)
+def reactivate_on_renewal(sender, instance, **kwargs):
+    """Recording a payment lifts a BILLING suspension immediately.
+
+    An operator who moves ``paid_until`` to today or later on a store
+    the dunning task suspended should not have to remember a second
+    step. Scoped strictly to ``suspended_reason == BILLING`` — a manual
+    (abuse/legal) suspension is never lifted by bookkeeping.
+
+    Recursion-safe: ``activate_tenant`` saves the row, which re-enters
+    this receiver with ``is_active=True`` and exits on the first guard.
+    The dunning task's own suspension save also lands here, but at that
+    moment ``paid_until`` is necessarily in the past, so nothing fires.
+    """
+    from django.utils import timezone  # noqa: PLC0415
+
+    from tenant.lifecycle import activate_tenant  # noqa: PLC0415
+    from tenant.models import SuspendedReason  # noqa: PLC0415
+
+    if instance.is_active:
+        return
+    if instance.suspended_reason != SuspendedReason.BILLING:
+        return
+    if instance.paid_until is None:
+        return
+    if instance.paid_until < timezone.localdate():
+        return
+    activate_tenant(instance)

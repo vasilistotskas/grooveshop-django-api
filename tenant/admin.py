@@ -31,7 +31,13 @@ from unfold.contrib.filters.admin import ChoicesRadioFilter
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from tenant.lifecycle import (
+    PROTECTED_SCHEMAS,
+    activate_tenant,
+    suspend_tenant,
+)
 from tenant.models import (
+    SuspendedReason,
     Tenant,
     TenantDomain,
     TenantMembershipRole,
@@ -39,8 +45,10 @@ from tenant.models import (
 )
 
 # Schemas that can never be suspended, activated, or destroyed via the
-# admin. Destroying these would break the platform.
-_PROTECTED = frozenset({"public", "webside"})
+# admin. Destroying these would break the platform. Aliased from
+# tenant.lifecycle (the shared source of truth) so the admin's guards
+# and the billing task's can never disagree.
+_PROTECTED = PROTECTED_SCHEMAS
 
 # Minimum time a tenant must be suspended before it can be destroyed.
 _SUSPEND_COOLDOWN = timedelta(hours=24)
@@ -123,6 +131,9 @@ class TenantAdmin(ModelAdmin):
         "created_at",
         "updated_at",
         "suspended_at",
+        "suspended_reason",
+        "billing_notice_stage",
+        "billing_notice_term",
     ]
     inlines = [TenantDomainInline]
 
@@ -216,8 +227,19 @@ class TenantAdmin(ModelAdmin):
         return super().has_add_permission(request)
 
     def has_delete_permission(self, request, obj=None):
-        """Only the platform destroys stores."""
+        """Only the platform destroys stores — and never protected ones.
+
+        ``Tenant.delete()`` raises ``ValidationError`` for protected
+        schemas, but the admin delete view does not catch it (only
+        ``ProtectedError``), so the red delete button on ``public`` /
+        ``webside`` was a 500 waiting behind a confirm page. Withhold
+        the permission instead: the button disappears and the delete
+        view answers 403, mirroring how the bulk actions skip these
+        schemas.
+        """
         if self_service_tenant(request) is not None:
+            return False
+        if obj is not None and obj.schema_name in _PROTECTED:
             return False
         return super().has_delete_permission(request, obj)
 
@@ -238,13 +260,22 @@ class TenantAdmin(ModelAdmin):
                     "owner_email",
                     "is_active",
                     "suspended_at",
+                    "suspended_reason",
                     "uuid",
                 ]
             },
         ),
         (
             "Plan & Billing",
-            {"fields": ["plan", "paid_until", "stripe_connect_account_id"]},
+            {
+                "fields": [
+                    "plan",
+                    "paid_until",
+                    "billing_notice_stage",
+                    "billing_notice_term",
+                    "stripe_connect_account_id",
+                ]
+            },
         ),
         (
             "Branding",
@@ -453,8 +484,11 @@ class TenantAdmin(ModelAdmin):
 
         Reversible via ``activate_tenants``. Does not touch the
         Postgres schema or any data. Skips protected schemas.
+
+        Semantics (first-suspension stamping, cooldown preservation)
+        live in ``tenant.lifecycle.suspend_tenant`` — the same code
+        path the billing dunning task uses, with a different reason.
         """
-        now = timezone.now()
         skipped = []
         suspended = []
 
@@ -462,16 +496,7 @@ class TenantAdmin(ModelAdmin):
             if tenant.schema_name in _PROTECTED:
                 skipped.append(tenant.name)
                 continue
-            if tenant.is_active or tenant.suspended_at is None:
-                # Only stamp suspended_at on the *first* suspension —
-                # re-suspending an already-suspended tenant must not
-                # reset the cooldown timer.
-                update_fields = ["is_active"]
-                tenant.is_active = False
-                if tenant.suspended_at is None:
-                    tenant.suspended_at = now
-                    update_fields.append("suspended_at")
-                tenant.save(update_fields=update_fields)
+            if suspend_tenant(tenant, reason=SuspendedReason.MANUAL):
                 suspended.append(tenant.name)
 
         if skipped:
@@ -498,7 +523,8 @@ class TenantAdmin(ModelAdmin):
         icon="play_circle",
     )
     def activate_tenants(self, request, queryset):
-        """Re-activate a suspended tenant. Clears ``suspended_at``.
+        """Re-activate a suspended tenant. Clears ``suspended_at`` and
+        ``suspended_reason`` (via ``tenant.lifecycle.activate_tenant``).
 
         Skips protected schemas.
         """
@@ -509,10 +535,8 @@ class TenantAdmin(ModelAdmin):
             if tenant.schema_name in _PROTECTED:
                 skipped.append(tenant.name)
                 continue
-            tenant.is_active = True
-            tenant.suspended_at = None
-            tenant.save(update_fields=["is_active", "suspended_at"])
-            activated.append(tenant.name)
+            if activate_tenant(tenant):
+                activated.append(tenant.name)
 
         if skipped:
             self.message_user(

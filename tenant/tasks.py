@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from core import celery_app
+from core.tasks import MonitoredTask
 from tenant.celery import TenantTask, run_for_all_tenants
 
 logger = logging.getLogger(__name__)
@@ -131,3 +132,21 @@ def fanout_cleanup_expired_data_exports():
 @celery_app.task(base=TenantTask)
 def fanout_check_stale_acs_shipments():
     return run_for_all_tenants("shipping_acs.tasks.check_stale_acs_shipments")
+
+
+# NOT a fanout: billing terms, dunning bookkeeping, and outbound
+# platform mail all live on the PUBLIC schema (Tenant rows), so the
+# whole estate is processed in one public-schema pass. Defined here —
+# not in tenant/billing.py — because Celery autodiscovery only scans
+# ``tasks.py`` modules.
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def process_tenant_billing():
+    from tenant.billing import run_billing_cycle  # noqa: PLC0415
+
+    return run_billing_cycle()

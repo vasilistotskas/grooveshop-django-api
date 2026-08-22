@@ -9413,3 +9413,219 @@ msgstr "MARK"
 #~| msgid "Thank you for shopping with us!"
 #~ msgid "Thank you for staying connected with %(site_name)s!"
 #~ msgstr "Vielen Dank, dass Sie bei uns eingekauft haben!"
+
+#: .\admin\platform_billing.py:39 .\core\templates\admin\platform_index.html:83 #: .\tenant\admin.py:184
+msgid "Suspended"
+msgstr "Gesperrt"
+
+#: .\admin\platform_billing.py:40
+msgid "Past due"
+msgstr "Überfällig"
+
+#: .\admin\platform_billing.py:41
+msgid "Expires soon"
+msgstr "Läuft bald ab"
+
+#: .\admin\platform_billing.py:42 #: .\core\templates\admin\platform_billing.html:106 .\tenant\models.py:22
+msgid "Trial"
+msgstr "Testphase"
+
+#: .\admin\platform_billing.py:43
+msgid "No term recorded"
+msgstr "Keine Laufzeit erfasst"
+
+#: .\admin\platform_billing.py:115
+msgid "Paid until"
+msgstr "Bezahlt bis"
+
+#: .\admin\platform_billing.py:116 #: .\core\templates\admin\platform_billing.html:85
+msgid "Billing status"
+msgstr "Abrechnungsstatus"
+
+#: .\admin\platform_billing.py:129 #: .\core\templates\admin\platform_billing.html:16 #: .\core\templates\admin\platform_billing.html:33 .\settings.py:2148
+msgid "Plan & Billing"
+msgstr "Tarif & Abrechnung"
+
+#: .\core\templates\admin\platform_billing.html:53
+msgid "Trials"
+msgstr "Testphasen"
+
+#: .\core\templates\admin\platform_billing.html:61
+msgid "Paid & current"
+msgstr "Bezahlt & aktuell"
+
+#: .\core\templates\admin\platform_billing.html:69
+#, python-format
+msgid "Expiring within %(days)s days"
+msgstr "Laufen innerhalb von %(days)s Tagen ab"
+
+#: .\core\templates\admin\platform_billing.html:77
+msgid "Past due / no term"
+msgstr "Überfällig / keine Laufzeit"
+
+#: .\core\templates\admin\platform_billing.html:97
+msgid "How it works"
+msgstr "So funktioniert es"
+
+#: .\core\templates\admin\platform_billing.html:101
+msgid "Plans"
+msgstr "Tarife"
+
+#: .\core\templates\admin\platform_billing.html:115
+msgid "Recording payment"
+msgstr "Zahlung erfassen"
+
+#: .\core\templates\admin\platform_billing.html:123
+msgid "What is enforced"
+msgstr "Was automatisch durchgesetzt wird"
+
+#: .\core\templates\admin\platform_billing.html:135
+msgid "Handling non-payment"
+msgstr "Umgang mit Zahlungsausfall"
+
+#: .\core\templates\admin\platform_billing.html:144
+msgid "Who sees what"
+msgstr "Wer sieht was"
+
+#: .\core\templates\admin\platform_billing.html:151
+msgid "Payment rails"
+msgstr "Zahlungswege"
+
+#: .\core\templates\emails\billing\expired.html:4
+msgid "Your trial has ended"
+msgstr "Ihre Testphase ist abgelaufen"
+
+#: .\core\templates\emails\billing\expired.html:4
+msgid "Your plan has expired"
+msgstr "Ihr Tarif ist abgelaufen"
+
+#: .\core\templates\emails\billing\expired.html:7 #: .\core\templates\emails\billing\expiring.html:7 #: .\core\templates\emails\billing\suspended.html:7
+#, python-format
+msgid "Hi — about %(store)s,"
+msgstr "Hallo — es geht um %(store)s,"
+
+#: .\core\templates\emails\billing\expired.html:10 #: .\core\templates\emails\billing\expired.txt:3
+#, python-format
+msgid "Your trial ended on %(date)s. Your store is still running, but not for long."
+msgstr "Ihre Testphase endete am %(date)s. Ihr Shop läuft noch, aber nicht mehr lange."
+
+#: .\core\templates\emails\billing\expired.html:12 #: .\core\templates\emails\billing\expired.txt:3
+#, python-format
+msgid "Your %(plan)s plan term ended on %(date)s. Your store is still running, but not for long."
+msgstr "Die Laufzeit Ihres Tarifs %(plan)s endete am %(date)s. Ihr Shop läuft noch, aber nicht mehr lange."
+
+#: .\core\templates\emails\billing\expired.html:15 #: .\core\templates\emails\billing\expired.txt:5
+#, python-format
+msgid "Unless a renewal is recorded within %(grace)s days of the term end, your store will be suspended: the storefront goes offline and stops taking orders. Your data stays intact."
+msgstr "Wird nicht innerhalb von %(grace)s Tagen nach Laufzeitende eine Verlängerung erfasst, wird Ihr Shop gesperrt: Der Shop geht offline und nimmt keine Bestellungen mehr an. Ihre Daten bleiben erhalten."
+
+#: .\core\templates\emails\billing\expired.html:17 #: .\core\templates\emails\billing\expired.txt:7
+#, python-format
+msgid "To renew, reply to this email or contact us at %(email)s. As soon as the renewal is recorded, everything continues as normal."
+msgstr "Zur Verlängerung antworten Sie auf diese E-Mail oder kontaktieren Sie uns unter %(email)s. Sobald die Verlängerung erfasst ist, läuft alles normal weiter."
+
+#: .\core\templates\emails\billing\expired.txt:1
+#, python-format
+msgid "Your trial for %(store)s has ended"
+msgstr "Ihre Testphase für %(store)s ist abgelaufen"
+
+#: .\core\templates\emails\billing\expired.txt:1
+#, python-format
+msgid "Your plan for %(store)s has expired"
+msgstr "Ihr Tarif für %(store)s ist abgelaufen"
+
+#: .\core\templates\emails\billing\expiring.html:4
+msgid "Your trial is ending"
+msgstr "Ihre Testphase endet bald"
+
+#: .\core\templates\emails\billing\expiring.html:4
+msgid "Your plan is expiring"
+msgstr "Ihr Tarif läuft bald ab"
+
+#: .\core\templates\emails\billing\expiring.html:10 #: .\core\templates\emails\billing\expiring.txt:3
+#, python-format
+msgid "Your trial ends on %(date)s (inclusive). To keep your store running without interruption, pick a plan and arrange the renewal before then."
+msgstr "Ihre Testphase endet am %(date)s (einschließlich). Damit Ihr Shop ohne Unterbrechung weiterläuft, wählen Sie einen Tarif und veranlassen Sie die Verlängerung vorher."
+
+#: .\core\templates\emails\billing\expiring.html:12 #: .\core\templates\emails\billing\expiring.txt:3
+#, python-format
+msgid "Your %(plan)s plan term ends on %(date)s (inclusive). To keep your store running without interruption, arrange the renewal before then."
+msgstr "Die Laufzeit Ihres Tarifs %(plan)s endet am %(date)s (einschließlich). Damit Ihr Shop ohne Unterbrechung weiterläuft, veranlassen Sie die Verlängerung vorher."
+
+#: .\core\templates\emails\billing\expiring.html:15 #: .\core\templates\emails\billing\expiring.txt:5
+#, python-format
+msgid "If the term lapses, your store keeps running for a grace period of %(grace)s days before it is suspended."
+msgstr "Läuft die Laufzeit ab, bleibt Ihr Shop noch für eine Kulanzfrist von %(grace)s Tagen in Betrieb, bevor er gesperrt wird."
+
+#: .\core\templates\emails\billing\expiring.html:17 #: .\core\templates\emails\billing\expiring.txt:7
+#, python-format
+msgid "Questions or already renewed? Reply to this email or contact us at %(email)s."
+msgstr "Fragen oder bereits verlängert? Antworten Sie auf diese E-Mail oder kontaktieren Sie uns unter %(email)s."
+
+#: .\core\templates\emails\billing\expiring.txt:1
+#, python-format
+msgid "Your trial for %(store)s is ending"
+msgstr "Ihre Testphase für %(store)s endet bald"
+
+#: .\core\templates\emails\billing\expiring.txt:1
+#, python-format
+msgid "Your plan for %(store)s is expiring"
+msgstr "Ihr Tarif für %(store)s läuft bald ab"
+
+#: .\core\templates\emails\billing\suspended.html:4
+msgid "Your store has been suspended"
+msgstr "Ihr Shop wurde gesperrt"
+
+#: .\core\templates\emails\billing\suspended.html:9 #: .\core\templates\emails\billing\suspended.txt:3
+#, python-format
+msgid "Your store has been suspended: its term ended on %(date)s and no renewal was recorded within the %(grace)s-day grace period. The storefront is offline and no orders can be placed."
+msgstr "Ihr Shop wurde gesperrt: Die Laufzeit endete am %(date)s und innerhalb der Kulanzfrist von %(grace)s Tagen wurde keine Verlängerung erfasst. Der Shop ist offline und es können keine Bestellungen aufgegeben werden."
+
+#: .\core\templates\emails\billing\suspended.html:11 #: .\core\templates\emails\billing\suspended.txt:5
+msgid "Nothing has been deleted — your products, orders, and settings are all intact."
+msgstr "Es wurde nichts gelöscht — Ihre Produkte, Bestellungen und Einstellungen sind vollständig erhalten."
+
+#: .\core\templates\emails\billing\suspended.html:13 #: .\core\templates\emails\billing\suspended.txt:7
+#, python-format
+msgid "To bring your store back, arrange the renewal by replying to this email or contacting us at %(email)s. The moment it is recorded, your store reactivates automatically."
+msgstr "Um Ihren Shop wieder zu aktivieren, veranlassen Sie die Verlängerung, indem Sie auf diese E-Mail antworten oder uns unter %(email)s kontaktieren. Sobald sie erfasst ist, wird Ihr Shop automatisch reaktiviert."
+
+#: .\core\templates\emails\billing\suspended.txt:1
+#, python-format
+msgid "Your store %(store)s has been suspended"
+msgstr "Ihr Shop %(store)s wurde gesperrt"
+
+#: .\tenant\billing.py:111
+#, python-format
+msgid "%(store)s — your plan expires on %(date)s"
+msgstr "%(store)s — Ihr Tarif läuft am %(date)s ab"
+
+#: .\tenant\billing.py:116
+#, python-format
+msgid "%(store)s — your plan has expired"
+msgstr "%(store)s — Ihr Tarif ist abgelaufen"
+
+#: .\tenant\billing.py:117
+#, python-format
+msgid "%(store)s — your store has been suspended"
+msgstr "%(store)s — Ihr Shop wurde gesperrt"
+
+#: .\tenant\models.py:39
+msgid "Manual"
+msgstr "Manuell"
+
+#: .\tenant\models.py:40
+msgid "Billing"
+msgstr "Abrechnung"
+
+#: .\tenant\models.py:113
+msgid "Suspended Reason"
+msgstr "Sperrgrund"
+
+#: .\tenant\models.py:150
+msgid "Billing Notice Stage"
+msgstr "Mahnstufe"
+
+#: .\tenant\models.py:158
+msgid "Billing Notice Term"
+msgstr "Mahnstufen-Laufzeit"

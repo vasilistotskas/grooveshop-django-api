@@ -1,0 +1,161 @@
+{% extends "admin/base.html" %}
+
+{% comment %}
+The control plane's Plan & Billing page.
+
+Selected by admin.platform_billing.PlanBillingView, which is mounted
+only on PlatformAdminSite — the page does not exist on any merchant
+admin. Context comes from that view.
+
+The documentation cards below describe the CURRENT mechanics on
+purpose, including what is NOT enforced. When enforcement is automated
+(expiry task, auto-suspend), update the prose here in the same change.
+{% endcomment %}
+{% load i18n unfold %}
+
+{% block title %}{% trans "Plan & Billing" %} | {{ site_title }}{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">{{ site_title }}</a>
+</h1>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6">
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# Header                                                          #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {% url 'admin:tenant_tenant_changelist' as tenants_url %}
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+            {% component "unfold/components/title.html" %}{% trans "Plan & Billing" %}{% endcomponent %}
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Each store's commercial terms, and how the platform records and enforces them." %}{% endcomponent %}
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% if tenants_url %}
+                {% component "unfold/components/button.html" with href=tenants_url icon="storefront" variant="default" %}{% trans "Tenants" %}{% endcomponent %}
+            {% endif %}
+        </div>
+    </div>
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# Billing counters                                                #}
+    {# ────────────────────────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+        {% component "unfold/components/card.html" %}
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 dark:bg-orange-950 text-orange-600 dark:text-orange-300">
+                {% component "unfold/components/icon.html" %}schedule{% endcomponent %}
+            </div>
+            <div class="font-semibold mt-4 text-2xl text-important">{{ billing_trial_count }}</div>
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Trials" %}{% endcomponent %}
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" %}
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-300">
+                {% component "unfold/components/icon.html" %}check_circle{% endcomponent %}
+            </div>
+            <div class="font-semibold mt-4 text-2xl text-important">{{ billing_paid_count }}</div>
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Paid & current" %}{% endcomponent %}
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" %}
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50 dark:bg-orange-950 text-orange-600 dark:text-orange-300">
+                {% component "unfold/components/icon.html" %}hourglass_top{% endcomponent %}
+            </div>
+            <div class="font-semibold mt-4 text-2xl text-important">{{ billing_expiring_count }}</div>
+            {% component "unfold/components/text.html" with class="mt-1" %}{% blocktranslate with days=expiry_warning_days %}Expiring within {{ days }} days{% endblocktranslate %}{% endcomponent %}
+        {% endcomponent %}
+
+        {% component "unfold/components/card.html" %}
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-300">
+                {% component "unfold/components/icon.html" %}event_busy{% endcomponent %}
+            </div>
+            <div class="font-semibold mt-4 text-2xl text-important">{{ billing_past_due_count }}</div>
+            {% component "unfold/components/text.html" with class="mt-1" %}{% trans "Past due / no term" %}{% endcomponent %}
+        {% endcomponent %}
+
+    </div>
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# The estate's billing state                                      #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {% trans "Billing status" as billing_title %}
+    {% component "unfold/components/card.html" with title=billing_title %}
+        {% if billing_table.rows %}
+            {% component "unfold/components/table.html" with table=billing_table card_included=1 striped=1 %}{% endcomponent %}
+        {% else %}
+            {% component "unfold/components/text.html" %}{% trans "No stores yet." %}{% endcomponent %}
+        {% endif %}
+    {% endcomponent %}
+
+    {# ────────────────────────────────────────────────────────────── #}
+    {# How it works                                                    #}
+    {# ────────────────────────────────────────────────────────────── #}
+    {% component "unfold/components/title.html" %}{% trans "How it works" %}{% endcomponent %}
+
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+        {% trans "Plans" as plans_title %}
+        {% component "unfold/components/card.html" with title=plans_title %}
+            <div class="flex flex-col gap-3 text-sm">
+                {% component "unfold/components/text.html" %}{% trans "Every store carries exactly one plan — a commercial label set by platform staff, here on the tenant's Plan & Billing section or at provisioning (tenant_create --plan). New stores start on Trial." %}{% endcomponent %}
+                <div class="flex flex-wrap gap-2">
+                    {% include "unfold/helpers/label.html" with text=_("Trial") type="warning" icon="schedule" %}
+                    {% include "unfold/helpers/label.html" with text=_("Basic") type="info" icon="storefront" %}
+                    {% include "unfold/helpers/label.html" with text=_("Pro") type="primary" icon="rocket_launch" %}
+                    {% include "unfold/helpers/label.html" with text=_("Enterprise") type="success" icon="workspace_premium" %}
+                </div>
+                {% component "unfold/components/text.html" %}{% trans "A plan does not switch any feature on or off by itself: the loyalty and blog toggles are separate per-store flags, also platform-controlled. Changing a plan changes the label and nothing else." %}{% endcomponent %}
+            </div>
+        {% endcomponent %}
+
+        {% trans "Recording payment" as recording_title %}
+        {% component "unfold/components/card.html" with title=recording_title %}
+            <div class="flex flex-col gap-3 text-sm">
+                {% component "unfold/components/text.html" %}{% trans "There is no automated platform billing rail yet. Merchants pay the platform outside the system (invoice / bank transfer), and staff record the outcome by setting the tenant's Paid Until date — extend it by the paid period on every renewal. Trials get a term at provisioning (tenant_create --trial-days, default 30); an empty Paid Until means the term never expires." %}{% endcomponent %}
+                {% component "unfold/components/text.html" %}{% trans "Paid Until is a date, read as inclusive: the term covers that day and lapses the day after. Moving it forward resets the dunning pipeline for the new term — and immediately reactivates a store the billing task had suspended." %}{% endcomponent %}
+            </div>
+        {% endcomponent %}
+
+        {% trans "What is enforced" as enforcement_title %}
+        {% component "unfold/components/card.html" with title=enforcement_title %}
+            <div class="flex flex-col gap-3 text-sm">
+                {% component "unfold/components/text.html" %}{% blocktranslate with warn=expiry_warning_days grace=billing_grace_days %}A daily billing task walks the estate and notifies the store owner at three points: an expiry warning {{ warn }} days before the term ends, an expired notice the day after it lapses, and — {{ grace }} days past the term end — suspension. Each stage is sent at most once per term; the expired and suspension notices also copy the platform admins.{% endblocktranslate %}{% endcomponent %}
+                {% if billing_auto_suspend %}
+                    {% component "unfold/components/text.html" %}{% trans "Auto-suspend is ON: stores past the grace period are suspended by the task (reason: billing) and reactivate automatically the moment a renewal is recorded." %}{% endcomponent %}
+                {% else %}
+                    {% component "unfold/components/text.html" %}{% trans "Auto-suspend is OFF (notify-only rollout): warnings and expired notices are sent, but nothing is suspended automatically — follow-up is the Suspend action on the Tenants list. Flip TENANT_BILLING_AUTO_SUSPEND to enable enforcement." %}{% endcomponent %}
+                {% endif %}
+            </div>
+        {% endcomponent %}
+
+        {% trans "Handling non-payment" as lifecycle_title %}
+        {% component "unfold/components/card.html" with title=lifecycle_title %}
+            <div class="flex flex-col gap-3 text-sm">
+                {% component "unfold/components/text.html" %}{% trans "Suspension (the Tenants list action, or the billing task) marks the store inactive and stamps when and why: 'manual' for operator action, 'billing' for the dunning task. The storefront stops resolving immediately (visitors see store-not-found), WebSocket connections are refused, scheduled jobs skip the store, and the agent gateway no longer serves it. Data is untouched; Activate restores everything." %}{% endcomponent %}
+                {% component "unfold/components/text.html" %}{% trans "Recording a renewal auto-reactivates billing suspensions only — a manual suspension (abuse, legal) is never lifted by bookkeeping. Destroy is separate and irreversible: it drops the store's schema, and only works after 24 hours of suspension. The public and webside tenants are protected from all of it." %}{% endcomponent %}
+                {% component "unfold/components/text.html" %}{% trans "Caveat: suspension takes the storefront down but is not a network cutoff — direct calls to the store's API host still resolve the schema." %}{% endcomponent %}
+            </div>
+        {% endcomponent %}
+
+        {% trans "Who sees what" as visibility_title %}
+        {% component "unfold/components/card.html" with title=visibility_title %}
+            <div class="flex flex-col gap-3 text-sm">
+                {% component "unfold/components/text.html" %}{% trans "Plan and Paid Until are platform-only. They are excluded from the public tenant-resolve payload, and the merchant self-service allowlist withholds every commercial term — a store admin can edit branding and their own credentials, never their plan, term, flags or lifecycle state." %}{% endcomponent %}
+            </div>
+        {% endcomponent %}
+
+        {% trans "Payment rails" as rails_title %}
+        {% component "unfold/components/card.html" with title=rails_title %}
+            <div class="flex flex-col gap-3 text-sm">
+                {% component "unfold/components/text.html" %}{% trans "The Viva Wallet and Stripe credentials on each tenant are the merchant's own accounts for their shoppers' checkout — unrelated to what the merchant owes the platform. Stripe Connect Account ID is reserved for a future platform-billing rail and is dormant today." %}{% endcomponent %}
+            </div>
+        {% endcomponent %}
+
+    </div>
+
+</div>
+{% endblock %}

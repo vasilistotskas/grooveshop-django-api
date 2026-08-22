@@ -210,6 +210,45 @@ class TestTenantDeleteProtection:
             )
 
 
+@pytest.mark.django_db
+class TestDeletePermissionOnProtectedTenants:
+    """The admin must WITHHOLD delete on protected tenants, not 500.
+
+    ``Tenant.delete()`` raises ``ValidationError`` for protected
+    schemas, but the admin delete view only catches ``ProtectedError``
+    — so while the permission was granted, the red delete button on
+    ``public``/``webside`` led to an uncaught exception behind the
+    confirm page. ``has_delete_permission`` is what hides the button
+    and turns the URL into a 403.
+    """
+
+    def _request(self):
+        from django.test import RequestFactory
+
+        request = RequestFactory().get("/admin/")
+        request.user = User.objects.create_superuser(
+            email="delete-guard-operator@example.com",
+            username="deleteguardoperator",
+            password="testpass123",
+        )
+        return request
+
+    def test_protected_tenant_is_not_deletable(self):
+        tenant = _make_tenant("protected-del-perm")
+        with patch("tenant.admin._PROTECTED", frozenset({tenant.schema_name})):
+            assert (
+                _admin().has_delete_permission(self._request(), tenant) is False
+            )
+
+    def test_ordinary_tenant_stays_deletable(self):
+        tenant = _make_tenant("ordinary-del-perm")
+        assert _admin().has_delete_permission(self._request(), tenant) is True
+
+    def test_changelist_level_permission_is_untouched(self):
+        """``obj=None`` (changelist) must keep the module-level answer."""
+        assert _admin().has_delete_permission(self._request(), None) is True
+
+
 # ---------------------------------------------------------------------------
 # Destroy admin action
 # ---------------------------------------------------------------------------

@@ -1,0 +1,18 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% if is_trial %}{% trans "Your trial has ended" %}{% else %}{% trans "Your plan has expired" %}{% endif %} - {{ store_name }}{% endblock %}
+
+{% block email_content %}
+<h1>{% blocktrans with store=store_name %}Hi — about {{ store }},{% endblocktrans %}</h1>
+
+{% if is_trial %}
+<p>{% blocktrans with date=paid_until|date:"DATE_FORMAT" %}Your trial ended on {{ date }}. Your store is still running, but not for long.{% endblocktrans %}</p>
+{% else %}
+<p>{% blocktrans with plan=plan_display date=paid_until|date:"DATE_FORMAT" %}Your {{ plan }} plan term ended on {{ date }}. Your store is still running, but not for long.{% endblocktrans %}</p>
+{% endif %}
+
+<p style="color: #b00;">{% blocktrans with grace=grace_days %}Unless a renewal is recorded within {{ grace }} days of the term end, your store will be suspended: the storefront goes offline and stops taking orders. Your data stays intact.{% endblocktrans %}</p>
+
+<p>{% blocktrans with email=INFO_EMAIL %}To renew, reply to this email or contact us at {{ email }}. As soon as the renewal is recorded, everything continues as normal.{% endblocktrans %}</p>
+{% endblock %}

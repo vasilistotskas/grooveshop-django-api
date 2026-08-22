@@ -1,0 +1,14 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Your store has been suspended" %} - {{ store_name }}{% endblock %}
+
+{% block email_content %}
+<h1>{% blocktrans with store=store_name %}Hi — about {{ store }},{% endblocktrans %}</h1>
+
+<p style="color: #b00;">{% blocktrans with date=paid_until|date:"DATE_FORMAT" grace=grace_days %}Your store has been suspended: its term ended on {{ date }} and no renewal was recorded within the {{ grace }}-day grace period. The storefront is offline and no orders can be placed.{% endblocktrans %}</p>
+
+<p>{% trans "Nothing has been deleted — your products, orders, and settings are all intact." %}</p>
+
+<p>{% blocktrans with email=INFO_EMAIL %}To bring your store back, arrange the renewal by replying to this email or contacting us at {{ email }}. The moment it is recorded, your store reactivates automatically.{% endblocktrans %}</p>
+{% endblock %}

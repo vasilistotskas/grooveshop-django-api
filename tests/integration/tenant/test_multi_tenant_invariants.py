@@ -73,19 +73,19 @@ def _attach_domain(tenant: Tenant, host: str) -> TenantDomain:
 
 
 @pytest.mark.django_db
-class TestKnoxCrossTenantReplay:
-    """A user with an active session on tenant A must not be granted
-    access on tenant B's domain via the same Knox token. H3 in
-    MULTI_TENANT_AUDIT.md.
+class TestMembershipIsolation:
+    """A membership in tenant A grants nothing in tenant B (H3).
 
-    The DRF authentication class ``BoundedTokenAuthentication`` calls
-    ``user_has_tenant_access(user, current_tenant)`` AFTER Knox has
-    validated the token. We exercise the membership branch directly
-    so the test is deterministic without needing Knox token tables.
+    ``get_membership`` is what every staff surface consults — the
+    admin's ``has_permission`` and ``TenantRolePermissionBackend``
+    both resolve roles through it. (Customer Knox tokens need no
+    membership check at all: ``knox_authtoken`` is per-schema, so a
+    token minted on tenant A does not exist in tenant B's table —
+    that isolation is structural, see BoundedTokenAuthentication.)
     """
 
-    def test_membership_required_to_pass_token_check(self) -> None:
-        from tenant.membership import user_has_tenant_access
+    def test_membership_does_not_cross_tenants(self) -> None:
+        from tenant.membership import get_membership
 
         tenant_a = _make_tenant("knox-tenant-a")
         tenant_b = _make_tenant("knox-tenant-b")
@@ -101,11 +101,11 @@ class TestKnoxCrossTenantReplay:
             is_active=True,
         )
 
-        assert user_has_tenant_access(user, tenant_a) is True
-        assert user_has_tenant_access(user, tenant_b) is False
+        assert get_membership(user, tenant_a) is not None
+        assert get_membership(user, tenant_b) is None
 
     def test_inactive_membership_does_not_grant_access(self) -> None:
-        from tenant.membership import user_has_tenant_access
+        from tenant.membership import get_membership
 
         tenant = _make_tenant("knox-tenant-c")
         user = User.objects.create_user(
@@ -119,7 +119,7 @@ class TestKnoxCrossTenantReplay:
             is_active=False,
         )
 
-        assert user_has_tenant_access(user, tenant) is False
+        assert get_membership(user, tenant) is None
 
 
 # ---------------------------------------------------------------------------

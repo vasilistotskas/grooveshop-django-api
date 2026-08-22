@@ -113,9 +113,10 @@ class TenantRolePermissionBackend(BaseBackend):
       platform operator's address. The only sound signal is provenance,
       so this backend grants exclusively to user objects that
       ``PlatformStaffBackend`` loaded from the public schema. Admin
-      sessions qualify; storefront/API sessions never do, which also
-      keeps this out of the DRF permission path where authorization is
-      ``HasTenantAccess`` plus role, not Django model permissions.
+      sessions qualify, and so do staff API tokens
+      (``tenant.api_tokens.PlatformStaffTokenAuthentication`` stamps
+      the identities it resolves from public); customer storefront/API
+      sessions never do.
 
     Platform-scope apps are never granted, at any role — see
     ``tenant.role_scopes.PLATFORM_ONLY_APP_LABELS``. The narrow grants

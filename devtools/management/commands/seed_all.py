@@ -672,9 +672,8 @@ class Command(BaseCommand):
         # correct on a single-tenant dev database, and a silent mistake
         # once tenants exist — everything this command writes is a
         # TENANT_APPS model, so a bare run fills the PUBLIC copies of
-        # those tables. Those copies are exactly what
-        # ``prune_public_legacy_data`` TRUNCATES after cutover, so the
-        # work is invisible and then deleted. Refuse rather than guess.
+        # those tables — where no request is ever served from, so the
+        # work is invisible. Refuse rather than guess.
         from django.db import connection as db_connection
 
         from tenant.models import Tenant

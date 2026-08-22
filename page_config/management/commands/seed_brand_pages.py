@@ -1,8 +1,7 @@
 """Seed the brand marketing page layouts for a single tenant schema.
 
 Opt-in counterpart to ``seed_page_layouts`` (which every tenant gets
-automatically during ``tenant_create``/``populate_tenant_schema``
-provisioning). The four layouts this command seeds — about / vision /
+automatically during ``tenant_create`` provisioning). The four layouts this command seeds — about / vision /
 what-is-microlearning / why-microlearning — render through per-tenant
 Nuxt variant components with no props, so they are NOT part of the
 universal default set: only tenants that actually ship these specific

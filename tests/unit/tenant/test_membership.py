@@ -1,19 +1,16 @@
-"""Tests for tenant.membership helpers + DRF permission."""
+"""Tests for tenant.membership helpers."""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connection
 
 from tenant.membership import (
-    HasTenantAccess,
     get_current_tenant,
     get_membership,
-    user_has_tenant_access,
 )
 from tenant.models import (
     Tenant,
@@ -125,54 +122,3 @@ class TestGetMembership:
         bind_tenant(active_tenant)
         anon = SimpleNamespace(is_authenticated=False)
         assert get_membership(anon) is None
-
-
-class TestUserHasTenantAccess:
-    @pytest.mark.django_db
-    def test_true_with_active_membership(
-        self, active_tenant, user, bind_tenant
-    ):
-        bind_tenant(active_tenant)
-        UserTenantMembership.objects.create(user=user, tenant=active_tenant)
-        assert user_has_tenant_access(user) is True
-
-    @pytest.mark.django_db
-    def test_false_without_membership(self, active_tenant, user, bind_tenant):
-        bind_tenant(active_tenant)
-        assert user_has_tenant_access(user) is False
-
-    @pytest.mark.django_db
-    def test_platform_superuser_not_auto_granted(
-        self, active_tenant, bind_tenant
-    ):
-        bind_tenant(active_tenant)
-        superuser = User.objects.create_superuser(
-            username="root-unit",
-            email="root-unit@platform",
-            password="p",  # noqa: S106
-        )
-        # Explicit — even superusers need a membership row; the helper
-        # does not short-circuit on is_superuser.
-        assert user_has_tenant_access(superuser) is False
-
-
-class TestHasTenantAccessPermission:
-    @pytest.mark.django_db
-    def test_has_permission_delegates_to_helper(
-        self, active_tenant, user, bind_tenant
-    ):
-        bind_tenant(active_tenant)
-        UserTenantMembership.objects.create(user=user, tenant=active_tenant)
-
-        permission = HasTenantAccess()
-        request = MagicMock(user=user)
-        assert permission.has_permission(request, view=MagicMock()) is True
-
-    @pytest.mark.django_db
-    def test_has_permission_rejects_without_membership(
-        self, active_tenant, user, bind_tenant
-    ):
-        bind_tenant(active_tenant)
-        permission = HasTenantAccess()
-        request = MagicMock(user=user)
-        assert permission.has_permission(request, view=MagicMock()) is False

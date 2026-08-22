@@ -1,10 +1,10 @@
 """Which app labels are tenant-only.
 
 An app listed in ``TENANT_APPS`` but not in ``SHARED_APPS`` owns tables
-that exist ONLY inside tenant schemas. Two places need that set and had
-been deriving it separately: ``prune_public_legacy_data`` (which
-truncates those tables out of ``public``) and the admin (which must not
-offer their model pages while serving the public schema).
+that exist ONLY inside tenant schemas. Consumers: the admin (which
+must not offer their model pages while serving the public schema) and
+``tenant.role_scopes`` (which derives the store-scope permission set
+from it).
 """
 
 from __future__ import annotations

@@ -92,6 +92,17 @@ class StockLog(TimeStampMixinModel):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        # ORM-only, like Product.changed_by. This field has MIXED
+        # writers: customer flows pass same-schema users
+        # (reservation.reserved_by), but manual admin stock changes copy
+        # ``history_user`` (product/signals.py) — a PLATFORM-PUBLIC
+        # identity, since PlatformStaffBackend is the only way into a
+        # tenant's admin. A real FK points that public id at the
+        # TENANT's user table: ForeignKeyViolation when the id has no
+        # tenant row, silent misattribution when it collides with a
+        # shopper's. StockReservation.reserved_by keeps its constraint —
+        # its writers are customers only.
+        db_constraint=False,
         help_text=_(
             "User who performed the operation (null for system operations)"
         ),

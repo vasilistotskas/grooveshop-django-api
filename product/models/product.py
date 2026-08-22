@@ -184,8 +184,25 @@ class Product(
         related_name="changed_products",
         null=True,
         blank=True,
+        # ORM-only, like UserAccount.loyalty_tier. ``changed_by`` is
+        # written from ``request.user`` in the admin, and on a tenant
+        # host EVERY admin user is a PLATFORM-PUBLIC identity by
+        # construction (PlatformStaffBackend). This table lives in the
+        # tenant schema, so a real FK would point that public id at the
+        # TENANT's user table: a ForeignKeyViolation when no such id
+        # exists there, or — worse — a silent match attributing the
+        # change to an unrelated shopper who happens to share the pk.
+        # It worked until now only because the cutover copied users
+        # id-preserving. PostgreSQL cannot express a cross-schema FK
+        # anyway. Same fix the shipping shipment histories carry.
+        db_constraint=False,
     )
-    history = HistoricalRecords()
+    history = HistoricalRecords(
+        # Same cross-schema reasoning as ``changed_by`` above — the
+        # ACS/BoxNow shipment histories already declare this; Product
+        # was the one historied model that had been missed.
+        user_db_constraint=False,
+    )
 
     points_coefficient = models.DecimalField(
         _("Points Coefficient"),

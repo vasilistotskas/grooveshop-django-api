@@ -10,7 +10,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from blog.filters.category import BlogCategoryFilter
 from blog.filters.post import BlogPostFilter
 from blog.models.category import BlogCategory
@@ -142,7 +142,7 @@ class BlogCategoryViewSet(BaseModelViewSet):
             "destroy",
             "reorder",
         ):
-            return [IsBlogEnabled(), IsPlatformSuperuser()]
+            return [IsBlogEnabled(), StoreStaffModelPermissions()]
         return [IsBlogEnabled(), AllowAny()]
 
     def get_filterset_class(self):

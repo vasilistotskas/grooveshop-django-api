@@ -4,7 +4,7 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.permissions import AllowAny
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -46,7 +46,7 @@ class ProductImageViewSet(BaseModelViewSet):
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):
-            return [IsPlatformSuperuser()]
+            return [StoreStaffModelPermissions()]
         return [AllowAny()]
 
     filterset_fields = [

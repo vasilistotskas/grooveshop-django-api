@@ -6,7 +6,7 @@ from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from blog.filters.author import BlogAuthorFilter
 from blog.filters.post import BlogPostFilter
 from blog.models.author import BlogAuthor
@@ -71,7 +71,7 @@ class BlogAuthorViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsBlogEnabled(), IsPlatformSuperuser()]
+            return [IsBlogEnabled(), StoreStaffModelPermissions()]
         return [IsBlogEnabled(), AllowAny()]
 
     def get_filterset_class(self):

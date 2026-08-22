@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -71,7 +71,7 @@ class PayWayViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ]:
-            return [IsPlatformSuperuser()]
+            return [StoreStaffModelPermissions()]
         return super().get_permissions()
 
     def get_queryset(self):

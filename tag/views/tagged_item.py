@@ -4,7 +4,7 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.permissions import AllowAny
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from tag.filters.tagged_item import TaggedItemFilter
 from tag.models.tagged_item import TaggedItem
 from tag.serializers.tagged_item import (
@@ -68,7 +68,7 @@ class TaggedItemViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsPlatformSuperuser()]
+            return [StoreStaffModelPermissions()]
         return [AllowAny()]
 
     ordering_fields = [

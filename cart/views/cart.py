@@ -16,7 +16,7 @@ from rest_framework.permissions import AllowAny
 
 from rest_framework.response import Response
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from cart.filters.cart import CartFilter
 from cart.models import Cart
 from cart.serializers.cart import (
@@ -211,7 +211,7 @@ class CartViewSet(BaseModelViewSet):
 
     def get_permissions(self):
         if self.action == "list":
-            self.permission_classes = [IsPlatformSuperuser]
+            self.permission_classes = [StoreStaffModelPermissions]
         else:
             # All other cart actions (retrieve, update, destroy, reserve_stock,
             # release_reservations, create_payment_intent) support guest users

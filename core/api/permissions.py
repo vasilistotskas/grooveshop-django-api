@@ -1,5 +1,5 @@
 from django.utils.translation import gettext_lazy as _
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, DjangoModelPermissions
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -53,6 +53,68 @@ class IsPlatformSuperuser(BasePermission):
             and user.is_active
             and user.is_superuser
         )
+
+
+class StoreStaffModelPermissions(DjangoModelPermissions):
+    """Role-derived permissions for STORE-scoped administrative routes.
+
+    DRF's own ``DjangoModelPermissions`` does the whole job once the
+    identity is right: it maps the HTTP method to a model permission
+    codename and asks ``user.has_perm(...)`` — which, for a user object
+    stamped by ``PlatformStaffTokenAuthentication``, resolves through
+    ``TenantRolePermissionBackend``: the SAME policy the admin uses
+    (``tenant.role_scopes``). One policy source; the API and the admin
+    cannot drift.
+
+    Who passes, concretely:
+
+    - A **platform superuser** — ``has_perm`` short-circuits before any
+      backend.
+    - A **staff token holder with a role in the CURRENT tenant** — the
+      role backend derives their set from ``connection.tenant`` +
+      membership. STAFF gets view/add/change on operational apps,
+      ADMIN/OWNER the full store scope.
+    - A **customer session: never.** Unstamped identities get nothing
+      from the role backend, customers hold no Django perms, and the
+      tenant-schema privilege flags were cleared — three independent
+      reasons.
+
+    The only extension over stock ``DjangoModelPermissions`` is
+    requiring the ``view`` permission on reads: these are
+    administrative routes whose LIST/RETRIEVE variants are separately
+    exposed as public endpoints where reading is intended; here a read
+    is staff activity like any other.
+    """
+
+    perms_map = {
+        **DjangoModelPermissions.perms_map,
+        "GET": ["%(app_label)s.view_%(model_name)s"],
+        "HEAD": ["%(app_label)s.view_%(model_name)s"],
+    }
+
+
+class StoreStaffChangePermission(BasePermission):
+    """``change`` permission on the view's model, for custom actions.
+
+    ``DjangoModelPermissions`` maps by HTTP method, and custom
+    operational actions are POSTs — which would map to ``add``. A
+    refund, a tracking update or a carrier cancel is not "adding an
+    order"; it is CHANGING one, and STAFF's role text ("cannot
+    delete") only holds if these map to ``change``. Used from
+    ``get_permissions`` for exactly those actions.
+    """
+
+    message = _("You do not have permission to manage this resource.")
+
+    def has_permission(self, request, view) -> bool:
+        user = getattr(request, "user", None)
+        if not (user and user.is_authenticated):
+            return False
+        queryset = getattr(view, "queryset", None)
+        if queryset is None:
+            queryset = view.get_queryset()
+        opts = queryset.model._meta
+        return user.has_perm(f"{opts.app_label}.change_{opts.model_name}")
 
 
 class IsOwnerMixin:

@@ -8,6 +8,7 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_tenants.models import DomainMixin, TenantMixin, _check_schema_name
+from knox.models import AbstractAuthToken
 
 from tenant.validators import (
     validate_reserved_schema_name,
@@ -1031,3 +1032,43 @@ class UserTenantMembership(TimeStampMixinModel):
             TenantMembershipRole.ADMIN,
             TenantMembershipRole.OWNER,
         )
+
+
+class PlatformStaffToken(AbstractAuthToken):
+    """API token for a PLATFORM identity — the staff sibling of knox's.
+
+    ``knox.AuthToken`` is in TENANT_APPS only: a customer token is a
+    per-schema row, which is what makes it structurally un-replayable
+    across stores. Staff are the opposite case — public-schema
+    identities operating on tenant data — so their tokens live in the
+    ONE app that is SHARED-only (this one), giving the mirror-image
+    guarantee: the table exists only in ``public`` and its user FK can
+    only ever reference ``public.user_useraccount``.
+
+    A concrete subclass rather than ``KNOX_TOKEN_MODEL`` because that
+    setting is a swap (one global model, like ``AUTH_USER_MODEL``) —
+    it cannot ADD a token model. Verified against knox 5.1.0, whose
+    ``AbstractAuthToken`` is the documented customization path.
+
+    Consumed exclusively by
+    ``tenant.api_tokens.PlatformStaffTokenAuthentication`` — never by
+    knox's own authentication class, which only queries
+    ``get_token_model()``. See ``docs/api-staff-identity.md``.
+    """
+
+    # Redeclared only to give the reverse accessor its own name:
+    # ``AbstractAuthToken.user`` hardcodes ``related_name=
+    # 'auth_token_set'``, which ``knox.AuthToken`` already claims.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="platform_staff_tokens",
+        verbose_name=_("User"),
+    )
+
+    class Meta:
+        verbose_name = _("Platform Staff Token")
+        verbose_name_plural = _("Platform Staff Tokens")
+
+    def __str__(self):
+        return f"staff:{self.token_key} : {self.user}"

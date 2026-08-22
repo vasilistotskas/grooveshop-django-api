@@ -4,7 +4,7 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.permissions import AllowAny
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from blog.filters.tag import BlogTagFilter
 from blog.models.tag import BlogTag
 from blog.serializers.tag import (
@@ -50,7 +50,7 @@ class BlogTagViewSet(BaseModelViewSet):
 
     def get_permissions(self):
         if self.action in ("create", "update", "partial_update", "destroy"):
-            return [IsBlogEnabled(), IsPlatformSuperuser()]
+            return [IsBlogEnabled(), StoreStaffModelPermissions()]
         return [IsBlogEnabled(), AllowAny()]
 
     ordering_fields = [

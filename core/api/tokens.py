@@ -45,10 +45,16 @@ class BoundedTokenAuthentication(KnoxTokenAuthentication):
     in place of ``knox.auth.TokenAuthentication``.
     """
 
-    def authenticate_credentials(self, token):
-        user, auth_token = super().authenticate_credentials(token)
+    @staticmethod
+    def enforce_absolute_age(auth_token) -> None:
+        """Reject (and delete) a token older than the absolute cap.
 
-        # 1. Absolute age cap.
+        A method of its own so
+        ``tenant.api_tokens.PlatformStaffTokenAuthentication`` — which
+        cannot call ``authenticate_credentials`` here because knox's
+        implementation hardwires ``get_token_model()`` — applies the
+        SAME cap to staff tokens instead of quietly diverging.
+        """
         age = timezone.now() - auth_token.created
         if age > KNOX_ABSOLUTE_MAX_AGE:
             auth_token.delete()
@@ -58,6 +64,12 @@ class BoundedTokenAuthentication(KnoxTokenAuthentication):
                     "Please log in again."
                 )
             )
+
+    def authenticate_credentials(self, token):
+        user, auth_token = super().authenticate_credentials(token)
+
+        # 1. Absolute age cap.
+        self.enforce_absolute_age(auth_token)
 
         # 2. Tenant binding needs no check here: knox is in TENANT_APPS
         # only, so ``knox_authtoken`` is a per-schema table and a token

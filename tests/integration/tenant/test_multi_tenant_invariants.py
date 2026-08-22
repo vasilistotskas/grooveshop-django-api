@@ -338,13 +338,23 @@ class TestPageConfigTenantPermission:
     sound notion of store staff, and what granting it would require.
     """
 
-    def test_admin_viewset_is_platform_only(self) -> None:
+    def test_admin_viewset_is_role_gated(self) -> None:
+        """The end state: permissions derive from the caller's ROLE in
+        the tenant on the connection (StoreStaffModelPermissions →
+        TenantRolePermissionBackend). An OWNER of store A holds nothing
+        on store B's host, which is H22 by construction — and a
+        platform superuser still passes via the has_perm short-circuit.
+
+        (An interim pass locked these routes to IsPlatformSuperuser
+        while the staff identity did not exist yet; Design B replaced
+        that — see docs/api-staff-identity.md.)
+        """
         from page_config.views import PageLayoutAdminViewSet
 
         permission_names = {
             cls.__name__ for cls in PageLayoutAdminViewSet.permission_classes
         }
-        assert "IsPlatformSuperuser" in permission_names
+        assert "StoreStaffModelPermissions" in permission_names
 
     def test_admin_viewset_does_not_rely_on_is_staff(self) -> None:
         """``IsAdminUser`` is literally ``is_staff`` — the H22 hole."""

@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_view
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -83,7 +83,7 @@ class AttributeValueViewSet(BaseModelViewSet):
         - Public read access for list and retrieve
         """
         if self.action in ["create", "update", "partial_update", "destroy"]:
-            self.permission_classes = [IsPlatformSuperuser]
+            self.permission_classes = [StoreStaffModelPermissions]
         else:
             self.permission_classes = []
 

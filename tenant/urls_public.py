@@ -17,6 +17,10 @@ from django.urls import path
 
 from admin.platform_site import platform_admin_site
 from core.urls import urlpatterns as core_urlpatterns
+from tenant.staff_api import (
+    PlatformStaffLoginView,
+    PlatformStaffLogoutView,
+)
 from tenant.views import TenantAdminViewSet
 
 # Manual path() patterns — consistent with the rest of the codebase which
@@ -38,6 +42,21 @@ urlpatterns = [
     # platform site is the one that should answer. Tenant hosts never
     # reach this module — it is only loaded via PUBLIC_SCHEMA_URLCONF.
     path("admin/", platform_admin_site.urls),
+    # Staff API tokens are minted on the PLATFORM host only — the
+    # storefront URLconf never mounts these, which is half of the wall
+    # that keeps customer logins from ever producing a staff token
+    # (the other half: PlatformStaffBackend is inert in global
+    # authenticate()). See docs/api-staff-identity.md.
+    path(
+        "api/v1/platform/auth/login",
+        PlatformStaffLoginView.as_view(),
+        name="platform-staff-login",
+    ),
+    path(
+        "api/v1/platform/auth/logout",
+        PlatformStaffLogoutView.as_view(),
+        name="platform-staff-logout",
+    ),
     path("api/v1/tenant/admin/", _admin_list, name="tenant-admin-list"),
     path(
         "api/v1/tenant/admin/<int:pk>/",

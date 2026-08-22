@@ -7,7 +7,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import ActionConfig
 from page_config.models import NavigationMenu, PageLayout, PageSection
@@ -70,8 +70,8 @@ def public_navigation(request):
 
 class NavigationMenuAdminViewSet(BaseModelViewSet):
     queryset = NavigationMenu.objects.all()
-    # Platform-only, same rationale as PageLayoutAdminViewSet below.
-    permission_classes = [IsPlatformSuperuser]
+    # Role-derived — same rationale as PageLayoutAdminViewSet below.
+    permission_classes = [StoreStaffModelPermissions]
     # One entry per ACTION. ``BaseModelViewSet.get_serializer_class``
     # looks the current action up by name (core/api/views.py) — there is
     # no "default" key anywhere in the codebase, so every one of these
@@ -99,19 +99,19 @@ class NavigationMenuAdminViewSet(BaseModelViewSet):
 
 class PageLayoutAdminViewSet(BaseModelViewSet):
     queryset = PageLayout.objects.prefetch_related("sections")
-    # H22 (MULTI_TENANT_AUDIT.md) paired ``IsAdminUser`` with
-    # ``HasTenantAccess`` so a platform-staff user could not mutate any
-    # tenant's layout. That pairing was unsound on an API request:
-    # ``UserTenantMembership.user`` is an FK to
-    # ``public.user_useraccount``, but an API session authenticates
-    # against the TENANT schema (knox is TENANT_APPS only), so the
-    # membership lookup compared primary keys ACROSS schemas and
-    # matched whichever public row happened to share the pk. It only
-    # ever "worked" because the cutover copied users id-preserving.
+    # H22 (MULTI_TENANT_AUDIT.md): a platform-staff user must not be
+    # able to mutate ANOTHER tenant's layout. The original fix paired
+    # ``IsAdminUser`` with ``HasTenantAccess``, which was unsound on an
+    # API request (the membership lookup compared primary keys ACROSS
+    # schemas — see docs/api-staff-identity.md); the interim fix locked
+    # these routes to platform superusers.
     #
-    # ``IsPlatformSuperuser`` closes H22 directly and soundly: is_staff
-    # is no longer the gate at all.
-    permission_classes = [IsPlatformSuperuser]
+    # ``StoreStaffModelPermissions`` is the end state: the permission
+    # set is derived from the caller's ROLE in the tenant currently on
+    # the connection, so an OWNER of store A holds nothing when the
+    # request arrives on store B's host — H22 by construction, and
+    # is_staff is not the gate at all.
+    permission_classes = [StoreStaffModelPermissions]
     serializers_config = {
         "list": ActionConfig(response=PageLayoutSerializer),
         "retrieve": ActionConfig(response=PageLayoutSerializer),

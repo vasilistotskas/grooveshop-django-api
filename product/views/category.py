@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -66,7 +66,7 @@ class ProductCategoryViewSet(BaseModelViewSet):
             "partial_update",
             "destroy",
         ):
-            return [IsPlatformSuperuser()]
+            return [StoreStaffModelPermissions()]
         return [AllowAny()]
 
     ordering_fields = [

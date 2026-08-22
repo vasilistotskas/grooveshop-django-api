@@ -360,6 +360,13 @@ PASSWORD_HASHERS = [
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "core.api.tokens.BoundedTokenAuthentication",
+        # Platform staff tokens — engages ONLY on the ``StaffBearer``
+        # keyword and returns None otherwise, so it composes with the
+        # customer authenticator above (which claims ``Bearer`` and
+        # raises on anything it doesn't recognise once engaged; two
+        # ``Bearer`` authenticators cannot coexist). Resolves and
+        # stamps PUBLIC-schema identities; see docs/api-staff-identity.md.
+        "tenant.api_tokens.PlatformStaffTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": [
@@ -407,6 +414,9 @@ REST_FRAMEWORK = {
         # Public proxies to rate-limited carrier partner APIs.
         "acs_address": None if DEBUG else "30/minute",
         "boxnow_nearest": None if DEBUG else "10/minute",
+        # Staff token minting (tenant.staff_api) — a credential-guessing
+        # surface on the platform host, so budget accordingly.
+        "staff_login": None if DEBUG else "10/hour",
     },
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",

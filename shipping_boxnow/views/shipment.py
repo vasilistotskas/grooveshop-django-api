@@ -18,7 +18,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.api.permissions import IsOwnerOrAdminOrGuest, IsPlatformSuperuser
+from core.api.permissions import (
+    IsOwnerOrAdminOrGuest,
+    StoreStaffModelPermissions,
+)
 from shipping_boxnow.models import BoxNowShipment
 from shipping_boxnow.serializers import BoxNowShipmentSerializer
 
@@ -85,7 +88,7 @@ class BoxNowCancelView(APIView):
     parcel is in ``NEW`` state per BoxNow docs.
     """
 
-    permission_classes = [IsPlatformSuperuser]
+    permission_classes = [StoreStaffModelPermissions]
     serializer_class = BoxNowShipmentSerializer
 
     @extend_schema(

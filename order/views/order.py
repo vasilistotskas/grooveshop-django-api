@@ -30,7 +30,8 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from core.api.permissions import (
     IsOwnerOrAdmin,
     IsOwnerOrAdminOrGuest,
-    IsPlatformSuperuser,
+    StoreStaffChangePermission,
+    StoreStaffModelPermissions,
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
@@ -405,12 +406,25 @@ class OrderViewSet(BaseModelViewSet):
             self.permission_classes = [IsOwnerOrAdmin]
         elif self.action in guest_allowed_actions:
             self.permission_classes = [IsOwnerOrAdminOrGuest]
+        elif self.action == "destroy":
+            # DELETE maps to delete_order — ADMIN/OWNER hold it, STAFF
+            # deliberately does not ("delete is the irreversible
+            # action", tenant.role_scopes).
+            self.permission_classes = [StoreStaffModelPermissions]
         elif self.action in admin_only_actions:
-            self.permission_classes = [IsPlatformSuperuser]
+            # Custom operational actions are POSTs, which
+            # DjangoModelPermissions would map to add_order — but a
+            # refund, a tracking update or a carrier cancel is not
+            # "adding an order", it is CHANGING one. change_order is
+            # what STAFF's role text grants, so these stay available to
+            # the people who run the store day to day.
+            self.permission_classes = [StoreStaffChangePermission]
         elif self.action in public_actions:
             self.permission_classes = []
         else:
-            self.permission_classes = [IsPlatformSuperuser]
+            # ``list`` (every order in the store) and any future
+            # unclassified action: staff surface, method-mapped.
+            self.permission_classes = [StoreStaffModelPermissions]
 
         return super().get_permissions()
 
@@ -2052,7 +2066,7 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["post"],
         url_path="boxnow_cancel",
-        permission_classes=[IsPlatformSuperuser],
+        permission_classes=[StoreStaffChangePermission],
     )
     def boxnow_cancel(self, request, pk=None):
         """Cancel the BoxNow shipment for an order (admin-only)."""
@@ -2128,7 +2142,7 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["post"],
         url_path="acs_cancel",
-        permission_classes=[IsPlatformSuperuser],
+        permission_classes=[StoreStaffChangePermission],
     )
     def acs_cancel(self, request, pk=None):
         """Cancel the ACS shipment for an order (admin-only)."""
@@ -2236,7 +2250,7 @@ class OrderViewSet(BaseModelViewSet):
         detail=True,
         methods=["post"],
         url_path="shipment_cancel",
-        permission_classes=[IsPlatformSuperuser],
+        permission_classes=[StoreStaffChangePermission],
     )
     def shipment_cancel(self, request, pk=None):
         """Cancel the carrier shipment — provider-agnostic.

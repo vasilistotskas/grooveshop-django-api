@@ -19,7 +19,10 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.api.permissions import IsOwnerOrAdminOrGuest, IsPlatformSuperuser
+from core.api.permissions import (
+    IsOwnerOrAdminOrGuest,
+    StoreStaffModelPermissions,
+)
 from shipping_acs.models import AcsShipment
 from shipping_acs.serializers import AcsShipmentDetailSerializer
 
@@ -74,7 +77,7 @@ class AcsLabelView(APIView):
 class AcsCancelView(APIView):
     """Cancel an ACS voucher (admin-only)."""
 
-    permission_classes = [IsPlatformSuperuser]
+    permission_classes = [StoreStaffModelPermissions]
     serializer_class = AcsShipmentDetailSerializer
 
     @extend_schema(

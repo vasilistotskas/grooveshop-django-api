@@ -3,6 +3,63 @@
 
 
 
+## v3.6.0 (2026-08-22)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.5.2 [skip ci] ([`f491c9a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f491c9ad71d44f29411a0b708d68c445680f5a64))
+
+### Continuous integration
+
+* ci: raise test step timeout to 32 minutes
+
+The 25-min cap died at 94% of the suite after the billing dunning
+work added ~100 tests; prior green runs were already at 25m45s
+total. Same growth pattern as the 15->25 bump.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`9cc0de2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9cc0de2ba8e78dd87d873d2ba616656d4c23420d))
+
+### Features
+
+* feat(tenant): add billing dunning and admin page
+
+paid_until becomes the universal inclusive term end for trials and
+paid plans; tenant_create --trial-days (default 30, 0 = never) stamps
+new trials. A daily public-schema beat task walks the estate and
+notifies the owner at three points: expiry warning WARN_DAYS (14)
+before the term ends, expired notice the day after it lapses, and
+suspension GRACE_DAYS (7) past it. Each stage is sent at most once per
+term (billing_notice_stage/term self-reset on renewal), only the
+highest newly-reached stage fires, and stages 2-3 copy the platform
+admins. Emails ship translated (el full, de merchant-facing) and are
+sent from the platform in the tenant's default locale.
+
+Enforcement ships OFF: TENANT_BILLING_AUTO_SUSPEND=False caps the
+cycle at the expired notice, so the rollout is notify-only until the
+switch is flipped.
+
+Suspend/activate semantics move to tenant/lifecycle.py — one code
+path for the admin actions and the task — with suspended_reason
+(manual|billing) distinguishing operator suspensions from dunning.
+Recording a renewal (paid_until >= today) auto-reactivates billing
+suspensions only; manual ones are never lifted by bookkeeping.
+
+The platform admin gains a Plan & Billing page (/admin/plan-billing/,
+UnfoldSiteViewMixin, platform site only): estate billing table with
+state badges, counters, and how-it-works documentation rendered from
+the live config.
+
+Also: protected tenants (public/webside) no longer offer the admin
+delete button (Tenant.delete() raised ValidationError uncaught — a
+500 behind the confirm page), and tenant_create validates --plan
+against TenantPlan both at the parser and in handle().
+
+Migration 0018 is additive and PreSync-safe; schema.yml unchanged.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`2b23e9f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2b23e9f70944d3fe75f1c1ce6b60287556f7393d))
+
 ## v3.5.2 (2026-08-22)
 
 ### Bug fixes

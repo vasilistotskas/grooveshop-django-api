@@ -167,6 +167,102 @@ class TestPlatformDashboard(TestCase):
             Tenant.objects.filter(pk=t.pk).delete()
 
 
+class TestControlPlaneIsSuperuserOnly(TestCase):
+    """A store operator must not reach the control plane.
+
+    ``is_staff`` on a public identity is what admits a MERCHANT to
+    their own store's admin, so every merchant holds it. Gating this
+    site on it let a merchant load the control-plane dashboard, which
+    renders every store's name, domain, plan and order count.
+
+    Their app list was empty — no role grants anything on the public
+    schema — so nothing was editable. The dashboard was the leak.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from tenant.models import (
+            Tenant,
+            TenantMembershipRole,
+            UserTenantMembership,
+        )
+        from user.models import UserAccount
+
+        cls.tenant = Tenant(
+            schema_name="controlplane_gate_tenant",
+            name="Control Plane Gate Tenant",
+            slug="controlplane-gate-tenant",
+            owner_email="owner-cp-gate@example.com",
+        )
+        cls.tenant.auto_create_schema = False
+        cls.tenant.save()
+
+        # A merchant: staff (so their own store admin admits them) plus
+        # an OWNER membership. The strongest non-platform identity.
+        cls.merchant = UserAccount.objects.create_user(
+            email="merchant-cp-gate@example.com",
+            username="merchantcpgate",
+            password="testpass123",
+        )
+        cls.merchant.is_staff = True
+        cls.merchant.save(update_fields=["is_staff"])
+        UserTenantMembership.objects.create(
+            user=cls.merchant,
+            tenant=cls.tenant,
+            role=TenantMembershipRole.OWNER,
+            is_active=True,
+        )
+
+        cls.operator = UserAccount.objects.create_superuser(
+            email="operator-cp-gate@example.com",
+            username="operatorcpgate",
+            password="testpass123",
+        )
+
+    def _request(self, user):
+        from importlib import import_module
+
+        from django.conf import settings
+        from django.contrib.auth import BACKEND_SESSION_KEY
+
+        from tenant.auth_backends import PLATFORM_STAFF_BACKEND_PATH
+
+        session_store = import_module(settings.SESSION_ENGINE).SessionStore
+        request = RequestFactory().get("/admin/")
+        request.urlconf = "tenant.urls_public"
+        request.user = user
+        request.session = session_store()
+        request.session[BACKEND_SESSION_KEY] = PLATFORM_STAFF_BACKEND_PATH
+        return request
+
+    def test_a_store_owner_is_refused(self):
+        assert (
+            platform_admin_site.has_permission(self._request(self.merchant))
+            is False
+        )
+
+    def test_a_platform_superuser_passes(self):
+        assert (
+            platform_admin_site.has_permission(self._request(self.operator))
+            is True
+        )
+
+    @override_settings(ROOT_URLCONF="tenant.urls_public")
+    def test_the_estate_is_not_rendered_for_a_store_owner(self):
+        """The dashboard IS the disclosure, so assert on the response.
+
+        ``admin_view`` turns a failed ``has_permission`` into a
+        redirect to the login page, so a merchant gets a 302 and never
+        a page listing other merchants' stores.
+        """
+        request = self._request(self.merchant)
+        response = platform_admin_site.admin_view(platform_admin_site.index)(
+            request
+        )
+        assert response.status_code == 302
+        assert self.tenant.name not in response.content.decode(errors="ignore")
+
+
 class TestPlatformDashboardPage(TestCase):
     """The control plane must render ITS dashboard, not a merchant's.
 

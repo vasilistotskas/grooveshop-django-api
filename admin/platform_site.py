@@ -95,7 +95,30 @@ class PlatformAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
             is_platform_staff_session,
         )
 
-        return is_platform_staff_session(request)
+        if not is_platform_staff_session(request):
+            return False
+
+        # Superuser, not merely is_staff.
+        #
+        # ``is_staff`` on a public identity is what lets a STORE
+        # OPERATOR into their own store's admin — that is how
+        # ``MyAdminSite`` admits them before checking membership. It is
+        # therefore held by every merchant, and gating the control
+        # plane on it let a merchant load THIS page: the dashboard
+        # renders the whole estate — every store's name, domain, plan
+        # and order count — which is another merchant's commercial
+        # data.
+        #
+        # The app list came back empty for them (no role grants
+        # anything on the public schema, where there is no current
+        # tenant), so nothing was editable and no model page opened.
+        # The dashboard itself was the leak, and "they cannot click
+        # through" is not a boundary.
+        #
+        # The platform is operated by superusers; anything finer needs
+        # a real platform-staff concept rather than borrowing the flag
+        # that means "can open some store's admin".
+        return bool(getattr(request.user, "is_superuser", False))
 
 
 platform_admin_site = PlatformAdminSite(name="platform_admin")

@@ -3,6 +3,43 @@
 
 
 
+## v3.5.2 (2026-08-22)
+
+### Bug fixes
+
+* fix(admin): make the command palette search records and survive Enter
+
+The platform admin's ⌘K palette was double-broken:
+
+- UNFOLD_PLATFORM had no COMMAND block, so it fell back to unfold's
+  defaults (search_models: False): every keystroke still cost a
+  500ms-debounced round trip to /admin/search/, but only sidebar APP
+  TITLES were matched — typing a tenant name, domain or user email
+  returned nothing. It now uses the same schema-aware
+  command_search_models callable as the merchant admin (public schema
+  -> SHARED_APPS whitelist, all of which the platform site registers
+  and all of which define search_fields).
+
+- django-unfold 0.104.1 (latest; unfixed on upstream main) ships an
+  unguarded selectItem: Enter with no highlighted result row
+  dereferences this.items[this.currentIndex - 1] -> TypeError, leaving
+  the palette's Alpine state broken. unfold_command_palette_fix.js
+  wraps the searchCommand factory on alpine:init (custom SCRIPTS load
+  before app.js, so load-time wrapping is impossible) and turns
+  selectItem into a no-op when no row is selected. Loaded on BOTH
+  admin sites. Verified against the real shipped bundles in a browser
+  harness: all three crash paths (Enter/ctrl+Enter on fresh palette,
+  Enter with unhighlighted results) silent, real selection unaffected,
+  and the unpatched control reproduces the production TypeError.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`66e21fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/66e21fb1f7677099fa0a4c49bc3f96cc264c4378))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.5.1 [skip ci] ([`1377775`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1377775812b36261d77542fec6072755b6d807f3))
+
 ## v3.5.1 (2026-08-22)
 
 ### Bug fixes

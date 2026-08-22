@@ -3,6 +3,145 @@
 
 
 
+## v3.4.0 (2026-08-22)
+
+### Bug fixes
+
+* fix(audit): stop cross-schema attribution FKs from breaking staff writes
+
+HistoryRequestMiddleware attributes writes to request.user -- on a
+tenant host that is a PLATFORM-PUBLIC identity -- while the audit
+columns live in the tenant schema, where the user table is the tenant
+copy. A real FK there only ever held because the cutover copied users
+id-preserving: a post-cutover staff member (public-only, no tenant row)
+saving a historied model got an FK violation at INSERT, and a colliding
+id would have silently attributed the action to an unrelated shopper.
+
+The ACS and BoxNow shipment histories already declare
+user_db_constraint=False for exactly this reason, as does
+AcsPickupList.issued_by. This closes the sites that were missed:
+
+- Product.changed_by and Product.history (history_user) -- the one
+  historied model without the flag.
+- StockLog.performed_by -- found BY the regression test, not by review:
+  product/signals.py copies history_user into performed_by on manual
+  admin stock changes, so a staff stock adjustment hit the same
+  constraint one table further down.
+
+StockReservation.reserved_by deliberately KEEPS its constraint: its
+writers are customers only (same schema), and enforcement should
+survive wherever it is sound. OrderHistory was swept and is safe --
+every call site passes user=None.
+
+The relations stay usable through the ORM; only enforcement is gone,
+which PostgreSQL could not express across schemas anyway. Prerequisite
+for the staff API (docs/api-staff-identity.md), but a live admin bug
+regardless of it.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`b473559`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b4735593a6668e4e5080c023f2f7c6c80de6dcf8))
+
+* fix(admin): require a superuser for the control plane, drop dead JWT tables
+
+Two fixes surfaced while verifying an access revocation:
+
+The control plane (platform_admin_site) admitted any is_staff platform
+identity. But is_staff is what admits a MERCHANT to their own store's
+admin, so every merchant holds it -- and the control-plane dashboard
+renders the whole estate: every store's name, domain, plan and order
+count, i.e. other merchants' commercial data. Their app list came back
+empty (no role grants anything on the public schema), so nothing was
+editable -- but the dashboard itself was the disclosure, and "they
+cannot click through" is not a boundary. The site now requires a
+superuser; three tests pin it, including that a store OWNER gets a 302
+and never a page listing other stores.
+
+core.0008 drops the orphaned token_blacklist tables. simplejwt was
+replaced by Knox but its tables, FK constraints and 11 migration rows
+stayed behind -- and Django's deletion collector cannot cascade models
+that are no longer in the app registry, while the DATABASE constraint
+still fires: a public-schema user deletion failed at COMMIT naming a
+table nobody recognises. A migration rather than one-off SQL so every
+environment converges. Irreversible by design; the rows are dead
+tokens for an uninstalled auth system, preserved in the pre-cleanup
+dump.
+
+docs/api-staff-identity.md gains the machinery-validation section for
+the deferred staff-API design (knox subclassing, the Bearer-keyword
+constraint, DjangoModelPermissions reuse, the attribution
+prerequisite).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`dce0421`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dce0421b235f7eb168bb84d85cb40bbb0ac07285))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.3.0 [skip ci] ([`64e0aa7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/64e0aa7ccc7a55500d23cd78f338151c80c31341))
+
+### Documentation
+
+* docs: record the API staff identity design (was silently gitignored)
+
+The docs/ pattern in .gitignore swallowed the file in two earlier
+commits whose messages claim it — git add skips ignored paths in a
+batch with only a warning. Force-added, matching docs/order-system.md
+which is tracked the same way.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`dc77bb4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dc77bb4bb212a160c5007ad711cb9fbf13d1c96a))
+
+### Features
+
+* feat(api): staff identity for the API — role-derived store administration
+
+Implements the design recorded and machinery-validated in
+docs/api-staff-identity.md: store operators get programmatic access to
+their own store, authorized by the SAME role policy as the admin.
+
+Identity. tenant.PlatformStaffToken subclasses knox's
+AbstractAuthToken in the one SHARED-only app, so the table and its
+user FK exist in public alone -- the structural mirror image of
+knox_authtoken, whose per-tenant residence is what makes customer
+tokens un-replayable across stores. (KNOX_TOKEN_MODEL is a swap, like
+AUTH_USER_MODEL; it cannot ADD a model, hence the subclass.)
+
+Authentication. PlatformStaffTokenAuthentication engages only on the
+StaffBearer keyword -- a hard constraint, not taste: knox RAISES on an
+unrecognised token once the keyword matches, and DRF stops the
+authenticator chain on a raise, so two Bearer authenticators cannot
+coexist. It resolves and renews under schema_context(public), stamps
+PLATFORM_IDENTITY_ATTR on the user, inherits the absolute-age cap
+(extracted from BoundedTokenAuthentication for exactly this reuse),
+and re-checks is_staff per request so the standing revocation flow
+kills outstanding tokens immediately.
+
+Authorization. The stamp is what makes user.has_perm() resolve through
+TenantRolePermissionBackend, so per-action authorization is DRF's own
+DjangoModelPermissions (StoreStaffModelPermissions adds only the view
+permission on reads). No second policy engine: the API and the admin
+read tenant.role_scopes and cannot drift. Custom operational actions
+(refund, tracking, carrier cancels) map to change_* via
+StoreStaffChangePermission -- a refund is not "adding an order", and
+STAFF's "cannot delete" only holds if POSTs do not map to add.
+
+Issuance. /api/v1/platform/auth/login|logout on the platform URLconf
+only, throttled, requiring an operable store (superuser or an active
+staff-capable membership). The storefront URLconf has no route and
+PlatformStaffBackend is inert in global authenticate() -- the same
+two-sided wall the admin login uses, pinned by test.
+
+Store-scoped administrative routes (product, blog, tag, pay_way, cart
+list, order administration, shipping, page_config) move from the
+interim IsPlatformSuperuser lockdown to the role-derived classes.
+Platform-scope routes (country, region, core, tenant, and the
+queryset-less function views) deliberately stay superuser-only.
+
+The storefront OpenAPI contract is unchanged -- schema.yml is
+generated from the storefront URLconf, where none of this exists.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0181GS9s98Hbp6VDGtTcAGqP ([`5c80df6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c80df66d9fe48aa892a01fe21b8f175b8089985))
+
 ## v3.3.0 (2026-08-21)
 
 ### Chores

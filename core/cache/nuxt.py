@@ -30,6 +30,28 @@ def _resolve_token() -> str | None:
     return getattr(settings, "NUXT_CACHE_PURGE_TOKEN", "") or None
 
 
+def _current_tenant_host() -> str | None:
+    """The purging tenant's primary storefront domain, or None.
+
+    A merchant cache purge runs inside that tenant's schema context, so
+    ``connection.tenant`` is the store issuing it. Passing its host to
+    the Nuxt purge endpoint scopes the eviction to that store's cached
+    keys (the SSR cache is shared across every tenant). None on the
+    public/platform schema — a platform purge is deliberately global.
+    """
+    from django.db import connection  # noqa: PLC0415
+
+    tenant = getattr(connection, "tenant", None)
+    domains = getattr(tenant, "domains", None)
+    if domains is None:  # public schema, or a bare FakeTenant
+        return None
+    try:
+        primary = domains.filter(is_primary=True).first()
+    except Exception:  # noqa: BLE001 — never fail a purge on host lookup
+        return None
+    return primary.domain if primary else None
+
+
 def is_configured() -> bool:
     return bool(_resolve_endpoint() and _resolve_token())
 
@@ -53,7 +75,10 @@ def request_purge(
         logger.warning(msg)
         return NuxtPurgeResult(matched=0, deleted=0, blocked=0, error=msg)
 
-    payload = {"patterns": patterns, "dryRun": dry_run}
+    payload: dict[str, object] = {"patterns": patterns, "dryRun": dry_run}
+    host = _current_tenant_host()
+    if host:
+        payload["host"] = host
     headers = {
         "X-Cache-Purge-Token": token,
         "Content-Type": "application/json",

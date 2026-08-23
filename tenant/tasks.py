@@ -161,3 +161,20 @@ def process_tenant_billing():
     from tenant.billing import run_billing_cycle  # noqa: PLC0415
 
     return run_billing_cycle()
+
+
+# NOT a fanout and NOT beat-scheduled: dispatched on demand from
+# tenant.lifecycle.suspend_tenant with a specific schema name. Runs in
+# public (it only makes an HTTP call to media-stream with the schema as
+# a string — no tenant-schema access), so no _schema_name is needed.
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=5,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def flush_tenant_media_task(schema_name: str):
+    from tenant.media_flush import flush_tenant_media  # noqa: PLC0415
+
+    return {"flushed": flush_tenant_media(schema_name)}

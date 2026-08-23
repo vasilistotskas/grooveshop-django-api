@@ -45,7 +45,27 @@ def suspend_tenant(tenant, *, reason: str) -> bool:
         tenant.suspended_at = timezone.now()
         update_fields.append("suspended_at")
     tenant.save(update_fields=update_fields)
+
+    # Drop the tenant's processed images from the media-stream cache so a
+    # suspended store stops serving assets (they would otherwise persist
+    # for the cache TTL — up to 180/360 days). Best-effort and off the
+    # critical path: a broker or media-stream outage must never block the
+    # suspension itself.
+    _dispatch_media_flush(tenant.schema_name)
     return True
+
+
+def _dispatch_media_flush(schema_name: str) -> None:
+    try:
+        from tenant.tasks import flush_tenant_media_task  # noqa: PLC0415
+
+        flush_tenant_media_task.delay(schema_name)
+    except Exception:  # noqa: BLE001 — never fail a suspend on dispatch
+        import logging  # noqa: PLC0415
+
+        logging.getLogger(__name__).warning(
+            "could not dispatch media flush for %s", schema_name
+        )
 
 
 def activate_tenant(tenant) -> bool:

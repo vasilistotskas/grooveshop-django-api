@@ -652,8 +652,17 @@ class TenantAdmin(ModelAdmin):
 
             # All gates passed — drop schema + row.
             try:
+                schema_name = tenant.schema_name
                 tenant.delete(force_drop=True)
                 destroyed.append(tenant.name)
+                # Evict the destroyed store's processed images from
+                # media-stream (keyed by schema name), which would
+                # otherwise keep serving for the cache TTL.
+                from tenant.lifecycle import (  # noqa: PLC0415
+                    _dispatch_media_flush,
+                )
+
+                _dispatch_media_flush(schema_name)
             except Exception as exc:  # noqa: BLE001
                 self.message_user(
                     request,

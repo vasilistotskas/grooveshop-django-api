@@ -68,6 +68,17 @@ APP_MAIN_HOST_NAME = getenv("APP_MAIN_HOST_NAME", "localhost")
 NUXT_BASE_URL = getenv("NUXT_BASE_URL", "http://localhost:3000")
 NUXT_BASE_DOMAIN = getenv("NUXT_BASE_DOMAIN", "localhost:3000")
 MEDIA_STREAM_BASE_URL = getenv("MEDIA_STREAM_BASE_URL", "http://localhost:3003")
+# Cluster-internal base URL for media-stream ADMIN calls (per-tenant
+# cache flush on suspend/destroy). Defaults to the browser-facing base;
+# in-cluster this should be the Service DNS (http://media-stream-service:80).
+MEDIA_STREAM_INTERNAL_URL = getenv(
+    "MEDIA_STREAM_INTERNAL_URL", MEDIA_STREAM_BASE_URL
+)
+# Shared secret for media-stream's InternalSecretGuard (x-internal-secret
+# header). Must equal the media-stream INTERNAL_ADMIN_SECRET env value.
+# Empty disables the flush call (fail-open — a suspended tenant's cached
+# media then expires only by its TTL).
+MEDIA_STREAM_INTERNAL_SECRET = getenv("MEDIA_STREAM_INTERNAL_SECRET", "")
 STATIC_BASE_URL = getenv("STATIC_BASE_URL", "http://localhost:8000")
 SITE_NAME = getenv("SITE_NAME", "Grooveshop")
 

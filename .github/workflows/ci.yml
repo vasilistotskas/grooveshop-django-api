@@ -121,7 +121,7 @@ jobs:
   testing:
     name: Testing
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     # PostgreSQL runs as a docker-run STEP, not a service container:
     # PG18 needs max_locks_per_transaction raised for this suite's
     # parallel DDL (validated: defaults exhaust the lock table under
@@ -229,15 +229,17 @@ jobs:
         # in ``pyproject.toml::addopts`` — keeping them explicit here
         # so a careless edit can't silently flip the project off the
         # supported configuration.
-        # The 32-min timeout absorbs coverage overhead (~2-3× the no-cov
-        # runtime) on the 2-vCPU GitHub runner. This cap has moved twice
-        # as the suite grew: 15 min timed out at ~85% once tenant-scoping
-        # work extended teardown hot paths, and 25 min timed out at ~94%
-        # once the billing dunning suite added ~100 tests (several
-        # rendering full admin pages). If it trips again, profile the
-        # slowest tests before reaching for the number.
+        # The timeout absorbs coverage overhead (~2-3× the no-cov
+        # runtime) on the 2-vCPU GitHub runner. This cap has moved as the
+        # suite grew: 15 min timed out at ~85% once tenant-scoping work
+        # extended teardown hot paths; 25 min timed out at ~94% once the
+        # billing dunning suite landed; 32 min was reached ~84% (~27 min)
+        # after the multi-tenant audit fixes added their tests, so it's
+        # now 40 with the job cap raised to match. The step, not the job,
+        # is the real signal — if it trips again, profile the slowest
+        # tests (pytest --durations=25) before reaching for the number.
         run: uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml -n auto --dist loadfile
-        timeout-minutes: 32
+        timeout-minutes: 40
         env:
           HYPOTHESIS_PROFILE: ci
 

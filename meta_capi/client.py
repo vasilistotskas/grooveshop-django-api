@@ -34,10 +34,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Cache the configured FacebookAdsApi instance keyed by (token, version)
-# so we don't re-init the global SDK state on every dispatch. The Celery
-# task pool may re-enter ``send`` concurrently; the lock prevents two
-# workers from racing on the same dict during the cold-cache window.
+# A per-tenant ``FacebookAdsApi`` instance keyed by (token, version).
+#
+# CRITICAL: these are STANDALONE api instances, never the SDK's
+# process-global default. ``FacebookAdsApi.init()`` calls
+# ``set_default_api()``, and one Celery worker serves every tenant — so
+# the default-api singleton is a cross-tenant hazard: after tenant B's
+# dispatch initialises it, a cache-hit dispatch for tenant A that skips
+# re-init would post A's events with B's token (which Meta rejects on a
+# pixel/token mismatch, silently losing A's conversions — or worse, if B
+# has access to A's pixel, mislabels them). We construct the api
+# directly and hand it to the pixel call explicitly (see ``send``), so
+# no dispatch ever depends on which tenant last touched the global.
+#
+# The lock guards only the cold-cache construction window (the Celery
+# pool may re-enter ``send`` concurrently for the same token).
 _api_cache: dict[tuple[str, str], Any] = {}
 _api_cache_lock = Lock()
 
@@ -52,12 +63,14 @@ def _get_api(access_token: str, api_version: str) -> Any:
         if cached is not None:
             return cached
         from facebook_business.api import FacebookAdsApi  # noqa: PLC0415
-
-        api = FacebookAdsApi.init(
-            access_token=access_token,
-            api_version=api_version,
-            crash_log=False,
+        from facebook_business.session import (  # noqa: PLC0415
+            FacebookSession,
         )
+
+        # Direct construction — NOT FacebookAdsApi.init(), which would
+        # also stamp this token onto the process-global default.
+        session = FacebookSession(access_token=access_token)
+        api = FacebookAdsApi(session, api_version=api_version)
         _api_cache[cache_key] = api
         return api
 
@@ -123,25 +136,35 @@ class MetaCapiClient:
 
         # Lazy imports — keep module import cheap (no SDK side effects
         # at Django boot) and the SDK out of the unit-test fast path.
+        from facebook_business.adobjects.adspixel import (  # noqa: PLC0415
+            AdsPixel,
+        )
         from facebook_business.adobjects.serverside.event_request import (
             EventRequest,
         )
         from facebook_business.exceptions import FacebookRequestError
 
-        # Init is cached so repeated dispatches don't reinitialise the
-        # global SDK state on every event. EventRequest reads the
-        # default api at execute() time.
-        _get_api(self.access_token, self.api_version)
+        # Resolve THIS tenant's own api instance (see ``_get_api``).
+        api = _get_api(self.access_token, self.api_version)
 
+        # ``EventRequest`` is reused only to serialise the payload.
+        # ``request.execute()`` is deliberately NOT called: it issues the
+        # POST through ``AdsPixel(pixel_id)`` with no api argument, which
+        # falls back to the global default api — the exact cross-tenant
+        # bleed ``_get_api`` exists to prevent. Instead we drive the same
+        # pixel edge with this tenant's api pinned explicitly.
         request = EventRequest(
             events=events,
             test_event_code=self.test_event_code,
             partner_agent=self.partner_agent,
             pixel_id=self.pixel_id,
         )
+        params = request.get_params()
 
         try:
-            response = request.execute()
+            response = AdsPixel(self.pixel_id, api=api).create_event(
+                fields=[], params=params
+            )
         except FacebookRequestError as exc:
             status = getattr(exc, "http_status", None) or 0
             body = getattr(exc, "body", None) or {}
@@ -166,8 +189,12 @@ class MetaCapiClient:
             # underlying requests session; treat as transient.
             raise MetaCapiTransientError(str(exc)) from exc
 
+        # ``create_event`` returns the raw pixel-events response (an
+        # ``AbstractCrudObject``, dict-like) rather than the SDK's
+        # ``EventResponse`` wrapper that ``request.execute()`` built —
+        # read the CAPI response fields the same way ``execute()`` does.
         return MetaCapiResponse(
-            events_received=int(getattr(response, "events_received", 0) or 0),
-            fbtrace_id=str(getattr(response, "fbtrace_id", "") or ""),
-            messages=list(getattr(response, "messages", []) or []),
+            events_received=int(response.get("events_received", 0) or 0),
+            fbtrace_id=str(response.get("fbtrace_id", "") or ""),
+            messages=list(response.get("messages", []) or []),
         )

@@ -184,6 +184,26 @@ TENANT_APPS = [
     "allauth.socialaccount.providers.discord",
     "allauth.socialaccount.providers.github",
     "knox",
+    # Admin log must be per-schema — mirrored in SHARED_APPS.
+    #
+    # The merchant admin is served on TENANT hosts (a store OWNER/ADMIN
+    # manages their catalogue there), so every admin add/change/delete
+    # writes a ``django_admin_log`` row. With admin SHARED-only that
+    # table existed ONLY in public, so those INSERTs fell through the
+    # search_path into ``public.django_admin_log`` carrying a
+    # ``content_type_id`` resolved against the TENANT's own
+    # ``django_content_type`` — a different app set, so a different id
+    # space (verified in prod: webside product.product CT id 48 is
+    # notification.notificationuser in public). Result: mislabelled
+    # admin history today, and a hard FK IntegrityError for any tenant
+    # whose content-type ids exceed public's range. Dual-listing gives
+    # every schema its own log with schema-local content-type ids, the
+    # same fix the sibling dual-listed apps above already apply. The
+    # public copy stays for the PLATFORM admin (which runs on public).
+    # admin's app_label ("admin") is in role_scopes.PLATFORM_ONLY_APP_
+    # LABELS and SHARED wins in tenant_only_app_labels(), so this does
+    # NOT expose any admin model page to a merchant.
+    "admin.apps.MyAdminConfig",
     # Domain apps (store-specific data)
     "product",
     "order",

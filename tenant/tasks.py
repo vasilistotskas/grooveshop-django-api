@@ -134,6 +134,17 @@ def fanout_check_stale_acs_shipments():
     return run_for_all_tenants("shipping_acs.tasks.check_stale_acs_shipments")
 
 
+@celery_app.task(base=TenantTask)
+def fanout_clear_expired_sessions():
+    # django_session is per-schema (sessions is dual-listed), so
+    # ``clearsessions`` only ever purges the schema it runs in. The beat
+    # scheduler fires the underlying task once in PUBLIC (platform-staff
+    # sessions live there); this fans it into every tenant schema so
+    # each store's expired customer sessions are purged too — without
+    # it, tenant ``django_session`` tables grow unbounded.
+    return run_for_all_tenants("core.tasks.clear_expired_sessions_task")
+
+
 # NOT a fanout: billing terms, dunning bookkeeping, and outbound
 # platform mail all live on the PUBLIC schema (Tenant rows), so the
 # whole estate is processed in one public-schema pass. Defined here —

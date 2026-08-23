@@ -213,7 +213,9 @@ class BoxNowCarrier(ShippingCarrierInterface):
             payment_mode=payment_mode,
         )
 
-    def dispatch_create_shipment_task(self, order: Order) -> None:
+    def dispatch_create_shipment_task(
+        self, order: Order, *, schema_name: str | None = None
+    ) -> None:
         """Enqueue the BoxNow create-shipment Celery task for ``order``."""
         try:
             from shipping_boxnow.tasks import (
@@ -232,7 +234,14 @@ class BoxNowCarrier(ShippingCarrierInterface):
             order.id,
             extra={"order_id": order.id, "carrier": "boxnow"},
         )
-        create_boxnow_shipment_for_order.delay(order.id)
+        # Stamp the caller-captured tenant schema — see the base
+        # method's contract.
+        from django.db import connection  # noqa: PLC0415
+
+        create_boxnow_shipment_for_order.apply_async(
+            args=[order.id],
+            headers={"_schema_name": schema_name or connection.schema_name},
+        )
 
     # ------------------------------------------------------------------
     # Pricing

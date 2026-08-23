@@ -1,8 +1,16 @@
 """Publish payment-status transitions to Redis pub/sub.
 
-The Nuxt SSE endpoint subscribes to `payment:status:{order_id}` and
-forwards each message to the customer's browser in real time, replacing
-the 2-second client-side poll loop.
+The Nuxt SSE endpoint subscribes to `payment:status:{schema}:{order_id}`
+and forwards each message to the customer's browser in real time,
+replacing the 2-second client-side poll loop. The subscriber builds the
+channel from the tenant it resolved (``schema_name`` is on the
+tenant-resolve payload) plus the order id.
+
+The schema segment is NOT decorative: this uses raw Redis pub/sub, which
+bypasses the cache ``KEY_FUNCTION`` that schema-scopes every other key,
+and order ids are per-schema sequences — so tenant A's order 17 and
+tenant B's order 17 would otherwise collide on one channel and a
+subscriber would receive the wrong store's payment events.
 
 Why pub/sub instead of polling from Nuxt:
 - Stripe/Viva webhooks update payment status in bursts. A push model
@@ -39,8 +47,8 @@ PAYMENT_STATUS_CHANNEL_PREFIX = "payment:status:"
 _redis_client: Any = None
 
 
-def payment_status_channel(order_id: int) -> str:
-    return f"{PAYMENT_STATUS_CHANNEL_PREFIX}{order_id}"
+def payment_status_channel(schema_name: str, order_id: int) -> str:
+    return f"{PAYMENT_STATUS_CHANNEL_PREFIX}{schema_name}:{order_id}"
 
 
 def _serialize(order: Order) -> str:
@@ -63,9 +71,11 @@ def _get_client() -> Any:
     return _redis_client
 
 
-def _publish(order_id: int, message: str) -> None:
+def _publish(schema_name: str, order_id: int, message: str) -> None:
     try:
-        _get_client().publish(payment_status_channel(order_id), message)
+        _get_client().publish(
+            payment_status_channel(schema_name, order_id), message
+        )
     except Exception as exc:  # pragma: no cover — defensive only
         # RedisError is the expected case; broader except guards against
         # the rare `django.core.exceptions.ImproperlyConfigured` at
@@ -85,5 +95,11 @@ def publish_payment_status(order: Order) -> None:
     receivers, or service methods — duplicate publishes are idempotent
     from the subscriber's perspective (same payload).
     """
+    from django.db import connection  # noqa: PLC0415
+
+    # Capture the schema NOW: ``on_commit`` fires after the enclosing
+    # tenant/schema context may have unwound, so reading it inside the
+    # callback could stamp the wrong (or public) schema onto the channel.
+    schema_name = connection.schema_name
     message = _serialize(order)
-    transaction.on_commit(lambda: _publish(order.id, message))
+    transaction.on_commit(lambda: _publish(schema_name, order.id, message))

@@ -12,7 +12,10 @@ import pytest
 from django.contrib.admin import site as admin_site
 from django.test import RequestFactory
 
-from tenant.admin import UserTenantMembershipAdmin
+from tenant.admin import (
+    PublicSchemaModelChoiceField,
+    UserTenantMembershipAdmin,
+)
 from tenant.models import UserTenantMembership
 from user.factories.account import UserAccountFactory
 
@@ -62,3 +65,78 @@ class TestUserFieldQueryset:
         db_field = UserTenantMembership._meta.get_field("tenant")
         field = _admin().formfield_for_foreignkey(db_field, request)
         assert field is not None
+
+
+class TestUserFieldSchemaPinOnTenantHost:
+    """On a tenant host the ``user`` field must be pinned to the public
+    schema so it lists platform identities, never that store's shoppers
+    (whose colliding pks would misbind the membership)."""
+
+    def _request(self):
+        return RequestFactory().get("/admin/tenant/usertenantmembership/add/")
+
+    def test_field_is_public_pinned_on_a_tenant_host(self):
+        from unittest import mock
+
+        with mock.patch(
+            "tenant.admin.self_service_tenant", return_value=object()
+        ):
+            field = _user_field(_admin(), self._request())
+        assert isinstance(field, PublicSchemaModelChoiceField)
+
+    def test_field_is_plain_on_the_platform_host(self):
+        from unittest import mock
+
+        with mock.patch("tenant.admin.self_service_tenant", return_value=None):
+            field = _user_field(_admin(), self._request())
+        assert not isinstance(field, PublicSchemaModelChoiceField)
+
+    def test_autocomplete_for_user_is_dropped_on_a_tenant_host(self):
+        from unittest import mock
+
+        with mock.patch(
+            "tenant.admin.self_service_tenant", return_value=object()
+        ):
+            fields = _admin().get_autocomplete_fields(self._request())
+        assert "user" not in fields
+        assert "tenant" in fields
+
+    def test_autocomplete_for_user_is_kept_on_the_platform_host(self):
+        from unittest import mock
+
+        with mock.patch("tenant.admin.self_service_tenant", return_value=None):
+            fields = _admin().get_autocomplete_fields(self._request())
+        assert "user" in fields
+
+
+class TestPublicSchemaModelChoiceFieldPins:
+    """The field wraps every DB touch in schema_context(public)."""
+
+    def _field(self):
+        from django.contrib.auth import get_user_model
+
+        return PublicSchemaModelChoiceField(
+            queryset=get_user_model().objects.all()
+        )
+
+    def test_to_python_enters_public_schema(self):
+        from unittest import mock
+
+        field = self._field()
+        with mock.patch("tenant.admin._public_schema_context") as ctx:
+            field.to_python("")  # empty value still wraps the call
+        ctx.assert_called_once()
+
+    def test_valid_value_enters_public_schema(self):
+        from unittest import mock
+
+        staff = UserAccountFactory(is_staff=True)
+        field = self._field()
+        with mock.patch("tenant.admin._public_schema_context") as ctx:
+            field.valid_value(staff)
+        assert ctx.called
+
+    def test_to_python_resolves_a_public_user(self):
+        staff = UserAccountFactory(is_staff=True)
+        field = self._field()
+        assert field.to_python(str(staff.pk)) == staff

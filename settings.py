@@ -861,8 +861,18 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        # Runs in PUBLIC — purges expired platform-staff sessions.
         "clear-expired-sessions": {
             "task": "core.tasks.clear_expired_sessions_task",
+            "schedule": SCHEDULE_PRESETS["weekly_monday_4am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        # Fans the same task into every tenant schema — django_session is
+        # per-schema, so the public pass above never touches a store's
+        # own customer sessions.
+        "clear-expired-sessions-tenants": {
+            "task": "tenant.tasks.fanout_clear_expired_sessions",
             "schedule": SCHEDULE_PRESETS["weekly_monday_4am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],

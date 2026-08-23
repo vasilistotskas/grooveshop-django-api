@@ -2,7 +2,7 @@ import logging
 from typing import Any
 
 from django.core.cache import cache
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import Signal, receiver
 
@@ -68,7 +68,16 @@ def handle_order_completed_loyalty(
             from loyalty.tasks import process_order_points
 
             order_id = order.id
-            transaction.on_commit(lambda: process_order_points.delay(order_id))
+            # Stamp the tenant schema NOW: on_commit fires after the
+            # request's schema context can unwind (Stripe replay /
+            # manual reprocess), where TenantTask would otherwise
+            # default to public and the task 500 on Order.DoesNotExist.
+            schema = connection.schema_name
+            transaction.on_commit(
+                lambda: process_order_points.apply_async(
+                    args=[order_id], headers={"_schema_name": schema}
+                )
+            )
     except Exception:
         logger.exception(
             "Failed to queue loyalty points for order %s", order.id
@@ -90,7 +99,13 @@ def handle_order_canceled_loyalty(
             from loyalty.tasks import reverse_order_points
 
             order_id = order.id
-            transaction.on_commit(lambda: reverse_order_points.delay(order_id))
+            # Stamp the tenant schema NOW — see handle_order_completed.
+            schema = connection.schema_name
+            transaction.on_commit(
+                lambda: reverse_order_points.apply_async(
+                    args=[order_id], headers={"_schema_name": schema}
+                )
+            )
     except Exception:
         logger.exception(
             "Failed to queue loyalty reversal for order %s", order.id
@@ -112,7 +127,13 @@ def handle_order_refunded_loyalty(
             from loyalty.tasks import reverse_order_points
 
             order_id = order.id
-            transaction.on_commit(lambda: reverse_order_points.delay(order_id))
+            # Stamp the tenant schema NOW — see handle_order_completed.
+            schema = connection.schema_name
+            transaction.on_commit(
+                lambda: reverse_order_points.apply_async(
+                    args=[order_id], headers={"_schema_name": schema}
+                )
+            )
     except Exception:
         logger.exception(
             "Failed to queue loyalty reversal for order %s", order.id
@@ -255,4 +276,11 @@ def notify_tier_up_live(
     from loyalty.tasks import notify_loyalty_tier_up_live
 
     user_id = user.pk
-    transaction.on_commit(lambda: notify_loyalty_tier_up_live.delay(user_id))
+    # Stamp the tenant schema NOW — tier changes fire under the request's
+    # tenant, but this on_commit runs after that context can unwind.
+    schema = connection.schema_name
+    transaction.on_commit(
+        lambda: notify_loyalty_tier_up_live.apply_async(
+            args=[user_id], headers={"_schema_name": schema}
+        )
+    )

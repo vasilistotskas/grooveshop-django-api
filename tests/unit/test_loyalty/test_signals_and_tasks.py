@@ -114,7 +114,11 @@ class TestSignalHandlerExceptionIsolation:
 
             handle_order_completed_loyalty(sender=Order, order=order)
 
-            mock_task.delay.assert_called_once_with(order.id)
+            # Dispatched via apply_async with the tenant schema stamped
+            # (tests run in the public schema).
+            mock_task.apply_async.assert_called_once_with(
+                args=[order.id], headers={"_schema_name": "public"}
+            )
 
     def test_canceled_handler_calls_delay_on_commit(self):
         """Handler queues reverse_order_points via transaction.on_commit."""
@@ -135,7 +139,11 @@ class TestSignalHandlerExceptionIsolation:
 
             handle_order_canceled_loyalty(sender=Order, order=order)
 
-            mock_task.delay.assert_called_once_with(order.id)
+            # Dispatched via apply_async with the tenant schema stamped
+            # (tests run in the public schema).
+            mock_task.apply_async.assert_called_once_with(
+                args=[order.id], headers={"_schema_name": "public"}
+            )
 
     def test_refunded_handler_calls_delay_on_commit(self):
         """Handler queues reverse_order_points via transaction.on_commit."""
@@ -156,7 +164,11 @@ class TestSignalHandlerExceptionIsolation:
 
             handle_order_refunded_loyalty(sender=Order, order=order)
 
-            mock_task.delay.assert_called_once_with(order.id)
+            # Dispatched via apply_async with the tenant schema stamped
+            # (tests run in the public schema).
+            mock_task.apply_async.assert_called_once_with(
+                args=[order.id], headers={"_schema_name": "public"}
+            )
 
     def test_completed_handler_does_not_raise_on_task_error(self):
         """When task.delay raises, the handler catches it and doesn't propagate."""
@@ -173,7 +185,7 @@ class TestSignalHandlerExceptionIsolation:
                 side_effect=lambda cb: cb(),
             ),
         ):
-            mock_task.delay.side_effect = RuntimeError("Celery down")
+            mock_task.apply_async.side_effect = RuntimeError("Celery down")
 
             from loyalty.signals import handle_order_completed_loyalty
 
@@ -195,7 +207,7 @@ class TestSignalHandlerExceptionIsolation:
                 side_effect=lambda cb: cb(),
             ),
         ):
-            mock_task.delay.side_effect = RuntimeError("Celery down")
+            mock_task.apply_async.side_effect = RuntimeError("Celery down")
 
             from loyalty.signals import handle_order_canceled_loyalty
 
@@ -217,7 +229,7 @@ class TestSignalHandlerExceptionIsolation:
             handle_order_completed_loyalty(sender=Order, order=order)
 
             mock_on_commit.assert_not_called()
-            mock_task.delay.assert_not_called()
+            mock_task.apply_async.assert_not_called()
 
 
 # ===========================================================================

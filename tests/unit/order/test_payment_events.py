@@ -15,7 +15,18 @@ from order.payment_events import (
 
 
 def test_payment_status_channel_format():
-    assert payment_status_channel(42) == f"{PAYMENT_STATUS_CHANNEL_PREFIX}42"
+    assert (
+        payment_status_channel("acme", 42)
+        == f"{PAYMENT_STATUS_CHANNEL_PREFIX}acme:42"
+    )
+
+
+def test_payment_status_channel_is_tenant_scoped():
+    """The same order id in two schemas must not share a channel — order
+    ids are per-schema sequences and raw pub/sub bypasses KEY_FUNCTION."""
+    assert payment_status_channel("acme", 17) != payment_status_channel(
+        "beta", 17
+    )
 
 
 @pytest.mark.django_db(transaction=True)
@@ -41,7 +52,9 @@ def test_publish_payment_status_fires_redis_publish_with_expected_payload():
 
         redis_cls.from_url.return_value.publish.assert_called_once()
         channel, payload = redis_cls.from_url.return_value.publish.call_args[0]
-        assert channel == payment_status_channel(17)
+        # Tests run in the public schema (multi-tenancy disabled in
+        # conftest), so publish_payment_status captures "public".
+        assert channel == payment_status_channel("public", 17)
         decoded = json.loads(payload)
         assert decoded == {
             "orderId": 17,

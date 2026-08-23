@@ -21,8 +21,10 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from django import forms
 from django.contrib import admin, messages
 from django.db import connection
+from django.forms.models import ModelChoiceIterator
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -108,6 +110,55 @@ def _unfold_label(text, tone: str, icon: str | None = None) -> str:
         "unfold/helpers/label.html",
         {"text": text, "type": tone, "icon": icon},
     )
+
+
+def _public_schema_context():
+    from django_tenants.utils import (  # noqa: PLC0415
+        get_public_schema_name,
+        schema_context,
+    )
+
+    return schema_context(get_public_schema_name())
+
+
+class _PublicSchemaModelChoiceIterator(ModelChoiceIterator):
+    """Iterate the field's queryset inside the PUBLIC schema.
+
+    The generator holds the schema context open across yields; admin
+    rendering consumes every choice, so the context is exited when the
+    iterator is exhausted.
+    """
+
+    def __iter__(self):
+        with _public_schema_context():
+            yield from super().__iter__()
+
+
+class PublicSchemaModelChoiceField(forms.ModelChoiceField):
+    """A ``ModelChoiceField`` pinned to the PUBLIC schema for BOTH
+    rendering and validation.
+
+    ``UserTenantMembership`` lives in the SHARED ``tenant`` app and its
+    ``user`` FK targets ``public.user_useraccount``. Served on a tenant
+    host (search_path = [tenant, public]), a plain ``ModelChoiceField``
+    re-evaluates its queryset against that tenant's OWN
+    ``user_useraccount`` copy — listing that store's shoppers, and
+    (worse) binding a submitted pk to whichever PUBLIC identity happens
+    to share it: a different person than the one displayed. Every DB
+    access here is wrapped in ``schema_context(public)`` so the choices
+    and the validated object are always the platform identities the FK
+    can legitimately reference.
+    """
+
+    iterator = _PublicSchemaModelChoiceIterator
+
+    def to_python(self, value):
+        with _public_schema_context():
+            return super().to_python(value)
+
+    def valid_value(self, value):
+        with _public_schema_context():
+            return super().valid_value(value)
 
 
 @admin.register(Tenant)
@@ -659,6 +710,23 @@ class UserTenantMembershipAdmin(ModelAdmin):
     autocomplete_fields = ["user", "tenant"]
     readonly_fields = ["created_at", "updated_at"]
 
+    def get_autocomplete_fields(self, request):
+        """Drop the ``user`` autocomplete on tenant hosts.
+
+        The autocomplete AJAX view runs its search in the REQUEST's
+        schema, so on a tenant host it would surface that store's
+        shoppers and let one be picked into a public-identity FK. There
+        the field is rendered as a plain select through the public-
+        pinned ``PublicSchemaModelChoiceField`` instead. ``tenant`` keeps
+        autocomplete (Tenant lives only in public); the platform host
+        (public schema) keeps ``user`` autocomplete, which resolves
+        correctly there.
+        """
+        fields = super().get_autocomplete_fields(request)
+        if self_service_tenant(request) is not None:
+            return tuple(f for f in fields if f != "user")
+        return fields
+
     def has_module_permission(self, request):
         """Public always; a tenant host only for its own ADMIN/OWNER.
 
@@ -733,26 +801,27 @@ class UserTenantMembershipAdmin(ModelAdmin):
         return super().formfield_for_choice_field(db_field, request, **kwargs)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Pin the ``user`` FK choices to the PUBLIC schema.
+        """Pin the ``user`` FK to the PUBLIC schema.
 
         ``UserAccount`` is mirrored per-schema — an unqualified
         ``UserAccount.objects.all()`` resolves against whatever schema
         the connection is currently pinned to. Membership rows only
-        ever reference PUBLIC-schema users (platform identities), so
-        the pks captured here are evaluated eagerly, inside
-        ``schema_context(public)``, rather than left as a lazy
-        queryset that could be (re-)evaluated later against a
-        different schema.
+        ever reference PUBLIC-schema users (platform identities), so the
+        candidate pks are captured eagerly inside
+        ``schema_context(public)``. That alone is NOT enough: the
+        queryset handed to the formfield is still lazy and, on a tenant
+        host, would be re-evaluated against that tenant's own user
+        table. On tenant hosts the field is therefore
+        ``PublicSchemaModelChoiceField``, which pins rendering AND
+        validation to public so a saved pk can only bind to the platform
+        identity it displayed. On the platform host (public schema) the
+        default field already resolves correctly.
         """
         if db_field.name == "user":
             from django.contrib.auth import get_user_model
-            from django_tenants.utils import (
-                get_public_schema_name,
-                schema_context,
-            )
 
             user_model = get_user_model()
-            with schema_context(get_public_schema_name()):
+            with _public_schema_context():
                 public_user_ids = list(
                     user_model.objects.order_by(
                         user_model.USERNAME_FIELD
@@ -761,6 +830,8 @@ class UserTenantMembershipAdmin(ModelAdmin):
             kwargs["queryset"] = user_model.objects.filter(
                 pk__in=public_user_ids
             )
+            if self_service_tenant(request) is not None:
+                kwargs["form_class"] = PublicSchemaModelChoiceField
         elif db_field.name == "tenant":
             # A store operator may only grant membership in THEIR store.
             # Without this the dropdown lists every tenant, and saving

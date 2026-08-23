@@ -148,13 +148,20 @@ class ShippingService:
         the admin "issue voucher now" action and other already-
         committed call sites still dispatch immediately.
         """
-        from django.db import transaction
+        from django.db import connection, transaction
 
         adapter = cls.adapter_for_order(order)
         if adapter is None:
             return
+        # Capture the tenant schema NOW: on_commit fires after the
+        # request's schema context can unwind (Stripe replay / manual
+        # reprocess), where the carrier task would otherwise dispatch
+        # under public and permanently fail on Order.DoesNotExist.
+        schema = connection.schema_name
         transaction.on_commit(
-            lambda: adapter.dispatch_create_shipment_task(order)
+            lambda: adapter.dispatch_create_shipment_task(
+                order, schema_name=schema
+            )
         )
 
     @classmethod

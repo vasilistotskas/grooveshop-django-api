@@ -94,7 +94,7 @@ class LoyaltyTierChangedDirectionTestCase(TestCase):
 
     The handler wraps the task dispatch in ``transaction.on_commit`` —
     we use ``captureOnCommitCallbacks`` (Django 3.2+) to flush the
-    callback so the ``.delay`` mock records the call before we assert.
+    callback so the ``.apply_async`` mock records the call before we assert.
     """
 
     def test_direction_up_fires_notification_task(self) -> None:
@@ -115,7 +115,7 @@ class LoyaltyTierChangedDirectionTestCase(TestCase):
                     old_tier_id=bronze.pk,
                     new_tier_id=gold.pk,
                 )
-        self.assertTrue(mock_task.delay.called)
+        self.assertTrue(mock_task.apply_async.called)
 
     def test_direction_down_does_not_fire(self) -> None:
         from loyalty.factories.tier import LoyaltyTierFactory
@@ -135,7 +135,7 @@ class LoyaltyTierChangedDirectionTestCase(TestCase):
                     old_tier_id=gold.pk,
                     new_tier_id=bronze.pk,
                 )
-        self.assertFalse(mock_task.delay.called)
+        self.assertFalse(mock_task.apply_async.called)
 
     def test_direction_same_does_not_fire(self) -> None:
         from loyalty.factories.tier import LoyaltyTierFactory
@@ -154,4 +154,4 @@ class LoyaltyTierChangedDirectionTestCase(TestCase):
                     old_tier_id=bronze.pk,
                     new_tier_id=bronze.pk,
                 )
-        self.assertFalse(mock_task.delay.called)
+        self.assertFalse(mock_task.apply_async.called)

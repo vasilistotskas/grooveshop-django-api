@@ -23,7 +23,7 @@ from decimal import Decimal
 from typing import Any
 
 from celery import shared_task
-from django.db import transaction
+from django.db import connection, transaction
 
 from core.tasks import MonitoredTask
 from meta_capi.client import MetaCapiClient
@@ -317,22 +317,39 @@ def schedule_purchase(order_id: int) -> None:
     """Convenience wrapper: schedule on commit, no-op if Celery is
     misconfigured. Used by signal handlers so they don't have to
     repeat the on_commit boilerplate.
+
+    The tenant schema is captured NOW and stamped onto the dispatch:
+    on_commit fires after the request's schema context can unwind (the
+    Stripe replay / manual-reprocess path), where TenantTask would
+    otherwise default to public and the CAPI event resolve against the
+    wrong store's order.
     """
+    schema = connection.schema_name
     transaction.on_commit(
-        lambda oid=order_id: dispatch_purchase_event.delay(oid)
+        lambda oid=order_id, s=schema: dispatch_purchase_event.apply_async(
+            args=[oid], headers={"_schema_name": s}
+        )
     )
 
 
 def schedule_initiate_checkout(order_id: int) -> None:
+    schema = connection.schema_name
     transaction.on_commit(
-        lambda oid=order_id: dispatch_initiate_checkout_event.delay(oid)
+        lambda oid=order_id, s=schema: (
+            dispatch_initiate_checkout_event.apply_async(
+                args=[oid], headers={"_schema_name": s}
+            )
+        )
     )
 
 
 def schedule_refund(order_id: int, amount: Decimal | None) -> None:
     amount_str = str(amount) if amount is not None else None
+    schema = connection.schema_name
     transaction.on_commit(
-        lambda oid=order_id, amt=amount_str: dispatch_refund_event.delay(
-            oid, amt
+        lambda oid=order_id, amt=amount_str, s=schema: (
+            dispatch_refund_event.apply_async(
+                args=[oid, amt], headers={"_schema_name": s}
+            )
         )
     )

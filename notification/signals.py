@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from django.core.cache import cache
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -58,4 +58,12 @@ def handle_notification_created(
         "translations": _get_translations(instance.notification),
     }
 
-    transaction.on_commit(lambda: send_notification_task.delay(data))
+    # Stamp the tenant schema NOW: on_commit fires after the request's
+    # schema context can unwind, where TenantTask would default to
+    # public and the notification would target the wrong schema.
+    schema = connection.schema_name
+    transaction.on_commit(
+        lambda: send_notification_task.apply_async(
+            args=[data], headers={"_schema_name": schema}
+        )
+    )

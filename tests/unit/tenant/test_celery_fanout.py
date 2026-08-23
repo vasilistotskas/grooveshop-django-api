@@ -154,6 +154,15 @@ class TestFanoutTaskWrappers:
             "shipping_acs.tasks.check_stale_acs_shipments"
         )
 
+    @pytest.mark.django_db
+    def test_fanout_clear_expired_sessions(self):
+        from tenant import tasks as tenant_tasks
+
+        with patch("tenant.tasks.run_for_all_tenants") as run:
+            tenant_tasks.fanout_clear_expired_sessions()
+
+        run.assert_called_once_with("core.tasks.clear_expired_sessions_task")
+
 
 class TestBeatScheduleTenantCoverage:
     """Every beat entry whose task touches TENANT_APPS-scoped tables must

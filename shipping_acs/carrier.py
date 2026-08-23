@@ -251,7 +251,9 @@ class AcsCarrier(ShippingCarrierInterface):
             item_quantity=item_quantity,
         )
 
-    def dispatch_create_shipment_task(self, order: Order) -> None:
+    def dispatch_create_shipment_task(
+        self, order: Order, *, schema_name: str | None = None
+    ) -> None:
         """Enqueue the ACS create-voucher Celery task for ``order``."""
         try:
             from shipping_acs.tasks import create_acs_voucher_for_order
@@ -268,7 +270,15 @@ class AcsCarrier(ShippingCarrierInterface):
             order.id,
             extra={"order_id": order.id, "carrier": "acs"},
         )
-        create_acs_voucher_for_order.delay(order.id)
+        # Stamp the caller-captured tenant schema so the worker binds
+        # the right store even when this dispatch is deferred past the
+        # request's schema context (see the base method's contract).
+        from django.db import connection  # noqa: PLC0415
+
+        create_acs_voucher_for_order.apply_async(
+            args=[order.id],
+            headers={"_schema_name": schema_name or connection.schema_name},
+        )
 
     # ------------------------------------------------------------------
     # Pricing

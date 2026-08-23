@@ -186,13 +186,21 @@ class ShippingCarrierInterface(ABC):
         """
         return None
 
-    def dispatch_create_shipment_task(self, order: Order) -> None:
+    def dispatch_create_shipment_task(
+        self, order: Order, *, schema_name: str | None = None
+    ) -> None:
         """Enqueue the provider's create-shipment Celery task.
 
         Called from ``OrderService.handle_payment_succeeded`` after a
         successful payment.  Default is a no-op so providers without
         an asynchronous create step (e.g. local-only fulfilment
         carriers) don't have to override.
+
+        ``schema_name`` is the tenant schema captured by the caller
+        BEFORE the deferring ``on_commit`` — overriders must stamp it
+        onto the dispatched task (``headers={"_schema_name": ...}``) so
+        the worker binds the right tenant even when on_commit fires
+        after the request's schema context has unwound.
         """
         return None
 

@@ -21,12 +21,13 @@ provides:
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.files.storage import FileSystemStorage
-from django.db import models, transaction
+from django.db import connection, models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
@@ -64,25 +65,60 @@ class MyDataStatus(models.TextChoices):
     CANCELED = "CANCELED", _("Canceled in myDATA")
 
 
-def _private_invoice_storage() -> Any:
-    """Resolve the per-tenant private storage backend for invoice files.
+def _private_media_root() -> str:
+    base = getattr(settings, "PRIVATE_MEDIA_ROOT", None)
+    if not base:
+        base = (
+            settings.MEDIA_ROOT + "_private"
+            if getattr(settings, "MEDIA_ROOT", None)
+            else "private_media"
+        )
+    return base
 
-    In DEBUG / self-hosted setups the private
-    tree is partitioned by schema too — ``{MEDIA_ROOT}_private/{schema}/``
-    — so a misconfigured webserver cannot serve another tenant's
-    invoices.
+
+class TenantPrivateInvoiceStorage(FileSystemStorage):
+    """Per-tenant private storage whose location resolves at ACCESS time.
+
+    ``base_location`` / ``location`` are PROPERTIES (mirroring
+    ``tenant.storage.TenantFileSystemStorage``), so every read/write
+    re-reads ``connection.schema_name`` and lands the file under
+    ``{PRIVATE_MEDIA_ROOT}/{schema}/``. A storage that captured the
+    schema eagerly would freeze to whatever schema was active when the
+    ``FileField`` first evaluated its storage — which is model-class
+    definition time, when no tenant is bound (i.e. ``public``) — sending
+    every tenant's invoices into one directory. Never used directly:
+    obtained through ``_private_invoice_storage`` so the field's
+    deconstructed storage reference (and therefore the migration state)
+    stays unchanged.
     """
-    from django.db import connection
 
-    base_location = getattr(
-        settings,
-        "PRIVATE_MEDIA_ROOT",
-        settings.MEDIA_ROOT + "_private"
-        if getattr(settings, "MEDIA_ROOT", None)
-        else "private_media",
-    )
-    schema = getattr(connection, "schema_name", "public") or "public"
-    return FileSystemStorage(location=f"{base_location}/{schema}")
+    def _tenant_location(self) -> str:
+        schema = getattr(connection, "schema_name", "public") or "public"
+        return os.path.join(_private_media_root(), schema)
+
+    @property
+    def base_location(self) -> str:
+        return self._tenant_location()
+
+    @property
+    def location(self) -> str:
+        return self._tenant_location()
+
+
+def _private_invoice_storage() -> Any:
+    """Return the per-tenant private storage backend for invoice files.
+
+    ``FileField`` evaluates this callable ONCE, at model-class
+    definition time (no tenant bound). Returning a storage whose
+    location is resolved eagerly here would therefore partition every
+    tenant's invoices under the public schema for the process lifetime;
+    returning ``TenantPrivateInvoiceStorage`` — whose location is a
+    property — defers the per-tenant partitioning to each file
+    operation instead. The private tree lives outside every public web
+    root, so ``{PRIVATE_MEDIA_ROOT}/{schema}/`` is a defence-in-depth
+    boundary on top of the authenticated ``invoice_download`` view.
+    """
+    return TenantPrivateInvoiceStorage()
 
 
 def _invoice_upload_to(instance: Invoice, filename: str) -> str:

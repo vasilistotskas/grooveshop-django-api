@@ -3,6 +3,50 @@
 
 
 
+## v3.6.1 (2026-08-23)
+
+### Bug fixes
+
+* fix(tenant): isolate admin log and Meta CAPI creds per tenant
+
+Two cross-tenant defects surfaced by the multi-tenant audit.
+
+H1 — the merchant admin runs on tenant hosts, so every admin action
+writes a django_admin_log row, but django.contrib.admin was SHARED-only
+so that table existed only in public. Those INSERTs fell through the
+search_path into public.django_admin_log carrying a content_type_id
+resolved against the tenant's own django_content_type — a different app
+set, a different id space (prod: webside product.product CT id 48 is
+notification.notificationuser in public). Result: mislabelled admin
+history today, and a hard FK IntegrityError for any tenant whose
+content-type ids exceed public's range. Dual-list admin in TENANT_APPS,
+the same pattern the sibling per-schema shared apps already use, so
+every schema gets its own log with schema-local ids. No new migration
+file — the existing admin migrations now run per-schema via the PreSync
+migrate_schemas (additive, PreSync-safe). SHARED still wins in
+tenant_only_app_labels(), so no admin model page is exposed to
+merchants.
+
+H2 — one Celery worker serves every tenant, and the Meta CAPI client
+relied on the SDK's process-global default api: it cached the per-token
+init but let EventRequest.execute() POST through AdsPixel(pixel_id) with
+no api argument, which reads whichever tenant last called init(). A
+dispatch for tenant A following tenant B's dispatch posted A's events
+with B's token. Build a standalone per-tenant FacebookAdsApi (never
+.init(), which stamps the global default) and pin the pixel call to it;
+EventRequest is now used only to serialise the payload. Credentials
+become a pure function of the sending client.
+
+Both guarded by new tests (per-tenant CAPI isolation; the SHARED-and-
+TENANT app-set invariant the audit flagged as unpinned).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`03158c7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/03158c7ae167fc138a7ca2adbb020fa6cd1e5ce8))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.6.0 [skip ci] ([`ddb4ecd`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ddb4ecd3abb24f5d80fa299940223515bdbba45e))
+
 ## v3.6.0 (2026-08-22)
 
 ### Chores

@@ -16,6 +16,7 @@ import pytest
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories import OrderFactory
 from order.views.viva_webhook import (
+    _handle_payment_created,
     _handle_payment_failed,
     _handle_reversal_created,
 )
@@ -147,6 +148,70 @@ class TestVivaPaymentFailedVerification:
             return_value=(PaymentStatus.COMPLETED, {"order_code": "OC2"}),
         ):
             _handle_payment_failed(order, {}, "viva_txn_2")
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PENDING
+
+
+@pytest.mark.django_db
+class TestVivaPaymentCreatedVerification:
+    """The payment-created (1796) handler must treat a Retrieve-
+    Transaction ERROR as "unavailable" (raise → 500 → retry), not as a
+    confirmed non-completion. This is both the fix for a latent
+    single-tenant bug (a transient Viva error was silently acked) and
+    the mechanism that lets a webhook whose transaction is not in THIS
+    tenant's Viva account fall through to the next candidate tenant.
+    """
+
+    def _order(self):
+        return OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            num_order_items=1,
+            metadata={},
+        )
+
+    def test_raises_when_verification_reports_viva_error(self):
+        """A 404 because the transaction is not in this tenant's Viva
+        account maps to (FAILED, {viva_error: True}) — must raise, not
+        skip."""
+        order = self._order()
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(PaymentStatus.FAILED, {"viva_error": True}),
+        ):
+            with pytest.raises(RuntimeError):
+                _handle_payment_created(order, {"StatusId": "F"}, "foreign_txn")
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PENDING
+
+    def test_raises_when_verification_reports_error(self):
+        order = self._order()
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(PaymentStatus.FAILED, {"error": "timeout"}),
+        ):
+            with pytest.raises(RuntimeError):
+                _handle_payment_created(order, {"StatusId": "F"}, "txn")
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PENDING
+
+    def test_clean_non_completed_status_skips_without_raising(self):
+        """A genuine, error-free non-COMPLETED status (a real pending
+        transaction in this account) is a legitimate skip — not a
+        verification failure — so it must NOT raise."""
+        order = self._order()
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(
+                PaymentStatus.PENDING,
+                {"order_code": "OC", "amount": None},
+            ),
+        ):
+            # Does not raise.
+            _handle_payment_created(order, {"StatusId": "F"}, "txn")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PENDING

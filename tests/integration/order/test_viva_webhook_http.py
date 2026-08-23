@@ -9,8 +9,11 @@ one does NOT.
 from __future__ import annotations
 
 import json
+from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.http import JsonResponse
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -168,3 +171,111 @@ class VivaWebhookMoneyPathTestCase(TestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.payment_status, PaymentStatus.COMPLETED)
         self.assertEqual(self.order.status, OrderStatus.PROCESSING)
+
+
+class VivaWebhookCandidateSelectionTestCase(TestCase):
+    """Order code lives in merchant-editable ``Order.metadata``, so when
+    it matches more than one tenant the handler must process in the one
+    whose Viva credentials verify the transaction and skip the others
+    (M4). A malicious merchant who plants a rival's order code in one of
+    their own orders must NOT be able to steer — or strand — the rival's
+    payment.
+
+    Drives ``_handle_webhook_event`` with the candidate list and the
+    per-tenant processing stubbed, so the loop's selection logic is
+    tested directly without standing up real Postgres schemas.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.url = reverse("viva-wallet-webhook")
+
+    def _post(self, body: dict):
+        return self.client.post(
+            self.url,
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+
+    @staticmethod
+    def _event():
+        return {
+            "EventTypeId": 1796,
+            "EventData": {
+                "TransactionId": "viva-txn",
+                "OrderCode": "OC-COLLIDE",
+                "StatusId": "F",
+            },
+        }
+
+    @staticmethod
+    @contextmanager
+    def _noop_tenant(_tenant):
+        yield
+
+    def _run(self, candidates, process_side_effect):
+        with (
+            patch(
+                "order.views.viva_webhook._resolve_tenant_candidates",
+                return_value=candidates,
+            ),
+            patch("order.views.viva_webhook.tenant_context", self._noop_tenant),
+            patch(
+                "order.views.viva_webhook._check_source_ip",
+                return_value=(False, "1.2.3.4"),
+            ),
+            patch(
+                "order.views.viva_webhook._process_event_in_tenant",
+                side_effect=process_side_effect,
+            ) as mock_proc,
+        ):
+            response = self._post(self._event())
+        return response, mock_proc
+
+    def test_processes_in_the_tenant_that_verifies(self):
+        """First candidate (planted) fails Retrieve-Transaction → 500;
+        second (real owner) verifies → 200. The webhook must 200 and try
+        both, in order."""
+        planted = SimpleNamespace(schema_name="planted_tenant")
+        real = SimpleNamespace(schema_name="real_tenant")
+        results = iter(
+            [
+                JsonResponse({"error": "verify"}, status=500),
+                JsonResponse({"status": "ok"}, status=200),
+            ]
+        )
+
+        response, mock_proc = self._run(
+            [planted, real], lambda **_: next(results)
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_proc.call_count, 2)
+
+    def test_stops_at_the_first_verifying_tenant(self):
+        """The real owner is first — the second candidate must NOT be
+        touched once one verifies."""
+        real = SimpleNamespace(schema_name="real_tenant")
+        other = SimpleNamespace(schema_name="other_tenant")
+
+        response, mock_proc = self._run(
+            [real, other],
+            lambda **_: JsonResponse({"status": "ok"}, status=200),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_proc.call_count, 1)
+
+    def test_all_candidates_fail_returns_500(self):
+        """No candidate owns the transaction (or a transient outage): the
+        handler returns 500 so Viva redelivers, and never acks."""
+        a = SimpleNamespace(schema_name="tenant_a")
+        b = SimpleNamespace(schema_name="tenant_b")
+
+        response, mock_proc = self._run(
+            [a, b],
+            lambda **_: JsonResponse({"error": "verify"}, status=500),
+        )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(mock_proc.call_count, 2)

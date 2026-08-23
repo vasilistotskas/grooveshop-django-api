@@ -30,45 +30,60 @@ from order.tasks import (
 )
 
 
-def _resolve_tenant_for_order_code(order_code: str):
-    """Return the ``Tenant`` row that owns ``order_code``.
+def _resolve_tenant_candidates(order_code: str) -> list:
+    """Every active, non-suspended tenant whose Order matches order_code.
 
-    Viva webhooks land in the public schema (no tenant routing exists
-    at the HTTP layer for machine-to-machine callers). We iterate
-    active tenants and look up the order via ``viva_order_code_q`` —
-    matching both the latest ``metadata.viva_order_code`` AND the
-    ``viva_order_codes`` history array, because every
-    ``create_checkout_session`` mints a fresh code and a shopper on a
-    stale tab may pay an earlier one. First match wins. Returns
-    ``None`` for an orphan order code (deleted order, wrong tenant,
-    test webhook).
+    Viva webhooks land in the public schema (no tenant routing exists at
+    the HTTP layer for machine-to-machine callers), so ownership is
+    found by iterating tenants and looking the order up via
+    ``viva_order_code_q`` — matching both the latest
+    ``metadata.viva_order_code`` AND the ``viva_order_codes`` history
+    array, because every ``create_checkout_session`` mints a fresh code
+    and a shopper on a stale tab may pay an earlier one.
 
-    Returns the real ``Tenant`` model instance (not just the schema
-    name) so callers can enter it via ``tenant_context(tenant)`` —
-    ``schema_context(schema_name)`` only sets a bare ``FakeTenant``
-    stand-in on ``connection.tenant``, which breaks every downstream
-    ``viva_wallet_credentials()`` read (tenant-only, no settings
-    fallback) — including ``VivaWalletPaymentProvider.__init__``'s
-    Retrieve Transaction API call that authenticates this very
-    webhook.
+    Returns ALL matches, not the first, because the order code lives in
+    merchant-editable ``Order.metadata`` and is therefore NOT proof of
+    ownership: a merchant could plant a rival's order code in one of
+    their own orders. When more than one tenant matches, the caller
+    disambiguates by Viva-credential verification — only the tenant
+    whose Viva account actually holds the transaction can retrieve it —
+    and processes in the first candidate that verifies (see
+    ``_handle_webhook_event``). Suspended/inactive tenants are excluded:
+    a re-delivery for a frozen tenant must not mutate its data; that
+    case is handled separately by ``_order_exists_on_unavailable_tenant``.
+
+    Real ``Tenant`` instances (not schema names) so callers enter them
+    via ``tenant_context(tenant)`` — ``schema_context(schema_name)``
+    only sets a bare ``FakeTenant`` on ``connection.tenant``, which
+    breaks every ``viva_wallet_credentials()`` read (tenant-only, no
+    settings fallback), including the Retrieve-Transaction call that
+    authenticates the webhook.
     """
     if not order_code:
-        return None
+        return []
 
     from tenant.models import Tenant  # noqa: PLC0415
 
-    # Skip suspended tenants — a Viva re-delivery for an order on a
-    # tenant that's been suspended mid-flight should NOT mutate the
-    # tenant's data; let Viva keep retrying and resolve once the
-    # operator either reactivates or destroys the tenant.
     public = get_public_schema_name()
+    candidates = []
     for tenant in Tenant.objects.filter(
         is_active=True, suspended_at__isnull=True
     ).exclude(schema_name=public):
         with schema_context(tenant.schema_name):
             if Order.objects.filter(viva_order_code_q(order_code)).exists():
-                return tenant
-    return None
+                candidates.append(tenant)
+    return candidates
+
+
+def _resolve_tenant_for_order_code(order_code: str):
+    """First tenant owning ``order_code`` (or ``None``).
+
+    Thin wrapper over ``_resolve_tenant_candidates`` for callers/tests
+    that only need presence. The webhook handler itself uses the full
+    candidate list so it can verify-then-select across a code collision.
+    """
+    candidates = _resolve_tenant_candidates(order_code)
+    return candidates[0] if candidates else None
 
 
 def _order_exists_on_unavailable_tenant(order_code: object) -> bool:
@@ -494,12 +509,12 @@ def _handle_webhook_event(request):
         logger.warning("No OrderCode in Viva Wallet webhook")
         return JsonResponse({"status": "ok"})
 
-    # Resolve the owning tenant up-front. Every ORM call below must run
-    # inside that tenant's schema_context — otherwise we'd query the
-    # public schema (where Order rows do not live) and silently drop
-    # the webhook on the floor.
-    tenant = _resolve_tenant_for_order_code(order_code)
-    if not tenant:
+    # Resolve the owning tenant. Every ORM call below must run inside
+    # that tenant's schema_context — otherwise we'd query the public
+    # schema (where Order rows do not live) and silently drop the
+    # webhook on the floor.
+    candidates = _resolve_tenant_candidates(order_code)
+    if not candidates:
         if _order_exists_on_unavailable_tenant(order_code):
             # Refuse to acknowledge so Viva redelivers once the operator
             # reactivates the tenant. Acknowledging would drop a PAID
@@ -523,41 +538,84 @@ def _handle_webhook_event(request):
         )
         return JsonResponse({"status": "ok"})
 
-    # The rest of the handler runs inside the tenant's context — via
-    # ``tenant_context(tenant)`` rather than ``schema_context(schema_
-    # name)`` so ``connection.tenant`` is the REAL row, not a bare
-    # ``FakeTenant``. ``viva_wallet_credentials()`` (tenant-only, no
-    # settings fallback) needs the real fields — including inside
-    # ``VivaWalletPaymentProvider.__init__``, which authenticates this
-    # very webhook via the Retrieve Transaction API.
-    with tenant_context(tenant):
-        # Best-effort IP check — informational only. Authentication of
-        # the webhook is done by the Retrieve Transaction API call
-        # inside _handle_payment_created, which uses our OAuth2
-        # credentials and confirms the transaction exists in Viva's
-        # system. Runs inside the resolved tenant's schema_context so
-        # ``live_mode`` reflects THIS tenant's Viva account rather than
-        # always resolving to demo (no tenant is active before the
-        # order_code → tenant lookup above).
-        ip_match, observed_ip = _check_source_ip(request)
-        if ip_match:
-            logger.info("Viva webhook IP %s matches Viva range", observed_ip)
-        else:
-            logger.info(
-                "Viva webhook from non-Viva IP %s — will rely on "
-                "transaction API verification (expected behind SNAT'd "
-                "ingress)",
-                observed_ip,
+    # Verification-driven selection across an order-code collision.
+    #
+    # The order code is merchant-editable metadata, so a single match is
+    # not proof of ownership. Process in the tenant whose Viva
+    # credentials actually VERIFY the transaction: a candidate that does
+    # not own it fails the Retrieve-Transaction call, and
+    # ``_process_event_in_tenant`` returns 500 with its atomic block
+    # rolled back (no side effects), so we move to the next candidate.
+    # The true owner verifies and returns 200. If EVERY candidate
+    # returns 500 — all wrong, or the real owner's verification is
+    # transiently unavailable — we return that 500 so Viva redelivers,
+    # exactly as the single-tenant path always has.
+    #
+    # Each candidate is entered via ``tenant_context(tenant)`` (not
+    # ``schema_context(schema_name)``) so ``connection.tenant`` is the
+    # REAL row: ``viva_wallet_credentials()`` (tenant-only, no settings
+    # fallback) needs the real fields, including inside
+    # ``VivaWalletPaymentProvider.__init__`` which authenticates this
+    # very webhook.
+    multi = len(candidates) > 1
+    last_response = None
+    for tenant in candidates:
+        with tenant_context(tenant):
+            # Best-effort IP check — informational only; authentication
+            # is the Retrieve-Transaction call. Runs inside the tenant's
+            # context so ``live_mode`` reflects THIS tenant's Viva
+            # account, not demo.
+            ip_match, observed_ip = _check_source_ip(request)
+            if ip_match:
+                logger.info(
+                    "Viva webhook IP %s matches Viva range", observed_ip
+                )
+            else:
+                logger.info(
+                    "Viva webhook from non-Viva IP %s — will rely on "
+                    "transaction API verification (expected behind SNAT'd "
+                    "ingress)",
+                    observed_ip,
+                )
+
+            response = _process_event_in_tenant(
+                order_code=order_code,
+                event_type_id=event_type_id,
+                event_data=event_data,
+                transaction_id=transaction_id,
+                status_id=status_id,
+                txn_hash=txn_hash,
             )
 
-        return _process_event_in_tenant(
-            order_code=order_code,
-            event_type_id=event_type_id,
-            event_data=event_data,
-            transaction_id=transaction_id,
-            status_id=status_id,
-            txn_hash=txn_hash,
+        if response.status_code != 500:
+            if multi:
+                logger.warning(
+                    "Viva webhook: order code %s matched %d tenants; "
+                    "processed in the one that verified (schema=%s)",
+                    order_code,
+                    len(candidates),
+                    tenant.schema_name,
+                )
+            return response
+        last_response = response
+        if multi:
+            # Only interesting on a collision — the single-tenant path
+            # 500s for ordinary transient verification failures too.
+            logger.warning(
+                "Viva webhook: candidate tenant schema=%s did not verify "
+                "the transaction for order code %s — trying next candidate",
+                tenant.schema_name,
+                order_code,
+            )
+
+    if multi:
+        logger.error(
+            "Viva webhook: order code %s matched %d tenants but NONE "
+            "verified the transaction — returning 500 so Viva retries",
+            order_code,
+            len(candidates),
         )
+    return last_response
 
 
 def _process_event_in_tenant(
@@ -754,16 +812,31 @@ def _handle_payment_created(order, event_data, transaction_id):
         if isinstance(verified_data, dict)
         else None,
     )
-    if verified_status is None:
+    verify_errored = isinstance(verified_data, dict) and (
+        verified_data.get("error") or verified_data.get("viva_error")
+    )
+    if verified_status is None or verify_errored:
         logger.error(
-            "Could not verify Viva transaction %s — "
-            "leaving event unprocessed so Viva can retry",
+            "Could not verify Viva transaction %s (status=%s, errored=%s) "
+            "— leaving event unprocessed so Viva can retry",
             transaction_id,
+            verified_status,
+            bool(verify_errored),
         )
         # Raise so the outer atomic block rolls back; the
         # VivaWebhookEvent row is never written, Viva retries fresh.
+        #
+        # Treating a Retrieve-Transaction ERROR (``error`` / ``viva_error``
+        # — e.g. a 404 because the id is not in THIS tenant's Viva account)
+        # as "unavailable" rather than as a confirmed non-completion is
+        # what lets a webhook whose transaction belongs to a DIFFERENT
+        # tenant fall through to the next candidate in
+        # ``_handle_webhook_event`` — and, independent of multi-tenancy,
+        # stops a transient Viva error from being silently acknowledged
+        # as "payment not completed". Mirrors
+        # ``_verify_viva_terminal_transaction`` (1797/1798).
         raise RuntimeError(
-            f"Viva transaction verification failed for {transaction_id}"
+            f"Viva transaction verification unavailable for {transaction_id}"
         )
     # Defence in depth: confirm the verified transaction amount matches
     # this order's total. Without this check an attacker who knows their

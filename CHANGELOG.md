@@ -3,6 +3,48 @@
 
 
 
+## v3.6.3 (2026-08-23)
+
+### Bug fixes
+
+* fix(order): verify-then-select the Viva webhook tenant (M4)
+
+The Viva webhook resolved the owning tenant by the FIRST tenant whose
+Order metadata contained the order code, and the order code lives in
+merchant-editable Order.metadata. A malicious merchant could plant a
+rival's order code in one of their own orders and, if they iterated
+first, steer the rival's payment webhook into their schema — where
+verification against their Viva account fails, the webhook errors, Viva
+stops retrying (or retries forever into the same wrong tenant), and the
+rival's PAID order is auto-cancelled 24h later without refund.
+
+Resolution is now verification-driven: _resolve_tenant_candidates
+returns EVERY active tenant matching the order code, and the handler
+processes in the first whose Viva credentials actually verify the
+transaction (only the real owner's Viva account can retrieve it). A
+candidate that does not own it fails Retrieve-Transaction and
+_process_event_in_tenant returns 500 with its atomic block rolled back
+(no side effects), so the loop moves on; if none verify, the last 500
+is returned so Viva redelivers — exactly as the single-tenant path
+always has. The single-candidate path is behaviourally identical.
+
+Also fixes a latent single-tenant bug this exposed: the 1796
+payment-created handler only raised when verification returned None,
+silently acking a Retrieve-Transaction ERROR (viva_error/error) as
+"payment not completed". It now raises on the error too, matching the
+1797/1798 terminal verifier — which is also what lets a foreign-account
+transaction fall through to the next candidate.
+
+Adds collision-selection and 1796-error-verification tests; all existing
+Viva webhook tests unchanged and green.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`31d60f7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/31d60f79e2d17764447db208e5a9076a2f6fe86c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.6.2 [skip ci] ([`c89f753`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c89f7536b05e980e3deaf221ba143607f3fb6c1a))
+
 ## v3.6.2 (2026-08-23)
 
 ### Bug fixes

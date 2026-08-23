@@ -3,6 +3,65 @@
 
 
 
+## v3.6.2 (2026-08-23)
+
+### Bug fixes
+
+* fix(tenant): flush media on suspend and scope Nuxt purge (M2, M6)
+
+- M6: a suspended or destroyed tenant kept serving processed images
+  from media-stream's cache for up to its TTL (180/360 days) — the
+  serve path never re-checks tenant existence and the only eviction was
+  a manual admin call. tenant.lifecycle.suspend_tenant (both the admin
+  action and the billing auto-suspend) and the destroy action now
+  dispatch flush_tenant_media_task, which POSTs media-stream's
+  /admin/cache/flush-tenant with the internal secret. Best-effort and
+  off the critical path: a broker or media-stream outage never blocks a
+  suspension. New MEDIA_STREAM_INTERNAL_URL / _SECRET settings
+  (fail-open when unset).
+
+- M2 (Django side): the Nuxt cache-purge client now sends the purging
+  tenant's primary host so the Nuxt endpoint can scope the eviction to
+  that store's keys instead of every tenant's. Omitted on the public
+  schema, where a platform purge is deliberately global.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`dc11647`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dc11647bce86e588ad838b710434d96b3d1fac2b))
+
+* fix(tenant): close five medium multi-tenant gaps
+
+Audit follow-ups, each validated against the code:
+
+- M3 invoice storage: the FileField storage callable was resolved once
+  at model-definition time (public schema), freezing every tenant's
+  invoices under one directory. Return a storage whose location is a
+  property, resolved per file operation. Same callable reference, so no
+  migration.
+- M5 membership admin: the user dropdown's queryset was lazy and
+  re-resolved against the request's tenant schema on a tenant host,
+  listing that store's shoppers and binding a saved pk to a colliding
+  public identity. Pin the field to the public schema and drop its
+  autocomplete on tenant hosts (the AJAX path had the same flaw).
+- M7 on-commit dispatch: loyalty, Meta CAPI, carrier and notification
+  signal handlers dispatched via bare .delay() inside on_commit, losing
+  the tenant schema on the Stripe replay / manual-reprocess path where
+  the context has unwound. Capture connection.schema_name at build time
+  and stamp _schema_name, matching the order handlers.
+- M8 payment pub/sub: the payment:status channel was order-id only, and
+  order ids are per-schema sequences on a raw Redis client that bypasses
+  KEY_FUNCTION — two tenants' order 17 collided. Schema-prefix the
+  channel.
+- M9 sessions: clearsessions ran only in public, but django_session is
+  per-schema, so tenant session tables grew unbounded. Add a fanout
+  wrapper + beat entry alongside the public pass.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`82b08ee`](https://github.com/vasilistotskas/grooveshop-django-api/commit/82b08ee79b945b0d5046a94563d663796476cf96))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.6.1 [skip ci] ([`34641d3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/34641d3a4fee4e7cac3106e759d6c1d4e5a2d3ce))
+
 ## v3.6.1 (2026-08-23)
 
 ### Bug fixes

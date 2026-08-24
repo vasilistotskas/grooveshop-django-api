@@ -3,13 +3,27 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from page_config.models import ComponentType, PageLayout, PageSection
+from page_config.models import (
+    ComponentType,
+    ContentPage,
+    PageLayout,
+    PageSection,
+)
 from tenant.models import (
     Tenant,
     TenantMembershipRole,
     UserTenantMembership,
 )
 from user.factories.account import UserAccountFactory
+
+
+def _make_content_page(slug, title, *, is_published, body="<p>Body</p>"):
+    page = ContentPage.objects.create(slug=slug, is_published=is_published)
+    page.set_current_language("el")
+    page.title = title
+    page.body = body
+    page.save()
+    return page
 
 
 class TestPublicPageConfig(TestCase):
@@ -228,3 +242,95 @@ class TestPageLayoutAdminViewSet(TestCase):
         self.client.force_authenticate(user=regular_user)
         response = self.client.get("/api/v1/page-config/admin")
         assert response.status_code == 403
+
+
+class TestContentPageViewSet(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.published = _make_content_page(
+            "terms", "Όροι Χρήσης", is_published=True
+        )
+        self.draft = _make_content_page(
+            "privacy", "Πολιτική Απορρήτου", is_published=False
+        )
+
+    def test_anonymous_get_published_by_slug(self):
+        response = self.client.get("/api/v1/content-page/terms")
+        assert response.status_code == 200
+        assert response.json()["slug"] == "terms"
+
+    def test_anonymous_unpublished_returns_404(self):
+        response = self.client.get("/api/v1/content-page/privacy")
+        assert response.status_code == 404
+
+    def test_anonymous_nonexistent_slug_returns_404(self):
+        response = self.client.get("/api/v1/content-page/does-not-exist")
+        assert response.status_code == 404
+
+    def test_list_returns_only_published_for_anonymous(self):
+        response = self.client.get("/api/v1/content-page")
+        assert response.status_code == 200
+        slugs = [item["slug"] for item in response.data["results"]]
+        assert "terms" in slugs
+        assert "privacy" not in slugs
+
+    def test_staff_sees_unpublished_in_list(self):
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+        self.client.force_authenticate(user=staff)
+        response = self.client.get("/api/v1/content-page")
+        assert response.status_code == 200
+        slugs = [item["slug"] for item in response.data["results"]]
+        assert "privacy" in slugs
+
+    def test_staff_can_retrieve_unpublished_by_slug(self):
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+        self.client.force_authenticate(user=staff)
+        response = self.client.get("/api/v1/content-page/privacy")
+        assert response.status_code == 200
+
+    def test_anonymous_create_denied(self):
+        response = self.client.post(
+            "/api/v1/content-page",
+            data={
+                "slug": "faq",
+                "isPublished": False,
+                "translations": {
+                    "el": {"title": "Συχνές Ερωτήσεις", "body": ""}
+                },
+            },
+            format="json",
+        )
+        assert response.status_code in (401, 403)
+
+    def test_non_staff_create_denied(self):
+        regular_user = UserAccountFactory(is_staff=False)
+        self.client.force_authenticate(user=regular_user)
+        response = self.client.post(
+            "/api/v1/content-page",
+            data={
+                "slug": "faq",
+                "isPublished": False,
+                "translations": {
+                    "el": {"title": "Συχνές Ερωτήσεις", "body": ""}
+                },
+            },
+            format="json",
+        )
+        assert response.status_code == 403
+
+    def test_staff_can_create(self):
+        staff = UserAccountFactory(is_staff=True, is_superuser=True)
+        self.client.force_authenticate(user=staff)
+        response = self.client.post(
+            "/api/v1/content-page",
+            data={
+                "slug": "faq",
+                "isPublished": False,
+                "translations": {
+                    "el": {"title": "Συχνές Ερωτήσεις", "body": ""}
+                },
+            },
+            format="json",
+        )
+        assert response.status_code == 201
+        assert response.json()["slug"] == "faq"

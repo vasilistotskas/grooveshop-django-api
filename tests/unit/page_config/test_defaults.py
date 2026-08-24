@@ -2,11 +2,13 @@ from django.test import TestCase
 
 from page_config.defaults import (
     BRAND_PAGE_LAYOUTS,
+    DEFAULT_CONTENT_PAGES,
     DEFAULT_PAGE_LAYOUTS,
     seed_brand_pages,
+    seed_content_pages,
     seed_page_layouts,
 )
-from page_config.models import PageLayout, PageSection
+from page_config.models import ContentPage, PageLayout, PageSection
 
 
 class TestSeedPageLayouts(TestCase):
@@ -186,3 +188,54 @@ class TestBrandHeroKeepsItsLink(TestCase):
         home = PageLayout.objects.get(page_type="home")
         hero = home.sections.get(component_type="hero_carousel")
         assert hero.props.get("link")
+
+
+class TestSeedContentPages(TestCase):
+    def test_creates_default_pages(self):
+        seed_content_pages()
+        assert ContentPage.objects.count() == len(DEFAULT_CONTENT_PAGES)
+        for slug in DEFAULT_CONTENT_PAGES:
+            assert ContentPage.objects.filter(slug=slug).exists()
+
+    def test_default_pages_are_unpublished(self):
+        # Placeholders wait for a merchant to write the real content
+        # and publish deliberately.
+        seed_content_pages()
+        assert not ContentPage.objects.filter(is_published=True).exists()
+
+    def test_pages_get_default_language_translation(self):
+        from django.conf import settings
+
+        seed_content_pages()
+        page = ContentPage.objects.get(slug="terms")
+        translation = page.translations.get(
+            language_code=settings.PARLER_DEFAULT_LANGUAGE_CODE
+        )
+        assert translation.title == DEFAULT_CONTENT_PAGES["terms"]["title"]
+
+    def test_idempotent(self):
+        seed_content_pages()
+        first_count = ContentPage.objects.count()
+
+        seed_content_pages()
+        assert ContentPage.objects.count() == first_count
+
+    def test_does_not_overwrite_merchant_edits(self):
+        # A slug that already exists (merchant already customized it)
+        # must be left alone — get_or_create only fills gaps.
+        seed_content_pages()
+        page = ContentPage.objects.get(slug="terms")
+        page.is_published = True
+        page.save()
+
+        seed_content_pages()
+        page.refresh_from_db()
+        assert page.is_published is True
+
+    def test_returns_created_map(self):
+        result = seed_content_pages()
+        assert set(result) == set(DEFAULT_CONTENT_PAGES)
+        assert all(created is True for created in result.values())
+
+        result_again = seed_content_pages()
+        assert all(created is False for created in result_again.values())

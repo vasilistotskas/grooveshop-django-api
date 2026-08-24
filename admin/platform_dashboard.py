@@ -54,8 +54,20 @@ def _tenant_rows() -> list[dict[str, Any]]:
         if _schema_exists(tenant.schema_name):
             try:
                 with tenant_context(tenant):
+                    from django.db.models import Sum  # noqa: PLC0415
+
+                    from order.enum.status import PaymentStatus  # noqa: PLC0415
+
                     Order = apps.get_model("order", "Order")
                     row["orders"] = Order.objects.count()
+                    # Same completed-orders Sum(paid_amount) shape as
+                    # the per-store merchant dashboard
+                    # (admin/dashboard.py::_zone_b_ops_charts) — only
+                    # money that actually landed counts as revenue.
+                    total = Order.objects.filter(
+                        payment_status=PaymentStatus.COMPLETED
+                    ).aggregate(total=Sum("paid_amount"))["total"]
+                    row["revenue"] = float(total) if total is not None else 0.0
             except Exception:  # noqa: BLE001 - never hard-fail the console
                 pass
         rows.append(row)
@@ -81,6 +93,8 @@ def _tenants_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
     never inject markup into the control plane.
     """
     from django.utils.translation import gettext as _g  # noqa: PLC0415
+
+    from admin.displays import money  # noqa: PLC0415
 
     table_rows = []
     for row in rows:
@@ -108,6 +122,7 @@ def _tenants_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
                 # ``_tenant_rows``. "0 orders" would read as a real
                 # figure for a half-provisioned store.
                 "—" if row["orders"] is None else str(row["orders"]),
+                "—" if row["revenue"] is None else money(row["revenue"]),
             ]
         )
 
@@ -119,6 +134,7 @@ def _tenants_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
             _g("Plan"),
             _g("Status"),
             _g("Orders"),
+            _g("Revenue"),
         ],
         "rows": table_rows,
     }

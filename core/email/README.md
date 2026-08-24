@@ -8,19 +8,6 @@ A fully dynamic, configuration-driven email template management system for Groov
 
 Navigate to: `http://localhost:8000/admin/email-templates/management/`
 
-### Test Configuration
-
-```bash
-cd grooveshop-django-api
-uv run python test_config.py
-```
-
-### Generate Previews
-
-```bash
-uv run python test_email_templates.py
-```
-
 ## Architecture
 
 ```
@@ -32,7 +19,8 @@ core/email/
 ├── admin_views.py         # Admin interface views
 ├── urls.py               # URL routing
 ├── CONFIGURATION_GUIDE.md # Complete guide for adding templates
-├── REFACTORING_SUMMARY.md # Technical details of refactoring
+├── ADMIN_GUIDE.md         # Admin interface usage guide
+├── DOCUMENTATION_INDEX.md # Documentation map
 └── README.md             # This file
 ```
 
@@ -205,24 +193,13 @@ Subject templates support variable substitution:
 
 ## Testing
 
-### Configuration Test
 ```bash
-uv run python test_config.py
+uv run pytest tests/unit/core/email/ tests/integration/core/email/
 ```
 
-Tests:
-- Configuration loading
-- Category detection
-- Context generator detection
-- Preview generation
-- Registry integration
-
-### Template Preview Test
-```bash
-uv run python test_email_templates.py
-```
-
-Generates HTML previews for all templates in `email_previews/` directory.
+- `tests/unit/core/email/test_registry.py` - template discovery/registry
+- `tests/unit/core/email/test_sample_data.py` - sample context generators
+- `tests/integration/core/email/test_preview_service.py` - preview rendering
 
 ## Admin Interface
 
@@ -291,7 +268,7 @@ Group related templates logically:
 ### 5. Testing
 Always test new templates:
 ```bash
-uv run python test_config.py
+uv run pytest tests/unit/core/email/ tests/integration/core/email/
 ```
 
 ## Troubleshooting
@@ -319,8 +296,8 @@ uv run python test_config.py
 ## Documentation
 
 - **CONFIGURATION_GUIDE.md** - Complete guide for adding templates
-- **REFACTORING_SUMMARY.md** - Technical details of refactoring
 - **ADMIN_GUIDE.md** - Admin interface usage guide
+- **DOCUMENTATION_INDEX.md** - Documentation map
 
 ## Support
 

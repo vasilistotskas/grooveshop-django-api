@@ -8,7 +8,6 @@
 
 ### For Developers
 - **[CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md)** - How to add and configure templates
-- **[REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md)** - Technical details and architecture
 
 ## Documentation Overview
 
@@ -45,16 +44,6 @@
 - Best practices
 - Troubleshooting
 
-### REFACTORING_SUMMARY.md
-**Purpose**: Technical documentation
-**Audience**: Developers, architects
-**Contents**:
-- Before/after comparison
-- Technical improvements
-- Code quality metrics
-- Migration path
-- Performance impact
-
 ## Current System Status
 
 ### Features
@@ -87,7 +76,6 @@ core/email/
 ├── README.md                   # Quick start guide
 ├── ADMIN_GUIDE.md              # Admin user guide
 ├── CONFIGURATION_GUIDE.md      # Developer guide
-├── REFACTORING_SUMMARY.md      # Technical details
 └── DOCUMENTATION_INDEX.md      # This file
 ```
 
@@ -114,15 +102,14 @@ core/templates/emails/
 ### For Developers
 1. Read [README.md](README.md) for overview
 2. Read [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) for details
-3. Check [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md) for architecture
-4. Run tests: `uv run python test_everything.py`
+3. Run tests: `uv run pytest tests/unit/core/email/ tests/integration/core/email/`
 
 ## Common Tasks
 
 ### Add a New Template
 1. Create HTML/TXT files in appropriate directory
 2. Add configuration to `config.py`
-3. Test with `uv run python test_everything.py`
+3. Test with `uv run pytest tests/unit/core/email/ tests/integration/core/email/`
 4. Preview in admin interface
 
 ### Add a New Category
@@ -133,17 +120,7 @@ core/templates/emails/
 
 ### Test the System
 ```bash
-# Comprehensive test
-uv run python test_everything.py
-
-# Configuration test
-uv run python test_config.py
-
-# Category check
-uv run python check_categories.py
-
-# System verification
-uv run python verify_system.py
+uv run pytest tests/unit/core/email/ tests/integration/core/email/
 ```
 
 ## Support

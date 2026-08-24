@@ -15,8 +15,8 @@ admin path) can never drift:
   identities are platform accounts, never a copy in the new tenant's
   own schema).
 - ``seed_tenant_defaults`` — extra_settings defaults, default page
-  layouts, and Meilisearch indexes, all best-effort inside
-  ``schema_context(tenant.schema_name)``.
+  layouts, default content pages, and Meilisearch indexes, all
+  best-effort inside ``schema_context(tenant.schema_name)``.
 
 ``provision_tenant`` runs all three and is what a caller with no
 step-by-step reporting needs (the admin path); ``tenant_create`` calls
@@ -155,6 +155,16 @@ def _seed_page_layouts(tenant: Tenant) -> None:
         logger.warning("Could not seed page layouts", exc_info=True)
 
 
+def _seed_content_pages(tenant: Tenant) -> None:
+    try:
+        from page_config.defaults import seed_content_pages  # noqa: PLC0415
+
+        seed_content_pages()
+        logger.info("Seeded content pages for %s", tenant.schema_name)
+    except Exception:
+        logger.warning("Could not seed content pages", exc_info=True)
+
+
 def _create_meili_indexes(tenant: Tenant) -> None:
     from django.conf import settings as django_settings  # noqa: PLC0415
 
@@ -183,7 +193,8 @@ def _create_meili_indexes(tenant: Tenant) -> None:
 
 
 def seed_tenant_defaults(tenant: Tenant) -> None:
-    """Seed extra_settings, default page layouts, and Meilisearch indexes.
+    """Seed extra_settings, default page layouts/content pages, and
+    Meilisearch indexes.
 
     Runs inside ``schema_context(tenant.schema_name)`` — every tenant
     gets these. Each step is independently best-effort (logged and
@@ -195,6 +206,7 @@ def seed_tenant_defaults(tenant: Tenant) -> None:
     with schema_context(tenant.schema_name):
         _seed_extra_settings(tenant)
         _seed_page_layouts(tenant)
+        _seed_content_pages(tenant)
         _create_meili_indexes(tenant)
 
 

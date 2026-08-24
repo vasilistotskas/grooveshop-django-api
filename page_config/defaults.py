@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import logging
 
-from page_config.models import PageLayout, PageSection
+from django.conf import settings
+
+from page_config.models import (
+    ContentPage,
+    ContentPageTranslation,
+    PageLayout,
+    PageSection,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -264,4 +271,66 @@ def seed_brand_pages() -> dict[str, bool]:
         hero.save(update_fields=["props"])
         logger.info("Applied brand banner props to the home hero")
     created_map["home"] = home_created
+    return created_map
+
+
+# Universal store-policy placeholders, every tenant gets these (unlike the
+# opt-in ``BRAND_PAGE_LAYOUTS`` above). Unpublished on creation — a merchant
+# reviews and writes the real content before it goes live; the slug + Greek
+# placeholder title/body just mark where each page belongs. Body is plain
+# HTML (not markdown) to match ``ContentPageTranslation.body``'s TinyMCE
+# field.
+DEFAULT_CONTENT_PAGES: dict[str, dict[str, str]] = {
+    "return-policy": {
+        "title": "Πολιτική Επιστροφών",
+        "body": "<p>Προσθέστε εδώ την πολιτική επιστροφών του καταστήματός σας.</p>",
+    },
+    "terms": {
+        "title": "Όροι Χρήσης",
+        "body": "<p>Προσθέστε εδώ τους όρους χρήσης του καταστήματός σας.</p>",
+    },
+    "privacy": {
+        "title": "Πολιτική Απορρήτου",
+        "body": "<p>Προσθέστε εδώ την πολιτική απορρήτου του καταστήματός σας.</p>",
+    },
+    "faq": {
+        "title": "Συχνές Ερωτήσεις",
+        "body": "<p>Προσθέστε εδώ τις συχνές ερωτήσεις των πελατών σας.</p>",
+    },
+    "about": {
+        "title": "Σχετικά με εμάς",
+        "body": "<p>Προσθέστε εδώ πληροφορίες σχετικά με το κατάστημά σας.</p>",
+    },
+    "shipping-info": {
+        "title": "Πληροφορίες Αποστολής",
+        "body": "<p>Προσθέστε εδώ τις πληροφορίες αποστολής του καταστήματός σας.</p>",
+    },
+}
+
+
+def seed_content_pages() -> dict[str, bool]:
+    """Create default (unpublished) content pages if they don't exist.
+
+    Idempotent (``get_or_create`` by slug) — safe to run repeatedly.
+    Called during tenant provisioning (every tenant gets these) AND
+    backfilled into every already-existing tenant schema via
+    ``page_config/migrations/0007_seed_content_pages.py`` so a tenant
+    created before ``ContentPage`` existed (including live ``webside``)
+    converges on the same default set. Returns ``{slug: created}``.
+    """
+    created_map: dict[str, bool] = {}
+    for slug, content in DEFAULT_CONTENT_PAGES.items():
+        page, created = ContentPage.objects.get_or_create(
+            slug=slug,
+            defaults={"is_published": False},
+        )
+        if created:
+            ContentPageTranslation.objects.create(
+                master=page,
+                language_code=settings.PARLER_DEFAULT_LANGUAGE_CODE,
+                title=content["title"],
+                body=content["body"],
+            )
+            logger.info("Seeded content page: %s", slug)
+        created_map[slug] = created
     return created_map

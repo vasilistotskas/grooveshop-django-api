@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import logging
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand, CommandError
-from django_tenants.utils import get_public_schema_name, schema_context
-
-logger = logging.getLogger(__name__)
+from django_tenants.utils import get_public_schema_name
 
 
 class Command(BaseCommand):
@@ -135,28 +132,15 @@ class Command(BaseCommand):
             is_primary=True,
         )
 
-        # The API host is not optional. Django's resolver DERIVES
-        # ``apiDomain`` as ``api.<primary>`` when no explicit ``api*``
-        # row exists, and the storefront dials that value for the
-        # WebSocket connection, the social-login redirect and CSP
-        # connect-src. But request routing matches TenantDomain rows
-        # EXACTLY, so a derived host with no row is a host Django
-        # refuses to serve: the storefront looks perfectly healthy while
-        # real-time notifications close 4004 on every attempt and every
-        # social login 404s at the form POST.
-        #
-        # Creating it here rather than trusting the operator to pass
-        # --extra-domains keeps the derivation and the routing in
-        # agreement by construction. Explicit --extra-domains entries
-        # still win (get_or_create below is a no-op if it is listed).
-        extras = list(options["extra_domains"])
-        api_domain = f"api.{domain}"
-        if not any(
-            e.lower() == api_domain for e in (x.lower() for x in extras)
-        ):
-            extras.append(api_domain)
+        # ``ensure_api_domain`` derives + creates the ``api.<domain>``
+        # row (see tenant/provisioning.py for why it is not optional).
+        # Explicit --extra-domains still win: get_or_create below is a
+        # no-op if the operator already listed it.
+        from tenant.provisioning import ensure_api_domain  # noqa: PLC0415
 
-        for extra in extras:
+        ensure_api_domain(tenant)
+
+        for extra in options["extra_domains"]:
             TenantDomain.objects.get_or_create(
                 domain=extra,
                 tenant=tenant,
@@ -173,9 +157,11 @@ class Command(BaseCommand):
         # tenant — the pre_login adapter would reject the credentials.
         self._provision_owner_membership(tenant, options["owner_email"])
 
-        # Seed default data in tenant schema
-        with schema_context(schema_name):
-            self._seed_defaults(tenant)
+        # Seed default data in tenant schema. ``seed_tenant_defaults``
+        # opens its own ``schema_context`` internally.
+        from tenant.provisioning import seed_tenant_defaults  # noqa: PLC0415
+
+        seed_tenant_defaults(tenant)
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -184,23 +170,12 @@ class Command(BaseCommand):
         )
 
     def _provision_owner_membership(self, tenant, owner_email: str):
-        from django.contrib.auth import get_user_model
-        from django_tenants.utils import get_public_schema_name, schema_context
-
-        from tenant.models import (
-            TenantMembershipRole,
-            UserTenantMembership,
+        from tenant.provisioning import (  # noqa: PLC0415
+            provision_owner_membership,
         )
 
-        User = get_user_model()
-        # Owner/staff identities are platform accounts — the lookup
-        # must always resolve the PUBLIC-schema row, not whichever
-        # schema happens to be active when this command runs (this
-        # command creates the tenant schema earlier in handle(), so
-        # the connection can be pinned to it by the time we get here).
-        with schema_context(get_public_schema_name()):
-            user = User.objects.filter(email__iexact=owner_email).first()
-        if user is None:
+        result = provision_owner_membership(tenant, owner_email)
+        if result is None:
             # Owner hasn't registered yet; emit a hint and move on. A
             # follow-up membership will be created when they first log
             # in via the admin or when an operator runs a backfill.
@@ -213,80 +188,9 @@ class Command(BaseCommand):
             )
             return
 
-        membership, created = UserTenantMembership.objects.update_or_create(
-            user=user,
-            tenant=tenant,
-            defaults={
-                "role": TenantMembershipRole.OWNER,
-                "is_active": True,
-            },
-        )
+        membership, created = result
         verb = "Created" if created else "Updated"
         self.stdout.write(
             f"  {verb} OWNER membership for {owner_email} on "
             f"{tenant.schema_name}."
         )
-
-    def _seed_defaults(self, tenant):
-        from django.conf import settings
-
-        # Seed extra_settings defaults
-        try:
-            from extra_settings.models import Setting
-
-            for default in getattr(settings, "EXTRA_SETTINGS_DEFAULTS", []):
-                Setting.objects.get_or_create(
-                    name=default["name"],
-                    defaults={
-                        "setting_type": default.get("type", "string"),
-                        "value": str(default.get("value", "")),
-                    },
-                )
-            logger.info(f"Seeded extra_settings for {tenant.schema_name}")
-        except Exception:
-            logger.warning("Could not seed extra_settings", exc_info=True)
-
-        # Seed default page layouts
-        try:
-            from page_config.defaults import seed_page_layouts
-
-            seed_page_layouts()
-            logger.info("Seeded page layouts for %s", tenant.schema_name)
-        except Exception:
-            logger.warning("Could not seed page layouts", exc_info=True)
-
-        # Create Meilisearch indexes for tenant
-        try:
-            self._create_meili_indexes(tenant)
-        except Exception:
-            logger.warning(
-                "Could not create Meilisearch indexes",
-                exc_info=True,
-            )
-
-    def _create_meili_indexes(self, tenant):
-        from django.conf import settings as django_settings
-
-        if django_settings.MEILISEARCH.get("OFFLINE"):
-            return
-
-        from meili._client import client as meili_client
-
-        # Discover all IndexMixin subclasses
-        from meili.models import IndexMixin
-
-        for model in IndexMixin.__subclasses__():
-            index_name = model.get_meili_index_name()
-            # Default must match meili's own ("pk" — see
-            # meili/apps.py::_initialize_meilisearch_config); an "id"
-            # default here gave tenant_create-provisioned indexes a
-            # different primaryKey than every other creation path.
-            pk = getattr(model.MeiliMeta, "primary_key", "pk")
-            try:
-                meili_client.create_index(index_name, pk)
-                logger.info(f"Created Meilisearch index: {index_name}")
-            except Exception:
-                logger.warning(
-                    f"Could not create index {index_name}",
-                    exc_info=True,
-                )

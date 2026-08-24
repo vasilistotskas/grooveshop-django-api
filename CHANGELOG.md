@@ -3,6 +3,56 @@
 
 
 
+## v3.6.4 (2026-08-24)
+
+### Bug fixes
+
+* fix(tenant): keep the storefront API off the platform host
+
+The platform control-plane host (public schema,
+platform.grooveshop.space) mounted the entire merchant storefront/
+commerce API: tenant.urls_public appended the whole core.urls, so
+/api/v1/product, /order, /cart, /user, /blog, /loyalty, /agent, … all
+resolved on the control plane. Behind the platform auth wall it exposed
+no live data (the public schema holds no store rows), but the surface
+should not be there at all (audit finding M1).
+
+Split core/urls.py into named groups and export
+public_shared_urlpatterns — root-shared infra (locale, OAuth AS
+discovery, payment/shipping webhook receivers) plus the shared i18n
+routes (admin/auth/editor infra, health, schema, country/region, tenant
+resolve + memberships). tenant.urls_public composes that plus its
+platform-only admin/staff endpoints, and no longer pulls in the 16
+storefront/commerce app groups (product, order, user, cart, blog,
+search, loyalty, pay_way, shipping{,_acs,_boxnow}, notification, contact,
+tag, page_config, agent).
+
+The tenant/storefront host (ROOT_URLCONF) is unchanged: its urlpatterns
+is the shared groups + the storefront groups in one i18n_patterns, the
+same shape as before. Proven by an empty `spectacular` operationId diff
+(307 endpoints identical) and the existing suite. A new regression test
+(tests/integration/tenant/test_public_url_surface.py) pins that the
+storefront API is absent from the platform host, present on tenant
+hosts, and the shared/control-plane surface resolves on both.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`c05bad4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c05bad4847a9a4b69737f8aaec01a759fc2c209e))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.6.3 [skip ci] ([`424c82d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/424c82de2688c391816965618eec9559729bb7d8))
+
+### Continuous integration
+
+* ci: raise test step timeout to 40 minutes
+
+The Run Tests step reached ~27 min (~84% of the 32-min cap) after the
+multi-tenant audit fixes added their suites. Bump the step to 40 and
+the job cap to 50 for headroom; the step timeout is the real signal.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`0c73374`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0c73374afc8e5c86ea5a99a309d05e8ab191f2bd))
+
 ## v3.6.3 (2026-08-23)
 
 ### Bug fixes

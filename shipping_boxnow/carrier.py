@@ -142,8 +142,8 @@ class BoxNowCarrier(ShippingCarrierInterface):
         """Persist the BoxNow shipment row for ``order``.
 
         Lifted from the inline blocks that previously lived in each
-        of the three ``OrderService.create_order*`` paths.  Idempotent
-        — re-runs are no-ops because the row already exists.
+        of the two ``OrderService.create_order_from_cart*`` paths.
+        Idempotent — re-runs are no-ops because the row already exists.
 
         Reads:
         * ``boxnow_locker_id`` (string)

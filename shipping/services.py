@@ -113,8 +113,8 @@ class ShippingService:
         or the provider's adapter does not implement
         ``create_shipment_row``.
 
-        Used by the three ``OrderService.create_order*`` paths so each
-        path collapses from a per-provider if/elif tower into one
+        Used by the two ``OrderService.create_order_from_cart*`` paths so
+        each path collapses from a per-provider if/elif tower into one
         registry-dispatched call.
         """
         adapter = cls.adapter_for_order(order)
@@ -130,9 +130,9 @@ class ShippingService:
         """Fire the provider's create-shipment Celery task.
 
         The order MUST have ``shipping_provider`` set — orders created
-        through any of the ``OrderService.create_order*`` paths always
-        go through ``_resolve_shipping_provider`` which sets it. A
-        missing provider here means the order is genuinely
+        through either of the ``OrderService.create_order_from_cart*``
+        paths always go through ``_resolve_shipping_provider`` which
+        sets it. A missing provider here means the order is genuinely
         provider-less (e.g. flat-rate home delivery without a courier
         adapter) — silently return.
 

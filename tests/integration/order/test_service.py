@@ -8,12 +8,12 @@ from djmoney.money import Money
 
 from order.enum.status import OrderStatus
 from order.exceptions import (
-    InsufficientStockError,
     InvalidStatusTransitionError,
     OrderCancellationError,
 )
 from order.models.order import Order
 from order.services import OrderService
+from order.stock import StockManager
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
@@ -68,46 +68,45 @@ class OrderServiceTestCase(TestCase):
         self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
         self.order.metadata = {}
 
-    @patch("django.db.transaction.on_commit")
-    @patch("order.signals.order_created.send")
-    def test_create_order(self, mock_signal, mock_on_commit):
-        # Mock on_commit to execute callbacks immediately
-        mock_on_commit.side_effect = lambda func: func()
+    def _create_order(self, order_data=None, items_data=None, user=None):
+        """Build a real, persisted order with items and decremented stock.
 
-        result = OrderService.create_order(
-            self.order_data, self.items_data, user=self.user
+        Stand-in fixture helper for the removed ``OrderService.create_order``
+        (the live checkout paths are ``create_order_from_cart`` /
+        ``create_order_from_cart_offline``) — kept here purely so the other
+        ``OrderService`` methods below (``update_order_status``,
+        ``get_user_orders``, ``cancel_order``) still have a real order to
+        exercise.
+        """
+        order_data = order_data if order_data is not None else self.order_data
+        items_data = items_data if items_data is not None else self.items_data
+        user = user if user is not None else self.user
+
+        order = Order.objects.create(
+            user=user, status=OrderStatus.PENDING, **order_data
         )
-
-        self.assertIsInstance(result, Order)
-        self.assertEqual(result.email, self.order_data["email"])
-        self.assertEqual(result.first_name, self.order_data["first_name"])
-        self.assertEqual(result.user, self.user)
-
-        self.assertEqual(result.items.count(), 2)
-
-        # Signal is called via transaction.on_commit, which we mocked to execute immediately
-        mock_signal.assert_called_once_with(sender=Order, order=result)
-
-    def test_create_order_insufficient_stock(self):
-        self.product1.stock = 1
-        self.product1.save(update_fields=["stock"])
-
-        with self.assertRaises(InsufficientStockError) as context:
-            OrderService.create_order(
-                self.order_data, self.items_data, user=self.user
+        for item in items_data:
+            product = item["product"]
+            quantity = item["quantity"]
+            StockManager.decrement_stock(
+                product_id=product.id,
+                quantity=quantity,
+                order_id=order.id,
+                reason="test_setup",
             )
-
-        exception = context.exception
-        self.assertEqual(exception.product_id, self.product1.id)
-        self.assertEqual(exception.available, 1)
-        self.assertEqual(exception.requested, 2)
+            order.items.create(
+                product=product,
+                price=product.final_price,
+                quantity=quantity,
+            )
+        order.paid_amount = order.calculate_order_total_amount()
+        order.save(update_fields=["paid_amount", "paid_amount_currency"])
+        return order
 
     @patch("order.signals.handlers.order_status_changed.send")
     @patch("order.signals.handlers.send_order_confirmation_email")
     def test_update_order_status_valid(self, mock_email, mock_signal):
-        order = OrderService.create_order(
-            self.order_data, self.items_data, user=self.user
-        )
+        order = self._create_order()
         mock_signal.reset_mock()
 
         OrderService.update_order_status(order, OrderStatus.PROCESSING)
@@ -119,9 +118,7 @@ class OrderServiceTestCase(TestCase):
     def test_update_order_status_invalid(self):
         # A real order is required: update_order_status now re-reads the row
         # under select_for_update (G0285), so a Mock order can't be used.
-        order = OrderService.create_order(
-            self.order_data, self.items_data, user=self.user
-        )
+        order = self._create_order()
         self.assertEqual(order.status, OrderStatus.PENDING)
 
         with self.assertRaises(InvalidStatusTransitionError) as context:
@@ -132,22 +129,16 @@ class OrderServiceTestCase(TestCase):
         self.assertIn("Cannot transition from", str(context.exception))
 
     def test_get_user_orders(self):
-        order1 = OrderService.create_order(
-            self.order_data, self.items_data, user=self.user
-        )
+        order1 = self._create_order()
 
         order_data_2 = self.order_data.copy()
         order_data_2["email"] = "customer2@example.com"
-        order2 = OrderService.create_order(
-            order_data_2, self.items_data, user=self.user
-        )
+        order2 = self._create_order(order_data=order_data_2)
 
         other_user = UserAccountFactory.create()
         order_data_3 = self.order_data.copy()
         order_data_3["email"] = "other@example.com"
-        OrderService.create_order(
-            order_data_3, self.items_data, user=other_user
-        )
+        self._create_order(order_data=order_data_3, user=other_user)
 
         result = OrderService.get_user_orders(self.user.id)
 
@@ -159,9 +150,7 @@ class OrderServiceTestCase(TestCase):
 
     def test_cancel_order(self):
         # Create a real order instead of using a mock
-        order = OrderService.create_order(
-            self.order_data, self.items_data, user=self.user
-        )
+        order = self._create_order()
 
         # Verify initial state
         self.assertEqual(order.status, OrderStatus.PENDING)
@@ -192,9 +181,7 @@ class OrderServiceTestCase(TestCase):
     @patch("order.signals.order_canceled.send")
     def test_cancel_order_not_cancelable(self, mock_signal):
         # Create a real order in the DB since cancel_order uses select_for_update
-        order = OrderService.create_order(
-            self.order_data, self.items_data, user=self.user
-        )
+        order = self._create_order()
         # Force status to SHIPPED (not cancelable)
         Order.objects.filter(id=order.id).update(status=OrderStatus.SHIPPED)
 

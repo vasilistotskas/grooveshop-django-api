@@ -10,7 +10,6 @@ from djmoney.money import Money
 
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
-    InsufficientStockError,
     InvalidStatusTransitionError,
     PaymentError,
 )
@@ -28,37 +27,6 @@ pytestmark = pytest.mark.assert_english
 class OrderServiceTestCase(TestCase):
     def setUp(self):
         self.order = OrderFactory()
-        self.user = self.order.user
-        self.product = ProductFactory(stock=20)
-
-        test_currency = self.order.shipping_price.currency
-
-        self.order_data = {
-            "email": "test@example.com",
-            "first_name": "John",
-            "last_name": "Doe",
-            "phone": "+1234567890",
-            "paid_amount": Money(
-                amount=Decimal("100.00"), currency=test_currency
-            ),
-            "status": OrderStatus.PENDING.value,
-            "shipping_price": Money(
-                amount=Decimal("10.00"), currency=test_currency
-            ),
-            "street": "123 Main St",
-            "street_number": "Apt 4",
-            "city": "Test City",
-            "zipcode": "12345",
-            "country": self.order.country,
-            "region": self.order.region,
-            "pay_way": self.order.pay_way,
-        }
-        self.items_data = [
-            {
-                "product": self.product,
-                "quantity": 2,
-            }
-        ]
 
     def test_get_order_by_id(self):
         result = OrderService.get_order_by_id(self.order.id)
@@ -77,40 +45,6 @@ class OrderServiceTestCase(TestCase):
         result = OrderService.get_order_by_uuid(str(self.order.uuid))
 
         self.assertEqual(result.id, self.order.id)
-
-    @patch("order.signals.order_created.send")
-    def test_create_order(self, mock_signal):
-        initial_count = Order.objects.count()
-
-        new_order = OrderService.create_order(
-            order_data=self.order_data,
-            items_data=self.items_data,
-            user=self.user,
-        )
-
-        self.assertEqual(Order.objects.count(), initial_count + 1)
-
-        self.assertEqual(new_order.email, self.order_data["email"])
-        self.assertEqual(new_order.first_name, self.order_data["first_name"])
-
-        self.assertEqual(new_order.items.count(), len(self.items_data))
-
-        # Signal is called via transaction.on_commit
-        # In integration tests, verify order was created successfully
-        self.assertTrue(
-            Order.objects.filter(email=self.order_data["email"]).exists()
-        )
-
-    def test_create_order_insufficient_stock(self):
-        self.product.stock = 1
-        self.product.save()
-
-        with self.assertRaises(InsufficientStockError):
-            OrderService.create_order(
-                order_data=self.order_data,
-                items_data=self.items_data,
-                user=self.user,
-            )
 
     def test_update_order_status_valid(self):
         with transaction.atomic():

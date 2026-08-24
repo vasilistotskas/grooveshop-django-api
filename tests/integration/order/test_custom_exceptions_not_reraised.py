@@ -1,6 +1,5 @@
 import pytest
 from django.conf import settings
-from django.db import transaction
 from djmoney.money import Money
 
 from cart.factories.cart import CartFactory
@@ -166,16 +165,9 @@ class TestCustomExceptionsNotReraisedAsValueError:
                 InvalidStatusTransitionError,
                 "invalid_status_transition",
             ),
-            # InsufficientStockError scenarios
-            (
-                "create_order_insufficient_stock",
-                InsufficientStockError,
-                "create_order_no_stock",
-            ),
         ],
         ids=[
             "invalid_status_transition",
-            "create_order_no_stock",
         ],
     )
     def test_order_service_preserves_custom_exception_types(
@@ -194,41 +186,6 @@ class TestCustomExceptionsNotReraisedAsValueError:
             # Attempt invalid backwards transition
             with pytest.raises(exception_type) as exc_info:
                 OrderService.update_order_status(order, OrderStatus.PROCESSING)
-
-            # Verify exception is NOT ValueError
-            exception = exc_info.value
-            assert not isinstance(exception, ValueError), (
-                f"Exception should be {exception_type.__name__}, not ValueError"
-            )
-            assert isinstance(exception, exception_type), (
-                f"Exception should be {exception_type.__name__}"
-            )
-
-        elif operation == "create_order_insufficient_stock":
-            # Create product with insufficient stock
-            product = ProductFactory.create(
-                price=Money("50.00", settings.DEFAULT_CURRENCY), stock=1
-            )
-            product.set_current_language("en")
-            product.name = "Test Product"
-            product.save()
-
-            # Prepare order data requesting more than available
-            order_data = {
-                "shipping_price": Money("10.00", settings.DEFAULT_CURRENCY),
-            }
-            items_data = [
-                {
-                    "product": product,
-                    "quantity": 10,  # More than available (1)
-                }
-            ]
-
-            # Attempt to create order
-            with pytest.raises(exception_type) as exc_info:
-                OrderService.create_order(
-                    order_data=order_data, items_data=items_data, user=None
-                )
 
             # Verify exception is NOT ValueError
             exception = exc_info.value
@@ -536,61 +493,6 @@ class TestCustomExceptionsNotReraisedAsValueError:
     # ========================================================================
     # Integration Tests with Multiple Operations
     # ========================================================================
-
-    def test_exception_types_preserved_through_transaction_rollback(self):
-        """
-        Test that exception types are preserved even during transaction rollback.
-
-        Verifies that when a transaction fails and rolls back, the original
-        custom exception type is preserved and not converted to ValueError.
-        """
-        # Create product with insufficient stock
-        product = ProductFactory.create(
-            price=Money("50.00", settings.DEFAULT_CURRENCY), stock=1
-        )
-        product.set_current_language("en")
-        product.name = "Test Product"
-        product.save()
-
-        # Prepare order data
-        order_data = {
-            "shipping_price": Money("10.00", settings.DEFAULT_CURRENCY),
-        }
-        items_data = [
-            {
-                "product": product,
-                "quantity": 10,  # More than available
-            }
-        ]
-
-        # Track exception type
-        exception_caught = None
-
-        try:
-            with transaction.atomic():
-                OrderService.create_order(
-                    order_data=order_data, items_data=items_data, user=None
-                )
-        except ValueError as e:
-            # Should NOT reach here
-            exception_caught = ("ValueError", e)
-        except InsufficientStockError as e:
-            # Should reach here
-            exception_caught = ("InsufficientStockError", e)
-        except Exception as e:
-            # Catch any other exception
-            exception_caught = (type(e).__name__, e)
-
-        # Verify exception type preserved through rollback
-        assert exception_caught is not None, (
-            "An exception should have been raised"
-        )
-        assert exception_caught[0] == "InsufficientStockError", (
-            f"Exception should be InsufficientStockError, not {exception_caught[0]}"
-        )
-        assert not isinstance(exception_caught[1], ValueError), (
-            "Exception should NOT be an instance of ValueError"
-        )
 
     def test_nested_operations_preserve_exception_types(self):
         """

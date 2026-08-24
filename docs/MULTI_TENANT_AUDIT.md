@@ -1,5 +1,9 @@
 # Multi-Tenant Deep Audit — Consolidated Findings
 
+> **⚠️ SUPERSEDED (2026-08-24).** The findings below are historical; H1–H3/M1–M9
+> and the criticals here were closed in the 2026-08-23/24 multi-tenant
+> hardening. Kept for history only.
+
 **Scope**: 25-agent parallel audit across all 4 repos (Django, Nuxt, Media-Stream, Infrastructure) on the `multi-tenant` branch.
 **Date**: 2026-05-11
 **Status**: 24/25 reports received; consolidation pending validation pass.

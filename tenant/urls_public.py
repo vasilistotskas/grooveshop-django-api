@@ -1,22 +1,29 @@
 """URL conf that always runs in public schema context.
 
-Mounted via PUBLIC_SCHEMA_URLCONF in settings.py.
-Tenant admin endpoints run here (public schema only). Everything else
-falls through to the main ROOT_URLCONF via ``core_urlpatterns``, which
-already includes ``tenant.urls`` — so ``tenant-resolve`` and
-``tenant-memberships-mine`` are reachable both directly (via the
-tenant app's URL conf) and through this public conf.
+Mounted via PUBLIC_SCHEMA_URLCONF in settings.py — i.e. served only on
+the platform control-plane host (``platform.grooveshop.space``).
 
-NOTE: We import ``urlpatterns`` from ``core.urls`` and extend the list
-instead of using ``include("core.urls")`` because ``core.urls`` uses
-``i18n_patterns()`` at module level, and Django forbids
-``i18n_patterns`` inside an ``include()``.
+Tenant admin + platform-staff endpoints run here (public schema only).
+Everything else is ``core.urls.public_shared_urlpatterns`` — the SHARED
+subset of the main URL surface: admin/auth/editor infra, OAuth AS
+discovery, health, schema, and shared reference/control-plane data
+(country/region, ``tenant-resolve``, ``tenant-memberships-mine``). It
+deliberately OMITS the merchant storefront/commerce API (product, order,
+cart, user, blog, loyalty, search, pay_way, shipping, notification,
+contact, tag, page_config, agent) — those live in ``core.urls`` and are
+served on tenant hosts only, so the control plane never exposes a store's
+data even behind the platform auth wall (defence in depth).
+
+NOTE: We import the shared list from ``core.urls`` and extend it instead
+of using ``include("core.urls")`` because that list contains
+``i18n_patterns()`` entries, and Django forbids ``i18n_patterns`` inside
+an ``include()``.
 """
 
 from django.urls import path
 
 from admin.platform_site import platform_admin_site
-from core.urls import urlpatterns as core_urlpatterns
+from core.urls import public_shared_urlpatterns
 from tenant.staff_api import (
     PlatformStaffLoginView,
     PlatformStaffLogoutView,
@@ -36,7 +43,7 @@ _admin_detail = TenantAdminViewSet.as_view(
 )
 
 urlpatterns = [
-    # The control-plane admin. Listed BEFORE ``core_urlpatterns`` so it
+    # The control-plane admin. Listed BEFORE ``public_shared_urlpatterns`` so it
     # shadows the shared tenant admin that ``core.urls`` mounts at the
     # same path: Django resolves in order, and on the public schema the
     # platform site is the one that should answer. Tenant hosts never
@@ -63,4 +70,4 @@ urlpatterns = [
         _admin_detail,
         name="tenant-admin-detail",
     ),
-] + core_urlpatterns
+] + public_shared_urlpatterns

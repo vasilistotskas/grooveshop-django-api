@@ -35,7 +35,30 @@ import core.filters.camel_case_ordering  # noqa
 
 app_name = "core"
 
-urlpatterns = [
+# ---------------------------------------------------------------------------
+# URL surface is split into named groups so the two hosts can compose
+# different subsets. django-tenants serves ``PUBLIC_SCHEMA_URLCONF``
+# (``tenant.urls_public``) on the PUBLIC schema — i.e. only the platform
+# control-plane host (``platform.grooveshop.space``) — and this
+# ``ROOT_URLCONF`` on every tenant/storefront host.
+#
+# ``_storefront_*`` groups carry a store's catalogue, orders, customers,
+# cart, loyalty and agent resources. They are mounted on the tenant host
+# ONLY. The platform host composes ``public_shared_urlpatterns`` (below),
+# which omits them, so the control plane never exposes a merchant's
+# storefront API — even though it sits behind the platform's auth wall,
+# defence in depth keeps store data structurally absent there rather than
+# reachable-but-empty. Everything a tenant host serves is UNCHANGED: its
+# ``urlpatterns`` is the shared groups + the storefront groups, in the
+# same shape as before.
+# ---------------------------------------------------------------------------
+
+# Root-mounted (outside i18n_patterns), served on BOTH hosts: locale
+# machinery, payment/shipping webhook receivers (POST-only, no data
+# exposure; the sender targets whichever host the webhook was registered
+# with, so the receiver stays available on both), and OAuth/OIDC AS
+# discovery + headless-auth endpoints.
+_root_shared_patterns = [
     path("robots.txt", robots_txt, name="robots-txt"),
     path("i18n/", include("django.conf.urls.i18n")),
     path("stripe/", include("djstripe.urls", namespace="djstripe")),
@@ -49,9 +72,6 @@ urlpatterns = [
         BoxNowWebhookView.as_view(),
         name="boxnow-webhook",
     ),
-]
-
-urlpatterns += [
     # allauth headless endpoints must be at the root (not inside i18n_patterns)
     # so non-default locales don't get a /{lang}/_allauth/ prefix that
     # the Nuxt proxy never sends.
@@ -74,12 +94,20 @@ urlpatterns += [
         oidc_views.configuration,
         name="oauth_authorization_server_metadata",
     ),
-    # Agent-facing scoped resources (OIDC bearer tokens only). Outside
-    # i18n_patterns for the same reason as the IdP endpoints.
+]
+
+# Root-mounted, STOREFRONT only: agent-facing scoped resources (a store's
+# orders/loyalty for an authenticated AI agent). Outside i18n_patterns for
+# the same reason as the IdP endpoints.
+_root_storefront_patterns = [
     path("api/v1/", include("agent.urls")),
 ]
 
-urlpatterns += i18n_patterns(
+# Locale-prefixed, served on BOTH hosts: admin + editor infra (the platform
+# admin login flow relies on ``accounts/``; unfold/tinymce/rosetta/image
+# upload are admin dependencies) and shared reference/control-plane data
+# (country/region, tenant resolve + memberships, health, settings, schema).
+_shared_i18n_patterns = [
     path("", HomeView.as_view(), name="home"),
     path(
         _("admin/email-templates/"),
@@ -98,24 +126,9 @@ urlpatterns += i18n_patterns(
     ),
     path("rosetta/", include("rosetta.urls")),
     path("tinymce/", include("tinymce.urls")),
-    path("api/v1/", include("product.urls")),
-    path("api/v1/", include("order.urls")),
-    path("api/v1/", include("user.urls")),
     path("api/v1/", include("country.urls")),
     path("api/v1/", include("region.urls")),
-    path("api/v1/", include("search.urls")),
-    path("api/v1/", include("blog.urls")),
-    path("api/v1/", include("tag.urls")),
-    path("api/v1/", include("pay_way.urls")),
-    path("api/v1/", include("shipping.urls")),
-    path("api/v1/", include("shipping_boxnow.urls")),
-    path("api/v1/", include("shipping_acs.urls")),
-    path("api/v1/", include("cart.urls")),
-    path("api/v1/", include("notification.urls")),
-    path("api/v1/", include("contact.urls")),
-    path("api/v1/", include("loyalty.urls")),
     path("api/v1/", include("tenant.urls")),
-    path("api/v1/", include("page_config.urls")),
     path("api/v1/health", health_check, name="api-health"),
     path("api/v1/health/live", health_live, name="api-health-live"),
     path("api/v1/settings", list_settings, name="api-settings-list"),
@@ -131,7 +144,44 @@ urlpatterns += i18n_patterns(
         SpectacularRedocView.as_view(url_name="schema"),
         name="redoc",
     ),
+]
+
+# Locale-prefixed, STOREFRONT only: the merchant storefront/commerce API.
+_storefront_i18n_patterns = [
+    path("api/v1/", include("product.urls")),
+    path("api/v1/", include("order.urls")),
+    path("api/v1/", include("user.urls")),
+    path("api/v1/", include("search.urls")),
+    path("api/v1/", include("blog.urls")),
+    path("api/v1/", include("tag.urls")),
+    path("api/v1/", include("pay_way.urls")),
+    path("api/v1/", include("shipping.urls")),
+    path("api/v1/", include("shipping_boxnow.urls")),
+    path("api/v1/", include("shipping_acs.urls")),
+    path("api/v1/", include("cart.urls")),
+    path("api/v1/", include("notification.urls")),
+    path("api/v1/", include("contact.urls")),
+    path("api/v1/", include("loyalty.urls")),
+    path("api/v1/", include("page_config.urls")),
+]
+
+# Platform control-plane host (PUBLIC schema) surface, minus the
+# platform-only admin/staff endpoints that ``tenant.urls_public`` prepends.
+# Consumed there via ``from core.urls import public_shared_urlpatterns``.
+public_shared_urlpatterns = _root_shared_patterns + i18n_patterns(
+    *_shared_i18n_patterns,
     prefix_default_language=False,
+)
+
+# Tenant/storefront host (ROOT_URLCONF): shared groups + storefront groups.
+urlpatterns = (
+    _root_shared_patterns
+    + _root_storefront_patterns
+    + i18n_patterns(
+        *_shared_i18n_patterns,
+        *_storefront_i18n_patterns,
+        prefix_default_language=False,
+    )
 )
 
 if bool(settings.ENABLE_DEBUG_TOOLBAR):

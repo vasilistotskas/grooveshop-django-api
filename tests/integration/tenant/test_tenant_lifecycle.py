@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from django.contrib.messages import storage as messages_storage
@@ -49,10 +50,24 @@ def _make_tenant(slug: str, **kwargs) -> Tenant:
     return t
 
 
-def _admin_request():
-    """Minimal mock of an HttpRequest sufficient for admin action calls."""
+def _admin_request(post=None, user=None):
+    """Minimal mock of an HttpRequest sufficient for admin action calls.
+
+    ``user`` defaults to a fresh superuser: the H2 audit trail
+    (``self.log_change``/``self.log_deletion``) writes a real
+    ``LogEntry`` keyed on ``request.user.pk``, which a bare
+    ``MagicMock`` cannot satisfy (the FK write fails on a non-integer
+    pk). ``post`` defaults to an empty dict — the destroy confirmation
+    guard reads ``request.POST.get("destroy_confirmed")``.
+    """
     req = MagicMock()
     req._messages = messages_storage.default_storage(req)
+    req.POST = post if post is not None else {}
+    req.user = user or User.objects.create_superuser(
+        email=f"admin-action-{uuid4().hex[:10]}@example.com",
+        username=f"adminaction{uuid4().hex[:10]}",
+        password="testpass123",
+    )
     return req
 
 
@@ -254,14 +269,23 @@ class TestDeletePermissionOnProtectedTenants:
 # ---------------------------------------------------------------------------
 
 
+_CONFIRMED = {"destroy_confirmed": "yes"}
+
+
 @pytest.mark.django_db
 class TestDestroyTenants:
+    """Every call here already carries ``destroy_confirmed=yes`` — the
+    confirmation-guard behaviour itself is covered separately by
+    ``TestDestroyConfirmationGuard``. These tests are only about the
+    gates that run AFTER confirmation (protected/cooldown/suspended)."""
+
     def test_destroy_non_suspended_is_refused(self):
         tenant = _make_tenant("destroy-not-suspended", is_active=True)
         admin = _admin()
         with patch.object(Tenant, "delete") as mock_delete:
             admin.destroy_tenants(
-                _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+                _admin_request(post=_CONFIRMED),
+                Tenant.objects.filter(pk=tenant.pk),
             )
             mock_delete.assert_not_called()
 
@@ -275,7 +299,8 @@ class TestDestroyTenants:
         admin = _admin()
         with patch.object(Tenant, "delete") as mock_delete:
             admin.destroy_tenants(
-                _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+                _admin_request(post=_CONFIRMED),
+                Tenant.objects.filter(pk=tenant.pk),
             )
             mock_delete.assert_not_called()
 
@@ -289,7 +314,8 @@ class TestDestroyTenants:
         admin = _admin()
         with patch.object(Tenant, "delete") as mock_delete:
             admin.destroy_tenants(
-                _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+                _admin_request(post=_CONFIRMED),
+                Tenant.objects.filter(pk=tenant.pk),
             )
             mock_delete.assert_called_once_with(force_drop=True)
 
@@ -303,7 +329,8 @@ class TestDestroyTenants:
         with patch("tenant.admin._PROTECTED", frozenset({tenant.schema_name})):
             with patch.object(Tenant, "delete") as mock_delete:
                 admin.destroy_tenants(
-                    _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+                    _admin_request(post=_CONFIRMED),
+                    Tenant.objects.filter(pk=tenant.pk),
                 )
                 mock_delete.assert_not_called()
 
@@ -317,6 +344,207 @@ class TestDestroyTenants:
         admin = _admin()
         with patch.object(Tenant, "delete") as mock_delete:
             admin.destroy_tenants(
-                _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+                _admin_request(post=_CONFIRMED),
+                Tenant.objects.filter(pk=tenant.pk),
             )
             mock_delete.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Destroy confirmation guard (quick win #4)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestDestroyConfirmationGuard:
+    """A first submission must render an "are you sure" page and touch
+    nothing; only a second POST carrying ``destroy_confirmed=yes``
+    (as the confirmation page's own form re-submits) may proceed to
+    the real gates in ``TestDestroyTenants``."""
+
+    def _real_admin(self):
+        """A ``TenantAdmin`` bound to a REAL ``AdminSite``.
+
+        ``_admin()`` above passes ``admin_site=None``, which is fine
+        for the confirmed path (it never touches ``self.admin_site``)
+        but ``_destroy_confirmation_page`` calls
+        ``self.admin_site.each_context(request)`` to render the page.
+        """
+        from django.contrib import admin as django_admin
+
+        return django_admin.site._registry[Tenant]
+
+    def _request(self, post=None):
+        from importlib import import_module
+
+        from django.conf import settings
+        from django.test import RequestFactory
+
+        # A real session (not just ``_messages``): Django's default
+        # ``MESSAGE_STORAGE`` is session-backed, and
+        # ``SessionStorage.__init__`` requires ``hasattr(request,
+        # "session")`` — true for a ``MagicMock`` (used by every other
+        # helper in this file) but false for a bare ``RequestFactory``
+        # request, which has no ``.session`` at all without
+        # SessionMiddleware. Mirrors
+        # ``test_platform_billing_page.py``'s identical need.
+        session_store = import_module(settings.SESSION_ENGINE).SessionStore
+        request = RequestFactory().post(
+            "/admin/tenant/tenant/", data=post or {}
+        )
+        request.session = session_store()
+        request.user = User.objects.create_superuser(
+            email=f"destroy-confirm-{uuid4().hex[:10]}@example.com",
+            username=f"destroyconfirm{uuid4().hex[:10]}",
+            password="testpass123",
+        )
+        request._messages = messages_storage.default_storage(request)
+        return request
+
+    def test_unconfirmed_post_renders_a_page_and_does_not_delete(self):
+        tenant = _make_tenant(
+            "destroy-unconfirmed",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        admin = self._real_admin()
+        with patch.object(Tenant, "delete") as mock_delete:
+            response = admin.destroy_tenants(
+                self._request(), Tenant.objects.filter(pk=tenant.pk)
+            )
+            mock_delete.assert_not_called()
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert tenant.name in content
+        assert tenant.schema_name in content
+
+    def test_confirmed_post_reaches_the_real_gates(self):
+        tenant = _make_tenant(
+            "destroy-confirmed-flow",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        admin = self._real_admin()
+        with patch.object(Tenant, "delete") as mock_delete:
+            response = admin.destroy_tenants(
+                self._request(post=_CONFIRMED),
+                Tenant.objects.filter(pk=tenant.pk),
+            )
+            mock_delete.assert_called_once_with(force_drop=True)
+        # No confirmation page — the bulk-action view handles the
+        # (falsy) return value itself and redirects.
+        assert response is None
+
+
+# ---------------------------------------------------------------------------
+# Audit trail on lifecycle actions (H2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+class TestLifecycleAuditTrail:
+    """Suspend/activate/destroy must leave BOTH a Django ``LogEntry``
+    (Unfold's History tab) and a ``Tenant.history`` row (django-simple-
+    history) — not just the current field values."""
+
+    def _log_entries_for(self, tenant):
+        from django.contrib.admin.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        return LogEntry.objects.filter(
+            content_type=ContentType.objects.get_for_model(Tenant),
+            object_id=str(tenant.pk),
+        )
+
+    def test_suspend_writes_a_log_entry(self):
+        tenant = _make_tenant("audit-suspend")
+        admin = _admin()
+        request = _admin_request()
+        admin.suspend_tenants(request, Tenant.objects.filter(pk=tenant.pk))
+
+        entries = self._log_entries_for(tenant)
+        assert entries.exists()
+        assert entries.first().user_id == request.user.pk
+
+    def test_suspend_writes_a_historical_record(self):
+        tenant = _make_tenant("audit-suspend-history")
+        admin = _admin()
+        admin.suspend_tenants(
+            _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+        )
+
+        tenant.refresh_from_db()
+        history = tenant.history.order_by("-history_date")
+        assert history.exists()
+        assert history.first().is_active is False
+
+    def test_re_suspend_does_not_duplicate_the_log_entry(self):
+        """``suspend_tenant()`` no-ops on an already-suspended tenant
+        (see ``TestSuspendTenant.test_re_suspend_does_not_reset_
+        suspended_at``) — the admin must not log a change that never
+        happened."""
+        early = timezone.now() - timedelta(hours=25)
+        tenant = _make_tenant(
+            "audit-re-suspend", is_active=False, suspended_at=early
+        )
+        admin = _admin()
+        admin.suspend_tenants(
+            _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+        )
+        assert not self._log_entries_for(tenant).exists()
+
+    def test_activate_writes_a_log_entry(self):
+        tenant = _make_tenant(
+            "audit-activate",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=2),
+        )
+        admin = _admin()
+        request = _admin_request()
+        admin.activate_tenants(request, Tenant.objects.filter(pk=tenant.pk))
+
+        entries = self._log_entries_for(tenant)
+        assert entries.exists()
+        assert entries.first().user_id == request.user.pk
+
+    def test_activate_writes_a_historical_record(self):
+        tenant = _make_tenant(
+            "audit-activate-history",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=2),
+        )
+        admin = _admin()
+        admin.activate_tenants(
+            _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+        )
+
+        tenant.refresh_from_db()
+        history = tenant.history.order_by("-history_date")
+        assert history.exists()
+        assert history.first().is_active is True
+
+    def test_destroy_writes_a_log_entry_before_the_row_is_gone(self):
+        tenant = _make_tenant(
+            "audit-destroy",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        tenant_pk = tenant.pk
+        admin = _admin()
+        request = _admin_request(post=_CONFIRMED)
+
+        with patch.object(Tenant, "delete") as mock_delete:
+            admin.destroy_tenants(request, Tenant.objects.filter(pk=tenant_pk))
+            mock_delete.assert_called_once_with(force_drop=True)
+
+        from django.contrib.admin.models import LogEntry
+        from django.contrib.contenttypes.models import ContentType
+
+        entries = LogEntry.objects.filter(
+            content_type=ContentType.objects.get_for_model(Tenant),
+            object_id=str(tenant_pk),
+        )
+        assert entries.exists()
+        assert entries.first().user_id == request.user.pk
+        assert entries.first().object_repr == str(tenant)

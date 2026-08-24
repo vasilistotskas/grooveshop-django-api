@@ -1,0 +1,65 @@
+{% extends "admin/base_site.html" %}
+{% load i18n unfold %}
+
+{% block breadcrumbs %}
+    <div class="px-4">
+        <div class="container mb-6 mx-auto -my-3 lg:mb-12">
+            <ul class="flex flex-wrap">
+                {% trans "Home" as home_name %}
+                {% include 'unfold/helpers/breadcrumb_item.html' with link=index_url name=home_name %}
+
+                {% include 'unfold/helpers/breadcrumb_item.html' with link=changelist_url name=opts.verbose_name_plural|capfirst %}
+
+                {% include 'unfold/helpers/breadcrumb_item.html' with link='' name=_('Are you sure?') %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}
+
+{% block title %}{% trans "Are you sure?" %}{% endblock %}
+
+{% block content %}
+    <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-2">
+            <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">
+                {% trans "Permanently destroy the selected tenant(s)?" %}
+            </h1>
+            <p class="text-sm font-semibold text-font-important-light dark:text-font-important-dark">
+                {% trans "This drops the Postgres schema and every row inside it — for good. It cannot be undone." %}
+            </p>
+        </div>
+
+        <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
+            <div class="p-6">
+                <h3 class="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                    {% trans "Tenants" %}
+                </h3>
+                <ul class="leading-relaxed list-disc pl-5 text-sm text-gray-900 dark:text-white">
+                    {% for tenant in queryset %}
+                        <li>{{ tenant.name }} ({{ tenant.schema_name }})</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <form method="post" action="{{ changelist_url }}" class="px-6 py-4 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-b-lg">
+                {% csrf_token %}
+
+                <input type="hidden" name="action" value="destroy_tenants">
+                <input type="hidden" name="destroy_confirmed" value="yes">
+                {% for tenant in queryset %}
+                    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ tenant.pk }}">
+                {% endfor %}
+
+                <div class="flex items-center justify-end gap-2">
+                    {% component "unfold/components/button.html" with href=changelist_url variant="secondary" %}
+                        {% trans "Cancel" %}
+                    {% endcomponent %}
+
+                    {% component "unfold/components/button.html" with submit=1 variant="danger" %}
+                        {% trans "Yes, permanently destroy" %}
+                    {% endcomponent %}
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

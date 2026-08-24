@@ -9,6 +9,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_tenants.models import DomainMixin, TenantMixin, _check_schema_name
 from knox.models import AbstractAuthToken
+from simple_history.models import HistoricalRecords
 
 from tenant.validators import (
     validate_reserved_schema_name,
@@ -743,6 +744,35 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "the browser. Empty disables the chat assistant for this "
             "tenant."
         ),
+    )
+
+    # Audit trail for the platform control plane (plan changes,
+    # suspend/activate, credential edits) — so Unfold's History tab
+    # (LogEntry, populated by the admin lifecycle actions) can be
+    # cross-checked against actual field-level diffs. ``tenant`` is
+    # SHARED_APPS-only (public schema), and so is AUTH_USER_MODEL, so
+    # unlike the tenant-schema shipment/Product histories this is a
+    # same-schema FK — no ``user_db_constraint=False`` needed here.
+    # Excludes the live credential/secret fields: duplicating a
+    # merchant's Stripe/ACS/BoxNow/Viva secret into every historical
+    # snapshot (one per save — including every suspend/activate) would
+    # sprawl plaintext secrets into a table with no dedicated retention
+    # or access policy of its own.
+    history = HistoricalRecords(
+        excluded_fields=[
+            "stripe_secret_key",
+            "meta_capi_access_token",
+            "viva_wallet_api_key",
+            "viva_wallet_client_secret",
+            "viva_wallet_webhook_verification_key",
+            "acs_api_key",
+            "acs_company_password",
+            "acs_user_password",
+            "box_now_client_secret",
+            "box_now_webhook_secret",
+            "acp_bearer_token",
+            "chat_api_key",
+        ],
     )
 
     auto_create_schema = True

@@ -35,14 +35,11 @@ from tenant.billing import billing_config, billing_state
 
 # Billing states, in the order an operator should care about them.
 # Presentation per state: (label, unfold label tone, material icon).
-_STATE_BADGES: dict[str, tuple[Any, str, str]] = {
-    "suspended": (_("Suspended"), "danger", "pause_circle"),
-    "past_due": (_("Past due"), "danger", "event_busy"),
-    "expiring": (_("Expires soon"), "warning", "hourglass_top"),
-    "trial": (_("Trial"), "warning", "schedule"),
-    "unbilled": (_("No term recorded"), "info", "contract"),
-    "paid": (_("Paid"), "success", "check_circle"),
-}
+#
+# Canonical map lives in tenant/admin.py (the Tenants changelist's own
+# billing-state badge column) — imported lazily below to avoid a
+# module-load-time circular import, mirroring how ``_billing_table``
+# already borrows ``_PLAN_BADGES``/``_unfold_label`` from there.
 
 
 def _billing_rows(today: date) -> list[dict[str, Any]]:
@@ -82,9 +79,13 @@ def _billing_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
     from django.utils.formats import date_format  # noqa: PLC0415
     from django.utils.safestring import mark_safe  # noqa: PLC0415
 
-    # Same badge map + renderer the Tenants changelist uses, so the two
-    # surfaces cannot drift as tiers change.
-    from tenant.admin import _PLAN_BADGES, _unfold_label  # noqa: PLC0415
+    # Same badge maps + renderer the Tenants changelist uses, so the two
+    # surfaces cannot drift as tiers/states change.
+    from tenant.admin import (  # noqa: PLC0415
+        _PLAN_BADGES,
+        _STATE_BADGES,
+        _unfold_label,
+    )
 
     table_rows = []
     for row in rows:

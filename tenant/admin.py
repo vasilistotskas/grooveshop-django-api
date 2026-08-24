@@ -11,20 +11,33 @@ Safety invariants:
 - Destroy requires the tenant to be suspended (``is_active=False``)
   AND ``suspended_at`` to be at least 24 hours in the past. This
   prevents fat-finger destruction immediately after suspension.
-- Destroy calls ``tenant.delete(force_drop=True)`` which drops the
+- Destroy requires an explicit second confirmation (intermediate page)
+  before it calls ``tenant.delete(force_drop=True)``, which drops the
   Postgres schema and then removes the row. This is irreversible.
 - The default Django ``delete_selected`` bulk action is disabled so
   operators cannot bypass our safety rails via the standard delete path.
+
+Provisioning a NEW tenant (the "New Store" add form) runs the same
+``tenant.provisioning`` steps as ``manage.py tenant_create`` — see
+``save_related`` below — so the two entry points can never drift.
+
+Lifecycle actions also write ``LogEntry``/``HistoricalRecords`` rows
+(``self.log_change``/``self.log_deletions``) so Unfold's History tab and
+``Tenant.history`` are meaningful audit trails, not just current state.
 """
 
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import Any
 
 from django import forms
 from django.contrib import admin, messages
-from django.db import connection
+from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
+from django.db import connection, transaction
 from django.forms.models import ModelChoiceIterator
+from django.shortcuts import render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
@@ -102,6 +115,20 @@ _PLAN_BADGES: dict[str, tuple[str, str]] = {
     "enterprise": ("workspace_premium", "success"),
 }
 
+# Billing state presentation: (label, unfold label tone, material icon),
+# keyed by ``tenant.billing.billing_state()``'s return value. Canonical
+# home for this map — the Plan & Billing page (admin/platform_billing.py)
+# imports it from here (mirroring how it already borrows ``_PLAN_BADGES``)
+# so the two surfaces cannot drift as states change.
+_STATE_BADGES: dict[str, tuple[Any, str, str]] = {
+    "suspended": (_("Suspended"), "danger", "pause_circle"),
+    "past_due": (_("Past due"), "danger", "event_busy"),
+    "expiring": (_("Expires soon"), "warning", "hourglass_top"),
+    "trial": (_("Trial"), "warning", "schedule"),
+    "unbilled": (_("No term recorded"), "info", "contract"),
+    "paid": (_("Paid"), "success", "check_circle"),
+}
+
 
 def _unfold_label(text, tone: str, icon: str | None = None) -> str:
     from django.template.loader import render_to_string  # noqa: PLC0415
@@ -167,6 +194,8 @@ class TenantAdmin(ModelAdmin):
         "display_store",
         "display_plan",
         "display_status",
+        "display_billing_state",
+        "display_last_activity",
         "schema_name",
         "created_at",
     ]
@@ -242,6 +271,59 @@ class TenantAdmin(ModelAdmin):
             _unfold_label(_("Live"), "success", "check_circle")
         )
 
+    @display(description=_("Billing"))
+    def display_billing_state(self, obj):
+        """The same classifier the Plan & Billing page renders (see
+        ``tenant.billing.billing_state``) — surfaced here too so a
+        past-due store is visible without leaving the Tenants list."""
+        from tenant.billing import billing_state  # noqa: PLC0415
+
+        state = billing_state(obj, timezone.localdate())
+        label, tone, icon = _STATE_BADGES[state]
+        return mark_safe(  # noqa: S308 - fixed strings, no user input
+            _unfold_label(str(label), tone, icon)
+        )
+
+    @display(description=_("Last activity"))
+    def display_last_activity(self, obj):
+        """Latest order in the tenant's OWN schema.
+
+        Same ``tenant_context`` + schema-existence guard as the
+        platform dashboard's estate table
+        (``admin/platform_dashboard.py::_tenant_rows``) — a
+        half-provisioned or not-yet-migrated schema must read as
+        "cannot tell" ("—"), not a misleading blank/zero. The
+        platform's own row is skipped outright: ``order`` is a
+        TENANT_APPS-only app, so the public schema has no orders table
+        to query at all.
+        """
+        from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+
+        from admin.platform_dashboard import _schema_exists  # noqa: PLC0415
+
+        if obj.schema_name == get_public_schema_name():
+            return "—"
+        if not _schema_exists(obj.schema_name):
+            return "—"
+
+        from django.apps import apps  # noqa: PLC0415
+        from django_tenants.utils import tenant_context  # noqa: PLC0415
+
+        from admin.displays import format_dt  # noqa: PLC0415
+
+        try:
+            with tenant_context(obj):
+                Order = apps.get_model("order", "Order")
+                latest = (
+                    Order.objects.order_by("-created_at")
+                    .values_list("created_at", flat=True)
+                    .first()
+                )
+        except Exception:  # noqa: BLE001 - never break the changelist
+            return "—"
+
+        return format_dt(latest) if latest is not None else "—"
+
     def get_queryset(self, request):
         """A store operator sees only their own row."""
         qs = super().get_queryset(request)
@@ -299,6 +381,110 @@ class TenantAdmin(ModelAdmin):
         if self_service_tenant(request) is not None:
             return []
         return super().get_inlines(request, obj)
+
+    def save_related(self, request, form, formsets, change):
+        """Provision a brand-new tenant the same way ``tenant_create`` does.
+
+        The stock Unfold "add" form only creates the ``Tenant`` row (and,
+        via ``TenantMixin.save()``, the Postgres schema). Everything a
+        store actually needs to be usable — the ``api.<domain>``
+        TenantDomain, the owner's OWNER membership, and the tenant's
+        default data — used to only happen on the CLI path
+        (``manage.py tenant_create``), so a store created here left its
+        owner locked out and realtime/social-login 404ing. See
+        ``tenant.provisioning`` for the shared steps.
+
+        Runs in ``save_related`` (not ``save_model``) so the
+        ``TenantDomainInline`` primary domain is already persisted —
+        ``ensure_api_domain`` needs it to derive the API host. Deferred
+        to ``transaction.on_commit`` so a Meilisearch/page_config hiccup
+        can never roll back the tenant row itself, and so the
+        provisioning queries (some of which switch into the new
+        tenant's own schema) only run once the row + inline domains are
+        durably committed.
+
+        Guarded to ADD only — editing an existing tenant must never
+        re-derive its API domain or re-grant OWNER membership.
+        """
+        super().save_related(request, form, formsets, change)
+        if change:
+            return
+
+        tenant_pk = form.instance.pk
+        transaction.on_commit(
+            lambda: self._provision_new_tenant(request, tenant_pk)
+        )
+
+    def _provision_new_tenant(self, request, tenant_pk) -> None:
+        from tenant.provisioning import provision_tenant  # noqa: PLC0415
+
+        try:
+            tenant = Tenant.objects.get(pk=tenant_pk)
+        except Tenant.DoesNotExist:  # pragma: no cover - defensive
+            return
+
+        try:
+            result = provision_tenant(tenant)
+        except Exception as exc:  # noqa: BLE001 - never break the add response
+            self.message_user(
+                request,
+                _(
+                    "Tenant created, but automatic provisioning failed: "
+                    "%(error)s. Provision the API domain, owner "
+                    "membership, and defaults manually."
+                )
+                % {"error": str(exc)},
+                level=messages.ERROR,
+            )
+            return
+
+        parts = []
+        if result["api_domain"] is not None:
+            parts.append(
+                _("API domain %(domain)s created.")
+                % {"domain": result["api_domain"]}
+            )
+        else:
+            self.message_user(
+                request,
+                _(
+                    "No primary domain was set — could not derive the "
+                    "API domain (api.<domain>). Add a primary domain, "
+                    "then add the api.<domain> row manually: without "
+                    "it, WebSocket notifications and social login will "
+                    "fail."
+                ),
+                level=messages.WARNING,
+            )
+
+        membership_result = result["membership"]
+        if membership_result is None:
+            self.message_user(
+                request,
+                _(
+                    "No UserAccount exists yet for owner %(email)s — "
+                    "OWNER membership was skipped. Grant it manually "
+                    "once the owner has registered."
+                )
+                % {"email": tenant.owner_email},
+                level=messages.WARNING,
+            )
+        else:
+            _membership, created = membership_result
+            parts.append(
+                _("OWNER membership %(verb)s for %(email)s.")
+                % {
+                    "verb": _("granted") if created else _("updated"),
+                    "email": tenant.owner_email,
+                }
+            )
+
+        if parts:
+            self.message_user(
+                request,
+                " ".join(str(part) for part in parts),
+                level=messages.INFO,
+            )
 
     fieldsets = [
         (
@@ -549,6 +735,7 @@ class TenantAdmin(ModelAdmin):
                 continue
             if suspend_tenant(tenant, reason=SuspendedReason.MANUAL):
                 suspended.append(tenant.name)
+                self.log_change(request, tenant, "Suspended via platform admin")
 
         if skipped:
             self.message_user(
@@ -588,6 +775,7 @@ class TenantAdmin(ModelAdmin):
                 continue
             if activate_tenant(tenant):
                 activated.append(tenant.name)
+                self.log_change(request, tenant, "Activated via platform admin")
 
         if skipped:
             self.message_user(
@@ -617,6 +805,10 @@ class TenantAdmin(ModelAdmin):
 
         Safety gates (all must pass for a tenant to be destroyed):
 
+        0. The operator has explicitly confirmed on an intermediate
+           page (see ``_destroy_confirmation_page``) — a second,
+           deliberate click, not just the one that opened the bulk
+           action dropdown.
         1. Schema is not in ``_PROTECTED`` (public / webside).
         2. Tenant is suspended (``is_active=False``).
         3. ``suspended_at`` is at least 24 hours in the past —
@@ -625,6 +817,9 @@ class TenantAdmin(ModelAdmin):
         This action is **irreversible**. The Postgres schema and all
         tenant data are permanently gone after this runs.
         """
+        if request.POST.get("destroy_confirmed") != "yes":
+            return self._destroy_confirmation_page(request, queryset)
+
         now = timezone.now()
         skipped_protected = []
         skipped_not_suspended = []
@@ -653,6 +848,15 @@ class TenantAdmin(ModelAdmin):
             # All gates passed — drop schema + row.
             try:
                 schema_name = tenant.schema_name
+                # BEFORE delete(): Django 6.0 replaced the old singular
+                # ``log_deletion(request, obj, object_repr)`` with a
+                # queryset-based ``log_deletions(request, queryset)``
+                # (its own docstring: "must be called before the
+                # deletion") — the type stub declares ``queryset`` as
+                # an actual ``QuerySet``, so re-query by pk rather than
+                # pass ``[tenant]`` (which works at runtime — the base
+                # implementation just iterates — but fails ``ty``).
+                self.log_deletions(request, Tenant.objects.filter(pk=tenant.pk))
                 tenant.delete(force_drop=True)
                 destroyed.append(tenant.name)
                 # Evict the destroyed store's processed images from
@@ -699,6 +903,43 @@ class TenantAdmin(ModelAdmin):
                 % {"count": len(destroyed), "names": ", ".join(destroyed)},
                 level=messages.SUCCESS,
             )
+
+    def _destroy_confirmation_page(self, request, queryset):
+        """An explicit, second "are you sure" step before the drop.
+
+        Rendering an intermediate page from a bulk admin action instead
+        of acting immediately is the documented Django extension point
+        for two-step confirmations — the same mechanism the built-in
+        ``delete_selected`` action uses, and the same shape this
+        project already uses for ``ProductAdmin.apply_custom_discount``.
+        The page re-POSTs the SAME action with ``destroy_confirmed=yes``,
+        so nothing short of that second, deliberate click can drop a
+        schema. The cooldown/protected-schema gates in
+        ``destroy_tenants`` still run in full on that second POST — this
+        only adds a step before them, it does not replace them.
+
+        The changelist/index URLs are resolved against
+        ``self.admin_site.name`` rather than hardcoded in the template:
+        this action is platform-only (``get_actions`` strips it for
+        merchants), reached exclusively through ``PlatformAdminSite``
+        (namespace ``platform_admin``), not the merchant ``admin`` site.
+        """
+        opts = self.model._meta
+        site_name = self.admin_site.name
+        context = {
+            **self.admin_site.each_context(request),
+            "title": _("Are you sure?"),
+            "queryset": queryset,
+            "opts": opts,
+            "action_checkbox_name": ACTION_CHECKBOX_NAME,
+            "changelist_url": reverse(
+                f"{site_name}:{opts.app_label}_{opts.model_name}_changelist"
+            ),
+            "index_url": reverse(f"{site_name}:index"),
+        }
+        return render(
+            request, "admin/tenant/destroy_confirmation.html", context
+        )
 
 
 @admin.register(TenantDomain)

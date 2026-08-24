@@ -3,6 +3,26 @@
 
 
 
+## v3.9.0 (2026-08-24)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.8.0 [skip ci] ([`fc4965e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fc4965e59299d9738103de418e7688241e653fbf))
+
+### Features
+
+* feat(contact): add per-tenant feedback submission form + API
+
+New Feedback model in the contact app (per-tenant): rating (1-5),
+category, message, plus optional name/email (anonymous allowed).
+AllowAny create endpoint (POST /api/v1/feedback) mirroring the contact
+form — spam filter, per-IP throttle, and a tenant-routed email
+notification (tenant_contact_email/from). Migration 0004 is a single
+additive CreateModel; UNFOLD sidebar gains a Feedback link.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`450a098`](https://github.com/vasilistotskas/grooveshop-django-api/commit/450a09829a5610ab26211cc8e1a15514b80d43b0))
+
 ## v3.8.0 (2026-08-24)
 
 ### Bug fixes

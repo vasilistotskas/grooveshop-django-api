@@ -93,3 +93,83 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
         extra={"contact_id": contact_id},
     )
     return True
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_feedback_notification_email_task(feedback_id: int) -> bool:
+    """Send a feedback-submission notification email to the tenant.
+
+    Loads the Feedback row by PK, renders a plain-text notification,
+    and dispatches it to the active tenant's public contact inbox.
+
+    Returns True on success, False when the feedback no longer exists
+    or no recipient is configured for the active tenant.
+
+    Subject/name are CRLF-sanitised the same way as the contact-form
+    task (``contact/signals.py::_sanitize_header_value``) — the name
+    is free-text and, while not currently interpolated into the
+    subject, is guarded here so a future subject change stays safe by
+    default.
+    """
+    import re
+
+    from contact.models import Feedback
+
+    _CRLF_RE = re.compile(r"[\r\n\t]+")
+
+    def _sanitize(value: str) -> str:
+        return _CRLF_RE.sub(" ", value).strip()[:200]
+
+    try:
+        feedback = Feedback.objects.get(id=feedback_id)
+    except Feedback.DoesNotExist:
+        logger.warning(
+            "send_feedback_notification_email_task: Feedback #%s not found",
+            feedback_id,
+            extra={"feedback_id": feedback_id},
+        )
+        return False
+
+    recipient = tenant_contact_email()
+    if not recipient:
+        logger.warning(
+            "send_feedback_notification_email_task: no contact email "
+            "configured for the active tenant — skipping",
+            extra={"feedback_id": feedback_id},
+        )
+        return False
+    recipient_list = [recipient]
+
+    safe_name = _sanitize(feedback.name) or "Anonymous"
+    category_display = feedback.get_category_display()
+    subject = _sanitize(
+        f"New Feedback ({feedback.rating}★ {category_display}) submission"
+    )
+    message = (
+        f"Rating: {feedback.rating}/5\n"
+        f"Category: {category_display}\n"
+        f"Name: {safe_name}\n"
+        f"Email: {feedback.email or '—'}\n"
+        f"Message: {feedback.message}"
+    )
+
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=tenant_from_email(),
+        recipient_list=recipient_list,
+        fail_silently=False,
+    )
+
+    logger.info(
+        "Feedback notification email sent for Feedback #%s",
+        feedback_id,
+        extra={"feedback_id": feedback_id},
+    )
+    return True

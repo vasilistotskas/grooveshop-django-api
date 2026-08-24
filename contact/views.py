@@ -6,10 +6,10 @@ from rest_framework import generics
 from rest_framework.permissions import AllowAny
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from contact.models import Contact
-from contact.serializers import ContactWriteSerializer
+from contact.models import Contact, Feedback
+from contact.serializers import ContactWriteSerializer, FeedbackWriteSerializer
 from core.api.serializers import ErrorResponseSerializer
-from core.api.throttling import ContactCreateThrottle
+from core.api.throttling import ContactCreateThrottle, FeedbackCreateThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,33 @@ class ContactCreateView(generics.CreateAPIView):
         tags=["Contact"],
         responses={
             201: ContactWriteSerializer,
+            400: ErrorResponseSerializer,
+        },
+    )
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+
+class FeedbackCreateView(generics.CreateAPIView):
+    queryset = Feedback.objects.all()
+    serializer_class = FeedbackWriteSerializer
+    permission_classes = [AllowAny]
+    # Same throttle stack rationale as ContactCreateView above.
+    throttle_classes = [
+        AnonRateThrottle,
+        UserRateThrottle,
+        FeedbackCreateThrottle,
+    ]
+
+    @extend_schema(
+        operation_id="createFeedback",
+        summary=_("Create a feedback submission"),
+        description=_(
+            "Submit storefront feedback (rating, category, message)."
+        ),
+        tags=["Feedback"],
+        responses={
+            201: FeedbackWriteSerializer,
             400: ErrorResponseSerializer,
         },
     )

@@ -25,6 +25,10 @@ class ContactCreateThrottle(AnonRateThrottle):
     scope = "contact"
 
 
+class FeedbackCreateThrottle(AnonRateThrottle):
+    scope = "feedback"
+
+
 class PaymentAttemptThrottle(UserRateThrottle):
     scope = "payment"
 

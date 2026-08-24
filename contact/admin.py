@@ -9,7 +9,15 @@ from unfold.decorators import display
 
 from admin.displays import format_dt, header_two_line, relative_time
 from admin.export import ExportModelAdmin
-from contact.models import Contact
+from contact.models import Contact, Feedback
+
+FEEDBACK_RATING_VARIANT: dict[str, str] = {
+    "5": "success",
+    "4": "success",
+    "3": "info",
+    "2": "warning",
+    "1": "danger",
+}
 
 CONTACT_PRIORITY_VARIANT: dict[str, str] = {
     "urgent": "danger",
@@ -177,3 +185,84 @@ class ContactAdmin(ExportModelAdmin):
         if diff < timedelta(days=1):
             return "medium", _("Medium")
         return "low", _("Low")
+
+
+@admin.register(Feedback)
+class FeedbackAdmin(ExportModelAdmin):
+    compressed_fields = True
+    warn_unsaved_form = True
+    list_fullwidth = True
+    list_filter_submit = True
+    list_filter_sheet = True
+
+    list_display = [
+        "submitter_info",
+        "rating_display",
+        "category",
+        "message_preview",
+        "feedback_timing",
+    ]
+    list_filter = [
+        "category",
+        "rating",
+        ("created_at", RangeDateTimeFilter),
+    ]
+    search_fields = ["name", "email", "message"]
+    readonly_fields = (
+        "id",
+        "uuid",
+        "created_at",
+        "updated_at",
+    )
+    list_per_page = 25
+    date_hierarchy = "created_at"
+
+    fieldsets = (
+        (
+            _("Submitter"),
+            {
+                "fields": ("name", "email"),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("Feedback"),
+            {
+                "fields": ("rating", "category", "message"),
+                "classes": ("wide",),
+            },
+        ),
+        (
+            _("System Information"),
+            {
+                "fields": ("id", "uuid", "created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    def get_ordering(self, request):
+        return ["-created_at"]
+
+    @display(description=_("Submitter"), header=True, ordering="name")
+    def submitter_info(self, obj):
+        name = obj.name or str(_("Anonymous"))
+        email = obj.email or str(_("(no email)"))
+        return header_two_line(name, email)
+
+    @display(
+        description=_("Rating"),
+        label=FEEDBACK_RATING_VARIANT,
+        ordering="rating",
+    )
+    def rating_display(self, obj):
+        return str(obj.rating), f"{obj.rating}★"
+
+    @admin.display(description=_("Message"))
+    def message_preview(self, obj):
+        full = (obj.message or "").replace("\n", " ").replace("\r", " ")
+        return full[:100] + ("..." if len(full) > 100 else "")
+
+    @admin.display(description=_("Timing"), ordering="created_at")
+    def feedback_timing(self, obj):
+        return f"{format_dt(obj.created_at, fmt='%d/%m/%Y')} ({relative_time(obj.created_at)})"

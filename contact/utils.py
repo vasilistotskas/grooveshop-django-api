@@ -89,3 +89,40 @@ def validate_contact_content(
         )
 
     return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
+
+
+def validate_feedback_content(
+    name: str, email: str, message: str, rating: Any
+) -> dict[str, Any]:
+    errors = {}
+    warnings = []
+
+    if name.strip() and len(name.strip()) < 2:
+        errors["name"] = _("Name must be at least 2 characters long")
+
+    if len(message.strip()) < 10:
+        errors["message"] = _("Message must be at least 10 characters long")
+
+    if len(message) > 5000:
+        errors["message"] = _("Message is too long (maximum 5000 characters)")
+
+    if email.strip():
+        email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(email_pattern, email):
+            errors["email"] = _("Please provide a valid email address")
+        else:
+            email_domain = email.split("@")[-1]
+            if is_disposable_domain(email_domain):
+                errors["email"] = _(
+                    "Disposable / temporary email addresses are not allowed"
+                )
+
+    if not isinstance(rating, int) or isinstance(rating, bool):
+        errors["rating"] = _("Rating must be between 1 and 5")
+    elif not 1 <= rating <= 5:
+        errors["rating"] = _("Rating must be between 1 and 5")
+
+    if detect_spam_patterns(message, email, name):
+        errors["spam"] = _("Message appears to be spam")
+
+    return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}

@@ -1,7 +1,7 @@
 import factory
 
 from contact import signals
-from contact.models import Contact
+from contact.models import Contact, Feedback, FeedbackCategory
 
 
 @factory.django.mute_signals(signals.post_save)
@@ -37,3 +37,32 @@ class ContactFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Contact
         django_get_or_create = ("email",)
+
+
+@factory.django.mute_signals(signals.post_save)
+class FeedbackFactory(factory.django.DjangoModelFactory):
+    name = factory.Faker("name")
+    email = factory.Faker("email")
+    rating = factory.Faker("random_int", min=1, max=5)
+    category = factory.Faker(
+        "random_element",
+        elements=[category.value for category in FeedbackCategory],
+    )
+    message = factory.Faker(
+        "random_element",
+        elements=[
+            "The checkout process was smooth and quick, thank you.",
+            "I love the new product catalog, it's much easier to browse.",
+            "Delivery took longer than expected but support was helpful.",
+            "The website could use a faster search feature overall.",
+            "Great selection of products, will definitely order again.",
+            "Customer support resolved my issue within a few minutes.",
+            "The mobile experience feels slow on my older phone.",
+            "Packaging was excellent and the item arrived undamaged.",
+            "Would love to see more filtering options on category pages.",
+            "Overall a pleasant shopping experience from start to finish.",
+        ],
+    )
+
+    class Meta:
+        model = Feedback

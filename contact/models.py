@@ -1,9 +1,10 @@
 from django.contrib.postgres.indexes import BTreeIndex
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
-from contact.managers import ContactManager
+from contact.managers import ContactManager, FeedbackManager
 from core.models import TimeStampMixinModel, UUIDModel
 
 
@@ -31,4 +32,46 @@ class Contact(
         ordering = ["-created_at"]
         indexes = [
             BTreeIndex(fields=["email"], name="contact_email_ix"),
+        ]
+
+
+class FeedbackCategory(models.TextChoices):
+    GENERAL = "general", _("General")
+    WEBSITE = "website", _("Website & UX")
+    PRODUCTS = "products", _("Products")
+    DELIVERY = "delivery", _("Delivery")
+    SUPPORT = "support", _("Customer support")
+    OTHER = "other", _("Other")
+
+
+class Feedback(
+    TimeStampMixinModel,
+    UUIDModel,
+):
+    name = models.CharField(_("Name"), max_length=100, blank=True, default="")
+    email = models.EmailField(_("Email"), blank=True, default="")
+    rating = models.PositiveSmallIntegerField(
+        _("Rating"), validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    category = models.CharField(
+        _("Category"),
+        max_length=20,
+        choices=FeedbackCategory.choices,
+        default=FeedbackCategory.GENERAL,
+    )
+    message = models.TextField(_("Message"))
+
+    objects: FeedbackManager = FeedbackManager()
+
+    def __str__(self):
+        name = self.name or str(_("Anonymous"))
+        return f"{self.get_category_display()} · {self.rating}★ · {name}"
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Feedback")
+        verbose_name_plural = _("Feedback")
+        ordering = ["-created_at"]
+        indexes = [
+            BTreeIndex(fields=["category"], name="feedback_category_ix"),
+            BTreeIndex(fields=["rating"], name="feedback_rating_ix"),
         ]

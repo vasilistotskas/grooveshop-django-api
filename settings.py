@@ -432,6 +432,7 @@ REST_FRAMEWORK = {
         # in core.api.throttling) — the global anon/user throttles continue to
         # apply on top.
         "contact": None if DEBUG else "5/minute",
+        "feedback": None if DEBUG else "5/minute",
         "payment": None if DEBUG else "10/minute",
         "payment_anon": None if DEBUG else "5/minute",
         "cart_mutation": None if DEBUG else "60/minute",
@@ -2549,6 +2550,13 @@ UNFOLD = {
                         ),
                         "badge": "admin.badges.unread_messages_badge",
                         "badge_variant": "info",
+                    },
+                    {
+                        "title": _("Feedback"),
+                        "icon": "reviews",
+                        "link": reverse_lazy(
+                            "admin:contact_feedback_changelist"
+                        ),
                     },
                 ],
             },

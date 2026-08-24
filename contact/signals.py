@@ -5,7 +5,7 @@ from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from contact.models import Contact
+from contact.models import Contact, Feedback
 
 logger = logging.getLogger(__name__)
 
@@ -34,5 +34,29 @@ def send_email_notification(sender, instance, created, **kwargs):
     transaction.on_commit(
         lambda contact_id=instance.id: (
             send_contact_notification_email_task.delay(contact_id)
+        )
+    )
+
+
+@receiver(
+    post_save,
+    sender=Feedback,
+    dispatch_uid="contact.send_feedback_email_notification",
+)
+def send_feedback_email_notification(sender, instance, created, **kwargs):
+    """Dispatch a feedback-submission notification email via Celery.
+
+    Uses ``transaction.on_commit`` so the Celery task is only enqueued
+    after the Feedback row is committed — the task worker therefore
+    always finds the row when it loads it by PK.
+    """
+    if not created:
+        return
+
+    from contact.tasks import send_feedback_notification_email_task
+
+    transaction.on_commit(
+        lambda feedback_id=instance.id: (
+            send_feedback_notification_email_task.delay(feedback_id)
         )
     )

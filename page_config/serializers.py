@@ -1,8 +1,19 @@
 from __future__ import annotations
 
+from drf_spectacular.utils import extend_schema_field
+from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
+from django.utils.translation import gettext_lazy as _
 
-from page_config.models import NavigationMenu, PageLayout, PageSection
+from core.api.schema import generate_schema_multi_lang
+from core.api.serializers import RequiredDefaultTranslationMixin
+from core.utils.serializers import TranslatedFieldExtended
+from page_config.models import (
+    ContentPage,
+    NavigationMenu,
+    PageLayout,
+    PageSection,
+)
 
 
 class PageSectionSerializer(serializers.ModelSerializer):
@@ -133,3 +144,79 @@ class NavigationMenuSerializer(serializers.ModelSerializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"items": exc.messages}) from exc
         return attrs
+
+
+@extend_schema_field(generate_schema_multi_lang(ContentPage))
+class ContentPageTranslatedFieldsField(TranslatedFieldExtended):
+    pass
+
+
+class ContentPageSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer[ContentPage]
+):
+    translations = ContentPageTranslatedFieldsField(shared_model=ContentPage)
+
+    class Meta:
+        model = ContentPage
+        fields = (
+            "id",
+            "uuid",
+            "slug",
+            "translations",
+            "is_published",
+            "published_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "uuid",
+            "published_at",
+            "created_at",
+            "updated_at",
+        )
+
+
+class ContentPageDetailSerializer(ContentPageSerializer):
+    class Meta(ContentPageSerializer.Meta):
+        fields = (
+            *ContentPageSerializer.Meta.fields,
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        )
+
+
+class ContentPageWriteSerializer(
+    RequiredDefaultTranslationMixin,
+    TranslatableModelSerializer,
+    serializers.ModelSerializer[ContentPage],
+):
+    required_translation_field = "title"
+    translations = ContentPageTranslatedFieldsField(shared_model=ContentPage)
+
+    class Meta:
+        model = ContentPage
+        fields = (
+            "translations",
+            "slug",
+            "is_published",
+            "seo_title",
+            "seo_description",
+            "seo_keywords",
+        )
+
+    def validate_slug(self, value: str) -> str:
+        if not value:
+            raise serializers.ValidationError(_("Slug is required."))
+
+        queryset = ContentPage.objects.filter(slug=value)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise serializers.ValidationError(
+                _("A content page with this slug already exists.")
+            )
+
+        return value

@@ -1,17 +1,33 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
+from parler.fields import TranslationsForeignKey
+from parler.models import TranslatableModel, TranslatedFieldsModel
+from tinymce.models import HTMLField
 
+from core.managers import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 from core.models import (
     PublishableManager,
     PublishableModel,
+    SeoModel,
     SortableModel,
     TimeStampMixinModel,
     UUIDModel,
 )
+from core.utils.sanitize import sanitize_html
+
+if TYPE_CHECKING:
+    from typing import Self
 
 
 class ComponentType(models.TextChoices):
@@ -203,3 +219,102 @@ class NavigationMenu(TimeStampMixinModel, UUIDModel):
 
     def __str__(self) -> str:
         return f"{self.get_slot_display()} navigation"
+
+
+class ContentPageQuerySet(TranslatableOptimizedQuerySet):
+    """Optimized QuerySet for ContentPage.
+
+    Mirrors ``core.models.PublishedQuerySet.published()`` — the base
+    ``PublishableManager`` isn't parler-aware, so ContentPage needs its
+    own manager stack (matching ``blog.managers.post.BlogPostManager``)
+    to keep ``.published()`` and ``.with_translations()`` composable.
+    """
+
+    def published(self) -> Self:
+        now = timezone.now()
+        return self.filter(
+            Q(published_at__lte=now, is_published=True)
+            | Q(published_at__isnull=True, is_published=True)
+        )
+
+    def for_list(self) -> Self:
+        return self.with_translations()
+
+    def for_detail(self) -> Self:
+        return self.for_list()
+
+
+class ContentPageManager(TranslatableOptimizedManager):
+    queryset_class = ContentPageQuerySet
+
+    def get_queryset(self) -> ContentPageQuerySet:
+        return ContentPageQuerySet(self.model, using=self._db)
+
+    def for_list(self) -> ContentPageQuerySet:
+        return self.get_queryset().for_list()
+
+    def for_detail(self) -> ContentPageQuerySet:
+        return self.get_queryset().for_detail()
+
+    def published(self) -> ContentPageQuerySet:
+        return self.get_queryset().published()
+
+
+class ContentPage(
+    TranslatableModel,
+    SeoModel,
+    TimeStampMixinModel,
+    PublishableModel,
+    UUIDModel,
+):
+    """Merchant-editable, translatable content page.
+
+    Covers store-policy pages a merchant owns end-to-end (return
+    policy, terms, privacy, FAQ, about, shipping info) — a plain
+    slug + rich-text body, unlike ``PageLayout`` (a builder of
+    component SECTIONS for structured pages like the homepage).
+    """
+
+    slug = models.SlugField(_("Slug"), max_length=255, unique=True)
+
+    objects: ContentPageManager = ContentPageManager()
+
+    class Meta(TypedModelMeta):
+        verbose_name = _("Content Page")
+        verbose_name_plural = _("Content Pages")
+        ordering = ["slug"]
+        indexes = [
+            *TimeStampMixinModel.Meta.indexes,
+            *PublishableModel.Meta.indexes,
+        ]
+
+    def __str__(self) -> str:
+        title = self.safe_translation_getter("title", any_language=True)
+        return title or self.slug
+
+
+class ContentPageTranslation(TranslatedFieldsModel):
+    master = TranslationsForeignKey(
+        "page_config.ContentPage",
+        on_delete=models.CASCADE,
+        related_name="translations",
+        null=True,
+    )
+    title = models.CharField(_("Title"), max_length=255, blank=True, default="")
+    body = HTMLField(_("Body"), blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        if self.body:
+            self.body = sanitize_html(self.body)
+        super().save(*args, **kwargs)
+
+    class Meta:
+        app_label = "page_config"
+        db_table = "page_config_contentpage_translation"
+        unique_together = ("language_code", "master")
+        verbose_name = _("Content Page Translation")
+        verbose_name_plural = _("Content Page Translations")
+
+    def __str__(self) -> str:
+        title = self.title or "Untitled"
+        return f"{title} ({self.language_code})"

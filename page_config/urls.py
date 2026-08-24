@@ -1,6 +1,7 @@
 from django.urls import path
 
 from page_config.views import (
+    ContentPageViewSet,
     NavigationMenuAdminViewSet,
     PageLayoutAdminViewSet,
     public_navigation,
@@ -10,6 +11,23 @@ from page_config.views import (
 app_name = "page_config"
 
 urlpatterns = [
+    path(
+        "content-page",
+        ContentPageViewSet.as_view({"get": "list", "post": "create"}),
+        name="content-page-list",
+    ),
+    path(
+        "content-page/<slug:slug>",
+        ContentPageViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
+        name="content-page-detail",
+    ),
     # Fixed routes must come before the catch-all <str:page_type>
     path(
         "page-config/navigation",

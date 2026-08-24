@@ -2,9 +2,15 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 
-from admin.base import BaseModelAdmin
+from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 
-from page_config.models import NavigationMenu, PageLayout, PageSection
+from page_config.models import (
+    ContentPage,
+    ContentPageTranslation,
+    NavigationMenu,
+    PageLayout,
+    PageSection,
+)
 
 
 class PageSectionInline(TabularInline):
@@ -86,3 +92,59 @@ class NavigationMenuAdmin(BaseModelAdmin):
 
         validate_navigation_items(obj.slot, obj.items)
         super().save_model(request, obj, form, change)
+
+
+class ContentPageTranslationInline(TabularInline):
+    model = ContentPageTranslation
+    extra = 0
+    fields = ("language_code", "title")
+    show_change_link = True
+
+    tab = True
+
+
+@admin.register(ContentPage)
+class ContentPageAdmin(BaseTranslatableAdmin):
+    list_display = (
+        "title_display",
+        "slug",
+        "is_published",
+        "updated_at",
+    )
+    list_filter = ("is_published",)
+    list_editable = ("is_published",)
+    search_fields = ("translations__title", "slug")
+    readonly_fields = ("id", "uuid", "created_at", "updated_at")
+
+    fieldsets = (
+        (
+            _("Content"),
+            {"fields": ("title", "body"), "classes": ("wide",)},
+        ),
+        (
+            _("Organization"),
+            {"fields": ("slug", "is_published"), "classes": ("wide",)},
+        ),
+        (
+            _("SEO"),
+            {
+                "fields": ("seo_title", "seo_description", "seo_keywords"),
+                "classes": ("collapse",),
+            },
+        ),
+        (
+            _("System"),
+            {
+                "fields": ("id", "uuid", "created_at", "updated_at"),
+                "classes": ("collapse",),
+            },
+        ),
+    )
+
+    inlines = [ContentPageTranslationInline]
+
+    @admin.display(description=_("Title"), ordering="translations__title")
+    def title_display(self, obj):
+        return obj.safe_translation_getter("title", any_language=True) or (
+            obj.slug
+        )

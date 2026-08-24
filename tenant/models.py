@@ -88,6 +88,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # db_index) mirrors the base field exactly; only the validators
     # list changes.
     schema_name = models.CharField(
+        _("Schema name"),
         max_length=63,
         unique=True,
         db_index=True,

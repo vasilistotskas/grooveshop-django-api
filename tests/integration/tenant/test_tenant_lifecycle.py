@@ -18,7 +18,7 @@ import pytest
 from django.contrib.messages import storage as messages_storage
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.utils import timezone
+from django.utils import timezone, translation
 
 from tenant.admin import TenantAdmin
 from tenant.models import Tenant
@@ -200,14 +200,23 @@ class TestTenantDeleteProtection:
         public_tenant = _make_tenant("public-del-test")
         # Patch schema_name to the protected value
         public_tenant.schema_name = "public"
-        # Don't save — just test the delete method guard
-        with pytest.raises(ValidationError, match="protected system tenant"):
+        # Don't save — just test the delete method guard. The message
+        # goes through gettext and the project's default locale is
+        # Greek, so pin English rather than bet on the translation
+        # catalogue.
+        with (
+            translation.override("en"),
+            pytest.raises(ValidationError, match="protected system tenant"),
+        ):
             public_tenant.delete()
 
     def test_delete_webside_raises_validation_error(self):
         webside_tenant = _make_tenant("webside-del-test")
         webside_tenant.schema_name = "webside"
-        with pytest.raises(ValidationError, match="protected system tenant"):
+        with (
+            translation.override("en"),
+            pytest.raises(ValidationError, match="protected system tenant"),
+        ):
             webside_tenant.delete()
 
     def test_delete_regular_tenant_does_not_raise(self):

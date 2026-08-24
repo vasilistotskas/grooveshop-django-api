@@ -15,6 +15,20 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.utils.translation import gettext_lazy as _
+
+# ``gettext_lazy`` under its module-level canonical name, not a local
+# ``gettext as _g`` alias: xgettext's keyword scan (what
+# ``makemessages`` drives) only recognises the standard names
+# (``_``, ``gettext``, ``gettext_lazy``, ...) called directly — an
+# aliased import is invisible to it, so every string built that way
+# was silently unextractable and only "worked" for the handful of
+# labels (Store, Suspended, ...) that happen to share a msgid with an
+# already-extracted string elsewhere (e.g. tenant/admin.py). "Schema"
+# has no such twin, which is why that column stayed English even
+# after translating everything else. Same fix ``platform_billing.py``
+# already applies to this exact trap — see its own comment.
+
 
 def _tenant_rows() -> list[dict[str, Any]]:
     """One row per tenant, with its order count and revenue."""
@@ -92,22 +106,20 @@ def _tenants_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
     component escapes ``content``, so a tenant-supplied store name can
     never inject markup into the control plane.
     """
-    from django.utils.translation import gettext as _g  # noqa: PLC0415
-
     from admin.displays import money  # noqa: PLC0415
 
     table_rows = []
     for row in rows:
         if row["suspended"]:
             status = {
-                "content": _g("Suspended"),
+                "content": _("Suspended"),
                 "class": "text-red-600 dark:text-red-400 font-semibold",
             }
         elif not row["is_active"]:
-            status = {"content": _g("Inactive"), "class": "text-base-500"}
+            status = {"content": _("Inactive"), "class": "text-base-500"}
         else:
             status = {
-                "content": _g("Live"),
+                "content": _("Live"),
                 "class": "text-green-600 dark:text-green-400 font-semibold",
             }
 
@@ -128,13 +140,13 @@ def _tenants_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
     return {
         "headers": [
-            _g("Store"),
-            _g("Domain"),
-            _g("Schema"),
-            _g("Plan"),
-            _g("Status"),
-            _g("Orders"),
-            _g("Revenue"),
+            _("Store"),
+            _("Domain"),
+            _("Schema"),
+            _("Plan"),
+            _("Status"),
+            _("Orders"),
+            _("Revenue"),
         ],
         "rows": table_rows,
     }

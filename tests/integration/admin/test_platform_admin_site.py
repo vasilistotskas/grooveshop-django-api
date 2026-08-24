@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import Resolver404, resolve
+from django.utils import translation
 
 from admin.platform_site import (
     PLATFORM_APP_LABELS,
@@ -332,7 +333,12 @@ class TestPlatformDashboardPage(TestCase):
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_renders(self):
-        assert "Control plane" in self._render()
+        """Locale-pinned: "Control plane" goes through gettext and the
+        admin renders in the project's default (Greek) locale — see
+        ``test_shows_the_tenant_estate`` for why a label assertion is
+        otherwise a bet on the translation catalogue."""
+        with translation.override("en"):
+            assert "Control plane" in self._render()
 
     @override_settings(ROOT_URLCONF="tenant.urls_public")
     def test_does_not_render_the_store_dashboard(self):
@@ -366,9 +372,12 @@ class TestPlatformDashboardPage(TestCase):
 
         These two labels exist only in ``UNFOLD_PLATFORM``'s navigation
         — no model's verbose name matches them — so they are absent
-        unless the curated sidebar really rendered.
+        unless the curated sidebar really rendered. Locale-pinned to
+        English for the same reason as ``test_renders``: both labels
+        are translated in the project's default (Greek) locale.
         """
-        html = self._render()
+        with translation.override("en"):
+            html = self._render()
         for label in ("Platform Staff", "Scheduled Tasks"):
             assert label in html, f"curated sidebar missing {label!r}"
 

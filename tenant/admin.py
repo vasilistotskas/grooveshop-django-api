@@ -503,7 +503,7 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Plan & Billing",
+            _("Plan & Billing"),
             {
                 "fields": [
                     "plan",
@@ -515,7 +515,7 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Branding",
+            _("Branding"),
             {
                 "fields": [
                     "store_name",
@@ -529,7 +529,7 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Theme",
+            _("Theme"),
             {
                 "fields": [
                     "primary_color",
@@ -545,11 +545,11 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Features",
+            _("Features"),
             {"fields": ["loyalty_enabled", "blog_enabled"]},
         ),
         (
-            "Analytics",
+            _("Analytics"),
             {
                 "fields": [
                     "meta_pixel_id",
@@ -562,7 +562,7 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Social Links",
+            _("Social Links"),
             {
                 "fields": [
                     "socials_discord",
@@ -578,7 +578,7 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Email",
+            _("Email"),
             {
                 "fields": [
                     "from_email",
@@ -588,14 +588,14 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Authentication",
+            _("Authentication"),
             {
                 "fields": ["totp_issuer"],
                 "classes": ["collapse"],
             },
         ),
         (
-            "Agentic Commerce",
+            _("Agentic Commerce"),
             {
                 "fields": [
                     "chat_api_key",
@@ -606,14 +606,14 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Security",
+            _("Security"),
             {
                 "fields": ["allowed_csp_sources"],
                 "classes": ["collapse"],
             },
         ),
         (
-            "Payments — Viva Wallet",
+            _("Payments — Viva Wallet"),
             {
                 "fields": [
                     "viva_wallet_merchant_id",
@@ -628,7 +628,7 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Shipping — ACS",
+            _("Shipping — ACS"),
             {
                 "fields": [
                     "acs_api_key",
@@ -643,7 +643,7 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Shipping — BoxNow",
+            _("Shipping — BoxNow"),
             {
                 "fields": [
                     "box_now_partner_id",
@@ -657,7 +657,7 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Payments — Stripe",
+            _("Payments — Stripe"),
             {
                 "fields": [
                     "stripe_publishable_key",
@@ -667,7 +667,7 @@ class TenantAdmin(ModelAdmin):
             },
         ),
         (
-            "Timestamps",
+            _("Timestamps"),
             {
                 "fields": ["created_at", "updated_at"],
                 "classes": ["collapse"],
@@ -735,7 +735,9 @@ class TenantAdmin(ModelAdmin):
                 continue
             if suspend_tenant(tenant, reason=SuspendedReason.MANUAL):
                 suspended.append(tenant.name)
-                self.log_change(request, tenant, "Suspended via platform admin")
+                self.log_change(
+                    request, tenant, str(_("Suspended via platform admin"))
+                )
 
         if skipped:
             self.message_user(
@@ -775,7 +777,9 @@ class TenantAdmin(ModelAdmin):
                 continue
             if activate_tenant(tenant):
                 activated.append(tenant.name)
-                self.log_change(request, tenant, "Activated via platform admin")
+                self.log_change(
+                    request, tenant, str(_("Activated via platform admin"))
+                )
 
         if skipped:
             self.message_user(

@@ -6,6 +6,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.utils import translation
 
 from tenant.models import (
     Tenant,
@@ -423,10 +424,16 @@ def test_stripe_secret_key_mode_mismatch_raises():
         stripe_secret_key="sk_live_abc",
         stripe_publishable_key="pk_test_abc",
     )
-    with pytest.raises(ValidationError) as exc_info:
-        t.clean()
-    msg = " ".join(exc_info.value.message_dict["stripe_secret_key"])
-    assert "mode" in msg.lower()
+    # The validation message is a lazy gettext string, rendered to
+    # text on ``message_dict`` access — not at raise time — and the
+    # project's default locale is Greek, so the whole read (raise AND
+    # ``message_dict`` access) must happen inside the override, or the
+    # assertion below is a bet on the translation catalogue.
+    with translation.override("en"):
+        with pytest.raises(ValidationError) as exc_info:
+            t.clean()
+        msg = " ".join(exc_info.value.message_dict["stripe_secret_key"])
+        assert "mode" in msg.lower()
 
 
 def test_stripe_secret_key_matching_modes_are_valid():

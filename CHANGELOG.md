@@ -3,6 +3,123 @@
 
 
 
+## v3.8.0 (2026-08-24)
+
+### Bug fixes
+
+* fix(tenant): capture missing verbose_name migration for schema_name
+
+Tenant.schema_name gained verbose_name=_("Schema name") without a
+migration, so makemigrations --check --dry-run failed on main. ([`08c4503`](https://github.com/vasilistotskas/grooveshop-django-api/commit/08c45032debdea0c28dfa902dc9cf6b455332665))
+
+* fix(admin,i18n): make the platform control-plane admin consistently Greek
+
+The platform admin rendered mixed English/Greek. Three causes, all fixed:
+- Many nav/dashboard/billing/model-field msgids had empty Greek msgstr
+  (silent English fallback) — filled in (183 translations in el.po).
+- tenant/admin.py fieldset section titles were raw string literals, never
+  wrapped in gettext — wrapped in _().
+- admin/platform_dashboard.py used a local `gettext as _g` alias that
+  makemessages/xgettext cannot extract (only canonical _/gettext names
+  are), so e.g. the "Schema" column never became translatable — switched
+  to a module-level `gettext_lazy as _` (matching platform_billing.py).
+- Added the missing verbose_name to Tenant.schema_name.
+
+Fixed 3 pre-existing tests that hardcoded English admin text, using the
+codebase's translation.override("en") pattern. compilemessages runs in the
+Dockerfile builder, so translations take effect on the next image build.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`55a0a4f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/55a0a4fe91c8b6ac7c420f37523c1ba63bfcd897))
+
+### Chores
+
+* chore(api): regenerate OpenAPI schema for ContentPage
+
+uv run python manage.py spectacular --color --file schema.yml
+Adds /api/v1/content-page{,/{slug}} paths and the ContentPage/
+ContentPageDetail/ContentPageWriteRequest schemas. Nuxt side (pnpm
+openapi-ts) is a follow-up, not part of this change. ([`00bc3d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00bc3d20a70d6b8e0ce677b1fc4bfb9e8886b069))
+
+* chore(deps): sync uv.lock to 3.7.0 [skip ci] ([`ccaddb7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ccaddb7c87d818b616e2429fe88b7459018a10a7))
+
+### Features
+
+* feat(page_config): seed default content pages per tenant + backfill
+
+New tenants get six unpublished placeholder ContentPages (return-
+policy, terms, privacy, faq, about, shipping-info) via
+tenant.provisioning.seed_tenant_defaults -> page_config.defaults.
+seed_content_pages(), idempotent get_or_create by slug, best-effort
+like the other seed steps.
+
+A data migration (0007) applies the identical defaults to every
+EXISTING tenant schema (including live webside) via migrate_schemas,
+since page_config is TENANT_APPS-only. The seed data is duplicated in
+the migration rather than imported from page_config.defaults, mirroring
+shipping/migrations/0002_seed_providers.py: a historical migration must
+not depend on live app code that can change shape later. Guarded
+(no-op) against the public schema for defense in depth, even though
+migrate_schemas never runs TENANT_APPS-only migrations there today. ([`5241d0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5241d0f5d43bed018bd5e62a3ee42950d8bb15aa))
+
+* feat(page_config): add merchant-editable ContentPage model + API
+
+Translatable (django-parler) store-policy pages (return-policy, terms,
+privacy, faq, about, shipping-info) — a plain slug + TinyMCE body,
+composed from TranslatableModel/SeoModel/TimeStampMixinModel/
+PublishableModel/UUIDModel like blog.BlogPost.
+
+- Model + manager (ContentPageQuerySet.published(), for_list/for_detail)
+  in page_config/models.py, registered in the merchant admin via
+  BaseTranslatableAdmin (TinyMCE picked up automatically through
+  BaseModelAdmin.formfield_overrides).
+- List/Detail/Write serializers via TranslatableModelSerializer +
+  RequiredDefaultTranslationMixin (title required for the default
+  language).
+- ContentPageViewSet(BaseModelViewSet), lookup_field="slug": public
+  reads (AllowAny) only see published pages; create/update/destroy
+  require StoreStaffModelPermissions — the same split as
+  BlogPostViewSet, not the project's blanket
+  IsAuthenticatedOrReadOnly default (which would let any signed-in
+  customer rewrite the store's Terms/Privacy page).
+- Routes: GET/POST /api/v1/content-page, GET/PUT/PATCH/DELETE
+  /api/v1/content-page/<slug>.
+
+page_config is TENANT_APPS-only and not in PLATFORM_APP_LABELS, so
+ContentPage is automatically absent from the platform control-plane
+admin — no extra wiring needed there. ([`918150a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/918150a4c930abeffe8fcee8c762f61a8f233c97))
+
+### Testing
+
+* test(page_config): cover ContentPage model, API, and seed/backfill
+
+- Model: slug uniqueness, translations, __str__ fallback, published()
+  manager (incl. null published_at branch).
+- ViewSet: anonymous GET published-by-slug; unpublished/nonexistent
+  slug 404 for anon; list hides unpublished from anon but not staff;
+  create is denied for anon/non-staff and allowed for staff.
+- page_config.defaults.seed_content_pages(): creates the 6 default
+  slugs unpublished, idempotent, never overwrites a merchant's edits.
+- Migration 0007's RunPython directly (importlib, no migration-testing
+  harness in this repo): seeds, idempotent, skips the public schema,
+  and its reverse only removes the default slugs. ([`c6fef75`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6fef7565463b1782b666d547271c9c7ee2f2f99))
+
+* test: speed up the local suite with --reuse-db + synchronous_commit=off
+
+The suite rebuilt the test DB from scratch every run, replaying all 285
+migrations once per xdist worker — ~13-20 min of pure setup.
+
+- --reuse-db (addopts): keep each worker's test DB between runs so the
+  migration replay only happens on a cold build; pass --create-db after
+  adding a migration. Safe for CI (its Postgres container is fresh each
+  run, nothing to reuse). Measured: warm targeted run ~9s vs ~13.5m cold.
+- synchronous_commit=off on the test DB session: crash-safe (a throwaway
+test DB never needs the last un-fsync'd commits) and cuts commit/DDL
+  latency across migration replay + per-test transaction churn.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`e065aef`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e065aef8d3d46d9d1d6ed138a936a7466e01657d))
+
 ## v3.7.0 (2026-08-24)
 
 ### Bug fixes

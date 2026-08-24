@@ -200,8 +200,15 @@ settings.DATABASES["default"]["CONN_MAX_AGE"] = 0
 # pyproject.toml, so removing the per-statement guard does not let a
 # real hang slip through silently.
 _test_db_options = dict(settings.DATABASES["default"].get("OPTIONS", {}))
+# ``synchronous_commit=off`` lets Postgres ack a COMMIT before the WAL record
+# is fsync'd to disk. It is crash-safe (no corruption — at most a few of the
+# very last commits are lost on a crash, which a throwaway test DB never
+# needs), and it markedly cuts commit/DDL latency across the migration replay
+# and the per-test transaction churn. Set per-session here so it applies to the
+# test DB only, never production.
 _test_db_options["options"] = (
     "-c statement_timeout=0 -c idle_in_transaction_session_timeout=0"
+    " -c synchronous_commit=off"
 )
 # Disable the psycopg connection pool for the test suite. Pooling
 # extends connection lifetimes per-process so that ``conn.close()`` on

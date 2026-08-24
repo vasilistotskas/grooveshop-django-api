@@ -1,7 +1,15 @@
-# API staff identity (deferred design)
+# API staff identity
 
-**Status:** deferred, not implemented. Recorded 2026-08-21 so the
-decision is not re-derived from scratch.
+**Status:** implemented in v3.4.0 (2026-08-22). This document is kept as
+the design record; the sections below describing the design as "deferred"
+are historical. The shipped implementation lives in `tenant/staff_api.py`
+(`PlatformStaffLoginView` / `PlatformStaffLogoutView`), `tenant/api_tokens.py`
+(`PlatformStaffTokenAuthentication`), and the `PlatformStaffToken` model
+(`tenant/migrations/0017_platformstafftoken.py`) — a Knox `AbstractAuthToken`
+subclass in the SHARED-only `tenant` app, exactly as prescribed below.
+A follow-up (`fix(audit): stop cross-schema attribution FKs from breaking
+staff writes`) closed the cross-schema-FK prerequisite noted later in this
+doc.
 
 **Question it answers:** how does a *store operator* get programmatic
 (API) write access to their own store?

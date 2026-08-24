@@ -116,12 +116,14 @@ def _consent_granted(order: Order) -> bool:
 def is_capi_enabled() -> bool:
     """Master kill switch: ``META_CAPI_ENABLED`` extra_settings row.
 
-    Also requires both ``META_PIXEL_ID`` and ``META_CAPI_ACCESS_TOKEN``
-    env vars to be set — flipping the toggle alone without those
-    would otherwise produce a flood of FAILED log rows from the
-    Celery dispatcher (config errors are non-retryable). Treating
-    missing config as "disabled" keeps the audit table clean and
-    lets ops stage credentials before flipping the toggle.
+    Also requires both a Meta Pixel ID and a Meta CAPI access token to
+    be configured on the active tenant (``Tenant.meta_pixel_id`` /
+    ``Tenant.meta_capi_access_token`` — tenant-only, no platform/env
+    fallback; see ``tenant/credentials.py``). Flipping the toggle alone
+    without those would otherwise produce a flood of FAILED log rows from
+    the Celery dispatcher (config errors are non-retryable). Treating
+    missing config as "disabled" keeps the audit table clean and lets ops
+    stage credentials before flipping the toggle.
 
     Re-evaluated on every dispatch — operators flipping the toggle
     in the Django admin take effect on the next event, modulo

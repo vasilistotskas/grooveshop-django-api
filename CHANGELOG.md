@@ -3,6 +3,184 @@
 
 
 
+## v3.7.0 (2026-08-24)
+
+### Bug fixes
+
+* fix(tenant): provision New Store admin tenants, not just tenant_create
+
+H1 (critical): the stock "New Store" add form in TenantAdmin only
+created the Tenant row + Postgres schema — the owner had no
+membership (locked out of the admin) and no api.<domain>
+TenantDomain row existed (WebSocket notifications close 4004, social
+login 404s at the form POST). TenantAdmin.save_related now runs the
+same tenant.provisioning steps as tenant_create (deferred to
+transaction.on_commit, guarded to ADD only), surfacing an
+info/warning summary of what was provisioned.
+
+H2: suspend/activate/destroy now write LogEntry rows
+(self.log_change / self.log_deletions — Django 6.0 renamed the old
+singular log_deletion to a queryset-based log_deletions, called
+before the row is dropped) so Unfold's History tab is meaningful, and
+Tenant gains django-simple-history tracking (HistoricalRecords,
+excluding the live credential/secret fields so they never sprawl into
+history rows). Purely additive migration (new HistoricalTenant table
+only).
+
+Quick wins: destroy_tenants now requires an explicit second
+confirmation (an intermediate page, the same two-step pattern this
+project already uses for ProductAdmin.apply_custom_discount) before
+the irreversible schema drop; the Tenants changelist gains Billing
+and Last activity columns (billing state reuses the Plan & Billing
+page's classifier/badges, now sourced from tenant/admin.py as the
+canonical map).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`bf4fcaf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bf4fcafa04c495d11364f296ef999738e3ed9902))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.6.4 [skip ci] ([`36ac52e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/36ac52eeb0e0f31ab1af9a02b93a209fd704ce86))
+
+### Documentation
+
+* docs(email): remove references to nonexistent files
+
+core/email/README.md and DOCUMENTATION_INDEX.md referenced
+test_config.py, test_email_templates.py, test_everything.py,
+check_categories.py, verify_system.py, and REFACTORING_SUMMARY.md -
+none of which exist in core/email/. Pointed the test instructions at
+the real pytest suite instead (tests/unit/core/email/,
+tests/integration/core/email/) and dropped the dead REFACTORING_
+SUMMARY.md references. Kept the accurate
+/admin/email-templates/management/ reference.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`57bedd7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/57bedd76ceb4733599b8fd7edba7dda96f783708))
+
+* docs(search): fix CONTAINS operator type-validation claim
+
+_add_contains_filter (meili/querysets.py:307-315) validates that the
+VALUE passed to __contains is a string — it does not check the
+field's type. final_price__contains="99" (a string value) does not
+raise; only a non-string value like final_price__contains=99 (an int)
+does. The doc claimed the opposite (CONTAINS on a "numeric/boolean/
+date field" raises TypeError) in five separate places, including a
+unit test example that would fail against the real code. Reworded all
+of them and fixed the accompanying test/troubleshooting examples to
+use a non-string value.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`14c2f7f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/14c2f7fc0fce2a767376c3070296862ab3363a3a))
+
+* docs(search): correct search API doc against actual views/urls
+
+docs/api/search.md described an API that never existed: fictional
+api.grooveshop.com host, /api/search/products and /api/search/blog-posts
+paths, min_price/max_price/in_stock params, and a fictional GitHub org.
+Rewrote it against search/urls.py + search/views.py:
+
+- Base path is api/v1/ on api.webside.gr
+- Real endpoints: search/product (singular), search/blog/post
+- Real product filters: price_min/price_max, categories,
+  attribute_values, likes_min, views_min - no in_stock
+- search/analytics requires IsPlatformSuperuser
+- Added the two previously-undocumented endpoints: search/click and
+  search/trending
+- Fixed the OpenAPI schema URL (api/v1/schema, not /schema.yml) and
+  the GitHub/support links to point at the real repo
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`4c478e6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4c478e64ed9b8aff46e3d98e1ddda912848b9f53))
+
+* docs: mark MULTI_TENANT_AUDIT.md as superseded
+
+The findings are historical — H1-H3/M1-M9 and the listed criticals
+(e.g. celery-tenant-task, Cart-IDOR) were closed in the 2026-08-23/24
+multi-tenant hardening pass. Kept for history only; not deleted.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`2563e8b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2563e8ba43628da66dacd66eb62ef7a671e7a2dc))
+
+* docs(order): resync line anchors in order-system.md
+
+Anchors drifted after the OrderService.create_order removal shifted
+everything below it by ~112 lines. Re-verified every anchor against
+current code (create_order_from_cart, _offline, update_order_status,
+the OrderStatus transition table, handle_stripe_payment_succeeded,
+handle_stripe_charge_refunded, Viva _handle_payment_created + row
+lock, ACS create_voucher_for_order) and folded section 3 from three
+entry points down to the two that actually exist. Bumped "Last
+refresh" to 2026-08-24.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`12cb782`](https://github.com/vasilistotskas/grooveshop-django-api/commit/12cb782c5c6b9f3fd36fb8b8a02f9569561f4cdd))
+
+* docs: correct stale multi-tenant status in two doc blocks
+
+- api-staff-identity.md: the design is no longer "deferred" — it shipped
+  in v3.4.0 (PlatformStaffLoginView/LogoutView, PlatformStaffToken). Mark
+  it implemented and point at the code; keep the design body as history.
+- meta_capi/services.py: is_capi_enabled() docstring still described
+  META_PIXEL_ID / META_CAPI_ACCESS_TOKEN as env vars. They are now
+  per-tenant Tenant fields (no platform/env fallback) — reword to match
+  the shipped per-tenant credential model.
+
+Comments/docs only; no behavior change.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`52612db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/52612db978dc25f8f30ff9ff8c39583fb59e0d35))
+
+### Features
+
+* feat(admin): show per-tenant revenue on the platform dashboard
+
+_tenant_rows() set row["revenue"] = None but nothing computed or
+rendered it. Compute it the same way the per-store merchant dashboard
+already does (admin/dashboard.py::_zone_b_ops_charts) — Sum(paid_amount)
+over completed orders, inside the existing tenant_context +
+_schema_exists guard — and render a Revenue column in _tenants_table.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`48d69e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/48d69e3ea7ef0e301e580a648631eb6e07bc3bfc))
+
+### Refactoring
+
+* refactor(tenant): extract shared post-row tenant provisioning
+
+`tenant_create`'s owner-membership/api-domain/seed-defaults logic
+only ran on the CLI path. Move it into `tenant/provisioning.py`
+(`ensure_api_domain`, `provision_owner_membership`,
+`seed_tenant_defaults`, `provision_tenant`) so `TenantAdmin`'s "New
+Store" add form can reuse the exact same steps in the next commit,
+instead of drifting from the CLI behind a second implementation.
+`tenant_create` itself now delegates to the shared functions;
+behavior and stdout messaging are unchanged (existing command tests
+still pass, plus new unit coverage for the extracted module and a
+happy-path regression for the command).
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`f0f579f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f0f579f738000b7f09ffc859afca08489f8e8917))
+
+* refactor(order): remove dead OrderService.create_order
+
+Zero production callers — the two live checkout paths are
+create_order_from_cart and create_order_from_cart_offline. Removes the
+~110-line legacy method plus the tests that existed solely to exercise
+it (test_create_order / test_create_order_insufficient_stock variants
+across test_service.py, test_service_order.py, test_exception_types.py,
+test_custom_exceptions_not_reraised.py). Other tests in those files
+that used create_order only as a fixture helper to build an order for
+exercising still-live OrderService methods (update_order_status,
+cancel_order, get_user_orders, etc.) are kept, rewired onto a local
+Order + StockManager.decrement_stock helper instead.
+
+Also updates the now-stale "three create_order* paths" doc comments in
+shipping/services.py, shipping_boxnow/carrier.py, and CLAUDE.md.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017PoWsX87xQRhZHXckWXaKd ([`3d101f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d101f9ba4358b3a4de02ff83fb005c165046fae))
+
 ## v3.6.4 (2026-08-24)
 
 ### Bug fixes

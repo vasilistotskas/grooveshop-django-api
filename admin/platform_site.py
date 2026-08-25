@@ -47,13 +47,36 @@ PLATFORM_APP_LABELS: frozenset[str] = frozenset(
         "auth",
         "sites",
         "usersessions",
-        "extra_settings",
+        # ``extra_settings`` is deliberately ABSENT: every knob in
+        # EXTRA_SETTINGS is store-scoped and read from the tenant's own
+        # schema (merchants edit them in THEIR admin). Nothing running
+        # in the public schema reads Setting — the section here only
+        # materialized meaningless public rows and invited edits that
+        # silently changed nothing for any store.
         "country",
         "region",
         "django_celery_beat",
         "django_celery_results",
-        "allauth_idp_oidc",
+        # ``allauth_idp_oidc`` deliberately ABSENT: allauth.idp.oidc is
+        # in TENANT_APPS only, so its tables do not exist in the public
+        # schema — the sections rendered on the control plane but 500'd
+        # (ProgrammingError) the moment they were opened. OIDC agent
+        # clients/tokens are per-store and live in the merchant admin.
         "core",
+    }
+)
+
+# Store-scoped models dragged in by an otherwise-platform app label.
+# ``user`` is whitelisted for PLATFORM STAFF accounts; its newsletter /
+# address / data-export models describe CUSTOMERS, who exist only in
+# tenant schemas — on the public schema those sections are permanently
+# empty noise.
+PLATFORM_EXCLUDED_MODELS: frozenset[str] = frozenset(
+    {
+        "user.SubscriptionTopic",
+        "user.UserSubscription",
+        "user.UserAddress",
+        "user.UserDataExport",
     }
 )
 
@@ -159,6 +182,8 @@ def register_platform_models() -> None:
 
     for model, model_admin in list(django_admin.site._registry.items()):
         if model._meta.app_label not in PLATFORM_APP_LABELS:
+            continue
+        if model._meta.label in PLATFORM_EXCLUDED_MODELS:
             continue
         if model in platform_admin_site._registry:
             continue

@@ -23,7 +23,9 @@ def command_search_models(request: HttpRequest) -> bool | list[str]:
         "tenant.TenantDomain",
         "tenant.UserTenantMembership",
         "user.UserAccount",
-        "extra_settings.Setting",
+        # extra_settings.Setting deliberately absent — the model is no
+        # longer registered on the platform site (store-scoped knobs;
+        # see admin/platform_site.py PLATFORM_APP_LABELS).
         "django_celery_beat.PeriodicTask",
         "country.Country",
         "region.Region",

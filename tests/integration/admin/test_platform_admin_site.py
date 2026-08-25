@@ -80,6 +80,30 @@ class TestPlatformSiteRegistry(TestCase):
         }
         assert not (labels & tenant_only)
 
+    def test_store_scoped_sections_stay_off_the_control_plane(self):
+        """Sections that were noise or outright broken on the platform
+        admin must stay structurally absent:
+
+        - extra_settings.Setting: every knob is store-scoped and read
+          from the tenant's own schema — a public-schema edit silently
+          changes nothing for any store.
+        - allauth_idp_oidc.*: TENANT_APPS-only tables; the sections
+          rendered but 500'd (ProgrammingError) when opened.
+        - customer-scoped user models: customers exist only in tenant
+          schemas, so on public those lists are permanently empty.
+        """
+        labels = {model._meta.label for model in platform_admin_site._registry}
+        for banned in (
+            "extra_settings.Setting",
+            "allauth_idp_oidc.Client",
+            "allauth_idp_oidc.Token",
+            "user.SubscriptionTopic",
+            "user.UserSubscription",
+            "user.UserAddress",
+            "user.UserDataExport",
+        ):
+            assert banned not in labels, f"{banned} back on the platform"
+
     def test_reuses_the_shared_model_admin_classes(self):
         """Copied from the default registry so the two cannot drift."""
         from django.contrib import admin as django_admin

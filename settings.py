@@ -2401,13 +2401,14 @@ UNFOLD_PLATFORM = {
                 "title": _("Platform"),
                 "separator": True,
                 "items": [
-                    {
-                        "title": _("Settings"),
-                        "icon": "settings",
-                        "link": reverse_lazy(
-                            "platform_admin:extra_settings_setting_changelist"
-                        ),
-                    },
+                    # extra_settings deliberately NOT here: every knob
+                    # in EXTRA_SETTINGS is STORE-scoped and read from
+                    # the tenant's own schema — nothing that runs in
+                    # the public schema reads Setting at all (verified
+                    # across beat tasks and the platform dashboard).
+                    # Exposing the section here materialized meaningless
+                    # public-schema rows and invited edits that
+                    # silently change nothing for any store.
                     {
                         "title": _("Scheduled Tasks"),
                         "icon": "schedule",

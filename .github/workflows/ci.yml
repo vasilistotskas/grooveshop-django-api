@@ -229,16 +229,20 @@ jobs:
         # in ``pyproject.toml::addopts`` — keeping them explicit here
         # so a careless edit can't silently flip the project off the
         # supported configuration.
-        # The timeout absorbs coverage overhead (~2-3× the no-cov
-        # runtime) on the 2-vCPU GitHub runner. This cap has moved as the
-        # suite grew: 15 min timed out at ~85% once tenant-scoping work
-        # extended teardown hot paths; 25 min timed out at ~94% once the
-        # billing dunning suite landed; 32 min was reached ~84% (~27 min)
-        # after the multi-tenant audit fixes added their tests, so it's
-        # now 40 with the job cap raised to match. The step, not the job,
-        # is the real signal — if it trips again, profile the slowest
-        # tests (pytest --durations=25) before reaching for the number.
-        run: uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject.toml -n auto --dist loadfile
+        # The timeout absorbs coverage overhead on the GitHub runner.
+        # This cap has moved as the suite grew: 15 min timed out at ~85%
+        # once tenant-scoping work extended teardown hot paths; 25 min
+        # timed out at ~94% once the billing dunning suite landed; 32 min
+        # was reached ~84% (~27 min) after the multi-tenant audit fixes
+        # added their tests, so it went to 40 with the job cap raised to
+        # match. Coverage now runs on the ``sysmon`` core (see
+        # ``[tool.coverage.run]``), which cut the former ~2-3× C-tracer
+        # overhead. No ``--cov-report=html``: htmlcov/ was never uploaded
+        # as an artifact, so generating it was wasted minutes. The step,
+        # not the job, is the real signal — if it trips again, profile
+        # the slowest tests (pytest --durations=25) before reaching for
+        # the number.
+        run: uv run pytest --cov=. --cov-report=term --cov-config=pyproject.toml -n auto --dist loadfile
         timeout-minutes: 40
         env:
           HYPOTHESIS_PROFILE: ci

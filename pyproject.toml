@@ -116,6 +116,12 @@ source = ["."]
 [tool.coverage.run]
 branch = true
 parallel = true
+# ``sysmon`` uses sys.monitoring (PEP 669) instead of the C tracer —
+# drastically lower measurement overhead. Branch coverage under sysmon
+# requires Python 3.14+; on older interpreters coverage falls back with
+# a warning. Validated 2026-08-25 on coverage 7.14.0 / Python 3.14.7:
+# identical totals to ctrace, branch arcs recorded.
+core = "sysmon"
 concurrency = ["multiprocessing", "thread"]
 omit = [
     "*/tests/*",

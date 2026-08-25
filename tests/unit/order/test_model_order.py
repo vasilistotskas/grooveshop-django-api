@@ -203,6 +203,12 @@ class OrderModelTestCase(TestCase):
             self.order.loyalty_discount = Money(
                 "0.00", settings.DEFAULT_CURRENCY
             )
+            self.order.discount_amount = Money(
+                "0.00", settings.DEFAULT_CURRENCY
+            )
+            self.order.gift_card_amount = Money(
+                "0.00", settings.DEFAULT_CURRENCY
+            )
 
             result = Order.calculate_order_total_amount(self.order)
 
@@ -225,6 +231,12 @@ class OrderModelTestCase(TestCase):
             self.order.total_price = expected_total
             self.order.loyalty_discount = Money(
                 "5.00", settings.DEFAULT_CURRENCY
+            )
+            self.order.discount_amount = Money(
+                "0.00", settings.DEFAULT_CURRENCY
+            )
+            self.order.gift_card_amount = Money(
+                "0.00", settings.DEFAULT_CURRENCY
             )
 
             result = Order.calculate_order_total_amount(self.order)

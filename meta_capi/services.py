@@ -230,10 +230,17 @@ def _build_initiate_checkout_custom_data(order: Order) -> Any:
     content_ids = [str(item.product_id) for item in items if item.product_id]
 
     # Compute the *expected* checkout total (items + shipping + payment
-    # method fee). Using ``paid_amount`` here would report 0 for COD
-    # orders (which only flip to paid on reconciliation), tanking
-    # InitiateCheckout value reporting and breaking funnel ROAS for
-    # COD-heavy markets like Greece.
+    # method fee, minus promotion/loyalty discounts). Using
+    # ``paid_amount`` here would report 0 for COD orders (which only
+    # flip to paid on reconciliation), tanking InitiateCheckout value
+    # reporting and breaking funnel ROAS for COD-heavy markets like
+    # Greece. Discounts must be subtracted or InitiateCheckout
+    # over-reports against the Purchase event (which reads the
+    # post-discount ``paid_amount``) and Meta flags the funnel as a
+    # conversion-value discrepancy. Gift cards are intentionally NOT
+    # subtracted — they are payment, and Purchase's ``paid_amount``
+    # excludes them the same way only for the provider-charged part,
+    # so the expected value stays the customer's economic commitment.
     total_items = order.total_price_items
     shipping = order.shipping_price
     fee = order.payment_method_fee
@@ -248,8 +255,10 @@ def _build_initiate_checkout_custom_data(order: Order) -> Any:
         _money_amount(total_items)
         + _money_amount(shipping)
         + _money_amount(fee)
+        - _money_amount(order.discount_amount)
+        - _money_amount(order.loyalty_discount)
     )
-    value = _decimal_to_float(expected_total) or 0.0
+    value = _decimal_to_float(max(expected_total, 0)) or 0.0
 
     # Currency lookup walks total_items → paid_amount → settings default
     # so we always emit a real ISO code even if the order has no items.

@@ -58,6 +58,13 @@ class CartMutationAnonThrottle(AnonRateThrottle):
         return super().get_cache_key(request, view)
 
 
+class CouponApplyThrottle(AnonRateThrottle):
+    """Tight per-IP throttle for coupon application — the endpoint is a
+    brute-forceable code oracle (valid/invalid distinguishes codes)."""
+
+    scope = "coupon_apply"
+
+
 class SearchThrottle(AnonRateThrottle):
     scope = "search"
 

@@ -57,6 +57,7 @@ from order.mydata.types import (
     VAT_CATEGORY_24,
     VAT_EXEMPTION_NO_VAT_ARTICLES,
 )
+from order.discounts import discounted_line_gross
 from order.mydata.uid import build_uid
 
 
@@ -420,13 +421,24 @@ def build_invoice_xml(
     cls_type, cls_category = _classification_pair_for(invoice_type)
 
     line_number = 0
-    for item in invoice.order.items.select_related("product__vat").all():
+    order_items = list(invoice.order.items.select_related("product__vat").all())
+    # Order-level discounts (promotions + loyalty) are allocated across
+    # the lines with the same largest-remainder split the PDF invoice
+    # uses, so both documents and the summary agree to the cent.
+    # Gift-card amounts are payment (multi-purpose voucher) — they
+    # never reduce the taxable line values.
+    line_gross_by_pk = discounted_line_gross(invoice.order, order_items)
+    for item in order_items:
         rate = (
             Decimal(item.product.vat.value)
             if item.product and item.product.vat_id
             else Decimal("0")
         )
-        line_gross = Decimal(item.price.amount) * Decimal(item.quantity)
+        line_gross = line_gross_by_pk[item.pk]
+        if line_gross <= 0:
+            # A fully-discounted line would be a zero-amount detail,
+            # which AADE rejects — skip it like the ancillary charges.
+            continue
         line_net, line_vat = _split_gross(line_gross, rate)
         line_number += 1
         _emit_detail(

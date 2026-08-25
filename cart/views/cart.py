@@ -25,6 +25,8 @@ from cart.serializers.cart import (
     CartPaymentIntentResponseSerializer,
     CartSerializer,
     CartWriteSerializer,
+    CouponApplyRequestSerializer,
+    CouponErrorResponseSerializer,
     ReleaseReservationsRequestSerializer,
     ReleaseReservationsResponseSerializer,
     ReserveStockResponseSerializer,
@@ -36,7 +38,9 @@ from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
     CartMutationAnonThrottle,
     CartMutationThrottle,
+    CouponApplyThrottle,
 )
+from tenant.permissions import IsPromotionsEnabled
 from core.api.views import BaseModelViewSet
 
 from core.utils.serializers import (
@@ -164,6 +168,27 @@ serializers_config: SerializersConfig = {
         tags=["Cart"],
         parameters=GUEST_CART_HEADERS,
     ),
+    "apply_coupon": ActionConfig(
+        request=CouponApplyRequestSerializer,
+        response=CartDetailSerializer,
+        responses={400: CouponErrorResponseSerializer},
+        operation_id="applyCartCoupon",
+        summary=_("Apply a coupon code to the cart"),
+        description=_(
+            "Attach a coupon code to the cart. Returns the updated cart "
+            "with promotion discount fields. Rejections carry a "
+            "machine-readable reason."
+        ),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
+    "remove_coupon": ActionConfig(
+        response=CartDetailSerializer,
+        operation_id="removeCartCoupon",
+        summary=_("Remove the applied coupon code from the cart"),
+        tags=["Cart"],
+        parameters=GUEST_CART_HEADERS,
+    ),
 }
 
 
@@ -202,6 +227,8 @@ class CartViewSet(BaseModelViewSet):
             "reserve_stock",
             "release_reservations",
             "create_payment_intent",
+            "apply_coupon",
+            "remove_coupon",
         }
     )
 
@@ -212,6 +239,10 @@ class CartViewSet(BaseModelViewSet):
     def get_permissions(self):
         if self.action == "list":
             self.permission_classes = [StoreStaffModelPermissions]
+        elif self.action in {"apply_coupon", "remove_coupon"}:
+            # Guest-capable like the rest of the cart surface, but 404s
+            # when the tenant's promotions plan flag is off.
+            self.permission_classes = [IsPromotionsEnabled]
         else:
             # All other cart actions (retrieve, update, destroy, reserve_stock,
             # release_reservations, create_payment_intent) support guest users
@@ -220,6 +251,16 @@ class CartViewSet(BaseModelViewSet):
         return super().get_permissions()
 
     def get_throttles(self):
+        if self.action == "apply_coupon":
+            # Coupon apply is a brute-forceable code oracle — cap it far
+            # tighter than the generic cart-mutation burst limits.
+            return [
+                CouponApplyThrottle(),
+                CartMutationThrottle(),
+                CartMutationAnonThrottle(),
+                AnonRateThrottle(),
+                UserRateThrottle(),
+            ]
         if self.action in self._MUTATION_ACTIONS:
             # Per-minute burst limits layered ON TOP of the global daily caps
             # (DEFAULT_THROTTLE_CLASSES) — include the defaults explicitly so
@@ -303,6 +344,58 @@ class CartViewSet(BaseModelViewSet):
             cart.delete()
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(status=status.HTTP_404_NOT_FOUND)
+
+    def _cart_detail_response(self, cart, status_code=status.HTTP_200_OK):
+        """Serialize the cart the same way ``retrieve`` does (optimized
+        reload so items are prefetched and totals annotated)."""
+        cart = Cart.objects.for_detail().get(pk=cart.pk)
+        response_serializer = CartDetailSerializer(
+            cart, context=self.get_serializer_context()
+        )
+        return Response(response_serializer.data, status=status_code)
+
+    @action(detail=False, methods=["post"], url_path="coupon")
+    def apply_coupon(self, request, *args, **kwargs):
+        """Attach a coupon code to the cart and return the updated cart."""
+        from promotion.services import CouponError, CouponService
+
+        cart = self.cart_service.get_or_create_cart()
+        if not cart:
+            return Response(
+                {"detail": _("Cart not found")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        request_serializer_class = self.get_request_serializer()
+        request_serializer = request_serializer_class(data=request.data)
+        request_serializer.is_valid(raise_exception=True)
+
+        try:
+            CouponService.apply(
+                cart,
+                request_serializer.validated_data["code"],
+                user=request.user if request.user.is_authenticated else None,
+            )
+        except CouponError as exc:
+            return Response(
+                {"detail": exc.message, "reason": exc.reason},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return self._cart_detail_response(cart)
+
+    @action(detail=False, methods=["delete"], url_path="coupon")
+    def remove_coupon(self, request, *args, **kwargs):
+        """Detach the applied coupon code from the cart."""
+        from promotion.services import CouponService
+
+        cart = self.cart_service.get_or_create_cart()
+        if not cart:
+            return Response(
+                {"detail": _("Cart not found")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        CouponService.remove(cart)
+        return self._cart_detail_response(cart)
 
     @action(detail=False, methods=["post"], url_path="reserve-stock")
     def reserve_stock(self, request, *args, **kwargs):
@@ -595,23 +688,39 @@ class CartViewSet(BaseModelViewSet):
         # Calculate cart total including shipping and payment method fee
         # using the SAME inputs the order-create verification step uses
         # (per-carrier free-shipping threshold + weight-banded quote +
-        # country/region multipliers). The intent must equal what
-        # ``OrderService.create_order_*`` will charge — otherwise
-        # ``PaymentAmountMismatchError`` raises at order-create time.
+        # country/region multipliers + promotion discount). The intent
+        # must equal what ``OrderService.create_order_*`` will charge —
+        # otherwise ``PaymentAmountMismatchError`` raises at
+        # order-create time.
+        from promotion.services import PromotionEngine
+
+        promo_result = PromotionEngine.evaluate(
+            cart,
+            user=request.user if request.user.is_authenticated else None,
+            email=request_serializer.validated_data.get("email") or "",
+        )
+
         cart_total = cart.total_price
         cart_weight_grams = compute_total_weight_grams(
             (item.product, item.quantity) for item in cart.items.all()
         )
-        shipping_cost = OrderService.calculate_shipping_cost(
-            order_value=cart_total,
-            country_id=country_id,
-            region_id=region_id,
-            shipping_provider_code=shipping_provider_code,
-            shipping_kind=shipping_kind,
-            weight_grams=cart_weight_grams,
-        )
+        if promo_result.free_shipping:
+            shipping_cost = Money(0, cart_total.currency)
+        else:
+            shipping_cost = OrderService.calculate_shipping_cost(
+                order_value=cart_total,
+                country_id=country_id,
+                region_id=region_id,
+                shipping_provider_code=shipping_provider_code,
+                shipping_kind=shipping_kind,
+                weight_grams=cart_weight_grams,
+            )
+        # Pay-way fee (and its free_threshold) is computed on the
+        # DISCOUNTED subtotal — the same figure order creation uses.
         order_subtotal = Money(
-            cart_total.amount + shipping_cost.amount,
+            cart_total.amount
+            - promo_result.discount_total.amount
+            + shipping_cost.amount,
             cart_total.currency,
         )
         payment_fee = OrderService.calculate_payment_method_fee(

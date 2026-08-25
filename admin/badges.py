@@ -121,3 +121,22 @@ def draft_blog_posts_badge(request):
         "BlogPost",
         is_published=False,
     )
+
+
+def live_promotions_badge(request):
+    """Promotions currently active and inside their schedule window."""
+
+    cached = cache.get("admin:badge:live_promotions")
+    if cached is not None:
+        return cached or None
+    try:
+        Promotion = apps.get_model("promotion", "Promotion")
+    except LookupError:
+        return None
+    try:
+        value = Promotion.objects.live().count()
+    except ProgrammingError:
+        # Public (platform) schema — promotion tables are tenant-only.
+        return None
+    cache.set("admin:badge:live_promotions", value, _BADGE_TTL)
+    return value or None

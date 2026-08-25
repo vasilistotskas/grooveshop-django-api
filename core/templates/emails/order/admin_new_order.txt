@@ -8,7 +8,7 @@ ORDER
   Status:          {{ order.status }}
   Payment status:  {{ order.payment_status }}
 {% if pay_way %}  Payment method:  {{ pay_way.name }}
-{% endif %}  Total:           {{ order.total_price }}
+{% endif %}  Total:           {{ order.calculate_order_total_amount }}
 
 CUSTOMER
   {{ order.first_name }} {{ order.last_name }} <{{ order.email }}>
@@ -24,6 +24,9 @@ ITEMS
 {% endfor %}
   Subtotal: {{ order.total_price_items }}
   Shipping: {{ order.shipping_price }}
-  Total:    {{ order.total_price }}
+{% if order.discount_amount.amount > 0 %}  Discount: -{{ order.discount_amount }}
+{% endif %}{% if order.loyalty_discount.amount > 0 %}  Loyalty discount: -{{ order.loyalty_discount }}
+{% endif %}{% if order.gift_card_amount.amount > 0 %}  Gift card: -{{ order.gift_card_amount }}
+{% endif %}  Total:    {{ order.calculate_order_total_amount }}
 
 This email is operational; staff only.

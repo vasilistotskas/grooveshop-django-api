@@ -47,6 +47,7 @@ from core.utils.serializers import (
 )
 from order.exceptions import (
     InsufficientStockError,
+    InvalidCouponError,
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
@@ -693,6 +694,24 @@ class OrderViewSet(BaseModelViewSet):
                 error_response["field_errors"] = e.field_errors
             return Response(
                 error_response,
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except InvalidCouponError as e:
+            logger.warning(
+                "Coupon refused at order creation: code=%s reason=%s",
+                e.code,
+                e.reason,
+            )
+            return Response(
+                {
+                    "detail": _("The coupon code can no longer be used."),
+                    "error": {
+                        "type": "invalid_coupon",
+                        "code": e.code,
+                        "reason": e.reason,
+                    },
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

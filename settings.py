@@ -224,6 +224,7 @@ TENANT_APPS = [
     "notification",
     "contact",
     "loyalty",
+    "promotion",
     "page_config",
     # Agent surface (OIDC-bearer API over tenant-schema data; no models
     # of its own — placed here because everything it serves is per-store)
@@ -437,6 +438,8 @@ REST_FRAMEWORK = {
         "payment_anon": None if DEBUG else "5/minute",
         "cart_mutation": None if DEBUG else "60/minute",
         "cart_mutation_anon": None if DEBUG else "30/minute",
+        # Coupon apply is a code-guessing oracle — keep the budget tight.
+        "coupon_apply": None if DEBUG else "10/minute",
         "search": None if DEBUG else "120/minute",
         # Clicks get their own budget - the anonymous click endpoint must
         # not be able to starve the search allowance for the same client.
@@ -1541,6 +1544,11 @@ EXTRA_SETTINGS_DEFAULTS = [
         "value": False,
     },
     {
+        "name": "PROMOTIONS_ENABLED",
+        "type": "bool",
+        "value": False,
+    },
+    {
         "name": "LOYALTY_POINTS_FACTOR",
         "type": "decimal",
         "value": 1.0,
@@ -2529,6 +2537,22 @@ UNFOLD = {
                         "title": _("Payment Methods"),
                         "icon": "payments",
                         "link": reverse_lazy("admin:pay_way_payway_changelist"),
+                    },
+                    {
+                        "title": _("Promotions"),
+                        "icon": "sell",
+                        "link": reverse_lazy(
+                            "admin:promotion_promotion_changelist"
+                        ),
+                        "badge": "admin.badges.live_promotions_badge",
+                        "badge_variant": "success",
+                    },
+                    {
+                        "title": _("Coupon Codes"),
+                        "icon": "confirmation_number",
+                        "link": reverse_lazy(
+                            "admin:promotion_promotioncode_changelist"
+                        ),
                     },
                     {
                         "title": _("VAT Rates"),

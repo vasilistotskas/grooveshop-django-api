@@ -254,6 +254,12 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # Feature flags
     loyalty_enabled = models.BooleanField(_("Loyalty Enabled"), default=False)
     blog_enabled = models.BooleanField(_("Blog Enabled"), default=True)
+    promotions_enabled = models.BooleanField(
+        _("Promotions Enabled"), default=False
+    )
+    gift_cards_enabled = models.BooleanField(
+        _("Gift Cards Enabled"), default=False
+    )
 
     # Stripe Connect — dormant/reserved. The platform runs SEPARATE
     # Stripe accounts per tenant (``stripe_secret_key`` below), not

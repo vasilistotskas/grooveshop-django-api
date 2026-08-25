@@ -13,6 +13,7 @@ from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     InsufficientStockError,
+    InvalidCouponError,
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
@@ -185,6 +186,28 @@ class OrderService:
         return converted_ids
 
     @classmethod
+    def _evaluate_promotions(cls, cart, *, user, email: str):
+        """Locked promotion evaluation for order creation.
+
+        Runs inside the caller's order-create transaction and takes
+        ``select_for_update`` on the candidate Promotion rows so the
+        usage-limit counts hold until commit. A refused attached
+        coupon raises ``InvalidCouponError`` — the offline providers
+        (COD/Viva) have no amount guard, so silently dropping the
+        discount would charge the shopper more than the sidebar showed.
+        """
+        from promotion.services import PromotionEngine  # noqa: PLC0415
+
+        result = PromotionEngine.evaluate(
+            cart, user=user, email=email, lock=True
+        )
+        blocking = result.blocking_rejections
+        if blocking:
+            code, reason = blocking[0]
+            raise InvalidCouponError(code=code, reason=reason)
+        return result
+
+    @classmethod
     @transaction.atomic
     def create_order_from_cart(
         cls,
@@ -265,6 +288,17 @@ class OrderService:
             # Step 2: Validate shipping address
             cls.validate_shipping_address(shipping_address, pay_way=pay_way)
 
+            # Step 2.5: Evaluate promotions under lock. The Promotion
+            # rows stay locked until commit, so the usage-limit counts
+            # the engine enforced cannot be raced by a concurrent
+            # checkout. A refused attached coupon aborts with a typed
+            # error rather than silently charging the undiscounted
+            # total (COD/Viva have no amount guard to catch it).
+            promo_result = cls._evaluate_promotions(
+                cart, user=user, email=shipping_address.get("email") or ""
+            )
+            promo_discount = promo_result.discount_total
+
             # Step 3: Validate payment intent exists
             from order.payment import get_payment_provider
 
@@ -306,18 +340,25 @@ class OrderService:
             _cart_weight_grams = compute_total_weight_grams(
                 (item.product, item.quantity) for item in cart.items.all()
             )
-            _shipping_cost = cls.calculate_shipping_cost(
-                order_value=_cart_total,
-                country_id=shipping_address.get("country_id"),
-                region_id=shipping_address.get("region_id"),
-                shipping_provider_code=shipping_address.get(
-                    "shipping_provider_code"
-                ),
-                shipping_kind=shipping_address.get("shipping_kind"),
-                weight_grams=_cart_weight_grams,
-            )
+            if promo_result.free_shipping:
+                _shipping_cost = Money(0, _cart_total.currency)
+            else:
+                _shipping_cost = cls.calculate_shipping_cost(
+                    order_value=_cart_total,
+                    country_id=shipping_address.get("country_id"),
+                    region_id=shipping_address.get("region_id"),
+                    shipping_provider_code=shipping_address.get(
+                        "shipping_provider_code"
+                    ),
+                    shipping_kind=shipping_address.get("shipping_kind"),
+                    weight_grams=_cart_weight_grams,
+                )
+            # Pay-way fee on the DISCOUNTED subtotal — mirrors the
+            # create-payment-intent endpoint exactly.
             _order_subtotal = Money(
-                _cart_total.amount + _shipping_cost.amount,
+                _cart_total.amount
+                - promo_discount.amount
+                + _shipping_cost.amount,
                 _cart_total.currency,
             )
             _payment_fee = cls.calculate_payment_method_fee(
@@ -325,7 +366,10 @@ class OrderService:
                 order_value=_order_subtotal,
             )
             _expected_total = (
-                _cart_total.amount + _shipping_cost.amount + _payment_fee.amount
+                _cart_total.amount
+                - promo_discount.amount
+                + _shipping_cost.amount
+                + _payment_fee.amount
             )
             calculated_total_cents = int(round(_expected_total * 100))
             # The Stripe provider returns amount already divided by 100
@@ -361,6 +405,12 @@ class OrderService:
                             "cart_total_amount": str(_cart_total.amount),
                             "shipping_cost_amount": str(_shipping_cost.amount),
                             "payment_fee_amount": str(_payment_fee.amount),
+                            "promotion_discount_amount": str(
+                                promo_discount.amount
+                            ),
+                            "promotion_free_shipping": (
+                                promo_result.free_shipping
+                            ),
                             "shipping_provider_code": shipping_address.get(
                                 "shipping_provider_code"
                             ),
@@ -466,22 +516,29 @@ class OrderService:
             cart_weight_grams = compute_total_weight_grams(
                 (ci.product, ci.quantity) for ci in cart_items
             )
-            shipping_cost = cls.calculate_shipping_cost(
-                order_value=cart_total,
-                country_id=shipping_address.get("country_id"),
-                region_id=shipping_address.get("region_id"),
-                shipping_provider_code=shipping_address.get(
-                    "shipping_provider_code"
-                ),
-                shipping_kind=shipping_address.get("shipping_kind"),
-                weight_grams=cart_weight_grams,
-            )
+            if promo_result.free_shipping:
+                shipping_cost = Money(0, cart_total.currency)
+            else:
+                shipping_cost = cls.calculate_shipping_cost(
+                    order_value=cart_total,
+                    country_id=shipping_address.get("country_id"),
+                    region_id=shipping_address.get("region_id"),
+                    shipping_provider_code=shipping_address.get(
+                        "shipping_provider_code"
+                    ),
+                    shipping_kind=shipping_address.get("shipping_kind"),
+                    weight_grams=cart_weight_grams,
+                )
             order_data["shipping_price"] = shipping_cost
 
             # Calculate payment method fee
-            # Note: Payment fee is calculated on items total + shipping
+            # Note: Payment fee is calculated on the DISCOUNTED items
+            # total + shipping — the same figure the payment-intent
+            # endpoint and the verification step above used.
             order_subtotal = Money(
-                cart_total.amount + shipping_cost.amount,
+                cart_total.amount
+                - promo_discount.amount
+                + shipping_cost.amount,
                 cart_total.currency,
             )
             payment_fee = cls.calculate_payment_method_fee(
@@ -642,15 +699,24 @@ class OrderService:
                     # Don't fail the order creation, just log the error
                     # The points won't be redeemed if this fails
 
-            # Persist the discount so it survives on the order, then let
-            # calculate_order_total_amount() be the single authority on
-            # what the customer owes. Subtracting here and leaving the
-            # order's own total undiscounted is what let every charge
-            # site bill the full amount while the points were burnt.
+            # Step 7.6: Record promotion redemptions (rows + metadata)
+            # for the evaluation done under lock at Step 2.5.
+            from promotion.services import PromotionEngine
+
+            order.discount_amount = PromotionEngine.record(order, promo_result)
+
+            # Persist the discounts so they survive on the order, then
+            # let calculate_order_total_amount() be the single authority
+            # on what the customer owes. Subtracting here and leaving
+            # the order's own total undiscounted is what let every
+            # charge site bill the full amount while the points were
+            # burnt.
             order.loyalty_discount = loyalty_discount
             order.paid_amount = order.calculate_order_total_amount()
             order.save(
                 update_fields=[
+                    "discount_amount",
+                    "discount_amount_currency",
                     "loyalty_discount",
                     "loyalty_discount_currency",
                     "paid_amount",
@@ -658,6 +724,12 @@ class OrderService:
                     "metadata",
                 ]
             )
+
+            # The coupon's durable record is the redemption row — the
+            # cart attachment has served its purpose.
+            from promotion.services import CouponService
+
+            CouponService.clear_after_order(cart)
 
             # Step 8: Clear cart
             # Keep the cart while the shopper still owes a hosted
@@ -687,6 +759,7 @@ class OrderService:
         except (
             ProductNotFoundError,
             InsufficientStockError,
+            InvalidCouponError,
             InvalidOrderDataError,
             PaymentNotFoundError,
             PaymentVerificationError,
@@ -785,6 +858,13 @@ class OrderService:
             # Step 2: Validate shipping address
             cls.validate_shipping_address(shipping_address, pay_way=pay_way)
 
+            # Step 2.5: Evaluate promotions under lock (see the
+            # payment-first path for the race/typed-error rationale).
+            promo_result = cls._evaluate_promotions(
+                cart, user=user, email=shipping_address.get("email") or ""
+            )
+            promo_discount = promo_result.discount_total
+
             # Step 3: Get stock reservations for cart session
             # Reservations are identified by cart.uuid (session_id)
             reservations = list(
@@ -852,22 +932,28 @@ class OrderService:
             cart_weight_grams = compute_total_weight_grams(
                 (ci.product, ci.quantity) for ci in cart_items
             )
-            shipping_cost = cls.calculate_shipping_cost(
-                order_value=cart_total,
-                country_id=shipping_address.get("country_id"),
-                region_id=shipping_address.get("region_id"),
-                shipping_provider_code=shipping_address.get(
-                    "shipping_provider_code"
-                ),
-                shipping_kind=shipping_address.get("shipping_kind"),
-                weight_grams=cart_weight_grams,
-            )
+            if promo_result.free_shipping:
+                shipping_cost = Money(0, cart_total.currency)
+            else:
+                shipping_cost = cls.calculate_shipping_cost(
+                    order_value=cart_total,
+                    country_id=shipping_address.get("country_id"),
+                    region_id=shipping_address.get("region_id"),
+                    shipping_provider_code=shipping_address.get(
+                        "shipping_provider_code"
+                    ),
+                    shipping_kind=shipping_address.get("shipping_kind"),
+                    weight_grams=cart_weight_grams,
+                )
             order_data["shipping_price"] = shipping_cost
 
             # Calculate payment method fee
-            # Note: Payment fee is calculated on items total + shipping
+            # Note: Payment fee is calculated on the DISCOUNTED items
+            # total + shipping — mirrors the payment-first path.
             order_subtotal = Money(
-                cart_total.amount + shipping_cost.amount,
+                cart_total.amount
+                - promo_discount.amount
+                + shipping_cost.amount,
                 cart_total.currency,
             )
             payment_fee = cls.calculate_payment_method_fee(
@@ -1029,15 +1115,24 @@ class OrderService:
                     # Don't fail the order creation, just log the error
                     # The points won't be redeemed if this fails
 
-            # Persist the discount so it survives on the order, then let
-            # calculate_order_total_amount() be the single authority on
-            # what the customer owes. Subtracting here and leaving the
-            # order's own total undiscounted is what let every charge
-            # site bill the full amount while the points were burnt.
+            # Step 6.6: Record promotion redemptions (rows + metadata)
+            # for the evaluation done under lock at Step 2.5.
+            from promotion.services import CouponService, PromotionEngine
+
+            order.discount_amount = PromotionEngine.record(order, promo_result)
+
+            # Persist the discounts so they survive on the order, then
+            # let calculate_order_total_amount() be the single authority
+            # on what the customer owes. Subtracting here and leaving
+            # the order's own total undiscounted is what let every
+            # charge site bill the full amount while the points were
+            # burnt.
             order.loyalty_discount = loyalty_discount
             order.paid_amount = order.calculate_order_total_amount()
             order.save(
                 update_fields=[
+                    "discount_amount",
+                    "discount_amount_currency",
                     "loyalty_discount",
                     "loyalty_discount_currency",
                     "paid_amount",
@@ -1045,6 +1140,10 @@ class OrderService:
                     "metadata",
                 ]
             )
+
+            # The coupon's durable record is the redemption row — the
+            # cart attachment has served its purpose.
+            CouponService.clear_after_order(cart)
 
             # Step 7: Clear cart
             # Keep the cart while the shopper still owes a hosted
@@ -1081,6 +1180,7 @@ class OrderService:
         except (
             ProductNotFoundError,
             InsufficientStockError,
+            InvalidCouponError,
             InvalidOrderDataError,
         ):
             raise

@@ -17,7 +17,7 @@
 <div class="email-card">
     <h2>{% trans "Order Details" %}</h2>
     <p><strong>{% trans "Order Date" %}:</strong> {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}</p>
-    <p><strong>{% trans "Order Total" %}:</strong> {{ order.total_price }}</p>
+    <p><strong>{% trans "Order Total" %}:</strong> {{ order.calculate_order_total_amount }}</p>
     <p>
         <strong>{% trans "Status" %}:</strong>
         <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #d1fae5; color: #065f46;">

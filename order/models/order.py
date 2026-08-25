@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Any, cast
 
 from django.conf import settings
@@ -171,6 +172,29 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         help_text=_(
             "Amount deducted from the order total in exchange for loyalty "
             "points. Deducted by calculate_order_total_amount()."
+        ),
+    )
+    discount_amount = MoneyField(
+        _("Promotion Discount"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        help_text=_(
+            "Total discount granted by promotions/coupons, snapshotted "
+            "at order creation. Breakdown lives in "
+            "metadata['promotions'] + PromotionRedemption rows. "
+            "Deducted by calculate_order_total_amount()."
+        ),
+    )
+    gift_card_amount = MoneyField(
+        _("Gift Card Amount"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        help_text=_(
+            "Portion of the order settled by gift-card balance. A "
+            "payment, not a discount — it never reduces the taxable "
+            "order value, only what the payment provider charges."
         ),
     )
     status_updated_at = models.DateTimeField(
@@ -554,14 +578,25 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         figure, which is what made it a bug rather than a pricing
         policy.
 
-        Kept separate from ``total_price`` so the discount stays a
-        visible line rather than being folded into the subtotal.
+        Kept separate from ``total_price`` so the discounts stay
+        visible lines rather than being folded into the subtotal.
         """
         total = self.total_price
-        discount = self.loyalty_discount
-        if not discount or discount.amount <= 0:
+        deductions = sum(
+            (
+                deduction.amount
+                for deduction in (
+                    self.discount_amount,
+                    self.loyalty_discount,
+                    self.gift_card_amount,
+                )
+                if deduction and deduction.amount > 0
+            ),
+            Decimal("0"),
+        )
+        if deductions <= 0:
             return total
-        return Money(max(0, total.amount - discount.amount), total.currency)
+        return Money(max(0, total.amount - deductions), total.currency)
 
     def mark_as_paid(
         self,

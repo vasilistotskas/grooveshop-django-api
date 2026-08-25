@@ -45,10 +45,45 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "ISO 4217 currency code for all monetary values in this cart"
         ),
     )
+    promotion_discount = serializers.SerializerMethodField(
+        help_text=_(
+            "Discount granted by live promotions (automatic + applied "
+            "coupon), on top of any product markdown already inside "
+            "the line prices"
+        ),
+    )
+    promotion_free_shipping = serializers.SerializerMethodField(
+        help_text=_("Whether a live promotion waives the shipping cost"),
+    )
+    applied_coupon_codes = serializers.SerializerMethodField(
+        help_text=_("Coupon codes currently attached to this cart"),
+    )
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_currency(self, obj: Cart) -> str:
         return str(settings.DEFAULT_CURRENCY)
+
+    def _promotion_result(self, obj: Cart):
+        # One engine evaluation per serialized cart — the three
+        # promotion fields all read from it.
+        cache = self.context.setdefault("_promotion_results", {})
+        if obj.pk not in cache:
+            from promotion.services import PromotionEngine  # noqa: PLC0415
+
+            cache[obj.pk] = PromotionEngine.evaluate(obj, user=obj.user)
+        return cache[obj.pk]
+
+    @extend_schema_field(OpenApiTypes.DECIMAL)
+    def get_promotion_discount(self, obj: Cart):
+        return self._promotion_result(obj).discount_total.amount
+
+    @extend_schema_field(OpenApiTypes.BOOL)
+    def get_promotion_free_shipping(self, obj: Cart) -> bool:
+        return self._promotion_result(obj).free_shipping
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_applied_coupon_codes(self, obj: Cart) -> list[str]:
+        return list(obj.applied_codes.values_list("code__code", flat=True))
 
     class Meta:
         model = Cart
@@ -64,6 +99,9 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "total_items_unique",
             "total_weight_grams",
             "currency",
+            "promotion_discount",
+            "promotion_free_shipping",
+            "applied_coupon_codes",
             "created_at",
             "updated_at",
             "last_activity",
@@ -77,6 +115,9 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "total_items",
             "total_items_unique",
             "total_weight_grams",
+            "promotion_discount",
+            "promotion_free_shipping",
+            "applied_coupon_codes",
             "created_at",
             "updated_at",
             "last_activity",
@@ -224,6 +265,18 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         ),
     )
 
+    email = serializers.EmailField(
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Checkout email. Lets promotion eligibility checks that "
+            "depend on customer identity (first-order-only, "
+            "per-customer limits) run against the same identity the "
+            "order-create verification will use, keeping the "
+            "PaymentIntent amount in lockstep."
+        ),
+    )
+
     def validate(self, attrs):
         """Pickup-point requires a carrier code; home-delivery doesn't.
 
@@ -246,6 +299,29 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
         # downstream None-check stays clean.
         attrs["shipping_provider_code"] = code or None
         return attrs
+
+
+class CouponApplyRequestSerializer(serializers.Serializer):
+    """Request body for ``POST /api/v1/cart/coupon``."""
+
+    code = serializers.CharField(
+        max_length=40,
+        help_text=_("Coupon code to apply (case-insensitive)"),
+    )
+
+
+class CouponErrorResponseSerializer(serializers.Serializer):
+    """4xx body for coupon apply — carries the machine-readable reason."""
+
+    detail = serializers.CharField(
+        help_text=_("Human-readable message"),
+    )
+    reason = serializers.CharField(
+        help_text=_(
+            "Machine-readable rejection reason (ACP discount-extension "
+            "vocabulary, e.g. discount_code_invalid)"
+        ),
+    )
 
 
 class CartPaymentIntentResponseSerializer(serializers.Serializer):

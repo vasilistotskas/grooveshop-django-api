@@ -104,7 +104,16 @@
 <div class="text-right mt-2">
     <p><strong>{% trans "Subtotal" %}:</strong> {{ order.total_price_items }}</p>
     <p><strong>{% trans "Shipping" %}:</strong> {{ order.shipping_price }}</p>
-    <p class="text-bold"><strong>{% trans "Order Total" %}:</strong> {{ order.total_price }}</p>
+    {% if order.discount_amount.amount > 0 %}
+    <p><strong>{% trans "Discount" %}:</strong> -{{ order.discount_amount }}</p>
+    {% endif %}
+    {% if order.loyalty_discount.amount > 0 %}
+    <p><strong>{% trans "Loyalty discount" %}:</strong> -{{ order.loyalty_discount }}</p>
+    {% endif %}
+    {% if order.gift_card_amount.amount > 0 %}
+    <p><strong>{% trans "Gift card" %}:</strong> -{{ order.gift_card_amount }}</p>
+    {% endif %}
+    <p class="text-bold"><strong>{% trans "Order Total" %}:</strong> {{ order.calculate_order_total_amount }}</p>
 </div>
 {% endif %}
 

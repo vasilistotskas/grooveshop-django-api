@@ -132,6 +132,9 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "uuid",
             "total_price_items",
             "total_price_extra",
+            "discount_amount",
+            "loyalty_discount",
+            "gift_card_amount",
             "full_address",
             "payment_id",
             "payment_status",
@@ -149,6 +152,9 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "payment_method_fee",
             "total_price_items",
             "total_price_extra",
+            "discount_amount",
+            "loyalty_discount",
+            "gift_card_amount",
             "created_at",
             "updated_at",
             "status_updated_at",
@@ -542,6 +548,9 @@ class OrderDetailSerializer(OrderSerializer):
                 "shipping_cost": {"type": "number"},
                 "payment_method_fee": {"type": "number"},
                 "extras_total": {"type": "number"},
+                "discount": {"type": "number"},
+                "loyalty_discount": {"type": "number"},
+                "gift_card_amount": {"type": "number"},
                 "grand_total": {"type": "number"},
                 "currency": {"type": "string"},
                 "paid_amount": {"type": "number"},
@@ -560,24 +569,35 @@ class OrderDetailSerializer(OrderSerializer):
         extras_total = (
             obj.total_price_extra.amount if obj.total_price_extra else 0
         )
+        discount = obj.discount_amount.amount if obj.discount_amount else 0
+        loyalty = obj.loyalty_discount.amount if obj.loyalty_discount else 0
+        gift_card = obj.gift_card_amount.amount if obj.gift_card_amount else 0
+        paid = obj.paid_amount.amount if obj.paid_amount else 0
 
-        grand_total = items_total + shipping_total + payment_fee
+        # What the customer owes overall — discounts reduce it, the
+        # gift-card portion settles part of it, the provider payment
+        # settles the rest. Ignoring the deductions here used to
+        # report a phantom outstanding balance on every discounted
+        # order (the Go gateway relays this payload to AI agents).
+        grand_total = max(
+            items_total + shipping_total + payment_fee - discount - loyalty,
+            0,
+        )
 
         return {
             "items_subtotal": items_total,
             "shipping_cost": shipping_total,
             "payment_method_fee": payment_fee,
             "extras_total": extras_total,
+            "discount": discount,
+            "loyalty_discount": loyalty,
+            "gift_card_amount": gift_card,
             "grand_total": grand_total,
             "currency": obj.total_price_items.currency.code
             if obj.total_price_items
             else "EUR",
-            "paid_amount": obj.paid_amount.amount if obj.paid_amount else 0,
-            "remaining_amount": max(
-                grand_total
-                - (obj.paid_amount.amount if obj.paid_amount else 0),
-                0,
-            ),
+            "paid_amount": paid,
+            "remaining_amount": max(grand_total - gift_card - paid, 0),
         }
 
     @extend_schema_field(

@@ -14,7 +14,7 @@
 {% trans "Order Details" %}
 ----------------------------------------
 {% trans "Order Date" %}: {{ order.created_at|date:"SHORT_DATETIME_FORMAT" }}
-{% trans "Order Total" %}: {{ order.total_price }}
+{% trans "Order Total" %}: {{ order.calculate_order_total_amount }}
 {% trans "Status" %}: {% trans "Completed" %}
 
 {% trans "What's Next?" %}

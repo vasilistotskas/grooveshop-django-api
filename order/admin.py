@@ -455,6 +455,12 @@ class OrderAdmin(BaseModelAdmin):
         "created_at",
         "updated_at",
         "status_updated_at",
+        # Stamped at checkout; the charge/redemption already happened.
+        # Editing them here would desync PromotionRedemption rows, the
+        # gift-card ledger, and the amount the provider captured.
+        "discount_amount",
+        "loyalty_discount",
+        "gift_card_amount",
     )
 
     fieldsets = (
@@ -511,11 +517,17 @@ class OrderAdmin(BaseModelAdmin):
                     "payment_method",
                     "payment_id",
                     "paid_amount",
+                    "discount_amount",
+                    "loyalty_discount",
+                    "gift_card_amount",
                 ),
                 "classes": ("tab",),
                 "description": _(
                     "Note: Ensure all money fields use the same currency "
-                    "(EUR preferred) to avoid calculation errors."
+                    "(EUR preferred) to avoid calculation errors. "
+                    "Discounts and gift-card amounts are stamped at "
+                    "checkout — editing them here does NOT re-charge or "
+                    "refund the customer."
                 ),
             },
         ),
@@ -659,7 +671,8 @@ class OrderAdmin(BaseModelAdmin):
         total_qty = getattr(obj, "total_items_quantity", 0) or 0
 
         try:
-            total = money(obj.total_price.amount)
+            # Post-discount figure — what the customer actually owes.
+            total = money(obj.calculate_order_total_amount().amount)
         except ValueError:
             total = _(
                 "items %(items)s + shipping %(shipping)s (currency mismatch)"

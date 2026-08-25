@@ -93,13 +93,22 @@ class StripePaymentProvider(PaymentProvider):
             currency_code = str(amount.currency).lower()
 
             # Separate shipping from the total so Stripe can display
-            # it as a distinct line on the checkout page
+            # it as a distinct line on the checkout page. When a
+            # discount swallows the item portion (amount is already
+            # net of discounts, shipping is not), splitting would
+            # produce a negative unit_amount — Stripe rejects that, so
+            # collapse to a single line at the full amount instead.
             shipping_price = kwargs.pop("shipping_price", None)
-            if shipping_price and shipping_price.amount > 0:
+            if (
+                shipping_price
+                and shipping_price.amount > 0
+                and amount.amount > shipping_price.amount
+            ):
                 line_item_amount = int(
                     round((amount.amount - shipping_price.amount) * 100)
                 )
             else:
+                shipping_price = None
                 line_item_amount = int(round(amount.amount * 100))
 
             success_url = kwargs.get("success_url")

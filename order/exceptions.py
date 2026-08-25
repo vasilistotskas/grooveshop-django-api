@@ -154,6 +154,30 @@ class InvalidOrderDataError(OrderServiceError):
         super().__init__(message)
 
 
+class InvalidCouponError(OrderServiceError):
+    """
+    Raised when a coupon attached to the cart is refused at order
+    creation time.
+
+    The cart preview and the order-create evaluation normally agree,
+    but state can change in between (usage limit exhausted, schedule
+    window ended, first-order check resolving against the checkout
+    email). Aborting with a typed error is the honest behaviour —
+    silently charging the undiscounted total is exactly the bug class
+    ``calculate_order_total_amount`` exists to prevent.
+
+    Attributes:
+        code (str): The refused coupon code.
+        reason (str): Machine-readable rejection reason
+            (ACP discount-extension vocabulary).
+    """
+
+    def __init__(self, code: str, reason: str):
+        self.code = code
+        self.reason = reason
+        super().__init__(f"Coupon {code} refused: {reason}")
+
+
 class OrderNotFoundError(OrderServiceError):
     """
     Raised when an order doesn't exist.

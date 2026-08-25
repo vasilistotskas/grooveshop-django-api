@@ -237,6 +237,12 @@
 
   <div class="summary">
     <table>
+      {% if totals.discount %}
+      <tr>
+        <td>{% trans "Discount (incl. VAT)" %}</td>
+        <td class="num">-{{ totals.discount|floatformat:2 }} {{ currency }}</td>
+      </tr>
+      {% endif %}
       <tr>
         <td>{% trans "Subtotal (excl. VAT)" %}</td>
         <td class="num">{{ totals.subtotal|floatformat:2 }} {{ currency }}</td>

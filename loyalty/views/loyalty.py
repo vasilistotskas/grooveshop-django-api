@@ -202,6 +202,24 @@ class LoyaltyViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Persist the discount on the order — every charge site reads
+        # calculate_order_total_amount(), which only subtracts what is
+        # stored on the row. The checkout path always did this; this
+        # standalone endpoint used to burn the points while leaving
+        # the order total (and therefore the charge) untouched.
+        from djmoney.money import Money
+
+        order.loyalty_discount = Money(discount, currency)
+        order.paid_amount = order.calculate_order_total_amount()
+        order.save(
+            update_fields=[
+                "loyalty_discount",
+                "loyalty_discount_currency",
+                "paid_amount",
+                "paid_amount_currency",
+            ]
+        )
+
         remaining_balance = LoyaltyService.get_user_balance(request.user)
 
         response_data = {

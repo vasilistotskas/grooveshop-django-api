@@ -36,7 +36,10 @@
 
 {% trans "Subtotal" %}: {{ order.total_price_items }}
 {% trans "Shipping" %}: {{ order.shipping_price }}
-{% trans "Order Total" %}: {{ order.total_price }}
+{% if order.discount_amount.amount > 0 %}{% trans "Discount" %}: -{{ order.discount_amount }}
+{% endif %}{% if order.loyalty_discount.amount > 0 %}{% trans "Loyalty discount" %}: -{{ order.loyalty_discount }}
+{% endif %}{% if order.gift_card_amount.amount > 0 %}{% trans "Gift card" %}: -{{ order.gift_card_amount }}
+{% endif %}{% trans "Order Total" %}: {{ order.calculate_order_total_amount }}
 {% endif %}
 
 {% trans "If you have any questions about your order, please contact our customer service team." %}

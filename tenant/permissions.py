@@ -81,3 +81,15 @@ class IsBlogEnabled(IsTenantFeatureEnabled):
     """Deny access with 404 when the tenant's blog plan flag is off."""
 
     feature_flag = "blog_enabled"
+
+
+class IsPromotionsEnabled(IsTenantFeatureEnabled):
+    """Deny access with 404 when the tenant's promotions plan flag is off."""
+
+    feature_flag = "promotions_enabled"
+
+
+class IsGiftCardsEnabled(IsTenantFeatureEnabled):
+    """Deny access with 404 when the tenant's gift-cards plan flag is off."""
+
+    feature_flag = "gift_cards_enabled"

@@ -14,7 +14,7 @@
     <p><strong>Status:</strong> {{ order.status }}</p>
     <p><strong>Payment status:</strong> {{ order.payment_status }}</p>
     {% if pay_way %}<p><strong>Payment method:</strong> {{ pay_way.name }}</p>{% endif %}
-    <p><strong>Total:</strong> {{ order.total_price }}</p>
+    <p><strong>Total:</strong> {{ order.calculate_order_total_amount }}</p>
 </div>
 
 <div class="email-card">
@@ -59,7 +59,16 @@
 <div class="text-right mt-3">
     <p><strong>Subtotal:</strong> {{ order.total_price_items }}</p>
     <p><strong>Shipping:</strong> {{ order.shipping_price }}</p>
-    <p class="text-bold"><strong>Total:</strong> {{ order.total_price }}</p>
+    {% if order.discount_amount.amount > 0 %}
+    <p><strong>Discount:</strong> -{{ order.discount_amount }}</p>
+    {% endif %}
+    {% if order.loyalty_discount.amount > 0 %}
+    <p><strong>Loyalty discount:</strong> -{{ order.loyalty_discount }}</p>
+    {% endif %}
+    {% if order.gift_card_amount.amount > 0 %}
+    <p><strong>Gift card:</strong> -{{ order.gift_card_amount }}</p>
+    {% endif %}
+    <p class="text-bold"><strong>Total:</strong> {{ order.calculate_order_total_amount }}</p>
 </div>
 
 <p class="mt-3">This email is operational; staff only.</p>

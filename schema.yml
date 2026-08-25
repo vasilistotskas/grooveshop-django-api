@@ -7506,6 +7506,128 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/cart/coupon:
+    post:
+      operationId: applyCartCoupon
+      description: Attach a coupon code to the cart. Returns the updated cart with
+        promotion discount fields. Rejections carry a machine-readable reason.
+      summary: Apply a coupon code to the cart
+      parameters:
+      - in: header
+        name: X-Cart-Id
+        schema:
+          type: string
+          format: uuid
+        description: Cart UUID for guest users. Used to identify and maintain guest
+          cart sessions. Sequential integer IDs were enumerable metadata, so the public
+          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+      tags:
+      - Cart
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CouponApplyRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CouponApplyRequestRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponApplyRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CouponErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartDetail'
+          description: ''
+    delete:
+      operationId: removeCartCoupon
+      description: Remove the applied coupon code from the cart
+      summary: Remove the applied coupon code from the cart
+      parameters:
+      - in: header
+        name: X-Cart-Id
+        schema:
+          type: string
+          format: uuid
+        description: Cart UUID for guest users. Used to identify and maintain guest
+          cart sessions. Sequential integer IDs were enumerable metadata, so the public
+          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+      tags:
+      - Cart
+      security:
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartDetail'
+          description: ''
   /api/v1/cart/create-payment-intent:
     post:
       operationId: createCartPaymentIntent
@@ -32828,6 +32950,22 @@ components:
           readOnly: true
           description: Κωδικός νομίσματος ISO 4217 για όλες τις χρηματικές τιμές αυτού
             του καλαθιού
+        promotionDiscount:
+          type: number
+          format: double
+          readOnly: true
+          description: Discount granted by live promotions (automatic + applied coupon),
+            on top of any product markdown already inside the line prices
+        promotionFreeShipping:
+          type: boolean
+          readOnly: true
+          description: Whether a live promotion waives the shipping cost
+        appliedCouponCodes:
+          type: array
+          items:
+            type: string
+          readOnly: true
+          description: Coupon codes currently attached to this cart
         createdAt:
           type: string
           format: date-time
@@ -32844,11 +32982,14 @@ components:
           readOnly: true
           title: Τελευταία δραστηριότητα
       required:
+      - appliedCouponCodes
       - createdAt
       - currency
       - id
       - items
       - lastActivity
+      - promotionDiscount
+      - promotionFreeShipping
       - totalDiscountValue
       - totalItems
       - totalItemsUnique
@@ -32905,6 +33046,16 @@ components:
           description: Προαιρετικός κωδικός περιφέρειας — καθορίζει την προσαρμογή
             αποστολής σε επίπεδο περιφέρειας.
           maxLength: 16
+        email:
+          description: Checkout email. Lets promotion eligibility checks that depend
+            on customer identity (first-order-only, per-customer limits) run against
+            the same identity the order-create verification will use, keeping the
+            PaymentIntent amount in lockstep.
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
       required:
       - payWayId
       - shippingKind
@@ -32989,6 +33140,22 @@ components:
           readOnly: true
           description: Κωδικός νομίσματος ISO 4217 για όλες τις χρηματικές τιμές αυτού
             του καλαθιού
+        promotionDiscount:
+          type: number
+          format: double
+          readOnly: true
+          description: Discount granted by live promotions (automatic + applied coupon),
+            on top of any product markdown already inside the line prices
+        promotionFreeShipping:
+          type: boolean
+          readOnly: true
+          description: Whether a live promotion waives the shipping cost
+        appliedCouponCodes:
+          type: array
+          items:
+            type: string
+          readOnly: true
+          description: Coupon codes currently attached to this cart
         createdAt:
           type: string
           format: date-time
@@ -33011,11 +33178,14 @@ components:
           readOnly: true
           description: Προτάσεις προϊόντων βάσει περιεχομένου καλαθιού
       required:
+      - appliedCouponCodes
       - createdAt
       - currency
       - id
       - items
       - lastActivity
+      - promotionDiscount
+      - promotionFreeShipping
       - recommendations
       - totalDiscountValue
       - totalItems
@@ -33917,6 +34087,31 @@ components:
       - alpha2
       - alpha3
       - translations
+    CouponApplyRequestRequest:
+      type: object
+      description: Request body for ``POST /api/v1/cart/coupon``.
+      properties:
+        code:
+          type: string
+          minLength: 1
+          description: Coupon code to apply (case-insensitive)
+          maxLength: 40
+      required:
+      - code
+    CouponErrorResponse:
+      type: object
+      description: 4xx body for coupon apply — carries the machine-readable reason.
+      properties:
+        detail:
+          type: string
+          description: Human-readable message
+        reason:
+          type: string
+          description: Machine-readable rejection reason (ACP discount-extension vocabulary,
+            e.g. discount_code_invalid)
+      required:
+      - detail
+      - reason
     CreateCheckoutSessionRequestRequest:
       type: object
       properties:
@@ -35084,6 +35279,39 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
+        discountAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          title: Promotion Discount
+          description: Total discount granted by promotions/coupons, snapshotted at
+            order creation. Breakdown lives in metadata['promotions'] + PromotionRedemption
+            rows. Deducted by calculate_order_total_amount().
+        loyaltyDiscount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          description: Amount deducted from the order total in exchange for loyalty
+            points. Deducted by calculate_order_total_amount().
+        giftCardAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          description: Portion of the order settled by gift-card balance. A payment,
+            not a discount — it never reduces the taxable order value, only what the
+            payment provider charges.
         fullAddress:
           type: string
           readOnly: true
@@ -35125,14 +35353,17 @@ components:
       - city
       - country
       - createdAt
+      - discountAmount
       - email
       - firstName
       - fullAddress
+      - giftCardAmount
       - id
       - isOnlinePayment
       - isPaid
       - items
       - lastName
+      - loyaltyDiscount
       - paidAmount
       - payWay
       - paymentMethodFee
@@ -35474,6 +35705,39 @@ components:
           exclusiveMaximum: true
           exclusiveMinimum: true
           readOnly: true
+        discountAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          title: Promotion Discount
+          description: Total discount granted by promotions/coupons, snapshotted at
+            order creation. Breakdown lives in metadata['promotions'] + PromotionRedemption
+            rows. Deducted by calculate_order_total_amount().
+        loyaltyDiscount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          description: Amount deducted from the order total in exchange for loyalty
+            points. Deducted by calculate_order_total_amount().
+        giftCardAmount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          description: Portion of the order settled by gift-card balance. A payment,
+            not a discount — it never reduces the taxable order value, only what the
+            payment provider charges.
         fullAddress:
           type: string
           readOnly: true
@@ -35542,6 +35806,12 @@ components:
             paymentMethodFee:
               type: number
             extrasTotal:
+              type: number
+            discount:
+              type: number
+            loyaltyDiscount:
+              type: number
+            giftCardAmount:
               type: number
             grandTotal:
               type: number
@@ -35684,9 +35954,11 @@ components:
       - createdAt
       - currency
       - customerFullName
+      - discountAmount
       - email
       - firstName
       - fullAddress
+      - giftCardAmount
       - hasInvoice
       - id
       - isCanceled
@@ -35695,6 +35967,7 @@ components:
       - isPaid
       - items
       - lastName
+      - loyaltyDiscount
       - metaEventIds
       - orderTimeline
       - paidAmount

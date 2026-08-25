@@ -46,6 +46,7 @@ from tenant.credentials import tenant_contact_email, tenant_site_name
 from extra_settings.models import Setting
 
 from core.utils.i18n import get_order_language
+from order.discounts import discounted_line_gross, order_discount_total
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
 
@@ -120,6 +121,10 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     ``{rate, subtotal, vat, gross}`` where values are decimals in the
     order's currency. Items without a configured VAT are grouped under
     rate=0 so the invoice still balances.
+
+    Order-level discounts (promotions + loyalty) are allocated across
+    the lines first — VAT is owed on what the customer actually paid.
+    Gift-card amounts are payment, never allocated (order/discounts.py).
     """
     buckets: dict[Decimal, dict[str, Decimal]] = defaultdict(
         lambda: {
@@ -129,10 +134,11 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
         }
     )
 
-    for item in order.items.select_related("product__vat").all():
-        unit_gross = Decimal(item.price.amount)
-        quantity = Decimal(item.quantity)
-        line_gross = unit_gross * quantity
+    items = list(order.items.select_related("product__vat").all())
+    line_gross_by_pk = discounted_line_gross(order, items)
+
+    for item in items:
+        line_gross = line_gross_by_pk[item.pk]
 
         rate = Decimal("0")
         if item.product and item.product.vat_id:
@@ -188,6 +194,9 @@ def _order_totals(
         "total_vat": total_vat,
         "shipping": shipping,
         "payment_fee": payment_fee,
+        # Informational — the line values above are already net of the
+        # allocation, so ``discount`` never enters the total arithmetic.
+        "discount": order_discount_total(order),
         "total": total,
     }
 

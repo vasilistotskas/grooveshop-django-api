@@ -546,7 +546,15 @@ class TenantAdmin(ModelAdmin):
         ),
         (
             _("Features"),
-            {"fields": ["loyalty_enabled", "blog_enabled"]},
+            {
+                "fields": [
+                    "loyalty_enabled",
+                    "blog_enabled",
+                    "promotions_enabled",
+                    "gift_cards_enabled",
+                    "agent_commerce_enabled",
+                ]
+            },
         ),
         (
             _("Analytics"),

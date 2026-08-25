@@ -120,6 +120,18 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
     queryset = SubscriptionTopic.objects.filter(is_active=True)
     serializers_config = subscription_topic_config
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        from tenant.permissions import (  # noqa: PLC0415
+            IsNewsletterEnabled,
+        )
+
+        # Merchant feature gate always fires first (404 when
+        # disabled). The token-based confirm/unsubscribe views below
+        # are deliberately NOT gated: links in already-sent emails
+        # must keep working after the feature is turned off.
+        return [IsNewsletterEnabled(), *super().get_permissions()]
+
     filterset_class = SubscriptionTopicFilter
     ordering_fields = ["category", "created_at", "updated_at", "slug"]
     ordering = ["category"]
@@ -284,6 +296,14 @@ class UserSubscriptionViewSet(BaseModelViewSet):
     serializers_config = user_subscription_config
 
     permission_classes = [IsOwnerOrAdmin]
+
+    def get_permissions(self):
+        from tenant.permissions import (  # noqa: PLC0415
+            IsNewsletterEnabled,
+        )
+
+        return [IsNewsletterEnabled(), *super().get_permissions()]
+
     filterset_class = UserSubscriptionFilter
     ordering_fields = [
         "subscribed_at",

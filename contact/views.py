@@ -8,6 +8,7 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from contact.models import Contact, Feedback
 from contact.serializers import ContactWriteSerializer, FeedbackWriteSerializer
+from tenant.permissions import IsFeedbackEnabled
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import ContactCreateThrottle, FeedbackCreateThrottle
 
@@ -44,7 +45,9 @@ class ContactCreateView(generics.CreateAPIView):
 class FeedbackCreateView(generics.CreateAPIView):
     queryset = Feedback.objects.all()
     serializer_class = FeedbackWriteSerializer
-    permission_classes = [AllowAny]
+    # Anonymous submissions allowed; the merchant feature gate 404s
+    # the endpoint when FEEDBACK_ENABLED is off.
+    permission_classes = [IsFeedbackEnabled]
     # Same throttle stack rationale as ContactCreateView above.
     throttle_classes = [
         AnonRateThrottle,

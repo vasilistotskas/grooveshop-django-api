@@ -1,0 +1,180 @@
+"""Merchant feature toggles (IsSettingEnabled) 404 their endpoints.
+
+Each gated surface must be indistinguishable from a missing route when
+the merchant turns its extra-setting off, and must work normally when
+it is on (the default). The public settings themselves are covered by
+test_settings_api.py.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import patch
+
+import pytest
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APIClient
+
+from user.factories.account import UserAccountFactory
+
+pytestmark = pytest.mark.django_db
+
+
+def _settings_off(*keys):
+    disabled = set(keys)
+
+    def _get(key, default=None):
+        if key in disabled:
+            return False
+        return default
+
+    return patch("extra_settings.models.Setting.get", side_effect=_get)
+
+
+GATED_LIST_ENDPOINTS = [
+    ("PRODUCT_REVIEWS_ENABLED", "product-review-list", False),
+    ("FAVOURITES_ENABLED", "product-favourite-list", True),
+    ("BLOG_COMMENTS_ENABLED", "blog-comment-list", False),
+    ("NEWSLETTER_ENABLED", "user-subscription-topic-list", True),
+    ("NEWSLETTER_ENABLED", "user-subscription-list", True),
+    ("PRODUCT_ALERTS_ENABLED", "product-alert-list", True),
+]
+
+
+class TestSettingGates:
+    @pytest.mark.parametrize(
+        ("setting_key", "url_name", "needs_auth"),
+        GATED_LIST_ENDPOINTS,
+    )
+    def test_disabled_setting_404s_the_endpoint(
+        self, setting_key, url_name, needs_auth
+    ):
+        client = APIClient()
+        if needs_auth:
+            client.force_authenticate(user=UserAccountFactory())
+
+        with _settings_off(setting_key):
+            response = client.get(reverse(url_name))
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.parametrize(
+        ("setting_key", "url_name", "needs_auth"),
+        GATED_LIST_ENDPOINTS,
+    )
+    def test_enabled_setting_serves_the_endpoint(
+        self, setting_key, url_name, needs_auth
+    ):
+        client = APIClient()
+        if needs_auth:
+            client.force_authenticate(user=UserAccountFactory())
+
+        response = client.get(reverse(url_name))
+
+        assert response.status_code == status.HTTP_200_OK
+
+    def test_feedback_gate(self):
+        client = APIClient()
+        url = reverse("feedback")
+        with _settings_off("FEEDBACK_ENABLED"):
+            response = client.post(url, {"message": "hi"}, format="json")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_agent_surface_gated_by_runtime_setting(self):
+        """The agent-commerce runtime gate fires BEFORE token auth:
+        disabled -> 404 (route hidden); enabled -> the usual 401/403
+        for an unauthenticated call."""
+        client = APIClient()
+        url = reverse("agent-me")
+
+        with _settings_off("AGENT_COMMERCE_ENABLED"):
+            response = client.get(url)
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+        response = client.get(url)
+        assert response.status_code in (
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_unsubscribe_token_views_stay_open(self):
+        """Links in already-sent emails keep working after the feature
+        is turned off — deliberately ungated (bad token -> 4xx, never
+        the gate's 404-with-empty-body)."""
+        client = APIClient()
+        with _settings_off("NEWSLETTER_ENABLED"):
+            response = client.get(
+                reverse(
+                    "user-subscription-confirm-by-token",
+                    args=["not-a-real-token"],
+                )
+            )
+        # The view answers (invalid token), the gate does not.
+        assert response.status_code != status.HTTP_404_NOT_FOUND
+
+
+class TestNotificationTaskGuards:
+    def test_favourites_driven_tasks_skip_when_disabled(self):
+        from product.factories.product import ProductFactory
+        from product.tasks import (
+            notify_back_in_stock_favourites_live,
+            send_price_drop_notifications,
+        )
+
+        product = ProductFactory(num_images=0, num_reviews=0)
+        with _settings_off("FAVOURITES_ENABLED"):
+            live = notify_back_in_stock_favourites_live.apply(
+                args=[product.id]
+            ).result
+            drop = send_price_drop_notifications.apply(
+                args=[product.id, 10.0, 5.0]
+            ).result
+
+        assert live["reason"] == "favourites_disabled"
+        assert drop["reason"] == "favourites_disabled"
+
+    def test_alert_tasks_skip_when_disabled(self):
+        from product.factories.product import ProductFactory
+        from product.tasks import (
+            send_product_alert_price_drop,
+            send_product_alert_restock,
+        )
+
+        product = ProductFactory(num_images=0, num_reviews=0)
+        with _settings_off("PRODUCT_ALERTS_ENABLED"):
+            restock = send_product_alert_restock.apply(args=[product.id]).result
+            drop = send_product_alert_price_drop.apply(
+                args=[product.id, 5.0]
+            ).result
+
+        assert restock["reason"] == "product_alerts_disabled"
+        assert drop["reason"] == "product_alerts_disabled"
+
+
+class TestTenantConfigAgentFlags:
+    def test_effective_flags_combine_plan_and_settings(self):
+        from tenant.models import Tenant
+        from tenant.serializers import TenantConfigSerializer
+
+        tenant = Tenant(
+            schema_name="public",
+            name="t",
+            agent_commerce_enabled=True,
+        )
+        serializer = TenantConfigSerializer()
+
+        assert serializer.get_agent_commerce_enabled(tenant) is True
+        assert serializer.get_product_feeds_enabled(tenant) is True
+
+        with _settings_off("PRODUCT_FEEDS_ENABLED"):
+            assert serializer.get_agent_commerce_enabled(tenant) is True
+            assert serializer.get_product_feeds_enabled(tenant) is False
+
+        with _settings_off("AGENT_COMMERCE_ENABLED"):
+            assert serializer.get_agent_commerce_enabled(tenant) is False
+            # Feeds are subordinate to the agent-commerce gate.
+            assert serializer.get_product_feeds_enabled(tenant) is False
+
+        tenant.agent_commerce_enabled = False
+        assert serializer.get_agent_commerce_enabled(tenant) is False
+        assert serializer.get_product_feeds_enabled(tenant) is False

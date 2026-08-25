@@ -64,6 +64,21 @@ class AgentAPIView(APIView):
 
     authentication_classes = [AgentTokenAuthentication]
 
+    def get_permissions(self):
+        from tenant.permissions import (  # noqa: PLC0415
+            IsAgentCommerceEnabled,
+            IsAgentCommerceRuntimeEnabled,
+        )
+
+        # Effective agent-commerce gate (plan flag AND merchant
+        # runtime setting) — mirrors the folded TenantConfig value the
+        # gateway enforces on its own routes.
+        return [
+            IsAgentCommerceEnabled(),
+            IsAgentCommerceRuntimeEnabled(),
+            *super().get_permissions(),
+        ]
+
 
 class AgentMeView(AgentAPIView):
     permission_classes = [

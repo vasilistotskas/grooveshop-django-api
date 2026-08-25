@@ -260,6 +260,15 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     gift_cards_enabled = models.BooleanField(
         _("Gift Cards Enabled"), default=False
     )
+    # Gates the ENTIRE agent-gateway surface for this tenant: MCP
+    # commerce tools, UCP/ACP agentic checkout, catalog feeds and the
+    # storefront chatbot backend. Default True — the surface predates
+    # the flag and is live for existing tenants; the flag exists so the
+    # platform can opt a tenant OUT (the merchant runtime tier is the
+    # AGENT_COMMERCE_ENABLED extra-setting, folded into TenantConfig).
+    agent_commerce_enabled = models.BooleanField(
+        _("Agent Commerce Enabled"), default=True
+    )
 
     # Stripe Connect — dormant/reserved. The platform runs SEPARATE
     # Stripe accounts per tenant (``stripe_secret_key`` below), not

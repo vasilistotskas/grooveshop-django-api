@@ -41,6 +41,11 @@ def notify_back_in_stock_favourites_live(product_id: int) -> dict:
     who are in both sets will see the live notification + receive the
     email; the two channels are intentionally independent.
     """
+    from extra_settings.models import Setting
+
+    if not bool(Setting.get("FAVOURITES_ENABLED", default=True)):
+        return {"status": "skipped", "reason": "favourites_disabled"}
+
     from notification.enum import (
         NotificationCategoryEnum,
         NotificationKindEnum,
@@ -134,6 +139,11 @@ def send_price_drop_notifications(
     Processes favourite users in batches via iterator() to avoid loading
     the full queryset into memory, and dispatches one notification per user.
     """
+    from extra_settings.models import Setting
+
+    if not bool(Setting.get("FAVOURITES_ENABLED", default=True)):
+        return {"status": "skipped", "reason": "favourites_disabled"}
+
     from notification.enum import (
         NotificationCategoryEnum,
         NotificationKindEnum,
@@ -408,6 +418,11 @@ def _send_product_alert_email(
 )
 def send_product_alert_restock(product_id: int) -> dict:
     """Notify every active RESTOCK ProductAlert subscriber for a product."""
+    from extra_settings.models import Setting
+
+    if not bool(Setting.get("PRODUCT_ALERTS_ENABLED", default=True)):
+        return {"status": "skipped", "reason": "product_alerts_disabled"}
+
     from product.models.alert import ProductAlert, ProductAlertKind
     from product.models.product import Product
 
@@ -481,6 +496,11 @@ def send_product_alert_restock(product_id: int) -> dict:
 )
 def send_product_alert_price_drop(product_id: int, new_price: float) -> dict:
     """Notify PRICE_DROP subscribers whose target_price is >= new_price."""
+    from extra_settings.models import Setting
+
+    if not bool(Setting.get("PRODUCT_ALERTS_ENABLED", default=True)):
+        return {"status": "skipped", "reason": "product_alerts_disabled"}
+
     from product.models.alert import ProductAlert, ProductAlertKind
     from product.models.product import Product
 

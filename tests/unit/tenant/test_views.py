@@ -303,9 +303,15 @@ class TestTenantResolveOnPublicSchema:
             tenant=tenant, domain="public-check.example", is_primary=True
         )
 
-        # Swap connection.tenant to a sentinel: if the view ever reads
-        # tenant-schema data we want the test to blow up visibly.
-        sentinel_tenant = object()
+        # Swap connection.tenant to a sentinel: the DOMAIN LOOKUP must
+        # hit the public schema regardless of what is bound. The
+        # sentinel needs a real schema_name because the serializer now
+        # legitimately enters the RESOLVED tenant's schema (agent
+        # feature settings) and django-tenants restores the bound
+        # tenant afterwards.
+        from types import SimpleNamespace  # noqa: PLC0415
+
+        sentinel_tenant = SimpleNamespace(schema_name="public")
         monkeypatch.setattr(
             connection, "tenant", sentinel_tenant, raising=False
         )

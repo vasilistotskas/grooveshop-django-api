@@ -555,6 +555,15 @@ PUBLIC_SETTING_KEYS = frozenset(
         # previously (mis)gated behind superuser-only preview mode).
         "MOBILE_BOTTOM_NAV_ENABLED",
         "STICKY_ADD_TO_CART_ENABLED",
+        # Merchant feature toggles the storefront gates UI on (the
+        # endpoints themselves are ALSO gated server-side via
+        # tenant.permissions.IsSettingEnabled subclasses).
+        "PRODUCT_REVIEWS_ENABLED",
+        "BLOG_COMMENTS_ENABLED",
+        "FAVOURITES_ENABLED",
+        "NEWSLETTER_ENABLED",
+        "FEEDBACK_ENABLED",
+        "PRODUCT_ALERTS_ENABLED",
         # Public contact email for storefront footer/contact page.
         # Falls back to Tenant.contact_email or settings.INFO_EMAIL.
         "CONTACT_EMAIL",

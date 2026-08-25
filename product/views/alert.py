@@ -57,9 +57,14 @@ class ProductAlertViewSet(BaseModelViewSet):
     ordering = ["-created_at"]
 
     def get_permissions(self):
+        from tenant.permissions import (  # noqa: PLC0415
+            IsProductAlertsEnabled,
+        )
+
+        # Merchant feature gate always fires first (404 when disabled).
         if self.action == "create":
-            return [AllowAny()]
-        return [IsAuthenticated()]
+            return [IsProductAlertsEnabled(), AllowAny()]
+        return [IsProductAlertsEnabled(), IsAuthenticated()]
 
     def get_queryset(self):
         user = getattr(self.request, "user", None)

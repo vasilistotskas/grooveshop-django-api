@@ -84,6 +84,12 @@ class TestGetSettingByKeyPublicAccess:
         for key in (
             "MOBILE_BOTTOM_NAV_ENABLED",
             "STICKY_ADD_TO_CART_ENABLED",
+            "PRODUCT_REVIEWS_ENABLED",
+            "BLOG_COMMENTS_ENABLED",
+            "FAVOURITES_ENABLED",
+            "NEWSLETTER_ENABLED",
+            "FEEDBACK_ENABLED",
+            "PRODUCT_ALERTS_ENABLED",
         ):
             response = client.get(url, {"key": key})
             assert response.status_code == status.HTTP_200_OK, key

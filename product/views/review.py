@@ -107,6 +107,10 @@ class ProductReviewViewSet(BaseModelViewSet):
             return queryset.filter(status=ReviewStatus.TRUE)
 
     def get_permissions(self):
+        from tenant.permissions import (  # noqa: PLC0415
+            IsProductReviewsEnabled,
+        )
+
         if self.action in [
             "create",
             "update",
@@ -115,7 +119,8 @@ class ProductReviewViewSet(BaseModelViewSet):
             "user_product_review",
         ]:
             self.permission_classes = [IsOwnerOrAdmin]
-        return super().get_permissions()
+        # Merchant feature gate always fires first (404 when disabled).
+        return [IsProductReviewsEnabled(), *super().get_permissions()]
 
     def perform_create(self, serializer):
         product = serializer.validated_data["product"]

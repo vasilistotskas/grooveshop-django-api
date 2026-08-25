@@ -144,8 +144,16 @@ class BlogCommentViewSet(BaseModelViewSet):
         )
 
     def get_permissions(self):
-        # Feature gate always fires first (raises 404 when disabled).
-        base: list[permissions.BasePermission] = [IsBlogEnabled()]
+        from tenant.permissions import (  # noqa: PLC0415
+            IsBlogCommentsEnabled,
+        )
+
+        # Feature gates always fire first (raise 404 when disabled):
+        # the blog plan flag, then the merchant's comments toggle.
+        base: list[permissions.BasePermission] = [
+            IsBlogEnabled(),
+            IsBlogCommentsEnabled(),
+        ]
         if self.action in [
             "create",
             "update",

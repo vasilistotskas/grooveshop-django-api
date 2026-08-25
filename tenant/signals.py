@@ -41,6 +41,36 @@ def invalidate_tenant_caches(sender, instance, **kwargs):
     cache.delete(f"global:tenant_domains:{instance.schema_name}")
 
 
+@receiver(post_save, sender="extra_settings.Setting")
+def invalidate_resolve_on_agent_setting_change(sender, instance, **kwargs):
+    """Purge the tenant-resolve cache when a merchant edits a setting
+    that is FOLDED into the cached TenantConfig payload.
+
+    ``AGENT_COMMERCE_ENABLED`` / ``PRODUCT_FEEDS_ENABLED`` are combined
+    with the plan flag inside ``TenantConfigSerializer`` — without this
+    purge a merchant toggle would sit behind the resolve cache for the
+    full TTL. Setting rows live in the TENANT schema, so the current
+    connection schema identifies whose domains to purge.
+    """
+    if getattr(instance, "name", "") not in {
+        "AGENT_COMMERCE_ENABLED",
+        "PRODUCT_FEEDS_ENABLED",
+    }:
+        return
+    from django.db import connection  # noqa: PLC0415
+    from django_tenants.utils import schema_context  # noqa: PLC0415
+
+    schema = connection.schema_name
+    if schema == "public":
+        return
+    with schema_context("public"):
+        tenant = Tenant.objects.filter(schema_name=schema).first()
+        if tenant is None:
+            return
+        for domain in tenant.domains.values_list("domain", flat=True):
+            cache.delete(f"global:tenant_resolve:{domain}")
+
+
 @receiver(post_save, sender=Tenant)
 def reactivate_on_renewal(sender, instance, **kwargs):
     """Recording a payment lifts a BILLING suspension immediately.

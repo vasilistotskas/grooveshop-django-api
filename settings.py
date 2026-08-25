@@ -1539,6 +1539,87 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "PRODUCT_REVIEWS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Product reviews feature: the review list and write-review "
+            "flow on product pages plus the review API. Turning it off "
+            "404s the endpoints and hides the storefront review UI."
+        ),
+    },
+    {
+        "name": "BLOG_COMMENTS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Blog comments (and comment likes) under blog posts. Only "
+            "meaningful while the blog plan flag is on — this is the "
+            "finer runtime knob for a read-only blog."
+        ),
+    },
+    {
+        "name": "FAVOURITES_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Product favourites/wishlist: the hearts across the "
+            "storefront, the account favourites page, the API, and the "
+            "favourites-driven price-drop / back-in-stock emails."
+        ),
+    },
+    {
+        "name": "NEWSLETTER_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Newsletter topic subscriptions: the account subscriptions "
+            "page and the topic/subscription APIs. Unsubscribe and "
+            "confirmation links from already-sent emails keep working "
+            "regardless."
+        ),
+    },
+    {
+        "name": "FEEDBACK_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "The storefront feedback page and its submission endpoint."
+        ),
+    },
+    {
+        "name": "PRODUCT_ALERTS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Explicit product alerts (back-in-stock / price-drop "
+            "subscriptions): the alert API and the alert emails."
+        ),
+    },
+    {
+        "name": "AGENT_COMMERCE_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Merchant runtime tier of the agent-commerce gate. The "
+            "effective value (this AND the Tenant plan flag) is served "
+            "in TenantConfig and enforced by the agent gateway for "
+            "MCP/UCP/ACP, feeds and the chatbot. Cached with the "
+            "tenant-resolve payload — changes take effect on cache "
+            "invalidation (automatic on save)."
+        ),
+    },
+    {
+        "name": "PRODUCT_FEEDS_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Catalog feed syndication (Meta / TikTok / agent feeds) "
+            "served by the gateway. Subordinate to agent commerce: "
+            "feeds are off whenever the agent-commerce gate is off."
+        ),
+    },
+    {
         "name": "MOBILE_BOTTOM_NAV_ENABLED",
         "type": "bool",
         "value": True,

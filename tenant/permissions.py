@@ -93,3 +93,78 @@ class IsGiftCardsEnabled(IsTenantFeatureEnabled):
     """Deny access with 404 when the tenant's gift-cards plan flag is off."""
 
     feature_flag = "gift_cards_enabled"
+
+
+class IsAgentCommerceEnabled(IsTenantFeatureEnabled):
+    """Deny access with 404 when the tenant's agent-commerce plan flag
+    is off. The gateway enforces the folded TenantConfig value for its
+    own routes; this is the belt-and-braces server-side gate for the
+    ``/api/v1/agent/*`` resources the gateway calls."""
+
+    feature_flag = "agent_commerce_enabled"
+
+
+class IsSettingEnabled(BasePermission):
+    """Base permission that gates a feature behind an extra-setting.
+
+    The merchant-tier twin of ``IsTenantFeatureEnabled``: subclasses
+    set ``setting_key`` to a boolean extra-setting the STORE OWNER
+    edits at runtime (no plan/billing dimension). Same 404 semantics —
+    a disabled feature is indistinguishable from a missing route.
+
+    ``Setting.get`` reads the ACTIVE schema, so the public/control
+    plane resolves the public schema's defaults (True) and is never
+    gated — mirroring the tenant-flag base's public-schema bypass.
+    """
+
+    setting_key: str = ""
+    default: bool = True
+
+    def has_permission(self, request, view) -> bool:
+        from extra_settings.models import Setting  # noqa: PLC0415
+
+        if not bool(Setting.get(self.setting_key, default=self.default)):
+            raise NotFound()
+        return True
+
+
+class IsProductReviewsEnabled(IsSettingEnabled):
+    """404 when the merchant has turned product reviews off."""
+
+    setting_key = "PRODUCT_REVIEWS_ENABLED"
+
+
+class IsBlogCommentsEnabled(IsSettingEnabled):
+    """404 when the merchant has turned blog comments off."""
+
+    setting_key = "BLOG_COMMENTS_ENABLED"
+
+
+class IsFavouritesEnabled(IsSettingEnabled):
+    """404 when the merchant has turned favourites/wishlist off."""
+
+    setting_key = "FAVOURITES_ENABLED"
+
+
+class IsNewsletterEnabled(IsSettingEnabled):
+    """404 when the merchant has turned newsletter subscriptions off."""
+
+    setting_key = "NEWSLETTER_ENABLED"
+
+
+class IsFeedbackEnabled(IsSettingEnabled):
+    """404 when the merchant has turned the feedback form off."""
+
+    setting_key = "FEEDBACK_ENABLED"
+
+
+class IsProductAlertsEnabled(IsSettingEnabled):
+    """404 when the merchant has turned product alerts off."""
+
+    setting_key = "PRODUCT_ALERTS_ENABLED"
+
+
+class IsAgentCommerceRuntimeEnabled(IsSettingEnabled):
+    """404 when the merchant has turned agent commerce off at runtime."""
+
+    setting_key = "AGENT_COMMERCE_ENABLED"

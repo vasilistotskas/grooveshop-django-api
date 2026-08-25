@@ -63,6 +63,32 @@ class TenantConfigSerializer(serializers.Serializer):
     promotions_enabled = serializers.BooleanField(read_only=True)
     gift_cards_enabled = serializers.BooleanField(read_only=True)
     agent_stripe_delegated_enabled = serializers.BooleanField(read_only=True)
+    # EFFECTIVE agent-commerce gates, consumed by the agent gateway:
+    # plan flag AND the tenant-schema extra-setting, folded here so
+    # the gateway reads ONE authoritative value per surface. Read
+    # under the tenant's schema — this serializer runs in whatever
+    # schema the resolve request happened to hit.
+    agent_commerce_enabled = serializers.SerializerMethodField()
+    product_feeds_enabled = serializers.SerializerMethodField()
+
+    def get_agent_commerce_enabled(self, obj) -> bool:
+        from django_tenants.utils import schema_context  # noqa: PLC0415
+        from extra_settings.models import Setting  # noqa: PLC0415
+
+        if not obj.agent_commerce_enabled:
+            return False
+        with schema_context(obj.schema_name):
+            return bool(Setting.get("AGENT_COMMERCE_ENABLED", default=True))
+
+    def get_product_feeds_enabled(self, obj) -> bool:
+        from django_tenants.utils import schema_context  # noqa: PLC0415
+        from extra_settings.models import Setting  # noqa: PLC0415
+
+        # Subordinate to the agent-commerce gate.
+        if not self.get_agent_commerce_enabled(obj):
+            return False
+        with schema_context(obj.schema_name):
+            return bool(Setting.get("PRODUCT_FEEDS_ENABLED", default=True))
 
     # --- Payments (public key only) ---
     # Public Stripe publishable key — pk_test_* / pk_live_* only.
@@ -209,6 +235,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "chat_api_key",
             "acp_bearer_token",
             "agent_stripe_delegated_enabled",
+            "agent_commerce_enabled",
             # --- Social Links ---
             "socials_discord",
             "socials_facebook",

@@ -178,6 +178,21 @@ class InvalidCouponError(OrderServiceError):
         super().__init__(f"Coupon {code} refused: {reason}")
 
 
+class InvalidGiftCardError(OrderServiceError):
+    """
+    Raised when a gift card supplied at order creation cannot be
+    redeemed (unknown code, disabled/expired/empty card, too many
+    cards, or insufficient coverage for a no-provider checkout).
+
+    Attributes:
+        reason (str): Machine-readable reason (gift_card_* vocabulary).
+    """
+
+    def __init__(self, reason: str, message: str):
+        self.reason = reason
+        super().__init__(message)
+
+
 class OrderNotFoundError(OrderServiceError):
     """
     Raised when an order doesn't exist.

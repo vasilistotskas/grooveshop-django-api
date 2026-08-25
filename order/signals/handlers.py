@@ -849,6 +849,27 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
 
     logger.info("Stripe payment succeeded: %s", payment_intent_id)
 
+    # Gift-card purchases are NOT orders — resolve them first and stop.
+    # ``complete_purchase`` is idempotent (status guard), so webhook
+    # redeliveries are harmless.
+    from giftcard.models import GiftCardPurchase
+
+    purchase = (
+        GiftCardPurchase.objects.select_for_update()
+        .filter(payment_id=payment_intent_id)
+        .first()
+    )
+    if purchase:
+        from giftcard.services import GiftCardService
+
+        GiftCardService.complete_purchase(
+            purchase, payment_id=payment_intent_id
+        )
+        logger.info(
+            "Gift card purchase %s completed via webhook", purchase.uuid
+        )
+        return
+
     # Atomic idempotency check-and-mark with row lock to prevent
     # duplicate processing from parallel webhook deliveries.
     already_processed = False
@@ -928,6 +949,20 @@ def handle_stripe_payment_failed(sender, **kwargs):
         event_id = event.id
 
         logger.info("Stripe payment failed: %s", payment_intent_id)
+
+        # Gift-card purchases are NOT orders — flag them failed and stop.
+        from giftcard.enum import GiftCardPurchaseStatus
+        from giftcard.models import GiftCardPurchase
+
+        purchase = GiftCardPurchase.objects.filter(
+            payment_id=payment_intent_id,
+            status=GiftCardPurchaseStatus.PENDING,
+        ).first()
+        if purchase:
+            purchase.status = GiftCardPurchaseStatus.FAILED
+            purchase.save(update_fields=["status"])
+            logger.info("Gift card purchase %s failed", purchase.uuid)
+            return
 
         # Event-level idempotency: Stripe may redeliver the same event.
         # A customer who has moved on to a retry (payment_id already

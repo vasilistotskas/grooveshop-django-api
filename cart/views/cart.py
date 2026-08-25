@@ -731,6 +731,44 @@ class CartViewSet(BaseModelViewSet):
             cart_total.currency,
         )
 
+        # Gift cards settle part of the total before the provider —
+        # the intent covers the REMAINDER only. Same plan math as the
+        # order-create verification (which recomputes it under card
+        # locks), so the two always agree.
+        gift_card_codes = request_serializer.validated_data.get(
+            "gift_card_codes"
+        )
+        if gift_card_codes:
+            from giftcard.services import GiftCardError, GiftCardService
+
+            try:
+                gift_plan = GiftCardService.plan_redemption(
+                    gift_card_codes, cart_total
+                )
+            except GiftCardError as exc:
+                return Response(
+                    {"detail": exc.message, "reason": exc.reason},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            cart_total = Money(
+                cart_total.amount - gift_plan.amount.amount,
+                cart_total.currency,
+            )
+            if cart_total.amount <= 0:
+                # Nothing left to charge — the frontend must skip the
+                # PaymentIntent entirely and create the order with the
+                # gift card codes alone.
+                return Response(
+                    {
+                        "detail": _(
+                            "Gift cards cover the full total; no "
+                            "payment intent is needed."
+                        ),
+                        "reason": "gift_card_covers_total",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
         # Get Stripe payment provider
         provider = PayWayService.get_provider_for_pay_way(pay_way)
         if not provider:

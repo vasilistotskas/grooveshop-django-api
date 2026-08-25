@@ -61,6 +61,16 @@ def fanout_process_points_expiration():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_expire_gift_cards():
+    return run_for_all_tenants("giftcard.tasks.expire_gift_cards")
+
+
+@celery_app.task(base=TenantTask)
+def fanout_deliver_scheduled_gift_cards():
+    return run_for_all_tenants("giftcard.tasks.deliver_scheduled_gift_cards")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_check_pending_orders():
     return run_for_all_tenants("order.tasks.check_pending_orders")
 

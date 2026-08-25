@@ -65,6 +65,13 @@ class CouponApplyThrottle(AnonRateThrottle):
     scope = "coupon_apply"
 
 
+class GiftCardCheckThrottle(AnonRateThrottle):
+    """Tight per-IP throttle for the gift-card balance check — the code
+    IS the bearer secret, so this endpoint must not be enumerable."""
+
+    scope = "gift_card_check"
+
+
 class SearchThrottle(AnonRateThrottle):
     scope = "search"
 

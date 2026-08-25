@@ -225,6 +225,7 @@ TENANT_APPS = [
     "contact",
     "loyalty",
     "promotion",
+    "giftcard",
     "page_config",
     # Agent surface (OIDC-bearer API over tenant-schema data; no models
     # of its own — placed here because everything it serves is per-store)
@@ -440,6 +441,8 @@ REST_FRAMEWORK = {
         "cart_mutation_anon": None if DEBUG else "30/minute",
         # Coupon apply is a code-guessing oracle — keep the budget tight.
         "coupon_apply": None if DEBUG else "10/minute",
+        # Gift-card balance check exposes a bearer secret's validity.
+        "gift_card_check": None if DEBUG else "6/minute",
         "search": None if DEBUG else "120/minute",
         # Clicks get their own budget - the anonymous click endpoint must
         # not be able to starve the search allowance for the same client.
@@ -976,6 +979,20 @@ def get_celery_beat_schedule():
         "process-loyalty-points-expiration": {
             "task": "tenant.tasks.fanout_process_points_expiration",
             "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "expire-gift-cards": {
+            "task": "tenant.tasks.fanout_expire_gift_cards",
+            "schedule": SCHEDULE_PRESETS["daily_3am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
+        "deliver-scheduled-gift-cards": {
+            # Cards bought with a future deliver_at — a daily sweep
+            # instead of far-future ETAs, which brokers redeliver badly.
+            "task": "tenant.tasks.fanout_deliver_scheduled_gift_cards",
+            "schedule": SCHEDULE_PRESETS["daily_6am"]
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
@@ -1547,6 +1564,28 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "PROMOTIONS_ENABLED",
         "type": "bool",
         "value": False,
+    },
+    {
+        "name": "GIFT_CARDS_ENABLED",
+        "type": "bool",
+        "value": False,
+    },
+    {
+        # Greek law caps gift-card validity at 5 years minimum for
+        # consumer protection; 0 disables expiry entirely.
+        "name": "GIFT_CARD_VALIDITY_DAYS",
+        "type": "int",
+        "value": 1825,
+    },
+    {
+        "name": "GIFT_CARD_MIN_AMOUNT",
+        "type": "decimal",
+        "value": 10.00,
+    },
+    {
+        "name": "GIFT_CARD_MAX_AMOUNT",
+        "type": "decimal",
+        "value": 500.00,
     },
     {
         "name": "LOYALTY_POINTS_FACTOR",
@@ -2552,6 +2591,13 @@ UNFOLD = {
                         "icon": "confirmation_number",
                         "link": reverse_lazy(
                             "admin:promotion_promotioncode_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Gift Cards"),
+                        "icon": "card_giftcard",
+                        "link": reverse_lazy(
+                            "admin:giftcard_giftcard_changelist"
                         ),
                     },
                     {

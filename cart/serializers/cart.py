@@ -276,6 +276,17 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
             "PaymentIntent amount in lockstep."
         ),
     )
+    gift_card_codes = serializers.ListField(
+        child=serializers.CharField(max_length=32),
+        required=False,
+        allow_empty=True,
+        max_length=3,
+        help_text=_(
+            "Gift card codes the shopper wants to redeem — the intent "
+            "is created for the REMAINDER after their balances. Pass "
+            "the same codes in the order-create body."
+        ),
+    )
 
     def validate(self, attrs):
         """Pickup-point requires a carrier code; home-delivery doesn't.

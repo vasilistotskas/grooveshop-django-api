@@ -48,6 +48,7 @@ from core.utils.serializers import (
 from order.exceptions import (
     InsufficientStockError,
     InvalidCouponError,
+    InvalidGiftCardError,
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
@@ -647,9 +648,19 @@ class OrderViewSet(BaseModelViewSet):
             # Providers that use hosted redirect checkout (order-first, no payment intent)
             redirect_checkout_providers = {"viva_wallet"}
 
+            # Gift cards covering the FULL total need no PaymentIntent
+            # at all — the storefront omits payment_intent_id and the
+            # order-first flow settles the order from the card balance
+            # (the service rejects insufficient coverage with a typed
+            # error rather than leaving an unpayable order behind).
+            gift_cards_without_intent = bool(
+                validated_data.get("gift_card_codes")
+            ) and not validated_data.get("payment_intent_id")
+
             if (
                 pay_way.is_online_payment
                 and pay_way.provider_code not in redirect_checkout_providers
+                and not gift_cards_without_intent
             ):
                 # Payment-first flow: Requires payment_intent_id (e.g. Stripe)
                 return self._create_with_payment_intent(
@@ -709,6 +720,21 @@ class OrderViewSet(BaseModelViewSet):
                     "error": {
                         "type": "invalid_coupon",
                         "code": e.code,
+                        "reason": e.reason,
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except InvalidGiftCardError as e:
+            logger.warning(
+                "Gift card refused at order creation: reason=%s", e.reason
+            )
+            return Response(
+                {
+                    "detail": _("The gift card cannot be used."),
+                    "error": {
+                        "type": "invalid_gift_card",
                         "reason": e.reason,
                     },
                 },
@@ -871,6 +897,7 @@ class OrderViewSet(BaseModelViewSet):
             pay_way=pay_way,
             user=user,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
+            gift_card_codes=validated_data.get("gift_card_codes"),
             meta_context=meta_context,
         )
 
@@ -945,6 +972,7 @@ class OrderViewSet(BaseModelViewSet):
             pay_way=pay_way,
             user=user,
             loyalty_points_to_redeem=loyalty_points_to_redeem,
+            gift_card_codes=validated_data.get("gift_card_codes"),
             meta_context=meta_context,
         )
 

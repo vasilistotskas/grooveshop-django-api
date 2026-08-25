@@ -1,0 +1,15 @@
+{% load i18n %}{% trans "YOU RECEIVED A GIFT CARD!" %}
+{% if card.sender_name %}
+{% blocktrans with sender=card.sender_name %}From {{ sender }}{% endblocktrans %}
+{% endif %}{% if card.message %}
+"{{ card.message }}"
+{% endif %}
+{% trans "Your gift card code" %}: {{ card.code }}
+{% trans "Value" %}: {{ balance }}
+{% if card.expires_at %}{% trans "Valid until" %}: {{ card.expires_at|date:"SHORT_DATE_FORMAT" }}
+{% endif %}
+{% trans "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

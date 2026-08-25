@@ -10270,6 +10270,195 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: ''
+  /api/v1/giftcard/check:
+    post:
+      operationId: checkGiftCard
+      description: Check a gift card's balance
+      summary: Check a gift card's balance
+      tags:
+      - Gift Cards
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GiftCardCheckRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GiftCardCheckRequestRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GiftCardCheckRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftCardErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftCardCheckResponse'
+          description: ''
+  /api/v1/giftcard/mine:
+    get:
+      operationId: listMyGiftCards
+      description: List the gift cards linked to my account
+      summary: List the gift cards linked to my account
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: pageSize
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          oneOf:
+          - type: string
+            pattern: ^-?\d+$
+          - type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - Gift Cards
+      security:
+      - cookieAuth: []
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedGiftCardList'
+          description: ''
+  /api/v1/giftcard/purchase:
+    post:
+      operationId: purchaseGiftCard
+      description: Buy a gift card (Stripe payment)
+      summary: Buy a gift card (Stripe payment)
+      tags:
+      - Gift Cards
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GiftCardPurchaseRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GiftCardPurchaseRequestRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GiftCardPurchaseRequestRequest'
+        required: true
+      security:
+      - cookieAuth: []
+      - {}
+      responses:
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftCardErrorResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GiftCardPurchaseResponse'
+          description: ''
   /api/v1/health:
     get:
       operationId: api_v1_health_retrieve
@@ -33056,6 +33245,16 @@ components:
             format: email
           - type: string
             maxLength: 0
+        giftCardCodes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 32
+          description: Gift card codes the shopper wants to redeem — the intent is
+            created for the REMAINDER after their balances. Pass the same codes in
+            the order-create body.
+          maxItems: 3
       required:
       - payWayId
       - shippingKind
@@ -34596,6 +34795,265 @@ components:
       - providerCode
       - providerName
       - threshold
+    GiftCard:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        uuid:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          title: Κωδικός
+          description: Crypto-random, uppercased; the bearer secret
+        initialValue:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+        balance:
+          type: string
+          readOnly: true
+        status:
+          allOf:
+          - $ref: '#/components/schemas/GiftCardStatusEnum'
+          readOnly: true
+          title: Κατάσταση
+        expiresAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          title: Λήγει στις
+          description: 'Defaults to GIFT_CARD_VALIDITY_DAYS after issue (Greek law:
+            5 years); empty means never expires'
+        recipientEmail:
+          type: string
+          format: email
+          readOnly: true
+        recipientName:
+          type: string
+          readOnly: true
+        senderName:
+          type: string
+          readOnly: true
+        message:
+          type: string
+          readOnly: true
+          title: Μήνυμα
+        deliveredAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/GiftCardTransaction'
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Δημιουργήθηκε στις
+      required:
+      - balance
+      - code
+      - createdAt
+      - deliveredAt
+      - expiresAt
+      - id
+      - initialValue
+      - message
+      - recipientEmail
+      - recipientName
+      - senderName
+      - status
+      - transactions
+      - uuid
+    GiftCardCheckRequestRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          description: Gift card code (case-insensitive)
+          maxLength: 32
+      required:
+      - code
+    GiftCardCheckResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        balance:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        currency:
+          type: string
+          maxLength: 3
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        isRedeemable:
+          type: boolean
+      required:
+      - balance
+      - code
+      - currency
+      - expiresAt
+      - isRedeemable
+    GiftCardErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Human-readable message
+        reason:
+          type: string
+          description: Machine-readable reason, e.g. gift_card_invalid
+      required:
+      - detail
+      - reason
+    GiftCardPurchaseRequestRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: 0
+          exclusiveMaximum: true
+          description: Card value in EUR — bounded by GIFT_CARD_MIN_AMOUNT / GIFT_CARD_MAX_AMOUNT
+        buyerEmail:
+          description: Required for guests; authenticated buyers default to their
+            account email
+          oneOf:
+          - type: string
+            format: email
+          - type: string
+            maxLength: 0
+        recipientEmail:
+          type: string
+          format: email
+          minLength: 1
+        recipientName:
+          type: string
+          default: ''
+          maxLength: 255
+        senderName:
+          type: string
+          default: ''
+          maxLength: 255
+        message:
+          type: string
+          default: ''
+          maxLength: 2000
+        deliverAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Empty means deliver right after payment
+      required:
+      - amount
+      - recipientEmail
+    GiftCardPurchaseResponse:
+      type: object
+      properties:
+        purchaseUuid:
+          type: string
+          format: uuid
+        clientSecret:
+          type: string
+          description: Stripe PaymentIntent client secret
+        paymentIntentId:
+          type: string
+        amount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+        currency:
+          type: string
+          maxLength: 3
+      required:
+      - amount
+      - clientSecret
+      - currency
+      - paymentIntentId
+      - purchaseUuid
+    GiftCardStatusEnum:
+      enum:
+      - ACTIVE
+      - DISABLED
+      type: string
+      description: |-
+        * `ACTIVE` - Ενεργή
+        * `DISABLED` - Disabled
+    GiftCardTransaction:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        kind:
+          allOf:
+          - $ref: '#/components/schemas/GiftCardTransactionKindEnum'
+          readOnly: true
+          title: Είδος
+        amount:
+          type: number
+          format: double
+          maximum: 1000000000
+          minimum: -1000000000
+          exclusiveMaximum: true
+          exclusiveMinimum: true
+          readOnly: true
+          description: 'Signed: positive adds balance (issue/refund credit), negative
+            removes it (redeem/expire)'
+        order:
+          type: integer
+          readOnly: true
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Δημιουργήθηκε στις
+      required:
+      - amount
+      - createdAt
+      - id
+      - kind
+      - order
+    GiftCardTransactionKindEnum:
+      enum:
+      - ISSUE
+      - REDEEM
+      - REFUND_CREDIT
+      - ADJUST
+      - EXPIRE
+      type: string
+      description: |-
+        * `ISSUE` - Issue
+        * `REDEEM` - Εξαργύρωση
+        * `REFUND_CREDIT` - Refund credit
+        * `ADJUST` - Προσαρμογή
+        * `EXPIRE` - Λήξη
     HealthCheckResponse:
       type: object
       properties:
@@ -35491,6 +35949,16 @@ components:
           nullable: true
           description: Αριθμός πόντων πιστότητας προς εξαργύρωση για έκπτωση σε αυτή
             την παραγγελία
+        giftCardCodes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 32
+          description: Gift card codes to redeem against this order (max 3). When
+            they cover the full total, omit payment_intent_id — no provider charge
+            happens at all.
+          maxItems: 3
         boxnowLockerId:
           type: string
           description: ID locker APM BoxNow από το widget
@@ -36937,6 +37405,44 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Country'
+    PaginatedGiftCardList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=4
+            previous:
+              type: string
+              nullable: true
+              format: uri
+              example: http://api.example.org/accounts/?page=2
+        count:
+          type: integer
+          example: 123
+        totalPages:
+          type: integer
+          example: 123
+        pageSize:
+          type: integer
+          example: 123
+        pageTotalResults:
+          type: integer
+          example: 123
+        page:
+          type: integer
+          example: 123
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/GiftCard'
     PaginatedLoyaltyTierList:
       type: object
       required:

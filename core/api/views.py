@@ -537,6 +537,10 @@ PUBLIC_SETTING_KEYS = frozenset(
         "ACS_SMARTPOINT_ENABLED",
         "LOYALTY_ENABLED",
         "PROMOTIONS_ENABLED",
+        "GIFT_CARDS_ENABLED",
+        # Purchase-form bounds for the storefront gift-card page.
+        "GIFT_CARD_MIN_AMOUNT",
+        "GIFT_CARD_MAX_AMOUNT",
         "LOYALTY_REDEMPTION_RATIO_EUR",
         "LOYALTY_POINTS_FACTOR",
         "LOYALTY_TIER_MULTIPLIER_ENABLED",

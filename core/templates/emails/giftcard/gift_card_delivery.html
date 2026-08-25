@@ -1,0 +1,34 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "You received a gift card!" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<div style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); padding: 32px 24px; text-align: center; border-radius: 8px; margin-bottom: 24px;">
+    <h2 style="color: white; font-size: 28px; margin: 0 0 12px 0;">🎁 {% trans "You received a gift card!" %}</h2>
+    {% if card.sender_name %}
+    <p style="color: white; font-size: 16px; margin: 0;">{% blocktrans with sender=card.sender_name %}From {{ sender }}{% endblocktrans %}</p>
+    {% endif %}
+</div>
+
+{% if card.recipient_name %}
+<p>{% blocktrans with name=card.recipient_name %}Dear {{ name }},{% endblocktrans %}</p>
+{% endif %}
+
+{% if card.message %}
+<div class="email-card">
+    <p style="font-style: italic;">"{{ card.message }}"</p>
+</div>
+{% endif %}
+
+<div class="email-card" style="text-align: center;">
+    <h2>{% trans "Your gift card" %}</h2>
+    <p style="font-size: 32px; font-weight: bold; letter-spacing: 2px; margin: 16px 0;">{{ card.code }}</p>
+    <p><strong>{% trans "Value" %}:</strong> {{ balance }}</p>
+    {% if card.expires_at %}
+    <p><strong>{% trans "Valid until" %}:</strong> {{ card.expires_at|date:"SHORT_DATE_FORMAT" }}</p>
+    {% endif %}
+</div>
+
+<p>{% trans "Enter the code at checkout to use your balance — you can spend it across several orders until it runs out." %}</p>
+{% endblock %}

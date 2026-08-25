@@ -810,6 +810,19 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         ),
     )
 
+    # Gift cards to settle (part of) the order with (optional)
+    gift_card_codes = serializers.ListField(
+        child=serializers.CharField(max_length=32),
+        required=False,
+        allow_empty=True,
+        max_length=3,
+        help_text=_(
+            "Gift card codes to redeem against this order (max 3). "
+            "When they cover the full total, omit payment_intent_id — "
+            "no provider charge happens at all."
+        ),
+    )
+
     # BoxNow locker fields (required when carrier=boxnow + kind=pickup_point)
     boxnow_locker_id = serializers.CharField(
         max_length=64,

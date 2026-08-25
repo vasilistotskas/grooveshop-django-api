@@ -14,6 +14,7 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     InsufficientStockError,
     InvalidCouponError,
+    InvalidGiftCardError,
     InvalidOrderDataError,
     InvalidStatusTransitionError,
     OrderCancellationError,
@@ -208,6 +209,44 @@ class OrderService:
         return result
 
     @classmethod
+    def _redeem_gift_cards(cls, gift_card_codes, order) -> Money:
+        """Order-first path: locked plan + record against what is still
+        due after promotions and loyalty. Returns the settled amount."""
+        if not gift_card_codes:
+            return Money(0, settings.DEFAULT_CURRENCY)
+        from giftcard.services import (  # noqa: PLC0415
+            GiftCardError,
+            GiftCardService,
+        )
+
+        amount_due = order.calculate_order_total_amount()
+        try:
+            return GiftCardService.redeem(gift_card_codes, order, amount_due)
+        except GiftCardError as exc:
+            raise InvalidGiftCardError(
+                reason=exc.reason, message=str(exc.message)
+            ) from exc
+
+    @classmethod
+    def _plan_gift_cards_locked(cls, gift_card_codes, amount_due: Money):
+        """Payment-first path: lock the cards and compute the plan the
+        PaymentIntent verification AND the later recording both use —
+        one plan, no drift between the verified and redeemed amounts."""
+        from giftcard.services import (  # noqa: PLC0415
+            GiftCardError,
+            GiftCardService,
+        )
+
+        try:
+            return GiftCardService.plan_redemption(
+                gift_card_codes or [], amount_due, lock=True
+            )
+        except GiftCardError as exc:
+            raise InvalidGiftCardError(
+                reason=exc.reason, message=str(exc.message)
+            ) from exc
+
+    @classmethod
     @transaction.atomic
     def create_order_from_cart(
         cls,
@@ -217,6 +256,7 @@ class OrderService:
         pay_way,
         user=None,
         loyalty_points_to_redeem: int | None = None,
+        gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
     ) -> Order:
         """
@@ -371,6 +411,15 @@ class OrderService:
                 + _shipping_cost.amount
                 + _payment_fee.amount
             )
+            # Gift cards settle part of the total BEFORE the provider
+            # charge — the plan locks the card rows until commit so
+            # the amount verified here is exactly what gets redeemed
+            # after the order row exists.
+            gift_plan = cls._plan_gift_cards_locked(
+                gift_card_codes,
+                Money(_expected_total, _cart_total.currency),
+            )
+            _expected_total -= gift_plan.amount.amount
             calculated_total_cents = int(round(_expected_total * 100))
             # The Stripe provider returns amount already divided by 100
             # (see payment.py StripePaymentProvider.get_payment_status) and
@@ -700,18 +749,23 @@ class OrderService:
                     # The points won't be redeemed if this fails
 
             # Step 7.6: Record promotion redemptions (rows + metadata)
-            # for the evaluation done under lock at Step 2.5.
+            # for the evaluation done under lock at Step 2.5, and the
+            # gift-card plan locked during payment verification.
+            from giftcard.services import GiftCardService
             from promotion.services import PromotionEngine
 
             order.discount_amount = PromotionEngine.record(order, promo_result)
+            order.loyalty_discount = loyalty_discount
+            order.gift_card_amount = GiftCardService.record_plan(
+                gift_plan, order
+            )
 
-            # Persist the discounts so they survive on the order, then
+            # Persist the deductions so they survive on the order, then
             # let calculate_order_total_amount() be the single authority
             # on what the customer owes. Subtracting here and leaving
             # the order's own total undiscounted is what let every
             # charge site bill the full amount while the points were
             # burnt.
-            order.loyalty_discount = loyalty_discount
             order.paid_amount = order.calculate_order_total_amount()
             order.save(
                 update_fields=[
@@ -719,6 +773,8 @@ class OrderService:
                     "discount_amount_currency",
                     "loyalty_discount",
                     "loyalty_discount_currency",
+                    "gift_card_amount",
+                    "gift_card_amount_currency",
                     "paid_amount",
                     "paid_amount_currency",
                     "metadata",
@@ -760,6 +816,7 @@ class OrderService:
             ProductNotFoundError,
             InsufficientStockError,
             InvalidCouponError,
+            InvalidGiftCardError,
             InvalidOrderDataError,
             PaymentNotFoundError,
             PaymentVerificationError,
@@ -786,6 +843,7 @@ class OrderService:
         pay_way,
         user=None,
         loyalty_points_to_redeem: int | None = None,
+        gift_card_codes: list[str] | None = None,
         meta_context: dict[str, Any] | None = None,
     ) -> Order:
         """
@@ -1120,14 +1178,21 @@ class OrderService:
             from promotion.services import CouponService, PromotionEngine
 
             order.discount_amount = PromotionEngine.record(order, promo_result)
+            order.loyalty_discount = loyalty_discount
 
-            # Persist the discounts so they survive on the order, then
+            # Step 6.7: Redeem gift cards LAST — they are payment, not
+            # discount, so they settle whatever is still due after the
+            # promotion and loyalty deductions.
+            order.gift_card_amount = cls._redeem_gift_cards(
+                gift_card_codes, order
+            )
+
+            # Persist the deductions so they survive on the order, then
             # let calculate_order_total_amount() be the single authority
             # on what the customer owes. Subtracting here and leaving
             # the order's own total undiscounted is what let every
             # charge site bill the full amount while the points were
             # burnt.
-            order.loyalty_discount = loyalty_discount
             order.paid_amount = order.calculate_order_total_amount()
             order.save(
                 update_fields=[
@@ -1135,6 +1200,8 @@ class OrderService:
                     "discount_amount_currency",
                     "loyalty_discount",
                     "loyalty_discount_currency",
+                    "gift_card_amount",
+                    "gift_card_amount_currency",
                     "paid_amount",
                     "paid_amount_currency",
                     "metadata",
@@ -1145,11 +1212,41 @@ class OrderService:
             # cart attachment has served its purpose.
             CouponService.clear_after_order(cart)
 
+            # Step 6.8: Gift cards covering the FULL total settle the
+            # order right here — no provider ever gets involved (a
+            # zero-amount PaymentIntent would be rejected anyway).
+            # Anything less on a non-redirect online pay way is a
+            # client error: this path only runs without a payment
+            # intent, so there would be nothing to charge the
+            # remainder with.
+            fully_covered = (
+                order.gift_card_amount.amount > 0
+                and order.paid_amount.amount == 0
+            )
+            if fully_covered:
+                order.mark_as_paid(
+                    payment_id=f"GIFTCARD_{order.uuid}",
+                    payment_method="gift_card",
+                )
+            elif (
+                gift_card_codes
+                and pay_way.is_online_payment
+                and pay_way.provider_code not in {"viva_wallet"}
+            ):
+                raise InvalidGiftCardError(
+                    reason="gift_card_insufficient",
+                    message=(
+                        "Gift cards do not cover the order total; an "
+                        "online payment intent is required for the "
+                        "remainder."
+                    ),
+                )
+
             # Step 7: Clear cart
             # Keep the cart while the shopper still owes a hosted
             # payment — see Order.awaits_online_payment. It clears on
             # ``order_paid`` instead.
-            if order.awaits_online_payment:
+            if order.awaits_online_payment and not fully_covered:
                 logger.info(
                     "Kept cart %s — order %s awaits online payment",
                     cart.uuid,
@@ -1160,11 +1257,11 @@ class OrderService:
                 logger.info("Cleared cart %s after order creation", cart.uuid)
 
             # Step 8: Dispatch shipment creation for true offline payments
-            # (COD, Bank Transfer). Online providers that route through
-            # this method (Viva Wallet) defer dispatch to the payment
-            # webhook so the courier voucher only mints after the
-            # shopper actually pays.
-            if not pay_way.is_online_payment:
+            # (COD, Bank Transfer) and fully-gift-card-settled orders.
+            # Online providers that route through this method (Viva
+            # Wallet) defer dispatch to the payment webhook so the
+            # courier voucher only mints after the shopper actually pays.
+            if not pay_way.is_online_payment or fully_covered:
                 cls._dispatch_shipment_creation_task(order)
 
             # Step 9: Return order in PENDING status
@@ -1181,6 +1278,7 @@ class OrderService:
             ProductNotFoundError,
             InsufficientStockError,
             InvalidCouponError,
+            InvalidGiftCardError,
             InvalidOrderDataError,
         ):
             raise

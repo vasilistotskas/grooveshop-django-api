@@ -5,7 +5,7 @@
 
 {% block email_content %}
 <h1>{% trans "Order Received" %}</h1>
-<p>{% trans "Thank you — we have received your order. It is waiting for payment." %}</p>
+<p>{% if order.is_paid %}{% trans "Thank you — we have received your order and your payment is confirmed." %}{% else %}{% trans "Thank you — we have received your order. It is waiting for payment." %}{% endif %}</p>
 
 <div class="email-card">
     <h2>{% trans "Order" %} #{{ order.id }}</h2>
@@ -13,7 +13,7 @@
     <p>
         <strong>{% trans "Payment Status" %}:</strong>
         <span style="display: inline-block; padding: 6px 12px; font-weight: bold; border-radius: 4px; background-color: #fef3c7; color: #92400e;">
-            {% trans "Awaiting payment" %}
+            {% if order.is_paid %}{% trans "Paid" %}{% else %}{% trans "Awaiting payment" %}{% endif %}
         </span>
     </p>
 </div>

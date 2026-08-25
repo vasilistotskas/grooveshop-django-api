@@ -1,10 +1,10 @@
 {% load i18n %}{% trans "ORDER RECEIVED" %}
 
-{% trans "Thank you — we have received your order. It is waiting for payment." %}
+{% if order.is_paid %}{% trans "Thank you — we have received your order and your payment is confirmed." %}{% else %}{% trans "Thank you — we have received your order. It is waiting for payment." %}{% endif %}
 
 {% trans "Order" %} #{{ order.id }}
 {% trans "Date" %}: {{ order.created_at|date:"SHORT_DATE_FORMAT" }}
-{% trans "Payment Status" %}: {% trans "Awaiting payment" %}
+{% trans "Payment Status" %}: {% if order.is_paid %}{% trans "Paid" %}{% else %}{% trans "Awaiting payment" %}{% endif %}
 
 {% if payment_instructions_text %}{% trans "HOW TO COMPLETE YOUR PAYMENT" %}
 {# already tag-stripped + entity-unescaped plain text; |safe stops the .txt template re-escaping & < > #}

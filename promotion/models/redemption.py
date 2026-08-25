@@ -62,7 +62,14 @@ class PromotionRedemption(TimeStampMixinModel):
             ),
         ]
         indexes = [
-            *TimeStampMixinModel.Meta.indexes,
+            # Explicit names: the mixin's %(class)s naming exceeds the
+            # 32-char index-name cap for this class name (models.E034).
+            BTreeIndex(
+                fields=["created_at"], name="promo_redeem_created_ix"
+            ),
+            BTreeIndex(
+                fields=["updated_at"], name="promo_redeem_updated_ix"
+            ),
             BTreeIndex(
                 fields=["promotion", "user"], name="promo_redeem_user_ix"
             ),

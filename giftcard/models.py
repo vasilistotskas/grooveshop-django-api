@@ -258,7 +258,10 @@ class GiftCardTransaction(TimeStampMixinModel):
             ),
         ]
         indexes = [
-            *TimeStampMixinModel.Meta.indexes,
+            # Explicit names: the mixin's %(class)s naming exceeds the
+            # 32-char index-name cap for this class name (models.E034).
+            BTreeIndex(fields=["created_at"], name="giftcard_tx_created_ix"),
+            BTreeIndex(fields=["updated_at"], name="giftcard_tx_updated_ix"),
             BTreeIndex(fields=["gift_card"], name="giftcard_tx_card_ix"),
             BTreeIndex(fields=["kind"], name="giftcard_tx_kind_ix"),
             BTreeIndex(fields=["order"], name="giftcard_tx_order_ix"),

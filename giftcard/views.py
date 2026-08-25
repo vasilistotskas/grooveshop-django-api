@@ -247,14 +247,18 @@ class GiftCardViewSet(BaseModelViewSet):
 
     @action(detail=False, methods=["GET"])
     def mine(self, request):
-        """GET /api/v1/giftcard/mine — cards linked to my account."""
+        """GET /api/v1/giftcard/mine — cards linked to my account.
+
+        Paginated envelope — the generated OpenAPI contract wraps
+        ``many=True`` list actions in the standard paginator shape
+        (loyalty transactions precedent).
+        """
         cards = (
             GiftCard.objects.filter(issued_to=request.user)
             .prefetch_related("transactions")
             .order_by("-created_at")
         )
         response_serializer_class = self.get_response_serializer()
-        serializer = response_serializer_class(
-            cards, many=True, context=self.get_serializer_context()
+        return self.paginate_and_serialize(
+            cards, request, serializer_class=response_serializer_class
         )
-        return Response(serializer.data, status=status.HTTP_200_OK)

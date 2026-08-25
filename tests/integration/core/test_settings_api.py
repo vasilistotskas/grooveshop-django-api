@@ -75,6 +75,24 @@ class TestGetSettingByKeyPublicAccess:
         data = response.json()
         assert data["name"] == "CONTACT_EMAIL"
 
+    def test_storefront_chrome_toggles_whitelisted_anonymous(self):
+        """MOBILE_BOTTOM_NAV_ENABLED / STICKY_ADD_TO_CART_ENABLED are
+        public store UI preferences (default ON — the storefront gates
+        shopper-facing chrome on them)."""
+        client = _anon_client()
+        url = reverse("api-settings-get")
+        for key in (
+            "MOBILE_BOTTOM_NAV_ENABLED",
+            "STICKY_ADD_TO_CART_ENABLED",
+        ):
+            response = client.get(url, {"key": key})
+            assert response.status_code == status.HTTP_200_OK, key
+            data = response.json()
+            assert data["name"] == key
+            # The endpoint serializes values as strings — the
+            # storefront's useSettingFlag parses 'true'/'1'/'yes'.
+            assert str(data["value"]).lower() == "true"
+
     def test_non_whitelisted_key_returns_404_anonymous(self):
         """DEEPL_AUTH_KEY (or any unlisted key) must be blocked."""
         client = _anon_client()

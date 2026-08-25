@@ -1539,6 +1539,27 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "MOBILE_BOTTOM_NAV_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the mobile bottom navigation bar on the storefront. "
+            "A store UI preference; the storefront fails OPEN if this "
+            "setting cannot be fetched."
+        ),
+    },
+    {
+        "name": "STICKY_ADD_TO_CART_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the sticky add-to-cart bar on product pages once the "
+            "main buy button scrolls out of view. A store UI "
+            "preference; the storefront fails OPEN if this setting "
+            "cannot be fetched."
+        ),
+    },
+    {
         "name": "ACCOUNT_REVIEWS_ENABLED",
         "type": "bool",
         "value": True,

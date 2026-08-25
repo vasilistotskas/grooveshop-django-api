@@ -550,6 +550,11 @@ PUBLIC_SETTING_KEYS = frozenset(
         "LOYALTY_XP_PER_LEVEL",
         "B2B_INVOICING_ENABLED",
         "RECENTLY_VIEWED_ENABLED",
+        # Storefront chrome toggles — STORE preferences like
+        # ACCOUNT_REVIEWS_ENABLED below (same lineage too: both were
+        # previously (mis)gated behind superuser-only preview mode).
+        "MOBILE_BOTTOM_NAV_ENABLED",
+        "STICKY_ADD_TO_CART_ENABLED",
         # Public contact email for storefront footer/contact page.
         # Falls back to Tenant.contact_email or settings.INFO_EMAIL.
         "CONTACT_EMAIL",

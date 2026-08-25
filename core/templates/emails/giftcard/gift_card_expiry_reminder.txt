@@ -1,0 +1,11 @@
+{% load i18n %}{% trans "YOUR GIFT CARD EXPIRES SOON" %}
+
+{% trans "Gift card code" %}: {{ card.code }}
+{% trans "Remaining balance" %}: {{ balance }}
+{% trans "Valid until" %}: {{ card.expires_at|date:"SHORT_DATE_FORMAT" }}
+
+{% trans "Use the code at checkout before it expires — any unused balance is lost after the expiry date." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

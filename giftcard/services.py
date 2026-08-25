@@ -297,16 +297,82 @@ class GiftCardService:
 
         from django.db import connection, transaction
 
-        schema = connection.schema_name
-        if not purchase.deliver_at or purchase.deliver_at <= timezone.now():
-            from giftcard.tasks import deliver_gift_card_email
+        from giftcard.tasks import (
+            deliver_gift_card_email,
+            send_gift_card_purchase_receipt,
+        )
 
+        schema = connection.schema_name
+        purchase_id = purchase.pk
+        transaction.on_commit(
+            lambda: send_gift_card_purchase_receipt.apply_async(
+                args=[purchase_id], headers={"_schema_name": schema}
+            )
+        )
+        if not purchase.deliver_at or purchase.deliver_at <= timezone.now():
             transaction.on_commit(
                 lambda: deliver_gift_card_email.apply_async(
                     args=[card.id], headers={"_schema_name": schema}
                 )
             )
         return card
+
+    @classmethod
+    def handle_purchase_reversal(cls, purchase) -> str:
+        """React to a provider-side reversal of a purchase payment.
+
+        Returns ``"processed"`` / ``"skipped"`` (the webhook's
+        ``VivaWebhookEvent`` outcome vocabulary). A pending purchase is
+        simply cancelled; a completed one voids the issued card when it
+        is still untouched, and screams for the ops team when the
+        balance has already been spent — clawing back spent value is a
+        human decision, not webhook logic.
+        """
+        if purchase.status == GiftCardPurchaseStatus.PENDING:
+            purchase.status = GiftCardPurchaseStatus.CANCELED
+            purchase.save(update_fields=["status"])
+            return "processed"
+
+        if purchase.status != GiftCardPurchaseStatus.PAID:
+            return "skipped"
+
+        purchase.status = GiftCardPurchaseStatus.CANCELED
+        purchase.save(update_fields=["status"])
+        outcome = "processed"
+        for card in purchase.gift_cards.all():
+            balance = Decimal(card.balance.amount)
+            initial = Decimal(card.initial_value.amount)
+            if balance >= initial:
+                # Untouched card — void it: zero the ledger and
+                # disable, keeping the audit trail append-only.
+                if balance > 0:
+                    GiftCardTransaction.objects.create(
+                        gift_card=card,
+                        kind=GiftCardTransactionKind.ADJUST,
+                        amount=-balance,
+                        description=(
+                            f"Voided — payment reversed "
+                            f"(purchase {purchase.uuid})"
+                        ),
+                    )
+                card.status = GiftCardStatus.DISABLED
+                card.save(update_fields=["status"])
+                logger.warning(
+                    "Gift card %s voided after payment reversal of purchase %s",
+                    card.code,
+                    purchase.uuid,
+                )
+            else:
+                logger.error(
+                    "Payment for gift card purchase %s was REVERSED but "
+                    "card %s already spent %s of %s — manual ops "
+                    "intervention required",
+                    purchase.uuid,
+                    card.code,
+                    initial - balance,
+                    initial,
+                )
+        return outcome
 
     # ── refunds ────────────────────────────────────────────────────
 

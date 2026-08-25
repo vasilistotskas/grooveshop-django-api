@@ -3,7 +3,7 @@ import logging
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _  # noqa: F401
 
 from core import celery_app
 from core.tasks import MonitoredTask
@@ -84,6 +84,122 @@ def deliver_scheduled_gift_cards(self) -> dict:
     for card in due:
         deliver_gift_card_email.apply(args=[card.id])
         sent += 1
+    return {"status": "success", "sent": sent}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=5,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_gift_card_purchase_receipt(self, purchase_id: int) -> dict:
+    """Confirmation email to the BUYER after payment lands.
+
+    Not a tax document — a multi-purpose voucher sale is outside VAT
+    scope, so this is a plain purchase confirmation (the recipient
+    gets the card itself via ``deliver_gift_card_email``).
+    """
+    from giftcard.enum import GiftCardPurchaseStatus
+    from giftcard.models import GiftCardPurchase
+
+    try:
+        purchase = GiftCardPurchase.objects.get(id=purchase_id)
+    except GiftCardPurchase.DoesNotExist:
+        logger.error("Gift card purchase %s not found", purchase_id)
+        return {"status": "error", "reason": "not_found"}
+
+    if purchase.status != GiftCardPurchaseStatus.PAID:
+        return {"status": "skipped", "reason": "not_paid"}
+    if not purchase.buyer_email:
+        return {"status": "skipped", "reason": "no_buyer_email"}
+
+    context = build_email_context(purchase=purchase)
+    subject = _("[{site}] Your gift card purchase").format(
+        site=tenant_site_name()
+    )
+    text_content = render_to_string(
+        "emails/giftcard/gift_card_purchase_receipt.txt", context
+    )
+    html_content = render_to_string(
+        "emails/giftcard/gift_card_purchase_receipt.html", context
+    )
+    msg = EmailMultiAlternatives(
+        subject,
+        text_content,
+        tenant_from_email(),
+        [purchase.buyer_email],
+    )
+    msg.attach_alternative(html_content, "text/html")
+    msg.send()
+    logger.info("Sent gift card purchase receipt for %s", purchase.uuid)
+    return {"status": "success", "purchase_id": purchase.id}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=5,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_jitter=True,
+)
+def send_gift_card_expiry_reminders(self) -> dict:
+    """Daily sweep: warn recipients whose card expires soon.
+
+    Window is merchant-tunable (``GIFT_CARD_EXPIRY_REMINDER_DAYS``,
+    0 disables); each card is reminded exactly once via
+    ``expiry_reminder_sent_at``.
+    """
+    from datetime import timedelta
+
+    from extra_settings.models import Setting
+
+    from giftcard.enum import GiftCardStatus
+    from giftcard.models import GiftCard
+
+    days = int(Setting.get("GIFT_CARD_EXPIRY_REMINDER_DAYS", default=30) or 0)
+    if days <= 0:
+        return {"status": "skipped", "reason": "disabled"}
+
+    now = timezone.now()
+    window_end = now + timedelta(days=days)
+    due = GiftCard.objects.filter(
+        status=GiftCardStatus.ACTIVE,
+        expires_at__isnull=False,
+        expires_at__gt=now,
+        expires_at__lte=window_end,
+        expiry_reminder_sent_at__isnull=True,
+    ).exclude(recipient_email="")
+
+    sent = 0
+    for card in due:
+        if card.balance.amount <= 0:
+            continue
+        context = build_email_context(card=card, balance=card.balance)
+        subject = _("[{site}] Your gift card expires soon").format(
+            site=tenant_site_name()
+        )
+        text_content = render_to_string(
+            "emails/giftcard/gift_card_expiry_reminder.txt", context
+        )
+        html_content = render_to_string(
+            "emails/giftcard/gift_card_expiry_reminder.html", context
+        )
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            tenant_from_email(),
+            [card.recipient_email],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+        card.expiry_reminder_sent_at = timezone.now()
+        card.save(update_fields=["expiry_reminder_sent_at"])
+        sent += 1
+
     return {"status": "success", "sent": sent}
 
 

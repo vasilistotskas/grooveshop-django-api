@@ -62,10 +62,38 @@ class AppliedPromotion:
 
 
 @dataclass
+class GiftEntitlement:
+    """A FREE_GIFT promotion's reward: ``quantity`` units of
+    ``product`` added to the order at price 0."""
+
+    promotion: Promotion
+    product: object
+    quantity: int
+
+
+@dataclass
+class NearMissEntry:
+    """An automatic promotion the cart ALMOST qualifies for — blocked
+    only by its minimum subtotal. Powers the storefront's "add X more
+    to unlock" teaser (never emitted for an empty cart)."""
+
+    promotion: Promotion
+    remaining_amount: Decimal
+
+
+@dataclass
 class CartDiscountResult:
     applied: list[AppliedPromotion] = field(default_factory=list)
     free_shipping: bool = False
+    gift_items: list[GiftEntitlement] = field(default_factory=list)
+    near_miss: list[NearMissEntry] = field(default_factory=list)
     rejected: list[tuple[str, str]] = field(default_factory=list)
+    # FREE_SHIPPING / FREE_GIFT promotions that applied — recorded as
+    # zero-amount redemption rows so their usage limits are enforced
+    # exactly like monetary promotions.
+    non_monetary: list[tuple[Promotion, PromotionCode | None]] = field(
+        default_factory=list
+    )
 
     @property
     def discount_total(self) -> Money:
@@ -143,6 +171,7 @@ class PromotionEngine:
             reason = cls._check_eligibility(
                 promotion,
                 code,
+                cart_items=cart_items,
                 items_total=items_total,
                 currency=currency,
                 user=user,
@@ -151,6 +180,23 @@ class PromotionEngine:
             if reason is not None:
                 if code is not None:
                     result.rejected.append((code.code, str(reason)))
+                elif (
+                    reason == str(CouponRejectionReason.MINIMUM_NOT_MET)
+                    and promotion.min_subtotal
+                ):
+                    # Near-miss teaser: an automatic promotion blocked
+                    # ONLY by its minimum subtotal. The strictly-exceed
+                    # distance never reports 0 for a cart resting
+                    # exactly on the threshold (adveshop near-miss
+                    # design note).
+                    remaining = _quantize(
+                        Decimal(str(promotion.min_subtotal.amount))
+                        - items_total
+                    )
+                    if remaining > 0:
+                        result.near_miss.append(
+                            NearMissEntry(promotion, remaining)
+                        )
                 continue
             eligible.append((promotion, code))
 
@@ -160,10 +206,20 @@ class PromotionEngine:
                 # always combines (``stackable`` is ignored, see the
                 # model help_text).
                 applicable_free_shipping = True
+                result.non_monetary.append((promotion, code))
                 continue
-            amount = cls._benefit_amount(
-                promotion, cart_items, items_total, currency
-            )
+            if promotion.benefit_type == BenefitType.FREE_GIFT:
+                entitlement = cls._gift_entitlement(promotion)
+                if entitlement is not None:
+                    result.gift_items.append(entitlement)
+                    result.non_monetary.append((promotion, code))
+                continue
+            if promotion.benefit_type == BenefitType.BXGY:
+                amount = cls._bxgy_amount(promotion, cart_items, currency)
+            else:
+                amount = cls._benefit_amount(
+                    promotion, cart_items, items_total, currency
+                )
             if amount.amount <= 0:
                 continue
             monetary.append(AppliedPromotion(promotion, code, amount))
@@ -186,6 +242,24 @@ class PromotionEngine:
         return result
 
     @classmethod
+    def gift_weight_grams(cls, result: CartDiscountResult) -> int:
+        """Extra parcel weight the entitled gift items add.
+
+        Shipping quotes are weight-banded (ACS) — every surface that
+        prices shipping (payment-intent, verification, creation) must
+        include the gifts or the courier voucher upcharges later.
+        """
+        if not result.gift_items:
+            return 0
+        from shipping.utils import (  # noqa: PLC0415
+            compute_total_weight_grams,
+        )
+
+        return compute_total_weight_grams(
+            (gift.product, gift.quantity) for gift in result.gift_items
+        )
+
+    @classmethod
     def record(cls, order, result: CartDiscountResult) -> Money:
         """Persist redemption rows for an evaluated result.
 
@@ -202,6 +276,17 @@ class PromotionEngine:
                 email=order.email or "",
                 amount=entry.amount,
             )
+        # Zero-amount rows for FREE_SHIPPING / FREE_GIFT applications —
+        # without them their usage limits would never count anything.
+        for promotion, code in result.non_monetary:
+            PromotionRedemption.objects.create(
+                promotion=promotion,
+                code=code,
+                order=order,
+                user=order.user,
+                email=order.email or "",
+                amount=Money(0, settings.DEFAULT_CURRENCY),
+            )
         if result.applied:
             order.metadata["promotions"] = [
                 {
@@ -214,6 +299,15 @@ class PromotionEngine:
                     "amount": str(entry.amount.amount),
                 }
                 for entry in result.applied
+            ]
+        if result.gift_items:
+            order.metadata["promotion_gifts"] = [
+                {
+                    "promotion_id": gift.promotion.id,
+                    "product_id": gift.product.id,
+                    "quantity": gift.quantity,
+                }
+                for gift in result.gift_items
             ]
         if result.free_shipping:
             order.metadata["promotion_free_shipping"] = True
@@ -285,6 +379,7 @@ class PromotionEngine:
         promotion: Promotion,
         code: PromotionCode | None,
         *,
+        cart_items,
         items_total: Decimal,
         currency: str,
         user,
@@ -301,6 +396,14 @@ class PromotionEngine:
             str(promotion.min_subtotal.amount)
         ):
             return str(CouponRejectionReason.MINIMUM_NOT_MET)
+
+        if promotion.min_quantity:
+            eligible_units = sum(
+                item.quantity
+                for item in cls._matching_items(promotion, cart_items)
+            )
+            if eligible_units < promotion.min_quantity:
+                return str(CouponRejectionReason.MINIMUM_NOT_MET)
 
         if promotion.first_order_only:
             from order.models.order import Order  # noqa: PLC0415
@@ -382,7 +485,13 @@ class PromotionEngine:
         items_total: Decimal,
         currency: str,
     ) -> Money:
-        base = cls._matching_base(promotion, cart_items, items_total)
+        base = sum(
+            (
+                item.total_price.amount
+                for item in cls._matching_items(promotion, cart_items)
+            ),
+            Decimal("0"),
+        )
         if base <= 0:
             return Money(Decimal("0"), currency)
 
@@ -398,40 +507,152 @@ class PromotionEngine:
         return Money(_quantize(amount), currency)
 
     @classmethod
-    def _matching_base(
-        cls, promotion: Promotion, cart_items, items_total: Decimal
-    ) -> Decimal:
-        if promotion.target_scope == TargetScope.ORDER:
-            return items_total
-
-        if promotion.target_scope == TargetScope.PRODUCTS:
-            product_ids = set(promotion.products.values_list("id", flat=True))
-            return sum(
-                (
-                    item.total_price.amount
-                    for item in cart_items
-                    if item.product_id in product_ids
-                ),
-                Decimal("0"),
-            )
-
+    def _expanded_category_ids(cls, categories_qs) -> set[int]:
         from product.models.category import ProductCategory  # noqa: PLC0415
 
-        category_ids = set(
-            ProductCategory.objects.filter(
-                pk__in=promotion.categories.values_list("id", flat=True)
-            )
+        ids = list(categories_qs.values_list("id", flat=True))
+        if not ids:
+            return set()
+        return set(
+            ProductCategory.objects.filter(pk__in=ids)
             .get_descendants(include_self=True)
             .values_list("id", flat=True)
         )
-        return sum(
-            (
-                item.total_price.amount
+
+    @classmethod
+    def _matching_items(cls, promotion: Promotion, cart_items) -> list:
+        """Cart items the promotion may count and discount.
+
+        Scope first (ORDER = everything, PRODUCTS/CATEGORIES with MPTT
+        descendants), then the exclusion set: excluded products,
+        excluded categories (descendants included), and — when
+        ``exclude_discounted_products`` — anything already carrying a
+        product-level markdown. Exclusions shrink both the discount
+        base AND condition counting (min_quantity), everywhere,
+        consistently.
+        """
+        if promotion.target_scope == TargetScope.PRODUCTS:
+            include_ids = set(promotion.products.values_list("id", flat=True))
+            items = [
+                item for item in cart_items if item.product_id in include_ids
+            ]
+        elif promotion.target_scope == TargetScope.CATEGORIES:
+            include_categories = cls._expanded_category_ids(
+                promotion.categories
+            )
+            items = [
+                item
                 for item in cart_items
-                if item.product.category_id in category_ids
-            ),
-            Decimal("0"),
+                if item.product.category_id in include_categories
+            ]
+        else:
+            items = list(cart_items)
+
+        excluded_ids = set(
+            promotion.excluded_products.values_list("id", flat=True)
         )
+        if excluded_ids:
+            items = [
+                item for item in items if item.product_id not in excluded_ids
+            ]
+
+        excluded_categories = cls._expanded_category_ids(
+            promotion.excluded_categories
+        )
+        if excluded_categories:
+            items = [
+                item
+                for item in items
+                if item.product.category_id not in excluded_categories
+            ]
+
+        if promotion.exclude_discounted_products:
+            items = [
+                item
+                for item in items
+                if not item.product.discount_percent
+                or item.product.discount_percent <= 0
+            ]
+
+        return items
+
+    @classmethod
+    def _unit_prices(cls, items) -> list[Decimal]:
+        """Expand cart lines to one entry per unit (final unit price)."""
+        units: list[Decimal] = []
+        for item in items:
+            unit = Decimal(str(item.product.final_price.amount))
+            units.extend([unit] * item.quantity)
+        return units
+
+    @classmethod
+    def _bxgy_amount(
+        cls, promotion: Promotion, cart_items, currency: str
+    ) -> Money:
+        """Buy-X-get-Y-discounted, on units already in the cart.
+
+        Two deterministic modes (documented on the admin form):
+
+        - ``get_products`` EMPTY — same-pool: every group of
+          ``buy_quantity + get_quantity`` eligible units earns one
+          application; the CHEAPEST ``get_quantity`` units per
+          application are discounted by ``get_discount_percent``.
+          ("Buy 2 get 1 free" needs 3 units in the cart.)
+        - ``get_products`` SET — reward-pool: applications =
+          ``floor(eligible buy units / buy_quantity)``; the cheapest
+          reward units already in the cart (up to ``applications ×
+          get_quantity``) are discounted. Reward units that also match
+          the buy scope still count on the buy side — the rule stays
+          monotonic as the shopper adds items.
+        """
+        buy_qty = promotion.buy_quantity or 0
+        get_qty = promotion.get_quantity or 0
+        if buy_qty < 1 or get_qty < 1:
+            return Money(Decimal("0"), currency)
+
+        buy_units = cls._unit_prices(cls._matching_items(promotion, cart_items))
+        reward_ids = set(promotion.get_products.values_list("id", flat=True))
+
+        if not reward_ids:
+            group_size = buy_qty + get_qty
+            applications = len(buy_units) // group_size
+            if applications < 1:
+                return Money(Decimal("0"), currency)
+            discounted_units = sorted(buy_units)[: applications * get_qty]
+        else:
+            applications = len(buy_units) // buy_qty
+            if applications < 1:
+                return Money(Decimal("0"), currency)
+            reward_units = cls._unit_prices(
+                [item for item in cart_items if item.product_id in reward_ids]
+            )
+            if not reward_units:
+                return Money(Decimal("0"), currency)
+            discounted_units = sorted(reward_units)[: applications * get_qty]
+
+        pct = promotion.get_discount_percent / Decimal("100")
+        amount = sum(discounted_units, Decimal("0")) * pct
+        if promotion.max_discount_amount:
+            amount = min(
+                amount, Decimal(str(promotion.max_discount_amount.amount))
+            )
+        return Money(_quantize(amount), currency)
+
+    @classmethod
+    def _gift_entitlement(cls, promotion: Promotion) -> GiftEntitlement | None:
+        """FREE_GIFT reward: the (single) configured gift product."""
+        gift_product = (
+            promotion.get_products.filter(active=True).order_by("pk").first()
+        )
+        if gift_product is None:
+            logger.warning(
+                "FREE_GIFT promotion %s has no active gift product "
+                "configured — skipping",
+                promotion.pk,
+            )
+            return None
+        quantity = promotion.get_quantity or 1
+        return GiftEntitlement(promotion, gift_product, quantity)
 
     @classmethod
     def _resolve_stacking(

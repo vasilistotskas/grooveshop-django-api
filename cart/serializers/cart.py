@@ -58,6 +58,15 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     applied_coupon_codes = serializers.SerializerMethodField(
         help_text=_("Coupon codes currently attached to this cart"),
     )
+    promotion_gift_items = serializers.SerializerMethodField(
+        help_text=_("Free-gift entitlements earned by this cart"),
+    )
+    promotion_near_miss = serializers.SerializerMethodField(
+        help_text=_(
+            "Automatic promotions blocked only by their minimum "
+            "subtotal — 'add X more to unlock'"
+        ),
+    )
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_currency(self, obj: Cart) -> str:
@@ -85,6 +94,69 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
     def get_applied_coupon_codes(self, obj: Cart) -> list[str]:
         return list(obj.applied_codes.values_list("code__code", flat=True))
 
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "promotionId": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "productId": {"type": "integer"},
+                    "quantity": {"type": "integer"},
+                },
+            },
+            "description": (
+                "FREE_GIFT entitlements the cart has earned — added to "
+                "the order as zero-price lines at checkout."
+            ),
+        }
+    )
+    def get_promotion_gift_items(self, obj: Cart) -> list[dict]:
+        return [
+            {
+                "promotionId": gift.promotion.id,
+                "name": gift.promotion.safe_translation_getter(
+                    "name", any_language=True
+                )
+                or "",
+                "productId": gift.product.id,
+                "quantity": gift.quantity,
+            }
+            for gift in self._promotion_result(obj).gift_items
+        ]
+
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "promotionId": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "remainingAmount": {"type": "number"},
+                },
+            },
+            "description": (
+                "Automatic promotions the cart ALMOST qualifies for — "
+                "blocked only by their minimum subtotal. Powers the "
+                "'add X more to unlock' teaser."
+            ),
+        }
+    )
+    def get_promotion_near_miss(self, obj: Cart) -> list[dict]:
+        return [
+            {
+                "promotionId": entry.promotion.id,
+                "name": entry.promotion.safe_translation_getter(
+                    "name", any_language=True
+                )
+                or "",
+                "remainingAmount": entry.remaining_amount,
+            }
+            for entry in self._promotion_result(obj).near_miss
+        ]
+
     class Meta:
         model = Cart
         fields = (
@@ -102,6 +174,8 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "promotion_discount",
             "promotion_free_shipping",
             "applied_coupon_codes",
+            "promotion_gift_items",
+            "promotion_near_miss",
             "created_at",
             "updated_at",
             "last_activity",
@@ -118,6 +192,8 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "promotion_discount",
             "promotion_free_shipping",
             "applied_coupon_codes",
+            "promotion_gift_items",
+            "promotion_near_miss",
             "created_at",
             "updated_at",
             "last_activity",
@@ -285,6 +361,18 @@ class CartCreatePaymentIntentRequestSerializer(serializers.Serializer):
             "Gift card codes the shopper wants to redeem — the intent "
             "is created for the REMAINDER after their balances. Pass "
             "the same codes in the order-create body."
+        ),
+    )
+    loyalty_points_to_redeem = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=0,
+        help_text=_(
+            "Loyalty points the shopper will redeem at order creation. "
+            "The intent amount subtracts the resulting discount so the "
+            "provider captures what the customer was shown. Pass the "
+            "same value in the order-create body. Requires an "
+            "authenticated request."
         ),
     )
 

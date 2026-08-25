@@ -996,6 +996,12 @@ def get_celery_beat_schedule():
             if not DEBUG
             else SCHEDULE_PRESETS["every_hour"],
         },
+        "send-gift-card-expiry-reminders": {
+            "task": "tenant.tasks.fanout_send_gift_card_expiry_reminders",
+            "schedule": SCHEDULE_PRESETS["daily_6am"]
+            if not DEBUG
+            else SCHEDULE_PRESETS["every_hour"],
+        },
         "auto-cancel-stuck-pending-orders": {
             "task": "tenant.tasks.fanout_auto_cancel_stuck_pending_orders",
             "schedule": crontab(minute="*/15"),
@@ -1586,6 +1592,21 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "GIFT_CARD_MAX_AMOUNT",
         "type": "decimal",
         "value": 500.00,
+    },
+    {
+        # AADE paymentMethodDetails.type for gift-card-settled amounts.
+        # No dedicated voucher code exists — accountant's choice:
+        # 3 = Μετρητά (default), 5 = Επί πιστώσει.
+        "name": "MYDATA_GIFT_CARD_PAYMENT_TYPE",
+        "type": "int",
+        "value": 3,
+    },
+    {
+        # Days before expiry to email gift-card recipients a reminder;
+        # 0 disables reminders.
+        "name": "GIFT_CARD_EXPIRY_REMINDER_DAYS",
+        "type": "int",
+        "value": 30,
     },
     {
         "name": "LOYALTY_POINTS_FACTOR",

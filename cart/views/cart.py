@@ -703,7 +703,7 @@ class CartViewSet(BaseModelViewSet):
         cart_total = cart.total_price
         cart_weight_grams = compute_total_weight_grams(
             (item.product, item.quantity) for item in cart.items.all()
-        )
+        ) + PromotionEngine.gift_weight_grams(promo_result)
         if promo_result.free_shipping:
             shipping_cost = Money(0, cart_total.currency)
         else:
@@ -731,10 +731,56 @@ class CartViewSet(BaseModelViewSet):
             cart_total.currency,
         )
 
-        # Gift cards settle part of the total before the provider —
-        # the intent covers the REMAINDER only. Same plan math as the
-        # order-create verification (which recomputes it under card
-        # locks), so the two always agree.
+        # Loyalty discount reduces the charge — same pricing math as
+        # redeem_points (validated, unquantised Decimal), so the intent
+        # equals what order creation persists as paid_amount.
+        loyalty_points = request_serializer.validated_data.get(
+            "loyalty_points_to_redeem"
+        )
+        if loyalty_points and loyalty_points > 0:
+            if not request.user.is_authenticated:
+                return Response(
+                    {
+                        "detail": _(
+                            "Loyalty redemption requires a signed-in customer."
+                        ),
+                        "reason": "loyalty_requires_authentication",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            from django.core.exceptions import (
+                ValidationError as DjangoValidationError,
+            )
+
+            from loyalty.services import LoyaltyService
+
+            try:
+                loyalty_preview = LoyaltyService.preview_redemption(
+                    request.user,
+                    loyalty_points,
+                    str(cart_total.currency),
+                    max_discount=cart.total_price.amount,
+                )
+            except DjangoValidationError as exc:
+                message = getattr(exc, "message", None) or "; ".join(
+                    str(msg) for msg in getattr(exc, "messages", [])
+                )
+                return Response(
+                    {
+                        "detail": message,
+                        "reason": "loyalty_redemption_invalid",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            cart_total = Money(
+                max(cart_total.amount - loyalty_preview, 0),
+                cart_total.currency,
+            )
+
+        # Gift cards settle part of the total LAST (payment, not
+        # discount) — the intent covers the REMAINDER only. Same plan
+        # math as the order-create verification (which recomputes it
+        # under card locks), so the two always agree.
         gift_card_codes = request_serializer.validated_data.get(
             "gift_card_codes"
         )
@@ -754,20 +800,24 @@ class CartViewSet(BaseModelViewSet):
                 cart_total.amount - gift_plan.amount.amount,
                 cart_total.currency,
             )
-            if cart_total.amount <= 0:
-                # Nothing left to charge — the frontend must skip the
-                # PaymentIntent entirely and create the order with the
-                # gift card codes alone.
-                return Response(
-                    {
-                        "detail": _(
-                            "Gift cards cover the full total; no "
-                            "payment intent is needed."
-                        ),
-                        "reason": "gift_card_covers_total",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+
+        if cart_total.amount <= 0:
+            # Nothing left to charge — gift cards, a 100% promotion or
+            # a full loyalty redemption cover everything. The frontend
+            # must skip the PaymentIntent and submit the order with
+            # the deductions alone; the order-first path settles it.
+            return Response(
+                {
+                    "detail": _(
+                        "The applied discounts and gift cards cover "
+                        "the full total; no payment intent is needed."
+                    ),
+                    "reason": "gift_card_covers_total"
+                    if gift_card_codes
+                    else "nothing_to_charge",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # Get Stripe payment provider
         provider = PayWayService.get_provider_for_pay_way(pay_way)

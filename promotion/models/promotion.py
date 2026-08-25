@@ -64,6 +64,78 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             "subcategories are included automatically"
         ),
     )
+    excluded_products = models.ManyToManyField(
+        "product.Product",
+        related_name="excluded_from_promotions",
+        blank=True,
+        help_text=_(
+            "Never counted or discounted by this promotion, whatever "
+            "the target scope"
+        ),
+    )
+    excluded_categories = models.ManyToManyField(
+        "product.ProductCategory",
+        related_name="excluded_from_promotions",
+        blank=True,
+        help_text=_(
+            "Products in these categories (subcategories included) are "
+            "never counted or discounted by this promotion"
+        ),
+    )
+    exclude_discounted_products = models.BooleanField(
+        _("Exclude Already-discounted Products"),
+        default=False,
+        help_text=_(
+            "Skip products that already carry a product-level markdown "
+            "(discount percent > 0)"
+        ),
+    )
+    min_quantity = models.PositiveIntegerField(
+        _("Minimum Quantity"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Minimum number of ELIGIBLE units (after scope and "
+            "exclusions) the cart must contain"
+        ),
+    )
+    # ── BXGY / FREE_GIFT benefit parameters ──────────────────────
+    buy_quantity = models.PositiveIntegerField(
+        _("Buy Quantity"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "BXGY: eligible units the shopper must buy per application"
+        ),
+    )
+    get_quantity = models.PositiveIntegerField(
+        _("Get Quantity"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "BXGY: units discounted per application. FREE_GIFT: gift "
+            "units added to the order"
+        ),
+    )
+    get_discount_percent = models.DecimalField(
+        _("Get Discount Percent"),
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("100"),
+        help_text=_(
+            "BXGY: discount applied to the 'get' units — 100 means "
+            "free, 50 means half price"
+        ),
+    )
+    get_products = models.ManyToManyField(
+        "product.Product",
+        related_name="promotions_as_reward",
+        blank=True,
+        help_text=_(
+            "BXGY: the reward pool (empty = same products as the buy "
+            "side). FREE_GIFT: the gift product (set exactly one)."
+        ),
+    )
     min_subtotal = MoneyField(
         _("Minimum Subtotal"),
         max_digits=11,
@@ -167,6 +239,35 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
             )
         if self.starts_at and self.ends_at and self.starts_at >= self.ends_at:
             raise ValidationError({"ends_at": _("End must be after start.")})
+        if self.benefit_type == BenefitType.BXGY:
+            if not self.buy_quantity or not self.get_quantity:
+                raise ValidationError(
+                    {
+                        "buy_quantity": _(
+                            "BXGY promotions need both a buy quantity "
+                            "and a get quantity."
+                        )
+                    }
+                )
+            if not (Decimal("0") < self.get_discount_percent <= Decimal("100")):
+                raise ValidationError(
+                    {
+                        "get_discount_percent": _(
+                            "Get-discount percent must be between 0 and 100."
+                        )
+                    }
+                )
+        if self.benefit_type == BenefitType.FREE_GIFT and (
+            not self.get_quantity or self.get_quantity < 1
+        ):
+            raise ValidationError(
+                {
+                    "get_quantity": _(
+                        "Free-gift promotions need a gift quantity of "
+                        "at least 1."
+                    )
+                }
+            )
 
     @property
     def is_live(self) -> bool:

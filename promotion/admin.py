@@ -90,7 +90,13 @@ class PromotionAdmin(BaseTranslatableAdmin):
         ("ends_at", RangeDateTimeFilter),
     )
     search_fields = ("translations__name", "codes__code")
-    autocomplete_fields = ("products", "categories")
+    autocomplete_fields = (
+        "products",
+        "categories",
+        "excluded_products",
+        "excluded_categories",
+        "get_products",
+    )
     list_sections = [RedemptionsTableSection]
     actions = ["activate_promotions", "deactivate_promotions"]
     actions_detail = ["generate_codes", "duplicate_promotion"]
@@ -113,6 +119,24 @@ class PromotionAdmin(BaseTranslatableAdmin):
             },
         ),
         (
+            _("Benefit Details"),
+            {
+                "classes": ("tab",),
+                "fields": (
+                    "buy_quantity",
+                    "get_quantity",
+                    "get_discount_percent",
+                    "get_products",
+                ),
+                "description": _(
+                    "BXGY: buy/get quantities + get-discount percent "
+                    "(100 = free); empty reward pool = same products "
+                    "as the buy side. FREE_GIFT: set exactly one gift "
+                    "product and the gift quantity."
+                ),
+            },
+        ),
+        (
             _("Targeting"),
             {
                 "classes": ("tab",),
@@ -120,6 +144,9 @@ class PromotionAdmin(BaseTranslatableAdmin):
                     "target_scope",
                     "products",
                     "categories",
+                    "excluded_products",
+                    "excluded_categories",
+                    "exclude_discounted_products",
                 ),
             },
         ),
@@ -129,6 +156,7 @@ class PromotionAdmin(BaseTranslatableAdmin):
                 "classes": ("tab",),
                 "fields": (
                     "min_subtotal",
+                    "min_quantity",
                     "first_order_only",
                     "stackable",
                     "priority",
@@ -141,7 +169,20 @@ class PromotionAdmin(BaseTranslatableAdmin):
     )
 
     conditional_fields = {
-        "benefit_value": f"benefit_type != '{BenefitType.FREE_SHIPPING}'",
+        "benefit_value": (
+            f"benefit_type == '{BenefitType.PERCENTAGE}' || "
+            f"benefit_type == '{BenefitType.FIXED_AMOUNT}'"
+        ),
+        "buy_quantity": f"benefit_type == '{BenefitType.BXGY}'",
+        "get_quantity": (
+            f"benefit_type == '{BenefitType.BXGY}' || "
+            f"benefit_type == '{BenefitType.FREE_GIFT}'"
+        ),
+        "get_discount_percent": f"benefit_type == '{BenefitType.BXGY}'",
+        "get_products": (
+            f"benefit_type == '{BenefitType.BXGY}' || "
+            f"benefit_type == '{BenefitType.FREE_GIFT}'"
+        ),
         "products": f"target_scope == '{TargetScope.PRODUCTS}'",
         "categories": f"target_scope == '{TargetScope.CATEGORIES}'",
     }
@@ -281,7 +322,12 @@ class PromotionAdmin(BaseTranslatableAdmin):
             benefit_value=source.benefit_value,
             target_scope=source.target_scope,
             min_subtotal=source.min_subtotal,
+            min_quantity=source.min_quantity,
             first_order_only=source.first_order_only,
+            exclude_discounted_products=source.exclude_discounted_products,
+            buy_quantity=source.buy_quantity,
+            get_quantity=source.get_quantity,
+            get_discount_percent=source.get_discount_percent,
             is_active=False,
             starts_at=source.starts_at,
             ends_at=source.ends_at,
@@ -299,6 +345,9 @@ class PromotionAdmin(BaseTranslatableAdmin):
             )
         clone.products.set(source.products.all())
         clone.categories.set(source.categories.all())
+        clone.excluded_products.set(source.excluded_products.all())
+        clone.excluded_categories.set(source.excluded_categories.all())
+        clone.get_products.set(source.get_products.all())
         self.message_user(
             request,
             _("Promotion duplicated as an inactive draft."),
@@ -310,7 +359,9 @@ class PromotionAdmin(BaseTranslatableAdmin):
 
 
 @admin.register(PromotionCode)
-class PromotionCodeAdmin(BaseModelAdmin):
+class PromotionCodeAdmin(ExportActionMixin, BaseModelAdmin):
+    actions = ["export_csv", "export_xml"]
+
     list_display = (
         "code",
         "promotion",

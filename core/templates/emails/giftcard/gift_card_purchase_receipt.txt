@@ -1,0 +1,16 @@
+{% load i18n %}{% trans "GIFT CARD PURCHASE CONFIRMATION" %}
+
+{% trans "Thank you for your purchase!" %}
+
+{% trans "Amount" %}: {{ purchase.amount }}
+{% trans "Recipient" %}: {{ purchase.recipient_email }}
+{% if purchase.deliver_at %}{% trans "Delivery date" %}: {{ purchase.deliver_at|date:"SHORT_DATE_FORMAT" }}
+{% else %}{% trans "The gift card has been emailed to the recipient." %}
+{% endif %}
+{% trans "The recipient receives the card code by email and can redeem it at checkout, across as many orders as they like, until the balance runs out." %}
+
+{% trans "This confirmation is not a tax document. VAT is charged when the gift card is redeemed for goods." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

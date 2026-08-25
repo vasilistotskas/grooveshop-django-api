@@ -1,5 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from giftcard.models import GiftCard, GiftCardTransaction
@@ -60,16 +61,56 @@ class GiftCardPurchaseRequestSerializer(serializers.Serializer):
         allow_null=True,
         help_text=_("Empty means deliver right after payment"),
     )
+    payment_provider = serializers.ChoiceField(
+        choices=(
+            ("stripe", "stripe"),
+            ("viva_wallet", "viva_wallet"),
+        ),
+        default="stripe",
+        help_text=_(
+            "stripe = inline card element (clientSecret in the "
+            "response); viva_wallet = hosted Smart Checkout redirect "
+            "(checkoutUrl in the response). Only providers the store "
+            "has credentials for are accepted."
+        ),
+    )
 
 
 class GiftCardPurchaseResponseSerializer(serializers.Serializer):
     purchase_uuid = serializers.UUIDField()
-    client_secret = serializers.CharField(
-        help_text=_("Stripe PaymentIntent client secret")
+    provider = serializers.CharField(
+        help_text=_("Which provider flow the client must run")
     )
-    payment_intent_id = serializers.CharField()
+    client_secret = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text=_("Stripe PaymentIntent client secret (stripe only)"),
+    )
+    payment_intent_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text=_("Stripe PaymentIntent id (stripe only)"),
+    )
+    checkout_url = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Viva Smart Checkout URL to redirect the buyer to "
+            "(viva_wallet only)"
+        ),
+    )
     amount = serializers.DecimalField(max_digits=11, decimal_places=2)
     currency = serializers.CharField(max_length=3)
+
+
+class GiftCardPurchaseStatusResponseSerializer(serializers.Serializer):
+    """Polled by the storefront return page while the provider webhook
+    races the browser redirect."""
+
+    purchase_uuid = serializers.UUIDField()
+    status = serializers.CharField(
+        help_text=_("PENDING / PAID / FAILED / CANCELED")
+    )
 
 
 class GiftCardTransactionSerializer(
@@ -86,6 +127,9 @@ class GiftCardSerializer(serializers.ModelSerializer[GiftCard]):
     balance = serializers.SerializerMethodField()
     transactions = GiftCardTransactionSerializer(many=True, read_only=True)
 
+    @extend_schema_field(
+        serializers.DecimalField(max_digits=11, decimal_places=2)
+    )
     def get_balance(self, obj: GiftCard):
         return obj.balance.amount
 

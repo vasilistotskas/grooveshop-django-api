@@ -160,7 +160,8 @@ class TestPaymentFirstOrderCreation(APITestCase):
         self.assertTrue(mock_get_payment_provider.called)
 
     def test_create_order_without_payment_intent_id(self):
-        """Test that order creation fails without payment_intent_id."""
+        """Intent-less online orders are refused unless deductions
+        (promotions / loyalty / gift cards) fully cover the total."""
         self.client.force_authenticate(user=self.user)
         data = self._get_valid_order_data()
         del data["payment_intent_id"]
@@ -173,7 +174,8 @@ class TestPaymentFirstOrderCreation(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("payment_intent_id", response.data)
+        self.assertEqual(response.data["error"]["type"], "invalid_order_data")
+        self.assertIn("payment_intent_id", response.data["field_errors"])
 
     @patch("order.services.OrderService.validate_cart_for_checkout")
     def test_create_order_with_invalid_cart(self, mock_validate_cart):

@@ -288,10 +288,15 @@ def _pick_payment_type(invoice: Any) -> int:
     etc.) acknowledged the charge → POS / e-POS (code 7). Web Banking
     (6) would only be correct for manual bank-transfer flows; COD
     orders without a provider id → Cash (3).
+
+    ``GIFTCARD_`` payment ids are NOT provider charges — a fully
+    gift-card-settled order has no card transaction, so the provider
+    branch must not claim POS for it (:func:`_payment_rows` reports
+    the gift-card portion under its own configurable code).
     """
     payment_id = getattr(invoice.order, "payment_id", "") or ""
     pay_way = getattr(invoice.order, "pay_way", None)
-    if payment_id:
+    if payment_id and not payment_id.startswith("GIFTCARD_"):
         return PAYMENT_METHOD_POS_CARD
     # No transaction ID on file; lean on the PayWay flag when it
     # exists — an "online" pay way without a payment_id is an
@@ -300,6 +305,52 @@ def _pick_payment_type(invoice: Any) -> int:
     if pay_way is not None and getattr(pay_way, "is_online_payment", False):
         return PAYMENT_METHOD_WEB_BANKING
     return PAYMENT_METHOD_CASH
+
+
+def _gift_card_payment_type() -> int:
+    """AADE payment code for gift-card-settled amounts.
+
+    myDATA has no dedicated voucher code, so the mapping is the
+    merchant's accountant's call — configurable via the
+    ``MYDATA_GIFT_CARD_PAYMENT_TYPE`` extra setting (default 3 =
+    Μετρητά; 5 = Επί πιστώσει is the usual alternative). Invalid
+    values fall back to Cash rather than producing a schema error.
+    """
+    from extra_settings.models import Setting  # noqa: PLC0415
+
+    try:
+        value = int(Setting.get("MYDATA_GIFT_CARD_PAYMENT_TYPE", default=3))
+    except TypeError, ValueError:
+        value = PAYMENT_METHOD_CASH
+    if value not in {1, 2, 3, 4, 5, 6, 7}:
+        value = PAYMENT_METHOD_CASH
+    return value
+
+
+def _payment_rows(invoice: Any) -> list[tuple[int, Decimal]]:
+    """One ``paymentMethodDetails`` row per settlement source.
+
+    AADE requires the row amounts to SUM exactly to
+    ``totalGrossValue``, so a split order (gift card + provider
+    remainder) must report two rows — a single POS row for the full
+    amount would claim a card capture that never happened. Gift cards
+    are payment (multi-purpose voucher), so they settle the invoice
+    without reducing its taxable value.
+    """
+    total = Decimal(invoice.total.amount)
+    gift_card = getattr(invoice.order, "gift_card_amount", None)
+    gift_amount = (
+        min(Decimal(gift_card.amount), total)
+        if gift_card and gift_card.amount > 0
+        else Decimal("0")
+    )
+    rows: list[tuple[int, Decimal]] = []
+    if gift_amount > 0:
+        rows.append((_gift_card_payment_type(), gift_amount))
+    remainder = total - gift_amount
+    if remainder > 0 or not rows:
+        rows.append((_pick_payment_type(invoice), remainder))
+    return rows
 
 
 def build_invoice_xml(
@@ -401,10 +452,13 @@ def build_invoice_xml(
     SubElement(header, "currency").text = invoice.currency or "EUR"
 
     # ── paymentMethods ──────────────────────────────────────────
+    # One row per settlement source; amounts MUST sum to
+    # totalGrossValue (AADE multi-payment rule).
     pm_container = SubElement(invoice_el, "paymentMethods")
-    pm_row = SubElement(pm_container, "paymentMethodDetails")
-    SubElement(pm_row, "type").text = str(_pick_payment_type(invoice))
-    SubElement(pm_row, "amount").text = _money(Decimal(invoice.total.amount))
+    for payment_type, payment_amount in _payment_rows(invoice):
+        pm_row = SubElement(pm_container, "paymentMethodDetails")
+        SubElement(pm_row, "type").text = str(payment_type)
+        SubElement(pm_row, "amount").text = _money(payment_amount)
 
     # ── invoiceDetails ──────────────────────────────────────────
     # Accumulate rounded per-line totals + per-classification sums so

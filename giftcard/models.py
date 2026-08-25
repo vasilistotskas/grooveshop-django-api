@@ -148,6 +148,15 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
     delivered_at = models.DateTimeField(
         _("Delivered At"), null=True, blank=True
     )
+    expiry_reminder_sent_at = models.DateTimeField(
+        _("Expiry Reminder Sent At"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "Stamped by the daily reminder sweep so each card is "
+            "reminded exactly once"
+        ),
+    )
     purchase = models.ForeignKey(
         GiftCardPurchase,
         related_name="gift_cards",

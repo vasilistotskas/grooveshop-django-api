@@ -62,6 +62,7 @@ def _resolve_tenant_candidates(order_code: str) -> list:
     if not order_code:
         return []
 
+    from giftcard.models import GiftCardPurchase  # noqa: PLC0415
     from tenant.models import Tenant  # noqa: PLC0415
 
     public = get_public_schema_name()
@@ -70,7 +71,13 @@ def _resolve_tenant_candidates(order_code: str) -> list:
         is_active=True, suspended_at__isnull=True
     ).exclude(schema_name=public):
         with schema_context(tenant.schema_name):
-            if Order.objects.filter(viva_order_code_q(order_code)).exists():
+            if (
+                Order.objects.filter(viva_order_code_q(order_code)).exists()
+                or GiftCardPurchase.objects.filter(
+                    payment_id=str(order_code),
+                    provider_code="viva_wallet",
+                ).exists()
+            ):
                 candidates.append(tenant)
     return candidates
 
@@ -111,7 +118,17 @@ def _order_exists_on_unavailable_tenant(order_code: object) -> bool:
     for tenant in unavailable.exclude(schema_name=public).distinct():
         try:
             with schema_context(tenant.schema_name):
-                if Order.objects.filter(viva_order_code_q(order_code)).exists():
+                from giftcard.models import (  # noqa: PLC0415
+                    GiftCardPurchase,
+                )
+
+                if (
+                    Order.objects.filter(viva_order_code_q(order_code)).exists()
+                    or GiftCardPurchase.objects.filter(
+                        payment_id=str(order_code),
+                        provider_code="viva_wallet",
+                    ).exists()
+                ):
                     return True
         except Exception:
             # A destroyed tenant's schema may be gone already; that is
@@ -631,6 +648,25 @@ def _process_event_in_tenant(
 
     Caller must already be inside ``tenant_context(tenant)``.
     """
+    # Gift-card purchases are NOT orders — their Viva orderCode lives on
+    # ``GiftCardPurchase.payment_id``. Resolve them first: the same
+    # verify-then-select contract applies (an unverifiable transaction
+    # raises so the outer loop tries the next tenant candidate).
+    from giftcard.models import GiftCardPurchase
+
+    purchase = GiftCardPurchase.objects.filter(
+        payment_id=str(order_code), provider_code="viva_wallet"
+    ).first()
+    if purchase is not None:
+        return _process_gift_card_purchase_event(
+            purchase=purchase,
+            event_type_id=event_type_id,
+            event_data=event_data,
+            transaction_id=transaction_id,
+            txn_hash=txn_hash,
+            order_code=order_code,
+        )
+
     order = Order.objects.filter(viva_order_code_q(order_code)).first()
 
     if not order:
@@ -742,6 +778,156 @@ def _process_event_in_tenant(
             {"error": "Internal verification error, please retry"},
             status=500,
         )
+
+    return JsonResponse({"status": "ok"})
+
+
+def _process_gift_card_purchase_event(
+    *,
+    purchase,
+    event_type_id,
+    event_data: dict,
+    transaction_id: str,
+    txn_hash: str,
+    order_code: str,
+) -> JsonResponse:
+    """Viva webhook state-machine for a gift-card PURCHASE.
+
+    Mirrors the order path's guarantees: Retrieve-Transaction
+    verification (an error raises so the multi-tenant candidate loop
+    can try the true owner), a strict amount guard against the
+    purchase value, and ``VivaWebhookEvent`` DB-level idempotency.
+    Completion itself is additionally idempotent via the purchase
+    status guard in ``GiftCardService.complete_purchase``.
+    """
+    from decimal import Decimal as _Decimal
+
+    from giftcard.enum import GiftCardPurchaseStatus
+    from giftcard.services import GiftCardService
+    from order.models.viva_webhook_event import VivaWebhookEvent
+
+    if (
+        transaction_id
+        and event_type_id is not None
+        and VivaWebhookEvent.objects.filter(
+            transaction_id=transaction_id, event_type_id=event_type_id
+        ).exists()
+    ):
+        logger.info(
+            "Viva gift-card webhook already processed | event_type=%s | "
+            "txn_hash=%s (idempotency hit)",
+            event_type_id,
+            txn_hash,
+        )
+        return JsonResponse({"status": "ok"})
+
+    try:
+        with transaction.atomic():
+            purchase = (
+                type(purchase).objects.select_for_update().get(pk=purchase.pk)
+            )
+
+            outcome = VivaWebhookEvent.OUTCOME_PROCESSED
+            if event_type_id == 1796:
+                status_id = event_data.get("StatusId", "")
+                if status_id and status_id != "F":
+                    outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+                elif not transaction_id:
+                    logger.error(
+                        "Viva gift-card event 1796 without TransactionId "
+                        "for purchase %s — cannot verify, skipping",
+                        purchase.uuid,
+                    )
+                    outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+                else:
+                    verified_status, verified_data = _verify_transaction(
+                        transaction_id
+                    )
+                    verify_errored = isinstance(verified_data, dict) and (
+                        verified_data.get("error")
+                        or verified_data.get("viva_error")
+                    )
+                    if verified_status is None or verify_errored:
+                        # Unverifiable ≠ failed: raise so the outer
+                        # candidate loop tries the next tenant / Viva
+                        # redelivers (same contract as the order path).
+                        raise RuntimeError(
+                            "Viva transaction verification unavailable "
+                            f"for gift-card purchase txn {transaction_id}"
+                        )
+                    verified_amount_raw = (
+                        verified_data.get("amount")
+                        if isinstance(verified_data, dict)
+                        else None
+                    )
+                    if verified_amount_raw is not None:
+                        verified_amount = _Decimal(str(verified_amount_raw))
+                        expected = _Decimal(str(purchase.amount.amount))
+                        if abs(verified_amount - expected) > _Decimal("0.01"):
+                            logger.error(
+                                "Viva gift-card txn %s amount mismatch: "
+                                "verified=%s expected=%s (purchase %s) — "
+                                "refusing to complete",
+                                transaction_id,
+                                verified_amount,
+                                expected,
+                                purchase.uuid,
+                            )
+                            outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+                            verified_status = None
+                    if verified_status == PaymentStatus.COMPLETED:
+                        GiftCardService.complete_purchase(purchase)
+                        logger.info(
+                            "Gift card purchase %s completed via Viva "
+                            "webhook (txn_hash=%s)",
+                            purchase.uuid,
+                            txn_hash,
+                        )
+                    elif outcome == VivaWebhookEvent.OUTCOME_PROCESSED:
+                        logger.warning(
+                            "Viva gift-card txn %s not completed "
+                            "(status=%s) — skipping",
+                            transaction_id,
+                            verified_status,
+                        )
+                        outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+            elif event_type_id == 1798:
+                if purchase.status == GiftCardPurchaseStatus.PENDING:
+                    purchase.status = GiftCardPurchaseStatus.FAILED
+                    purchase.save(update_fields=["status"])
+                    logger.info(
+                        "Gift card purchase %s marked FAILED via Viva webhook",
+                        purchase.uuid,
+                    )
+                else:
+                    outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+            elif event_type_id == 1797:
+                outcome = GiftCardService.handle_purchase_reversal(purchase)
+            else:
+                logger.info(
+                    "Unhandled Viva event type %s for gift-card purchase %s",
+                    event_type_id,
+                    purchase.uuid,
+                )
+                outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+
+            if transaction_id and event_type_id is not None:
+                VivaWebhookEvent.objects.create(
+                    transaction_id=transaction_id,
+                    event_type_id=event_type_id,
+                    order=None,
+                    order_code=str(order_code),
+                    status_id=event_data.get("StatusId", "") or "",
+                    outcome=outcome,
+                )
+    except Exception as exc:
+        logger.error(
+            "Viva gift-card webhook processing failed for purchase %s: %s",
+            purchase.uuid,
+            exc,
+            exc_info=True,
+        )
+        return JsonResponse({"error": "processing failed"}, status=500)
 
     return JsonResponse({"status": "ok"})
 

@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from typing import Any, ClassVar
 
 from django.conf import settings
@@ -28,6 +29,7 @@ from order.exceptions import (
 )
 from order.models.item import OrderItem
 from order.models.order import Order
+from promotion.services import CouponService, PromotionEngine
 from order.models.stock_reservation import StockReservation
 from order.signals import order_refunded
 from order.stock import StockManager
@@ -197,8 +199,6 @@ class OrderService:
         (COD/Viva) have no amount guard, so silently dropping the
         discount would charge the shopper more than the sidebar showed.
         """
-        from promotion.services import PromotionEngine  # noqa: PLC0415
-
         result = PromotionEngine.evaluate(
             cart, user=user, email=email, lock=True
         )
@@ -225,6 +225,90 @@ class OrderService:
         except GiftCardError as exc:
             raise InvalidGiftCardError(
                 reason=exc.reason, message=str(exc.message)
+            ) from exc
+
+    @classmethod
+    def _inject_promotion_gifts(cls, order, promo_result, target_currency):
+        """Add FREE_GIFT entitlements as zero-price order lines.
+
+        Stock is decremented directly (gifts never went through the
+        reservation flow). An out-of-stock gift is SKIPPED, never a
+        checkout blocker — the paid goods must not be held hostage by
+        a promotional freebie; the skip is recorded for ops.
+        """
+        if not promo_result.gift_items:
+            return
+        from order.stock import StockManager  # noqa: PLC0415
+
+        skipped = []
+        for gift in promo_result.gift_items:
+            try:
+                StockManager.decrement_stock(
+                    product_id=gift.product.id,
+                    quantity=gift.quantity,
+                    order_id=order.id,
+                    reason="promotion_gift",
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Promotion gift %s x%s skipped for order %s "
+                    "(stock decrement failed: %s)",
+                    gift.product.id,
+                    gift.quantity,
+                    order.id,
+                    exc,
+                )
+                skipped.append(gift.product.id)
+                continue
+            OrderItem.objects.create(
+                order=order,
+                product=gift.product,
+                quantity=gift.quantity,
+                price=Money(0, target_currency),
+            )
+        if skipped:
+            order.metadata["promotion_gifts_skipped"] = skipped
+
+    @classmethod
+    def _plan_loyalty_locked(
+        cls, user, loyalty_points_to_redeem, currency, max_discount
+    ) -> Decimal:
+        """Payment-first path: price the loyalty redemption under the
+        user-row lock so the PaymentIntent verification and the later
+        ``redeem_points`` (same transaction, same lock) cannot drift.
+
+        Returns Decimal("0") when no redemption was requested. A
+        redemption that cannot be honoured aborts order creation with
+        a typed error — the intent was created for the discounted
+        amount, so silently dropping the discount would make the
+        capture disagree with ``paid_amount``.
+        """
+        if (
+            not loyalty_points_to_redeem
+            or loyalty_points_to_redeem <= 0
+            or user is None
+            or not getattr(user, "is_authenticated", False)
+        ):
+            return Decimal("0")
+
+        from loyalty.services import LoyaltyService  # noqa: PLC0415
+
+        try:
+            return LoyaltyService.preview_redemption(
+                user,
+                loyalty_points_to_redeem,
+                str(currency),
+                max_discount,
+                lock=True,
+            )
+        except ValidationError as exc:
+            message = getattr(exc, "message", None) or "; ".join(
+                str(msg) for msg in getattr(exc, "messages", [])
+            )
+            raise InvalidOrderDataError(
+                _("Loyalty redemption cannot be applied: {reason}").format(
+                    reason=message
+                )
             ) from exc
 
     @classmethod
@@ -379,7 +463,7 @@ class OrderService:
             _cart_total = cart.total_price
             _cart_weight_grams = compute_total_weight_grams(
                 (item.product, item.quantity) for item in cart.items.all()
-            )
+            ) + PromotionEngine.gift_weight_grams(promo_result)
             if promo_result.free_shipping:
                 _shipping_cost = Money(0, _cart_total.currency)
             else:
@@ -411,8 +495,24 @@ class OrderService:
                 + _shipping_cost.amount
                 + _payment_fee.amount
             )
-            # Gift cards settle part of the total BEFORE the provider
-            # charge — the plan locks the card rows until commit so
+            # Loyalty is a discount, so it reduces what the provider
+            # charges — priced here under the user-row lock with the
+            # SAME math ``redeem_points`` runs after the order exists,
+            # so the verified intent amount and ``paid_amount`` cannot
+            # drift. (Historically the intent ignored loyalty and
+            # Stripe captured the undiscounted total while the points
+            # were still burnt.)
+            loyalty_preview = cls._plan_loyalty_locked(
+                user,
+                loyalty_points_to_redeem,
+                _cart_total.currency,
+                max_discount=_cart_total.amount,
+            )
+            _expected_total = max(
+                _expected_total - loyalty_preview, Decimal("0")
+            )
+            # Gift cards settle part of the total LAST (payment, not
+            # discount) — the plan locks the card rows until commit so
             # the amount verified here is exactly what gets redeemed
             # after the order row exists.
             gift_plan = cls._plan_gift_cards_locked(
@@ -460,6 +560,8 @@ class OrderService:
                             "promotion_free_shipping": (
                                 promo_result.free_shipping
                             ),
+                            "loyalty_preview_amount": str(loyalty_preview),
+                            "gift_plan_amount": str(gift_plan.amount.amount),
                             "shipping_provider_code": shipping_address.get(
                                 "shipping_provider_code"
                             ),
@@ -564,7 +666,7 @@ class OrderService:
             cart_total = cart.total_price
             cart_weight_grams = compute_total_weight_grams(
                 (ci.product, ci.quantity) for ci in cart_items
-            )
+            ) + PromotionEngine.gift_weight_grams(promo_result)
             if promo_result.free_shipping:
                 shipping_cost = Money(0, cart_total.currency)
             else:
@@ -699,6 +801,11 @@ class OrderService:
             # Store reservation IDs in order metadata
             order.metadata["stock_reservation_ids"] = reservation_ids
 
+            # FREE_GIFT entitlements become zero-price lines (stock
+            # decremented directly; an out-of-stock gift is skipped,
+            # never a blocker).
+            cls._inject_promotion_gifts(order, promo_result, target_currency)
+
             # Step 7.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
             if (
@@ -745,14 +852,27 @@ class OrderService:
                         e,
                         exc_info=True,
                     )
-                    # Don't fail the order creation, just log the error
-                    # The points won't be redeemed if this fails
+                    # The PaymentIntent was verified WITH the loyalty
+                    # discount (Step 2.6) — silently dropping it here
+                    # would make the captured amount disagree with
+                    # ``paid_amount``. The user-row lock taken during
+                    # verification makes this branch unreachable in
+                    # practice; if it ever fires, fail loud so the
+                    # transaction (and its idempotency mark) rolls
+                    # back and the checkout retries cleanly.
+                    raise InvalidOrderDataError(
+                        str(
+                            _(
+                                "Loyalty redemption failed after payment "
+                                "verification."
+                            )
+                        )
+                    ) from e
 
             # Step 7.6: Record promotion redemptions (rows + metadata)
             # for the evaluation done under lock at Step 2.5, and the
             # gift-card plan locked during payment verification.
             from giftcard.services import GiftCardService
-            from promotion.services import PromotionEngine
 
             order.discount_amount = PromotionEngine.record(order, promo_result)
             order.loyalty_discount = loyalty_discount
@@ -783,8 +903,6 @@ class OrderService:
 
             # The coupon's durable record is the redemption row — the
             # cart attachment has served its purpose.
-            from promotion.services import CouponService
-
             CouponService.clear_after_order(cart)
 
             # Step 8: Clear cart
@@ -989,7 +1107,7 @@ class OrderService:
             cart_total = cart.total_price
             cart_weight_grams = compute_total_weight_grams(
                 (ci.product, ci.quantity) for ci in cart_items
-            )
+            ) + PromotionEngine.gift_weight_grams(promo_result)
             if promo_result.free_shipping:
                 shipping_cost = Money(0, cart_total.currency)
             else:
@@ -1124,6 +1242,11 @@ class OrderService:
             # Store reservation IDs in order metadata
             order.metadata["stock_reservation_ids"] = reservation_ids
 
+            # FREE_GIFT entitlements become zero-price lines (stock
+            # decremented directly; an out-of-stock gift is skipped,
+            # never a blocker).
+            cls._inject_promotion_gifts(order, promo_result, target_currency)
+
             # Step 6.5: Apply loyalty points redemption if requested
             loyalty_discount = Money(0, target_currency)
             if (
@@ -1175,8 +1298,6 @@ class OrderService:
 
             # Step 6.6: Record promotion redemptions (rows + metadata)
             # for the evaluation done under lock at Step 2.5.
-            from promotion.services import CouponService, PromotionEngine
-
             order.discount_amount = PromotionEngine.record(order, promo_result)
             order.loyalty_discount = loyalty_discount
 
@@ -1212,34 +1333,54 @@ class OrderService:
             # cart attachment has served its purpose.
             CouponService.clear_after_order(cart)
 
-            # Step 6.8: Gift cards covering the FULL total settle the
+            # Step 6.8: Deductions covering the FULL total settle the
             # order right here — no provider ever gets involved (a
             # zero-amount PaymentIntent would be rejected anyway).
-            # Anything less on a non-redirect online pay way is a
+            # Gift cards are the usual cause; a 100% promotion or a
+            # full loyalty redemption produces the same zero
+            # remainder and settles identically. Anything LESS than
+            # full coverage on a non-redirect online pay way is a
             # client error: this path only runs without a payment
-            # intent, so there would be nothing to charge the
-            # remainder with.
-            fully_covered = (
+            # intent, so there is nothing to charge the remainder
+            # with.
+            deductions_present = (
                 order.gift_card_amount.amount > 0
-                and order.paid_amount.amount == 0
+                or order.discount_amount.amount > 0
+                or order.loyalty_discount.amount > 0
             )
+            fully_covered = deductions_present and order.paid_amount.amount == 0
             if fully_covered:
+                if order.gift_card_amount.amount > 0:
+                    settle_id = f"GIFTCARD_{order.uuid}"
+                    settle_method = "gift_card"
+                else:
+                    settle_id = f"DISCOUNT_{order.uuid}"
+                    settle_method = "discount"
                 order.mark_as_paid(
-                    payment_id=f"GIFTCARD_{order.uuid}",
-                    payment_method="gift_card",
+                    payment_id=settle_id,
+                    payment_method=settle_method,
                 )
-            elif (
-                gift_card_codes
-                and pay_way.is_online_payment
-                and pay_way.provider_code not in {"viva_wallet"}
-            ):
-                raise InvalidGiftCardError(
-                    reason="gift_card_insufficient",
-                    message=(
-                        "Gift cards do not cover the order total; an "
-                        "online payment intent is required for the "
-                        "remainder."
-                    ),
+            elif pay_way.is_online_payment and pay_way.provider_code not in {
+                "viva_wallet"
+            }:
+                if gift_card_codes:
+                    raise InvalidGiftCardError(
+                        reason="gift_card_insufficient",
+                        message=(
+                            "Gift cards do not cover the order total; "
+                            "an online payment intent is required for "
+                            "the remainder."
+                        ),
+                    )
+                message = str(
+                    _(
+                        "A payment intent is required — the applied "
+                        "discounts do not cover the order total."
+                    )
+                )
+                raise InvalidOrderDataError(
+                    message,
+                    field_errors={"payment_intent_id": [message]},
                 )
 
             # Step 7: Clear cart

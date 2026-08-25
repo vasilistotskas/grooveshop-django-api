@@ -279,6 +279,99 @@ class LoyaltyService:
         return total_reversed
 
     @classmethod
+    def _validate_and_price_redemption(
+        cls,
+        user,
+        points_amount: int,
+        currency: str,
+        max_discount: Decimal,
+        *,
+        lock: bool,
+    ) -> Decimal:
+        """Shared validation + pricing for a redemption WITHOUT writing.
+
+        Raises ValidationError on any rule violation; returns the exact
+        (unquantised) discount Decimal — both ``redeem_points`` and the
+        payment-intent preview go through this, so the amount a Stripe
+        PaymentIntent is created for and the amount later persisted on
+        the order cannot drift.
+
+        ``lock=True`` takes ``select_for_update`` on the user row: run
+        inside the order-create transaction it guarantees a subsequent
+        ``redeem_points`` in the SAME transaction cannot fail on
+        balance (the lock is held until commit).
+        """
+        if not cls.is_enabled():
+            raise ValidationError(_("Loyalty system is currently disabled."))
+
+        if points_amount <= 0:
+            raise ValidationError(_("Points amount must be positive."))
+
+        supported_currencies = {"EUR", "USD"}
+        if currency not in supported_currencies:
+            raise ValidationError(
+                _("Unsupported currency: %(currency)s. Supported: EUR, USD")
+                % {"currency": currency}
+            )
+
+        if lock:
+            from django.contrib.auth import get_user_model  # noqa: PLC0415
+
+            User = get_user_model()
+            User.objects.select_for_update().get(pk=user.pk)
+
+        balance = cls.get_user_balance(user)
+        if points_amount > balance:
+            raise ValidationError(
+                _(
+                    "Insufficient points balance. Available: %(balance)s, Requested: %(amount)s"
+                )
+                % {"balance": balance, "amount": points_amount}
+            )
+
+        ratio_key = f"LOYALTY_REDEMPTION_RATIO_{currency}"
+        ratio = Decimal(str(Setting.get(ratio_key, default=100.0)))
+        discount = Decimal(str(points_amount)) / ratio
+
+        if discount > max_discount:
+            raise ValidationError(
+                _(
+                    "Loyalty discount (%(discount)s %(currency)s) exceeds the "
+                    "maximum allowed amount (%(max)s %(currency)s). Points can "
+                    "only be applied against the products total."
+                )
+                % {
+                    "discount": discount,
+                    "currency": currency,
+                    "max": max_discount,
+                }
+            )
+
+        return discount
+
+    @classmethod
+    def preview_redemption(
+        cls,
+        user,
+        points_amount: int,
+        currency: str,
+        max_discount: Decimal,
+        *,
+        lock: bool = False,
+    ) -> Decimal:
+        """Price a redemption without redeeming.
+
+        Used by the cart payment-intent endpoint and the order-create
+        verification so the charged amount already reflects the
+        loyalty discount (the redemption itself still happens at order
+        creation). Same validations and the same exact Decimal as
+        ``redeem_points``.
+        """
+        return cls._validate_and_price_redemption(
+            user, points_amount, currency, max_discount, lock=lock
+        )
+
+    @classmethod
     @transaction.atomic
     def redeem_points(
         cls,
@@ -298,34 +391,11 @@ class LoyaltyService:
         If an order is provided, stores loyalty_points_redeemed and loyalty_discount
         in the Order's metadata JSON field and sets reference_order on the transaction.
         """
-        if not cls.is_enabled():
-            raise ValidationError(_("Loyalty system is currently disabled."))
-
-        if points_amount <= 0:
-            raise ValidationError(_("Points amount must be positive."))
-
-        supported_currencies = {"EUR", "USD"}
-        if currency not in supported_currencies:
-            raise ValidationError(
-                _("Unsupported currency: %(currency)s. Supported: EUR, USD")
-                % {"currency": currency}
-            )
-
         # Lock the user row to prevent concurrent redemption requests
-        # from both passing the balance check
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
-        User.objects.select_for_update().get(pk=user.pk)
-
-        balance = cls.get_user_balance(user)
-        if points_amount > balance:
-            raise ValidationError(
-                _(
-                    "Insufficient points balance. Available: %(balance)s, Requested: %(amount)s"
-                )
-                % {"balance": balance, "amount": points_amount}
-            )
+        # from both passing the balance check.
+        discount = cls._validate_and_price_redemption(
+            user, points_amount, currency, max_discount, lock=True
+        )
 
         # Idempotency: at most one redemption per order. Enforced here under
         # the user-row lock (not only in the view) so two concurrent requests
@@ -340,24 +410,6 @@ class LoyaltyService:
         ):
             raise ValidationError(
                 _("Points have already been redeemed for this order.")
-            )
-
-        ratio_key = f"LOYALTY_REDEMPTION_RATIO_{currency}"
-        ratio = Decimal(str(Setting.get(ratio_key, default=100.0)))
-        discount = Decimal(str(points_amount)) / ratio
-
-        if discount > max_discount:
-            raise ValidationError(
-                _(
-                    "Loyalty discount (%(discount)s %(currency)s) exceeds the "
-                    "maximum allowed amount (%(max)s %(currency)s). Points can "
-                    "only be applied against the products total."
-                )
-                % {
-                    "discount": discount,
-                    "currency": currency,
-                    "max": max_discount,
-                }
             )
 
         PointsTransaction.objects.create(

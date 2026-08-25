@@ -8,12 +8,14 @@ class PromotionTrigger(models.TextChoices):
 
 
 class BenefitType(models.TextChoices):
-    # BXGY / GIFT / BUNDLE are planned follow-ups: they arrive as new
-    # values here plus additive nullable columns on Promotion — never
-    # as a rewrite of the existing rows.
+    # BUNDLE is deliberately NOT a benefit type: bundles are a catalog
+    # construct (a composite product with component stock), not a cart
+    # rule — see the promotions design notes.
     PERCENTAGE = "PERCENTAGE", _("Percentage off")
     FIXED_AMOUNT = "FIXED_AMOUNT", _("Fixed amount off")
     FREE_SHIPPING = "FREE_SHIPPING", _("Free shipping")
+    BXGY = "BXGY", _("Buy X get Y discounted")
+    FREE_GIFT = "FREE_GIFT", _("Free gift item")
 
 
 class TargetScope(models.TextChoices):

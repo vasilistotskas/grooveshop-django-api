@@ -30,6 +30,7 @@ from giftcard.serializers import (
     GiftCardErrorResponseSerializer,
     GiftCardPurchaseRequestSerializer,
     GiftCardPurchaseResponseSerializer,
+    GiftCardPurchaseStatusResponseSerializer,
     GiftCardSerializer,
 )
 from giftcard.services import GiftCardError, GiftCardService
@@ -59,6 +60,12 @@ serializers_config: SerializersConfig = {
         many=True,
         operation_id="listMyGiftCards",
         summary=_("List the gift cards linked to my account"),
+        tags=["Gift Cards"],
+    ),
+    "purchase_status": ActionConfig(
+        response=GiftCardPurchaseStatusResponseSerializer,
+        operation_id="getGiftCardPurchaseStatus",
+        summary=_("Poll a gift card purchase's payment status"),
         tags=["Gift Cards"],
     ),
 }
@@ -91,6 +98,14 @@ class GiftCardViewSet(BaseModelViewSet):
         return super().get_permissions()
 
     def get_throttles(self):
+        if self.action == "purchase_status":
+            # Same tight budget as the balance oracle — the poll leaks
+            # nothing but must not be a free enumeration channel.
+            return [
+                GiftCardCheckThrottle(),
+                AnonRateThrottle(),
+                UserRateThrottle(),
+            ]
         if self.action == "check":
             # Balance check is a bearer-code oracle — budget it tightly.
             return [
@@ -137,12 +152,14 @@ class GiftCardViewSet(BaseModelViewSet):
 
     @action(detail=False, methods=["POST"])
     def purchase(self, request):
-        """POST /api/v1/giftcard/purchase — create purchase + Stripe PI.
+        """POST /api/v1/giftcard/purchase — start an online payment.
 
-        Online card payment only: a gift card is delivered by email the
-        moment payment confirms, which rules COD out, and Viva's
-        redirect flow is built around Order rows. The webhook branch in
-        ``handle_stripe_payment_succeeded`` mints the card.
+        Two provider flows, matching the store's checkout providers:
+        stripe = inline PaymentIntent (clientSecret in the response,
+        completed by ``handle_stripe_payment_succeeded``); viva_wallet
+        = hosted Smart Checkout redirect (checkoutUrl in the response,
+        completed by the Viva webhook's gift-card branch). Offline
+        payment makes no sense for an email-delivered voucher.
         """
         from order.payment import get_payment_provider
         from pay_way.services import PayWayService
@@ -160,6 +177,7 @@ class GiftCardViewSet(BaseModelViewSet):
         serializer = request_serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        provider_code = data.get("payment_provider") or "stripe"
 
         user = request.user if request.user.is_authenticated else None
         buyer_email = data.get("buyer_email") or (user.email if user else "")
@@ -180,7 +198,7 @@ class GiftCardViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not PayWayService.is_provider_configured("stripe"):
+        if not PayWayService.is_provider_configured(provider_code):
             return Response(
                 {
                     "detail": _(
@@ -201,23 +219,58 @@ class GiftCardViewSet(BaseModelViewSet):
             sender_name=data.get("sender_name", ""),
             message=data.get("message", ""),
             deliver_at=data.get("deliver_at"),
-            provider_code="stripe",
+            provider_code=provider_code,
         )
 
-        provider = get_payment_provider("stripe")
-        success, payment_data = provider.process_payment(
-            amount=amount,
-            order_id=f"giftcard_{purchase.uuid}",
-            order_uuid=f"giftcard_{purchase.uuid}",
-            customer_email=buyer_email,
-        )
+        provider = get_payment_provider(provider_code)
+        response_payload = {
+            "purchase_uuid": purchase.uuid,
+            "provider": provider_code,
+            "amount": amount.amount,
+            "currency": str(amount.currency),
+        }
+
+        if provider_code == "viva_wallet":
+            # Hosted redirect: mint a Smart Checkout order. Its
+            # orderCode is stored as payment_id — that is how BOTH the
+            # webhook's gift-card branch and the viva_return resolver
+            # find the purchase again.
+            success, payment_data = provider.create_checkout_session(
+                amount=amount,
+                order_id=f"giftcard-{purchase.pk}",
+                order_uuid=f"giftcard:{purchase.uuid}",
+                description=str(_("Gift card {amount}").format(amount=amount)),
+                customer_email=buyer_email,
+            )
+            if success:
+                purchase.payment_id = str(payment_data["session_id"])
+                purchase.save(update_fields=["payment_id"])
+                response_payload["checkout_url"] = payment_data["checkout_url"]
+        else:
+            success, payment_data = provider.process_payment(
+                amount=amount,
+                order_id=f"giftcard_{purchase.uuid}",
+                order_uuid=f"giftcard_{purchase.uuid}",
+                customer_email=buyer_email,
+            )
+            if success:
+                purchase.payment_id = payment_data["payment_id"]
+                purchase.save(update_fields=["payment_id"])
+                response_payload["client_secret"] = payment_data[
+                    "client_secret"
+                ]
+                response_payload["payment_intent_id"] = payment_data[
+                    "payment_id"
+                ]
+
         if not success:
             from giftcard.enum import GiftCardPurchaseStatus
 
             purchase.status = GiftCardPurchaseStatus.FAILED
             purchase.save(update_fields=["status"])
             logger.error(
-                "Gift card purchase PI creation failed: %s",
+                "Gift card purchase payment start failed (%s): %s",
+                provider_code,
                 payment_data.get("error"),
             )
             return Response(
@@ -228,22 +281,47 @@ class GiftCardViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        purchase.payment_id = payment_data["payment_id"]
-        purchase.save(update_fields=["payment_id"])
-
         response_serializer_class = self.get_response_serializer()
-        response_serializer = response_serializer_class(
-            {
-                "purchase_uuid": purchase.uuid,
-                "client_secret": payment_data["client_secret"],
-                "payment_intent_id": payment_data["payment_id"],
-                "amount": amount.amount,
-                "currency": str(amount.currency),
-            }
-        )
+        response_serializer = response_serializer_class(response_payload)
         return Response(
             response_serializer.data, status=status.HTTP_201_CREATED
         )
+
+    @action(detail=False, methods=["GET"], url_path="purchase-status")
+    def purchase_status(self, request):
+        """GET /api/v1/giftcard/purchase-status?uuid= — poll a purchase.
+
+        The Viva redirect races the webhook, so the storefront return
+        page polls this until the purchase flips PAID/FAILED. The UUID
+        is unguessable — same access model as guest orders.
+        """
+        purchase_uuid = (request.query_params.get("uuid") or "").strip()
+        if not purchase_uuid:
+            return Response(
+                {"detail": _("Missing uuid.")},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from django.core.exceptions import (
+            ValidationError as DjangoValidationError,
+        )
+
+        try:
+            purchase = GiftCardPurchase.objects.get(uuid=purchase_uuid)
+        except (
+            GiftCardPurchase.DoesNotExist,
+            DjangoValidationError,
+            ValueError,
+        ):
+            return Response(
+                {"detail": _("Purchase not found.")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        response_serializer_class = self.get_response_serializer()
+        response_serializer = response_serializer_class(
+            {"purchase_uuid": purchase.uuid, "status": purchase.status}
+        )
+        return Response(response_serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["GET"])
     def mine(self, request):

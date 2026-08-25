@@ -21,6 +21,11 @@ urlpatterns = [
         GiftCardViewSet.as_view({"get": "mine"}),
         name="giftcard-mine",
     ),
+    path(
+        "giftcard/purchase-status",
+        GiftCardViewSet.as_view({"get": "purchase_status"}),
+        name="giftcard-purchase-status",
+    ),
 ]
 
 urlpatterns = format_suffix_patterns(urlpatterns)

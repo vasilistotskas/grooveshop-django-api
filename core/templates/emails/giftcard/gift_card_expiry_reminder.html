@@ -1,0 +1,16 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Your gift card expires soon" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>⏳ {% trans "Your gift card expires soon" %}</h1>
+
+<div class="email-card" style="text-align: center;">
+    <p style="font-size: 28px; font-weight: bold; letter-spacing: 2px; margin: 16px 0;">{{ card.code }}</p>
+    <p><strong>{% trans "Remaining balance" %}:</strong> {{ balance }}</p>
+    <p><strong>{% trans "Valid until" %}:</strong> {{ card.expires_at|date:"SHORT_DATE_FORMAT" }}</p>
+</div>
+
+<p>{% trans "Use the code at checkout before it expires — any unused balance is lost after the expiry date." %}</p>
+{% endblock %}

@@ -1437,12 +1437,27 @@ class PaymentStatusResponseSerializer(serializers.Serializer):
 
 
 class VivaReturnLookupResponseSerializer(serializers.Serializer):
-    """Minimal, PII-free payload for the Viva post-payment redirect hop."""
+    """Minimal, PII-free payload for the Viva post-payment redirect hop.
 
-    id = serializers.IntegerField()
-    uuid = serializers.UUIDField()
-    status = serializers.CharField()
-    payment_status = serializers.CharField()
+    ``kind`` discriminates the two things a Smart Checkout return can
+    resolve to: an order, or a gift-card PURCHASE (which shares the
+    same static return URL but is not an order). Order fields are
+    absent for purchases and vice versa.
+    """
+
+    kind = serializers.ChoiceField(
+        choices=(
+            ("order", "order"),
+            ("gift_card_purchase", "gift_card_purchase"),
+        ),
+        default="order",
+    )
+    id = serializers.IntegerField(required=False)
+    uuid = serializers.UUIDField(required=False)
+    status = serializers.CharField(required=False)
+    payment_status = serializers.CharField(required=False)
+    purchase_uuid = serializers.UUIDField(required=False)
+    purchase_status = serializers.CharField(required=False)
 
 
 class CancelOrderRequestSerializer(serializers.Serializer):

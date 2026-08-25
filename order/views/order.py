@@ -648,19 +648,18 @@ class OrderViewSet(BaseModelViewSet):
             # Providers that use hosted redirect checkout (order-first, no payment intent)
             redirect_checkout_providers = {"viva_wallet"}
 
-            # Gift cards covering the FULL total need no PaymentIntent
-            # at all — the storefront omits payment_intent_id and the
-            # order-first flow settles the order from the card balance
-            # (the service rejects insufficient coverage with a typed
-            # error rather than leaving an unpayable order behind).
-            gift_cards_without_intent = bool(
-                validated_data.get("gift_card_codes")
-            ) and not validated_data.get("payment_intent_id")
-
+            # An intent-less submission on a non-redirect online pay
+            # way routes ORDER-FIRST: deductions covering the FULL
+            # total (gift cards, a 100% promotion, a full loyalty
+            # redemption) settle there with no provider involved,
+            # and anything short of full coverage is rejected by the
+            # service with a typed error — strictly better than the
+            # old blanket "payment_intent_id required" 400, which
+            # made zero-total checkouts impossible.
             if (
                 pay_way.is_online_payment
                 and pay_way.provider_code not in redirect_checkout_providers
-                and not gift_cards_without_intent
+                and validated_data.get("payment_intent_id")
             ):
                 # Payment-first flow: Requires payment_intent_id (e.g. Stripe)
                 return self._create_with_payment_intent(
@@ -1772,6 +1771,40 @@ class OrderViewSet(BaseModelViewSet):
                     "order_code": order_code,
                 },
             )
+            # Gift-card purchases share the same static Smart Checkout
+            # return URL but are not orders — their Viva orderCode
+            # lives on ``GiftCardPurchase.payment_id``. Resolve them so
+            # the storefront can route the buyer to the gift-card
+            # confirmation instead of a dead order lookup.
+            if order_code:
+                from giftcard.models import (  # noqa: PLC0415
+                    GiftCardPurchase,
+                )
+
+                purchase = (
+                    GiftCardPurchase.objects.filter(
+                        payment_id=order_code,
+                        provider_code="viva_wallet",
+                    )
+                    .values("uuid", "status")
+                    .first()
+                )
+                if purchase is not None:
+                    logger.info(
+                        "Viva return lookup resolved gift card purchase",
+                        extra={
+                            "purchase_uuid": str(purchase["uuid"]),
+                            "purchase_status": str(purchase["status"]),
+                        },
+                    )
+                    return Response(
+                        {
+                            "kind": "gift_card_purchase",
+                            "purchaseUuid": str(purchase["uuid"]),
+                            "purchaseStatus": str(purchase["status"]),
+                        }
+                    )
+
             raise NotFound(
                 _("No order found for transaction id {t}").format(
                     t=transaction_id or order_code
@@ -1789,6 +1822,7 @@ class OrderViewSet(BaseModelViewSet):
 
         return Response(
             {
+                "kind": "order",
                 "id": row["id"],
                 "uuid": str(row["uuid"]),
                 "status": str(row["status"]),

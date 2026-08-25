@@ -121,6 +121,14 @@ class IsSettingEnabled(BasePermission):
     default: bool = True
 
     def has_permission(self, request, view) -> bool:
+        # drf-spectacular introspects endpoints through mocked views
+        # (swagger_fake_view) and calls check_permissions on each one.
+        # A runtime feature gate must not decide schema membership —
+        # the OpenAPI contract is generated from local dev and cannot
+        # vary by merchant toggle — nor touch the DB during generation
+        # (the schema tests deliberately run without DB access).
+        if getattr(view, "swagger_fake_view", False):
+            return True
         from extra_settings.models import Setting  # noqa: PLC0415
 
         if not bool(Setting.get(self.setting_key, default=self.default)):

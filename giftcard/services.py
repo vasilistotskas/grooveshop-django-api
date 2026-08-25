@@ -209,22 +209,28 @@ class GiftCardService:
             per_card.append((card, take))
             remaining -= take
 
-        planned = due - remaining
-        if 0 < remaining < MIN_PROVIDER_CHARGE:
-            # Trim the last card's contribution so the provider still
-            # has a chargeable remainder; the sliver stays on the card.
-            trim = MIN_PROVIDER_CHARGE - remaining
+        # Respect the provider minimum-charge floor on partial
+        # coverage: trim the redemption so the provider remainder is
+        # never a sub-minimum sliver (it stays on the card instead).
+        # Popping a fully-trimmed card changes the remainder again, so
+        # iterate; ``per_card`` is the single source of truth and the
+        # planned amount is always its sum — the ledger rows written
+        # by ``record_plan`` and ``order.gift_card_amount`` must agree
+        # to the cent.
+        while per_card:
+            planned = sum(take for _, take in per_card)
+            shortfall = due - planned
+            if shortfall <= 0 or shortfall >= MIN_PROVIDER_CHARGE:
+                break
+            trim = MIN_PROVIDER_CHARGE - shortfall
             card, take = per_card[-1]
-            new_take = take - trim
-            if new_take <= 0:
+            if take - trim <= 0:
                 per_card.pop()
             else:
-                per_card[-1] = (card, new_take)
-            planned -= trim
+                per_card[-1] = (card, take - trim)
 
-        return RedemptionPlan(
-            Money(max(planned, Decimal("0")), currency), per_card
-        )
+        planned = sum((take for _, take in per_card), start=Decimal("0"))
+        return RedemptionPlan(Money(planned, currency), per_card)
 
     @classmethod
     def record_plan(cls, plan: RedemptionPlan, order) -> Money:
@@ -379,8 +385,12 @@ class GiftCardService:
     @classmethod
     def credit_refund(cls, order) -> Decimal:
         """Return the gift-card-settled portion of a refunded order to
-        the source card(s). Idempotent per order via the description
-        marker check."""
+        the source card(s). Idempotent per order: the partial unique
+        constraint on (gift_card, order) for REFUND_CREDIT rows makes
+        a racing duplicate insert impossible — the loser skips the
+        card instead of double-crediting it."""
+        from django.db import IntegrityError, transaction  # noqa: PLC0415
+
         redeems = GiftCardTransaction.objects.filter(
             order=order, kind=GiftCardTransactionKind.REDEEM
         ).select_related("gift_card")
@@ -393,13 +403,18 @@ class GiftCardService:
         for redeem in redeems:
             if redeem.gift_card_id in already:
                 continue
-            GiftCardTransaction.objects.create(
-                gift_card=redeem.gift_card,
-                kind=GiftCardTransactionKind.REFUND_CREDIT,
-                amount=-redeem.amount,  # redeem rows are negative
-                order=order,
-                description=f"Refund of order #{order.id}",
-            )
+            try:
+                with transaction.atomic():
+                    GiftCardTransaction.objects.create(
+                        gift_card=redeem.gift_card,
+                        kind=GiftCardTransactionKind.REFUND_CREDIT,
+                        amount=-redeem.amount,  # redeem rows are negative
+                        order=order,
+                        description=f"Refund of order #{order.id}",
+                    )
+            except IntegrityError:
+                # A concurrent refund task credited this card first.
+                continue
             credited += -redeem.amount
         return credited
 

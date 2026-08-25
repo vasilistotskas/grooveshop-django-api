@@ -114,6 +114,43 @@ class TestPlanRedemption:
 
         assert plan.amount.amount == Decimal("99.50")
 
+    def test_floor_trim_pop_keeps_plan_and_ledger_in_lockstep(
+        self, enable_gift_cards
+    ):
+        # Two small cards fall 0.10 short of a 0.60 due — the trim
+        # must POP the last card and keep trimming from the previous
+        # one, so plan.amount always equals the per-card sum that the
+        # ledger rows will debit (regression: the single-pass trim
+        # debited 0.15 while crediting the order only 0.10).
+        card_small = GiftCardFactory(
+            initial_value=Money(Decimal("0.15"), "EUR")
+        )
+        card_big = GiftCardFactory(initial_value=Money(Decimal("0.35"), "EUR"))
+
+        plan = GiftCardService.plan_redemption(
+            [card_small.code, card_big.code], Money(Decimal("0.60"), "EUR")
+        )
+
+        per_card_sum = sum(
+            (take for _, take in plan.per_card), start=Decimal("0")
+        )
+        assert plan.amount.amount == per_card_sum == Decimal("0.10")
+        # Provider remainder respects the 0.50 floor exactly.
+        assert Decimal("0.60") - plan.amount.amount == Decimal("0.50")
+
+    def test_floor_trim_can_empty_the_plan(self, enable_gift_cards):
+        # A single tiny card against a due just above it: any positive
+        # redemption would leave a sub-minimum provider charge, so the
+        # plan empties and the provider charges the full due.
+        card = GiftCardFactory(initial_value=Money(Decimal("0.05"), "EUR"))
+
+        plan = GiftCardService.plan_redemption(
+            [card.code], Money(Decimal("0.40"), "EUR")
+        )
+
+        assert plan.per_card == []
+        assert plan.amount.amount == Decimal("0")
+
     def test_unknown_code_rejected(self, enable_gift_cards):
         with pytest.raises(GiftCardError) as excinfo:
             GiftCardService.plan_redemption(
@@ -224,3 +261,39 @@ class TestRefundCredit:
         assert first == Decimal("20")
         assert second == Decimal("0")
         assert card.balance.amount == Decimal("50")
+
+    def test_duplicate_refund_credit_blocked_at_db_level(
+        self, enable_gift_cards
+    ):
+        # The check-then-act in credit_refund cannot stop two RACING
+        # tasks by itself — the partial unique constraint must. A
+        # direct duplicate insert (what the race loser would attempt)
+        # has to die in the database.
+        from django.db import IntegrityError, transaction
+
+        from order.factories.order import OrderFactory
+
+        order = OrderFactory()
+        card = GiftCardFactory(initial_value=Money(Decimal("50"), "EUR"))
+        for _ in range(2):
+            try:
+                with transaction.atomic():
+                    GiftCardTransaction.objects.create(
+                        gift_card=card,
+                        kind=GiftCardTransactionKind.REFUND_CREDIT,
+                        amount=Decimal("20"),
+                        order=order,
+                    )
+            except IntegrityError:
+                duplicate_blocked = True
+            else:
+                duplicate_blocked = False
+
+        assert duplicate_blocked
+        assert (
+            GiftCardTransaction.objects.filter(
+                order=order,
+                kind=GiftCardTransactionKind.REFUND_CREDIT,
+            ).count()
+            == 1
+        )

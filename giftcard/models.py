@@ -265,6 +265,13 @@ class GiftCardTransaction(TimeStampMixinModel):
                 condition=models.Q(kind="REDEEM"),
                 name="unique_giftcard_redeem_per_order",
             ),
+            # Mirror for the refund side: one credit-back per card per
+            # order, so racing refund tasks cannot double-credit.
+            models.UniqueConstraint(
+                fields=["gift_card", "order"],
+                condition=models.Q(kind="REFUND_CREDIT"),
+                name="unique_giftcard_refund_per_order",
+            ),
         ]
         indexes = [
             # Explicit names: the mixin's %(class)s naming exceeds the

@@ -50,6 +50,20 @@ def _make_tenant(**kwargs) -> Tenant:
     return t
 
 
+@pytest.fixture(autouse=True)
+def _no_schema_ddl():
+    """``_make_tenant`` disables ``auto_create_schema`` on its own
+    instance only — but ``run_billing_cycle`` iterates a fresh queryset
+    whose instances carry the class default (True), so the warn/suspend
+    saves walked into django-tenants' schema healing (``create_schema``
+    → full ``migrate_schemas`` replay, ~90s per test). Patching the
+    class attribute keeps every code path DDL-free, which is this
+    module's stated contract.
+    """
+    with patch.object(Tenant, "auto_create_schema", False):
+        yield
+
+
 # ---------------------------------------------------------------------------
 # Classifier
 # ---------------------------------------------------------------------------

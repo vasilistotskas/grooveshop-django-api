@@ -76,6 +76,20 @@ def _admin():
     return TenantAdmin(Tenant, None)
 
 
+@pytest.fixture(autouse=True)
+def _no_schema_ddl():
+    """``_make_tenant`` disables ``auto_create_schema`` on its own
+    instance only — but the admin actions operate on a freshly-fetched
+    queryset whose instances carry the class default (True), so their
+    ``save()`` walked into django-tenants' schema healing
+    (``create_schema`` → full ``migrate_schemas`` replay, ~90s per
+    test). Patching the class attribute keeps every code path DDL-free,
+    which is this module's stated contract.
+    """
+    with patch.object(Tenant, "auto_create_schema", False):
+        yield
+
+
 # ---------------------------------------------------------------------------
 # Suspension
 # ---------------------------------------------------------------------------

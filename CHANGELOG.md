@@ -3,6 +3,140 @@
 
 
 
+## v3.11.0 (2026-08-25)
+
+### Bug fixes
+
+* fix(tests): stop tenant lifecycle/dunning tests from replaying migrations
+
+The two slowest files in the suite (profiled with --durations=60) were
+tests/integration/tenant/test_tenant_lifecycle.py (8 tests at 75-112s)
+and tests/unit/tenant/test_billing_dunning.py (6 tests at 83-112s) —
+together ~21 minutes of runtime, each file serialized onto a single
+xdist worker by --dist loadfile, forming the CI critical path.
+
+A pytest-timeout stack dump pinpointed the cost: both files' helpers
+set auto_create_schema=False on the instance they build, but the code
+under test (admin bulk actions, run_billing_cycle) re-fetches tenants
+through fresh querysets whose instances carry the class default (True).
+Their save() then hit django-tenants schema healing — create_schema →
+a full migrate_schemas replay into a new Postgres schema, ~90s per
+test. An autouse fixture now patches the class attribute for the
+module, honoring the files' stated no-DDL contract on every code path.
+Both files: ~21 min → 16s locally, all 50 tests still pass.
+
+Also corrects the Run Tests comment in ci.yml: an A/B of CI runs
+showed the coverage core (ctrace vs sysmon) makes no measurable
+difference — the suite is DB/fixture-bound, so the earlier "~2-3x
+C-tracer overhead" claim was wrong. sysmon stays (same data, cheaper
+where CPU is the cost).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LHbUFt1skPCSxVDWbCTFwk ([`28676c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/28676c9cb679f6c278774efe055432d973c4d999))
+
+* fix(tenant): keep setting gates out of OpenAPI schema introspection
+
+drf-spectacular calls check_permissions on mocked views while
+parsing endpoints; IsSettingEnabled then read extra_settings during
+schema generation — endpoints could vanish from the contract by
+merchant toggle, and the DB-free schema tests broke. Gates now
+short-circuit on swagger_fake_view, the marker spectacular itself
+recommends checking.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`8dc9ff6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8dc9ff63c8828404cd9a9f6430785078a3048564))
+
+* fix(admin): prune store-scoped and broken sections from the control plane
+
+The platform admin registered by app label, which dragged three kinds
+of wrong sections onto the control plane: extra_settings.Setting
+(every knob is store-scoped and read from the tenant schema — a
+public-schema edit silently changes nothing for any store, and the
+section materialized meaningless public rows), allauth_idp_oidc
+Client/Token (TENANT_APPS-only tables — the sections 500'd with
+ProgrammingError when opened), and the customer-scoped user models
+(topics, subscriptions, addresses, data exports — permanently empty
+on public). Registration now honours a model-level exclusion set, the
+sidebar and command-palette whitelist drop the Settings entry, and a
+regression test pins all seven banned labels. Countries and Regions
+stay: they are the single shared reference copy every store reads,
+and the control plane is their only management surface.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`4596726`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4596726c4fdaaf07f659326d459fdca535c3775d))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.10.0 [skip ci] ([`4785957`](https://github.com/vasilistotskas/grooveshop-django-api/commit/478595719e1e8a8accaca2f86d1663918317abf3))
+
+### Continuous integration
+
+* ci(release): pin GitPython for semantic-release until PSR catches up
+
+GitPython 3.1.60 (released today) removed Actor.name_email_regex and
+the PSR action's Docker image installs dependencies unpinned at
+runtime, so every release job crashes. Run the same PSR version via
+uvx with GitPython pinned to 3.1.59 (the version behind this
+morning's healthy v3.10.0 release), emitting the released/version
+outputs the lockfile-sync step consumes.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`889eb2b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/889eb2b5e6fb4e3f2f5631e73174dc0c0e97297e))
+
+* ci(coverage): switch to the sysmon core and drop the unused html report
+
+The Testing job's pytest step ran ~32 min, dominated by coverage
+measurement overhead: coverage.py's default C tracer with branch=true
+costs ~2-3x the no-cov runtime. Python 3.14 supports the sys.monitoring
+(PEP 669) measurement core, which collects the same line+branch data at
+a fraction of the cost. Validated locally on coverage 7.14.0 /
+Python 3.14.7 under xdist: identical coverage totals to ctrace, branch
+arcs recorded, no fallback warnings.
+
+Also stops generating --cov-report=html in CI: htmlcov/ was never
+uploaded as an artifact, so rendering it for 600+ measured files was
+wasted wall time. The terminal report (the signal actually read in CI
+logs) stays.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LHbUFt1skPCSxVDWbCTFwk ([`a9b7048`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a9b7048437fbdd26ca49976e6595e280ddae3048))
+
+### Features
+
+* feat(tenant): feature gates for reviews, comments, favourites, newsletter, feedback, alerts and agent commerce
+
+Six new merchant runtime toggles following the established gating
+concept: PRODUCT_REVIEWS / BLOG_COMMENTS / FAVOURITES / NEWSLETTER /
+FEEDBACK / PRODUCT_ALERTS extra-settings (all default ON, public),
+enforced server-side by IsSettingEnabled permission subclasses with
+the same 404-hiding semantics as the plan-flag gates, plus task-level
+guards on the favourites-driven and alert notification emails.
+Token-based unsubscribe/confirm links stay open by design.
+
+Agent commerce becomes a real two-tier gate: the new
+Tenant.agent_commerce_enabled plan flag (default ON — the surface
+predates the flag) combines with AGENT_COMMERCE_ENABLED /
+PRODUCT_FEEDS_ENABLED settings into effective TenantConfig values the
+gateway enforces per tenant; editing those settings purges the
+tenant-resolve cache via a Setting post_save receiver, and the
+/api/v1/agent/* resources carry the same gate as belt and braces.
+The platform admin Features fieldset now exposes all five plan flags
+(promotions/gift-cards were missing).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`7b84469`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b844694f25d5904481751f837d25871e882f0bf))
+
+* feat(settings): public storefront chrome toggles for bottom nav and sticky add-to-cart
+
+MOBILE_BOTTOM_NAV_ENABLED and STICKY_ADD_TO_CART_ENABLED (bool,
+default ON, PUBLIC_SETTING_KEYS) — store UI preferences following the
+ACCOUNT_REVIEWS_ENABLED lineage: both features were previously
+(mis)gated behind the storefront's superuser-only preview mode, so
+real shoppers never saw them.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`7b373c0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b373c089902849e8cbf3030f245fe151690cb44))
+
 ## v3.10.0 (2026-08-25)
 
 ### Bug fixes

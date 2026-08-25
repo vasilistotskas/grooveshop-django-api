@@ -3,6 +3,158 @@
 
 
 
+## v3.10.0 (2026-08-25)
+
+### Bug fixes
+
+* fix(giftcard): keep the minimum-charge trim ledger-consistent and DB-enforce refund-credit idempotency
+
+The single-pass floor trim could pop the last card from the plan while
+subtracting only the trim from the planned amount, debiting the ledger
+more than the order was credited (customer overpays) — and a pop could
+leave the provider remainder below the floor again. The trim now
+iterates with per_card as the single source of truth: plan.amount is
+always exactly the per-card sum the REDEEM rows will write.
+
+credit_refund's check-then-act could double-credit a card when two
+refund tasks raced (Celery redelivery, refund+cancel sequences). A
+partial unique constraint on (gift_card, order) for REFUND_CREDIT rows
+now makes the duplicate insert impossible; the race loser skips the
+card instead.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`a69c4ff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a69c4ff2320e1f56233dda030916c46111dd9fd0))
+
+* fix(order): order-received email reflects already-settled payments
+
+Fully gift-card-settled orders arrive paid — the received email now
+says the payment is confirmed instead of asking the customer to pay.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`2ada713`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2ada71353db33c8aac457d1d23d158c5f5674631))
+
+* fix(giftcard): paginate my-cards envelope and shorten mixin index names
+
+The generated OpenAPI contract wraps many=True list actions in the
+standard paginator envelope, so /giftcard/mine now goes through
+paginate_and_serialize (loyalty transactions precedent). The
+TimeStampMixin %(class)s index names exceeded the 32-char cap
+(models.E034) on PromotionRedemption and GiftCardTransaction —
+explicit short names + rename migrations.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`1b8d514`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b8d51464a2eaf11f188ba59776c286f4a285738))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.9.0 [skip ci] ([`8e191f6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8e191f678c61645725f02a4bfab5c2474edb8485))
+
+### Features
+
+* feat(promotion): advanced benefits, Viva gift-card purchases and deduction parity
+
+Promotions: BXGY (same-pool and reward-pool), free-gift entitlements
+injected as zero-price order lines with real stock decrements,
+product/category exclusions (MPTT descendants), min-quantity gates,
+and near-miss teasers for automatic threshold promotions.
+
+Gift cards: Viva Smart Checkout purchase flow (tenant-resolved
+webhook verification with amount guard, return-URL lookup and
+storefront status polling), purchase receipts, configurable expiry
+reminders, and reversal handling that voids untouched cards while
+flagging spent ones for ops.
+
+Checkout parity: the payment-intent endpoint now prices loyalty
+redemptions through the same locked validation redeem_points uses,
+zero-total orders settle order-first for every deduction combination
+(DISCOUNT_/GIFTCARD_ settlement ids), gift weight feeds all shipping
+quotes, and myDATA invoices emit split paymentMethodDetails rows
+(configurable gift-card payment type) that sum to totalGrossValue.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`f88a4c9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f88a4c93f9f7a7ff0af5b36f17528328749804fd))
+
+* feat(order): expose tenant promo/gift-card flags and redeemed coupon codes
+
+TenantConfig now carries promotions_enabled + gift_cards_enabled so the
+storefront can gate its widgets/pages on the plan flag (two-tier gate,
+loyalty pattern), and OrderDetail exposes applied_coupon_codes for GA4
+purchase attribution and order-detail display.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`44f585c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/44f585cbe5f3e04b16c85f1cc8cc139ce538fbb0))
+
+* feat(giftcard): stored-value gift cards with purchase, redemption and ledger
+
+New tenant-only giftcard app: GiftCard (crypto-random bearer code,
+ledger-derived balance, 5-year default expiry per Greek consumer law,
+admin-issued or purchased), GiftCardTransaction (append-only signed
+ledger: ISSUE/REDEEM/REFUND_CREDIT/ADJUST/EXPIRE with a partial unique
+constraint anchoring one redeem per card per order) and GiftCardPurchase
+(storefront purchase — deliberately NOT an Order, so no stock, shipping,
+courier or AADE retail-receipt machinery touches a multi-purpose
+voucher sale; VAT stays due at redemption and the sale is never
+submitted to myDATA).
+
+Redemption is payment, not discount: gift_card_codes on order create
+settle what remains after promotions and loyalty, smallest balance
+first across up to 3 cards, with a EUR 0.50 provider-minimum floor on
+partial coverage. The payment-first path locks the cards during the
+PaymentIntent verification and records the same plan after the order
+exists, so the verified and redeemed amounts cannot drift; full
+coverage routes order-first, marks the order paid as GIFTCARD_<uuid>
+with no provider involved, and dispatches the shipment like COD.
+Refunds and cancellations credit the settled portion back to the
+source cards via the order signals.
+
+Purchase flow: POST /api/v1/giftcard/purchase creates a Stripe
+PaymentIntent (online card payment only); the payment_intent.succeeded
+webhook branch mints the card and queues the delivery email
+(scheduled deliveries + expiry run as daily tenant fanouts). Balance
+check is a tightly-throttled bearer-code oracle; my-cards endpoint
+lists account-linked cards. Unfold admin ships card issuance through
+the service, an adjust-balance dialog writing auditable ADJUST rows,
+disable/resend actions and read-only ledger/purchase screens. Feature
+gated by Tenant.gift_cards_enabled + GIFT_CARDS_ENABLED with
+min/max purchase bounds in extra_settings.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`3d4146b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3d4146b251fba52daf026a38c38524df060dcbc0))
+
+* feat(promotion): rule-based promotion engine with coupons and automatic discounts
+
+New tenant-only promotion app: Promotion (percentage/fixed/free-shipping
+benefits, order/product/category targeting with MPTT descendants,
+schedule windows, min-subtotal, first-order-only, stacking with
+priority, per-application ceiling, total/per-customer usage limits),
+PromotionCode (bulk generation, per-code limits, personal assignment to
+a user/email), PromotionRedemption (locked usage-limit ledger) and
+CartPromotionCode (cart attachment).
+
+PromotionEngine is the single evaluation authority shared by the cart
+serializer preview, the pre-order PaymentIntent amount, the order-create
+verification guard and the order application itself, so every surface
+agrees to the cent. Coupons are applied via POST/DELETE /api/v1/cart/coupon
+(guest-capable, tightly throttled code oracle, ACP-vocabulary rejection
+reasons). Order rows gain discount_amount + gift_card_amount and
+calculate_order_total_amount() now deducts promotions, loyalty and
+gift-card amounts, so all charge sites, webhook guards, COD collection
+and dashboards inherit correctness.
+
+Consistency surfaces covered: pricing_breakdown exposes and deducts the
+discounts (fixes the loyalty phantom outstanding balance and the
+standalone loyalty redeem endpoint never writing loyalty_discount),
+order emails render discount lines and post-discount totals, invoice
+PDF + AADE myDATA allocate discounts across lines with largest-remainder
+rounding (gift cards stay payment, never reducing taxable value), Meta
+CAPI InitiateCheckout subtracts discounts, Stripe hosted checkout guards
+against negative line amounts, unfold admin ships Promotion/Code/
+Redemption screens with dialog code generation and a Sales sidebar
+badge. Feature gated by Tenant.promotions_enabled + PROMOTIONS_ENABLED.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`d43d356`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d43d356d5dca9bc29b5ce7cf4e1a2721afb7acc2))
+
 ## v3.9.0 (2026-08-24)
 
 ### Chores

@@ -244,6 +244,12 @@ class OrderDetailSerializer(OrderSerializer):
             "totals in multi-currency reports."
         )
     )
+    applied_coupon_codes = serializers.SerializerMethodField(
+        help_text=(
+            "Coupon codes redeemed on this order (empty when no coupon "
+            "was used)."
+        )
+    )
     phone = PhoneNumberField(read_only=True)
 
     @extend_schema_field(
@@ -268,6 +274,26 @@ class OrderDetailSerializer(OrderSerializer):
             for key, value in event_ids.items()
             if isinstance(value, (str, int)) and str(value)
         }
+
+    @extend_schema_field(
+        {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "Coupon codes redeemed on this order — analytics "
+                "attribution (GA4 purchase.coupon) and order detail "
+                "display."
+            ),
+        }
+    )
+    def get_applied_coupon_codes(self, obj: Order) -> list[str]:
+        return [
+            redemption.code.code
+            for redemption in obj.promotion_redemptions.select_related(
+                "code"
+            ).all()
+            if redemption.code_id
+        ]
 
     @extend_schema_field({"type": "string", "example": "EUR"})
     def get_currency(self, obj: Order) -> str:
@@ -656,6 +682,7 @@ class OrderDetailSerializer(OrderSerializer):
             "shipment",
             "shipment_provider_code",
             "cancellation",
+            "applied_coupon_codes",
             "phone",
             "document_type",
             "payment_id",

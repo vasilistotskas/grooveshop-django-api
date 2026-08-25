@@ -60,6 +60,8 @@ class TenantConfigSerializer(serializers.Serializer):
     # --- Feature flags ---
     loyalty_enabled = serializers.BooleanField(read_only=True)
     blog_enabled = serializers.BooleanField(read_only=True)
+    promotions_enabled = serializers.BooleanField(read_only=True)
+    gift_cards_enabled = serializers.BooleanField(read_only=True)
     agent_stripe_delegated_enabled = serializers.BooleanField(read_only=True)
 
     # --- Payments (public key only) ---
@@ -188,6 +190,8 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             # --- Features ---
             "loyalty_enabled",
             "blog_enabled",
+            "promotions_enabled",
+            "gift_cards_enabled",
             # --- Payments (public keys) ---
             "stripe_connect_account_id",
             "stripe_publishable_key",

@@ -36375,6 +36375,13 @@ components:
             Returns null when the order was not canceled. Internal flags from the
             metadata bag (webhook idempotency markers, mint tickets) are intentionally
             not surfaced.
+        appliedCouponCodes:
+          type: array
+          items:
+            type: string
+          description: Coupon codes redeemed on this order (empty when no coupon was
+            used).
+          readOnly: true
         trackingNumber:
           type: string
           title: Αριθμός Παρακολούθησης
@@ -36414,6 +36421,7 @@ components:
             which breaks ad-pixel attribution and cart totals in multi-currency reports.
       required:
       - acsShipment
+      - appliedCouponCodes
       - boxnowShipment
       - canBeCanceled
       - cancellation
@@ -43253,6 +43261,12 @@ components:
         blogEnabled:
           type: boolean
           readOnly: true
+        promotionsEnabled:
+          type: boolean
+          readOnly: true
+        giftCardsEnabled:
+          type: boolean
+          readOnly: true
         agentStripeDelegatedEnabled:
           type: boolean
           readOnly: true
@@ -43316,6 +43330,7 @@ components:
       - errorHex
       - faviconUrl
       - gaTrackingId
+      - giftCardsEnabled
       - infoHex
       - logoDarkUrl
       - logoLightUrl
@@ -43325,6 +43340,7 @@ components:
       - neutralColor
       - primaryColor
       - primaryDomain
+      - promotionsEnabled
       - schemaName
       - socialsDiscord
       - socialsFacebook

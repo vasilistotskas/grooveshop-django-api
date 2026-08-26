@@ -52,6 +52,34 @@ def regular_user(db):
 # ---------------------------------------------------------------------------
 
 
+STOREFRONT_FEATURE_TOGGLES = (
+    "MOBILE_BOTTOM_NAV_ENABLED",
+    "STICKY_ADD_TO_CART_ENABLED",
+    "PRODUCT_REVIEWS_ENABLED",
+    "BLOG_COMMENTS_ENABLED",
+    "FAVOURITES_ENABLED",
+    "NEWSLETTER_ENABLED",
+    "FEEDBACK_ENABLED",
+    "PRODUCT_ALERTS_ENABLED",
+)
+
+
+def test_storefront_feature_toggles_ship_enabled():
+    """Every storefront gate defaults ON — a merchant opts OUT.
+
+    Read from EXTRA_SETTINGS_DEFAULTS rather than a DB row: the rows
+    are seeded at app-ready time and a TransactionTestCase on the same
+    xdist worker can truncate them mid-run.
+    """
+    from django.conf import settings as dj_settings
+
+    defaults = {s["name"]: s for s in dj_settings.EXTRA_SETTINGS_DEFAULTS}
+    for key in STOREFRONT_FEATURE_TOGGLES:
+        assert key in defaults, f"{key} missing from EXTRA_SETTINGS_DEFAULTS"
+        assert defaults[key]["type"] == "bool", key
+        assert defaults[key]["value"] is True, key
+
+
 @pytest.mark.django_db
 class TestGetSettingByKeyPublicAccess:
     """Anonymous callers can read whitelisted keys, nothing else."""
@@ -75,29 +103,26 @@ class TestGetSettingByKeyPublicAccess:
         data = response.json()
         assert data["name"] == "CONTACT_EMAIL"
 
-    def test_storefront_chrome_toggles_whitelisted_anonymous(self):
-        """MOBILE_BOTTOM_NAV_ENABLED / STICKY_ADD_TO_CART_ENABLED are
-        public store UI preferences (default ON — the storefront gates
-        shopper-facing chrome on them)."""
+    def test_storefront_feature_toggles_whitelisted_anonymous(self):
+        """Every storefront UI / merchant feature toggle the storefront
+        gates on must be readable anonymously.
+
+        Asserts membership of PUBLIC_SETTING_KEYS only — never the
+        seeded VALUE. extra_settings rows are created at app-ready
+        time, not by a fixture, so a TransactionTestCase running
+        earlier on the same xdist worker truncates them without
+        restoring, and ``value`` then comes back null (CI, 2026-08-26).
+        The defaults themselves are asserted in the EXTRA_SETTINGS
+        config, and the gates pass their own ``default=True``.
+        """
         client = _anon_client()
         url = reverse("api-settings-get")
-        for key in (
-            "MOBILE_BOTTOM_NAV_ENABLED",
-            "STICKY_ADD_TO_CART_ENABLED",
-            "PRODUCT_REVIEWS_ENABLED",
-            "BLOG_COMMENTS_ENABLED",
-            "FAVOURITES_ENABLED",
-            "NEWSLETTER_ENABLED",
-            "FEEDBACK_ENABLED",
-            "PRODUCT_ALERTS_ENABLED",
-        ):
+        for key in STOREFRONT_FEATURE_TOGGLES:
             response = client.get(url, {"key": key})
             assert response.status_code == status.HTTP_200_OK, key
             data = response.json()
             assert data["name"] == key
-            # The endpoint serializes values as strings — the
-            # storefront's useSettingFlag parses 'true'/'1'/'yes'.
-            assert str(data["value"]).lower() == "true"
+            assert "value" in data, key
 
     def test_non_whitelisted_key_returns_404_anonymous(self):
         """DEEPL_AUTH_KEY (or any unlisted key) must be blocked."""

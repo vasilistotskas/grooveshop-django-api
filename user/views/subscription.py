@@ -40,7 +40,6 @@ from user.serializers.subscription import (
 from user.utils.subscription import (
     UNSUBSCRIBE_MAX_AGE,
     UNSUBSCRIBE_SALT,
-    send_subscription_confirmation,
 )
 
 logger = logging.getLogger(__name__)
@@ -218,11 +217,18 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
         subscription = UserSubscription.objects.create(**subscription_data)
 
         if topic.requires_confirmation:
-            success = send_subscription_confirmation(subscription, user)
-            if not success:
-                logger.warning(
-                    f"Failed to send confirmation email for subscription {subscription.id}"
+            # Queue it, don't block the request on SMTP — and dispatch
+            # only after commit so the worker can't read the row before
+            # it is persisted. Mirrors the signup path in user/signals.py.
+            from user.tasks import (  # noqa: PLC0415
+                send_subscription_confirmation_email_task,
+            )
+
+            transaction.on_commit(
+                lambda s=subscription: (
+                    send_subscription_confirmation_email_task.delay(s.id)
                 )
+            )
 
         response_serializer_class = self.get_response_serializer()
         response_serializer = response_serializer_class(subscription)

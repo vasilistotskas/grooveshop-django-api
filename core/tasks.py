@@ -117,9 +117,15 @@ def clear_expired_sessions_task():
 def clear_all_cache_task():
     try:
         logger.info("Starting cache cleanup")
-        management.call_command("clear_cache", verbosity=0)
+        # ``--all`` is REQUIRED: with no surfaces and no --all the command
+        # falls through to its "list available surfaces" branch and purges
+        # nothing, while this task still reported success.
+        # Stays a public-schema task (not a fanout) because surface
+        # patterns are raw wildcard scans (e.g. ``*PayWayViewSet_*``) that
+        # bypass the schema key prefix and so already span every tenant.
+        management.call_command("clear_cache", "--all", verbosity=0)
 
-        return {"status": "success", "message": "Cache cleared by prefix"}
+        return {"status": "success", "message": "Cache surfaces purged"}
     except management.CommandError as e:
         logger.error(f"Django command error in clear_cache: {e}")
         return {

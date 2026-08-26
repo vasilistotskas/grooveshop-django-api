@@ -110,11 +110,21 @@ class TestClearAllCacheTask:
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.logger")
     def test_successful_cache_cleanup(self, mock_logger, mock_call_command):
+        """``--all`` is load-bearing, not cosmetic.
+
+        ``clear_cache`` with no surfaces and no ``--all`` takes its
+        "list available surfaces" branch and purges NOTHING, so the
+        monthly beat task was a silent no-op that still reported
+        success. This assertion is what keeps the flag from being
+        dropped again.
+        """
         result = clear_all_cache_task()
 
-        mock_call_command.assert_called_once_with("clear_cache", verbosity=0)
+        mock_call_command.assert_called_once_with(
+            "clear_cache", "--all", verbosity=0
+        )
         assert result["status"] == "success"
-        assert result["message"] == "Cache cleared by prefix"
+        assert result["message"] == "Cache surfaces purged"
 
     @patch("core.tasks.management.call_command")
     def test_cache_cleanup_command_error(self, mock_call_command):

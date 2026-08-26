@@ -103,6 +103,8 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                     "promotionId": {"type": "integer"},
                     "name": {"type": "string"},
                     "productId": {"type": "integer"},
+                    "productName": {"type": "string"},
+                    "productImagePath": {"type": "string"},
                     "quantity": {"type": "integer"},
                 },
             },
@@ -113,6 +115,10 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         }
     )
     def get_promotion_gift_items(self, obj: Cart) -> list[dict]:
+        # ``name`` is the PROMOTION name (why the gift exists);
+        # ``productName``/``productImagePath`` describe the actual
+        # product the shopper receives — the storefront leads with
+        # those so the free line reads as a real item, not a slogan.
         return [
             {
                 "promotionId": gift.promotion.id,
@@ -121,6 +127,11 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                 )
                 or "",
                 "productId": gift.product.id,
+                "productName": gift.product.safe_translation_getter(
+                    "name", any_language=True
+                )
+                or "",
+                "productImagePath": gift.product.main_image_path,
                 "quantity": gift.quantity,
             }
             for gift in self._promotion_result(obj).gift_items

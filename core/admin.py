@@ -86,6 +86,118 @@ class UnfoldPeriodicTaskForm(PeriodicTaskForm):
         self.fields["regtask"].widget = UnfoldTaskSelectWidget()
 
 
+# Ordered prefix → category map for the ~80 flat extra_settings rows.
+# First match wins, so put the more specific prefixes before generic
+# ones (MYDATA_GIFT_CARD_* is a myDATA knob, not a gift-card one).
+# The "Other" bucket catches anything unmapped — extend this map when
+# a new settings family lands.
+SETTING_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
+    (
+        "Storefront UI",
+        (
+            "MOBILE_BOTTOM_NAV_",
+            "STICKY_ADD_TO_CART_",
+            "RECENTLY_VIEWED_",
+            "CHAT_WIDGET_",
+            "ACCOUNT_REVIEWS_",
+            "PRODUCT_REVIEWS_",
+            "BLOG_COMMENTS_",
+            "FAVOURITES_",
+            "NEWSLETTER_",
+            "FEEDBACK_",
+            "PRODUCT_ALERTS_",
+        ),
+    ),
+    ("Invoicing & myDATA", ("INVOICE_", "MYDATA_", "B2B_")),
+    ("Promotions & Gift Cards", ("PROMOTIONS_", "GIFT_CARD")),
+    ("Loyalty", ("LOYALTY_",)),
+    (
+        "Shipping",
+        (
+            "ACS_",
+            "BOXNOW_",
+            "CHECKOUT_SHIPPING_",
+            "FREE_SHIPPING_",
+            "DEFAULT_WEIGHT_",
+        ),
+    ),
+    (
+        "Orders & Checkout",
+        (
+            "ORDER_",
+            "PENDING_ORDER_",
+            "STOCK_",
+            "CART_",
+            "CHECKOUT_",
+            "LOW_STOCK_",
+            "ABANDONED_CART_",
+            "OLD_GUEST_CART_",
+        ),
+    ),
+    (
+        "Emails & Engagement",
+        (
+            "REENGAGEMENT_",
+            "INACTIVE_USER_",
+            "NOTIFICATION_",
+            "SUBSCRIPTION_",
+            "CONTACT_EMAIL",
+        ),
+    ),
+    ("Agent Commerce", ("AGENT_", "PRODUCT_FEEDS_")),
+    ("Analytics", ("META_CAPI_",)),
+    ("Search", ("SEARCH_",)),
+]
+
+
+def setting_category(name: str) -> str:
+    for category, prefixes in SETTING_CATEGORIES:
+        if name.startswith(prefixes):
+            return category
+    return "Other"
+
+
+class SettingCategoryFilter(admin.SimpleListFilter):
+    """Group the flat settings list into functional areas.
+
+    Rendered as an unfold dropdown via the admin's
+    ``list_filter``; the categories come from the shared
+    ``SETTING_CATEGORIES`` prefix map so the badge column and the
+    filter can never disagree.
+    """
+
+    title = _("Category")
+    parameter_name = "category"
+
+    def lookups(self, request, model_admin):
+        return [
+            *((category, _(category)) for category, _p in SETTING_CATEGORIES),
+            ("Other", _("Other")),
+        ]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+        from django.db.models import Q  # noqa: PLC0415
+
+        prefix_map = dict(SETTING_CATEGORIES)
+        if value == "Other":
+            # Everything NO category prefix matches.
+            query = Q()
+            for prefixes in prefix_map.values():
+                for prefix in prefixes:
+                    query |= Q(name__startswith=prefix)
+            return queryset.exclude(query)
+        prefixes = prefix_map.get(value)
+        if not prefixes:
+            return queryset
+        query = Q()
+        for prefix in prefixes:
+            query |= Q(name__startswith=prefix)
+        return queryset.filter(query)
+
+
 class SettingAdmin(ModelAdmin):
     from core.forms.settings import SettingAdminForm
 
@@ -94,15 +206,17 @@ class SettingAdmin(ModelAdmin):
     warn_unsaved_form = True
     list_fullwidth = False
     list_filter_submit = True
+    ordering = ["name"]
 
     list_display = [
         "name_display",
+        "category_badge",
         "value_type_badge",
         "value_preview",
         "description_preview",
     ]
     list_display_links = ["name_display"]
-    list_filter = ["value_type"]
+    list_filter = [SettingCategoryFilter, "value_type"]
     search_fields = ["name", "description"]
 
     class Media:
@@ -164,6 +278,16 @@ class SettingAdmin(ModelAdmin):
     @admin.display(description=_("Name"), ordering="name")
     def name_display(self, obj):
         return obj.name
+
+    @admin.display(description=_("Category"))
+    def category_badge(self, obj):
+        from django.utils.html import format_html  # noqa: PLC0415
+
+        return format_html(
+            '<span class="setting-type-badge" data-type="{category}">'
+            "{category}</span>",
+            category=setting_category(obj.name),
+        )
 
     @admin.display(description=_("Type"))
     def value_type_badge(self, obj):

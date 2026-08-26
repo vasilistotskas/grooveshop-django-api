@@ -3,6 +3,31 @@
 
 
 
+## v3.12.0 (2026-08-26)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.11.0 [skip ci] ([`0490f0b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0490f0b8516a7380e0133c85857a33c524188b66))
+
+### Features
+
+* feat(admin): category grouping for settings and product identity on gift entitlements
+
+The ~80 extra_settings rows render as one flat list; a shared
+prefix→category map now drives a Category badge column and an unfold
+dropdown filter (Storefront UI, Invoicing & myDATA, Promotions & Gift
+Cards, Loyalty, Shipping, Orders & Checkout, Emails & Engagement,
+Agent Commerce, Analytics, Search — Other catches the unmapped), with
+the list ordered by name.
+
+Cart promotionGiftItems now carry productName and productImagePath
+alongside the promotion name, so the storefront can present a free
+gift as the actual product being added rather than the promotion's
+internal label.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`6e29647`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6e29647d29473c22855a647e298cdbd1a2a9ec66))
+
 ## v3.11.0 (2026-08-25)
 
 ### Bug fixes

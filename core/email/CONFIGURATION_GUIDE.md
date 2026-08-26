@@ -46,8 +46,7 @@ Create your HTML and TXT templates in the appropriate directory:
 core/templates/emails/
 ├── order/              # Order-related templates
 ├── subscription/       # Subscription templates
-├── user/              # User management templates
-└── marketing/         # Marketing templates
+└── user/              # User management templates
 ```
 
 **Auto-Discovery**: Templates are automatically discovered based on their directory location.
@@ -159,7 +158,6 @@ generator_map = {
     "generate_order_context": lambda: self._get_context_data(order_id),
     "generate_subscription_context": lambda: (self._get_sample_subscription_context(), True),
     "generate_user_context": lambda: (self._get_sample_user_context(), True),
-    "generate_marketing_context": lambda: (self._get_sample_user_context(), True),
     "generate_payment_context": lambda: (self._get_sample_payment_context(), True),  # NEW
 }
 ```

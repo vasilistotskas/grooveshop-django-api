@@ -35,7 +35,6 @@ core/email/
 - Order templates (`order/`)
 - Subscription templates (`subscription/`)
 - User management templates (`user/`)
-- Marketing templates (`marketing/`)
 - Auto-discovers templates based on directory structure
 - Easy to add new categories
 
@@ -132,7 +131,6 @@ Available context generators:
 - `generate_order_context` - Order data (order, items, tracking)
 - `generate_subscription_context` - Subscription data
 - `generate_user_context` - User data
-- `generate_marketing_context` - Marketing data
 
 ### Adding a Custom Generator
 
@@ -263,7 +261,6 @@ Group related templates logically:
 - Order lifecycle → "Order Lifecycle"
 - Shipping updates → "Shipping"
 - User actions → "User Management"
-- Promotions → "Marketing"
 
 ### 5. Testing
 Always test new templates:

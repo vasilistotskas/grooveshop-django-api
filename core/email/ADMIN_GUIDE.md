@@ -33,7 +33,6 @@ The left panel shows all available email templates organized by category:
   - Subscription Confirmation
 - **User Management**: User account templates
   - Inactive User Notification
-- **Marketing**: Marketing templates
 
 **Category Features**:
 - Click the arrow button (▼/▶) to collapse/expand each category
@@ -59,7 +58,7 @@ The preview panel allows you to test templates:
    - **Sample Data**: Uses generated test data (recommended for initial testing)
    - **Real Order**: Uses actual order from database (requires Order ID)
      - **Note**: Only available for order templates
-     - Automatically hidden for subscription, user, and marketing templates
+     - Automatically hidden for subscription and user templates
 
 3. **Format Tabs**
    - **HTML**: Rich formatted email view

@@ -93,7 +93,9 @@ class TestEmailTemplateRegistry:
         """Test that status-to-template mapping is correct."""
         # Test a few known mappings
         pending_templates = registry.get_by_status(OrderStatus.PENDING)
-        assert any(t.name == "order_pending" for t in pending_templates)
+        assert any(
+            t.name == "order_pending_reminder" for t in pending_templates
+        )
 
         shipped_templates = registry.get_by_status(OrderStatus.SHIPPED)
         assert any(t.name == "order_shipped" for t in shipped_templates)

@@ -49,7 +49,7 @@
 ### Features
 ✅ Configuration-driven architecture
 ✅ Auto-discovery based on directory structure
-✅ Multi-category support (Order, Subscription, User, Marketing)
+✅ Multi-category support (Order, Subscription, User)
 ✅ Search functionality (Ctrl+K)
 ✅ Collapsible categories
 ✅ Smart data source selection

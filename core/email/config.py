@@ -63,12 +63,6 @@ class EmailTemplateConfig:
             context_generator="generate_user_context",
             templates={},
         ),
-        "marketing": TemplateCategory(
-            name="Marketing",
-            path="marketing",
-            context_generator="generate_marketing_context",
-            templates={},
-        ),
     }
 
     # Template configurations
@@ -119,24 +113,6 @@ class EmailTemplateConfig:
             is_used=True,
             context_keys=["order", "items"],
         ),
-        "order_pending": TemplateConfig(
-            name="order_pending",
-            category_name="Order Lifecycle",
-            description="Status update for pending orders",
-            subject_template="Order #{order[id]} - Pending",
-            order_statuses=[OrderStatus.PENDING],
-            is_used=False,
-            context_keys=["order", "items"],
-        ),
-        "order_processing": TemplateConfig(
-            name="order_processing",
-            category_name="Order Lifecycle",
-            description="Status update for processing orders",
-            subject_template="Order #{order[id]} - Processing",
-            order_statuses=[OrderStatus.PROCESSING],
-            is_used=False,
-            context_keys=["order", "items"],
-        ),
         "order_completed": TemplateConfig(
             name="order_completed",
             category_name="Order Lifecycle",
@@ -181,31 +157,6 @@ class EmailTemplateConfig:
             subject_template="We Miss You, {user[first_name]}!",
             is_used=True,
             context_keys=["user", "app_base_url"],
-        ),
-        "password_reset": TemplateConfig(
-            name="password_reset",
-            category_name="User Management",
-            description="Password reset request",
-            subject_template="Reset Your Password",
-            is_used=False,
-            context_keys=["user", "reset_link"],
-        ),
-        "welcome": TemplateConfig(
-            name="welcome",
-            category_name="User Management",
-            description="Welcome email for new users",
-            subject_template="Welcome to {SITE_NAME}, {user[first_name]}!",
-            is_used=False,
-            context_keys=["user", "activation_link"],
-        ),
-        # Marketing templates
-        "promotion": TemplateConfig(
-            name="promotion",
-            category_name="Marketing",
-            description="Promotional email",
-            subject_template="Special Offer for {user[first_name]}!",
-            is_used=False,
-            context_keys=["user", "promotion"],
         ),
     }
 

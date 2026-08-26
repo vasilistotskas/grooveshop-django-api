@@ -1,1 +1,0 @@
-{% include "emails/order/order_status_generic.txt" %}

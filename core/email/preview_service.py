@@ -8,8 +8,8 @@ from django.conf import settings
 from django.template.loader import render_to_string
 
 from core.email.config import EmailTemplateConfig
-from core.utils.tenant_urls import get_tenant_static_base_url
-from tenant.credentials import tenant_contact_email, tenant_site_name
+from core.utils.email_context import build_email_context
+from tenant.credentials import tenant_site_name
 from core.email.sample_data import SampleOrderDataGenerator
 from order.models import Order
 
@@ -125,10 +125,6 @@ class EmailTemplatePreviewService:
                 True,
             ),
             "generate_user_context": lambda: (
-                self._get_sample_user_context(),
-                True,
-            ),
-            "generate_marketing_context": lambda: (
                 self._get_sample_user_context(),
                 True,
             ),
@@ -248,9 +244,7 @@ class EmailTemplatePreviewService:
     def _get_status_from_template_name(self, template_name: str) -> str:
         """Extract order status from template name."""
         status_map = {
-            "order_pending": "PENDING",
             "order_pending_reminder": "PENDING",
-            "order_processing": "PROCESSING",
             "order_shipped": "SHIPPED",
             "order_delivered": "DELIVERED",
             "order_completed": "COMPLETED",
@@ -266,17 +260,16 @@ class EmailTemplatePreviewService:
         from django.template import TemplateDoesNotExist, TemplateSyntaxError
         from django.utils import translation
 
-        # Add context processor variables that are needed for email templates
-        # These match what's provided by core.context_processors.metadata
-        context = {
+        # Build the SAME shared context real sends use, so the preview
+        # shows what the recipient actually gets — tenant logo included.
+        # Hand-rolling these keys here previously pinned SITE_URL to the
+        # PLATFORM base url and omitted SITE_LOGO_URL entirely, so every
+        # preview rendered the text wordmark instead of the tenant's
+        # logo, on the wrong domain.
+        context = build_email_context(
             **context,
-            "STATIC_BASE_URL": get_tenant_static_base_url(),
-            "SITE_NAME": tenant_site_name(),
-            "SITE_URL": settings.NUXT_BASE_URL,
-            "INFO_EMAIL": tenant_contact_email(),
-            "LANGUAGE_CODE": translation.get_language()
-            or settings.LANGUAGE_CODE,
-        }
+            LANGUAGE_CODE=translation.get_language() or settings.LANGUAGE_CODE,
+        )
 
         try:
             return render_to_string(template_path, context)

@@ -3,6 +3,55 @@
 
 
 
+## v3.13.0 (2026-08-26)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.12.3 [skip ci] ([`8ad2cc7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/8ad2cc7112818cd9f4e269d86eb3bda77bd80d94))
+
+### Features
+
+* feat(pay_way): seed default payment methods for new tenants
+
+Order.pay_way is required at checkout, but provisioning seeded no
+payment methods at all -- shipping providers get their rows from
+shipping/migrations/0002_seed_providers.py while payment had no
+equivalent, so a newly provisioned store could not accept a single
+order until someone hand-created rows in the admin. The staging tenant
+"aurora" has zero rows today.
+
+Seeded state mirrors the shipping precedent -- the offline method is
+usable immediately, the online ones stay dark until configured:
+
+cash_on_delivery ACTIVE needs no credentials, so the store has a
+                           working checkout on day one
+viva_wallet INACTIVE primary processor, but its credentials
+                           live on the Tenant row and are empty for a
+                           new tenant; an active card option with no
+                           keys is a checkout that fails at payment
+stripe INACTIVE same, secondary processor
+
+provider_code values are the ones order.payment.get_payment_provider
+registers; cash_on_delivery is deliberately absent from that registry
+because it is offline and never reaches the lookup. name holds the
+PayWayEnum KEY, not a display string, because the storefront resolves
+it through payment_methods.* in its el locale (CREDIT_CARD ->
+"Πληρωμή με Κάρτα").
+
+Uses get_or_create, NOT the update_or_create the shipping seeder uses:
+these rows are live on existing tenants -- production runs
+cash_on_delivery and viva_wallet ACTIVE -- and overwriting their
+defaults would have deactivated a merchant's working payment methods
+on the next deploy. Merchant edits always win; the seeder only fills
+gaps, which is also what backfills aurora.
+
+The seeded rows join the migrated test database, so pay_way suites
+that count rows, assert ordering, or expect SortableModel to start at
+0 now clear them via an autouse fixture per test package.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`695c0aa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/695c0aa58ee37046277ee7d9f5a39dfa6bfdc283))
+
 ## v3.12.3 (2026-08-26)
 
 ### Bug fixes

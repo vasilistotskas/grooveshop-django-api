@@ -5,9 +5,8 @@ import logging
 from typing import Any
 
 from django.conf import settings
-from django.contrib.admin.views.decorators import staff_member_required
 from django.http import HttpRequest, JsonResponse
-from django.utils.decorators import method_decorator
+from django.utils.translation import gettext_lazy as _
 from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 
@@ -16,8 +15,14 @@ from .preview_service import EmailTemplatePreviewService
 
 logger = logging.getLogger(__name__)
 
+# NOTE: access control for every view in this module is applied at the
+# URLconf (``core/email/urls.py``) via ``admin.site.admin_view``, which
+# runs the tenant-membership gate. Do NOT fall back to
+# ``staff_member_required`` here — it only checks the global
+# ``is_staff`` flag and would let a merchant read another store's
+# orders.
 
-@method_decorator(staff_member_required, name="dispatch")
+
 class EmailTemplateManagementView(TemplateView):
     """
     Main admin view for email template management.
@@ -72,22 +77,18 @@ class EmailTemplateManagementView(TemplateView):
 
         context.update(
             {
-                "title": "Email Template Management",
+                "title": _("Email Template Management"),
                 "templates": templates,
                 "templates_by_category": templates_by_category,
                 "categories": categories,
                 "recent_orders": list(recent_orders),
                 "available_languages": available_languages,
-                "site_title": "GrooveShop",
-                "site_header": "GrooveShop Administration",
-                "has_permission": True,
             }
         )
 
         return context
 
 
-@staff_member_required
 @require_http_methods(["POST"])
 def preview_template_ajax(request: HttpRequest) -> JsonResponse:
     """
@@ -149,7 +150,6 @@ def preview_template_ajax(request: HttpRequest) -> JsonResponse:
         )
 
 
-@staff_member_required
 @require_http_methods(["GET"])
 def get_template_info(request: HttpRequest, template_name: str) -> JsonResponse:
     """
@@ -207,7 +207,6 @@ def get_template_info(request: HttpRequest, template_name: str) -> JsonResponse:
         )
 
 
-@staff_member_required
 @require_http_methods(["GET"])
 def get_order_data(request: HttpRequest, order_id: int) -> JsonResponse:
     """

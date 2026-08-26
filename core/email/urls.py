@@ -1,5 +1,16 @@
-"""URL routing for email template management."""
+"""URL routing for email template management.
 
+Every view is wrapped in ``admin.site.admin_view`` so it inherits
+``MyAdminSite.has_permission`` — the platform-staff session check PLUS
+the per-tenant ``UserTenantMembership`` check. ``staff_member_required``
+alone is NOT enough here: ``is_staff`` is a global flag on the shared
+``UserAccount``, so a merchant staffer of store A would otherwise read
+store B's orders (this page lists recent orders and renders their
+emails). The mount point is storefront-only (see ``core/urls.py``);
+these views query ``Order``, which lives in TENANT_APPS.
+"""
+
+from django.contrib import admin
 from django.urls import path
 
 from .admin_views import (
@@ -14,22 +25,22 @@ app_name = "email_templates"
 urlpatterns = [
     path(
         "management/",
-        EmailTemplateManagementView.as_view(),
+        admin.site.admin_view(EmailTemplateManagementView.as_view()),
         name="management",
     ),
     path(
         "preview/",
-        preview_template_ajax,
+        admin.site.admin_view(preview_template_ajax),
         name="preview",
     ),
     path(
         "template/<str:template_name>/",
-        get_template_info,
+        admin.site.admin_view(get_template_info),
         name="template_info",
     ),
     path(
         "order/<int:order_id>/",
-        get_order_data,
+        admin.site.admin_view(get_order_data),
         name="order_data",
     ),
 ]

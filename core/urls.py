@@ -109,10 +109,6 @@ _root_storefront_patterns = [
 # (country/region, tenant resolve + memberships, health, settings, schema).
 _shared_i18n_patterns = [
     path("", HomeView.as_view(), name="home"),
-    path(
-        _("admin/email-templates/"),
-        include("core.email.urls", namespace="email_templates"),
-    ),
     path(_("admin/"), admin.site.urls),
     path("upload_image", upload_image, name="upload_image"),
     path("accounts/", include("allauth.urls")),
@@ -143,6 +139,20 @@ _shared_i18n_patterns = [
         "api/v1/schema/redoc",
         SpectacularRedocView.as_view(url_name="schema"),
         name="redoc",
+    ),
+]
+
+# Locale-prefixed, STOREFRONT only: merchant admin tooling that reads
+# TENANT_APPS data. Kept in its own group because it MUST be resolved
+# before ``admin/`` — ``AdminSite`` ends its URLconf with a catch-all
+# (``final_catch_all_view``) that would answer ``admin/email-templates/*``
+# with a 404 instead of letting resolution fall through. It is absent
+# from ``public_shared_urlpatterns`` on purpose: these views query
+# ``Order``, whose table does not exist in the public schema.
+_storefront_admin_i18n_patterns = [
+    path(
+        _("admin/email-templates/"),
+        include("core.email.urls", namespace="email_templates"),
     ),
 ]
 
@@ -179,6 +189,7 @@ urlpatterns = (
     _root_shared_patterns
     + _root_storefront_patterns
     + i18n_patterns(
+        *_storefront_admin_i18n_patterns,
         *_shared_i18n_patterns,
         *_storefront_i18n_patterns,
         prefix_default_language=False,

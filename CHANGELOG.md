@@ -3,6 +3,66 @@
 
 
 
+## v3.12.3 (2026-08-26)
+
+### Bug fixes
+
+* fix(admin): resolve admin-log actors across the schema boundary
+
+An admin-log row is the one record with MIXED provenance: a PUBLIC
+actor acting on a TENANT object. Its two foreign keys pull opposite
+ways and PostgreSQL cannot express a cross-schema FK, so exactly one
+can be real.
+
+content_type_id keeps its constraint -- it MUST resolve locally,
+since a tenant's content-type id space differs from public's (in
+production webside's product.product is notification.notificationuser
+in public). That is why admin is dual-listed into TENANT_APPS.
+
+user_id therefore gives up its constraint, the same trade
+product.changed_by, order.stock_log and the ACS/BoxNow shipment
+histories already make with db_constraint=False. Without it a freshly
+provisioned tenant fails twice: ForeignKeyViolation on the owner's
+first admin save, then -- once the tenant grows past that pk range --
+silent misattribution, because the constraint gets satisfied by a
+SHOPPER and nothing errors. webside survived only because the cutover
+copied users id-preserving, making all five platform identities
+coincidentally resolve to the same person.
+
+Dropping the constraint alone would trade a crash for a lie, so the
+read half is fixed too. bind_public_actors caches the public identity
+on each entry before render. A cached None would NOT be enough:
+ForwardManyToOneDescriptor treats a cached None alongside a non-null
+user_id as a cache miss and re-queries the TENANT user table, which is
+exactly the misattribution being closed -- hence the UnknownActor
+sentinel for actors that no longer exist.
+
+Applied by patching ModelAdmin.history_view once from
+MyAdminConfig.ready() rather than mixing into a base class: the admins
+that log include ones this project does not own (dj-stripe, allauth,
+celery-beat) and ones extending unfold's ModelAdmin directly rather
+than admin.base.BaseModelAdmin -- TenantAdmin is both a direct
+subclass and an active log_change caller. One seam, no per-admin
+adoption step to forget. Follows the existing third_party.py patching
+precedent.
+
+The migration lives in user/ because the project's admin/ package is
+an AppConfig for django.contrib.admin and owns no migrations, while
+user is dual-listed so it runs in every schema and the guard decides.
+Model state is untouched, so the ORM still treats LogEntry.user as a
+FK; only the database constraint goes.
+
+Verified against real PostgreSQL: with the constraint an insert of a
+public actor pk into a tenant schema raises IntegrityError; after the
+drop it succeeds. Idempotent, and public is left untouched.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`691ec99`](https://github.com/vasilistotskas/grooveshop-django-api/commit/691ec9977602b08500cf3c0e85b13f7eb8c7ab51))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.12.2 [skip ci] ([`050d223`](https://github.com/vasilistotskas/grooveshop-django-api/commit/050d22355205ee08e53f685d709f46ca3860cdcd))
+
 ## v3.12.2 (2026-08-26)
 
 ### Bug fixes

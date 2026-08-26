@@ -3,6 +3,52 @@
 
 
 
+## v3.12.1 (2026-08-26)
+
+### Bug fixes
+
+* fix(tests): settings-toggle test must not assert on app-seeded rows
+
+test_storefront_chrome_toggles_whitelisted_anonymous asserted the
+VALUE of extra_settings rows, which are created at app-ready time
+rather than by a fixture — a TransactionTestCase earlier on the same
+xdist worker truncates them without restoring, so `value` came back
+null and CI failed with `assert 'none' == 'true'` (the run passed
+earlier purely on ordering luck).
+
+The endpoint test now asserts what the change actually added —
+PUBLIC_SETTING_KEYS membership (200 + name + value present), matching
+the sibling tests — and a new DB-free test pins the defaults from
+EXTRA_SETTINGS_DEFAULTS so "ships enabled" stays covered.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`cc1a518`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cc1a518e9d723164182c2eea0f22385909fb5f92))
+
+* fix(admin): platform site kept upstream ModelAdmins for late overrides
+
+admin.apps.ready() copies the default registry onto the control-plane
+site, and the admin app precedes core in INSTALLED_APPS — so the copy
+ran BEFORE core.apps.ready() swapped third-party admins for their
+Unfold-wrapped subclasses. The platform therefore served the ORIGINAL
+classes: extra_settings' raw list_editable grid (every value_* column,
+date/time inputs, choice selects) instead of our SettingAdmin, plus
+un-wrapped Scheduled Tasks, Task Results, Sites and User Sessions —
+nine models in total.
+
+override_third_party_admins() now mirrors each re-registration onto
+the platform site when the model is present there. Order-independent:
+if the platform copy has not run yet the model is simply absent and
+the copy picks up the already-overridden class. A regression test
+asserts no platform model holds a different admin class than the
+tenant site.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_012N1xt3YbLoBUEiBarisejS ([`243a2c0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/243a2c0f1fe4ef701209e2af2f6e171795d652b4))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.12.0 [skip ci] ([`89043b0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/89043b014851583ca780d45a3880ff9932980595))
+
 ## v3.12.0 (2026-08-26)
 
 ### Chores

@@ -3,6 +3,201 @@
 
 
 
+## v3.12.2 (2026-08-26)
+
+### Bug fixes
+
+* fix(email): render previews with the real send context
+
+_render_template hand-rolled its SITE_* context instead of calling
+build_email_context. Two consequences: SITE_URL was pinned to the
+platform NUXT_BASE_URL rather than the tenant's own domain, and
+SITE_LOGO_URL was omitted entirely -- so every preview fell into
+email_base.html's no-logo branch and showed the text wordmark, no
+matter what the merchant had configured on the Tenant row.
+
+Route the preview through build_email_context so what an admin sees
+is what the recipient gets.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`bd7b5d9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/bd7b5d945933a70674c300f82578e67eb6fe72a3))
+
+* fix(core): make the monthly cache purge actually purge
+
+clear_all_cache_task invoked the clear_cache management command with
+no surfaces and no --all. That combination takes the command's "list
+available surfaces" branch and returns without touching a single key,
+while the task still reported {"status": "success"} -- so the monthly
+beat entry had been a silent no-op.
+
+Pass --all. The task correctly stays a public-schema entry rather
+than a tenant fanout: surface patterns are raw wildcard scans
+(e.g. *PayWayViewSet_*) issued through cache.keys(), which bypass the
+schema key prefix and so already span every tenant in one pass.
+
+The existing test asserted the call WITHOUT --all, i.e. it encoded
+the no-op; updated to assert the flag and to say why it is
+load-bearing.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`c5b1592`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5b15928550b3fb5310ee2cb4bafc5c91d8ab6c1))
+
+* fix(giftcard): bind the tenant schema and localise card emails
+
+Two defects in the gift-card mail path.
+
+1. Scheduled deliveries ran in the wrong schema. The daily sweep
+   called deliver_gift_card_email.apply(args=[card.id]). .apply() is
+   Celery's eager path and never carries the _schema_name header that
+   TenantTask.apply_async stamps, so the delivery body ran under
+   schema_context("public") -- where the giftcard table does not
+   exist. CELERY_TASK_EAGER_PROPAGATES is False in production, so the
+   exception was swallowed into an EagerResult while the sweep still
+   counted the card as sent. Every future-dated gift card was
+   therefore never delivered and never retried (delivered_at stayed
+   NULL, so the same rows failed again on the next tick), and
+   immediate delivery is deliberately skipped for scheduled cards,
+   making this sweep their only path. Switch to .delay(), matching
+   the dispatches in giftcard/services.py and giftcard/admin.py.
+
+2. All three card emails rendered in the worker's active locale and
+   carried no Reply-To -- the only customer-facing templated mail in
+   the codebase missing both. Wrap subject and body rendering in
+   translation.override(get_user_language(...)) off the linked
+   account, add reply_to=[tenant_contact_email()], and switch the
+   module from lazy to eager gettext so subjects resolve inside the
+   override rather than whenever the proxy is formatted.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`447244d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/447244d924b7b5c1643f3357f9bef0fe24b9bf92))
+
+* fix(email): gate template management behind the tenant admin check
+
+The four email-template admin views were mounted in the SHARED url
+group -- served on every tenant host and on the platform control
+plane -- behind nothing but staff_member_required. is_staff is a
+global flag on the shared UserAccount, so that check let any staff
+identity read another store's data: the management page lists recent
+orders, order/<id>/ returns customer PII, and preview/ renders a
+real order's email.
+
+Wrap every view in admin.site.admin_view so it runs
+MyAdminSite.has_permission (platform-staff session + per-tenant
+UserTenantMembership), and move the mount into a storefront-only
+group. These views query Order, which lives in TENANT_APPS and has
+no table in the public schema, so serving them on the platform host
+was both an exposure path and a 500.
+
+The mount needs its own group rather than joining
+_storefront_i18n_patterns: AdminSite ends its URLconf with a
+catch-all (final_catch_all_view), so anything ordered after
+`admin/` gets answered with the admin's 404 instead of falling
+through to us.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`210e804`](https://github.com/vasilistotskas/grooveshop-django-api/commit/210e804d960d874decc4f455dcde141215979b62))
+
+### Chores
+
+* chore(claude): load dead agents, repair mcp path
+
+security-reviewer and test-runner had no YAML frontmatter, so Claude
+Code skipped both as documentation and neither ever loaded. Give them
+name/description plus read-only tool sets, and restrict
+migration-safety-reviewer, whose body already says not to edit files.
+
+.claude/.mcp.json is never read — project MCP config must sit at the
+repo root — so context7 was unavailable. Merge it into .mcp.json.
+
+auto-lint reported ty findings on stderr while exiting 0, which only
+reaches the debug log; switch to additionalContext and pin the command
+cwd. Hook paths now use ${CLAUDE_PROJECT_DIR} with explicit timeouts.
+
+CLAUDE.md said Ruff targets 3.13; pyproject sets py314. Document
+uv run ty check, which pre-commit does not cover.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01XfNnkKTVx5cGwNEhw4sdsX ([`87e472c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/87e472c8352c19337d5dd1774518e2cd100afbee))
+
+* chore(deps): sync uv.lock to 3.12.1 [skip ci] ([`22dc10b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/22dc10b636254a290c903eaf16a14e6b54028092))
+
+### Continuous integration
+
+* ci(testing): shard the suite across a 4-job matrix with a combined coverage gate
+
+The Testing job was a single ~25 min critical path (~20 min pytest +
+~4 min migrate_schemas validation). The suite is DB/fixture-bound, so
+after fixing the pathological files the only remaining wall-time lever
+is more machines:
+
+- testing: 4 duration-balanced shards via pytest-split 0.11.0
+  (--splits 4 --group N), driven by the committed .test_durations
+  (generated from a full local run under HYPOTHESIS_PROFILE=ci).
+  Validated locally: durations record correctly under xdist, groups
+  partition cleanly (no dupes/misses), and shard 1 runs green with the
+  exact CI invocation. Four shards, not more, because each shard pays
+  a fixed ~3 min creating its xdist worker test-databases (measured
+  with --create-db -n 4).
+- coverage: shards upload raw coverage data (renamed visible for
+  upload-artifact@v7, which excludes dotfiles); a new job combines
+  them and enforces fail_under=70 for the whole suite — per-shard
+  percentages are meaningless, so shards run --cov-fail-under=0 with
+  no report.
+- migrations: makemigrations --check + both migrate_schemas paths move
+  to a parallel job with the same tuned Postgres, off the test shards'
+  critical path (pytest builds its own test databases).
+- release now gates on quality, migrations, testing, coverage, and
+  security-scan. Shard step timeout tightened 40 -> 18 min so a
+  regression alarms early.
+
+Expected wall time for the pipeline: roughly 10-12 min, from ~25.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LHbUFt1skPCSxVDWbCTFwk ([`4ad17ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4ad17aed0fc0115bec908aa632289852414c2409))
+
+### Performance improvements
+
+* perf(user): queue the subscription confirmation email
+
+The subscribe endpoint called send_subscription_confirmation inline,
+holding the request open for the SMTP round trip and losing the mail
+outright if the transaction later rolled back. The signup path
+already does this correctly.
+
+Dispatch send_subscription_confirmation_email_task on commit instead,
+mirroring user/signals.py -- off the request path, retried by Celery,
+and never dispatched for a subscription row that did not persist.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`23f8db5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23f8db5107b98987e97fb3511a331e366e12376a))
+
+### Refactoring
+
+* refactor(email): drop dead templates and stale registry entries
+
+Audit of the template registry against what the code actually sends.
+
+Removed templates, verified unreachable first:
+  - order_pending.{html,txt} and order_processing.{html,txt}. Their
+    only possible renderer, send_order_status_update_email, returns
+    early for PENDING and PROCESSING, and the dispatcher never
+    enqueues those statuses.
+  - The project-root emails/ directory: a byte-identical copy of the
+    BoxNow template on a path that is not in TEMPLATES DIRS, so it
+    could never be loaded. The live copy in templates/ is untouched.
+
+Removed config entries with no backing file: password_reset, welcome
+and promotion (the real password-reset mail is allauth's, outside
+this system), plus the whole marketing category -- that directory has
+never existed, so the registry scan for it always no-opped.
+
+test_registry asserted the order_pending mapping; repointed at
+order_pending_reminder, which is the template that status genuinely
+uses. Docs updated to match.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`0f9b2f1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0f9b2f11d6a4458974ae2f3333e7f79b47d40f77))
+
 ## v3.12.1 (2026-08-26)
 
 ### Bug fixes

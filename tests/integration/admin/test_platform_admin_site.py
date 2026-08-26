@@ -104,6 +104,29 @@ class TestPlatformSiteRegistry(TestCase):
         ):
             assert banned not in labels, f"{banned} back on the platform"
 
+    def test_third_party_overrides_reach_the_platform_site(self):
+        """A model re-registered AFTER the platform copy must not keep
+        the upstream ModelAdmin.
+
+        ``admin.apps.ready()`` copies the default registry before
+        ``core.apps.ready()`` swaps third-party admins for their
+        Unfold-wrapped subclasses, so the platform site used to serve
+        the ORIGINAL classes — production rendered extra_settings'
+        raw list_editable grid, and Scheduled Tasks / Task Results /
+        Sites / User Sessions were un-wrapped (2026-08-26).
+        """
+        from django.contrib import admin as django_admin
+
+        mismatched = [
+            model._meta.label
+            for model, platform_admin in platform_admin_site._registry.items()
+            if (default := django_admin.site._registry.get(model)) is not None
+            and type(default) is not type(platform_admin)
+        ]
+        assert not mismatched, (
+            f"platform site holds stale admin classes for: {mismatched}"
+        )
+
     def test_reuses_the_shared_model_admin_classes(self):
         """Copied from the default registry so the two cannot drift."""
         from django.contrib import admin as django_admin

@@ -26,6 +26,36 @@ from admin.mixins import IsSuperuserOnlyModelAdmin
 logger = logging.getLogger(__name__)
 
 
+def _resync_platform_site(model, admin_class):
+    """Mirror a LATE re-registration onto the control-plane site.
+
+    ``admin.apps.MyAdminConfig.ready()`` copies the default registry
+    onto ``platform_admin_site``, and the ``admin`` app precedes
+    ``core`` in INSTALLED_APPS — so that copy happens BEFORE the
+    overrides below replace the third-party classes. Without this
+    re-sync the platform keeps the ORIGINAL ModelAdmin: production
+    (2026-08-26) rendered extra_settings' own list_editable grid on
+    the platform Settings changelist while the tenant admin rendered
+    ours, and Scheduled Tasks / Task Results / Sites / User Sessions
+    were left un-wrapped by Unfold for the same reason.
+
+    Order-independent by design: if the platform copy has not run
+    yet, the model is simply absent here and the copy picks up the
+    already-overridden class.
+    """
+    from django.contrib.admin.exceptions import NotRegistered
+
+    from admin.platform_site import platform_admin_site
+
+    if model not in platform_admin_site._registry:
+        return
+    try:
+        platform_admin_site.unregister(model)
+    except NotRegistered:
+        pass
+    platform_admin_site.register(model, admin_class)
+
+
 def override_third_party_admins():
     """Re-register third-party admin classes with Unfold ModelAdmin.
 
@@ -48,6 +78,7 @@ def override_third_party_admins():
         except NotRegistered:
             pass
         admin.site.register(model_class, admin_class)
+        _resync_platform_site(model_class, admin_class)
 
     for model, model_admin in dict(admin.site._registry).items():
         if model._meta.app_label not in [
@@ -73,6 +104,7 @@ def override_third_party_admins():
         )
 
         admin.site.register(model, new_admin_class)
+        _resync_platform_site(model, new_admin_class)
 
 
 class UnfoldTaskSelectWidget(UnfoldAdminSelectWidget, TaskSelectWidget):

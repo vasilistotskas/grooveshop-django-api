@@ -118,10 +118,108 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: settings
 
+  migrations:
+    name: Migration Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Validates both django-tenants migration paths on a clean DB:
+    # ``migrate_schemas --shared`` for SHARED_APPS (which also runs the
+    # ``tenant.0002_seed_webside_tenant`` seed), then the TENANT_APPS
+    # path against the seeded webside schema. Lives in its own job so
+    # its ~4 min run in parallel with the test shards instead of on
+    # their critical path — pytest builds its own test databases and
+    # does not depend on this DB. Redis + Meilisearch services mirror
+    # the testing job: the tenant seed's ``post_save`` signal touches
+    # the Redis-backed resolve cache.
+    services:
+      redis:
+        image: redis:8-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+      meilisearch:
+        image: getmeili/meilisearch:v1.53.1
+        ports:
+          - 7700:7700
+        env:
+          MEILI_HTTP_ADDR: meilisearch:7700
+          MEILI_LOG_LEVEL: INFO
+          MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
+          MEILI_ENV: production
+
+    env:
+      DB: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      MEILI_HTTP_ADDR: meilisearch:7700
+      MEILI_LOG_LEVEL: INFO
+      MEILI_MASTER_KEY: ${{ secrets.MEILI_MASTER_KEY }}
+      MEILI_ENV: production
+
+    steps:
+      - name: Start PostgreSQL
+        # Same tuned container as the testing job — see its comment.
+        run: |
+          docker run -d --name ci-postgres \
+            -e POSTGRES_DB=postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            --shm-size=512m \
+            --mount type=tmpfs,destination=/var/lib/postgresql \
+            postgres:18.6-alpine3.23 \
+            -c max_locks_per_transaction=256 -c max_connections=200
+          for i in $(seq 1 30); do
+            docker exec ci-postgres pg_isready -U postgres && exit 0
+            sleep 2
+          done
+          echo "PostgreSQL failed to become ready" >&2
+          docker logs ci-postgres >&2
+          exit 1
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: '.python-version'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: |
+            **/*requirements*.txt
+            **/pyproject.toml
+            **/uv.lock
+
+      - name: Install psycopg prerequisites
+        run: sudo apt-get install -y --no-install-recommends libpq-dev
+
+      - name: Install Dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Check for missing migrations
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Run migrations (django-tenants)
+        run: |
+          uv run python manage.py migrate_schemas --shared
+          uv run python manage.py migrate_schemas --schema=webside
+
   testing:
     name: Testing
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
     # PostgreSQL runs as a docker-run STEP, not a service container:
     # PG18 needs max_locks_per_transaction raised for this suite's
     # parallel DDL (validated: defaults exhaust the lock table under
@@ -205,20 +303,7 @@ jobs:
       - name: Install Dependencies
         run: uv sync --locked --all-extras --dev
 
-      - name: Check for missing migrations
-        run: uv run python manage.py makemigrations --check --dry-run
-
-      - name: Run migrations (django-tenants)
-        # Using ``migrate_schemas --shared`` for SHARED_APPS first, then
-        # exercising the TENANT_APPS migration path against the seeded
-        # webside schema (created by ``tenant.0002_seed_webside_tenant``
-        # which runs as part of ``--shared``). This validates both shared
-        # and tenant migration paths on a clean DB.
-        run: |
-          uv run python manage.py migrate_schemas --shared
-          uv run python manage.py migrate_schemas --schema=webside
-
-      - name: Run Tests
+      - name: Run Tests (shard)
         # ``--dist loadfile`` is mandatory for stability per
         # ``project_test_suite_stability.md`` — interleaving tests
         # from different files on the same xdist worker (the
@@ -229,30 +314,91 @@ jobs:
         # in ``pyproject.toml::addopts`` — keeping them explicit here
         # so a careless edit can't silently flip the project off the
         # supported configuration.
-        # The cap has moved with the suite: 15 min timed out at ~85%
-        # once tenant-scoping work extended teardown hot paths; 25 min
-        # timed out at ~94% once the billing dunning suite landed; 32 min
-        # was reached ~84% (~27 min) after the multi-tenant audit fixes
-        # added their tests, so it went to 40 with the job cap raised to
-        # match. Coverage measurement is NOT where the time goes: an A/B
-        # of CI runs (2026-08-25, ctrace 31:44 vs sysmon 34:27 with 20
-        # extra tests) showed the coverage core makes no measurable
-        # difference — the suite is DB/fixture-bound. sysmon stays (see
-        # ``[tool.coverage.run]``: same data, lower overhead where CPU is
-        # the cost), and ``--cov-report=html`` stays gone (htmlcov/ was
-        # never uploaded as an artifact). The 30+-min runs were dominated
-        # by two test files whose tenant saves leaked into django-tenants
-        # schema healing (a full migrate_schemas replay per test, ~90s
-        # each, serialized on one worker by ``--dist loadfile``) — fixed
-        # in the test files themselves. If the step creeps again, profile
-        # first: pytest --durations=25.
-        run: uv run pytest --cov=. --cov-report=term --cov-config=pyproject.toml -n auto --dist loadfile
-        timeout-minutes: 40
+        # The suite is split into 4 duration-balanced shards by
+        # pytest-split from the committed ``.test_durations`` file.
+        # Refresh it occasionally with ``uv run pytest
+        # --store-durations`` (HYPOTHESIS_PROFILE=ci for CI-like
+        # weights); tests missing from the file are assumed average, so
+        # drift costs balance, never correctness. Four shards, not more:
+        # each shard pays a fixed ~3 min creating its xdist worker
+        # test-databases (validated locally with ``--create-db -n 4``),
+        # so extra shards mostly buy overhead.
+        # Coverage: shards upload raw data files; the ``coverage`` job
+        # combines them and enforces ``fail_under`` for the whole suite.
+        # A single shard's percentage is meaningless, so the per-shard
+        # run must not gate (``--cov-fail-under=0``) and prints no
+        # report (``--cov-report=``). Note the coverage CORE is not a
+        # lever here: an A/B of CI runs (2026-08-25, ctrace 31:44 vs
+        # sysmon 34:27) showed the suite is DB/fixture-bound. If a shard
+        # creeps toward its timeout, profile first:
+        # pytest --durations=25.
+        run: >
+          uv run pytest --cov=. --cov-report= --cov-fail-under=0
+          --cov-config=pyproject.toml -n auto --dist loadfile
+          --splits 4 --group ${{ matrix.group }}
+        timeout-minutes: 18
         env:
           HYPOTHESIS_PROFILE: ci
 
+      - name: Stage coverage data for upload
+        # upload-artifact excludes dotfiles by default; a visible,
+        # shard-unique name also lets the coverage job combine the
+        # merged downloads directly.
+        run: mv .coverage coverage-shard-${{ matrix.group }}
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-shard-${{ matrix.group }}
+          path: coverage-shard-${{ matrix.group }}
+          if-no-files-found: error
+          retention-days: 1
+
+  coverage:
+    name: Coverage Gate
+    needs: testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: '.python-version'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: |
+            **/*requirements*.txt
+            **/pyproject.toml
+            **/uv.lock
+
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
+
+      - name: Download shard coverage data
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-shard-*
+          merge-multiple: true
+
+      - name: Combine and enforce coverage
+        # ``coverage report`` reads ``fail_under`` from pyproject
+        # (currently 70) and exits non-zero below it — the single
+        # coverage gate for the whole suite. ``relative_files = true``
+        # in the coverage config is what makes data files combinable
+        # across runners.
+        run: |
+          uv run coverage combine coverage-shard-*
+          uv run coverage report
+
   release:
-    needs: [quality, testing, security-scan]
+    needs: [quality, migrations, testing, coverage, security-scan]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15

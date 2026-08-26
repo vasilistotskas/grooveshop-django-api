@@ -5,6 +5,7 @@ description: >
   PreSync hook deploy model — schema lands BEFORE new code rolls out.
   Use after generating any migration, when reviewing PRs that touch
   `*/migrations/*.py`, or whenever model changes are about to ship.
+tools: Read, Grep, Glob, Bash
 ---
 
 # Migration Safety Reviewer

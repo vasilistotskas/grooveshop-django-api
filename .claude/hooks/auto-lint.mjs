@@ -17,21 +17,29 @@ const filePath = input.tool_input?.file_path
 
 if (filePath && /\.py$/.test(filePath) && !/\/migrations\//.test(filePath.replace(/\\/g, '/'))) {
   try {
-    execSync(`uv run ruff check --fix --quiet ${JSON.stringify(filePath)}`, { stdio: 'pipe' })
-    execSync(`uv run ruff format --quiet ${JSON.stringify(filePath)}`, { stdio: 'pipe' })
+    execSync(`uv run ruff check --fix --quiet ${JSON.stringify(filePath)}`, { cwd: process.env.CLAUDE_PROJECT_DIR || process.cwd(), stdio: 'pipe' })
+    execSync(`uv run ruff format --quiet ${JSON.stringify(filePath)}`, { cwd: process.env.CLAUDE_PROJECT_DIR || process.cwd(), stdio: 'pipe' })
   }
   catch {
     // Ruff errors are non-blocking
   }
 
   try {
-    execSync(`uv run ty check ${JSON.stringify(filePath)}`, { stdio: 'pipe' })
+    execSync(`uv run ty check ${JSON.stringify(filePath)}`, { cwd: process.env.CLAUDE_PROJECT_DIR || process.cwd(), stdio: 'pipe' })
   }
   catch (err) {
     // Surface ty errors to the model so they get fixed pre-commit, but never block.
+    // This goes through `additionalContext` rather than stderr: stderr from a
+    // PostToolUse hook that exits 0 only reaches the debug log, so the previous
+    // version's findings were never seen.
     const out = (err.stdout?.toString() || '') + (err.stderr?.toString() || '')
     if (out.trim()) {
-      process.stderr.write(`ty check found issues in ${filePath}:\n${out}`)
+      process.stdout.write(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PostToolUse',
+          additionalContext: `ty check found issues in ${filePath}:\n${out.trim()}`,
+        },
+      }))
     }
   }
 }

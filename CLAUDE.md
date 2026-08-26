@@ -28,6 +28,9 @@ uv run pytest --cov=. --cov-report=term --cov-report=html --cov-config=pyproject
 uv run ruff check --fix
 uv run ruff format
 
+# Type check (required before commit; not covered by pre-commit)
+uv run ty check
+
 # Run all pre-commit hooks
 uv run pre-commit run --all-files
 
@@ -194,7 +197,10 @@ GitHub Actions (`.github/workflows/ci.yml`): 3-stage pipeline:
 ## Code Style
 
 - **Line length**: 80 characters
-- **Formatter/Linter**: Ruff (targets Python 3.13)
+- **Formatter/Linter**: Ruff (`target-version = "py314"`)
+- **Type checker**: `ty` (config under `[tool.ty]`). Not in pre-commit — run
+  `uv run ty check` yourself before committing; the `.claude` PostToolUse hook
+  reports per-file findings as you edit but never blocks.
 - **Max function args**: 6 (pylint rule via ruff)
 - Migrations are excluded from linting (`**/migrations/**`)
 - Semantic release: `feat` → minor, `fix`/`perf` → patch

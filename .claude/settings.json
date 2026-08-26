@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "hooks": {
     "PreToolUse": [
       {
@@ -6,7 +7,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/block-sensitive.mjs"
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/block-sensitive.mjs\"",
+            "timeout": 15
           }
         ]
       }
@@ -17,7 +19,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/auto-lint.mjs"
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/auto-lint.mjs\"",
+            "statusMessage": "ruff + ty…",
+            "timeout": 180
           }
         ]
       }

@@ -1,3 +1,12 @@
+---
+name: test-runner
+description: >
+  Run the pytest suites covering the Django apps that changed, then triage the
+  failures. Use after editing models, serializers, views, managers, filters,
+  signals or Celery tasks in grooveshop-django-api/, or when the user asks to
+  run or fix the backend tests.
+tools: Read, Grep, Glob, Bash
+---
 # Test Runner
 
 Run targeted tests for modified apps in the grooveshop-django-api project.
@@ -56,6 +65,26 @@ Run targeted tests for modified apps in the grooveshop-django-api project.
 - **Run tests matching a pattern**: `uv run pytest -k "test_list" tests/unit/product/`
 - **Skip Meilisearch tests**: they auto-skip when offline (via `requires_meilisearch` marker)
 - **Coverage for a single app**: `uv run pytest tests/unit/product/ --cov=product --cov-report=term -n0`
+
+## Never run two pytest invocations at once
+
+Not even a small targeted run alongside a background full suite. pytest-xdist
+derives worker database names (`test_postgres_gw0..gwN`) from the DB name in
+settings, so both runs create and drop the **same** databases.
+
+The collision does not look like a collision. It surfaces as a flood of
+`psycopg.errors.DuplicateDatabase: database "test_postgres_gw1" already exists`
+and `ObjectInUse: ... is being accessed by other users`, reported as ERRORs at
+setup of whatever test each worker happened to start with. On 2026-08-20 this
+produced `2018 errors` and `541 failed, 1457 errors`, and a targeted
+`pytest tests/unit/pay_way/` reporting `66 errors` while the same file passed
+56/56 under `-n0`. It reads exactly like a catastrophic regression.
+
+Before believing **any** mass-failure result, check whether another pytest
+process is running. If one is, discard the result and re-run rather than
+debugging it. The clean baseline is **5651 passed, 6 skipped, 0 failed**,
+identical under `-n auto`, `-n 4` and `-n 8` — so a run with mass failures is a
+signal to check for contention first.
 
 ## Notes
 

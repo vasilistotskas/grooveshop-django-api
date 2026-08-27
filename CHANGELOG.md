@@ -3,6 +3,159 @@
 
 
 
+## v3.14.0 (2026-08-27)
+
+### Bug fixes
+
+* fix(email): render brand colours as literal hex, not CSS variables
+
+email_base.html styled everything through CSS custom properties -- 22
+var(--x) references, none with a fallback. Per caniemail, Gmail,
+Outlook, Apple Mail, Yahoo and Thunderbird accept the var() FUNCTION
+but drop the :root { --x: ... } DECLARATION, which makes every
+reference invalid at computed-value time.
+
+That is not a cosmetic degradation. The primary CTA paired
+
+background-color: var(--primary-color);
+color: #ffffff !important;
+
+so where the declaration is stripped the background falls back to
+transparent over the white card while the white text survives: an
+INVISIBLE button, in all 27 templates that inherit this base.
+
+Brand colours are now resolved server-side to literal hex by
+tenant_email_theme() and rendered into the style block by Django before
+the mail is sent, so there is no client dependency left. That also
+closes the branding half: the header was hardcoded #97b7ff and no
+tenant theme field reached email at all, so every store's mail wore the
+same palette. Colours resolve theme_metadata.colors.primaryScale ->
+accent_hex/success_hex -> platform default. Tenant.primary_color and
+neutral_color are deliberately NOT used -- they hold Tailwind colour
+NAMES for the Nuxt compiler, not hex.
+
+Malformed theme_metadata cannot break outbound mail: the JSON is
+merchant-editable, so every level is type-checked before use and falls
+back to the platform palette.
+
+BoxNow's template now extends the base like every other. It was the
+lone holdout, carrying its own style block with a hardcoded #1c2d5e
+belonging to no tenant, a hardcoded lang="el" that ignored the language
+its task activates, and no logo despite already receiving one in
+context. It gains the tenant logo, footer, language and palette, and
+the tree keeps no hardcoded brand colour.
+
+Two sweeps guard against regression: no email template may contain
+var(--, and every one must extend the shared base.
+
+Also corrects tenant_logo_url's docstring, which described a
+logo-dark.svg fallback that _email_logo_url has not done for a while --
+the platform asset is substituted only for the platform tenant.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`240f69f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/240f69f694e8df7e8ca0db18a30887ac42c5cce5))
+
+* fix(templates): stop semantic-release copying Django templates to root
+
+The repo root carried two tracked directories nobody put there --
+emails/ and unfold/ -- that reappeared after every version bump. Root
+cause: pyproject.toml sets
+
+[tool.semantic_release.changelog] template_dir = "templates"
+
+and PSR renders EVERY file under that directory into the repo root on
+each release. settings.py also listed the same directory in TEMPLATES
+DIRS, so the two tools were sharing one folder: every Django template
+parked there was copied out as a stray top-level mirror of itself.
+That is why deleting the strays never stuck -- they came back with the
+next release, first observed at v2.0.0 and again at v3.12.2.
+
+Both misplaced templates now sit with their siblings, which is where
+they always belonged:
+
+templates/emails/order/boxnow_parcel_at_locker.{html,txt}
+  -> core/templates/emails/order/ (every other email template)
+templates/unfold/helpers/app_list_badge.html
+  -> core/templates/unfold/helpers/ (app_list.html and
+     app_list_item.html already live there)
+
+Template NAMES are unchanged, so no render call or include needed
+touching; core/templates is in DIRS, so the unfold override still
+takes precedence over the packaged one.
+
+Root templates/ is dropped from TEMPLATES DIRS so it is now
+unambiguously PSR's alone, with a comment recording why. It holds only
+CHANGELOG.md.j2.
+
+Verified: all six affected template names still resolve, and the
+unfold badge resolves to our override rather than the package copy.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`63b4348`](https://github.com/vasilistotskas/grooveshop-django-api/commit/63b434857bb248459e43664c147b76fa6bfc0f13))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.13.0 [skip ci] ([`ea77d21`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ea77d21d08d7b50a1f6325961cd6221b6250db22))
+
+### Features
+
+* feat(tenant): close the fresh-tenant provisioning gaps
+
+Four things a newly provisioned store needed and was not getting. Each
+left it broken or degraded with nothing surfacing why.
+
+VAT rates were never seeded. vat is TENANT_APPS-only with no data
+migration, so a new tenant started with an empty table (the staging
+tenant "aurora" has none). That BLOCKED the product write API outright:
+both product serializers declare vat as an explicitly-declared relation,
+which is required regardless of the model's null=True, against an empty
+queryset. Products created through the admin instead saved with
+vat=None and were then priced AND invoiced at 0% -- a silently wrong
+Greek invoice. Seeds 24/13/6/0, the mainland rates
+order/mydata/builder.py recognises, and makes the serializer field
+match the model so deleting the rows cannot re-break the API.
+
+Meilisearch indexes were created WITHOUT their settings, leaving
+filterableAttributes at the engine default []. Every storefront search
+sends a filter, so the engine rejected it and search/views.py turned
+that into HTTP 400 -- no working search AT ALL on a new tenant until
+the nightly fanout sync or the next deploy's PreSync hook, up to ~24h.
+Calling update_meili_settings() instead still guarantees the primary
+key: it calls create_index(index_name, primary_key) itself first,
+precisely so a settings call cannot auto-create a pk-less index.
+
+No django.contrib.sites Site row was created. TenantSocialAccountAdapter
+resolves per-tenant SocialApp credentials BY Site, so a merchant's own
+OAuth app was unreachable and allauth silently fell back to the
+platform's. It also removes a latent 500: the only Site a merchant can
+pick today is the auto-created example.com, and a SocialApp linked to
+THAT makes allauth's get_app raise MultipleObjectsReturned.
+
+Stripe provisioning had zero programmatic callers -- bootstrap_stripe
+was CLI-only, so a merchant who pasted their Stripe secret got no
+webhook endpoint, dj-stripe never received payment_intent.succeeded,
+and their Stripe orders never confirmed. The logic moves into
+provisioning.provision_stripe (the command now renders it, keeping one
+implementation) and is exposed as a TenantAdmin action, deliberately
+NOT stripped for merchants since saving the key is exactly when it
+needs to run. It stays out of provision_tenant: at creation time the
+key is always empty, so running it there would be a guaranteed no-op
+that hides the real trigger.
+
+Seeders use get_or_create, never update_or_create -- production runs a
+single live 23.0 VAT row that priced products point at, and rewriting
+it would change what customers are charged and what appears on issued
+invoices.
+
+NOTE worth acting on separately: that 23.0 stopped being the Greek
+standard rate in June 2016 and is absent from _VAT_CATEGORY_BY_RATE, so
+it will raise "Unsupported VAT rate 23%" the moment myDATA is enabled
+(it is off today). Seeding 24 makes the correct rate available to move
+to; reassigning products is a tax decision for the merchant.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`e574127`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e5741271f164a41725346b55e970da4a8ae983ac))
+
 ## v3.13.0 (2026-08-26)
 
 ### Chores

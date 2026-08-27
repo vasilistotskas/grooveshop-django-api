@@ -3,6 +3,71 @@
 
 
 
+## v3.14.1 (2026-08-27)
+
+### Bug fixes
+
+* fix(tenant): enforce plan flags on the order path, not just at the door
+
+tenant/permissions.py documents a two-tier contract: the PLAN flag on
+the Tenant row (platform-controlled, what a store has PAID for) AND the
+extra_settings toggle (merchant-controlled, whether they want it on).
+Both must hold.
+
+Only the endpoint half was enforced. Order create never passes through
+those endpoints -- "create" is a public action and runs with
+permission_classes = [] so guest checkout works -- and the services it
+calls consulted ONLY the merchant-editable setting:
+
+GiftCardService.is_enabled() -> Setting.get("GIFT_CARDS_ENABLED")
+
+extra_settings is in STORE_SHARED_APP_LABELS, so a store's ADMIN/OWNER
+holds change_setting. The bypass was therefore: flip GIFT_CARDS_ENABLED
+in your own admin, issue a card (GiftCardService.issue has no
+enablement check), and have a shopper redeem it at checkout -- a paid
+plan boundary a tenant could lift for itself. Same shape for automatic
+promotions, which never touch the plan-gated coupon endpoints, and for
+loyalty points, earned and redeemed through order signals.
+
+Folding tenant_plan_allows() into each service's is_enabled() closes
+every entry point at once, because all of them funnel through those
+three methods, and leaves the DRF permission classes as the 404-hiding
+outer gate they were designed to be. get_current_tenant() is a pure
+connection attribute read, so this adds no queries. It fails open on a
+FakeTenant (schema_context attaches one with no plan fields) because a
+background task must not refuse legitimate work over how its schema was
+entered; the path that matters is HTTP, where a real Tenant is attached.
+
+Also:
+
+- default_currency is no longer merchant-editable. The STOREFRONT
+  formats every price in it (usePriceFormat, checkout, cart, RSS) while
+  every backend money path uses settings.DEFAULT_CURRENCY, so a
+  merchant setting "USD" would show $ prices while Django built the
+  order, charged the gateway and issued the invoice in EUR. It stays on
+  the model and in TenantConfig -- five frontend consumers depend on it
+  -- but only the platform may set it.
+
+- from_email's help_text no longer promises sender behaviour it never
+  delivers. The field stays editable (a test pins that it is theirs to
+  set, and a stored value is ready for the per-tenant transport it is
+  reserved for) but now says plainly that mail is sent from the
+  platform address with the store name as display name.
+
+- upload_image accepts a store's own ADMIN/OWNER, not just superusers.
+  The storage side was already tenant-aware (images land in
+  MEDIA_ROOT/{schema}/uploads/tinymce/) but the permission check still
+  asked for is_superuser, which a merchant never is -- so every
+  merchant-owned rich-text field had an editor whose upload button
+  403'd. STAFF stays excluded.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`3759e46`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3759e4644b9bdff37e4a4b26f15ed7239a55ee44))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.14.0 [skip ci] ([`7e4ad4f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7e4ad4fbf32e8edfa33497ff603893834c214e66))
+
 ## v3.14.0 (2026-08-27)
 
 ### Bug fixes

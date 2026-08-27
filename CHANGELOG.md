@@ -3,6 +3,36 @@
 
 
 
+## v3.18.1 (2026-08-27)
+
+### Bug fixes
+
+* fix(cache): let the admin purge the published seller identity
+
+The storefront renders the seller's legal identity from
+/api/v1/tenant/legal-identity, which Nuxt caches for 30 minutes. Its
+source is the INVOICE_SELLER_* rows in extra_settings, but the settings
+cache surface only purged `cache:nitro:handlers:settings*` — a different
+route name, so it matched nothing.
+
+A merchant correcting their GEMI number or registered address in the
+admin would therefore keep publishing the OLD identity for the full
+maxAge, with no way to force it. Publishing the wrong registered
+identity is precisely what the disclosure rules exist to prevent.
+
+Found while validating on staging: after filling in the identity the
+footer stayed empty, because tenantLegalIdentity still held the pre-fill
+empty response. Django had been returning the right data throughout.
+
+Note the prefix matters — cached HANDLERS live under
+`cache:nitro:handlers:`, page renders under `cache:nitro:routes:`. A
+pattern aimed at the wrong one purges nothing and reports success, so
+the second test pins it. ([`3fe9334`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3fe93344eb99e5719f0eddc842775d1f4a8c3d23))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.18.0 [skip ci] ([`19fca71`](https://github.com/vasilistotskas/grooveshop-django-api/commit/19fca71d63b198a818fca2eff64e272cad41bac0))
+
 ## v3.18.0 (2026-08-27)
 
 ### Chores

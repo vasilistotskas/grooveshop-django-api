@@ -187,9 +187,21 @@ class TestTenantConfigAgentFlags:
         they must never appear in this list.
         """
         from pay_way.factories import PayWayFactory
+        from pay_way.models import PayWay
         from tenant.models import Tenant
         from tenant.serializers import TenantConfigSerializer
 
+        # Seeded data already includes an offline cash-on-delivery row, so
+        # start from a known table to assert on exact contents.
+        PayWay.objects.all().delete()
+
+        PayWayFactory(
+            active=True,
+            is_online_payment=False,
+            provider_code="cash_on_delivery",
+        )
+        # A second row sharing the code must still yield ONE instrument:
+        # a merchant may offer cash on delivery through two carriers.
         PayWayFactory(
             active=True,
             is_online_payment=False,
@@ -216,8 +228,13 @@ class TestTenantConfigAgentFlags:
 
     def test_agent_payment_instruments_empty_when_surface_off(self):
         from pay_way.factories import PayWayFactory
+        from pay_way.models import PayWay
         from tenant.models import Tenant
         from tenant.serializers import TenantConfigSerializer
+
+        # Seeded data already includes an offline cash-on-delivery row, so
+        # start from a known table to assert on exact contents.
+        PayWay.objects.all().delete()
 
         PayWayFactory(
             active=True,

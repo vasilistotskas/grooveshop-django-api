@@ -114,15 +114,21 @@ class TenantConfigSerializer(serializers.Serializer):
         if not self.get_agent_commerce_enabled(obj):
             return []
         with schema_context(obj.schema_name):
-            return [
-                code
-                for code in PayWay.objects.filter(
-                    active=True, is_online_payment=False
-                )
+            # list() forces evaluation INSIDE the schema context: a lazy
+            # queryset would run its query after the context exits, against
+            # whatever schema the connection happened to be left on.
+            codes = list(
+                PayWay.objects.filter(active=True, is_online_payment=False)
                 .exclude(provider_code="")
                 .order_by("sort_order", "id")
                 .values_list("provider_code", flat=True)
-            ]
+            )
+        # Distinct, first occurrence wins. Several pay-way rows may share
+        # a provider code (a merchant offering cash on delivery through
+        # two carriers, say), but each code maps to ONE agent payment
+        # instrument, and a repeated instrument is not a thing UCP can
+        # advertise.
+        return list(dict.fromkeys(codes))
 
     # --- Payments (public key only) ---
     # Public Stripe publishable key — pk_test_* / pk_live_* only.

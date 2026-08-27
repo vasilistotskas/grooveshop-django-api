@@ -193,3 +193,56 @@ def flush_tenant_media_task(schema_name: str):
     from tenant.media_flush import flush_tenant_media  # noqa: PLC0415
 
     return {"flushed": flush_tenant_media(schema_name)}
+
+
+@celery_app.task(
+    base=MonitoredTask,
+    bind=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def purge_expired_tenant_archives(self) -> dict:
+    """Erase destroyed tenants' invoices once their retention expires.
+
+    The other half of the offboarding trade. Invoices survive a store's
+    destruction because a legal obligation overrides erasure (GDPR art.
+    17(3)(b)); once that obligation lapses the exception lapses with it,
+    and keeping them becomes a storage-limitation breach in its own
+    right (art. 5(1)(e)). Retaining forever is not the safe option — it
+    is the opposite failure.
+
+    Runs in the PUBLIC schema: ``TenantArchive`` lives there precisely
+    because the schemas it describes no longer exist.
+    """
+    from django.utils import timezone
+
+    from tenant.models import TenantArchive
+    from tenant.offboarding import _remove_tree
+
+    today = timezone.now().date()
+    due = TenantArchive.objects.filter(
+        purged_at__isnull=True,
+        retention_until__isnull=False,
+        retention_until__lte=today,
+    )
+
+    purged = []
+    for archive in due:
+        if archive.retained_invoice_path:
+            _remove_tree(
+                archive.retained_invoice_path,
+                what="retained invoices (retention expired)",
+                schema_name=archive.schema_name,
+            )
+        archive.purged_at = timezone.now()
+        archive.save(update_fields=["purged_at", "updated_at"])
+        purged.append(archive.schema_name)
+
+    if purged:
+        logger.info(
+            "Purged expired retention for %d tenant archive(s): %s",
+            len(purged),
+            ", ".join(purged),
+        )
+    return {"status": "success", "purged": purged}

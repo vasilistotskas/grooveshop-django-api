@@ -189,6 +189,10 @@ class TestBeatScheduleTenantCoverage:
         # Billing terms + dunning bookkeeping are public-schema Tenant
         # rows; the cycle never enters a tenant schema (tenant/billing.py).
         "tenant.tasks.process_tenant_billing",
+        # TenantArchive rows live in the public schema BECAUSE the
+        # schemas they describe have been dropped — there is no tenant
+        # left to fan out into.
+        "tenant.tasks.purge_expired_tenant_archives",
     }
 
     def test_every_tenant_scoped_beat_entry_uses_fanout(self):

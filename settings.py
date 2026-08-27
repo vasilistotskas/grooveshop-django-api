@@ -966,6 +966,16 @@ def get_celery_beat_schedule():
             "task": "tenant.tasks.fanout_cleanup_expired_stock_reservations",
             "schedule": SCHEDULE_PRESETS["every_hour"],
         },
+        "purge-expired-tenant-archives": {
+            # NOT a fanout: TenantArchive rows live in the public schema
+            # precisely because the schemas they describe were dropped.
+            # Erases a destroyed store's invoices once the statutory
+            # retention period expires — keeping them past that point
+            # would breach storage limitation (GDPR art. 5(1)(e)) just
+            # as deleting them early would breach the tax-record duty.
+            "task": "tenant.tasks.purge_expired_tenant_archives",
+            "schedule": SCHEDULE_PRESETS["daily_3am"],
+        },
         "process-tenant-billing": {
             # NOT a fanout: billing terms and dunning bookkeeping are
             # public-schema Tenant rows — one pass covers the estate.
@@ -3553,6 +3563,29 @@ else:
             "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
         },
     }
+
+# ---------------------------------------------------------------------------
+# Tenant offboarding — retention of legally-mandated records
+# ---------------------------------------------------------------------------
+# When a tenant is destroyed, GDPR Art. 17/28(3)(g) requires its personal
+# data to be erased — EXCEPT where Union or Member State law requires
+# storage. Issued invoices are exactly that exception: the Greek Tax
+# Procedure Code (Ν. 4987/2022, art. 13) requires accounting records to
+# be kept for at least FIVE years from the END of the tax year in which
+# the filing obligation arises. Because the return for tax year Y is
+# filed in Y+1, five years from the end of that year lands on
+# 31 December of Y+6 — hence the default below, expressed in years from
+# the invoice's own tax year so the anchor is the legally correct one.
+#
+# Raise this where art. 36(2) extends the assessment period (unfiled
+# returns, evasion indicators) — that can reach ten years. Lowering it
+# below the statutory minimum would breach the retention duty; leaving
+# records forever would breach storage limitation. Both directions are
+# wrong, which is why this is an explicit, auditable knob rather than a
+# constant buried in code.
+TENANT_INVOICE_RETENTION_YEARS = int(
+    getenv("TENANT_INVOICE_RETENTION_YEARS", "6")
+)
 
 TINYMCE_DEFAULT_CONFIG = {
     "theme": "silver",

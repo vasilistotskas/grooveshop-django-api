@@ -15,8 +15,10 @@ from rest_framework.decorators import (
 )
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from tenant.lifecycle import destroy_tenant
 from tenant.membership import get_current_tenant
 from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tenant.serializers import (
@@ -265,5 +267,34 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
+        """Destroy a tenant through the SAME path as the admin action.
+
+        This used to call DRF's ``perform_destroy`` -> ``instance.delete()``
+        with no ``force_drop``. ``auto_drop_schema`` is False (the
+        django-tenants default and never overridden here), so the row
+        vanished while the ENTIRE Postgres schema stayed behind — plus
+        its files and search indexes. Two destroy verbs, one of which
+        quietly orphaned everything it claimed to remove.
+
+        ``lifecycle.destroy_tenant`` is now the only implementation:
+        schema and files erased, invoices retained under their statutory
+        period, erasure recorded in ``TenantArchive``.
+        """
         self._require_public_schema()
-        return super().destroy(request, *args, **kwargs)
+        tenant = self.get_object()
+        try:
+            result = destroy_tenant(
+                tenant, actor=getattr(request.user, "email", "") or ""
+            )
+        except ValueError as exc:
+            # Protected schema — lifecycle refuses as a last line of
+            # defence even if a caller skipped the earlier gates.
+            raise ValidationError({"detail": str(exc)}) from exc
+        return Response(
+            {
+                "schemaName": result["schema_name"],
+                "retentionUntil": result["retention_until"],
+                "indexesDropped": result["indexes_dropped"],
+            },
+            status=status.HTTP_200_OK,
+        )

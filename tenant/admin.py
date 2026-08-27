@@ -54,6 +54,7 @@ from tenant.lifecycle import (
 from tenant.models import (
     SuspendedReason,
     Tenant,
+    TenantArchive,
     TenantDomain,
     TenantMembershipRole,
     UserTenantMembership,
@@ -224,6 +225,7 @@ class TenantAdmin(ModelAdmin):
         "activate_tenants",
         "destroy_tenants",
         "provision_stripe_webhook",
+        "export_tenant_data_action",
     ]
 
     @display(description=_("Store"), ordering="name", header=True)
@@ -716,6 +718,10 @@ class TenantAdmin(ModelAdmin):
                 "suspend_tenants",
                 "activate_tenants",
                 "destroy_tenants",
+                # Whole-schema dump written to the private volume — an
+                # operator offboarding step, not a merchant self-service
+                # download.
+                "export_tenant_data_action",
             ):
                 actions.pop(name, None)
         return actions
@@ -778,6 +784,51 @@ class TenantAdmin(ModelAdmin):
                 self.log_change(
                     request, tenant, str(_("Provisioned Stripe webhook"))
                 )
+
+    # ------------------------------------------------------------------
+    # Action — Export store data (GDPR art. 28(3)(g) "return")
+    # ------------------------------------------------------------------
+
+    @action(
+        description=str(_("Export store data (before destroying)")),
+        icon="download",
+    )
+    def export_tenant_data_action(self, request, queryset):
+        """Give the controller the "return" half of their art. 28 choice.
+
+        A processor must delete OR RETURN personal data at the end of
+        processing, AT THE CONTROLLER'S CHOICE. Destroying a store used
+        to offer only deletion, which answers half the article and takes
+        the merchant's own records with it.
+
+        Platform-operator only: the queryset spans stores, and the dump
+        is written to the private volume rather than handed to a
+        browser, so it is an operator step in the offboarding runbook
+        rather than a self-service download.
+        """
+        from tenant.lifecycle import export_tenant_data  # noqa: PLC0415
+
+        for tenant in queryset:
+            if tenant.schema_name in _PROTECTED:
+                continue
+            try:
+                path = export_tenant_data(
+                    tenant, actor=getattr(request.user, "email", "") or ""
+                )
+            except Exception as exc:  # noqa: BLE001 — surfaced to operator
+                self.message_user(
+                    request,
+                    _("%(store)s: export failed — %(error)s")
+                    % {"store": tenant.name, "error": exc},
+                    messages.ERROR,
+                )
+                continue
+            self.message_user(
+                request,
+                _("%(store)s: data exported to %(path)s")
+                % {"store": tenant.name, "path": path},
+                messages.SUCCESS,
+            )
 
     # ------------------------------------------------------------------
     # Action A — Suspend
@@ -923,7 +974,6 @@ class TenantAdmin(ModelAdmin):
 
             # All gates passed — drop schema + row.
             try:
-                schema_name = tenant.schema_name
                 # BEFORE delete(): Django 6.0 replaced the old singular
                 # ``log_deletion(request, obj, object_repr)`` with a
                 # queryset-based ``log_deletions(request, queryset)``
@@ -933,16 +983,31 @@ class TenantAdmin(ModelAdmin):
                 # pass ``[tenant]`` (which works at runtime — the base
                 # implementation just iterates — but fails ``ty``).
                 self.log_deletions(request, Tenant.objects.filter(pk=tenant.pk))
-                tenant.delete(force_drop=True)
-                destroyed.append(tenant.name)
-                # Evict the destroyed store's processed images from
-                # media-stream (keyed by schema name), which would
-                # otherwise keep serving for the cache TTL.
-                from tenant.lifecycle import (  # noqa: PLC0415
-                    _dispatch_media_flush,
-                )
+                # ONE destroy path for the admin and the platform API —
+                # see tenant.lifecycle.destroy_tenant. It erases the
+                # schema, files and search indexes, RETAINS invoices
+                # under their statutory period, and records the erasure
+                # in TenantArchive.
+                from tenant.lifecycle import destroy_tenant  # noqa: PLC0415
 
-                _dispatch_media_flush(schema_name)
+                result = destroy_tenant(
+                    tenant, actor=getattr(request.user, "email", "") or ""
+                )
+                destroyed.append(tenant.name)
+                if result["retention_until"]:
+                    self.message_user(
+                        request,
+                        _(
+                            "%(name)s: invoices retained until "
+                            "%(until)s under the statutory record-keeping "
+                            "obligation; everything else erased."
+                        )
+                        % {
+                            "name": tenant.name,
+                            "until": result["retention_until"],
+                        },
+                        level=messages.INFO,
+                    )
             except Exception as exc:  # noqa: BLE001
                 self.message_user(
                     request,
@@ -1166,3 +1231,49 @@ class UserTenantMembershipAdmin(ModelAdmin):
             if scope is not None:
                 kwargs["queryset"] = Tenant.objects.filter(pk=scope.pk)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(TenantArchive)
+class TenantArchiveAdmin(ModelAdmin):
+    """Read-only erasure records for destroyed tenants.
+
+    GDPR art. 5(2) requires the controller to be able to DEMONSTRATE
+    compliance, which a row nobody can see does not achieve. Every field
+    is read-only and nothing can be added or deleted here: this is the
+    evidence that a store was erased, what was kept, on what basis and
+    until when — editing it would defeat the point, and deleting it
+    would destroy the proof while leaving the retained files behind.
+    """
+
+    list_display = [
+        "schema_name",
+        "tenant_name",
+        "destroyed_at",
+        "display_retention",
+        "data_exported",
+    ]
+    list_filter = ["data_exported", "destroyed_at"]
+    search_fields = ["schema_name", "tenant_name", "destroyed_by"]
+    ordering = ["-destroyed_at"]
+
+    def get_readonly_fields(self, request, obj=None):
+        return [field.name for field in self.model._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @display(description=_("Retention"))
+    def display_retention(self, obj):
+        if obj.purged_at is not None:
+            return _unfold_label(_("Purged"), "success", "delete_sweep")
+        if obj.retention_until is None:
+            return _unfold_label(_("Nothing retained"), "info", "block")
+        tone = "danger" if obj.retention_expired else "warning"
+        return _unfold_label(
+            _("Until %(date)s") % {"date": obj.retention_until},
+            tone,
+            "gavel",
+        )

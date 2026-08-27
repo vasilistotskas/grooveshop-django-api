@@ -3,6 +3,72 @@
 
 
 
+## v3.17.0 (2026-08-27)
+
+### Bug fixes
+
+* fix(tenant): dedupe agent payment instruments and evaluate in schema
+
+CI caught the test asserting on a clean pay-way table: seeded data
+already carries an offline cash-on-delivery row, so the list came back
+with the code twice. Several pay-way rows legitimately share a provider
+code — a merchant offering cash on delivery through two carriers — but
+each code maps to ONE agent payment instrument, and a repeated instrument
+is not something UCP can advertise. The serializer now returns distinct
+codes, first occurrence wins, preserving merchant order.
+
+Also forces the queryset to evaluate INSIDE the schema context. It was
+lazy, so the query would have run after the context exited, against
+whatever schema the connection was left on — wrong data for every tenant
+whose schema is not the ambient one. The tests missed it because the
+fixture tenant's schema IS public.
+
+The tests now clear the pay-way table first so they assert on exact
+contents, and pin the dedupe with a second row sharing the code.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NUKABRcUinrsC1a7VKeG4N ([`607f1d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/607f1d2ce58cab53468b42aab53d850d75211322))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.16.0 [skip ci] ([`385ceb2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/385ceb2cc5f0e2d2e76c8d0c9b259d6668149222))
+
+### Features
+
+* feat(tenant): expose agent-completable payment instruments on resolve
+
+Add ``agentPaymentInstruments`` to the public tenant-resolve payload: the
+provider codes an AI agent can settle without handing the buyer to a
+browser, in the merchant's presentation order. The agent gateway reads it
+to advertise UCP payment instruments under the
+``space.grooveshop.payments`` handler, replacing an empty
+``payment_handlers`` registry that told agents the store accepts no
+agent-completable payment at all.
+
+Only ACTIVE OFFLINE pay-ways with a provider code qualify. Offline
+methods need no payment credential — the buyer settles with the carrier —
+so no participant enters PCI scope. Online methods are excluded on
+purpose: they require the buyer to authenticate at the PSP, which UCP
+models as an escalation, not a payment handler.
+
+Served on resolve rather than fetched per request so UCP discovery stays
+a cached single-round-trip lookup on a public endpoint; the authoritative
+per-checkout set is still resolved from live pay-way data in checkout
+responses, which is what the UCP spec designates as authoritative.
+
+Pay-way writes now purge the tenant-resolve cache. Without it a merchant
+enabling cash-on-delivery would stay invisible to agents for the full
+hour-long TTL. The existing extra-setting receiver grew the same
+tenant-schema lookup, so both now share
+``_purge_resolve_for_current_schema``.
+
+schema.yml also picks up pre-existing drift unrelated to this change:
+``vat`` is nullable and no longer required across four product schemas,
+but the committed contract still described it as a required integer.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NUKABRcUinrsC1a7VKeG4N ([`c5155ce`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5155cea6d9164078cff4a965b16aac0a9c747de))
+
 ## v3.16.0 (2026-08-27)
 
 ### Chores

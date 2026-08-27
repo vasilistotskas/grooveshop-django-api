@@ -3,6 +3,72 @@
 
 
 
+## v3.15.0 (2026-08-27)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.14.2 [skip ci] ([`7a47fc6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7a47fc6136942b9d100470614200d31a4bd670bc))
+
+### Features
+
+* feat(tenant): erase a destroyed store's data, retain what the law requires
+
+Destroying a tenant dropped the Postgres schema and flushed the
+media-stream HTTP cache, and stopped. Three things outlived the store,
+silently: its {schema}__* Meilisearch indexes (a destroyed shop stayed
+searchable and kept consuming engine memory), MEDIA_ROOT/{schema}, and
+_gdpr_exports/{schema} -- whole-account PII bundles built for subject
+access requests, the most sensitive files in the tree.
+
+The obvious fix is also wrong, and most of this change is that
+distinction. Issued invoices carry buyer names, addresses and VAT
+numbers, and they are the one category that must NOT be deleted: GDPR
+art. 17(3)(b) and art. 28(3)(g) both yield where Member State law
+requires storage, and the Greek Tax Procedure Code (N. 4987/2022 art.
+13) requires accounting records kept for at least five years from the
+END of the tax year in which the filing obligation arises. Deleting
+them to satisfy one regulation would breach another. Keeping them
+forever would breach storage limitation, art. 5(1)(e) -- so "retain
+everything" is not the safe default either.
+
+So invoices are retained deliberately: under a recorded legal basis, to
+a dated expiry anchored on the invoice's own tax year (not the
+destruction date, because that is what the statute counts from), and
+erased by a daily task once that expiry passes. The period is a
+setting, not a constant -- art. 36(2) extends the assessment period in
+some cases and only an operator knows which apply.
+
+TenantArchive is the erasure record. GDPR art. 5(2) requires
+demonstrable compliance, and before this a destroyed store simply
+vanished: no note of what was erased, what was kept, on whose
+authority, or until when. It lives in the public schema because the
+schema it describes has been dropped, and it is read-only in the admin
+-- editing the evidence would defeat it.
+
+File erasure uses an ALLOWLIST inside the private tree (everything
+except invoices/), not a denylist, so a future private artefact is
+erased by default rather than retained by omission.
+
+Also closes the art. 28(3)(g) half nobody offered: the article says
+delete OR RETURN, at the CONTROLLER's choice, and the platform is the
+processor here. An export action now writes a portable dump before
+destruction, and the archive records whether the merchant took it.
+
+And one plain bug: the platform API destroy called DRF's
+perform_destroy -> instance.delete() with no force_drop. auto_drop_schema
+is False (the django-tenants default, never overridden), so that removed
+the row and orphaned the ENTIRE Postgres schema, while the admin action
+passed force_drop=True. Two verbs spelled the same, doing materially
+different things. Both now call lifecycle.destroy_tenant, which is the
+only implementation.
+
+Migrations are safe under the PreSync deploy model: 0023 emits literally
+"(no-op)" SQL (help_text only) and 0024 is CREATE TABLE on a new table
+old pods never reference.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`0004b3a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0004b3a9ffcd14d7ff0ea6e40a57c99c0bd77573))
+
 ## v3.14.2 (2026-08-27)
 
 ### Bug fixes

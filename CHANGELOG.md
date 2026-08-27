@@ -3,6 +3,34 @@
 
 
 
+## v3.16.0 (2026-08-27)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.15.0 [skip ci] ([`1fb91f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1fb91f5a7eda4a5059d045286c2b66136e09bff7))
+
+### Features
+
+* feat(page_config): seed a cookies content page so merchants can override it
+
+The storefront ships /cookies-policy alongside /terms-of-use and
+/privacy-policy, and those routes now prefer a merchant's own published
+ContentPage over the platform boilerplate. "cookies" had no seeded slug,
+so it was the one legal page a merchant could NOT override — permanently
+stuck with platform text published under their name.
+
+Migration 0007 carries its own frozen copy of the defaults, so tenants
+provisioned before this never receive the new entry from
+page_config.defaults; 0008 backfills them. Unpublished on creation like
+every other seeded page, so a store that does nothing renders exactly
+what it renders today.
+
+Verified locally: both tenant schemas gained the slug, and the public
+schema was correctly skipped (page_config is TENANT_APPS-only).
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`49b59e1`](https://github.com/vasilistotskas/grooveshop-django-api/commit/49b59e1cc720ce6db03addeb96c0524778fdde74))
+
 ## v3.15.0 (2026-08-27)
 
 ### Chores

@@ -178,3 +178,61 @@ class TestTenantConfigAgentFlags:
         tenant.agent_commerce_enabled = False
         assert serializer.get_agent_commerce_enabled(tenant) is False
         assert serializer.get_product_feeds_enabled(tenant) is False
+
+    def test_agent_payment_instruments_lists_active_offline_pay_ways(self):
+        """Only pay-ways an agent can settle unaided are advertised.
+
+        Online methods send the buyer to the PSP to authenticate, which
+        UCP models as an escalation rather than a payment handler, so
+        they must never appear in this list.
+        """
+        from pay_way.factories import PayWayFactory
+        from tenant.models import Tenant
+        from tenant.serializers import TenantConfigSerializer
+
+        PayWayFactory(
+            active=True,
+            is_online_payment=False,
+            provider_code="cash_on_delivery",
+        )
+        PayWayFactory(
+            active=True, is_online_payment=True, provider_code="viva_wallet"
+        )
+        PayWayFactory(
+            active=False, is_online_payment=False, provider_code="bank_wire"
+        )
+        # A provider-less row is unaddressable — an agent has nothing to
+        # name when submitting the instrument.
+        PayWayFactory(active=True, is_online_payment=False, provider_code="")
+
+        tenant = Tenant(
+            schema_name="public", name="t", agent_commerce_enabled=True
+        )
+        serializer = TenantConfigSerializer()
+
+        assert serializer.get_agent_payment_instruments(tenant) == [
+            "cash_on_delivery"
+        ]
+
+    def test_agent_payment_instruments_empty_when_surface_off(self):
+        from pay_way.factories import PayWayFactory
+        from tenant.models import Tenant
+        from tenant.serializers import TenantConfigSerializer
+
+        PayWayFactory(
+            active=True,
+            is_online_payment=False,
+            provider_code="cash_on_delivery",
+        )
+        serializer = TenantConfigSerializer()
+
+        # Plan flag off.
+        off = Tenant(
+            schema_name="public", name="t", agent_commerce_enabled=False
+        )
+        assert serializer.get_agent_payment_instruments(off) == []
+
+        # Plan flag on, merchant extra-setting off.
+        on = Tenant(schema_name="public", name="t", agent_commerce_enabled=True)
+        with _settings_off("AGENT_COMMERCE_ENABLED"):
+            assert serializer.get_agent_payment_instruments(on) == []

@@ -41,6 +41,28 @@ def invalidate_tenant_caches(sender, instance, **kwargs):
     cache.delete(f"global:tenant_domains:{instance.schema_name}")
 
 
+def _purge_resolve_for_current_schema():
+    """Purge the tenant-resolve cache for the schema handling this write.
+
+    For rows that live in a TENANT schema and are folded into the cached
+    ``TenantConfigSerializer`` payload. The connection's current schema
+    identifies whose domains to purge; the keys themselves are
+    schema-independent "global:" keys (see ``invalidate_domain_caches``).
+    """
+    from django.db import connection  # noqa: PLC0415
+    from django_tenants.utils import schema_context  # noqa: PLC0415
+
+    schema = connection.schema_name
+    if schema == "public":
+        return
+    with schema_context("public"):
+        tenant = Tenant.objects.filter(schema_name=schema).first()
+        if tenant is None:
+            return
+        for domain in tenant.domains.values_list("domain", flat=True):
+            cache.delete(f"global:tenant_resolve:{domain}")
+
+
 @receiver(post_save, sender="extra_settings.Setting")
 def invalidate_resolve_on_agent_setting_change(sender, instance, **kwargs):
     """Purge the tenant-resolve cache when a merchant edits a setting
@@ -57,18 +79,20 @@ def invalidate_resolve_on_agent_setting_change(sender, instance, **kwargs):
         "PRODUCT_FEEDS_ENABLED",
     }:
         return
-    from django.db import connection  # noqa: PLC0415
-    from django_tenants.utils import schema_context  # noqa: PLC0415
+    _purge_resolve_for_current_schema()
 
-    schema = connection.schema_name
-    if schema == "public":
-        return
-    with schema_context("public"):
-        tenant = Tenant.objects.filter(schema_name=schema).first()
-        if tenant is None:
-            return
-        for domain in tenant.domains.values_list("domain", flat=True):
-            cache.delete(f"global:tenant_resolve:{domain}")
+
+@receiver([post_save, post_delete], sender="pay_way.PayWay")
+def invalidate_resolve_on_pay_way_change(sender, instance, **kwargs):
+    """Purge the tenant-resolve cache when a pay-way changes.
+
+    ``agent_payment_instruments`` is derived from the tenant's active
+    offline pay-ways inside ``TenantConfigSerializer``, so a merchant
+    enabling cash-on-delivery would otherwise stay invisible to AI
+    agents for the full TTL — the agent gateway reads that list to
+    decide which UCP payment instruments the store advertises.
+    """
+    _purge_resolve_for_current_schema()
 
 
 @receiver(post_save, sender=Tenant)

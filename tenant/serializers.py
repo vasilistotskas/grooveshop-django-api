@@ -90,6 +90,40 @@ class TenantConfigSerializer(serializers.Serializer):
         with schema_context(obj.schema_name):
             return bool(Setting.get("PRODUCT_FEEDS_ENABLED", default=True))
 
+    # Provider codes an AI agent can settle on its own, in the order the
+    # merchant presents them. The agent gateway advertises one UCP payment
+    # instrument per entry under the ``space.grooveshop.payments`` handler,
+    # so an agent can place the order without handing the buyer to a
+    # browser. Offline methods qualify because they need no payment
+    # credential — the buyer settles with the carrier. Online methods are
+    # excluded on purpose: they require the buyer to authenticate at the
+    # PSP, which UCP models as an escalation, not a payment handler.
+    #
+    # Served here rather than fetched per request so UCP discovery stays a
+    # cached, single-round-trip lookup. The authoritative per-checkout set
+    # is still resolved from live pay-way data in checkout responses.
+    agent_payment_instruments = serializers.SerializerMethodField()
+
+    def get_agent_payment_instruments(self, obj) -> list[str]:
+        from django_tenants.utils import schema_context  # noqa: PLC0415
+
+        from pay_way.models import PayWay  # noqa: PLC0415
+
+        # Subordinate to the agent-commerce gate: a tenant with the
+        # surface off advertises no agent-completable payment at all.
+        if not self.get_agent_commerce_enabled(obj):
+            return []
+        with schema_context(obj.schema_name):
+            return [
+                code
+                for code in PayWay.objects.filter(
+                    active=True, is_online_payment=False
+                )
+                .exclude(provider_code="")
+                .order_by("sort_order", "id")
+                .values_list("provider_code", flat=True)
+            ]
+
     # --- Payments (public key only) ---
     # Public Stripe publishable key — pk_test_* / pk_live_* only.
     # Empty string means Stripe is not configured for this tenant —

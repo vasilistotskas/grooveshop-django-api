@@ -224,3 +224,76 @@ class TestSignalInvalidationUsesGlobalKeys:
         tenant.save()
 
         assert cache.get(cache_key) is None
+
+
+class TestPayWayResolveInvalidation:
+    """A pay-way edit must not sit behind the resolve cache.
+
+    ``agent_payment_instruments`` is derived from the tenant's active
+    offline pay-ways and folded into the cached resolve payload, so a
+    merchant enabling cash-on-delivery would otherwise stay invisible
+    to AI agents for the full hour-long TTL. Pay-way rows live in the
+    TENANT schema, so the receiver resolves the tenant from the
+    connection's schema rather than from the row.
+    """
+
+    def test_saving_a_pay_way_triggers_the_purge(self, db):
+        """Proves the receiver is actually wired to ``pay_way.PayWay``.
+
+        Asserted through a real save rather than signal introspection so
+        the test does not depend on Django's private receiver registry.
+        """
+        from pay_way.factories import PayWayFactory
+
+        with patch("tenant.signals._purge_resolve_for_current_schema") as purge:
+            pay_way = PayWayFactory(
+                active=True,
+                is_online_payment=False,
+                provider_code="cash_on_delivery",
+            )
+            assert purge.called, "post_save receiver not connected"
+
+            purge.reset_mock()
+            pay_way.delete()
+            assert purge.called, "post_delete receiver not connected"
+
+    def test_pay_way_change_clears_every_domain_of_its_tenant(
+        self, tenant_factory
+    ):
+        from tenant.signals import invalidate_resolve_on_pay_way_change
+
+        tenant = tenant_factory("payway-invalidate")
+        primary = TenantDomain.objects.create(
+            tenant=tenant, domain="payway-invalidate.example", is_primary=True
+        )
+        alias = TenantDomain.objects.create(
+            tenant=tenant,
+            domain="api.payway-invalidate.example",
+            is_primary=False,
+        )
+        keys = [f"global:tenant_resolve:{d.domain}" for d in (primary, alias)]
+        for key in keys:
+            cache.set(key, {"schemaName": tenant.schema_name}, 3600)
+            assert cache.get(key) is not None
+
+        # The write lands while serving the TENANT's own schema.
+        with patch("django.db.connection") as conn:
+            conn.schema_name = tenant.schema_name
+            invalidate_resolve_on_pay_way_change(None, None)
+
+        for key in keys:
+            assert cache.get(key) is None
+
+    def test_public_schema_write_purges_nothing(self):
+        """Seed/fixture loads run in the public schema, which owns no
+        storefront domains — purging there would be a wasted scan."""
+        from tenant.signals import invalidate_resolve_on_pay_way_change
+
+        key = "global:tenant_resolve:untouched.example"
+        cache.set(key, {"schemaName": "public"}, 3600)
+
+        with patch("django.db.connection") as conn:
+            conn.schema_name = "public"
+            invalidate_resolve_on_pay_way_change(None, None)
+
+        assert cache.get(key) is not None

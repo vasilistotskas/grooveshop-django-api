@@ -208,14 +208,21 @@ def register_default_surfaces() -> None:
             description=_(
                 "django-extra-settings cache (extra_settings_*) and the"
                 " admin dashboard summary. Touches the Nuxt"
-                " /api/settings proxy too."
+                " /api/settings proxy and the published seller identity."
             ),
             django_patterns=(
                 "*extra_settings_*",
                 "*admin:dashboard*",
                 "*SettingsViewSet_*",
             ),
-            nuxt_patterns=_nuxt("settings"),
+            # ``tenantLegalIdentity`` is the storefront's published seller
+            # identity, and it is built from the INVOICE_SELLER_* rows in
+            # extra_settings — so editing them here has to invalidate it.
+            # Without this entry the footer keeps serving the previous
+            # identity for the route's 30-minute maxAge, which for a
+            # merchant who just corrected their GEMI number or address
+            # means the wrong legal identity stays published.
+            nuxt_patterns=_nuxt("settings", "tenantLegalIdentity"),
             related=("pay_way", "shipping", "loyalty"),
             icon="tune",
             group="config",

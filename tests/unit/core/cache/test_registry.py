@@ -133,3 +133,46 @@ class TestExpandWithRelated:
         # When the operator explicitly selects a danger surface it
         # passes through unchanged.
         assert expand_with_related(["heavy"]) == ["heavy"]
+
+
+class TestSellerIdentityIsPurgeable:
+    """Editing INVOICE_SELLER_* must invalidate the published identity.
+
+    The storefront renders the seller's legal identity (company name,
+    legal form, registered seat, GEMI, VAT id) from a Nuxt route cached
+    for 30 minutes. Its source is the INVOICE_SELLER_* rows in
+    extra_settings, so the ``settings`` surface owns it.
+
+    Without this coupling a merchant who corrects their GEMI number or
+    address in the admin keeps publishing the OLD legal identity for
+    half an hour with no way to force it — and publishing the wrong
+    registered identity is the exact failure the disclosure rules
+    (ECD art. 5, N. 4919/2022 art. 22) exist to prevent.
+    """
+
+    def test_settings_surface_purges_the_identity_route(self):
+        from core.cache.registry import get_surface
+
+        surface = get_surface("settings")
+        assert any(
+            "tenantLegalIdentity" in pattern
+            for pattern in surface.nuxt_patterns
+        ), (
+            "the seller identity route is not covered by any purge — "
+            "correcting a GEMI number in the admin would leave the old "
+            "one published for the route's full maxAge"
+        )
+
+    def test_it_targets_the_handler_cache_not_the_route_cache(self):
+        """Nitro stores cached handlers under a different prefix.
+
+        ``cache:nitro:routes:*`` matches ZERO handler keys; a pattern
+        aimed at the wrong prefix purges nothing and reports success.
+        """
+        from core.cache.registry import get_surface
+
+        surface = get_surface("settings")
+        identity = [
+            p for p in surface.nuxt_patterns if "tenantLegalIdentity" in p
+        ]
+        assert identity == ["cache:nitro:handlers:tenantLegalIdentity*"]

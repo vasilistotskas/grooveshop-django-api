@@ -3,6 +3,45 @@
 
 
 
+## v3.19.0 (2026-08-27)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.18.1 [skip ci] ([`af30812`](https://github.com/vasilistotskas/grooveshop-django-api/commit/af3081283a10b1ed63fac21cfdda268e333e3ce0))
+
+### Features
+
+* feat(tenant): gate agent hosted-payment selection at both tiers
+
+Adds a two-tier gate for letting an AI-agent platform choose an ONLINE
+payment method: the order is placed and the buyer authorises on the PSP's
+page, instead of being sent back to re-enter the whole checkout on the
+web.
+
+UCP cannot model that selection itself. An instrument is something a
+platform ACQUIRES and submits, and with a merchant-hosted payment page
+there is nothing to acquire — the buyer types their card there. An Action
+cannot carry it either: both standard payment Action types require a
+`payment_instrument_id` that does not exist. So the selection travels as
+a declared UCP extension, and this gate is how it is withdrawn.
+
+`agent_hosted_payment_enabled` on Tenant is the PLATFORM tier;
+`AGENT_HOSTED_PAYMENT_ENABLED` is the MERCHANT tier. TenantConfig serves
+the AND of the two, subordinate to agent commerce, so the gateway reads
+one authoritative value — the same shape as the existing agent gates.
+Either tier alone withdraws the feature.
+
+Default on: it only exposes a choice the store already offers on the web.
+With it off, agents complete only with methods they can settle themselves
+and card buyers are handed off to the storefront checkout, which is the
+plain UCP escalation flow.
+
+The extra-setting joins the resolve-cache invalidation list, so a
+merchant toggle takes effect immediately rather than after the hour TTL.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NUKABRcUinrsC1a7VKeG4N ([`b6fe103`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b6fe1039d93ed708b6d9b1669e7e5f5f12fc448d))
+
 ## v3.18.1 (2026-08-27)
 
 ### Bug fixes

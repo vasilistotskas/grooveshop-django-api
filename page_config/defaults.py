@@ -293,6 +293,13 @@ DEFAULT_CONTENT_PAGES: dict[str, dict[str, str]] = {
         "title": "Πολιτική Απορρήτου",
         "body": "<p>Προσθέστε εδώ την πολιτική απορρήτου του καταστήματός σας.</p>",
     },
+    # The storefront ships a /cookies-policy route like terms and
+    # privacy, but no slug backed it — so a merchant could override the
+    # other two and was stuck with platform boilerplate for this one.
+    "cookies": {
+        "title": "Πολιτική Cookies",
+        "body": "<p>Προσθέστε εδώ την πολιτική cookies του καταστήματός σας.</p>",
+    },
     "faq": {
         "title": "Συχνές Ερωτήσεις",
         "body": "<p>Προσθέστε εδώ τις συχνές ερωτήσεις των πελατών σας.</p>",

@@ -10,6 +10,10 @@ admin path) can never drift:
   row. Without it WebSocket notifications close 4004 and social login
   404s at the form POST (routing matches ``TenantDomain`` rows
   EXACTLY; a derived-but-unrouted host is not one Django will serve).
+- ``ensure_site`` — the public-schema ``django.contrib.sites`` Site for
+  the primary domain, which per-tenant ``SocialApp`` credentials are
+  keyed on. Without it a merchant's own OAuth app is unreachable and
+  allauth silently falls back to the platform's.
 - ``provision_owner_membership`` — grants the tenant owner an OWNER
   ``UserTenantMembership``, looked up in the PUBLIC schema (staff
   identities are platform accounts, never a copy in the new tenant's
@@ -70,6 +74,174 @@ def ensure_api_domain(tenant: Tenant) -> str | None:
         defaults={"is_primary": False},
     )
     return api_domain
+
+
+def ensure_site(tenant: Tenant) -> str | None:
+    """Ensure a ``django.contrib.sites`` Site exists for the primary domain.
+
+    ``TenantSocialAccountAdapter.get_app`` resolves a per-tenant
+    ``SocialApp`` by looking up the Site whose ``domain`` matches the
+    tenant's primary domain, then filtering ``SocialApp`` on it. With no
+    such Site the lookup always misses and the adapter silently falls
+    back to the platform-wide OAuth credentials from settings — so the
+    per-tenant social-app feature that adapter exists to provide is
+    unreachable, even after a merchant fills in their own client id and
+    secret.
+
+    It also removes a latent 500: the only Site a merchant can pick in
+    the admin today is the auto-created ``example.com`` (pk 1). A
+    ``SocialApp`` linked to THAT is returned by allauth's ``list_apps``
+    alongside the settings-backed app for the same provider, and
+    ``get_app`` then raises ``MultipleObjectsReturned``, breaking social
+    login for that provider on that tenant.
+
+    ``django.contrib.sites`` is in SHARED_APPS only, so ``django_site``
+    exists just in the public schema and its rows are platform-global —
+    hence the explicit public schema context rather than the tenant's.
+
+    Idempotent (``get_or_create`` on ``domain``); never rewrites an
+    existing Site's name, since an operator may have set it
+    deliberately. Returns the domain, or ``None`` when the tenant has no
+    primary domain yet — matching ``ensure_api_domain``'s contract.
+    """
+    from django.contrib.sites.models import Site  # noqa: PLC0415
+    from django_tenants.utils import (  # noqa: PLC0415
+        get_public_schema_name,
+        schema_context,
+    )
+
+    primary = tenant.domains.filter(is_primary=True).first()
+    if primary is None:
+        return None
+
+    with schema_context(get_public_schema_name()):
+        Site.objects.get_or_create(
+            domain=primary.domain,
+            defaults={"name": tenant.store_name or tenant.name},
+        )
+    return primary.domain
+
+
+def provision_stripe(
+    tenant: Tenant,
+    *,
+    dry_run: bool = False,
+    rotate_endpoint: bool = False,
+) -> dict[str, Any]:
+    """Register the tenant's Stripe API key and webhook endpoint.
+
+    Deliberately NOT part of ``provision_tenant``: at creation time the
+    Stripe key is always empty, so running it there would be a
+    guaranteed no-op that hides where the real trigger belongs. The
+    trigger is "a merchant just saved their Stripe secret", which is why
+    this is exposed as a ``TenantAdmin`` action as well as the
+    ``bootstrap_stripe`` command — before, the ONLY way to run it was
+    the CLI, so a merchant who pasted their key got no webhook endpoint,
+    dj-stripe never received ``payment_intent.succeeded``, and Stripe
+    orders silently never confirmed.
+
+    ``tenant_context(tenant)``, NOT ``schema_context(schema_name)``:
+    schema_context sets ``connection.tenant`` to a bare ``FakeTenant``
+    carrying only ``schema_name``, and every ``tenant.credentials.*``
+    helper reads real fields off ``connection.tenant`` — so
+    ``stripe_credentials()`` would read the key as EMPTY no matter what
+    the row holds, and this would report the tenant unconfigured and
+    skip it.
+
+    Idempotent: the API key is ``get_or_create``d, and an existing
+    endpoint for this tenant's API host is left alone unless
+    ``rotate_endpoint`` is set.
+
+    Returns ``{"status": ..., "detail": str}`` where status is one of
+    ``no_key``, ``no_domain``, ``dry_run``, ``created``, ``exists`` —
+    callers render it (stdout for the command, ``message_user`` for the
+    admin) rather than this function printing.
+    """
+    from urllib.parse import urljoin  # noqa: PLC0415
+
+    from django.urls import reverse  # noqa: PLC0415
+    from django_tenants.utils import tenant_context  # noqa: PLC0415
+
+    with tenant_context(tenant):
+        from tenant.credentials import stripe_credentials  # noqa: PLC0415
+
+        secret_key = stripe_credentials()["secret_key"]
+        if not secret_key:
+            return {
+                "status": "no_key",
+                "detail": "No Stripe secret key configured on the tenant.",
+            }
+
+        primary = tenant.domains.filter(is_primary=True).first()
+        if primary is None:
+            return {
+                "status": "no_domain",
+                "detail": (
+                    "No primary domain — the webhook URL cannot be built."
+                ),
+            }
+
+        # Every tenant owns an ``api.<domain>`` subdomain (infra TEMPLATE
+        # contract) — that host routes straight into this tenant's
+        # schema, which is what makes the UUID lookup and row-secret
+        # verification per-tenant.
+        base_url = f"https://api.{primary.domain}"
+
+        if dry_run:
+            return {
+                "status": "dry_run",
+                "detail": (
+                    f"Would provision APIKey (…{secret_key[-4:]}) + "
+                    f"webhook endpoint on {base_url}."
+                ),
+            }
+
+        from djstripe.models import APIKey, WebhookEndpoint  # noqa: PLC0415
+
+        api_key, created = APIKey.objects.get_or_create_by_api_key(secret_key)
+        if api_key.djstripe_owner_account_id is None:
+            api_key.refresh_account()
+        key_note = (
+            f"APIKey {'created' if created else 'exists'} "
+            f"({api_key.secret_redacted})"
+        )
+
+        existing = WebhookEndpoint.objects.filter(
+            url__startswith=base_url
+        ).first()
+        if existing is not None and not rotate_endpoint:
+            return {
+                "status": "exists",
+                "detail": (
+                    f"{key_note}; webhook endpoint already provisioned "
+                    f"({existing.url}). Use rotate to mint a new one."
+                ),
+            }
+
+        # Mirror dj-stripe's WebhookEndpointAdminCreateForm: build the
+        # instance first so its djstripe_uuid exists, create the endpoint
+        # ON Stripe with that uuid in metadata, then sync the response
+        # (which includes the signing secret) into the row the webhook
+        # view verifies against.
+        instance = WebhookEndpoint()
+        url_path = reverse(
+            "djstripe:djstripe_webhook_by_uuid",
+            kwargs={"uuid": instance.djstripe_uuid},
+        )
+        url = urljoin(base_url, url_path, allow_fragments=False)
+        stripe_data = WebhookEndpoint._api_create(
+            url=url,
+            enabled_events=["*"],
+            metadata={"djstripe_uuid": str(instance.djstripe_uuid)},
+            api_key=secret_key,
+        )
+        endpoint = WebhookEndpoint.sync_from_stripe_data(
+            stripe_data, api_key=secret_key
+        )
+        return {
+            "status": "created",
+            "detail": f"{key_note}; webhook endpoint created: {endpoint.url}",
+        }
 
 
 def provision_owner_membership(
@@ -171,21 +343,30 @@ def _create_meili_indexes(tenant: Tenant) -> None:
     if django_settings.MEILISEARCH.get("OFFLINE"):
         return
 
-    from meili._client import client as meili_client  # noqa: PLC0415
-
     # Discover all IndexMixin subclasses
     from meili.models import IndexMixin  # noqa: PLC0415
 
     for model in IndexMixin.__subclasses__():
         index_name = model.get_meili_index_name()
-        # Default must match meili's own ("pk" — see
-        # meili/apps.py::_initialize_meilisearch_config); an "id"
-        # default here gave tenant_create-provisioned indexes a
-        # different primaryKey than every other creation path.
-        pk = getattr(model.MeiliMeta, "primary_key", "pk")
         try:
-            meili_client.create_index(index_name, pk)
-            logger.info("Created Meilisearch index: %s", index_name)
+            # ``update_meili_settings`` and NOT a bare ``create_index``:
+            # creating the index alone leaves filterableAttributes at
+            # Meilisearch's default ``[]``, and every storefront search
+            # sends a filter (language_code / active / is_deleted), so
+            # the engine rejects it and the search endpoint returns HTTP
+            # 400 for EVERY query on that tenant. Settings were only
+            # applied later, by the nightly fanout sync or the next
+            # deploy's PreSync hook — a window of up to ~24h in which a
+            # brand-new store has no working search at all.
+            #
+            # It still guarantees the primary key: the method calls
+            # ``create_index(index_name, primary_key)`` first, precisely
+            # so a settings call cannot auto-create a pk-less index
+            # (see meili/models.py::update_meili_settings).
+            model.update_meili_settings()
+            logger.info(
+                "Created Meilisearch index with settings: %s", index_name
+            )
         except Exception:
             logger.warning(
                 "Could not create index %s", index_name, exc_info=True
@@ -226,6 +407,7 @@ def provision_tenant(
 
         {
             "api_domain": str | None,
+            "site_domain": str | None,
             "membership": (membership, created) | None,
         }
     """
@@ -233,10 +415,12 @@ def provision_tenant(
         owner_email = tenant.owner_email
 
     api_domain = ensure_api_domain(tenant)
+    site_domain = ensure_site(tenant)
     membership_result = provision_owner_membership(tenant, owner_email)
     seed_tenant_defaults(tenant)
 
     return {
         "api_domain": api_domain,
+        "site_domain": site_domain,
         "membership": membership_result,
     }

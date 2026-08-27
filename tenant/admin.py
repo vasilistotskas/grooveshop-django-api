@@ -219,7 +219,12 @@ class TenantAdmin(ModelAdmin):
 
     # Disable the default bulk-delete action — use our explicit
     # suspend / destroy actions instead so safety checks always run.
-    actions = ["suspend_tenants", "activate_tenants", "destroy_tenants"]
+    actions = [
+        "suspend_tenants",
+        "activate_tenants",
+        "destroy_tenants",
+        "provision_stripe_webhook",
+    ]
 
     @display(description=_("Store"), ordering="name", header=True)
     def display_store(self, obj):
@@ -714,6 +719,65 @@ class TenantAdmin(ModelAdmin):
             ):
                 actions.pop(name, None)
         return actions
+
+    # ------------------------------------------------------------------
+    # Action — Provision Stripe
+    # ------------------------------------------------------------------
+
+    @action(
+        description=str(_("Provision Stripe webhook")),
+        icon="webhook",
+    )
+    def provision_stripe_webhook(self, request, queryset):
+        """Register the tenant's Stripe API key + webhook endpoint.
+
+        Deliberately NOT stripped for merchants in ``get_actions``:
+        pasting a Stripe secret into the Tenant form is exactly the
+        moment this needs to run, and until now the only way to run it
+        was ``manage.py bootstrap_stripe`` — so a merchant who saved
+        their key got no webhook endpoint, dj-stripe never received
+        ``payment_intent.succeeded``, and their Stripe orders never
+        confirmed, with nothing in the product surfacing why.
+
+        Safe for a merchant to trigger on their own store: the queryset
+        is already scoped to their own row, and it only ever touches
+        THEIR Stripe account using THEIR key. Idempotent — an existing
+        endpoint is reported, not replaced (rotation stays a CLI
+        operation, since it needs the old endpoint disabled in the
+        Stripe dashboard first).
+        """
+        from tenant.provisioning import provision_stripe  # noqa: PLC0415
+
+        level_by_status = {
+            "created": messages.SUCCESS,
+            "exists": messages.INFO,
+            "no_key": messages.WARNING,
+            "no_domain": messages.ERROR,
+        }
+
+        for tenant in queryset:
+            if tenant.schema_name in _PROTECTED:
+                continue
+            try:
+                result = provision_stripe(tenant)
+            except Exception as exc:  # noqa: BLE001 — surfaced to operator
+                self.message_user(
+                    request,
+                    _("%(store)s: Stripe provisioning failed — %(error)s")
+                    % {"store": tenant.name, "error": exc},
+                    messages.ERROR,
+                )
+                continue
+
+            self.message_user(
+                request,
+                f"{tenant.name}: {result['detail']}",
+                level_by_status.get(result["status"], messages.INFO),
+            )
+            if result["status"] == "created":
+                self.log_change(
+                    request, tenant, str(_("Provisioned Stripe webhook"))
+                )
 
     # ------------------------------------------------------------------
     # Action A — Suspend

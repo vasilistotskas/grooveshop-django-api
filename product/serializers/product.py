@@ -27,7 +27,14 @@ class ProductSerializer(
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=Product)
     category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
-    vat = PrimaryKeyRelatedField(queryset=Vat.objects.all())
+    # Mirrors Product.vat (null=True, blank=True, SET_NULL). An
+    # explicitly-declared relation does NOT inherit the model's
+    # nullability, so without this the field is required — and on a
+    # tenant with no Vat rows the whole product write API rejects every
+    # payload, because the queryset is empty too.
+    vat = PrimaryKeyRelatedField(
+        queryset=Vat.objects.all(), required=False, allow_null=True
+    )
     brand_name = serializers.CharField(
         source="brand.name", read_only=True, allow_null=True
     )
@@ -114,7 +121,11 @@ class ProductWriteSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[Product]
 ):
     category = PrimaryKeyRelatedField(queryset=ProductCategory.objects.all())
-    vat = PrimaryKeyRelatedField(queryset=Vat.objects.all())
+    # See ProductSerializer.vat — matches the model's nullability so a
+    # tenant without seeded VAT rates can still create products.
+    vat = PrimaryKeyRelatedField(
+        queryset=Vat.objects.all(), required=False, allow_null=True
+    )
     brand = PrimaryKeyRelatedField(
         queryset=Brand.objects.all(), required=False, allow_null=True
     )

@@ -136,9 +136,15 @@ class Command(BaseCommand):
         # row (see tenant/provisioning.py for why it is not optional).
         # Explicit --extra-domains still win: get_or_create below is a
         # no-op if the operator already listed it.
-        from tenant.provisioning import ensure_api_domain  # noqa: PLC0415
+        from tenant.provisioning import (  # noqa: PLC0415
+            ensure_api_domain,
+            ensure_site,
+        )
 
         ensure_api_domain(tenant)
+        # The public-schema Site row that per-tenant SocialApp
+        # credentials key on — see tenant/provisioning.py::ensure_site.
+        ensure_site(tenant)
 
         for extra in options["extra_domains"]:
             TenantDomain.objects.get_or_create(

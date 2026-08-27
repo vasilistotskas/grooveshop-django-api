@@ -305,9 +305,17 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
+        # Project templates live in core/templates ONLY. The repo-root
+        # ``templates/`` directory belongs to python-semantic-release
+        # (``[tool.semantic_release.changelog] template_dir``), which
+        # renders EVERY file it finds there into the repo root on each
+        # release. A Django template parked in it was therefore copied
+        # out as a stray top-level directory on every version bump —
+        # that is where the tracked ``emails/`` and ``unfold/`` folders
+        # at the repo root came from. Keeping it out of DIRS removes the
+        # incentive to put Django templates there at all.
         "DIRS": [
             path.join(BASE_DIR, "core/templates"),
-            path.join(BASE_DIR, "templates"),
         ],
         "APP_DIRS": True,
         "OPTIONS": {

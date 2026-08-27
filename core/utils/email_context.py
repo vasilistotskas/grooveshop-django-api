@@ -27,6 +27,7 @@ from core.utils.tenant_urls import (
 )
 from tenant.credentials import (
     tenant_contact_email,
+    tenant_email_theme,
     tenant_logo_url,
     tenant_site_name,
 )
@@ -47,6 +48,10 @@ def build_email_context(**extra: Any) -> dict[str, Any]:
         "INFO_EMAIL": tenant_contact_email(),
         "STATIC_BASE_URL": get_tenant_static_base_url(),
         "SITE_LOGO_URL": _email_logo_url(),
+        # Brand colours as literal hex — email_base.html renders them
+        # straight into its <style> block. See tenant_email_theme for
+        # why CSS custom properties cannot be used here.
+        "THEME": tenant_email_theme(),
         **extra,
     }
 

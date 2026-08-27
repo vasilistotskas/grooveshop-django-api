@@ -50,6 +50,10 @@ class TestBuildEmailContext:
             "INFO_EMAIL",
             "STATIC_BASE_URL",
             "SITE_LOGO_URL",
+            # Brand colours as literal hex. email_base.html renders
+            # these into its <style> block because CSS custom
+            # properties do not survive the major email clients.
+            "THEME",
         }
         assert context["SITE_NAME"] == "Acme"
 

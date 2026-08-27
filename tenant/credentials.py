@@ -177,14 +177,77 @@ def tenant_logo_url() -> str:
     """Return the tenant's light-mode logo URL for email branding.
 
     Priority: ``Tenant.logo_light_url`` → ``""``. Tenant-only — no
-    platform-wide fallback, because there IS no platform logo asset;
-    ``core.utils.email_context.build_email_context`` treats an empty
-    value as "no tenant logo configured" and the ``email_base.html``
-    template falls back to the static ``logo-dark.svg`` asset, so an
-    empty string here is a normal, expected state rather than an
-    error.
+    platform-wide fallback here. An empty string is a normal, expected
+    state, not an error: ``core.utils.email_context._email_logo_url``
+    treats it as "no tenant logo configured" and substitutes the
+    platform's static ``logo-dark.svg`` ONLY for the platform tenant
+    itself, leaving it empty for anyone else so an unbranded store's
+    email never wears another store's brand (``email_base.html`` then
+    renders the store name as a text wordmark).
     """
     return _get_tenant_field("logo_light_url")
+
+
+# Platform fallbacks, used when no tenant is active or the tenant has
+# not customised its palette. These are the values the email base
+# template carried inline before it was made themable.
+_DEFAULT_EMAIL_THEME = {
+    "primary": "#2563eb",
+    "primary_dark": "#1e40af",
+    "secondary": "#16a34a",
+    "header": "#97b7ff",
+}
+
+
+def tenant_email_theme() -> dict[str, str]:
+    """Return the tenant's brand colours for email, as literal hex.
+
+    Email clients are the reason this exists as resolved hex rather
+    than CSS custom properties: caniemail records Gmail, Outlook,
+    Apple Mail, Yahoo and Thunderbird as accepting the ``var()``
+    FUNCTION while dropping the ``:root { --x: … }`` DECLARATION, which
+    makes every ``var()`` reference invalid at computed-value time. The
+    base template used 22 of them with no fallbacks, so the primary CTA
+    resolved to ``background-color: transparent`` while keeping
+    ``color: #ffffff !important`` — white text on a white card.
+
+    Sources, in priority order:
+      1. ``Tenant.theme_metadata["colors"]["primaryScale"]`` — the
+         per-shade map the storefront token compiler already uses.
+      2. ``Tenant.accent_hex`` / ``Tenant.success_hex`` — the validated
+         ``#RRGGBB`` fields on the Tenant row.
+      3. The platform defaults above.
+
+    ``Tenant.primary_color`` and ``neutral_color`` are deliberately NOT
+    consulted: they hold Tailwind colour NAMES ("blue", "zinc") for the
+    Nuxt compiler, not hex, so they cannot go into email CSS without a
+    name→hex table this does not need.
+    """
+    theme = dict(_DEFAULT_EMAIL_THEME)
+
+    scale = {}
+    metadata = _get_tenant_field("theme_metadata") or {}
+    if isinstance(metadata, dict):
+        colors = metadata.get("colors")
+        if isinstance(colors, dict):
+            candidate = colors.get("primaryScale")
+            if isinstance(candidate, dict):
+                scale = candidate
+
+    accent = _get_tenant_field("accent_hex")
+    success = _get_tenant_field("success_hex")
+
+    primary = scale.get("600") or accent
+    if primary:
+        theme["primary"] = primary
+        theme["header"] = primary
+    dark = scale.get("700") or primary
+    if dark:
+        theme["primary_dark"] = dark
+    if success:
+        theme["secondary"] = success
+
+    return theme
 
 
 # ---------------------------------------------------------------------------

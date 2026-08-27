@@ -3,6 +3,56 @@
 
 
 
+## v3.18.0 (2026-08-27)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.17.0 [skip ci] ([`9964eb6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9964eb66bb961c2d7a0e3b7dc5e08ca0d1e4a6aa))
+
+### Features
+
+* feat(tenant): wire the legal-identity endpoint and shared key map
+
+Carries the halves that git pull --rebase --autostash reapplied as
+unstaged, so the previous commit landed only the two new files: the two
+new settings, the shared-map switch in order/invoicing, the serializer,
+the view, the route, and the regenerated schema. ([`7a0260e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7a0260e874b7b4345ccfef4685f10371f56c9bc1))
+
+* feat(tenant): publish the merchant's legal identity on the storefront
+
+A storefront has to say who is selling, and ours did not.
+
+The facts already existed as INVOICE_SELLER_* settings but were only
+ever rendered onto an invoice. Publishing them on the site is a separate
+obligation with its own basis:
+
+- e-Commerce Directive 2000/31/EC art. 5(1): name (a), geographic
+  address of establishment (b), contact details allowing rapid and
+  direct communication (c), trade register + registration number (d)
+  and VAT identification number (g), "easily, directly and permanently
+  accessible".
+- N. 4919/2022 art. 22 §3: the GEMI number on the e-shop.
+- N. 4919/2022 art. 22 §4: legal form, name, registered seat and
+  liquidation status "σε εμφανές σημείο". Art. 50(γ) fines €200-500.
+
+Two of those had no field at all — legal form and liquidation status —
+so no merchant on the platform could have complied. Both added.
+
+Rather than adding a parallel set of identity fields to Tenant, the
+existing keys become the single definition in tenant.legal_identity,
+which order.invoicing now imports: invoicing is a CONSUMER of the
+seller's identity, so the dependency points that way and an invoice can
+never name a different seller than the site does.
+
+Served from its own tenant-scoped endpoint rather than folded into
+tenant/resolve — resolve answers from the PUBLIC schema while these
+settings live in the tenant schema, so it would mean a cross-schema read
+on the hottest path in the stack.
+
+Blanks are published as blanks and missing_fields names the gaps.
+Invoicing falls back to the site name for its own rendering; disclosure
+must not — a fabricated legal name looks compliant and is wrong. ([`ec1c365`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ec1c365377310cf3896c1cf87d67e36b8f86447e))
+
 ## v3.17.0 (2026-08-27)
 
 ### Bug fixes

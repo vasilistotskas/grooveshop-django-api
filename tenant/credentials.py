@@ -188,15 +188,39 @@ def tenant_logo_url() -> str:
     return _get_tenant_field("logo_light_url")
 
 
-# Platform fallbacks, used when no tenant is active or the tenant has
-# not customised its palette. These are the values the email base
-# template carried inline before it was made themable.
+# The palette ``email_base.html`` carried inline before it was made
+# themable. These are the EXACT values from its old ``:root`` block —
+# an unbranded tenant's mail must render byte-identically to before.
 _DEFAULT_EMAIL_THEME = {
     "primary": "#2563eb",
     "primary_dark": "#1e40af",
-    "secondary": "#16a34a",
+    "secondary": "#10b981",
     "header": "#97b7ff",
 }
+
+
+def _customised(field: str) -> str:
+    """The tenant's value ONLY when it differs from the model default.
+
+    Every ``Tenant`` row carries the field's default — ``accent_hex``
+    defaults to ``#003DFF``, ``success_hex`` to ``#16a34a`` — so "the
+    field has a value" does NOT mean "the merchant chose it". Treating
+    it that way would have repainted every existing store's email
+    (header ``#97b7ff`` -> ``#003DFF``) purely because a default exists.
+
+    Comparing against the field default is how the storefront token
+    compiler decides too: ``server/utils/themeTokens.ts`` emits a token
+    only when the tenant's value differs from ``PLATFORM_COLORS``, so a
+    tenant that customised nothing emits nothing. Case-insensitive for
+    the same reason it is there — the hex fields are free text.
+    """
+    from tenant.models import Tenant  # noqa: PLC0415
+
+    value = (_get_tenant_field(field) or "").strip()
+    if not value:
+        return ""
+    default = str(Tenant._meta.get_field(field).default or "").strip()
+    return "" if value.lower() == default.lower() else value
 
 
 def tenant_email_theme() -> dict[str, str]:
@@ -234,8 +258,8 @@ def tenant_email_theme() -> dict[str, str]:
             if isinstance(candidate, dict):
                 scale = candidate
 
-    accent = _get_tenant_field("accent_hex")
-    success = _get_tenant_field("success_hex")
+    accent = _customised("accent_hex")
+    success = _customised("success_hex")
 
     primary = scale.get("600") or accent
     if primary:

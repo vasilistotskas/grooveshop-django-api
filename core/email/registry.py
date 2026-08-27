@@ -87,27 +87,23 @@ class EmailTemplateRegistry:
             )
             return
 
-        # Discover templates using configuration
+        # Discover templates from the FILESYSTEM, not from the
+        # configured category list. Deriving categories from what is
+        # actually on disk is what stops this drifting again: the
+        # config listed 3 categories while 9 directories existed, so
+        # billing, cart, giftcard, product and shipping_acs — 12 live
+        # templates — were invisible to the admin UI entirely, and a
+        # new directory would have been invisible too.
         try:
-            # Scan all configured categories
-            for (
-                category_key,
-                category_config,
-            ) in EmailTemplateConfig.CATEGORIES.items():
-                category_path = (
-                    emails_dir / category_config.path
-                    if category_config.path
-                    else emails_dir
-                )
+            for category_path in sorted(
+                entry for entry in emails_dir.iterdir() if entry.is_dir()
+            ):
+                directory = category_path.name
+                # ``base/`` holds email_base.html, the layout every
+                # template extends. It is not a sendable template.
+                if directory == "base":
+                    continue
 
-                # Get templates for this category from configuration
-                templates_in_category = [
-                    config
-                    for config in EmailTemplateConfig.TEMPLATES.values()
-                    if config.category_name == category_config.name
-                ]
-
-                # Build metadata map for this category
                 metadata_map = {
                     config.name: {
                         "category": config.category_name,
@@ -115,13 +111,12 @@ class EmailTemplateRegistry:
                         "statuses": config.order_statuses,
                         "is_used": config.is_used,
                     }
-                    for config in templates_in_category
+                    for config in EmailTemplateConfig.TEMPLATES.values()
                 }
 
-                # Scan templates in this category
                 self._scan_category_templates(
                     category_path,
-                    category_config.path,
+                    directory,
                     metadata_map,
                     logger,
                     recursive=False,
@@ -167,18 +162,42 @@ class EmailTemplateRegistry:
             )
             return
 
+        # ONE display name per directory. Config-backed templates carry
+        # a category_name ("Order Lifecycle"); everything else in the
+        # same folder must land under the same heading rather than a
+        # second, titleised one ("Order").
+        display_category = next(
+            (
+                cfg.name
+                for cfg in EmailTemplateConfig.CATEGORIES.values()
+                if cfg.path == category_path
+            ),
+            category_path.replace("_", " ").title(),
+        )
+
         for html_file in html_files:
             try:
                 template_name = html_file.stem
                 txt_file = html_file.parent / f"{template_name}.txt"
 
+                # Fall back to the DIRECTORY as the display category
+                # rather than a flat "Other": without this, every
+                # template lacking a config entry — including heavily
+                # used ones like order_received, invoice_issued and
+                # admin_new_order — was filed under "Other / not used",
+                # which is both useless to group by and untrue.
+                #
+                # ``is_used`` defaults True here because a template
+                # sitting in a scanned directory is one the code
+                # renders; config still marks the exceptions
+                # explicitly.
                 metadata = metadata_map.get(
                     template_name,
                     {
-                        "category": "Other",
+                        "category": display_category,
                         "description": "Email template",
                         "statuses": [],
-                        "is_used": False,
+                        "is_used": True,
                     },
                 )
 

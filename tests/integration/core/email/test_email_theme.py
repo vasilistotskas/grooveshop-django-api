@@ -163,3 +163,80 @@ class TestThemeResolution:
             )
             theme = credentials.tenant_email_theme()
             assert theme["primary"].startswith("#")
+
+
+class TestUncustomisedTenantRendersExactlyAsBefore:
+    """An existing store's mail must not change appearance.
+
+    Every ``Tenant`` row carries the model's field defaults —
+    ``accent_hex`` is ``#003DFF``, ``success_hex`` is ``#16a34a`` —
+    so "the field has a value" does NOT mean the merchant chose it.
+    Treating a default as a customisation repainted every existing
+    store's email (header ``#97b7ff`` -> ``#003DFF``, buttons
+    ``#2563eb`` -> ``#003DFF``) purely because a default exists.
+
+    These are the EXACT values from the old ``:root`` block. Rendering
+    the pre-change template with its variables resolved produced output
+    byte-identical to the current template under this palette.
+    """
+
+    ORIGINAL_PALETTE = {
+        "primary": "#2563eb",
+        "primary_dark": "#1e40af",
+        "secondary": "#10b981",
+        "header": "#97b7ff",
+    }
+
+    def test_platform_defaults_are_the_original_palette(self):
+        from tenant.credentials import _DEFAULT_EMAIL_THEME
+
+        assert _DEFAULT_EMAIL_THEME == self.ORIGINAL_PALETTE
+
+    def test_tenant_carrying_model_defaults_gets_the_original_palette(
+        self, monkeypatch
+    ):
+        import tenant.credentials as credentials
+        from tenant.models import Tenant
+
+        defaults = {
+            "accent_hex": Tenant._meta.get_field("accent_hex").default,
+            "success_hex": Tenant._meta.get_field("success_hex").default,
+            "theme_metadata": {},
+        }
+        monkeypatch.setattr(
+            credentials,
+            "_get_tenant_field",
+            lambda name, *a, **kw: defaults.get(name, ""),
+        )
+
+        assert credentials.tenant_email_theme() == self.ORIGINAL_PALETTE
+
+    def test_customisation_is_still_honoured(self, monkeypatch):
+        """The feature must still work for a store that DID choose."""
+        import tenant.credentials as credentials
+
+        values = {"accent_hex": "#AA00BB", "theme_metadata": {}}
+        monkeypatch.setattr(
+            credentials,
+            "_get_tenant_field",
+            lambda name, *a, **kw: values.get(name, ""),
+        )
+
+        theme = credentials.tenant_email_theme()
+        assert theme["primary"] == "#AA00BB"
+        assert theme["header"] == "#AA00BB"
+
+    def test_default_comparison_is_case_insensitive(self, monkeypatch):
+        """The hex fields are free text; #003dff is not a customisation."""
+        import tenant.credentials as credentials
+        from tenant.models import Tenant
+
+        default = str(Tenant._meta.get_field("accent_hex").default)
+        values = {"accent_hex": default.lower(), "theme_metadata": {}}
+        monkeypatch.setattr(
+            credentials,
+            "_get_tenant_field",
+            lambda name, *a, **kw: values.get(name, ""),
+        )
+
+        assert credentials.tenant_email_theme() == self.ORIGINAL_PALETTE

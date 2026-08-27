@@ -111,8 +111,26 @@ class EmailTemplatePreviewService:
         self, template_name: str, order_id: Optional[int] = None
     ) -> tuple[dict, bool]:
         """Get context data for template rendering based on configuration."""
-        generator_name = EmailTemplateConfig.get_context_generator_for_template(
-            template_name
+        # Resolve the generator from the template's REAL directory, not
+        # its name prefix. Fixing only the path would have left these
+        # rendering with USER sample data — invoice_issued and
+        # admin_new_order would preview with no order in context at all.
+        generator_by_directory = {
+            "order": "generate_order_context",
+            "cart": "generate_order_context",
+            "shipping_acs": "generate_order_context",
+            "giftcard": "generate_order_context",
+            "billing": "generate_user_context",
+            "product": "generate_user_context",
+            "subscription": "generate_subscription_context",
+            "user": "generate_user_context",
+        }
+        directory = self._extract_category(template_name)
+        generator_name = generator_by_directory.get(
+            directory or "",
+            EmailTemplateConfig.get_context_generator_for_template(
+                template_name
+            ),
         )
 
         # Map generator names to methods
@@ -309,10 +327,31 @@ class EmailTemplatePreviewService:
             return f"Error rendering template: {e!s}"
 
     def _extract_category(self, template_name: str) -> Optional[str]:
-        """Extract category from template name using configuration."""
-        category = EmailTemplateConfig.get_category_for_template(template_name)
-        # Return None for root level (empty string means root)
-        return category if category else None
+        """Resolve a template's directory from the REGISTRY, not its name.
+
+        This used to call ``EmailTemplateConfig.get_category_for_template``,
+        which only infers a directory for names starting with ``order_``
+        or ``subscription_`` and returns None for everything else. The
+        preview then built a ROOT-level path (``emails/<name>.html``)
+        that does not exist, so seven live templates —
+        acs_out_for_delivery, admin_new_order, boxnow_parcel_at_locker,
+        data_export_ready, dispute_notification, invoice_issued and
+        payment_failed — previewed as "Template not found".
+
+        ``EmailTemplateInfo.path`` already carries the TRUE path the
+        registry found on disk, so reading it back cannot disagree with
+        reality and cannot regress when a directory is added.
+        """
+        from core.email.registry import EmailTemplateRegistry  # noqa: PLC0415
+
+        info = EmailTemplateRegistry().get_template(template_name)
+        if info is not None:
+            # path is "emails/<category>/<name>.html"; take <category>.
+            parts = info.path.split("/")
+            if len(parts) >= 3:
+                return parts[1]
+            return None
+        return EmailTemplateConfig.get_category_for_template(template_name)
 
     def _get_available_template_list(self) -> list[str]:
         """Get list of available email templates for error messages."""

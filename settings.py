@@ -1846,6 +1846,17 @@ EXTRA_SETTINGS_DEFAULTS = [
         "description": "Legal company name shown at the top of the invoice.",
     },
     {
+        "name": "INVOICE_SELLER_LEGAL_FORM",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Legal form of the business (νομική μορφή) — e.g. ΙΚΕ, ΑΕ, "
+            "ΕΠΕ, ΟΕ, ΕΕ, Ατομική Επιχείρηση. Free text rather than a "
+            "fixed list because the platform is not Greece-only. "
+            "N. 4919/2022 art. 22 §4 requires this on the storefront."
+        ),
+    },
+    {
         "name": "INVOICE_SELLER_VAT_ID",
         "type": "string",
         "value": "",
@@ -1910,6 +1921,16 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "string",
         "value": "",
         "description": "Seller contact email (falls back to INFO_EMAIL).",
+    },
+    {
+        "name": "INVOICE_SELLER_IN_LIQUIDATION",
+        "type": "bool",
+        "value": False,
+        "description": (
+            "Whether the business is in liquidation (υπό εκκαθάριση). "
+            "N. 4919/2022 art. 22 §4 requires disclosing this on the "
+            "storefront when it applies. Rare, hence default False."
+        ),
     },
     # myDATA (AADE / IAPR) integration. Credentials come from the
     # AADE developer portal after subscription approval — separate

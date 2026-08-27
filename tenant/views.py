@@ -18,10 +18,15 @@ from rest_framework.request import Request
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from tenant.legal_identity import (
+    merchant_legal_identity,
+    missing_disclosure_fields,
+)
 from tenant.lifecycle import destroy_tenant
 from tenant.membership import get_current_tenant
 from tenant.models import Tenant, TenantDomain, UserTenantMembership
 from tenant.serializers import (
+    MerchantLegalIdentitySerializer,
     TenantAdminSerializer,
     TenantConfigSerializer,
 )
@@ -298,3 +303,40 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
+
+
+@extend_schema(
+    responses=MerchantLegalIdentitySerializer,
+    description=(
+        "The seller identity the storefront is legally required to "
+        "publish: e-Commerce Directive 2000/31/EC art. 5(1) and, for "
+        "Greek merchants, N. 4919/2022 art. 22 §3-4."
+    ),
+    tags=["Tenant"],
+)
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def merchant_legal_identity_view(request: Request) -> Response:
+    """Publish the current tenant's legal identity.
+
+    Deliberately NOT folded into ``tenant_resolve``: that endpoint
+    answers from the PUBLIC schema (it resolves a domain to a Tenant row
+    and may be called via any tenant's host), while this data lives in
+    the tenant schema's ``extra_settings``. Serving it there would mean
+    a cross-schema read on the hottest path in the stack, keyed by a
+    cache whose invalidation fires from the public schema.
+
+    Cached per tenant: the identity changes when a merchant edits a
+    setting, which is rare, and this is fetched on page renders.
+    """
+    identity = merchant_legal_identity()
+    missing = missing_disclosure_fields()
+    payload = {
+        **identity,
+        "missing_fields": missing,
+        "is_complete": not missing,
+    }
+    return Response(
+        MerchantLegalIdentitySerializer(payload).data,
+        status=status.HTTP_200_OK,
+    )

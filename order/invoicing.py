@@ -53,25 +53,13 @@ from order.models.order import Order
 logger = logging.getLogger(__name__)
 
 
-# Setting keys for seller info — documented so ops / tests can find
-# them without grepping template context. Defaults are intentionally
-# obvious-in-dev ("Grooveshop" / empty VAT ID) so an unconfigured
-# environment produces a recognisable invoice rather than silently
-# shipping a plausible-but-wrong one.
-INVOICE_SELLER_SETTING_KEYS = {
-    "name": "INVOICE_SELLER_NAME",
-    "vat_id": "INVOICE_SELLER_VAT_ID",
-    "tax_office": "INVOICE_SELLER_TAX_OFFICE",
-    "registration_number": "INVOICE_SELLER_REGISTRATION_NUMBER",
-    "business_activity": "INVOICE_SELLER_BUSINESS_ACTIVITY",
-    "address_line_1": "INVOICE_SELLER_ADDRESS_LINE_1",
-    "address_line_2": "INVOICE_SELLER_ADDRESS_LINE_2",
-    "city": "INVOICE_SELLER_CITY",
-    "postal_code": "INVOICE_SELLER_POSTAL_CODE",
-    "country": "INVOICE_SELLER_COUNTRY",
-    "phone": "INVOICE_SELLER_PHONE",
-    "email": "INVOICE_SELLER_EMAIL",
-}
+# The seller's identity is not an invoicing concept — the same facts are
+# published on the storefront under e-Commerce Directive art. 5 and
+# N. 4919/2022 art. 22. One definition lives in ``tenant.legal_identity``
+# so an invoice can never name a different seller than the site does.
+from tenant.legal_identity import SELLER_SETTING_KEYS  # noqa: E402
+
+INVOICE_SELLER_SETTING_KEYS = SELLER_SETTING_KEYS
 
 
 def _seller_snapshot() -> dict[str, str]:

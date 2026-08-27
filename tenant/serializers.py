@@ -320,3 +320,38 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             "domains",
         ]
         read_only_fields = ["schema_name", "uuid", "created_at", "updated_at"]
+
+
+class MerchantLegalIdentitySerializer(serializers.Serializer):
+    """The seller identity a storefront is legally required to publish.
+
+    Read-only and AllowAny by design: every field here is information the
+    merchant is *obliged* to make public (e-Commerce Directive art. 5,
+    N. 4919/2022 art. 22), so there is nothing to protect. Blanks are
+    returned as blanks rather than omitted — a consumer of this endpoint
+    needs to distinguish "not provided" from "not applicable", and
+    ``missing_fields`` names the ones that are legally required.
+    """
+
+    name = serializers.CharField(read_only=True, allow_blank=True)
+    legal_form = serializers.CharField(read_only=True, allow_blank=True)
+    vat_id = serializers.CharField(read_only=True, allow_blank=True)
+    tax_office = serializers.CharField(read_only=True, allow_blank=True)
+    registration_number = serializers.CharField(
+        read_only=True, allow_blank=True
+    )
+    business_activity = serializers.CharField(read_only=True, allow_blank=True)
+    address_line_1 = serializers.CharField(read_only=True, allow_blank=True)
+    address_line_2 = serializers.CharField(read_only=True, allow_blank=True)
+    city = serializers.CharField(read_only=True, allow_blank=True)
+    postal_code = serializers.CharField(read_only=True, allow_blank=True)
+    country = serializers.CharField(read_only=True, allow_blank=True)
+    phone = serializers.CharField(read_only=True, allow_blank=True)
+    email = serializers.CharField(read_only=True, allow_blank=True)
+    in_liquidation = serializers.BooleanField(read_only=True)
+    # Named so the storefront can render a compliance warning to staff
+    # instead of silently publishing an incomplete disclosure.
+    missing_fields = serializers.ListField(
+        child=serializers.CharField(), read_only=True
+    )
+    is_complete = serializers.BooleanField(read_only=True)

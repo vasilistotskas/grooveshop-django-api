@@ -27,7 +27,17 @@ class LoyaltyService:
 
     @classmethod
     def is_enabled(cls) -> bool:
-        """Check if the loyalty system is enabled via Setting.get('LOYALTY_ENABLED')."""
+        """Plan AND merchant toggle — both must hold.
+
+        The loyalty endpoints are plan-gated by DRF permissions, but
+        points are earned and redeemed through order signals and order
+        create, which runs with no permission classes. See
+        tenant.membership.tenant_plan_allows.
+        """
+        from tenant.membership import tenant_plan_allows  # noqa: PLC0415
+
+        if not tenant_plan_allows("loyalty_enabled"):
+            return False
         return bool(Setting.get("LOYALTY_ENABLED", default=False))
 
     @classmethod

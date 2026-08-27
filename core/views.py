@@ -43,9 +43,41 @@ class HomeView(View):
         return render(request, self.template_name, {})
 
 
+def _may_upload_editor_image(user) -> bool:
+    """Platform superusers, plus a store's own ADMIN/OWNER.
+
+    This is the TinyMCE upload endpoint, and the storage side was made
+    tenant-aware (images land in MEDIA_ROOT/{schema}/uploads/tinymce/)
+    while the permission check was not — it still asked for
+    ``is_superuser``, which a merchant never is. Merchants are
+    ``is_staff`` platform identities whose rights come from a
+    ``UserTenantMembership``, so every merchant-owned rich-text field —
+    product and category descriptions, blog bodies, content pages,
+    payment instructions — had a working editor with an upload button
+    that 403'd.
+
+    STAFF stays excluded, consistent with the store-settings surface:
+    uploading brand assets is an ADMIN/OWNER concern.
+    """
+    if user.is_superuser:
+        return True
+
+    from tenant.membership import (  # noqa: PLC0415
+        get_current_tenant,
+        get_membership,
+    )
+
+    tenant = get_current_tenant()
+    if tenant is None:
+        # Public schema — platform console, superusers only.
+        return False
+    membership = get_membership(user, tenant)
+    return membership is not None and membership.can_manage_tenant
+
+
 @login_required
 def upload_image(request):
-    if not request.user.is_superuser:
+    if not _may_upload_editor_image(request.user):
         return JsonResponse(
             {"Error Message": "You are not authorized to upload images"},
             status=403,

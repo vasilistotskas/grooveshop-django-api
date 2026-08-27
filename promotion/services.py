@@ -128,6 +128,17 @@ class PromotionEngine:
 
     @classmethod
     def is_enabled(cls) -> bool:
+        """Plan AND merchant toggle — both must hold.
+
+        The coupon endpoints are plan-gated by DRF permissions, but
+        AUTOMATIC promotions never touch them: they are collected
+        during order create, which runs with no permission classes.
+        See tenant.membership.tenant_plan_allows.
+        """
+        from tenant.membership import tenant_plan_allows  # noqa: PLC0415
+
+        if not tenant_plan_allows("promotions_enabled"):
+            return False
         return bool(Setting.get("PROMOTIONS_ENABLED", default=False))
 
     @classmethod

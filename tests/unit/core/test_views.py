@@ -114,6 +114,13 @@ class TestUploadImage(TestCase):
         )
 
     def test_non_superuser_access(self):
+        """A user with no tenant membership cannot upload.
+
+        The check is no longer superuser-only — a store's own
+        ADMIN/OWNER may upload editor images into their own schema — but
+        this user holds no membership, and the suite runs without an
+        active tenant, so the rejection still stands.
+        """
         request = self.factory.post("/upload_image/")
         request.user = self.regular_user
 

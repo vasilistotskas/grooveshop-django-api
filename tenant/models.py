@@ -477,9 +477,11 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         blank=True,
         default="",
         help_text=_(
-            "Sender address for outbound email from this tenant "
-            "(e.g. 'no-reply@myshop.com'). "
-            "Empty falls back to settings.DEFAULT_FROM_EMAIL."
+            "Reserved for a future per-tenant SMTP transport — NOT "
+            "currently used. All mail is sent from the platform address "
+            "with your store name as the display name, which is what "
+            "keeps it DMARC-aligned. Set Contact Email instead: that is "
+            "the reply-to address customers actually reach you on."
         ),
     )
     contact_email = models.EmailField(

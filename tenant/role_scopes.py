@@ -125,9 +125,24 @@ TENANT_SELF_EDITABLE_FIELDS: frozenset[str] = frozenset(
         "store_name",
         "store_description",
         "contact_email",
+        # Inert today — the platform relay always sends as
+        # DEFAULT_FROM_EMAIL with the store name as display name, for
+        # DMARC alignment (tenant/credentials.py). Kept editable so a
+        # merchant's value is already in place when the per-tenant
+        # transport it is reserved for lands; its help_text now says
+        # plainly that it does nothing yet.
         "from_email",
         "default_locale",
-        "default_currency",
+        # ``default_currency`` is deliberately NOT merchant-editable.
+        #
+        # It is read by the STOREFRONT (price formatting,
+        # checkout, RSS) while every backend money path uses
+        # settings.DEFAULT_CURRENCY. A merchant setting "USD" would make
+        # the storefront render $ prices while Django still built the
+        # order, charged the gateway and issued the invoice in EUR —
+        # silent price misrepresentation. It stays on the model and in
+        # TenantConfig as the single display-truth source, ready for
+        # real per-tenant currency, but only the platform may set it.
         # Branding
         "logo_light_url",
         "logo_dark_url",

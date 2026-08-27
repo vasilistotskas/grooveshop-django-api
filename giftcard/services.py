@@ -60,6 +60,17 @@ class RedemptionPlan:
 class GiftCardService:
     @classmethod
     def is_enabled(cls) -> bool:
+        """Plan AND merchant toggle — both must hold.
+
+        The plan half is checked HERE rather than only on the gift-card
+        endpoints because order create runs with no permission classes
+        (public action, for guest checkout), so redemption bypassed the
+        endpoint gate entirely. See tenant.membership.tenant_plan_allows.
+        """
+        from tenant.membership import tenant_plan_allows  # noqa: PLC0415
+
+        if not tenant_plan_allows("gift_cards_enabled"):
+            return False
         return bool(Setting.get("GIFT_CARDS_ENABLED", default=False))
 
     # ── issuing ────────────────────────────────────────────────────

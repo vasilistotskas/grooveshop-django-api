@@ -50,6 +50,41 @@ def get_current_tenant() -> Any | None:
     return tenant
 
 
+def tenant_plan_allows(flag: str) -> bool:
+    """True when the active tenant's PLAN permits a feature.
+
+    The plan flags on ``Tenant`` (``gift_cards_enabled`` and friends)
+    are platform-controlled and describe what a store has PAID for. The
+    matching ``extra_settings`` toggles are merchant-controlled and
+    describe whether the store currently WANTS it on. Both must hold —
+    see the contract in ``tenant/permissions.py``.
+
+    That contract used to be enforced only by the DRF permission
+    classes on each feature's own endpoints, which the order-create
+    path never passes through: ``create`` is a public action and runs
+    with ``permission_classes = []`` for guest checkout. Redemption and
+    discounting therefore consulted only the merchant-editable setting,
+    so a merchant on a plan WITHOUT gift cards could flip
+    ``GIFT_CARDS_ENABLED`` in their own admin, issue a card, and have
+    it redeemed at checkout. Folding the plan flag into each service's
+    ``is_enabled()`` closes every entry point at once, because all of
+    them funnel through those methods.
+
+    ``getattr`` with a permissive default rather than a direct
+    attribute read: under ``schema_context`` django-tenants attaches a
+    ``FakeTenant`` carrying only ``schema_name``, so the plan fields are
+    absent. Failing open there is deliberate — a background task must
+    not start refusing legitimate work because of how its schema was
+    entered. The path that matters is the HTTP one, where
+    ``TenantMainMiddleware`` attaches a real ``Tenant`` row.
+    """
+    tenant = get_current_tenant()
+    if tenant is None:
+        # Public schema — platform routines are not plan-gated.
+        return True
+    return bool(getattr(tenant, flag, True))
+
+
 def get_membership(user: Any, tenant: Any | None = None) -> Any | None:
     """Return the active membership for user+tenant, or None."""
     if user is None or not getattr(user, "is_authenticated", False):

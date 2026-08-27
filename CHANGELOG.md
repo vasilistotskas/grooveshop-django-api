@@ -3,6 +3,61 @@
 
 
 
+## v3.14.2 (2026-08-27)
+
+### Bug fixes
+
+* fix(email): align the template registry and preview with what is on disk
+
+Two halves of the same drift.
+
+DISCOVERY iterated the CONFIGURED category list — three entries while
+nine directories existed — so billing, cart, giftcard, product and
+shipping_acs were invisible to the admin UI entirely: 11 live templates
+the code sends every day, absent from the page that exists to show
+them. A newly added directory would have been invisible too. It now
+walks the filesystem, so it cannot drift again.
+
+PREVIEW resolution inferred a directory from the template NAME, which
+only works for order_/subscription_ prefixes and built a root-level
+path for everything else. Seven live templates previewed as "Template
+not found": acs_out_for_delivery, admin_new_order,
+boxnow_parcel_at_locker, data_export_ready, dispute_notification,
+invoice_issued and payment_failed. It now reads EmailTemplateInfo.path,
+which the registry built from the real file, so it cannot disagree with
+reality. The context generator resolves from that same directory —
+fixing only the path would have left invoice_issued and admin_new_order
+previewing with USER sample data and no order in context at all.
+
+Templates without a config entry now take their DIRECTORY as the
+display category instead of a flat "Other / not used", and a directory
+resolves to exactly one heading, so a folder never appears twice.
+
+Result on production data: 19 templates discovered -> 30, and 7 broken
+previews -> 0.
+
+Also corrects the email THEME defaults, which is the important one:
+_DEFAULT_EMAIL_THEME now carries the EXACT values from the old :root
+block, and a tenant field only overrides when it DIFFERS from the model
+default. Every Tenant row carries accent_hex="#003DFF" and
+success_hex="#16a34a" as field defaults, so treating "has a value" as
+"the merchant chose it" would have repainted every existing store's
+email — header #97b7ff -> #003DFF, buttons #2563eb -> #003DFF, and
+secondary #10b981 -> #16a34a — purely because defaults exist. Comparing
+against the default is how the storefront token compiler decides too
+(themeTokens.ts against PLATFORM_COLORS).
+
+Verified by rendering the pre-change template with its CSS variables
+resolved and diffing against the current one for a tenant carrying
+model defaults: byte-identical, zero diff.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BEdVeQZh7DkKFE37XGMBUN ([`4b1138f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4b1138f767dafc519514bc7cb688a8fff2a6c329))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.14.1 [skip ci] ([`72f18eb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/72f18eb995795fc23180a02ff0b0bda273665dac))
+
 ## v3.14.1 (2026-08-27)
 
 ### Bug fixes

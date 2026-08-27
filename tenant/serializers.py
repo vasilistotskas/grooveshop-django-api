@@ -102,6 +102,26 @@ class TenantConfigSerializer(serializers.Serializer):
     # Served here rather than fetched per request so UCP discovery stays a
     # cached, single-round-trip lookup. The authoritative per-checkout set
     # is still resolved from live pay-way data in checkout responses.
+    # Effective hosted-payment gate: platform flag AND the merchant's
+    # extra-setting, subordinate to agent-commerce. The agent gateway
+    # advertises the space.grooveshop.payments.hosted_selection
+    # extension — and accepts the pay-way id it carries — only while
+    # this is true.
+    agent_hosted_payment_enabled = serializers.SerializerMethodField()
+
+    def get_agent_hosted_payment_enabled(self, obj) -> bool:
+        from django_tenants.utils import schema_context  # noqa: PLC0415
+        from extra_settings.models import Setting  # noqa: PLC0415
+
+        if not self.get_agent_commerce_enabled(obj):
+            return False
+        if not obj.agent_hosted_payment_enabled:
+            return False
+        with schema_context(obj.schema_name):
+            return bool(
+                Setting.get("AGENT_HOSTED_PAYMENT_ENABLED", default=True)
+            )
+
     agent_payment_instruments = serializers.SerializerMethodField()
 
     def get_agent_payment_instruments(self, obj) -> list[str]:
@@ -274,6 +294,7 @@ class TenantAdminSerializer(serializers.ModelSerializer):
             # --- Agentic Commerce ---
             "chat_api_key",
             "acp_bearer_token",
+            "agent_hosted_payment_enabled",
             "agent_stripe_delegated_enabled",
             "agent_commerce_enabled",
             # --- Social Links ---

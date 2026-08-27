@@ -77,6 +77,7 @@ def invalidate_resolve_on_agent_setting_change(sender, instance, **kwargs):
     if getattr(instance, "name", "") not in {
         "AGENT_COMMERCE_ENABLED",
         "PRODUCT_FEEDS_ENABLED",
+        "AGENT_HOSTED_PAYMENT_ENABLED",
     }:
         return
     _purge_resolve_for_current_schema()

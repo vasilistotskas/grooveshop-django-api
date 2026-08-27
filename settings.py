@@ -1628,6 +1628,24 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "AGENT_HOSTED_PAYMENT_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Merchant runtime tier of the hosted-payment selection gate. "
+            "Lets an AI-agent platform choose an ONLINE payment method, "
+            "so the order is placed and the buyer authorises on the "
+            "PSP's page instead of re-entering the whole checkout on the "
+            "web. The effective value (this AND the Tenant plan flag) is "
+            "served in TenantConfig; the gateway advertises the "
+            "space.grooveshop.payments.hosted_selection UCP extension "
+            "and accepts its pay-way id only while it is on. "
+            "Subordinate to agent commerce. Cached with the "
+            "tenant-resolve payload — changes take effect on cache "
+            "invalidation (automatic on save)."
+        ),
+    },
+    {
         "name": "PRODUCT_FEEDS_ENABLED",
         "type": "bool",
         "value": True,

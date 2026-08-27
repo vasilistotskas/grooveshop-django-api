@@ -739,6 +739,28 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             "this tenant."
         ),
     )
+    # Platform tier of the hosted-payment selection gate. The merchant
+    # tier is the AGENT_HOSTED_PAYMENT_ENABLED extra-setting, and
+    # TenantConfig serves the AND of the two.
+    #
+    # Default ON because it only exposes a choice the store already
+    # offers on the web: an agent may name an ONLINE pay-way so the
+    # order is placed and the buyer authorises on the PSP's page,
+    # instead of being sent back to re-enter the whole checkout. UCP
+    # cannot model that selection itself — an online method is not an
+    # instrument a platform can acquire — so it travels as a declared
+    # extension, and this flag is how a platform withdraws it.
+    agent_hosted_payment_enabled = models.BooleanField(
+        _("Agent Hosted Payment Selection"),
+        default=True,
+        help_text=_(
+            "Let AI-agent platforms choose an online payment method, "
+            "placing the order and handing the buyer the payment page. "
+            "When off, agents can only complete with methods they can "
+            "settle themselves (e.g. cash on delivery) and card buyers "
+            "are handed off to the storefront checkout."
+        ),
+    )
     agent_stripe_delegated_enabled = models.BooleanField(
         _("Agent Stripe Delegated Payments"),
         default=False,

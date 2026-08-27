@@ -615,6 +615,7 @@ class TenantAdmin(ModelAdmin):
                 "fields": [
                     "chat_api_key",
                     "acp_bearer_token",
+                    "agent_hosted_payment_enabled",
                     "agent_stripe_delegated_enabled",
                 ],
                 "classes": ["collapse"],

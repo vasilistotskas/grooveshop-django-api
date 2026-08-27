@@ -253,3 +253,52 @@ class TestTenantConfigAgentFlags:
         on = Tenant(schema_name="public", name="t", agent_commerce_enabled=True)
         with _settings_off("AGENT_COMMERCE_ENABLED"):
             assert serializer.get_agent_payment_instruments(on) == []
+
+    def test_hosted_payment_gate_needs_both_tiers(self):
+        """Either tier alone can withdraw the feature.
+
+        The platform flag is the plan tier and the extra-setting is the
+        merchant tier; the effective value is the AND, and both are
+        subordinate to agent commerce.
+        """
+        from tenant.models import Tenant
+        from tenant.serializers import TenantConfigSerializer
+
+        serializer = TenantConfigSerializer()
+        on = Tenant(
+            schema_name="public",
+            name="t",
+            agent_commerce_enabled=True,
+            agent_hosted_payment_enabled=True,
+        )
+        assert serializer.get_agent_hosted_payment_enabled(on) is True
+
+        # Merchant tier off.
+        with _settings_off("AGENT_HOSTED_PAYMENT_ENABLED"):
+            assert serializer.get_agent_hosted_payment_enabled(on) is False
+
+        # Platform tier off.
+        platform_off = Tenant(
+            schema_name="public",
+            name="t",
+            agent_commerce_enabled=True,
+            agent_hosted_payment_enabled=False,
+        )
+        assert (
+            serializer.get_agent_hosted_payment_enabled(platform_off) is False
+        )
+
+        # Subordinate to agent commerce: the surface being off withdraws
+        # it regardless of either payment tier.
+        with _settings_off("AGENT_COMMERCE_ENABLED"):
+            assert serializer.get_agent_hosted_payment_enabled(on) is False
+
+        commerce_off = Tenant(
+            schema_name="public",
+            name="t",
+            agent_commerce_enabled=False,
+            agent_hosted_payment_enabled=True,
+        )
+        assert (
+            serializer.get_agent_hosted_payment_enabled(commerce_off) is False
+        )

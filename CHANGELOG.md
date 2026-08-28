@@ -3,6 +3,23 @@
 
 
 
+## v3.21.0 (2026-08-28)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.20.0 [skip ci] ([`41158b5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/41158b510a43a0a86a0266c30c014de31b38e4f0))
+
+### Features
+
+* feat(tenant): CART_ENABLED chrome toggle
+
+Public extra_setting (default True) gating the storefront cart chrome
+(navbar buttons, /cart) for shop-dark tenants that launch as content
+sites before their catalogue exists.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NUKABRcUinrsC1a7VKeG4N ([`9cd5a13`](https://github.com/vasilistotskas/grooveshop-django-api/commit/9cd5a131f0941087ce0a6a629697721893e5de59))
+
 ## v3.20.0 (2026-08-28)
 
 ### Chores

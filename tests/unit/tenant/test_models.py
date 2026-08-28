@@ -488,6 +488,43 @@ def test_theme_metadata_bad_scale_hex_raises():
         t.clean()
 
 
+def test_theme_metadata_dark_and_secondary_tokens_are_valid():
+    t = _unsaved_tenant(
+        theme_metadata={
+            "colors": {"secondaryScale": {"500": "#5d9d91"}},
+            "darkColors": {
+                "primaryScale": {"500": "#9aa882"},
+                "secondaryScale": {"400": "#7eb8ac"},
+            },
+            "likedHex": "#b3694b",
+            "accentDarkHex": "#d09d75",
+        }
+    )
+    t.clean()  # must not raise
+
+
+def test_theme_metadata_dark_colors_unknown_scale_raises():
+    t = _unsaved_tenant(
+        theme_metadata={"darkColors": {"accentScale": {"500": "#123456"}}}
+    )
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
+def test_theme_metadata_dark_colors_bad_hex_raises():
+    t = _unsaved_tenant(
+        theme_metadata={"darkColors": {"primaryScale": {"500": "#12345"}}}
+    )
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
+def test_theme_metadata_bad_liked_hex_raises():
+    t = _unsaved_tenant(theme_metadata={"likedHex": "hotpink"})
+    with pytest.raises(ValidationError):
+        t.clean()
+
+
 # ---------------------------------------------------------------------------
 # Tenant.clean() / field validator — reserved schema_name
 # ---------------------------------------------------------------------------

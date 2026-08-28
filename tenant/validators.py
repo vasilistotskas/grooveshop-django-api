@@ -59,20 +59,35 @@ _SHADES = {
     "950",
 }
 
-_SCALE_KEYS = {"primaryScale", "neutralScale"}
+_SCALE_KEYS = {"primaryScale", "neutralScale", "secondaryScale"}
+
+_HEX_KEYS = {"likedHex", "accentDarkHex"}
 
 
-def _validate_scale(name: str, scale: object) -> list[str]:
+def _validate_scale(prefix: str, name: str, scale: object) -> list[str]:
     errors: list[str] = []
     if not isinstance(scale, dict):
-        return [f"colors.{name} must be an object of shade -> hex"]
+        return [f"{prefix}.{name} must be an object of shade -> hex"]
     for shade, value in scale.items():
         if str(shade) not in _SHADES:
-            errors.append(f"colors.{name}.{shade}: unknown shade")
+            errors.append(f"{prefix}.{name}.{shade}: unknown shade")
         elif not isinstance(value, str) or not _HEX_RE.match(value):
             errors.append(
-                f"colors.{name}.{shade}: must be a #RRGGBB hex string"
+                f"{prefix}.{name}.{shade}: must be a #RRGGBB hex string"
             )
+    return errors
+
+
+def _validate_scale_set(prefix: str, entry: object) -> list[str]:
+    """Validate ``colors`` / ``darkColors`` (same shape)."""
+    if not isinstance(entry, dict):
+        return [f"{prefix}: must be an object"]
+    errors: list[str] = []
+    for scale_key, scale in entry.items():
+        if scale_key not in _SCALE_KEYS:
+            errors.append(f"{prefix}.{scale_key}: unknown key")
+        else:
+            errors.extend(_validate_scale(prefix, str(scale_key), scale))
     return errors
 
 
@@ -100,15 +115,11 @@ def validate_theme_metadata(value: object) -> None:
                 errors.append(
                     f"container: must be one of {sorted(_CONTAINER_ALLOWLIST)}"
                 )
-        elif key == "colors":
-            if not isinstance(entry, dict):
-                errors.append("colors: must be an object")
-                continue
-            for scale_key, scale in entry.items():
-                if scale_key not in _SCALE_KEYS:
-                    errors.append(f"colors.{scale_key}: unknown key")
-                else:
-                    errors.extend(_validate_scale(str(scale_key), scale))
+        elif key in ("colors", "darkColors"):
+            errors.extend(_validate_scale_set(str(key), entry))
+        elif key in _HEX_KEYS:
+            if not isinstance(entry, str) or not _HEX_RE.match(entry):
+                errors.append(f"{key}: must be a #RRGGBB hex string")
         else:
             errors.append(f"{key}: unknown key")
 

@@ -586,3 +586,16 @@ def test_schema_name_public_schema_name_is_valid(value):
 
     t = _unsaved_tenant(schema_name=value)
     t.clean()  # must not raise
+
+
+def test_theme_metadata_font_display_is_valid():
+    t = _unsaved_tenant(
+        theme_metadata={"fontSans": "manrope", "fontDisplay": "source-serif-4"}
+    )
+    t.clean()  # must not raise
+
+
+def test_theme_metadata_bad_font_display_raises():
+    t = _unsaved_tenant(theme_metadata={"fontDisplay": "comic-sans"})
+    with pytest.raises(ValidationError):
+        t.clean()

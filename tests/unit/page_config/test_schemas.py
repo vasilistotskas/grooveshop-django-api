@@ -242,3 +242,31 @@ def test_image_gallery_items_shape():
         )
     with pytest.raises(ValidationError):
         validate_section_props("image_gallery", {"columns": 5})
+
+
+def test_hero_banner_decor_and_secondary_cta():
+    validate_section_props(
+        "hero_banner",
+        {
+            "eyebrow": "Γυναικείος Συνεταιρισμός",
+            "heading": "Από τη φύση",
+            "decor": "orbs",
+            "cta_text": "Η ιστορία μας",
+            "cta_link": "/about",
+            "secondary_cta_text": "Επικοινωνία",
+            "secondary_cta_link": "/contact",
+        },
+    )
+    with pytest.raises(ValidationError):
+        validate_section_props("hero_banner", {"decor": "sparkles"})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "hero_banner", {"secondary_cta_link": "javascript:x"}
+        )
+
+
+def test_divider_variant():
+    validate_section_props("divider", {"variant": "thread"})
+    validate_section_props("divider", {"variant": "line"})
+    with pytest.raises(ValidationError):
+        validate_section_props("divider", {"variant": "dotted"})

@@ -105,10 +105,10 @@ def validate_theme_metadata(value: object) -> None:
                 errors.append(
                     f"radius: must be one of {sorted(_RADIUS_ALLOWLIST)}"
                 )
-        elif key == "fontSans":
+        elif key in ("fontSans", "fontDisplay"):
             if entry not in _FONT_ALLOWLIST:
                 errors.append(
-                    f"fontSans: must be one of {sorted(_FONT_ALLOWLIST)}"
+                    f"{key}: must be one of {sorted(_FONT_ALLOWLIST)}"
                 )
         elif key == "container":
             if entry not in _CONTAINER_ALLOWLIST:

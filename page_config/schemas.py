@@ -98,9 +98,18 @@ _VALIDATORS: dict[str, dict] = {
     "hero_banner": {
         "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
         "subheading": lambda v: None if _is_str(v, 500) else "string ≤500",
+        "eyebrow": lambda v: None if _is_str(v, 100) else "string ≤100",
         "image_url": lambda v: None if _is_str(v, 1000) else "string ≤1000",
         "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
         "cta_link": lambda v: (
+            None
+            if _is_str(v, 1000) and _LINK_RE.match(v)
+            else "internal path or https URL"
+        ),
+        "secondary_cta_text": lambda v: (
+            None if _is_str(v, 100) else "string ≤100"
+        ),
+        "secondary_cta_link": lambda v: (
             None
             if _is_str(v, 1000) and _LINK_RE.match(v)
             else "internal path or https URL"
@@ -109,6 +118,11 @@ _VALIDATORS: dict[str, dict] = {
             None
             if isinstance(v, (int, float)) and 0 <= v <= 1
             else "number between 0 and 1"
+        ),
+        "decor": lambda v: (
+            None
+            if v in ("none", "orbs", "gradient")
+            else "one of none/orbs/gradient"
         ),
     },
     "hero_carousel": {
@@ -185,7 +199,13 @@ _VALIDATORS: dict[str, dict] = {
             None if v in ("sm", "md", "lg", "xl") else "one of sm/md/lg/xl"
         ),
     },
-    "divider": {},
+    "divider": {
+        # ``thread`` renders the woven tri-strand divider (derived from
+        # the tenant's primary/secondary/accent tokens).
+        "variant": lambda v: (
+            None if v in ("line", "thread") else "one of line/thread"
+        ),
+    },
     "loyalty_hero": {},
     "search_bar": {},
     "about_content": {},

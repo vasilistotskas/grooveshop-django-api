@@ -381,3 +381,46 @@ class TestHeadlessGetFrontendUrl:
         adapter = self._adapter_with_host("unmatched-host.example")
 
         assert adapter.get_frontend_url("account_signup") is None
+
+
+class TestSocialLoginProviderFilter:
+    """SOCIAL_LOGIN_PROVIDERS drives TenantSocialAccountAdapter.list_apps."""
+
+    def _allowed(self, setting_value, schema_name="shop"):
+        from contextlib import nullcontext
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from tenant.allauth_adapter import TenantSocialAccountAdapter
+
+        tenant = SimpleNamespace(schema_name=schema_name)
+        with (
+            patch(
+                "tenant.allauth_adapter._resolve_tenant_from_request",
+                return_value=tenant,
+            ),
+            patch(
+                "django_tenants.utils.schema_context",
+                return_value=nullcontext(),
+            ),
+            patch(
+                "extra_settings.models.Setting.get",
+                return_value=setting_value,
+            ),
+        ):
+            return TenantSocialAccountAdapter._allowed_providers(object())
+
+    def test_star_means_no_restriction(self):
+        assert self._allowed(["*"]) is None
+
+    def test_unset_means_no_restriction(self):
+        assert self._allowed(None) is None
+
+    def test_subset_whitelists(self):
+        assert self._allowed(["google"]) == {"google"}
+
+    def test_empty_list_disables_all(self):
+        assert self._allowed([]) == set()
+
+    def test_public_schema_never_restricts(self):
+        assert self._allowed(["google"], schema_name="public") is None

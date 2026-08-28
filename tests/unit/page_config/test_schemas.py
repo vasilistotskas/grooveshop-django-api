@@ -270,3 +270,42 @@ def test_divider_variant():
     validate_section_props("divider", {"variant": "line"})
     with pytest.raises(ValidationError):
         validate_section_props("divider", {"variant": "dotted"})
+
+
+def test_story_timeline_items_shape():
+    validate_section_props(
+        "story_timeline",
+        {
+            "heading": "Από το χωράφι στο βάζο",
+            "items": [
+                {
+                    "title": "Συγκομιδή",
+                    "date": "Άνοιξη",
+                    "text": "Μαζεύουμε καρπούς και βότανα.",
+                    "icon": "i-heroicons-sun",
+                }
+            ],
+        },
+    )
+    with pytest.raises(ValidationError):
+        validate_section_props("story_timeline", {"items": [{"date": "2020"}]})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "story_timeline",
+            {"items": [{"title": "X", "icon": "<svg onload=x>"}]},
+        )
+
+
+def test_faq_items_shape():
+    validate_section_props(
+        "faq",
+        {
+            "heading": "Συχνές Ερωτήσεις",
+            "multiple": True,
+            "items": [{"question": "Πού;", "answer": "Στη Φυτειά."}],
+        },
+    )
+    with pytest.raises(ValidationError):
+        validate_section_props("faq", {"items": [{"question": "Πού;"}]})
+    with pytest.raises(ValidationError):
+        validate_section_props("faq", {"multiple": "yes"})

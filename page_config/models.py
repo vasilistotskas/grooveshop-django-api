@@ -93,6 +93,8 @@ class ComponentType(models.TextChoices):
     FEATURES_GRID = "features_grid", _("Features Grid")
     MEDIA_TEXT = "media_text", _("Media + Text")
     IMAGE_GALLERY = "image_gallery", _("Image Gallery")
+    STORY_TIMELINE = "story_timeline", _("Story Timeline")
+    FAQ = "faq", _("FAQ Accordion")
 
 
 class PageLayout(

@@ -1703,6 +1703,22 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "SOCIAL_LOGIN_PROVIDERS",
+        "type": "json",
+        "value": ["*"],
+        "validator": (
+            "tenant.validators.validate_social_login_providers_setting"
+        ),
+        "description": (
+            "Whitelist of social-login provider ids for this store. "
+            '["*"] (default) = every provider configured on the '
+            'platform; e.g. ["google"] = Google only; [] = social '
+            "login fully off. Enforced in the allauth adapter, so it "
+            "controls both the login/signup buttons and the OAuth "
+            "flows themselves. Consumed server-side only."
+        ),
+    },
+    {
         "name": "CART_ENABLED",
         "type": "bool",
         "value": True,

@@ -193,6 +193,32 @@ def validate_business_hours_setting(value: object) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# SOCIAL_LOGIN_PROVIDERS extra_setting
+# ---------------------------------------------------------------------------
+
+_PROVIDER_ID_RE = re.compile(r"^[a-z0-9_-]+$")
+
+
+def validate_social_login_providers_setting(value: object) -> bool:
+    """django-extra-settings validator (boolean contract, like
+    ``validate_business_hours_setting``).
+
+    A list of provider ids, each ``"*"`` (= all configured providers)
+    or a lowercase slug (``google``, ``facebook``, …). Empty list =
+    social login off. Enforced by
+    ``TenantSocialAccountAdapter.list_apps``.
+    """
+    if value in (None, ""):
+        return True
+    if not isinstance(value, list):
+        return False
+    return all(
+        isinstance(item, str) and (item == "*" or _PROVIDER_ID_RE.match(item))
+        for item in value
+    )
+
+
+# ---------------------------------------------------------------------------
 # Reserved schema names
 # ---------------------------------------------------------------------------
 

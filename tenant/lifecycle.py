@@ -24,7 +24,7 @@ from django.utils import timezone
 
 # Schemas that can never be suspended, activated, or destroyed through
 # admin actions or automation. Destroying these breaks the platform.
-PROTECTED_SCHEMAS = frozenset({"public", "webside"})
+PROTECTED_SCHEMAS = frozenset({"public", "webside", "ekfyseosfyteias"})
 
 
 def suspend_tenant(tenant, *, reason: str) -> bool:

@@ -281,6 +281,26 @@ _VALIDATORS: dict[str, dict] = {
         ),
         "columns": lambda v: None if _is_int(v, 2, 4) else "int 2–4",
     },
+    "story_timeline": {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "items": lambda v: _check_items(
+            v,
+            max_items=20,
+            required={"title": 100},
+            optional={"date": 50, "text": 500, "icon": 100},
+            icon_keys=frozenset({"icon"}),
+        ),
+    },
+    "faq": {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "items": lambda v: _check_items(
+            v,
+            max_items=30,
+            required={"question": 200, "answer": 2000},
+            optional={},
+        ),
+        "multiple": lambda v: None if isinstance(v, bool) else "boolean",
+    },
 }
 
 

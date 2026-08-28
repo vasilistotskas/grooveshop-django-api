@@ -105,3 +105,17 @@ def test_extra_entry_keys_rejected():
     assert not validate_business_hours_setting(
         {"timezone": "Europe/Athens", "schedule": schedule}
     )
+
+
+def test_social_login_providers_setting_validator():
+    from tenant.validators import validate_social_login_providers_setting
+
+    assert validate_social_login_providers_setting(["*"])
+    assert validate_social_login_providers_setting(["google"])
+    assert validate_social_login_providers_setting(["google", "facebook"])
+    assert validate_social_login_providers_setting([])
+    assert validate_social_login_providers_setting(None)
+    assert not validate_social_login_providers_setting("google")
+    assert not validate_social_login_providers_setting(["GOOGLE"])
+    assert not validate_social_login_providers_setting([1])
+    assert not validate_social_login_providers_setting(["javascript:alert(1)"])

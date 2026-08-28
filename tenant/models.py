@@ -819,7 +819,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
 
     # Schema names that may never be deleted through normal paths.
     # Deletion of these tenants would destroy the platform itself.
-    _PROTECTED_SCHEMAS = frozenset({"public", "webside"})
+    _PROTECTED_SCHEMAS = frozenset({"public", "webside", "ekfyseosfyteias"})
 
     def delete(
         self, using=None, keep_parents=False, *, force_drop: bool = False

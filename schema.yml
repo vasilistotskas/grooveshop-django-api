@@ -33879,6 +33879,8 @@ components:
       - features_grid
       - media_text
       - image_gallery
+      - story_timeline
+      - faq
       type: string
       description: |-
         * `hero_banner` - Hero Banner
@@ -33909,6 +33911,8 @@ components:
         * `features_grid` - Features Grid
         * `media_text` - Media + Text
         * `image_gallery` - Image Gallery
+        * `story_timeline` - Story Timeline
+        * `faq` - FAQ Accordion
     ConfirmAgentPaymentRequestRequest:
       type: object
       properties:

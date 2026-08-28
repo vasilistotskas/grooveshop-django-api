@@ -139,6 +139,63 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
     and keeps allauth's own tooling (admin, shell) usable for managing apps.
     """
 
+    @staticmethod
+    def _allowed_providers(request) -> set[str] | None:
+        """The tenant's ``SOCIAL_LOGIN_PROVIDERS`` whitelist, or ``None``
+        for "no restriction".
+
+        Semantics of the json setting (validated by
+        ``tenant.validators.validate_social_login_providers_setting``):
+        ``["*"]`` (the default) = every configured provider; a list of
+        provider ids = exactly those; ``[]`` = social login fully off.
+        Resolved from the request host (H7 — never ``connection.tenant``)
+        and read inside an explicit ``schema_context`` because
+        ``Setting`` is a TENANT_APPS model.
+        """
+        tenant = _resolve_tenant_from_request(request)
+        if (
+            tenant is None
+            or getattr(tenant, "schema_name", "public") == "public"
+        ):
+            return None
+        try:
+            from django_tenants.utils import schema_context  # noqa: PLC0415
+            from extra_settings.models import Setting  # noqa: PLC0415
+
+            with schema_context(tenant.schema_name):
+                value = Setting.get("SOCIAL_LOGIN_PROVIDERS", default=None)
+        except Exception:
+            logger.warning(
+                "SOCIAL_LOGIN_PROVIDERS lookup failed for tenant %r — "
+                "not restricting",
+                getattr(tenant, "schema_name", "?"),
+                exc_info=True,
+            )
+            return None
+        if not isinstance(value, list) or "*" in value:
+            return None
+        return {str(item) for item in value}
+
+    def list_apps(self, request, provider=None, client_id=None):
+        """Filter the (db ⊕ settings) app list by the tenant whitelist.
+
+        ``list_apps`` is the single funnel every consumer goes through:
+        the headless config's provider list (the login/signup buttons)
+        derives from it via ``list_providers``, and ``get_app`` — the
+        redirect/token auth flows — selects from it. Filtering here
+        therefore both hides disabled providers from the UI and rejects
+        direct flow attempts against them.
+        """
+        apps = super().list_apps(
+            request, provider=provider, client_id=client_id
+        )
+        allowed = self._allowed_providers(request)
+        if allowed is None:
+            return apps
+        return [
+            app for app in apps if (app.provider_id or app.provider) in allowed
+        ]
+
     def get_app(self, request, provider, client_id=None):
         """Return the ``SocialApp`` for ``provider`` on the current tenant.
 

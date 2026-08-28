@@ -3,6 +3,28 @@
 
 
 
+## v3.22.0 (2026-08-28)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.21.0 [skip ci] ([`ffeb4a6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ffeb4a6cc5a5a610fb32513cfe28eb06a5f58f7f))
+
+### Features
+
+* feat(tenant): per-tenant social-login whitelist, timeline + FAQ sections, protect tenant2 schema
+
+- SOCIAL_LOGIN_PROVIDERS json setting (["*"] = all configured,
+  subset = exactly those, [] = social login off) enforced in
+  TenantSocialAccountAdapter.list_apps — the single funnel behind both
+  the headless config's provider list and the OAuth flows. Server-side
+  only (not in PUBLIC_SETTING_KEYS).
+- ComponentType grows story_timeline + faq with props contracts;
+  choices-only migration (no-op SQL).
+- ekfyseosfyteias joins the protected schemas.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NUKABRcUinrsC1a7VKeG4N ([`f1a714c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f1a714c56fd8ca0261e8e0401f2e463dfd36b8e7))
+
 ## v3.21.0 (2026-08-28)
 
 ### Chores

@@ -3,6 +3,54 @@
 
 
 
+## v3.20.0 (2026-08-28)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.19.0 [skip ci] ([`a2cd45d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a2cd45db85ae5ac31da54c91258de6798f26793b))
+
+### Features
+
+* feat(page_config): hero decor + secondary CTA, thread divider, fontDisplay token
+
+Write-side mirrors for the storefront's redesign kit: hero_banner
+grows eyebrow/decor/secondary_cta_*, divider grows variant
+(line/thread), and theme_metadata accepts fontDisplay (same font
+allowlist) for the new --font-display heading face.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NUKABRcUinrsC1a7VKeG4N ([`65310ca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/65310ca404c4e08f5a12d26cab239986f09330f1))
+
+* feat(tenant): business hours + store geo settings, presence page sections
+
+- BUSINESS_HOURS (json, validator-backed: IANA timezone + all-seven-day
+  schedule with HH:MM windows), STORE_GEO_LAT/LNG extra_settings, all
+  three publicly readable for the storefront hours widget, footer badge
+  and LocalBusiness schema.org.
+- ComponentType grows business_hours, location_map and three generic
+  configurable marketing blocks (features_grid, media_text,
+  image_gallery) with write-side props contracts; choices-only
+  migration, no-op SQL.
+- get_setting_by_key serializes dict/list settings as JSON instead of
+  a Python repr the storefront cannot parse.
+- provisioning._seed_extra_settings now calls the canonical
+  Setting.set_defaults_from_settings(): the hand-rolled get_or_create
+  passed a nonexistent setting_type field (silent TypeError) and
+  dropped validator/description.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NUKABRcUinrsC1a7VKeG4N ([`d232bca`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d232bca2d7cca430feab7edc15fd572339265059))
+
+* feat(tenant): accept dark-mode, secondary-scale and liked theme tokens
+
+Mirror of the storefront's zThemeMetadata growth (secondaryScale under
+colors, a darkColors scale set, likedHex, accentDarkHex) so new
+metadata passes admin/API validation. The Nuxt parse stays the
+render-time authority.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01NUKABRcUinrsC1a7VKeG4N ([`faa0e49`](https://github.com/vasilistotskas/grooveshop-django-api/commit/faa0e49e5c86963dbbb0a814f9d18bcad024654c))
+
 ## v3.19.0 (2026-08-27)
 
 ### Chores

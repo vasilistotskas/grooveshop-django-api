@@ -1528,6 +1528,43 @@ EXTRA_SETTINGS_DEFAULTS = [
             "or settings.INFO_EMAIL."
         ),
     },
+    # Store presence (contact page, footer badge, LocalBusiness
+    # schema.org). All default empty — a tenant without them simply
+    # renders no hours/geo anywhere.
+    {
+        "name": "BUSINESS_HOURS",
+        "type": "json",
+        "value": {},
+        "validator": "tenant.validators.validate_business_hours_setting",
+        "description": (
+            "Weekly opening hours as JSON: "
+            '{"timezone": "<IANA zone>", "schedule": {"mon".."sun": '
+            'null | {"opens": "HH:MM", "closes": "HH:MM"}}}. All seven '
+            "day keys are required; null means closed that day. Drives "
+            "the storefront business-hours section, the footer "
+            "open/closed badge and schema.org openingHoursSpecification. "
+            "Empty {} = feature off."
+        ),
+    },
+    {
+        "name": "STORE_GEO_LAT",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Physical store latitude (decimal degrees, as a string). "
+            "Consumed with STORE_GEO_LNG by the LocalBusiness "
+            "schema.org block; empty disables geo output."
+        ),
+    },
+    {
+        "name": "STORE_GEO_LNG",
+        "type": "string",
+        "value": "",
+        "description": (
+            "Physical store longitude (decimal degrees, as a string). "
+            "See STORE_GEO_LAT."
+        ),
+    },
     # Meta Conversions API
     {
         "name": "META_CAPI_ENABLED",

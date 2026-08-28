@@ -152,3 +152,93 @@ def test_navigation_footer_columns_shape():
     )
     with pytest.raises(ValidationError):
         validate_navigation_items("footer", [{"label": "Help", "children": []}])
+
+
+def test_location_map_props():
+    validate_section_props(
+        "location_map",
+        {
+            "embed_url": "https://www.google.com/maps/embed?pb=abc",
+            "lat": 40.563156,
+            "lng": 22.110502,
+            "address": "Fyteia, Veria",
+        },
+    )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "location_map", {"embed_url": "http://insecure.example"}
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props("location_map", {"lat": 400})
+
+
+def test_business_hours_carries_no_props():
+    validate_section_props("business_hours", {})
+    with pytest.raises(ValidationError):
+        validate_section_props("business_hours", {"schedule": {}})
+
+
+def test_features_grid_items_shape():
+    validate_section_props(
+        "features_grid",
+        {
+            "heading": "Why us",
+            "items": [
+                {
+                    "title": "Homemade",
+                    "text": "Small batches",
+                    "icon": "i-lucide-heart",
+                }
+            ],
+            "columns": 3,
+            "decor": "gradient_tiles",
+        },
+    )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "features_grid",
+            {"items": [{"title": "X", "icon": "<svg onload=x>"}]},
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props("features_grid", {"decor": "sparkles"})
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "features_grid", {"items": [{"text": "no title"}]}
+        )
+
+
+def test_media_text_props():
+    validate_section_props(
+        "media_text",
+        {
+            "heading": "Our story",
+            "body": "Eleven women…",
+            "image_url": "/img/story.jpg",
+            "image_position": "left",
+            "cta_text": "Read more",
+            "cta_link": "/about",
+            "decor": "orbs",
+        },
+    )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "media_text", {"cta_link": "javascript:alert(1)"}
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props("media_text", {"image_position": "top"})
+
+
+def test_image_gallery_items_shape():
+    validate_section_props(
+        "image_gallery",
+        {
+            "items": [{"src": "/img/a.jpg", "alt": "A", "caption": "cap"}],
+            "columns": 3,
+        },
+    )
+    with pytest.raises(ValidationError):
+        validate_section_props(
+            "image_gallery", {"items": [{"src": "/img/a.jpg"}]}
+        )
+    with pytest.raises(ValidationError):
+        validate_section_props("image_gallery", {"columns": 5})

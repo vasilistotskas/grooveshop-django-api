@@ -299,19 +299,17 @@ def provision_owner_membership(
 
 
 def _seed_extra_settings(tenant: Tenant) -> None:
-    from django.conf import settings  # noqa: PLC0415
-
     try:
         from extra_settings.models import Setting  # noqa: PLC0415
 
-        for default in getattr(settings, "EXTRA_SETTINGS_DEFAULTS", []):
-            Setting.objects.get_or_create(
-                name=default["name"],
-                defaults={
-                    "setting_type": default.get("type", "string"),
-                    "value": str(default.get("value", "")),
-                },
-            )
+        # The canonical seeding path (also wired to post_migrate by
+        # django-extra-settings itself, and used by the
+        # backfill_extra_settings_defaults command). Idempotent, and —
+        # unlike the hand-rolled get_or_create this replaced, which
+        # passed a nonexistent ``setting_type`` field and silently
+        # TypeError'd — it carries each default's ``validator`` and
+        # ``description`` through.
+        Setting.set_defaults_from_settings()
         logger.info("Seeded extra_settings for %s", tenant.schema_name)
     except Exception:
         logger.warning("Could not seed extra_settings", exc_info=True)

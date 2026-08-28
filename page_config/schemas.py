@@ -33,6 +33,46 @@ def _is_int(value, lo: int, hi: int) -> bool:
     )
 
 
+def _check_items(
+    value,
+    *,
+    max_items: int,
+    required: dict[str, int],
+    optional: dict[str, int],
+    link_keys: frozenset[str] = frozenset(),
+    icon_keys: frozenset[str] = frozenset(),
+) -> str | None:
+    """Shared list-of-objects checker: ``required``/``optional`` map key
+    -> max string length; ``icon_keys`` must additionally match the
+    ``i-*`` icon pattern."""
+    if not isinstance(value, list) or len(value) > max_items:
+        return f"items: must be a list of at most {max_items} entries"
+    for i, raw in enumerate(value):
+        if not isinstance(raw, dict):
+            return f"items[{i}]: must be an object"
+        item = {str(k): v for k, v in raw.items()}
+        for key, max_length in required.items():
+            entry = item.get(key)
+            if not entry or not _is_str(entry, max_length):
+                return f"items[{i}].{key}: required string (max {max_length})"
+        for key, max_length in optional.items():
+            entry = item.get(key)
+            if entry is not None and not _is_str(entry, max_length):
+                return f"items[{i}].{key}: must be a string (max {max_length})"
+        for key in icon_keys:
+            entry = item.get(key)
+            if entry is not None and not _ICON_RE.match(str(entry)):
+                return f"items[{i}].{key}: must be an i-* icon name"
+        for key in link_keys:
+            entry = item.get(key)
+            if entry is not None and not _LINK_RE.match(str(entry)):
+                return f"items[{i}].{key}: internal path or https URL"
+        unknown = set(item) - set(required) - set(optional)
+        if unknown:
+            return f"items[{i}]: unknown keys {sorted(unknown)}"
+    return None
+
+
 def _check_testimonial_items(value) -> str | None:
     if not isinstance(value, list) or len(value) > 20:
         return "items: must be a list of at most 20 entries"
@@ -152,6 +192,75 @@ _VALIDATORS: dict[str, dict] = {
     "vision_content": {},
     "what_is_microlearning": {},
     "why_microlearning": {},
+    # Weekly schedule + open/closed badge; data comes from the
+    # BUSINESS_HOURS extra_setting, so the section carries no props.
+    "business_hours": {},
+    "location_map": {
+        "embed_url": lambda v: (
+            None
+            if _is_str(v, 1000) and str(v).startswith("https://")
+            else "https URL ≤1000"
+        ),
+        "lat": lambda v: (
+            None
+            if isinstance(v, (int, float))
+            and not isinstance(v, bool)
+            and -90 <= v <= 90
+            else "number between -90 and 90"
+        ),
+        "lng": lambda v: (
+            None
+            if isinstance(v, (int, float))
+            and not isinstance(v, bool)
+            and -180 <= v <= 180
+            else "number between -180 and 180"
+        ),
+        "address": lambda v: None if _is_str(v, 300) else "string ≤300",
+    },
+    "features_grid": {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "items": lambda v: _check_items(
+            v,
+            max_items=12,
+            required={"title": 100},
+            optional={"text": 500, "icon": 100},
+            icon_keys=frozenset({"icon"}),
+        ),
+        "columns": lambda v: None if _is_int(v, 1, 4) else "int 1–4",
+        "decor": lambda v: (
+            None
+            if v in ("none", "gradient_tiles")
+            else "one of none/gradient_tiles"
+        ),
+    },
+    "media_text": {
+        "heading": lambda v: None if _is_str(v, 200) else "string ≤200",
+        "body": lambda v: None if _is_str(v, 5000) else "string ≤5000",
+        "image_url": lambda v: None if _is_str(v, 1000) else "string ≤1000",
+        "image_position": lambda v: (
+            None if v in ("left", "right") else "one of left/right"
+        ),
+        "cta_text": lambda v: None if _is_str(v, 100) else "string ≤100",
+        "cta_link": lambda v: (
+            None
+            if _is_str(v, 1000) and _LINK_RE.match(v)
+            else "internal path or https URL"
+        ),
+        "decor": lambda v: (
+            None
+            if v in ("none", "orbs", "gradient")
+            else "one of none/orbs/gradient"
+        ),
+    },
+    "image_gallery": {
+        "items": lambda v: _check_items(
+            v,
+            max_items=24,
+            required={"src": 1000, "alt": 200},
+            optional={"caption": 200},
+        ),
+        "columns": lambda v: None if _is_int(v, 2, 4) else "int 2–4",
+    },
 }
 
 

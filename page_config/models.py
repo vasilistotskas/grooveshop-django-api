@@ -84,6 +84,16 @@ class ComponentType(models.TextChoices):
     LOYALTY_HERO = "loyalty_hero", _("Loyalty Program Hero")
     SEARCH_BAR = "search_bar", _("Search Bar")
 
+    # Store presence
+    BUSINESS_HOURS = "business_hours", _("Business Hours")
+    LOCATION_MAP = "location_map", _("Location Map")
+
+    # Generic marketing blocks (configurable via props — preferred over
+    # new per-tenant variant component types)
+    FEATURES_GRID = "features_grid", _("Features Grid")
+    MEDIA_TEXT = "media_text", _("Media + Text")
+    IMAGE_GALLERY = "image_gallery", _("Image Gallery")
+
 
 class PageLayout(
     PublishableModel,

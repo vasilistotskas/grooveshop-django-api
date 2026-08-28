@@ -19,8 +19,10 @@ class TestComponentType(TestCase):
 
     def test_choices_count(self):
         # 19 original + 4 brand content blocks (about/vision/
-        # what-is-microlearning/why-microlearning).
-        assert len(ComponentType.choices) == 23
+        # what-is-microlearning/why-microlearning) + 2 store presence
+        # (business_hours/location_map) + 3 generic marketing blocks
+        # (features_grid/media_text/image_gallery).
+        assert len(ComponentType.choices) == 28
 
 
 class TestPageLayout(TestCase):

@@ -1,3 +1,4 @@
+import json
 import logging
 from django.core.exceptions import ImproperlyConfigured
 from celery.exceptions import CeleryError
@@ -555,6 +556,11 @@ PUBLIC_SETTING_KEYS = frozenset(
         # previously (mis)gated behind superuser-only preview mode).
         "MOBILE_BOTTOM_NAV_ENABLED",
         "STICKY_ADD_TO_CART_ENABLED",
+        # Store presence: hours/geo feed the business-hours section,
+        # footer open/closed badge and LocalBusiness schema.org.
+        "BUSINESS_HOURS",
+        "STORE_GEO_LAT",
+        "STORE_GEO_LNG",
         # Merchant feature toggles the storefront gates UI on (the
         # endpoints themselves are ALSO gated server-side via
         # tenant.permissions.IsSettingEnabled subclasses).
@@ -637,10 +643,17 @@ def get_setting_by_key(request):
             setting_value = Setting.get(key)
             from core.api.serializers import SettingDetailSerializer
 
+            # json-typed settings hold dicts/lists — ``str()`` would
+            # produce a Python repr (single quotes) the storefront
+            # can't JSON.parse.
+            if isinstance(setting_value, (dict, list)):
+                serialized_value = json.dumps(setting_value)
+            else:
+                serialized_value = str(setting_value)
             serializer = SettingDetailSerializer(
                 {
                     "name": key,
-                    "value": str(setting_value),
+                    "value": serialized_value,
                 }
             )
             return Response(serializer.data, status=status.HTTP_200_OK)

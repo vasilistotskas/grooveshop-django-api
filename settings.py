@@ -1703,6 +1703,17 @@ EXTRA_SETTINGS_DEFAULTS = [
         ),
     },
     {
+        "name": "CART_ENABLED",
+        "type": "bool",
+        "value": True,
+        "description": (
+            "Show the cart chrome (navbar cart button, /cart page) on "
+            "the storefront. Off for shop-dark tenants that launch as "
+            "content sites before their catalogue exists. Fails OPEN "
+            "if the setting cannot be fetched."
+        ),
+    },
+    {
         "name": "STICKY_ADD_TO_CART_ENABLED",
         "type": "bool",
         "value": True,

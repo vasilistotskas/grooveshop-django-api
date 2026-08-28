@@ -556,6 +556,7 @@ PUBLIC_SETTING_KEYS = frozenset(
         # previously (mis)gated behind superuser-only preview mode).
         "MOBILE_BOTTOM_NAV_ENABLED",
         "STICKY_ADD_TO_CART_ENABLED",
+        "CART_ENABLED",
         # Store presence: hours/geo feed the business-hours section,
         # footer open/closed badge and LocalBusiness schema.org.
         "BUSINESS_HOURS",

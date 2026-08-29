@@ -12,6 +12,7 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.cache.models import CachePurgeLog  # noqa: F401
+from core.fields.plain_text import PlainTextField
 
 
 class SeoModel(models.Model):
@@ -22,7 +23,10 @@ class SeoModel(models.Model):
     seo_title = models.CharField(
         _("Seo Title"), max_length=70, blank=True, default=""
     )
-    seo_description = models.TextField(
+    # PlainTextField, not TextField: this lands verbatim inside
+    # ``<meta name="description" content="...">``, where markup cannot
+    # render and only corrupts the snippet.
+    seo_description = PlainTextField(
         _("Seo Description"), max_length=300, blank=True, default=""
     )
     seo_keywords = models.CharField(

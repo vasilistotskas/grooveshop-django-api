@@ -6,16 +6,80 @@ from core.cache.registry import CacheSurface, register_surface
 
 
 def _nuxt(*names: str) -> tuple[str, ...]:
-    """Build Nuxt Nitro handler patterns.
+    """Build Nuxt Nitro handler patterns from EXACT handler names.
 
-    Nitro stores cached event handlers under ``cache:nitro:handlers:<name>:*``.
+    Nitro stores cached event handlers under
+    ``cache:nitro:handlers:<name>:<key>``. The name must be complete:
+    the purge endpoint resolves a trailing-``*`` pattern with unstorage's
+    ``getKeys()``, which treats its argument as a key PATH and only
+    matches on ``:`` segment boundaries. Use ``_nuxt_matching`` to sweep a
+    family by name fragment.
     """
 
     return tuple(f"cache:nitro:handlers:{name}*" for name in names)
 
 
-def _nuxt_routes(*names: str) -> tuple[str, ...]:
-    return tuple(f"cache:nitro:routes:{name}*" for name in names)
+def _nuxt_matching(*fragments: str) -> tuple[str, ...]:
+    """Build handler patterns that match a NAME FRAGMENT.
+
+    ``getKeys("nitro:handlers:Blog")`` returns nothing, because the key's
+    segment is the whole handler name (``BlogCategoryDetail``), not a
+    prefix of it — so ``cache:nitro:handlers:Blog*`` silently matched
+    zero keys while claiming to cover every blog handler. A LEADING
+    ``*`` makes the purge endpoint fall back to its regex post-filter
+    over the ``nitro:handlers:`` prefix instead, which is the only shape
+    that can sweep a family.
+
+    Measured against production on 2026-08-29:
+    ``handlers:Blog*`` -> 0 keys, ``handlers:*Blog*`` -> 270.
+    """
+
+    return tuple(f"cache:nitro:handlers:*{fragment}*" for fragment in fragments)
+
+
+def _nuxt_routes(*paths: str) -> tuple[str, ...]:
+    """Build Nuxt patterns for CACHED SSR PAGES (Nitro route rules).
+
+    Nitro keys a cached route as
+    ``cache:nitro:routes:_:<pathname>.<hash>:<vary>.<hash>...`` where
+    ``<pathname>`` is the URL path with every non-word character removed,
+    truncated to 16 chars, and ``_`` is the unnamed cached function. So
+    ``/blog/post/42/x`` is stored under ``_:blogpost42x...``.
+
+    Callers therefore pass a URL PATH and it is flattened the same way —
+    ``/blog`` covers every blog page because each one's escaped pathname
+    starts with ``blog``.
+
+    The pattern is ``_:*<path>*`` rather than ``_:<path>*`` for the same
+    segment-boundary reason as ``_nuxt_matching``: the key's segment is
+    the full ``blogpost42mnhmhr.<hash>``, so only a leading ``*`` gets the
+    regex post-filter applied over the ``nitro:routes:_:`` prefix.
+
+    This differs from ``_nuxt`` above, which targets cached API handlers
+    (``cache:nitro:handlers:``). Purging a handler drops the JSON the page
+    is built from; purging a route drops the rendered HTML. A merchant
+    edit needs BOTH, or the storefront keeps serving the old page from
+    Nitro's SSR cache until its TTL expires.
+    """
+
+    return tuple(
+        "cache:nitro:routes:_:*{}*".format(
+            "".join(ch for ch in path if ch.isalnum())[:16]
+        )
+        for path in paths
+    )
+
+
+def _nuxt_functions(*names: str) -> tuple[str, ...]:
+    """Build Nuxt patterns for cached FUNCTIONS (``defineCachedFunction``).
+
+    Stored as ``cache:nitro:functions:<name>:<args>``. Distinct from both
+    ``_nuxt`` (cached event handlers) and ``_nuxt_routes`` (cached page
+    renders) — the sitemap and RSS feeds build their data through cached
+    functions, so neither of the other two prefixes ever matched them.
+    """
+
+    return tuple(f"cache:nitro:functions:{name}*" for name in names)
 
 
 def register_default_surfaces() -> None:
@@ -97,7 +161,11 @@ def register_default_surfaces() -> None:
                 "ProductAttributeViewSet",
                 "ProductAttributeValueViewSet",
                 "SearchProductViewSet",
-            ),
+            )
+            # The rendered pages too, not just the JSON behind them:
+            # /products and /products/** are SWR-cached (300s), so
+            # without this a price edit stayed visible for the whole TTL.
+            + _nuxt_routes("/products"),
             related=("categories", "tags"),
             icon="inventory_2",
             group="catalog",
@@ -117,7 +185,10 @@ def register_default_surfaces() -> None:
                 "ProductCategoryViewSet",
                 "ProductCategoryAll",
                 "ProductCategoryDetail",
-            ),
+            )
+            # Category pages live under /products/category/**, which the
+            # same escaped-path prefix covers.
+            + _nuxt_routes("/products"),
             icon="category",
             group="catalog",
         )
@@ -142,7 +213,12 @@ def register_default_surfaces() -> None:
             # BlogPostComments, BlogCategoryViewSet, BlogCategoryDetail,
             # BlogCategoryPostsViewSet, BlogTagViewSet, BlogTagDetail,
             # BlogAuthorViewSet, BlogAuthorDetail, BlogCommentViewSet).
-            nuxt_patterns=_nuxt("Blog"),
+            # ``_nuxt_matching("Blog")``, not ``_nuxt("Blog")``: the
+            # latter matched zero keys (see the helper docstrings).
+            # ``_nuxt_routes("/blog")`` adds the rendered pages —
+            # /blog, /blog/categories, /blog/category/**, /blog/post/**
+            # are SWR-cached (600s).
+            nuxt_patterns=_nuxt_matching("Blog") + _nuxt_routes("/blog"),
             icon="article",
             group="content",
         )
@@ -239,7 +315,14 @@ def register_default_surfaces() -> None:
                 " content that should appear immediately."
             ),
             django_patterns=(),
-            nuxt_patterns=_nuxt_routes("__sitemap__", "rss")
+            # These are cached FUNCTIONS, not routes: the sitemap source
+            # and the RSS feed build their data through
+            # ``defineCachedFunction`` (``sitemap:blog-posts``,
+            # ``rss:products``, ``RssFeed``, ...), so the previous
+            # ``cache:nitro:routes:__sitemap__*`` / ``:rss*`` patterns
+            # matched no key in Redis and this surface's Nuxt half was a
+            # no-op. Verified against the live keyspace.
+            nuxt_patterns=_nuxt_functions("sitemap", "rss", "RssFeed")
             + _nuxt("nuxt-ai-ready"),
             icon="map",
             group="content",

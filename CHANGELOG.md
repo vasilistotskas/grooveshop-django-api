@@ -3,6 +3,118 @@
 
 
 
+## v3.22.1 (2026-08-29)
+
+### Bug fixes
+
+* fix(cache): make the Nuxt purge patterns match Nitro's actual keys
+
+The purge endpoint resolves a trailing-`*` pattern through unstorage's
+`getKeys()`, which treats its argument as a key PATH and only matches on
+`:` segment boundaries. A handler name is one whole segment, so
+`cache:nitro:handlers:Blog*` never matched
+`cache:nitro:handlers:BlogCategoryDetail:...` — the blog surface's Nuxt
+purge has silently been a no-op. Measured against production:
+
+handlers:Blog* -> 0 keys
+handlers:*Blog* -> 270 keys
+
+`_nuxt_matching()` adds the leading `*` that reaches the endpoint's regex
+post-filter. The sitemap/SEO surface was broken the same way for a
+different reason: it aimed `cache:nitro:routes:` patterns at feeds that
+are cached as FUNCTIONS (`cache:nitro:functions:sitemap:blog-posts:...`),
+so `_nuxt_functions()` now targets the right prefix.
+
+`_nuxt_routes()` is new and covers the rendered HTML, not just the JSON
+behind it — the blog and catalogue pages are about to become SWR-cached,
+and without this a merchant edit would stay invisible for the whole TTL.
+
+Includes the one-off script used to fix webside.gr's stored content
+(post 37 alt text, ten category descriptions, 24 placeholder post
+descriptions), and tests pinning all three key shapes so the layout
+cannot drift back unnoticed. ([`28d212c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/28d212c651502c2080688aa840d382c790628713))
+
+* fix(seo): store seo_description as plain text
+
+`seo_description` lands verbatim inside `<meta name="description"
+content="...">`, where markup cannot render and only corrupts the
+snippet. 31 of webside.gr's 78 blog posts had rich text pasted into the
+field and shipped `content="<div>...</div>"` to crawlers.
+
+Introduces `PlainTextField`, a `TextField` that strips tags, decodes
+entities and collapses whitespace in `pre_save` — the hook that runs on
+every save path, not just the ones that call full_clean(). Applying it on
+`SeoModel` covers BlogPost, Product, ProductCategory and ContentPage for
+every tenant at once.
+
+The accompanying migrations are pure data backfill: `sqlmigrate` renders
+each AlterField as a literal `(no-op)` because the field keeps
+TextField's db_type, so nothing locks and the PreSync hook stays safe.
+Historical (simple_history) tables are deliberately left alone — they
+record what was stored at the time. ([`fff140b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fff140bcb00351bfdbd9b0a9a8a3689881cafd34))
+
+* fix(blog): stop leaking unpublished posts from category and author listings
+
+`BlogPostViewSet` filtered drafts for non-staff, but the category and
+author `posts` actions read straight off the reverse FK accessors
+(`category.blog_posts` / `author.blog_posts`). Those return a plain
+QuerySet that bypasses `BlogPostManager` entirely, so both AllowAny
+endpoints published unpublished posts — title, slug, image and preview —
+to anonymous callers.
+
+It was also breaking the storefront: the category page rendered a card
+for a draft whose detail route then answered 404. Ahrefs reported it as
+"404 page" plus six "Page has links to broken page" on webside.gr.
+
+Adds `BlogPostQuerySet.visible_to(user)` as the single visibility gate
+(staff see drafts, everyone else sees `published()`) and routes all three
+call sites through it. The public counters agreed with neither: author
+`number_of_posts` / `total_likes_received` counted drafts, and category
+`_post_count` filtered on `is_published` alone, so a future-dated post
+inflated the badge above what the listing actually returns.
+
+Regression tests cover anonymous vs staff on both endpoints and the
+count/listing agreement. ([`0011508`](https://github.com/vasilistotskas/grooveshop-django-api/commit/00115085c73aae54c5ad283fd9f15ecfe816ada2))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.22.0 [skip ci] ([`b0b98d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b0b98d24e2a8008dfa23860bc0fce9b512646d12))
+
+### Continuous integration
+
+* ci: revert to duration_based_chunks — least_duration scatters files across shards
+
+least_duration assigns tests individually, so one file's tests land on
+different shards: run 33245930085 split test_dynamic_pricing.py 11/6/4/11
+and three of its live-quote tests failed from worker pollution (mocked
+AcsClient never reached; all three pass in isolation). That is the same
+state-leak class --dist loadfile co-locates files to prevent, so the
+default contiguous algorithm is the only one this suite supports. The
+comment now records the constraint; the ~1-2 min shard imbalance is the
+accepted cost, with a CI-weighted .test_durations refresh as the only
+safe rebalancing lever.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011xWBBQkhpMTMR9aNLHKSBH ([`f9f4273`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f9f427353b00171d7f96d591cedfe4737941a272))
+
+* ci: balance test shards with least_duration and single-pass docker publish
+
+Shard 3 ran 1-2.5 min slower than the others in every recent run: the
+default duration_based_chunks algorithm splits contiguous blocks, so
+one shard keeps inheriting the heavy files. least_duration balances by
+recorded duration while keeping relative test order; --dist loadfile
+still groups files per xdist worker, so the stability contract from
+project_test_suite_stability is unchanged. Shard count stays at 4 per
+the measured ~3 min fixed cost per shard.
+
+Merge the docker publish into a single build+push with the
+(informational, exit-code 0) Trivy scan moved after the push — the
+build-twice shape only duplicated the image export — and SHA-pin
+trivy-action after the 2026-03 tag-hijack incident.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011xWBBQkhpMTMR9aNLHKSBH ([`aa7b7c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/aa7b7c29cea0f207a6ea2aad5ab2b003ff149bb7))
+
 ## v3.22.0 (2026-08-28)
 
 ### Chores

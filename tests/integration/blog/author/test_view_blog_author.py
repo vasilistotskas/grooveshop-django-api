@@ -275,6 +275,48 @@ class BlogAuthorViewSetTestCase(TestURLFixerMixin, APITestCase):
             else:
                 self.assertEqual(post_data["author"], self.blog_author.id)
 
+    def test_posts_endpoint_hides_drafts_from_anonymous(self):
+        """Regression: ``author.blog_posts`` bypassed BlogPostManager.
+
+        The accessor returns a plain QuerySet, so this AllowAny listing
+        exposed the author's unpublished drafts (title, slug, image,
+        preview) to anonymous callers.
+        """
+        draft = BlogPostFactory(author=self.blog_author, is_published=False)
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            self.get_blog_author_posts_url(self.blog_author.id)
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned = [item["id"] for item in response.data["results"]]
+        self.assertNotIn(draft.id, returned)
+        self.assertCountEqual(
+            returned, [self.blog_post_1.id, self.blog_post_2.id]
+        )
+
+    def test_posts_endpoint_shows_drafts_to_staff(self):
+        draft = BlogPostFactory(author=self.blog_author, is_published=False)
+
+        response = self.client.get(
+            self.get_blog_author_posts_url(self.blog_author.id)
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned = [item["id"] for item in response.data["results"]]
+        self.assertIn(draft.id, returned)
+
+    def test_number_of_posts_excludes_drafts(self):
+        BlogPostFactory(author=self.blog_author, is_published=False)
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            self.get_blog_author_detail_url(self.blog_author.id)
+        )
+
+        self.assertEqual(response.data["number_of_posts"], 2)
+
     def test_website_validation(self):
         new_user = UserAccountFactory(num_addresses=0, is_superuser=False)
 

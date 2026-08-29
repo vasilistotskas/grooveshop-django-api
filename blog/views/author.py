@@ -10,6 +10,7 @@ from core.api.permissions import StoreStaffModelPermissions
 from blog.filters.author import BlogAuthorFilter
 from blog.filters.post import BlogPostFilter
 from blog.models.author import BlogAuthor
+from blog.models.post import BlogPost
 from blog.serializers.author import (
     BlogAuthorDetailSerializer,
     BlogAuthorSerializer,
@@ -84,9 +85,16 @@ class BlogAuthorViewSet(BaseModelViewSet):
             from rest_framework.generics import get_object_or_404
 
             author = get_object_or_404(BlogAuthor, id=self.kwargs["pk"])
-            return author.blog_posts.select_related(
-                "category", "author__user"
-            ).prefetch_related("translations", "tags__translations", "likes")
+            # ``BlogPost.objects`` (not ``author.blog_posts``) so the
+            # queryset carries ``visible_to``: the reverse accessor returns
+            # a plain QuerySet that bypasses BlogPostManager, which listed
+            # this author's drafts to anonymous callers.
+            return (
+                BlogPost.objects.filter(author=author)
+                .visible_to(self.request.user)
+                .select_related("category", "author__user")
+                .prefetch_related("translations", "tags__translations", "likes")
+            )
 
         if self.action == "list":
             return BlogAuthor.objects.for_list()

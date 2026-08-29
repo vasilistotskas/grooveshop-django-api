@@ -42,9 +42,22 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
         return self.user.image
 
     @property
+    def published_posts(self):
+        """This author's publicly visible posts.
+
+        ``self.blog_posts`` is a plain reverse-FK QuerySet and does not
+        carry ``BlogPostQuerySet``; both public counters below are
+        serialized on an ``AllowAny`` endpoint, so they must not count
+        drafts.
+        """
+        from blog.models.post import BlogPost  # noqa: PLC0415
+
+        return BlogPost.objects.filter(author=self).published()
+
+    @property
     def number_of_posts(self) -> int:
-        return self.blog_posts.count()
+        return self.published_posts.count()
 
     @property
     def total_likes_received(self) -> int | Literal[0]:
-        return sum([post.likes.count() for post in self.blog_posts.all()])
+        return sum([post.likes.count() for post in self.published_posts])

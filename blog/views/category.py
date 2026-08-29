@@ -14,6 +14,7 @@ from core.api.permissions import StoreStaffModelPermissions
 from blog.filters.category import BlogCategoryFilter
 from blog.filters.post import BlogPostFilter
 from blog.models.category import BlogCategory
+from blog.models.post import BlogPost
 from blog.serializers.category import (
     BlogCategoryDetailSerializer,
     BlogCategoryReorderRequestSerializer,
@@ -198,18 +199,21 @@ class BlogCategoryViewSet(BaseModelViewSet):
         self.ordering = []
         self.search_fields = []
 
+        # ``BlogPost.objects`` (not the ``category.blog_posts`` reverse
+        # accessor) so the queryset carries ``visible_to`` — the accessor
+        # returns a plain QuerySet that bypasses BlogPostManager, which is
+        # how drafts reached this public listing.
         if request.query_params.get("recursive") == "true":
             categories = category.get_descendants(include_self=True)
-            queryset = (
-                category.__class__.objects.get(pk=pk)
-                .blog_posts.model.objects.filter(category__in=categories)
-                .select_related("category", "author__user")
-                .prefetch_related("likes", "tags")
-            )
+            queryset = BlogPost.objects.filter(category__in=categories)
         else:
-            queryset = category.blog_posts.select_related(
-                "author__user"
-            ).prefetch_related("likes", "tags")
+            queryset = BlogPost.objects.filter(category=category)
+
+        queryset = (
+            queryset.visible_to(request.user)
+            .select_related("category", "author__user")
+            .prefetch_related("likes", "tags")
+        )
 
         return self.paginate_and_serialize(queryset, request)
 

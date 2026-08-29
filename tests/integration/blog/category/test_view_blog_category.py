@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.conf import settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -238,6 +241,89 @@ class BlogCategoryViewSetTestCase(TestURLFixerMixin, APITestCase):
         self.assertIn("results", response.data)
 
         self.assertTrue(len(response.data["results"]) >= 1)
+
+    def test_posts_endpoint_hides_drafts_from_anonymous(self):
+        """Regression: drafts must not surface in the public listing.
+
+        ``category.blog_posts`` bypasses ``BlogPostManager``, so this
+        action used to publish unpublished posts to anonymous callers —
+        and the storefront rendered cards linking to a detail route that
+        answered 404 (Ahrefs "404 page" / "links to broken page").
+        """
+        draft = BlogPostFactory(
+            category=self.parent_category,
+            slug="draft-post",
+            is_published=False,
+        )
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            self.get_category_posts_url(self.parent_category.id)
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned = [item["id"] for item in response.data["results"]]
+        self.assertNotIn(draft.id, returned)
+        self.assertIn(self.post_in_parent.id, returned)
+
+    def test_posts_endpoint_recursive_hides_drafts_from_anonymous(self):
+        draft = BlogPostFactory(
+            category=self.child_category,
+            slug="draft-post-recursive",
+            is_published=False,
+        )
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            self.get_category_posts_url(self.parent_category.id),
+            {"recursive": "true"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned = [item["id"] for item in response.data["results"]]
+        self.assertNotIn(draft.id, returned)
+        self.assertIn(self.post_in_child.id, returned)
+
+    def test_posts_endpoint_shows_drafts_to_staff(self):
+        draft = BlogPostFactory(
+            category=self.parent_category,
+            slug="draft-post-staff",
+            is_published=False,
+        )
+
+        response = self.client.get(
+            self.get_category_posts_url(self.parent_category.id)
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        returned = [item["id"] for item in response.data["results"]]
+        self.assertIn(draft.id, returned)
+
+    def test_post_count_excludes_drafts_and_future_posts(self):
+        """``postCount`` has to agree with what /posts actually lists."""
+        BlogPostFactory(
+            category=self.category, slug="count-draft", is_published=False
+        )
+        BlogPostFactory(
+            category=self.category,
+            slug="count-future",
+            is_published=True,
+            published_at=timezone.now() + timedelta(days=7),
+        )
+        visible = BlogPostFactory(
+            category=self.category, slug="count-visible", is_published=True
+        )
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            self.get_category_detail_url(self.category.id)
+        )
+        posts = self.client.get(self.get_category_posts_url(self.category.id))
+
+        self.assertEqual(response.data["post_count"], 1)
+        self.assertEqual(
+            [item["id"] for item in posts.data["results"]], [visible.id]
+        )
 
     def test_posts_endpoint_recursive(self):
         url = self.get_category_posts_url(self.parent_category.id)

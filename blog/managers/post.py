@@ -70,6 +70,21 @@ class BlogPostQuerySet(TranslatableOptimizedQuerySet):
             | Q(published_at__isnull=True, is_published=True)
         )
 
+    def visible_to(self, user) -> Self:
+        """Public visibility gate for the read-only blog endpoints.
+
+        Staff see drafts (admin preview); everyone else sees only
+        ``published()``. Every public entry point into blog posts must
+        route through this. The reverse FK accessors
+        (``category.blog_posts`` / ``author.blog_posts``) bypass this
+        manager entirely: listed raw, they exposed drafts to anonymous
+        callers and rendered category cards linking to a detail route
+        that then 404'd.
+        """
+        if user is not None and user.is_authenticated and user.is_staff:
+            return self
+        return self.published()
+
     def with_author(self) -> Self:
         """Select related author and user."""
         return self.select_related("author__user", "author")

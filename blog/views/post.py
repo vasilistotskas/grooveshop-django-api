@@ -217,11 +217,7 @@ class BlogPostViewSet(BaseModelViewSet):
         # only staff may see them (e.g. admin preview). The read actions are
         # AllowAny, so without this filter anonymous callers can enumerate
         # unpublished posts by id.
-        user = self.request.user
-        if not (user and user.is_authenticated and user.is_staff):
-            queryset = queryset.published()
-
-        return queryset
+        return queryset.visible_to(self.request.user)
 
     def get_filterset_class(self):
         if self.action == "comments":

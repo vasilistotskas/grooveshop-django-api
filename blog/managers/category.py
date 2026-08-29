@@ -41,17 +41,26 @@ class BlogCategoryQuerySet(TreeTranslatableQuerySet):
         Annotate with post_count and has_children to avoid N+1 queries.
 
         These annotations are used by BlogCategorySerializer.
+
+        ``_post_count`` mirrors ``BlogPostQuerySet.published()`` exactly —
+        ``is_published`` alone counted future-dated posts that the posts
+        listing itself hides, so the badge disagreed with the page.
         """
+        from django.utils import timezone  # noqa: PLC0415
+
         from blog.models.category import BlogCategory  # noqa: PLC0415
 
         children_subquery = BlogCategory.objects.filter(
             parent=OuterRef("pk")
         ).values("pk")[:1]
 
+        published = Q(blog_posts__is_published=True) & (
+            Q(blog_posts__published_at__lte=timezone.now())
+            | Q(blog_posts__published_at__isnull=True)
+        )
+
         return self.annotate(
-            _post_count=Count(
-                "blog_posts", filter=Q(blog_posts__is_published=True)
-            ),
+            _post_count=Count("blog_posts", filter=published),
             _has_children=Exists(children_subquery),
         )
 

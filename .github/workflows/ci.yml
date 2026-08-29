@@ -44,7 +44,9 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@v0.36.0
+        # SHA-pinned: trivy-action's mutable tags were hijacked in the
+        # 2026-03 supply-chain incident, so tags are not trusted.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -316,7 +318,12 @@ jobs:
         # supported configuration.
         # The suite is split into 4 duration-balanced shards by
         # pytest-split from the committed ``.test_durations`` file.
-        # Refresh it occasionally with ``uv run pytest
+        # ``--splitting-algorithm least_duration`` because the default
+        # ``duration_based_chunks`` splits contiguous blocks and left
+        # shard 3 consistently 1-2.5 min slower than the rest (measured
+        # across runs 2026-08-27/28); least_duration balances by
+        # duration and keeps relative test order.
+        # Refresh ``.test_durations`` occasionally with ``uv run pytest
         # --store-durations`` (HYPOTHESIS_PROFILE=ci for CI-like
         # weights); tests missing from the file are assumed average, so
         # drift costs balance, never correctness. Four shards, not more:
@@ -336,6 +343,7 @@ jobs:
           uv run pytest --cov=. --cov-report= --cov-fail-under=0
           --cov-config=pyproject.toml -n auto --dist loadfile
           --splits 4 --group ${{ matrix.group }}
+          --splitting-algorithm least_duration
         timeout-minutes: 18
         env:
           HYPOTHESIS_PROFILE: ci

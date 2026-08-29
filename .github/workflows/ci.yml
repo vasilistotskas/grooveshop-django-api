@@ -318,11 +318,17 @@ jobs:
         # supported configuration.
         # The suite is split into 4 duration-balanced shards by
         # pytest-split from the committed ``.test_durations`` file.
-        # ``--splitting-algorithm least_duration`` because the default
-        # ``duration_based_chunks`` splits contiguous blocks and left
-        # shard 3 consistently 1-2.5 min slower than the rest (measured
-        # across runs 2026-08-27/28); least_duration balances by
-        # duration and keeps relative test order.
+        # The default ``duration_based_chunks`` algorithm is the ONLY
+        # one this suite supports: it splits contiguous blocks, so a
+        # file's tests stay in one shard. ``least_duration`` balances
+        # better on paper but assigns tests individually, scattering a
+        # file across shards — validated 2026-08-29 (run 33245930085):
+        # it split test_dynamic_pricing.py 11/6/4/11 across the four
+        # shards and three of its tests failed from worker-pollution,
+        # the same class of leak ``--dist loadfile`` exists to prevent.
+        # Shard 3 running ~1-2 min longer than the rest is the accepted
+        # cost; a CI-weighted ``.test_durations`` refresh is the only
+        # safe rebalancing lever.
         # Refresh ``.test_durations`` occasionally with ``uv run pytest
         # --store-durations`` (HYPOTHESIS_PROFILE=ci for CI-like
         # weights); tests missing from the file are assumed average, so
@@ -343,7 +349,6 @@ jobs:
           uv run pytest --cov=. --cov-report= --cov-fail-under=0
           --cov-config=pyproject.toml -n auto --dist loadfile
           --splits 4 --group ${{ matrix.group }}
-          --splitting-algorithm least_duration
         timeout-minutes: 18
         env:
           HYPOTHESIS_PROFILE: ci

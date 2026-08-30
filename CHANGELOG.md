@@ -3,6 +3,36 @@
 
 
 
+## v3.24.0 (2026-08-30)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.23.0 [skip ci] ([`936a140`](https://github.com/vasilistotskas/grooveshop-django-api/commit/936a140fe1724f7820100f1879d144dbf0957512))
+
+### Features
+
+* feat: Greece country/region seeding, myDATA rate guardrails, multi-tenant test lane
+
+- country/region: seed Greece + its 12 regions (public schema,
+  get_or_create by natural PK, prod-derived dataset) so a fresh
+  environment converges without manual data entry
+- vat: rates are now validated against the myDATA category mapping at
+  save time (vat/constants.py is the single source of truth; the
+  builder asserts the two sets match at import time) - a rate outside
+  the mapping used to surface as a ValueError per order, deep inside
+  invoice submission, which is how production's stale 23% row was found
+- order: new `mydata_readiness` command (per-tenant / --all-tenants)
+  reporting unmapped VAT rates, NULL-vat products, and per-rate product
+  counts; non-zero exit on violations - the pre-flight gate before
+  enabling MYDATA_ENABLED (mandatory B2B e-invoicing lands in 2026)
+- tests_mt/: new multi-tenant smoke lane (sibling of tests/, real
+  TenantSyncRouter + TenantMainMiddleware, one session-scoped tenant
+  schema, 9 tests / ~3s) covering the schema-binding bug class the main
+  suite deliberately cannot see; separate `test-mt` CI job
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CxtjnZqaSCsdg1HdcVXwT3 ([`26028c5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/26028c565272da556f22c4e34184d51ea59b667f))
+
 ## v3.23.0 (2026-08-30)
 
 ### Bug fixes

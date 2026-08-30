@@ -89,6 +89,7 @@ serializers_config: SerializersConfig = {
     "images": ActionConfig(
         response=ProductImageSerializer,
         many=True,
+        paginated=False,
         operation_id="listProductImages",
         summary=_("Get product images"),
         description=_("Get all images for a product."),
@@ -114,6 +115,7 @@ serializers_config: SerializersConfig = {
     "tags": ActionConfig(
         response=TagSerializer,
         many=True,
+        paginated=False,
         operation_id="listProductTags",
         summary=_("Get product tags"),
         description=_("Get all tags associated with a product."),

@@ -36,6 +36,7 @@ serializers_config: SerializersConfig = {
     "get_regions_by_country_alpha_2": ActionConfig(
         response=RegionSerializer,
         many=True,
+        paginated=False,
         operation_id="listRegionsByCountry",
         summary=_("Get regions by country"),
         description=_(

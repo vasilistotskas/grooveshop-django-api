@@ -1,0 +1,8 @@
+{% extends "account/email/_security_notification_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Email changed" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block notification_message %}
+<p>{% blocktrans %}Your email has been changed from {{ from_email }} to {{ to_email }}.{% endblocktrans %}</p>
+{% endblock %}

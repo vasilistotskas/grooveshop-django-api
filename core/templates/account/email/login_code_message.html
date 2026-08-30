@@ -1,0 +1,16 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Your sign-in code" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "Your sign-in code" %}</h1>
+
+<p>{% trans "Your sign-in code is listed below. Please enter it in your open browser window." %}</p>
+
+<div class="email-card text-center">
+    <p style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #1f2937; margin: 0;">{{ code }}</p>
+</div>
+
+<p class="text-muted">{% trans "This mail can be safely ignored if you did not initiate this action." %}</p>
+{% endblock %}

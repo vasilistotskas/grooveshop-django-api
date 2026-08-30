@@ -32,14 +32,23 @@ from django.template.loader import render_to_string
 from core.utils.email_context import build_email_context
 
 EMAIL_TEMPLATE_ROOT = Path(settings.BASE_DIR) / "core" / "templates" / "emails"
+# django-allauth account emails (login code, password reset, email
+# confirmation, security notices) live in the separate ``account/email/``
+# tree — allauth's own template-lookup convention — but must be no less
+# themed than the rest of transactional mail, so the sweep covers both.
+ACCOUNT_EMAIL_TEMPLATE_ROOT = (
+    Path(settings.BASE_DIR) / "core" / "templates" / "account"
+)
+SWEPT_ROOTS = (EMAIL_TEMPLATE_ROOT, ACCOUNT_EMAIL_TEMPLATE_ROOT)
 
 
 class TestNoCssCustomProperties:
     def test_no_email_template_uses_var(self):
         """A single var() re-opens the invisible-CTA bug."""
         offenders = [
-            str(path.relative_to(EMAIL_TEMPLATE_ROOT))
-            for path in EMAIL_TEMPLATE_ROOT.rglob("*.html")
+            str(path.relative_to(root))
+            for root in SWEPT_ROOTS
+            for path in root.rglob("*.html")
             if "var(--" in path.read_text(encoding="utf-8")
         ]
         assert offenders == [], (
@@ -57,14 +66,19 @@ class TestNoCssCustomProperties:
         """The base is where branding and theming live.
 
         BoxNow was the lone exception and carried its own hardcoded
-        palette.
+        palette. ``{% include %}`` also counts: the allauth signup
+        confirmation email is a thin include of the (themed)
+        add-email confirmation template, mirroring allauth's own
+        ``email_confirmation_signup_message.txt`` convention.
         """
         orphans = []
-        for path in EMAIL_TEMPLATE_ROOT.rglob("*.html"):
-            if path.parent.name == "base":
-                continue
-            if "{% extends" not in path.read_text(encoding="utf-8"):
-                orphans.append(str(path.relative_to(EMAIL_TEMPLATE_ROOT)))
+        for root in SWEPT_ROOTS:
+            for path in root.rglob("*.html"):
+                if path.parent.name == "base":
+                    continue
+                text = path.read_text(encoding="utf-8")
+                if "{% extends" not in text and "{% include" not in text:
+                    orphans.append(str(path.relative_to(root)))
         assert orphans == [], (
             f"these bypass the shared base and its theming: {orphans}"
         )

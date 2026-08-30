@@ -1,0 +1,18 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Unknown account" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "No account found" %}</h1>
+
+<p>{% blocktrans %}You are receiving this email because you, or someone else, tried to access an account with email {{ email }}. However, we do not have any record of such an account.{% endblocktrans %}</p>
+
+<p class="text-muted">{% trans "This mail can be safely ignored if you did not initiate this action." %}</p>
+
+<p>{% trans "If it was you, you can sign up for an account using the link below." %}</p>
+
+<div class="text-center mt-2 mb-2">
+    <a href="{{ signup_url }}" class="email-button">{% trans "Create an account" %}</a>
+</div>
+{% endblock %}

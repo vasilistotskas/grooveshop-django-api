@@ -1,0 +1,8 @@
+{% extends "account/email/_security_notification_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Email removed" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block notification_message %}
+<p>{% blocktrans %}Email address {{ deleted_email }} has been removed from your account.{% endblocktrans %}</p>
+{% endblock %}

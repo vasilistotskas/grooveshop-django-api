@@ -33,6 +33,7 @@ serializers_config: SerializersConfig = {
     "all": ActionConfig(
         response=ProductCategorySerializer,
         many=True,
+        paginated=False,
         operation_id="listAllProductCategory",
         summary="List all product categories (unpaginated)",
         description="Retrieve all product categories without pagination. "

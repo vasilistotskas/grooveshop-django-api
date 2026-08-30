@@ -1,0 +1,16 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Account already exists" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% trans "Account already exists" %}</h1>
+
+<p>{% blocktrans %}You are receiving this email because you, or someone else, tried to sign up for an account using the email address {{ email }}. However, an account using that email address already exists.{% endblocktrans %}</p>
+
+<p>{% trans "In case you have forgotten about this, use the link below to recover your account:" %}</p>
+
+<div class="text-center mt-2 mb-2">
+    <a href="{{ password_reset_url }}" class="email-button">{% trans "Reset my password" %}</a>
+</div>
+{% endblock %}

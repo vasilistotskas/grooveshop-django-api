@@ -53,6 +53,7 @@ serializers_config: SerializersConfig = {
         request=ProductFavouriteByProductsRequestSerializer,
         response=ProductFavouriteByProductsResponseSerializer,
         many=True,
+        paginated=False,
         operation_id="getProductFavouritesByProducts",
         summary=_("Get favourites by product IDs"),
         description=_(

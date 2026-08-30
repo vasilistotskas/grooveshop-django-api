@@ -472,6 +472,18 @@ class TestUserAdmin:
 
     @pytest.mark.assert_english
     def test_loyalty_tier_name_none(self, admin_request):
+        """``loyalty_tier_name`` recomputes from the user's level via
+        ``LoyaltyService.get_user_tier`` — it never reads the ``obj.
+        loyalty_tier`` FK directly. So "no tier" only happens when NO
+        ``LoyaltyTier`` row qualifies at all (empty table), not merely
+        because this particular user's FK is unset. Clear the tiers
+        ``loyalty/migrations/0005_seed_default_loyalty_tiers`` seeds
+        (Bronze at required_level=1 would otherwise qualify every
+        level-1 user, including this one)."""
+        from loyalty.models.tier import LoyaltyTier
+
+        LoyaltyTier.objects.all().delete()
+
         admin = UserAdmin(UserAccount, AdminSite())
         user = UserAccountFactory(loyalty_tier=None)
 

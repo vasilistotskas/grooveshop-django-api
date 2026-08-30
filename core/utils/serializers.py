@@ -81,6 +81,14 @@ class ActionConfig:
     parameters: list | None = None
     deprecated: bool = False
     many: bool = False
+    # Only meaningful when ``many=True`` on a non-CRUD action: whether the
+    # action actually paginates its output (most do, via
+    # ``paginate_and_serialize``). A handful of custom actions return a
+    # deliberately unpaginated array (``@action(..., pagination_class=None)``
+    # + a bare ``serializer_class(queryset, many=True)`` call) — set this to
+    # ``False`` there so the schema doesn't advertise pagination params the
+    # view ignores.
+    paginated: bool = True
 
     def get_response_map(self, *, error_serializer=None, default_status=200):
         result = {}
@@ -209,6 +217,38 @@ def _build_pagination_parameters(include_pagination_params):
     ]
 
 
+def _build_custom_action_pagination_parameters(include_pagination_params):
+    """Pagination parameters for a custom (non-CRUD) ``many=True`` action.
+
+    Extends :func:`_build_pagination_parameters` with explicit ``page``/
+    ``cursor`` entries. drf-spectacular's paginator introspection — which
+    already documents ``page``/``cursor`` for the router-generated `list`
+    action — never fires for a hand-written ``@action`` method, so a
+    custom action has no other source for them. Kept out of
+    ``_build_pagination_parameters`` itself so `list` schemas are
+    untouched: merging these into that shared list would let spectacular
+    override the `list` action's introspected (better-localized) page/
+    cursor descriptions with these generic ones.
+    """
+    if not include_pagination_params:
+        return []
+    return [
+        *_build_pagination_parameters(True),
+        OpenApiParameter(
+            name="page",
+            description=_("Page number (pageNumber pagination strategy)"),
+            required=False,
+            type=int,
+        ),
+        OpenApiParameter(
+            name="cursor",
+            description=_("Opaque cursor (cursor pagination strategy)"),
+            required=False,
+            type=str,
+        ),
+    ]
+
+
 # Default status codes per CRUD action
 _CRUD_DEFAULT_STATUS = {
     "create": 201,
@@ -295,6 +335,9 @@ def create_schema_view_config(
     pagination_parameters = _build_pagination_parameters(
         include_pagination_params
     )
+    custom_action_pagination_parameters = (
+        _build_custom_action_pagination_parameters(include_pagination_params)
+    )
 
     list_parameters = []
     if language_parameter:
@@ -345,6 +388,24 @@ def create_schema_view_config(
             parameters = list_parameters
         elif action_name in {"create", "retrieve", "update", "partial_update"}:
             parameters = [language_parameter] if language_parameter else None
+        elif ac.many:
+            # Custom list-shaped action (e.g. a `paginate_and_serialize`
+            # action like replies/thread/my_comments). spectacular's
+            # paginator introspection only fires for the router-generated
+            # `list` action, never a hand-written `@action` method, so
+            # these documented NO pagination/language params at all even
+            # though the view honours them at runtime — the Nuxt proxy's
+            # generated Zod schema then strips the query params before
+            # they ever reach Django. Actions that opt out via
+            # `paginated=False` (a real `pagination_class=None` action)
+            # still get the language param: every response goes through
+            # `get_serializer_context()`'s language_code lookup.
+            many_parameters = []
+            if language_parameter:
+                many_parameters.append(language_parameter)
+            if ac.paginated:
+                many_parameters.extend(custom_action_pagination_parameters)
+            parameters = many_parameters
         else:
             parameters = None
 

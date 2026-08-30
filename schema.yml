@@ -512,6 +512,11 @@ paths:
         σελιδοποίηση.
       summary: Λήψη άρθρων συντάκτη
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -520,6 +525,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -531,24 +546,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|user_FirstName|\-user_FirstName|user_LastName|\-user_LastName|user_Email|\-user_Email|user_CreatedAt|\-user_CreatedAt|website|\-website)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|user_FirstName|\-user_FirstName|user_LastName|\-user_LastName|user_Email|\-user_Email|user_CreatedAt|\-user_CreatedAt|website|\-website))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -1032,6 +1064,11 @@ paths:
       description: Λήψη όλων των προγόνων (γονέας, παππούς κ.λπ.) αυτής της κατηγορίας.
       summary: Λήψη προγόνων κατηγορίας
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -1040,6 +1077,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -1050,24 +1097,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -1122,6 +1186,11 @@ paths:
       description: Λήψη άμεσων θυγατρικών κατηγοριών αυτής της κατηγορίας.
       summary: Λήψη θυγατρικών κατηγοριών
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -1130,6 +1199,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -1140,24 +1219,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -1212,6 +1308,11 @@ paths:
       description: Λήψη όλων των απογόνων (θυγατρικές, εγγόνια κ.λπ.) αυτής της κατηγορίας.
       summary: Λήψη απογόνων κατηγορίας
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -1220,6 +1321,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -1230,24 +1341,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -1406,6 +1534,11 @@ paths:
       description: Λήψη κατηγοριών-αδερφών (ίδιο επίπεδο γονέα).
       summary: Λήψη αδερφών κατηγοριών
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -1414,6 +1547,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -1424,24 +1567,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -1556,6 +1716,21 @@ paths:
         ή ιεραρχιών κατηγοριών.
       summary: Λήψη πλήρους δέντρου κατηγοριών
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -1566,24 +1741,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|sortOrder|\-sortOrder|level|\-level|lft|\-lft|rght|\-rght|treeId|\-treeId|name|\-name))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -2632,6 +2824,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
+      - in: query
         name: descendantOf
         schema:
           oneOf:
@@ -2727,6 +2924,16 @@ paths:
             - '0'
           - type: boolean
         description: Φίλτρο τελικών σχολίων (χωρίς εγκεκριμένες απαντήσεις)
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - in: query
         name: level
         schema:
@@ -2864,24 +3071,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|level|\-level|lft|\-lft|approved|\-approved)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|level|\-level|lft|\-lft|approved|\-approved))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: parent
         schema:
@@ -3167,6 +3391,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
+      - in: query
         name: descendantOf
         schema:
           oneOf:
@@ -3262,6 +3491,16 @@ paths:
             - '0'
           - type: boolean
         description: Φίλτρο τελικών σχολίων (χωρίς εγκεκριμένες απαντήσεις)
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - in: query
         name: level
         schema:
@@ -3399,24 +3638,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|level|\-level|lft|\-lft|approved|\-approved)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|level|\-level|lft|\-lft|approved|\-approved))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: parent
         schema:
@@ -3815,6 +4071,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
+      - in: query
         name: descendantOf
         schema:
           oneOf:
@@ -3902,6 +4163,16 @@ paths:
             - '0'
           - type: boolean
         description: Φίλτρο τελικών σχολίων (χωρίς εγκεκριμένες απαντήσεις)
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - in: query
         name: level
         schema:
@@ -4039,24 +4310,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|level|\-level|lft|\-lft|approved|\-approved)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|level|\-level|lft|\-lft|approved|\-approved))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: parent
         schema:
@@ -5594,6 +5882,11 @@ paths:
         description: Φίλτρο αντικειμένων που είναι επί του παρόντος δημοσιευμένα (published_at
           <= now και is_published=True)
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
+      - in: query
         name: featured
         schema:
           oneOf:
@@ -5637,6 +5930,16 @@ paths:
           - type: boolean
         description: Φίλτρο ανά κατάσταση δημοσίευσης
       - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
+      - in: query
         name: minComments
         schema:
           oneOf:
@@ -5678,24 +5981,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|publishedAt|\-publishedAt|viewCount|\-viewCount|featured|\-featured)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|publishedAt|\-publishedAt|viewCount|\-viewCount|featured|\-featured))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: publishedAfter
         schema:
@@ -5992,6 +6312,11 @@ paths:
         description: Φίλτρο αντικειμένων που είναι επί του παρόντος δημοσιευμένα (published_at
           <= now και is_published=True)
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
+      - in: query
         name: featured
         schema:
           oneOf:
@@ -6035,6 +6360,16 @@ paths:
           - type: boolean
         description: Φίλτρο ανά κατάσταση δημοσίευσης
       - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
+      - in: query
         name: minComments
         schema:
           oneOf:
@@ -6076,24 +6411,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|publishedAt|\-publishedAt|viewCount|\-viewCount|featured|\-featured)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|publishedAt|\-publishedAt|viewCount|\-viewCount|featured|\-featured))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: publishedAfter
         schema:
@@ -10334,24 +10686,56 @@ paths:
       description: List the gift cards linked to my account
       summary: List the gift cards linked to my account
       parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -10687,6 +11071,16 @@ paths:
       description: Λίστα όλων των tier πιστότητας
       summary: Λίστα όλων των tier πιστότητας
       parameters:
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: page
         required: false
         in: query
@@ -10758,24 +11152,56 @@ paths:
       description: Λίστα συναλλαγών πιστότητας
       summary: Λίστα συναλλαγών πιστότητας
       parameters:
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -14951,6 +15377,11 @@ paths:
           format: date-time
         description: Filter items created before this date
       - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
+      - in: query
         name: customerNotes
         schema:
           type: string
@@ -15115,6 +15546,16 @@ paths:
           - type: boolean
         description: Φίλτρο πληρωμένων/μη πληρωμένων παραγγελιών
       - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
+      - in: query
         name: lastName
         schema:
           type: string
@@ -15152,24 +15593,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|status|\-status|statusUpdatedAt|\-statusUpdatedAt|paidAmount|\-paidAmount|shippingPrice|\-shippingPrice|paymentStatus|\-paymentStatus|user_FirstName|\-user_FirstName|user_LastName|\-user_LastName)(?:,(?:id|\-id|createdAt|\-createdAt|updatedAt|\-updatedAt|status|\-status|statusUpdatedAt|\-statusUpdatedAt|paidAmount|\-paidAmount|shippingPrice|\-shippingPrice|paymentStatus|\-paymentStatus|user_FirstName|\-user_FirstName|user_LastName|\-user_LastName))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - in: query
         name: paidAmount_Gte
         schema:
@@ -21079,6 +21537,16 @@ paths:
           * `FEATURE` - Κεντρική Εικόνα
           * `PROMOTIONAL` - Προωθητική εικόνα
           * `SEASONAL` - Εποχιακή εικόνα
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -21197,6 +21665,16 @@ paths:
           * `FEATURE` - Κεντρική Εικόνα
           * `PROMOTIONAL` - Προωθητική εικόνα
           * `SEASONAL` - Εποχιακή εικόνα
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -23851,6 +24329,16 @@ paths:
           type: string
           format: date-time
         description: Filter items created before this date
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - in: query
         name: name
         schema:
@@ -26750,6 +27238,11 @@ paths:
       description: Λήψη όλων των διευθύνσεων για συγκεκριμένο χρήστη.
       summary: Λήψη διευθύνσεων χρήστη
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -26758,6 +27251,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -26768,24 +27271,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt)(?:,(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -26839,6 +27359,11 @@ paths:
       description: Λήψη όλων των σχολίων σε άρθρα που έχει γράψει συγκεκριμένος χρήστης.
       summary: Λήψη σχολίων blog χρήστη
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -26847,6 +27372,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -26857,24 +27392,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt)(?:,(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -26996,6 +27548,11 @@ paths:
         ώστε η διεπαφή να εμφανίζει την πρόοδο και τον τελευταίο σύνδεσμο λήψης.
       summary: Λίστα εξαγωγών δεδομένων GDPR
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -27004,6 +27561,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -27014,24 +27581,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt)(?:,(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -27155,6 +27739,11 @@ paths:
       description: Λήψη όλων των αγαπημένων προϊόντων για συγκεκριμένο χρήστη.
       summary: Λήψη αγαπημένων προϊόντων χρήστη
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -27163,6 +27752,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -27173,24 +27772,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt)(?:,(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -27244,6 +27860,11 @@ paths:
       description: Λήψη όλων των άρθρων που έχει επισημάνει συγκεκριμένος χρήστης.
       summary: Λήψη άρθρων με επισήμανση χρήστη
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -27252,6 +27873,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -27262,24 +27893,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt)(?:,(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -27434,6 +28082,11 @@ paths:
       description: Λήψη όλων των παραγγελιών για συγκεκριμένο χρήστη.
       summary: Λήψη παραγγελιών χρήστη
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -27442,6 +28095,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -27452,24 +28115,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt)(?:,(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -27524,6 +28204,11 @@ paths:
         χρήστης.
       summary: Λήψη κριτικών προϊόντος χρήστη
       parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+        description: Opaque cursor (cursor pagination strategy)
       - in: path
         name: id
         schema:
@@ -27532,6 +28217,16 @@ paths:
             pattern: ^-?\d+$
           - type: integer
         required: true
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       - name: ordering
         in: query
         required: false
@@ -27542,24 +28237,41 @@ paths:
         schema:
           type: string
           pattern: ^(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt)(?:,(?:id|\-id|email|\-email|username|\-username|createdAt|\-createdAt|updatedAt|\-updatedAt))*$
-      - name: page
-        required: false
-        in: query
-        description: A page number within the paginated result set.
+      - in: query
+        name: page
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
-      - name: pageSize
-        required: false
-        in: query
-        description: Number of results to return per page.
+        description: Page number (pageNumber pagination strategy)
+      - in: query
+        name: pageSize
         schema:
           oneOf:
           - type: string
             pattern: ^-?\d+$
           - type: integer
+        description: Αριθμός αποτελεσμάτων ανά σελίδα
+      - in: query
+        name: pagination
+        schema:
+          type: string
+          enum:
+          - 'false'
+          - 'true'
+          default: 'true'
+        description: Ενεργοποίηση/απενεργοποίηση σελιδοποίησης
+      - in: query
+        name: paginationType
+        schema:
+          type: string
+          enum:
+          - cursor
+          - limitOffset
+          - pageNumber
+          default: pageNumber
+        description: Τύπος στρατηγικής σελιδοποίησης
       - name: search
         required: false
         in: query
@@ -29981,6 +30693,17 @@ paths:
       description: Λήψη των θεμάτων εγγραφής στα οποία είναι εγγεγραμμένος και των
         διαθέσιμων θεμάτων για τον τρέχοντα χρήστη.
       summary: Λήψη συνδρομών μου
+      parameters:
+      - in: query
+        name: languageCode
+        schema:
+          type: string
+          enum:
+          - de
+          - el
+          - en
+          default: el
+        description: Κωδικός γλώσσας για μεταφράσεις (el, en, de)
       tags:
       - Subscription Topics
       security:

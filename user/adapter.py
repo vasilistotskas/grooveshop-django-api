@@ -13,6 +13,7 @@ from django.utils import translation
 from django.utils.encoding import force_str
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from core.utils.email_context import build_email_context
 from core.utils.i18n import resolve_request_language
 from core.utils.tenant_urls import get_tenant_frontend_url
 from tenant.credentials import tenant_from_email, tenant_site_name
@@ -32,12 +33,27 @@ class UserAccountAdapter(DefaultAccountAdapter):
         return user
 
     def send_mail(self, template_prefix, email, context):
+        """Merge in the shared branding/theme context before allauth
+        renders ``account/email/<name>_message.{html,txt}``.
+
+        Allauth builds its own context (``user``, ``code``/``key``,
+        ``activate_url``, etc.) with no knowledge of
+        ``core.utils.email_context.build_email_context`` — every other
+        transactional email routes through it, but allauth's own
+        ``send_mail`` never did, so ``core/templates/account/email/*``
+        would render with unresolved ``SITE_NAME``/``THEME`` variables.
+        allauth's own keys always win on collision (none exist today).
+        """
         user = context.get("user") if isinstance(context, dict) else None
         language = (
             getattr(user, "language_code", None) if user else None
         ) or settings.LANGUAGE_CODE
+        merged_context = {
+            **build_email_context(LANGUAGE_CODE=language),
+            **context,
+        }
         with translation.override(language):
-            return super().send_mail(template_prefix, email, context)
+            return super().send_mail(template_prefix, email, merged_context)
 
     def format_email_subject(self, subject: str) -> str:
         """Prefix the subject with the active tenant's display name.

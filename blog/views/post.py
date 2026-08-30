@@ -70,6 +70,7 @@ serializers_config: SerializersConfig = {
     "related_posts": ActionConfig(
         response=BlogPostSerializer,
         many=True,
+        paginated=False,
         operation_id="listBlogPostRelated",
         summary=_("Get related posts"),
         description=_("Get related posts for a blog post."),

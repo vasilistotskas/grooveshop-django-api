@@ -1,0 +1,21 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_content %}
+<h1>{% trans "Account security notice" %}</h1>
+
+<p>{% trans "You are receiving this email because the following change was made to your account:" %}</p>
+
+<div class="email-card">
+    {% block notification_message %}{% endblock %}
+</div>
+
+<p class="text-muted" style="font-size: 13px;">
+    {% trans "If you do not recognize this change then please take proper security precautions immediately. The change to your account originates from:" %}
+</p>
+<p class="text-muted" style="font-size: 13px;">
+    {% trans "IP address" %}: {{ ip }}<br>
+    {% trans "Browser" %}: {{ user_agent }}<br>
+    {% trans "Date" %}: {{ timestamp }}
+</p>
+{% endblock %}

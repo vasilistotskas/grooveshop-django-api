@@ -50,6 +50,7 @@ serializers_config: SerializersConfig = {
     "by_category": ActionConfig(
         response=ProductCategoryImageSerializer,
         many=True,
+        paginated=False,
         operation_id="getProductCategoryImagesByCategory",
         summary=_("Get images by category"),
         description=_("Retrieve all images for a specific category."),
@@ -58,6 +59,7 @@ serializers_config: SerializersConfig = {
     "by_type": ActionConfig(
         response=ProductCategoryImageSerializer,
         many=True,
+        paginated=False,
         operation_id="getProductCategoryImagesByType",
         summary=_("Get images by type"),
         description=_(

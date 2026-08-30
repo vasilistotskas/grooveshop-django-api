@@ -1,0 +1,27 @@
+{% extends "emails/base/email_base.html" %}
+{% load account %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Please confirm your email address" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+{% user_display user as user_display %}
+<h1>{% trans "Confirm your email address" %}</h1>
+
+<p>{% blocktrans %}You're receiving this email because {{ user_display }} added your email address to their account on {{ SITE_NAME }}.{% endblocktrans %}</p>
+
+{% if code %}
+<p>{% trans "Your email verification code is listed below. Please enter it in your open browser window." %}</p>
+<div class="email-card text-center">
+    <p style="font-size: 32px; font-weight: 700; letter-spacing: 4px; color: #1f2937; margin: 0;">{{ code }}</p>
+</div>
+{% else %}
+<div class="text-center mt-2 mb-2">
+    <a href="{{ activate_url }}" class="email-button">{% trans "Confirm my email" %}</a>
+</div>
+<p class="text-muted" style="font-size: 13px;">
+    {% trans "If the button doesn't work, copy and paste this link into your browser:" %}<br>
+    <a href="{{ activate_url }}">{{ activate_url }}</a>
+</p>
+{% endif %}
+{% endblock %}

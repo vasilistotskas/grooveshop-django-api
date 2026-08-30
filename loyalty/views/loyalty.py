@@ -66,6 +66,7 @@ serializers_config: SerializersConfig = {
     "tiers": ActionConfig(
         response=LoyaltyTierSerializer,
         many=True,
+        paginated=False,
         operation_id="listLoyaltyTiers",
         summary=_("List all loyalty tiers"),
         tags=["Loyalty"],

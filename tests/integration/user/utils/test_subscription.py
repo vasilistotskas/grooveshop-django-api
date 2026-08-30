@@ -9,7 +9,6 @@ from user.utils.subscription import (
     check_subscription_before_send,
     generate_unsubscribe_link,
     get_user_subscription_summary,
-    send_newsletter,
     send_subscription_confirmation,
 )
 
@@ -254,133 +253,6 @@ class TestSubscriptionUtils:
             "pk": self.user.pk,
         }
 
-    @override_settings(
-        DEFAULT_FROM_EMAIL="noreply@test.com",
-        NUXT_BASE_URL="https://test-site.com",
-    )
-    @patch("user.utils.subscription.render_to_string")
-    @patch("user.utils.subscription.EmailMultiAlternatives")
-    @patch("user.utils.subscription.generate_unsubscribe_link")
-    def test_send_newsletter_success(
-        self, mock_unsubscribe, mock_email_class, mock_render
-    ):
-        mock_render.return_value = "<html>Newsletter content</html>"
-        mock_unsubscribe.return_value = "https://test.com/unsubscribe/123/"
-        mock_email = MagicMock()
-        mock_email_class.return_value = mock_email
-
-        user2 = UserAccountFactory()
-        UserSubscription.objects.create(
-            user=self.user,
-            topic=self.topic,
-            status=UserSubscription.SubscriptionStatus.ACTIVE,
-        )
-        UserSubscription.objects.create(
-            user=user2,
-            topic=self.topic,
-            status=UserSubscription.SubscriptionStatus.ACTIVE,
-        )
-
-        context = {"newsletter_title": "Test Newsletter"}
-
-        result = send_newsletter(
-            topic=self.topic,
-            subject="Test Subject",
-            template_base="newsletter/test",
-            context=context,
-            batch_size=50,
-        )
-
-        assert result["sent"] == 2
-        assert result["failed"] == 0
-        assert result["skipped"] == 0
-        assert mock_email.send.call_count == 2
-
-    @override_settings(
-        DEFAULT_FROM_EMAIL="noreply@test.com",
-        NUXT_BASE_URL="https://test-site.com",
-    )
-    @patch("user.utils.subscription.render_to_string")
-    @patch("user.utils.subscription.EmailMultiAlternatives")
-    @patch("user.utils.subscription.generate_unsubscribe_link")
-    def test_send_newsletter_with_inactive_user(
-        self, mock_unsubscribe, mock_email_class, mock_render
-    ):
-        mock_render.return_value = "<html>Newsletter content</html>"
-        mock_unsubscribe.return_value = "https://test.com/unsubscribe/123/"
-        mock_email = MagicMock()
-        mock_email_class.return_value = mock_email
-
-        inactive_user = UserAccountFactory(is_active=False)
-        UserSubscription.objects.create(
-            user=inactive_user,
-            topic=self.topic,
-            status=UserSubscription.SubscriptionStatus.ACTIVE,
-        )
-
-        result = send_newsletter(
-            topic=self.topic,
-            subject="Test Subject",
-            template_base="newsletter/test",
-            context={},
-        )
-
-        assert result["sent"] == 0
-        assert result["failed"] == 0
-        assert result["skipped"] == 1
-        mock_email.send.assert_not_called()
-
-    @override_settings(
-        DEFAULT_FROM_EMAIL="noreply@test.com",
-        NUXT_BASE_URL="https://test-site.com",
-    )
-    @patch("user.utils.subscription.render_to_string")
-    @patch("user.utils.subscription.EmailMultiAlternatives")
-    @patch("user.utils.subscription.generate_unsubscribe_link")
-    def test_send_newsletter_email_exception(
-        self, mock_unsubscribe, mock_email_class, mock_render
-    ):
-        mock_render.return_value = "<html>Newsletter content</html>"
-        mock_unsubscribe.return_value = "https://test.com/unsubscribe/123/"
-        mock_email = MagicMock()
-        mock_email.send.side_effect = Exception("Email failed")
-        mock_email_class.return_value = mock_email
-
-        UserSubscription.objects.create(
-            user=self.user,
-            topic=self.topic,
-            status=UserSubscription.SubscriptionStatus.ACTIVE,
-        )
-
-        result = send_newsletter(
-            topic=self.topic,
-            subject="Test Subject",
-            template_base="newsletter/test",
-            context={},
-        )
-
-        assert result["sent"] == 0
-        assert result["failed"] == 1
-        assert result["skipped"] == 0
-
-    def test_send_newsletter_no_active_subscriptions(self):
-        UserSubscription.objects.create(
-            user=self.user,
-            topic=self.topic,
-            status=UserSubscription.SubscriptionStatus.PENDING,
-        )
-
-        result = send_newsletter(
-            topic=self.topic,
-            subject="Test Subject",
-            template_base="newsletter/test",
-            context={},
-        )
-
-        assert result["sent"] == 0
-        assert result["failed"] == 0
-        assert result["skipped"] == 0
-
     def test_get_user_subscription_summary_empty(self):
         result = get_user_subscription_summary(self.user)
 
@@ -526,28 +398,3 @@ class TestSubscriptionUtils:
 
         mock_logger.error.assert_called_once()
         assert "No confirmation token" in mock_logger.error.call_args[0][0]
-
-    @patch("user.utils.subscription.logger")
-    def test_send_newsletter_logs_stats(self, mock_logger):
-        UserSubscription.objects.create(
-            user=self.user,
-            topic=self.topic,
-            status=UserSubscription.SubscriptionStatus.ACTIVE,
-        )
-
-        with (
-            patch("user.utils.subscription.render_to_string"),
-            patch("user.utils.subscription.EmailMultiAlternatives"),
-            patch("user.utils.subscription.generate_unsubscribe_link"),
-        ):
-            send_newsletter(
-                topic=self.topic,
-                subject="Test",
-                template_base="test",
-                context={},
-            )
-
-            mock_logger.info.assert_called()
-            log_message = mock_logger.info.call_args[0][0]
-            assert "Newsletter sent for topic" in log_message
-            assert "1 sent, 0 failed, 0 skipped" in log_message

@@ -33,6 +33,7 @@ class TestProductAlertEmailUnsubscribeHeaders:
         INFO_EMAIL="info@example.com",
         SITE_NAME="GrooveShop",
         API_BASE_URL="https://api.example.com",
+        NUXT_BASE_URL="https://example.com",
     )
     def test_user_bound_alert_emits_list_unsubscribe_headers(self):
         user = UserAccountFactory(num_addresses=0)
@@ -68,9 +69,11 @@ class TestProductAlertEmailUnsubscribeHeaders:
             == "List-Unsubscribe=One-Click"
         )
 
-        # List-ID lets mailbox providers bucket per-list reputation.
+        # List-ID lets mailbox providers bucket per-list reputation. RFC
+        # 2919 requires a bracketed ``label.domain`` — no display names.
         assert (
-            msg.extra_headers["List-ID"] == "product-restock-alerts.GrooveShop"
+            msg.extra_headers["List-ID"]
+            == "<product-restock-alerts.example.com>"
         )
 
     @override_settings(DEFAULT_FROM_EMAIL="from@example.com")

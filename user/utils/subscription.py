@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 from datetime import timedelta
 
@@ -10,20 +11,18 @@ from extra_settings.models import Setting
 from core.utils.email_context import build_email_context
 from core.utils.tenant_urls import (
     get_tenant_api_base_url,
-    get_tenant_frontend_url,
+    get_tenant_base_url,
 )
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
-    tenant_site_name,
 )
 from django.contrib.auth import get_user_model
 from django.core import signing
-from django.core.cache import cache
 from django.db import connection
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from django.utils import timezone, translation
+from django.utils import translation
 from django.utils.translation import gettext as _
 
 from core.utils.i18n import get_user_language
@@ -198,6 +197,19 @@ def generate_blanket_unsubscribe_link(
     return f"{base_url}/api/v1/user/unsubscribe/{token}"
 
 
+def _list_id_domain() -> str:
+    """Bare hostname for the ``List-ID`` domain half.
+
+    RFC 2919 requires the identifier to be ``list-label.domain`` enclosed
+    in angle brackets, with no spaces or display names inside the
+    brackets — ``tenant_site_name()`` (a human store name, potentially
+    containing spaces/unicode) does not qualify. Uses the same tenant
+    domain ``get_tenant_frontend_url`` resolves against, never a
+    hardcoded platform domain.
+    """
+    return urlsplit(get_tenant_base_url()).netloc
+
+
 def build_list_unsubscribe_headers(
     unsubscribe_url: str, *, list_id: str
 ) -> dict[str, str]:
@@ -218,7 +230,7 @@ def build_list_unsubscribe_headers(
             f"<{unsubscribe_url}>"
         ),
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        "List-ID": f"{list_id}.{tenant_site_name()}",
+        "List-ID": f"<{list_id}.{_list_id_domain()}>",
     }
 
 
@@ -240,98 +252,8 @@ def build_transactional_list_headers(*, list_id: str) -> dict[str, str]:
         "List-Unsubscribe": (
             f"<mailto:{tenant_contact_email()}?subject=unsubscribe>"
         ),
-        "List-ID": f"{list_id}.{tenant_site_name()}",
+        "List-ID": f"<{list_id}.{_list_id_domain()}>",
     }
-
-
-def send_newsletter(
-    topic: SubscriptionTopic,
-    subject: str,
-    template_base: str,
-    context: dict[str, Any],
-    batch_size: int = 100,
-    force: bool = False,
-    dedup_window_hours: int = 24,
-) -> dict[str, int]:
-    """Send a newsletter to every ACTIVE subscriber of `topic`.
-
-    The HTML/TXT body is rendered per-user under `translation.override(user.language_code)`;
-    subject is caller-resolved (translate it in the caller if needed).
-
-    Dedup: a Redis key `newsletter:sent:{slug}:{uid}:{date}` holds a flag for
-    `dedup_window_hours`; set `force=True` to bypass (e.g. intentional re-send
-    after a content fix).
-    """
-    stats = {"sent": 0, "failed": 0, "skipped": 0}
-
-    active_subscriptions = UserSubscription.objects.filter(
-        topic=topic, status=UserSubscription.SubscriptionStatus.ACTIVE
-    ).select_related("user")
-
-    today = timezone.now().date().isoformat()
-    dedup_ttl_seconds = int(timedelta(hours=dedup_window_hours).total_seconds())
-
-    for subscription in active_subscriptions.iterator(chunk_size=batch_size):
-        user = subscription.user
-
-        if not user.is_active or not user.email:
-            stats["skipped"] += 1
-            continue
-
-        cache_key = f"newsletter:sent:{topic.slug}:{user.pk}:{today}"
-        if not force and cache.get(cache_key):
-            stats["skipped"] += 1
-            continue
-
-        unsubscribe_url = generate_unsubscribe_link(user, topic)
-        user_context = build_email_context(
-            **{
-                **context,
-                "user": user,
-                "topic": topic,
-                "subscription": subscription,
-                "unsubscribe_url": unsubscribe_url,
-                "preferences_url": get_tenant_frontend_url(
-                    "/account/subscriptions/"
-                ),
-            }
-        )
-
-        try:
-            with translation.override(get_user_language(user)):
-                html_message = render_to_string(
-                    f"{template_base}.html", user_context
-                )
-                text_message = render_to_string(
-                    f"{template_base}.txt", user_context
-                )
-
-            email = EmailMultiAlternatives(
-                subject=subject,
-                body=text_message,
-                from_email=tenant_from_email(),
-                to=[user.email],
-                reply_to=[tenant_contact_email()],
-                headers=build_list_unsubscribe_headers(
-                    unsubscribe_url, list_id=topic.slug
-                ),
-            )
-            email.attach_alternative(html_message, "text/html")
-            email.send()
-
-            cache.set(cache_key, True, timeout=dedup_ttl_seconds)
-            stats["sent"] += 1
-
-        except Exception as e:
-            logger.error(f"Failed to send newsletter to {user.email}: {e}")
-            stats["failed"] += 1
-
-    logger.info(
-        f"Newsletter sent for topic {topic.slug}: "
-        f"{stats['sent']} sent, {stats['failed']} failed, {stats['skipped']} skipped"
-    )
-
-    return stats
 
 
 def get_user_subscription_summary(user: "User") -> dict[str, Any]:

@@ -55,6 +55,7 @@ subscription_topic_config: SerializersConfig = {
     "my_subscriptions": ActionConfig(
         response=SubscriptionTopicSerializer,
         many=True,
+        paginated=False,
         operation_id="getMySubscriptionTopics",
         summary=_("Get my subscriptions"),
         description=_(

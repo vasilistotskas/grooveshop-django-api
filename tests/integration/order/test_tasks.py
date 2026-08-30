@@ -132,34 +132,36 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         )
         self.assertNotIn("&lt;div&gt;", html_body)
 
-    @override_settings(SITE_NAME="GrooveShop")
-    @patch(
-        "user.utils.subscription.tenant_site_name", return_value="Branded Store"
+    @override_settings(
+        SITE_NAME="GrooveShop", NUXT_BASE_URL="https://brandedstore.example"
     )
     @patch(
         "core.utils.email_context.tenant_site_name",
         return_value="Branded Store",
     )
     def test_order_confirmation_uses_tenant_store_name(
-        self, mock_context_site_name, mock_subscription_site_name
+        self, mock_context_site_name
     ):
-        """``SITE_NAME`` context / ``List-ID`` header must come from
-        ``tenant_site_name()`` (the active tenant's ``store_name``), not
-        the platform-wide ``settings.SITE_NAME`` — a tenant-B customer's
-        confirmation email must say "Branded Store", never "GrooveShop".
+        """``SITE_NAME`` context must come from ``tenant_site_name()`` (the
+        active tenant's ``store_name``), not the platform-wide
+        ``settings.SITE_NAME`` — a tenant-B customer's confirmation email
+        must say "Branded Store", never "GrooveShop". The ``List-ID``
+        header carries the tenant's domain (RFC 2919 — no display names
+        allowed inside the identifier), resolved via
+        ``get_tenant_base_url`` and falling back to ``NUXT_BASE_URL`` in
+        this schema-less test context.
 
         ``send_order_confirmation_email`` is a ``TenantTask``: a direct
         (non-``apply_async``) call in tests always executes inside
         ``schema_context("public")`` (no ``_schema_name`` header), so
         binding a fake ``connection.tenant`` before the call would be
         silently overridden for the task's duration. Patching
-        ``tenant_site_name`` at each call site instead exercises exactly
-        what TASK A changed — the ``SITE_NAME`` context key is now built
-        centrally by ``core.utils.email_context.build_email_context``
-        (every email task routes through it), while the ``List-ID``
-        header still calls ``tenant_site_name`` directly in
-        ``user.utils.subscription.build_transactional_list_headers`` —
-        without fighting the schema-switch machinery.
+        ``tenant_site_name`` at the email-context call site instead
+        exercises exactly what TASK A changed — the ``SITE_NAME`` context
+        key is now built centrally by
+        ``core.utils.email_context.build_email_context`` (every email
+        task routes through it) — without fighting the schema-switch
+        machinery.
 
         Renders the REAL templates (render_to_string is NOT mocked), same
         approach as the WYSIWYG-safety test above.
@@ -183,7 +185,8 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         headers = mock_email.call_args.kwargs.get("headers", {})
         self.assertEqual(
-            headers.get("List-ID"), "order_confirmation.Branded Store"
+            headers.get("List-ID"),
+            "<order_confirmation.brandedstore.example>",
         )
 
     @patch(

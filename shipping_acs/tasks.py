@@ -32,6 +32,7 @@ from shipping_acs.exceptions import (
     AcsRetryableError,
 )
 from core.utils.email_context import build_email_context
+from core.utils.i18n import get_order_language
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -613,10 +614,7 @@ def acs_send_arrival_notification(self, shipment_id: int) -> dict[str, Any]:
         return {"status": "not_found", "shipment_id": shipment_id}
 
     order = shipment.order
-    lang = (
-        getattr(order, "language_code", None) or settings.LANGUAGE_CODE or "el"
-    )
-    with translation.override(lang):
+    with translation.override(get_order_language(order)):
         subject = _("Your ACS parcel is out for delivery")
         context = build_email_context(
             order=order,

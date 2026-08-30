@@ -29,7 +29,10 @@ from tenant.credentials import (
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
 from order.services import OrderService
-from user.utils.subscription import build_transactional_list_headers
+from user.utils.subscription import (
+    build_list_unsubscribe_headers,
+    build_transactional_list_headers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1851,13 +1854,16 @@ def send_checkout_abandonment_emails() -> int:
                 html_content = render_to_string(
                     "emails/cart/checkout_abandoned.html", context
                 )
-            headers = {"List-ID": f"abandoned-cart.{tenant_site_name()}"}
             if unsubscribe_url:
-                headers["List-Unsubscribe"] = (
-                    f"<mailto:{tenant_contact_email()}?subject=unsubscribe>, "
-                    f"<{unsubscribe_url}>"
+                headers = build_list_unsubscribe_headers(
+                    unsubscribe_url, list_id="abandoned-cart"
                 )
-                headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+            else:
+                headers = {
+                    "List-ID": build_transactional_list_headers(
+                        list_id="abandoned-cart"
+                    )["List-ID"]
+                }
             msg = EmailMultiAlternatives(
                 subject,
                 text_content,

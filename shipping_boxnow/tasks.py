@@ -4,7 +4,6 @@ import logging
 from typing import Any
 
 from celery import shared_task
-from django.conf import settings
 from django.utils import translation
 
 from shipping_boxnow.exceptions import (
@@ -13,6 +12,7 @@ from shipping_boxnow.exceptions import (
     BoxNowRetryableError,
 )
 from core.utils.email_context import build_email_context
+from core.utils.i18n import get_order_language
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -331,10 +331,7 @@ def boxnow_send_arrival_notification(
     )
 
     # --- Email -----------------------------------------------------------
-    lang = (
-        getattr(order, "language_code", None) or settings.LANGUAGE_CODE or "el"
-    )
-    with translation.override(lang):
+    with translation.override(get_order_language(order)):
         subject = _("Your BOX NOW parcel arrived at the locker")
         context = build_email_context(
             order=order,

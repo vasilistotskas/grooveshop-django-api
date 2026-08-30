@@ -59,7 +59,7 @@ from order.mydata.types import (
 )
 from order.discounts import discounted_line_gross
 from order.mydata.uid import build_uid
-
+from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 
 # VAT rate → AADE ``vatCategory``. Strict whitelist per v1.0.10 annex
 # 8.x; unknown rates are treated as a bug upstream (in master data)
@@ -76,6 +76,16 @@ _VAT_CATEGORY_BY_RATE: dict[Decimal, int] = {
     Decimal("3"): VAT_CATEGORY_3,  # Law 5057/2023
     Decimal("0"): VAT_CATEGORY_0,
 }
+# ``vat.constants.MYDATA_SUPPORTED_VAT_RATES`` mirrors these keys so the
+# ``Vat`` model can reject an unmapped rate at save time (``order``
+# cannot be imported from ``vat`` — see that module's docstring for
+# why). This assertion is the tripwire that keeps the two from ever
+# silently drifting apart: editing one without the other now fails
+# at import time instead of at invoice-submission time.
+assert set(_VAT_CATEGORY_BY_RATE) == MYDATA_SUPPORTED_VAT_RATES, (
+    "_VAT_CATEGORY_BY_RATE and vat.constants.MYDATA_SUPPORTED_VAT_RATES "
+    "have drifted apart — update both."
+)
 # Rates that are NOT taxed — these land in vatCategory=7 and need
 # ``vatExemptionCategory`` per AADE error 217.
 _ZERO_RATED = Decimal("0")

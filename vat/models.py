@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.postgres.indexes import BTreeIndex
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import CheckConstraint, Q
@@ -8,10 +9,34 @@ from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.models import TimeStampMixinModel, UUIDModel
+from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 from vat.managers import VatManager
 
 MIN_VAT_VALUE = Decimal("0.0")
 MAX_VAT_VALUE = Decimal("100.0")
+
+
+def validate_mydata_vat_rate(value) -> None:
+    """Reject a VAT rate ``order/mydata/builder.py`` cannot map.
+
+    A rate outside ``MYDATA_SUPPORTED_VAT_RATES`` would build an
+    invoice fine and then raise ``ValueError`` deep inside
+    ``order.mydata.service.submit_invoice`` for every order that uses
+    it — surfacing here instead, at row-save time, is far cheaper to
+    fix than a submission failure discovered after the fact.
+    """
+    if Decimal(value) not in MYDATA_SUPPORTED_VAT_RATES:
+        allowed = ", ".join(
+            f"{rate:g}%"
+            for rate in sorted(MYDATA_SUPPORTED_VAT_RATES, reverse=True)
+        )
+        raise ValidationError(
+            _(
+                "%(value)s%% is not a myDATA-recognised VAT rate. "
+                "Allowed rates: %(allowed)s."
+            ),
+            params={"value": value, "allowed": allowed},
+        )
 
 
 class Vat(TimeStampMixinModel, UUIDModel):
@@ -30,6 +55,7 @@ class Vat(TimeStampMixinModel, UUIDModel):
                 MAX_VAT_VALUE,
                 message=_("VAT value cannot exceed %(limit_value)s."),
             ),
+            validate_mydata_vat_rate,
         ],
     )
 

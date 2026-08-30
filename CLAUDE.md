@@ -179,6 +179,8 @@ Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key
 - `count_queries` fixture and `QueryCountAssertionMixin` for N+1 detection
 - Coverage minimum: 50% (`fail_under = 50`), timeout: 600s
 
+**MT (multi-tenant) lane** — `tests_mt/` is a SIBLING of `tests/`, not a subdirectory: `tests/conftest.py` strips multi-tenancy (`DATABASE_ROUTERS = []`, no `TenantMainMiddleware`) to keep the main suite fast, which makes schema-binding bugs (cross-schema FKs, cache-key leaks, seed migrations that stop reaching new tenants) invisible to it. `tests_mt/conftest.py` keeps the real `TenantSyncRouter` and `TenantMainMiddleware`, provisions one tenant schema per session, and runs a handful of high-leverage smoke tests on top. Not collected by a bare `uv run pytest` (`testpaths = ["tests"]` excludes it) — run it explicitly with `uv run pytest tests_mt -n 0` (serial; schema switching is process-global via `connection`).
+
 ### Infrastructure (Docker)
 
 - `infra.compose.yml` — PostgreSQL 17, Redis, RabbitMQ, Meilisearch v1.42.1, pgAdmin, RedisInsight

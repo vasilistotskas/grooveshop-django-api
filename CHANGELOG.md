@@ -3,6 +3,57 @@
 
 
 
+## v3.23.0 (2026-08-30)
+
+### Bug fixes
+
+* fix: RFC 2919 List-ID headers, order-language stragglers, dead code removal
+
+- List-ID now emits the RFC 2919 angle-bracketed <label.domain> form
+  with the tenant's real domain instead of a display name with spaces;
+  the abandoned-cart task uses the shared header helpers instead of
+  hand-rolling its own
+- ACS/BoxNow notification tasks resolve the customer language via
+  get_order_language() like every other order email path
+- remove send_newsletter (zero production callers) and the applied
+  one-off SEO content script (verified executed against production)
+- payment-failure tests now document the real stock design: a failed
+  payment keeps stock through the retry grace window; release happens
+  terminally via auto_cancel_stuck_pending_orders -> cancel_order, now
+  covered end-to-end (cancel after threshold, no double-restore, grace
+  window respected, linked reservations released)
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CxtjnZqaSCsdg1HdcVXwT3 ([`ff90f0f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff90f0f9fafc271c4f1c2b7ede6450b092a2ac88))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.22.1 [skip ci] ([`1ab6ba7`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ab6ba795a3f47434188f0b9340ada6a5fc7e2e4))
+
+### Features
+
+* feat: pagination params on custom actions, seeded loyalty tiers, branded allauth emails
+
+- OpenAPI: create_schema_view_config now documents language + pagination
+  parameters (paginationType/pagination/pageSize plus explicit page and
+  cursor) on custom paginated many=True actions - spectacular's paginator
+  introspection never fires for hand-written @action methods, so the
+  Nuxt proxy's generated Zod schema silently stripped the cursor and
+  replies pagination was inert in production. New ActionConfig.paginated
+  flag lets genuinely unpaginated array actions opt out (9 audited and
+  marked). 26 operations gained parameters; the schema diff is purely
+  additive
+- loyalty: seed the 4 default tiers per tenant schema
+  (get_or_create-only, following the vat/pay_way seeding precedents)
+- email: allauth account emails (verification codes, password reset,
+  ...) now render branded HTML alternatives - 12 templates under
+  core/templates/account/email/ extending the shared email base, with
+  UserAccountAdapter.send_mail merging build_email_context() so tenant
+  theming resolves; template guard sweeps extended to the new directory
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CxtjnZqaSCsdg1HdcVXwT3 ([`4047186`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4047186591cbaf1191c03ae7b182129bd394d3fb))
+
 ## v3.22.1 (2026-08-29)
 
 ### Bug fixes

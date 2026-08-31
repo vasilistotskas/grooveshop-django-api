@@ -3,6 +3,61 @@
 
 
 
+## v3.25.2 (2026-08-31)
+
+### Bug fixes
+
+* fix(b2b): keep wholesale carts out of the loyalty program entirely
+
+Accrual was already gated on B2B_LOYALTY_ENABLED, but redemption was
+not: a wholesale buyer could still spend retail-basis points as a
+further discount on already-negotiated prices — exactly the "retail
+program subsidizing wholesale" the accrual gate was written to prevent.
+The checkout also advertised "you'll earn N points" on orders the
+backend awards nothing for.
+
+Make the one setting govern both halves. B2BService.loyalty_allowed()
+is now the single source both sides read, and suppresses_loyalty(cart)
+answers it for a bound cart. The redemption is dropped right after
+bind_cart in both order-create paths and at payment-intent creation —
+before any pricing math, so the verified intent amount, the order total
+and redeem_points all agree (dropping it later would leave the capture
+disagreeing with paid_amount).
+
+The cart's b2bPricing block gains allowLoyalty so the storefront can
+hide the points-earned promise and the redemption widget instead of
+offering a discount that would silently not apply.
+
+Also covers the admin, which had none: the detail actions are the only
+sanctioned way to move a profile's status, and the dialog ones only run
+once BaseDialogForm validates — so the tests drive real POST data
+rather than a stub form, which is what proves an empty dialog cannot
+silently approve and that an inactive tier is not selectable.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01X8CBdikFcL8Wthy41ZJcSD ([`dc40131`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dc401315155b69492ec9a1df4a6eb5eb57a795ea))
+
+* fix(cart): scale total VAT by line quantity
+
+Cart.total_vat_value summed each item's PER-UNIT vat_value, while
+total_price and total_discount_value both use the quantity-aware
+total_* item properties. Any line with quantity > 1 therefore
+under-reported VAT, and the cart summary's net/VAT split never added up
+to the (correct) total price — a cart of 8 items showed 52.25 + 5.10
+against a total of 57.35 instead of 46.25 + 11.10.
+
+Retail carts were affected too; wholesale pricing only made it easy to
+spot. Add CartItem.total_vat_value mirroring the other two totals, and
+assert the reconciliation (price x qty + VAT - discount == total) so
+the three totals cannot drift apart again.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01X8CBdikFcL8Wthy41ZJcSD ([`ab84ee6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ab84ee6550f44205b3b3beb950d4812a40f34b5e))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.25.1 [skip ci] ([`4b2dcc9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4b2dcc9735486050b3790c555ad5a50cf1ab396d))
+
 ## v3.25.1 (2026-08-31)
 
 ### Bug fixes

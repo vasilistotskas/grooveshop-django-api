@@ -418,9 +418,17 @@ class OrderService:
             # payment fee, item price snapshots, PaymentIntent amount
             # verification) must see the same prices the cart preview
             # showed. Kept in lockstep with the offline path.
-            from b2b.services import B2BPricingService  # noqa: PLC0415
+            from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
 
             B2BPricingService.bind_cart(cart, user)
+
+            # Wholesale carts sit outside the loyalty program unless the
+            # merchant opts in. Dropped HERE, before any pricing math,
+            # so the verified PaymentIntent amount, the order total and
+            # ``redeem_points`` all agree — dropping it later would let
+            # the capture disagree with ``paid_amount``.
+            if B2BService.suppresses_loyalty(cart):
+                loyalty_points_to_redeem = 0
 
             # Wholesale minimum-order-value gate (standard B2B term).
             # Checked here AND at payment-intent creation so an online
@@ -1088,9 +1096,14 @@ class OrderService:
 
             # Step 2.4: Re-bind wholesale pricing on the LOCKED cart
             # (see the payment-first path for the rationale).
-            from b2b.services import B2BPricingService  # noqa: PLC0415
+            from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
 
             B2BPricingService.bind_cart(cart, user)
+
+            # Wholesale carts sit outside the loyalty program unless the
+            # merchant opts in (see the payment-first path).
+            if B2BService.suppresses_loyalty(cart):
+                loyalty_points_to_redeem = 0
 
             # Wholesale minimum-order-value gate (standard B2B term).
             # Checked here AND at payment-intent creation so an online

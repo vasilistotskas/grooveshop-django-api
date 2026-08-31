@@ -1516,10 +1516,12 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "bool",
         "value": False,
     },
-    # Whether wholesale-priced orders accrue loyalty points. Off by
-    # default: the points basis is the RETAIL price, so a negotiated
-    # price would earn full retail-basis points — a retail program
-    # subsidizing wholesale.
+    # Whether wholesale-priced orders take part in the loyalty program
+    # — BOTH earning and redeeming. Off by default: the points basis is
+    # the RETAIL price, so a negotiated price would earn full
+    # retail-basis points and redeem them for a further discount on
+    # already-discounted prices — a retail program subsidizing
+    # wholesale. One switch, so the two halves can never disagree.
     {
         "name": "B2B_LOYALTY_ENABLED",
         "type": "bool",

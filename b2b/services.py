@@ -88,6 +88,31 @@ class B2BService:
         return bool(Setting.get("B2B_ALLOW_PROMOTIONS", default=False))
 
     @classmethod
+    def loyalty_allowed(cls) -> bool:
+        """Whether wholesale orders take part in the loyalty program.
+
+        Governs BOTH halves — earning and redeeming. The points basis
+        is the retail price, so a wholesale order would otherwise earn
+        retail-basis points and let them be redeemed as a further
+        discount on already-negotiated prices: a retail program
+        subsidizing wholesale. Off by default; one switch so the two
+        halves can never disagree.
+        """
+        return bool(Setting.get("B2B_LOYALTY_ENABLED", default=False))
+
+    @classmethod
+    def suppresses_loyalty(cls, cart) -> bool:
+        """Whether this cart's loyalty redemption must be dropped.
+
+        True only for a cart actually bound to wholesale pricing while
+        the merchant keeps wholesale out of the loyalty program.
+        """
+        return (
+            B2BPricingService.cart_pricing_active(cart)
+            and not cls.loyalty_allowed()
+        )
+
+    @classmethod
     def resolve_group(cls, user) -> CustomerGroup | None:
         """The wholesale group pricing binds to, or None.
 

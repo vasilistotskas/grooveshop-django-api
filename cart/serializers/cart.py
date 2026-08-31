@@ -89,6 +89,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
                 "applied": {"type": "boolean"},
                 "groupName": {"type": "string"},
                 "allowPromotions": {"type": "boolean"},
+                "allowLoyalty": {"type": "boolean"},
                 "minOrderValue": {"type": "string"},
                 "belowMinimum": {"type": "boolean"},
             },
@@ -107,6 +108,12 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             # the storefront hides the coupon input when they don't, so
             # shoppers never type codes the engine will silently ignore.
             "allow_promotions": B2BService.promotions_allowed(),
+            # Whether this cart earns AND can redeem loyalty points.
+            # The storefront hides both the points-earned promise and
+            # the redemption widget when false — the backend drops a
+            # redemption on these carts, so promising points here would
+            # advertise a reward that is never granted.
+            "allow_loyalty": B2BService.loyalty_allowed(),
             # Standard wholesale term: the sidebar warns (and checkout
             # refuses) below this items total. "0.00" disables it.
             "min_order_value": str(context.group.min_order_value.amount),

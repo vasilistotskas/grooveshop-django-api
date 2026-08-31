@@ -672,7 +672,7 @@ class CartViewSet(BaseModelViewSet):
         # Wholesale minimum-order-value gate — refuse to mint an intent
         # order-create would reject AFTER the customer confirmed (and
         # possibly captured) the payment.
-        from b2b.services import B2BPricingService  # noqa: PLC0415
+        from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
 
         unmet_minimum = B2BPricingService.min_order_value_unmet(cart)
         if unmet_minimum is not None:
@@ -786,6 +786,11 @@ class CartViewSet(BaseModelViewSet):
         loyalty_points = request_serializer.validated_data.get(
             "loyalty_points_to_redeem"
         )
+        # Wholesale carts sit outside the loyalty program unless the
+        # merchant opts in — drop it here too, so this intent matches
+        # what order creation will charge (which drops it as well).
+        if B2BService.suppresses_loyalty(cart):
+            loyalty_points = 0
         if loyalty_points and loyalty_points > 0:
             if not request.user.is_authenticated:
                 return Response(

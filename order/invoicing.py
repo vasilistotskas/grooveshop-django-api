@@ -84,7 +84,14 @@ def _seller_snapshot() -> dict[str, str]:
 
 def _buyer_snapshot(order: Order) -> dict[str, str]:
     """Capture the buyer fields at issue time (order state is mutable
-    until the invoice is frozen)."""
+    until the invoice is frozen).
+
+    Company requisites (Επωνυμία / ΑΦΜ / ΔΟΥ / activity + the
+    registered address) render the B2B block on the PDF; blank on
+    legacy rows and retail receipts, so the template guards on
+    presence. Billing address falls back to the shipping address for
+    orders created before the billing columns existed.
+    """
     return {
         "name": f"{order.first_name} {order.last_name}".strip(),
         "email": order.email,
@@ -99,6 +106,19 @@ def _buyer_snapshot(order: Order) -> dict[str, str]:
         "region": (order.region.name if order.region_id else "")
         if hasattr(order, "region")
         else "",
+        "company_name": order.billing_company_name,
+        "vat_id": order.billing_vat_id,
+        "tax_office": order.billing_tax_office,
+        "activity": order.billing_activity,
+        # ISO code of the buyer's TAX country (may differ from the
+        # shipping country the ``country`` key above renders).
+        "billing_country": order.billing_country,
+        "billing_address_line_1": (
+            f"{order.billing_street} {order.billing_street_number}".strip()
+            or f"{order.street} {order.street_number}".strip()
+        ),
+        "billing_city": order.billing_city or order.city,
+        "billing_postal_code": order.billing_zipcode or order.zipcode,
     }
 
 

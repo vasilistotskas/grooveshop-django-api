@@ -1,0 +1,7 @@
+{% load i18n %}{% blocktrans with company=profile.company_name %}Good news — the business account for {{ company }} has been approved.{% endblocktrans %}
+
+{% trans "Company" %}: {{ profile.company_name }}
+{% trans "VAT number (ΑΦΜ)" %}: {{ profile.vat_id }}
+{% if profile.customer_group %}{% trans "Pricing tier" %}: {{ profile.customer_group.name }}
+{% endif %}
+{% trans "From now on, your wholesale prices apply automatically while you are signed in — in the cart, at checkout, and on your invoices." %}

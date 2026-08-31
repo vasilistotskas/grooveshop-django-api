@@ -1,0 +1,21 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "Update on your business account application" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<div style="background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); padding: 32px 24px; text-align: center; border-radius: 8px; margin-bottom: 24px;">
+    <h2 style="color: white; font-size: 28px; margin: 0;">{% trans "Update on your business account application" %}</h2>
+</div>
+
+<p>{% blocktrans with company=profile.company_name %}Unfortunately, we could not approve the business account for {{ company }} at this time.{% endblocktrans %}</p>
+
+{% if profile.rejection_reason %}
+<div class="email-card">
+    <p><strong>{% trans "Reason" %}:</strong></p>
+    <p>{{ profile.rejection_reason }}</p>
+</div>
+{% endif %}
+
+<p>{% trans "You can update your details from your account page and submit the application again — it will be reviewed anew." %}</p>
+{% endblock %}

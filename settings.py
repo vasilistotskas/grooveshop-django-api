@@ -226,6 +226,7 @@ TENANT_APPS = [
     "loyalty",
     "promotion",
     "giftcard",
+    "b2b",
     "page_config",
     # Agent surface (OIDC-bearer API over tenant-schema data; no models
     # of its own — placed here because everything it serves is per-store)
@@ -451,6 +452,8 @@ REST_FRAMEWORK = {
         "coupon_apply": None if DEBUG else "10/minute",
         # Gift-card balance check exposes a bearer secret's validity.
         "gift_card_check": None if DEBUG else "6/minute",
+        # Business-profile submit can trigger an outbound VIES check.
+        "b2b_profile_submit": None if DEBUG else "5/minute",
         "search": None if DEBUG else "120/minute",
         # Clicks get their own budget - the anonymous click endpoint must
         # not be able to starve the search allowance for the same client.
@@ -1496,6 +1499,39 @@ EXTRA_SETTINGS_DEFAULTS = [
         "name": "B2B_INVOICING_ENABLED",
         "type": "bool",
         "value": True,
+    },
+    # Wholesale program (business profiles, customer groups, price
+    # lists). Merchant runtime half of the two-tier gate — the plan
+    # half is Tenant.b2b_enabled. Ships dark.
+    {
+        "name": "B2B_WHOLESALE_ENABLED",
+        "type": "bool",
+        "value": False,
+    },
+    # Whether promotions/coupons stack ON TOP of wholesale prices.
+    # Off by default: wholesale is already a negotiated price, and
+    # stacking retail promos on it double-discounts silently.
+    {
+        "name": "B2B_ALLOW_PROMOTIONS",
+        "type": "bool",
+        "value": False,
+    },
+    # Whether wholesale-priced orders accrue loyalty points. Off by
+    # default: the points basis is the RETAIL price, so a negotiated
+    # price would earn full retail-basis points — a retail program
+    # subsidizing wholesale.
+    {
+        "name": "B2B_LOYALTY_ENABLED",
+        "type": "bool",
+        "value": False,
+    },
+    # Rollout shim: require company name/ΔΟΥ/activity on INVOICE
+    # orders. Stays False until the storefront release that sends
+    # those fields is live, else the deployed checkout breaks.
+    {
+        "name": "B2B_INVOICE_COMPANY_REQUIRED",
+        "type": "bool",
+        "value": False,
     },
     {
         "name": "ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES",
@@ -2843,6 +2879,29 @@ UNFOLD = {
                         "icon": "card_giftcard",
                         "link": reverse_lazy(
                             "admin:giftcard_giftcard_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("Business Customers"),
+                        "icon": "business_center",
+                        "link": reverse_lazy(
+                            "admin:b2b_businessprofile_changelist"
+                        ),
+                        "badge": "admin.badges.pending_business_profiles_badge",
+                        "badge_variant": "warning",
+                    },
+                    {
+                        "title": _("Customer Groups"),
+                        "icon": "group_work",
+                        "link": reverse_lazy(
+                            "admin:b2b_customergroup_changelist"
+                        ),
+                    },
+                    {
+                        "title": _("B2B Price Lists"),
+                        "icon": "request_quote",
+                        "link": reverse_lazy(
+                            "admin:b2b_pricelistitem_changelist"
                         ),
                     },
                     {

@@ -1,0 +1,21 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% trans "New B2B application awaiting review" %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<div style="background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%); padding: 32px 24px; text-align: center; border-radius: 8px; margin-bottom: 24px;">
+    <h2 style="color: white; font-size: 28px; margin: 0;">{% trans "New B2B application awaiting review" %}</h2>
+</div>
+
+<div class="email-card">
+    <p><strong>{% trans "Company" %}:</strong> {{ profile.company_name }}</p>
+    <p><strong>{% trans "VAT number (ΑΦΜ)" %}:</strong> {{ profile.vat_id }}</p>
+    <p><strong>{% trans "Tax office" %}:</strong> {{ profile.tax_office }}</p>
+    <p><strong>{% trans "Activity" %}:</strong> {{ profile.activity }}</p>
+    <p><strong>{% trans "Account" %}:</strong> {{ profile.user.email }}</p>
+    <p><strong>{% trans "VIES" %}:</strong> {{ profile.get_vies_status_display }}{% if profile.vies_name %} — {{ profile.vies_name }}{% endif %}</p>
+</div>
+
+<p>{% trans "Review the application from the store admin — Business Customers." %}</p>
+{% endblock %}

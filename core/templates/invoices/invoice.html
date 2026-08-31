@@ -191,12 +191,25 @@
   <div class="parties">
     <div class="block">
       <h2>{% trans "Bill to" %}</h2>
-      <p><strong>{{ buyer.name }}</strong></p>
-      {% if buyer.vat_id %}<p><strong>{% trans "VAT ID" %}:</strong> {{ buyer.vat_id }}</p>{% endif %}
-      {% if buyer.address_line_1 %}<p>{{ buyer.address_line_1 }}</p>{% endif %}
-      {% if buyer.address_line_2 %}<p>{{ buyer.address_line_2 }}</p>{% endif %}
-      {% if buyer.postal_code or buyer.city %}
-        <p>{{ buyer.postal_code }} {{ buyer.city }}{% if buyer.country %}, {{ buyer.country }}{% endif %}</p>
+      {% if buyer.company_name %}
+        {# B2B: the company requisites, not the contact person #}
+        <p><strong>{{ buyer.company_name }}</strong></p>
+        {% if buyer.vat_id %}<p><strong>{% trans "VAT ID" %}:</strong> {{ buyer.vat_id }}</p>{% endif %}
+        {% if buyer.tax_office %}<p><strong>{% trans "Tax office" %}:</strong> {{ buyer.tax_office }}</p>{% endif %}
+        {% if buyer.activity %}<p>{{ buyer.activity }}</p>{% endif %}
+        {% if buyer.billing_address_line_1 %}<p>{{ buyer.billing_address_line_1 }}</p>{% endif %}
+        {% if buyer.billing_postal_code or buyer.billing_city %}
+          <p>{{ buyer.billing_postal_code }} {{ buyer.billing_city }}{% if buyer.billing_country %}, {{ buyer.billing_country }}{% elif buyer.country %}, {{ buyer.country }}{% endif %}</p>
+        {% endif %}
+        <p>{{ buyer.name }}</p>
+      {% else %}
+        <p><strong>{{ buyer.name }}</strong></p>
+        {% if buyer.vat_id %}<p><strong>{% trans "VAT ID" %}:</strong> {{ buyer.vat_id }}</p>{% endif %}
+        {% if buyer.address_line_1 %}<p>{{ buyer.address_line_1 }}</p>{% endif %}
+        {% if buyer.address_line_2 %}<p>{{ buyer.address_line_2 }}</p>{% endif %}
+        {% if buyer.postal_code or buyer.city %}
+          <p>{{ buyer.postal_code }} {{ buyer.city }}{% if buyer.country %}, {{ buyer.country }}{% endif %}</p>
+        {% endif %}
       {% endif %}
       {% if buyer.email %}<p>{{ buyer.email }}</p>{% endif %}
       {% if buyer.phone %}<p>{{ buyer.phone }}</p>{% endif %}

@@ -112,6 +112,19 @@ def abandoned_carts_badge(request):
     return value or None
 
 
+def pending_business_profiles_badge(request):
+    """B2B applications awaiting review."""
+
+    from b2b.enum import BusinessProfileStatus
+
+    return _cached_count(
+        "admin:badge:pending_business_profiles",
+        "b2b",
+        "BusinessProfile",
+        status=BusinessProfileStatus.PENDING,
+    )
+
+
 def draft_blog_posts_badge(request):
     """Editorial queue depth — unpublished blog posts."""
 

@@ -95,6 +95,12 @@ class IsGiftCardsEnabled(IsTenantFeatureEnabled):
     feature_flag = "gift_cards_enabled"
 
 
+class IsB2BEnabled(IsTenantFeatureEnabled):
+    """Deny access with 404 when the tenant's B2B plan flag is off."""
+
+    feature_flag = "b2b_enabled"
+
+
 class IsAgentCommerceEnabled(IsTenantFeatureEnabled):
     """Deny access with 404 when the tenant's agent-commerce plan flag
     is off. The gateway enforces the folded TenantConfig value for its
@@ -176,3 +182,15 @@ class IsAgentCommerceRuntimeEnabled(IsSettingEnabled):
     """404 when the merchant has turned agent commerce off at runtime."""
 
     setting_key = "AGENT_COMMERCE_ENABLED"
+
+
+class IsB2BWholesaleEnabled(IsSettingEnabled):
+    """404 when the merchant has not turned the wholesale program on.
+
+    Fails CLOSED (``default=False``) — a commercial feature must not
+    leak on a settings hiccup, matching the promotions/gift-cards
+    posture rather than the chrome-feature fail-open default.
+    """
+
+    setting_key = "B2B_WHOLESALE_ENABLED"
+    default = False

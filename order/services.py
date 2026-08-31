@@ -412,6 +412,31 @@ class OrderService:
             # Step 2: Validate shipping address
             cls.validate_shipping_address(shipping_address, pay_way=pay_way)
 
+            # Step 2.4: Re-bind wholesale pricing on the LOCKED cart —
+            # the refetch above produced a fresh instance. Everything
+            # below (promotion gating, totals, shipping threshold,
+            # payment fee, item price snapshots, PaymentIntent amount
+            # verification) must see the same prices the cart preview
+            # showed. Kept in lockstep with the offline path.
+            from b2b.services import B2BPricingService  # noqa: PLC0415
+
+            B2BPricingService.bind_cart(cart, user)
+
+            # Wholesale minimum-order-value gate (standard B2B term).
+            # Checked here AND at payment-intent creation so an online
+            # payment can never be captured for an order this would
+            # reject.
+            unmet_minimum = B2BPricingService.min_order_value_unmet(cart)
+            if unmet_minimum is not None:
+                raise InvalidOrderDataError(
+                    str(
+                        _(
+                            "The order total is below this wholesale "
+                            "tier's minimum of {minimum}."
+                        ).format(minimum=unmet_minimum)
+                    )
+                )
+
             # Step 2.5: Evaluate promotions under lock. The Promotion
             # rows stay locked until commit, so the usage-limit counts
             # the engine enforced cannot be raced by a concurrent
@@ -652,6 +677,21 @@ class OrderService:
                 # EL/GR prefix, uppercased country).
                 "billing_vat_id": shipping_address.get("billing_vat_id", ""),
                 "billing_country": shipping_address.get("billing_country", ""),
+                "billing_company_name": shipping_address.get(
+                    "billing_company_name", ""
+                ),
+                "billing_tax_office": shipping_address.get(
+                    "billing_tax_office", ""
+                ),
+                "billing_activity": shipping_address.get(
+                    "billing_activity", ""
+                ),
+                "billing_street": shipping_address.get("billing_street", ""),
+                "billing_street_number": shipping_address.get(
+                    "billing_street_number", ""
+                ),
+                "billing_city": shipping_address.get("billing_city", ""),
+                "billing_zipcode": shipping_address.get("billing_zipcode", ""),
                 "document_type": (
                     shipping_address.get("document_type")
                     or OrderDocumentTypeEnum.RECEIPT
@@ -738,6 +778,16 @@ class OrderService:
             # Persisted alongside cart_snapshot so the CAPI dispatcher
             # can build a UserData payload with the same fbp/fbc the
             # browser pixel saw.
+            # Wholesale audit: which group priced this order. The line
+            # prices are already snapshotted on OrderItem rows — this
+            # records WHY they differ from retail.
+            b2b_context = getattr(cart, "_b2b_pricing", None)
+            if b2b_context is not None:
+                order.metadata["b2b_pricing"] = {
+                    "group_id": b2b_context.group.pk,
+                    "group_name": b2b_context.group.name,
+                    "discount_percent": str(b2b_context.group.discount_percent),
+                }
             sanitised_meta = cls._sanitise_meta_context(meta_context)
             if sanitised_meta:
                 order.metadata["meta"] = sanitised_meta
@@ -765,8 +815,10 @@ class OrderService:
                         )
                     )
 
-                # Get product price and convert to target currency if needed
-                product_price = product.final_price
+                # Get the line price — bound-aware: a wholesale cart's
+                # items carry their group price — and convert currency
+                # if needed
+                product_price = cart_item.final_price
                 if product_price.currency != target_currency:
                     item_price = Money(product_price.amount, target_currency)
                 else:
@@ -1034,6 +1086,27 @@ class OrderService:
             # Step 2: Validate shipping address
             cls.validate_shipping_address(shipping_address, pay_way=pay_way)
 
+            # Step 2.4: Re-bind wholesale pricing on the LOCKED cart
+            # (see the payment-first path for the rationale).
+            from b2b.services import B2BPricingService  # noqa: PLC0415
+
+            B2BPricingService.bind_cart(cart, user)
+
+            # Wholesale minimum-order-value gate (standard B2B term).
+            # Checked here AND at payment-intent creation so an online
+            # payment can never be captured for an order this would
+            # reject.
+            unmet_minimum = B2BPricingService.min_order_value_unmet(cart)
+            if unmet_minimum is not None:
+                raise InvalidOrderDataError(
+                    str(
+                        _(
+                            "The order total is below this wholesale "
+                            "tier's minimum of {minimum}."
+                        ).format(minimum=unmet_minimum)
+                    )
+                )
+
             # Step 2.5: Evaluate promotions under lock (see the
             # payment-first path for the race/typed-error rationale).
             promo_result = cls._evaluate_promotions(
@@ -1093,6 +1166,21 @@ class OrderService:
                 # EL/GR prefix, uppercased country).
                 "billing_vat_id": shipping_address.get("billing_vat_id", ""),
                 "billing_country": shipping_address.get("billing_country", ""),
+                "billing_company_name": shipping_address.get(
+                    "billing_company_name", ""
+                ),
+                "billing_tax_office": shipping_address.get(
+                    "billing_tax_office", ""
+                ),
+                "billing_activity": shipping_address.get(
+                    "billing_activity", ""
+                ),
+                "billing_street": shipping_address.get("billing_street", ""),
+                "billing_street_number": shipping_address.get(
+                    "billing_street_number", ""
+                ),
+                "billing_city": shipping_address.get("billing_city", ""),
+                "billing_zipcode": shipping_address.get("billing_zipcode", ""),
                 "document_type": (
                     shipping_address.get("document_type")
                     or OrderDocumentTypeEnum.RECEIPT
@@ -1179,6 +1267,16 @@ class OrderService:
                 },
                 "payment_type": "offline",
             }
+            # Wholesale audit: which group priced this order. The line
+            # prices are already snapshotted on OrderItem rows — this
+            # records WHY they differ from retail.
+            b2b_context = getattr(cart, "_b2b_pricing", None)
+            if b2b_context is not None:
+                order.metadata["b2b_pricing"] = {
+                    "group_id": b2b_context.group.pk,
+                    "group_name": b2b_context.group.name,
+                    "discount_percent": str(b2b_context.group.discount_percent),
+                }
             sanitised_meta = cls._sanitise_meta_context(meta_context)
             if sanitised_meta:
                 order.metadata["meta"] = sanitised_meta
@@ -1206,8 +1304,10 @@ class OrderService:
                         )
                     )
 
-                # Get product price and convert to target currency if needed
-                product_price = product.final_price
+                # Get the line price — bound-aware: a wholesale cart's
+                # items carry their group price — and convert currency
+                # if needed
+                product_price = cart_item.final_price
                 if product_price.currency != target_currency:
                     item_price = Money(product_price.amount, target_currency)
                 else:

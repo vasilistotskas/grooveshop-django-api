@@ -213,6 +213,29 @@ class DocumentTypeFilter(DropdownFilter):
         return queryset.filter(**filter_kwargs)
 
 
+class WholesaleOrderFilter(DropdownFilter):
+    """Orders priced with a B2B customer group (the order-create paths
+    stamp ``metadata["b2b_pricing"]`` whenever group pricing applied)."""
+
+    title = _("Wholesale")
+    parameter_name = "wholesale"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("yes", _("Wholesale-priced")),
+            ("no", _("Retail-priced")),
+        ]
+
+    def queryset(self, request, queryset):
+        match self.value():
+            case "yes":
+                return queryset.filter(metadata__has_key="b2b_pricing")
+            case "no":
+                return queryset.exclude(metadata__has_key="b2b_pricing")
+            case _:
+                return queryset
+
+
 class RecentOrdersFilter(DropdownFilter):
     title = _("Recent Orders")
     parameter_name = "recent_orders"
@@ -410,6 +433,7 @@ class OrderAdmin(BaseModelAdmin):
         OrderStatusGroupFilter,
         PaymentStatusFilter,
         DocumentTypeFilter,
+        WholesaleOrderFilter,
         RecentOrdersFilter,
         "status",
         "payment_status",
@@ -461,7 +485,26 @@ class OrderAdmin(BaseModelAdmin):
         "discount_amount",
         "loyalty_discount",
         "gift_card_amount",
+        "wholesale_pricing",
     )
+
+    @admin.display(description=_("Wholesale pricing"))
+    def wholesale_pricing(self, obj):
+        """Which B2B group priced this order — the ONLY visibility for
+        the ``metadata["b2b_pricing"]`` audit stamp."""
+        info = (obj.metadata or {}).get("b2b_pricing")
+        if not info:
+            return _("Retail (no group pricing)")
+        return _(
+            # The bare % would otherwise make xgettext flag this as a
+            # python-format string and msgfmt hard-fail on the Greek
+            # translation (whose % is followed by a non-directive).
+            # xgettext:no-python-format
+            "Group “{name}” — {percent}% off net"
+        ).format(
+            name=info.get("group_name", "?"),
+            percent=info.get("discount_percent", "?"),
+        )
 
     fieldsets = (
         (
@@ -470,12 +513,34 @@ class OrderAdmin(BaseModelAdmin):
                 "fields": (
                     "uuid",
                     "status",
-                    "document_type",
                     "created_at",
                     "updated_at",
                     "status_updated_at",
                 ),
                 "classes": ("tab",),
+            },
+        ),
+        (
+            _("Billing / Invoice"),
+            {
+                "fields": (
+                    "document_type",
+                    "billing_company_name",
+                    "billing_vat_id",
+                    "billing_tax_office",
+                    "billing_activity",
+                    "billing_country",
+                    "billing_street",
+                    "billing_street_number",
+                    "billing_city",
+                    "billing_zipcode",
+                    "wholesale_pricing",
+                ),
+                "classes": ("tab",),
+                "description": _(
+                    "Buyer identity snapshotted for the Τιμολόγιο. "
+                    "Populated only on INVOICE orders."
+                ),
             },
         ),
         (

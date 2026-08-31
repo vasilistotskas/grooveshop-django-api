@@ -550,6 +550,10 @@ PUBLIC_SETTING_KEYS = frozenset(
         "LOYALTY_NEW_CUSTOMER_BONUS_POINTS",
         "LOYALTY_XP_PER_LEVEL",
         "B2B_INVOICING_ENABLED",
+        # Runtime half of the wholesale-program gate; the plan half
+        # (Tenant.b2b_enabled) travels on TenantConfig. The other B2B_*
+        # settings are server-side pricing/rollout policy — not public.
+        "B2B_WHOLESALE_ENABLED",
         "RECENTLY_VIEWED_ENABLED",
         # Storefront chrome toggles — STORE preferences like
         # ACCOUNT_REVIEWS_ENABLED below (same lineage too: both were

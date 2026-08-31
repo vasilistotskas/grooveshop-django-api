@@ -62,6 +62,11 @@ class TenantConfigSerializer(serializers.Serializer):
     blog_enabled = serializers.BooleanField(read_only=True)
     promotions_enabled = serializers.BooleanField(read_only=True)
     gift_cards_enabled = serializers.BooleanField(read_only=True)
+    # Raw plan flag, not folded — the storefront's two-tier gate reads
+    # the plan half here and the B2B_WHOLESALE_ENABLED runtime half via
+    # /settings/get (the loyalty/gift-cards pattern). Folding is for
+    # gateway-consumed values only, and the gateway stays retail-only.
+    b2b_enabled = serializers.BooleanField(read_only=True)
     agent_stripe_delegated_enabled = serializers.BooleanField(read_only=True)
     # EFFECTIVE agent-commerce gates, consumed by the agent gateway:
     # plan flag AND the tenant-schema extra-setting, folded here so

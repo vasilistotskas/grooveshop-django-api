@@ -1,0 +1,5 @@
+{% load i18n %}{% blocktrans with company=profile.company_name %}Unfortunately, we could not approve the business account for {{ company }} at this time.{% endblocktrans %}
+{% if profile.rejection_reason %}
+{% trans "Reason" %}: {{ profile.rejection_reason }}
+{% endif %}
+{% trans "You can update your details from your account page and submit the application again — it will be reviewed anew." %}

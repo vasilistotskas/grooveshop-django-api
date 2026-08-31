@@ -1,0 +1,10 @@
+{% load i18n %}{% trans "New B2B application awaiting review" %}
+
+{% trans "Company" %}: {{ profile.company_name }}
+{% trans "VAT number (ΑΦΜ)" %}: {{ profile.vat_id }}
+{% trans "Tax office" %}: {{ profile.tax_office }}
+{% trans "Activity" %}: {{ profile.activity }}
+{% trans "Account" %}: {{ profile.user.email }}
+{% trans "VIES" %}: {{ profile.get_vies_status_display }}{% if profile.vies_name %} — {{ profile.vies_name }}{% endif %}
+
+{% trans "Review the application from the store admin — Business Customers." %}

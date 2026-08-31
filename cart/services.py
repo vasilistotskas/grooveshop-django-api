@@ -86,6 +86,25 @@ class CartService:
         if self.cart:
             self.cart.refresh_last_activity()
 
+    def _bind_pricing(self, cart):
+        """Attach the wholesale-pricing context to a cart this service
+        hands out.
+
+        Both materialization methods below route through here, so EVERY
+        instance a view receives — retrieve/update/destroy, coupon
+        apply/remove, ``create_payment_intent`` — carries the same
+        bound prices, and the preview totals always match the amount
+        the payment provider is asked to charge. (The views' own
+        ``for_detail`` reloads transplant the context off these
+        instances rather than re-resolving.) No-op for guests,
+        non-approved users and disabled tenants.
+        """
+        if cart is not None:
+            from b2b.services import B2BPricingService  # noqa: PLC0415
+
+            B2BPricingService.bind_cart(cart, self.request.user)
+        return cart
+
     def get_existing_cart(self):
         user = self.request.user
 
@@ -100,10 +119,10 @@ class CartService:
                 if guest_cart:
                     self.merge_carts(guest_cart, cart)
 
-            return cart
+            return self._bind_pricing(cart)
         else:
             if self.cart_id:
-                return (
+                return self._bind_pricing(
                     Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
 
@@ -123,14 +142,14 @@ class CartService:
                 if guest_cart:
                     self.merge_carts(guest_cart, cart)
 
-            return cart
+            return self._bind_pricing(cart)
         else:
             if self.cart_id:
                 cart = (
                     Cart.objects.guest_carts().filter(uuid=self.cart_id).first()
                 )
                 if cart:
-                    return cart
+                    return self._bind_pricing(cart)
 
             return Cart.objects.create(user=None)
 

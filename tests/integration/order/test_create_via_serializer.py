@@ -123,11 +123,18 @@ class TestOrderCreateSerializerValidation(APITestCase):
             assert "billing_vat_id" in serializer.errors
 
     def test_serializer_billing_vat_id_strips_el_prefix(self):
-        """validate_billing_vat_id normalises 'EL123456789' → '123456789'."""
-        data = self._base_data(billing_vat_id="EL123456789")
+        """validate_billing_vat_id normalises 'EL123456783' → '123456783'.
+
+        Asserted under INVOICE — a RECEIPT deliberately blanks the
+        buyer tax identity (no smuggled company block on retail
+        receipts), so normalisation is only observable here.
+        """
+        data = self._base_data(
+            document_type="INVOICE", billing_vat_id="EL123456783"
+        )
         serializer = OrderCreateFromCartSerializer(data=data)
         serializer.is_valid()
-        assert serializer.validated_data.get("billing_vat_id") == "123456789"
+        assert serializer.validated_data.get("billing_vat_id") == "123456783"
 
     def test_serializer_pickup_point_requires_provider_code(self):
         """A pickup_point order with no shipping_provider_code is rejected

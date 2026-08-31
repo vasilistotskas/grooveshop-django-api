@@ -127,6 +127,17 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "shipping_price",
             "payment_method_fee",
             "document_type",
+            # B2B billing identity — read-side so the storefront's
+            # order history and the admin can render the invoice block.
+            "billing_vat_id",
+            "billing_country",
+            "billing_company_name",
+            "billing_tax_office",
+            "billing_activity",
+            "billing_street",
+            "billing_street_number",
+            "billing_city",
+            "billing_zipcode",
             "created_at",
             "updated_at",
             "uuid",
@@ -150,6 +161,15 @@ class OrderSerializer(serializers.ModelSerializer[Order]):
             "paid_amount",
             "shipping_price",
             "payment_method_fee",
+            "billing_vat_id",
+            "billing_country",
+            "billing_company_name",
+            "billing_tax_office",
+            "billing_activity",
+            "billing_street",
+            "billing_street_number",
+            "billing_city",
+            "billing_zipcode",
             "total_price_items",
             "total_price_extra",
             "discount_amount",
@@ -826,6 +846,47 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             "valid ``billing_vat_id``."
         ),
     )
+    # Company requisites for the invoice document. Optional at the
+    # field level; ``validate()`` requires the identity trio for
+    # INVOICE orders once the merchant flips
+    # ``B2B_INVOICE_COMPANY_REQUIRED`` (rollout shim — the deployed
+    # storefront release predating these fields sends only the ΑΦΜ).
+    billing_company_name = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        help_text=_("Company legal name (Επωνυμία) for the invoice"),
+    )
+    billing_tax_office = serializers.CharField(
+        max_length=100,
+        required=False,
+        allow_blank=True,
+        help_text=_("Company tax office (ΔΟΥ)"),
+    )
+    billing_activity = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        help_text=_("Company business activity (Δραστηριότητα)"),
+    )
+    billing_street = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        help_text=_(
+            "Company registered address street — blank copies the "
+            "shipping street on INVOICE orders"
+        ),
+    )
+    billing_street_number = serializers.CharField(
+        max_length=50, required=False, allow_blank=True
+    )
+    billing_city = serializers.CharField(
+        max_length=100, required=False, allow_blank=True
+    )
+    billing_zipcode = serializers.CharField(
+        max_length=20, required=False, allow_blank=True
+    )
 
     # Loyalty points redemption (optional)
     loyalty_points_to_redeem = serializers.IntegerField(
@@ -995,6 +1056,12 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                     "(optionally prefixed with EL or GR)."
                 )
             )
+        from b2b.validators import is_valid_greek_vat  # noqa: PLC0415
+
+        if not is_valid_greek_vat(cleaned):
+            raise serializers.ValidationError(
+                _("Enter a valid Greek VAT number (ΑΦΜ).")
+            )
         return cleaned
 
     def validate_billing_country(self, value: str) -> str:
@@ -1040,6 +1107,57 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                     )
                 }
             )
+        if document_type == "INVOICE":
+            # Company identity trio — enforced only after the merchant
+            # confirms the new storefront is live (rollout shim; the
+            # previous release sends only the ΑΦΜ).
+            if Setting.get("B2B_INVOICE_COMPANY_REQUIRED", default=False):
+                errors = {}
+                for field, label in (
+                    ("billing_company_name", _("Company name is required.")),
+                    ("billing_tax_office", _("Tax office (ΔΟΥ) is required.")),
+                    ("billing_activity", _("Business activity is required.")),
+                ):
+                    if not (attrs.get(field) or "").strip():
+                        errors[field] = label
+                if errors:
+                    raise serializers.ValidationError(errors)
+            # Blank billing address ⇒ the buyer said "same as delivery".
+            # Copy EXPLICITLY so the Order row snapshots the invoice
+            # address instead of relying on read-time fallbacks. A
+            # PARTIAL explicit address is rejected — the invoice would
+            # otherwise mix the billing street with the shipping city.
+            if not (attrs.get("billing_street") or "").strip():
+                attrs["billing_street"] = attrs.get("street") or ""
+                attrs["billing_street_number"] = (
+                    attrs.get("street_number") or ""
+                )
+                attrs["billing_city"] = attrs.get("city") or ""
+                attrs["billing_zipcode"] = attrs.get("zipcode") or ""
+            else:
+                address_errors = {}
+                for field, label in (
+                    ("billing_city", _("Billing city is required.")),
+                    ("billing_zipcode", _("Billing zipcode is required.")),
+                ):
+                    if not (attrs.get(field) or "").strip():
+                        address_errors[field] = label
+                if address_errors:
+                    raise serializers.ValidationError(address_errors)
+        else:
+            # A retail receipt carries NO buyer tax identity — blank
+            # anything a stale or hand-crafted client smuggled in, or
+            # the invoice PDF template (which branches on
+            # billing_company_name) renders a B2B block on a receipt.
+            attrs["billing_vat_id"] = ""
+            attrs["billing_country"] = ""
+            attrs["billing_company_name"] = ""
+            attrs["billing_tax_office"] = ""
+            attrs["billing_activity"] = ""
+            attrs["billing_street"] = ""
+            attrs["billing_street_number"] = ""
+            attrs["billing_city"] = ""
+            attrs["billing_zipcode"] = ""
 
         provider_code = attrs.get("shipping_provider_code")
         shipping_kind = attrs.get("shipping_kind")

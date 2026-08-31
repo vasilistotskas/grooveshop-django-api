@@ -67,7 +67,7 @@ class B2BInvoicingGateTestCase(TestCase):
             data={
                 **BASE_PAYLOAD,
                 "document_type": "INVOICE",
-                "billing_vat_id": "123456789",
+                "billing_vat_id": "123456783",
             }
         )
         self.assertFalse(serializer.is_valid())
@@ -79,11 +79,11 @@ class B2BInvoicingGateTestCase(TestCase):
             data={
                 **BASE_PAYLOAD,
                 "document_type": "INVOICE",
-                "billing_vat_id": "123456789",
+                "billing_vat_id": "123456783",
             }
         )
-        # ΑΦΜ 123456789 is structurally valid (9 digits); pay_way_id
-        # lookup happens downstream in the service, not the serializer.
+        # ΑΦΜ 123456783 is checksum-valid; pay_way_id lookup happens
+        # downstream in the service, not the serializer.
         self.assertTrue(serializer.is_valid(), serializer.errors)
 
     def test_receipt_accepted_regardless_of_setting(self):

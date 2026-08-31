@@ -243,6 +243,37 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
             "1.3 third-country) applies."
         ),
     )
+    # Company requisites for the invoice document (PDF + the tenant's
+    # ERP handoff). Deliberately NOT in the myDATA counterpart block —
+    # AADE forbids <name>/<address> for domestic counterparts (error
+    # 220); the registry resolves them from the ΑΦΜ.
+    billing_company_name = models.CharField(
+        _("Billing Company Name"), max_length=255, blank=True, default=""
+    )
+    billing_tax_office = models.CharField(
+        _("Billing Tax Office (ΔΟΥ)"), max_length=100, blank=True, default=""
+    )
+    billing_activity = models.CharField(
+        _("Billing Business Activity"),
+        max_length=255,
+        blank=True,
+        default="",
+    )
+    # The company's registered address (έδρα) — the delivery address is
+    # NOT the invoice address for most businesses. Copied from the
+    # shipping fields at validation time when the buyer says they match.
+    billing_street = models.CharField(
+        _("Billing Street"), max_length=255, blank=True, default=""
+    )
+    billing_street_number = models.CharField(
+        _("Billing Street Number"), max_length=50, blank=True, default=""
+    )
+    billing_city = models.CharField(
+        _("Billing City"), max_length=100, blank=True, default=""
+    )
+    billing_zipcode = models.CharField(
+        _("Billing Zipcode"), max_length=20, blank=True, default=""
+    )
     tracking_number = models.CharField(
         _("Tracking Number"), max_length=255, blank=True, default=""
     )

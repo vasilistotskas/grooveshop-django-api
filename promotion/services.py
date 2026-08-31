@@ -163,6 +163,33 @@ class PromotionEngine:
         if not cls.is_enabled():
             return result
 
+        # Wholesale carts don't stack retail promotions unless the
+        # merchant explicitly opts in (B2B_ALLOW_PROMOTIONS) — a
+        # negotiated B2B price plus a retail promo double-discounts
+        # silently. One gate here covers every caller (cart preview,
+        # payment intent, order create), because pricing always binds
+        # before evaluation on those paths. Attached codes surface as
+        # COMBINATION_DISALLOWED (non-blocking, ACP vocabulary): a new
+        # apply_coupon gets a clear refusal instead of silently
+        # attaching a dead code, while order create proceeds without a
+        # discount — exactly what the preview showed.
+        from b2b.services import (  # noqa: PLC0415
+            B2BPricingService,
+            B2BService,
+        )
+
+        if (
+            B2BPricingService.cart_pricing_active(cart)
+            and not B2BService.promotions_allowed()
+        ):
+            result.rejected.extend(
+                (code, str(CouponRejectionReason.COMBINATION_DISALLOWED))
+                for code in cart.applied_codes.values_list(
+                    "code__code", flat=True
+                )
+            )
+            return result
+
         cart_items = list(cart.items.select_related("product"))
         if not cart_items:
             return result
@@ -589,10 +616,15 @@ class PromotionEngine:
 
     @classmethod
     def _unit_prices(cls, items) -> list[Decimal]:
-        """Expand cart lines to one entry per unit (final unit price)."""
+        """Expand cart lines to one entry per unit (final unit price).
+
+        Reads the CartItem property, not ``product.final_price``, so a
+        wholesale-bound cart credits BxGY discounts against the price
+        the buyer actually pays — retail carts resolve identically.
+        """
         units: list[Decimal] = []
         for item in items:
-            unit = Decimal(str(item.product.final_price.amount))
+            unit = Decimal(str(item.final_price.amount))
             units.extend([unit] * item.quantity)
         return units
 

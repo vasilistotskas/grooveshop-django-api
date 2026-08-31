@@ -118,6 +118,23 @@ class LoyaltyService:
         if not order.user_id:
             return 0
 
+        # Wholesale orders don't accrue loyalty points unless the
+        # merchant opts in: the points basis below is the RETAIL product
+        # price (get_price_basis_amount), so a negotiated-price order
+        # would earn full retail-basis points and redeem them against
+        # further orders — a retail program silently subsidizing
+        # wholesale. The order-create paths stamp the marker whenever
+        # group pricing applied.
+        if (order.metadata or {}).get("b2b_pricing") and not bool(
+            Setting.get("B2B_LOYALTY_ENABLED", default=False)
+        ):
+            logger.info(
+                "Order %s was wholesale-priced — skipping loyalty accrual "
+                "(B2B_LOYALTY_ENABLED is off)",
+                order_id,
+            )
+            return 0
+
         from django.contrib.auth import get_user_model
 
         User = get_user_model()

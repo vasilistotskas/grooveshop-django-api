@@ -37,6 +37,20 @@
     </p>
 </div>
 
+{% if order.document_type == "INVOICE" %}
+<div class="email-card" style="border-left: 4px solid #1d4ed8;">
+    <h3>{% trans "Invoice details (Τιμολόγιο)" %}</h3>
+    <p>
+        {% if order.billing_company_name %}<strong>{{ order.billing_company_name }}</strong><br>{% endif %}
+        {% trans "VAT number (ΑΦΜ)" %}: {{ order.billing_vat_id }}<br>
+        {% if order.billing_tax_office %}{% trans "Tax office" %}: {{ order.billing_tax_office }}<br>{% endif %}
+        {% if order.billing_activity %}{{ order.billing_activity }}<br>{% endif %}
+        {% if order.billing_street %}{{ order.billing_street }} {{ order.billing_street_number }}, {{ order.billing_zipcode }} {{ order.billing_city }}{% endif %}
+    </p>
+    <p style="font-size: 12px; color: #6b7280;">{% trans "Check these details carefully — the invoice is issued with exactly what is shown here." %}</p>
+</div>
+{% endif %}
+
 <h3>{% trans "Order Items" %}</h3>
 <table class="email-table">
     <thead>

@@ -191,6 +191,25 @@ class CartItemViewSet(BaseModelViewSet):
 
         return base.filter(cart=self.cart_service.cart)
 
+    def _repoint_to_bound_cart(self, item):
+        """Point an item's ``cart`` at the service's BOUND instance.
+
+        The optimizers' ``select_related("cart")`` and get_object's
+        lazy load materialize fresh cart objects, which silently price
+        the line at retail for wholesale buyers. Only items of the
+        request's own cart are re-pointed — staff listings of other
+        carts stay untouched. (The base viewset instantiates response
+        serializers directly, so this can't hook get_serializer.)
+        """
+        bound_cart = self.cart_service.cart
+        if (
+            bound_cart is not None
+            and getattr(bound_cart, "_b2b_pricing", None) is not None
+            and item.cart_id == bound_cart.pk
+        ):
+            item.cart = bound_cart
+        return item
+
     def get_object(self):
         pk = self.kwargs.get("pk")
 
@@ -207,7 +226,7 @@ class CartItemViewSet(BaseModelViewSet):
                     ),
                 )
 
-            return obj
+            return self._repoint_to_bound_cart(obj)
         except CartItem.DoesNotExist:
             raise Http404(str(_("No CartItem matches the given query.")))
 
@@ -215,6 +234,21 @@ class CartItemViewSet(BaseModelViewSet):
         context = super().get_serializer_context()
         context["cart"] = self.cart_service.cart
         return context
+
+    def list(self, request, *args, **kwargs):
+        bound_cart = self.cart_service.cart
+        if (
+            bound_cart is not None
+            and getattr(bound_cart, "_b2b_pricing", None) is not None
+        ):
+            items = [
+                self._repoint_to_bound_cart(item)
+                for item in self.filter_queryset(self.get_queryset())
+            ]
+            return self.paginate_and_serialize(
+                items, request, serializer_class=self.get_response_serializer()
+            )
+        return super().list(request, *args, **kwargs)
 
     def create(self, request, *args, **kwargs):
         if not self.cart_service.cart:

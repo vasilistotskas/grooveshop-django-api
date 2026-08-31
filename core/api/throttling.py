@@ -72,6 +72,14 @@ class GiftCardCheckThrottle(AnonRateThrottle):
     scope = "gift_card_check"
 
 
+class B2BProfileSubmitThrottle(AnonRateThrottle):
+    """Tight per-IP throttle for business-profile submits — each one can
+    trigger an outbound VIES HTTP check (5s timeout), so an unthrottled
+    endpoint is a request amplifier against both our workers and VIES."""
+
+    scope = "b2b_profile_submit"
+
+
 class SearchThrottle(AnonRateThrottle):
     scope = "search"
 

@@ -1075,6 +1075,17 @@ class OrderViewSet(BaseModelViewSet):
             "document_type": validated_data.get("document_type"),
             "billing_vat_id": validated_data.get("billing_vat_id", ""),
             "billing_country": validated_data.get("billing_country", ""),
+            "billing_company_name": validated_data.get(
+                "billing_company_name", ""
+            ),
+            "billing_tax_office": validated_data.get("billing_tax_office", ""),
+            "billing_activity": validated_data.get("billing_activity", ""),
+            "billing_street": validated_data.get("billing_street", ""),
+            "billing_street_number": validated_data.get(
+                "billing_street_number", ""
+            ),
+            "billing_city": validated_data.get("billing_city", ""),
+            "billing_zipcode": validated_data.get("billing_zipcode", ""),
             # Registry-driven shipping dispatch: explicit
             # ``(shipping_provider_code, shipping_kind)`` flows through
             # ``_resolve_shipping_provider`` → carrier adapter.

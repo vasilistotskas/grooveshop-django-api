@@ -149,6 +149,24 @@ class TestGetSettingByKeyPublicAccess:
         response = client.get(url, {"key": "RECENTLY_VIEWED_ENABLED"})
         assert response.status_code == status.HTTP_200_OK
 
+    def test_b2b_wholesale_enabled_is_whitelisted(self):
+        """The storefront's two-tier B2B gate reads this anonymously."""
+        client = _anon_client()
+        url = reverse("api-settings-get")
+        response = client.get(url, {"key": "B2B_WHOLESALE_ENABLED"})
+        assert response.status_code == status.HTTP_200_OK
+
+    @pytest.mark.parametrize(
+        "key", ["B2B_ALLOW_PROMOTIONS", "B2B_LOYALTY_ENABLED"]
+    )
+    def test_b2b_policy_settings_stay_server_side(self, key):
+        """Pricing-policy knobs are NOT public — only the wholesale
+        gate itself is."""
+        client = _anon_client()
+        url = reverse("api-settings-get")
+        response = client.get(url, {"key": key})
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
 
 @pytest.mark.django_db
 class TestGetSettingByKeyAdminAccess:

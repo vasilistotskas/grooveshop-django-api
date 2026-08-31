@@ -67,10 +67,52 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "subtotal — 'add X more to unlock'"
         ),
     )
+    b2b_pricing = serializers.SerializerMethodField(
+        help_text=_(
+            "Present when wholesale group pricing is applied to this "
+            "cart's line prices; null for retail carts. Lets the "
+            "storefront show a wholesale badge and hide the coupon "
+            "input (promotions don't stack on B2B prices unless the "
+            "merchant opts in)."
+        ),
+    )
 
     @extend_schema_field(OpenApiTypes.STR)
     def get_currency(self, obj: Cart) -> str:
         return str(settings.DEFAULT_CURRENCY)
+
+    @extend_schema_field(
+        {
+            "type": "object",
+            "nullable": True,
+            "properties": {
+                "applied": {"type": "boolean"},
+                "groupName": {"type": "string"},
+                "allowPromotions": {"type": "boolean"},
+                "minOrderValue": {"type": "string"},
+                "belowMinimum": {"type": "boolean"},
+            },
+        }
+    )
+    def get_b2b_pricing(self, obj: Cart) -> dict | None:
+        context = getattr(obj, "_b2b_pricing", None)
+        if context is None:
+            return None
+        from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
+
+        return {
+            "applied": True,
+            "group_name": context.group.name,
+            # Whether retail promotions stack on the wholesale prices —
+            # the storefront hides the coupon input when they don't, so
+            # shoppers never type codes the engine will silently ignore.
+            "allow_promotions": B2BService.promotions_allowed(),
+            # Standard wholesale term: the sidebar warns (and checkout
+            # refuses) below this items total. "0.00" disables it.
+            "min_order_value": str(context.group.min_order_value.amount),
+            "below_minimum": B2BPricingService.min_order_value_unmet(obj)
+            is not None,
+        }
 
     def _promotion_result(self, obj: Cart):
         # One engine evaluation per serialized cart — the three
@@ -187,6 +229,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "applied_coupon_codes",
             "promotion_gift_items",
             "promotion_near_miss",
+            "b2b_pricing",
             "created_at",
             "updated_at",
             "last_activity",
@@ -205,6 +248,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
             "applied_coupon_codes",
             "promotion_gift_items",
             "promotion_near_miss",
+            "b2b_pricing",
             "created_at",
             "updated_at",
             "last_activity",

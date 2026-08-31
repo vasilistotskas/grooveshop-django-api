@@ -17,7 +17,15 @@
 {{ order.city }}, {{ order.zipcode }}
 {{ order.country }}
 
-{% trans "ORDER ITEMS" %}
+{% if order.document_type == "INVOICE" %}{% trans "INVOICE DETAILS (ΤΙΜΟΛΟΓΙΟ)" %}
+{% if order.billing_company_name %}{{ order.billing_company_name }}
+{% endif %}{% trans "VAT number (ΑΦΜ)" %}: {{ order.billing_vat_id }}
+{% if order.billing_tax_office %}{% trans "Tax office" %}: {{ order.billing_tax_office }}
+{% endif %}{% if order.billing_activity %}{{ order.billing_activity }}
+{% endif %}{% if order.billing_street %}{{ order.billing_street }} {{ order.billing_street_number }}, {{ order.billing_zipcode }} {{ order.billing_city }}
+{% endif %}{% trans "Check these details carefully — the invoice is issued with exactly what is shown here." %}
+
+{% endif %}{% trans "ORDER ITEMS" %}
 {% for item in items %}{{ item.product.name }} - {{ item.quantity }} x {{ item.price }} = {{ item.total_price }}
 {% endfor %}
 {% trans "Subtotal" %}: {{ order.total_price_items }}

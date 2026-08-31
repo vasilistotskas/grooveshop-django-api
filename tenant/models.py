@@ -269,6 +269,12 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     agent_commerce_enabled = models.BooleanField(
         _("Agent Commerce Enabled"), default=True
     )
+    # Plan gate for the wholesale program (business profiles, customer
+    # groups, price lists). The merchant runtime tier is the
+    # B2B_WHOLESALE_ENABLED extra-setting; both must hold. Invoice-at-
+    # checkout is NOT behind this — that stays a plain merchant setting
+    # (B2B_INVOICING_ENABLED) available on every plan.
+    b2b_enabled = models.BooleanField(_("B2B Enabled"), default=False)
 
     # Stripe Connect — dormant/reserved. The platform runs SEPARATE
     # Stripe accounts per tenant (``stripe_secret_key`` below), not

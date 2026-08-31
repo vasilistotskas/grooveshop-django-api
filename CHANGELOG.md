@@ -3,6 +3,48 @@
 
 
 
+## v3.25.3 (2026-08-31)
+
+### Bug fixes
+
+* fix(tenant): key the resolve cache by payload shape
+
+Adding `b2bEnabled` to TenantConfigSerializer took production down on
+2026-08-31. What is cached under `global:tenant_resolve:<domain>` is the
+SERIALIZED payload, so after the backend deploy the endpoint kept
+serving the pre-release shape for the rest of the TTL. The storefront
+validates that response against a generated Zod schema in which the new
+field is REQUIRED, parseDataAs rejected every resolve, and the tenant
+middleware turned each one into a 404 "Store not found" — on every
+route, for every tenant. Deleting the one stale key restored service.
+
+The two-step Django-then-Nuxt deploy does not prevent this: the backend
+was fully rolled out and correct, and still served the old shape from
+cache.
+
+Derive the key from TenantConfigSerializer's field names, so a changed
+payload shape simply reads a different key. The old entry is never
+consulted again and ages out on its own TTL — no deploy step to
+remember, and the whole class of bug goes away rather than this one
+instance.
+
+The key string was duplicated across five call sites (the view plus four
+invalidation paths in signals.py), which is what made it possible for a
+reader and a writer to disagree in the first place. All five now go
+through tenant.cache.tenant_resolve_key; a signal that builds the key
+differently is a silent no-op, so this had to be centralised, not copied.
+
+The domain and the `global:` prefix stay in the key: ops scan and delete
+these by `*tenant_resolve*`, and `global:` is what keeps the key
+schema-independent.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01X8CBdikFcL8Wthy41ZJcSD ([`2adc14d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2adc14d198860fd01818687f9dffce5d2b5dd2c5))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.25.2 [skip ci] ([`1aee896`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1aee89625295fb9bfe6044057ee938de47d28a1f))
+
 ## v3.25.2 (2026-08-31)
 
 ### Bug fixes

@@ -367,31 +367,22 @@ def _render_pdf_bytes(context: dict[str, Any]) -> bytes:
 
 
 @transaction.atomic
-def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
-    """Idempotent invoice generation for a single order.
+def _persist_invoice_row(
+    order: Order, existing: Invoice | None, *, force: bool
+) -> tuple[Invoice, list[dict[str, Any]], dict[str, Any]]:
+    """Allocate the number and persist the Invoice row (no PDF).
 
-    Returns the existing Invoice if one exists unless ``force=True``.
-    Never fabricates sequential numbers — always routes through
-    :meth:`InvoiceCounter.allocate`. With ``force=True`` the original
-    ``invoice_number`` and ``issue_date`` are preserved so the
-    sequential register stays gap-free (Greek tax law forbids
-    gaps) — only the PDF, snapshots, and derived totals are
-    refreshed.
+    Deliberately SHORT and transactional: the counter allocation takes
+    a row lock, so anything slow inside this block (notably the PDF
+    render) would hold both the lock and an idle transaction open —
+    see ``generate_invoice`` for why that matters.
     """
-    existing = Invoice.objects.filter(order_id=order.id).first()
-    if existing and not force:
-        logger.debug(
-            "Invoice %s already exists for order %s — returning existing",
-            existing.invoice_number,
-            order.id,
-        )
-        return existing
-
-    if existing and force:
-        # Preserve the original number + issue date so regeneration
+    if existing is not None:
+        # Preserve the original number + issue date so a regeneration
         # doesn't consume a fresh counter slot and leave the previous
-        # one orphaned. The "corrective regen" use case is "the PDF
-        # is wrong" not "this never happened".
+        # one orphaned. The "corrective regen" use case is "the PDF is
+        # wrong", not "this never happened" — and the same applies when
+        # resuming a run whose render died after the row was committed.
         invoice = existing
         invoice_number = existing.invoice_number
         issue_date = existing.issue_date
@@ -407,7 +398,7 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
         invoice_number = InvoiceCounter.allocate(issue_date.year)
         invoice = Invoice(order=order)
 
-    if existing and force and existing.mydata_mark:
+    if existing is not None and existing.mydata_mark:
         # Once transmitted to AADE (has a MARK) the invoice's financial
         # values are LEGALLY frozen. A corrective PDF regen must reuse the
         # persisted breakdown/totals rather than recompute from the
@@ -437,13 +428,50 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
     invoice.total_vat = totals["total_vat"]
     invoice.total = totals["total"]
     invoice.currency = currency
-    # Save first so ``invoice.pk`` exists when the upload_to callable
-    # builds the file path.
+    # Save so ``invoice.pk`` exists when the upload_to callable builds
+    # the file path during the (post-commit) render step.
     invoice.save()
+    return invoice, vat_breakdown, totals
+
+
+def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
+    """Idempotent invoice generation for a single order.
+
+    Returns the existing Invoice if one exists WITH its PDF, unless
+    ``force=True``. Never fabricates sequential numbers — always routes
+    through :meth:`InvoiceCounter.allocate`. With ``force=True`` the
+    original ``invoice_number`` and ``issue_date`` are preserved so the
+    sequential register stays gap-free (Greek tax law forbids gaps) —
+    only the PDF, snapshots, and derived totals are refreshed.
+
+    The row write and the PDF render are deliberately split: every
+    connection carries ``idle_in_transaction_session_timeout`` (10s,
+    ``settings._db_options``) and a WeasyPrint render of a real invoice
+    takes longer than that, so rendering inside the transaction had
+    Postgres terminate the connection mid-render and NO invoice PDF was
+    ever produced for any order. The row is committed first; the render
+    then runs with no transaction open.
+
+    A row committed by a run whose render then failed is resumed rather
+    than returned as-is — otherwise the early return would hand back a
+    PDF-less invoice forever.
+    """
+    existing = Invoice.objects.filter(order_id=order.id).first()
+    if existing and not force and existing.has_document():
+        logger.debug(
+            "Invoice %s already exists for order %s — returning existing",
+            existing.invoice_number,
+            order.id,
+        )
+        return existing
+
+    invoice, vat_breakdown, totals = _persist_invoice_row(
+        order, existing, force=force
+    )
 
     # Render under the buyer's preferred language so e.g. a German
     # shopper gets a German-labelled invoice even though the seller
-    # operates primarily in Greek.
+    # operates primarily in Greek. OUTSIDE the transaction — see above.
     language = get_order_language(order)
     with translation_override(language):
         pdf_bytes = _render_pdf_bytes(

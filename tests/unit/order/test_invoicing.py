@@ -257,6 +257,79 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         self.assertIn("email", invoice.buyer_snapshot)
         self.assertEqual(invoice.currency, "EUR")
 
+    def test_pdf_render_runs_outside_any_transaction(self) -> None:
+        """Every connection carries
+        ``idle_in_transaction_session_timeout=10s`` (settings._db_options)
+        and a real WeasyPrint render takes longer than that — rendering
+        inside the atomic block had Postgres terminate the connection
+        mid-render, so NO invoice PDF was ever produced in staging/prod.
+
+        Pin the split: at render time there must be no transaction open
+        beyond the test's own wrapper.
+        """
+        from django.db import transaction
+
+        order = self._make_order()
+        # The TestCase wraps each test in one atomic block; anything the
+        # implementation opens on top shows up as a deeper level.
+        baseline = len(transaction.get_connection().savepoint_ids) + 1
+        seen: dict[str, int] = {}
+
+        def _capture(context):
+            conn = transaction.get_connection()
+            seen["depth"] = len(conn.savepoint_ids) + (
+                1 if conn.in_atomic_block else 0
+            )
+            return b"%PDF-1.4 ... %EOF"
+
+        with patch("order.invoicing._render_pdf_bytes", side_effect=_capture):
+            generate_invoice(order)
+
+        self.assertEqual(
+            seen["depth"],
+            baseline,
+            "the PDF render opened/held an extra transaction — it must run "
+            "after the invoice row is committed",
+        )
+
+    def test_resumes_row_whose_render_failed(self) -> None:
+        """A row committed by a run whose render then died must be
+        FINISHED on the next call, not returned as a PDF-less invoice
+        forever (and without burning a second counter slot)."""
+        order = self._make_order()
+
+        with (
+            patch(
+                "order.invoicing._render_pdf_bytes",
+                side_effect=RuntimeError("weasyprint exploded"),
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            generate_invoice(order)
+
+        stranded = Invoice.objects.get(order=order)
+        self.assertFalse(stranded.has_document())
+        counter_before = InvoiceCounter.objects.get(
+            year=stranded.issue_date.year
+        ).next_number
+
+        with patch(
+            "order.invoicing._render_pdf_bytes",
+            return_value=b"%PDF-1.4 ... %EOF",
+        ):
+            finished = generate_invoice(order)
+
+        self.assertEqual(finished.pk, stranded.pk)
+        self.assertEqual(finished.invoice_number, stranded.invoice_number)
+        self.assertTrue(finished.has_document())
+        self.assertEqual(
+            counter_before,
+            InvoiceCounter.objects.get(
+                year=stranded.issue_date.year
+            ).next_number,
+            "resuming a failed render must not consume a new counter slot",
+        )
+
 
 class RenderItemsTestCase(TestCase):
     """``_render_items`` resolves the product name via

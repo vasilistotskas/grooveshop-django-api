@@ -3,6 +3,45 @@
 
 
 
+## v3.25.1 (2026-08-31)
+
+### Bug fixes
+
+* fix(order): render invoice PDFs outside the DB transaction
+
+Every connection sets idle_in_transaction_session_timeout=10s
+(settings._db_options) and a real WeasyPrint render of an invoice takes
+longer than that, so generate_invoice() — atomic end to end — had
+Postgres terminate the connection mid-render:
+
+Error generating invoice for order #256: terminating connection due
+to idle-in-transaction timeout
+  File "order/invoicing.py", line 455, in generate_invoice
+    invoice.save(update_fields=["document_file"])
+
+The task then retried on the same wall every 300s. Net effect: NO
+invoice PDF was ever produced — no attachment on the invoice email and
+nothing for myDATA to submit. Found while validating B2B invoice
+orders on staging, but it applies to every INVOICE order.
+
+Split the work: _persist_invoice_row() keeps the counter allocation and
+row write in a short atomic block (the allocation takes a row lock, so
+it must not span the render), then the PDF renders with no transaction
+open and is attached in a single follow-up UPDATE.
+
+Also resume — instead of returning forever — an invoice row whose
+render died after the row committed: the early return now requires an
+actual document, and an existing row always reuses its number and issue
+date so a resumed run cannot consume a second counter slot (Greek tax
+law forbids gaps in the register).
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01X8CBdikFcL8Wthy41ZJcSD ([`fdeea73`](https://github.com/vasilistotskas/grooveshop-django-api/commit/fdeea733423325607ad6416cb299bb527226062c))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.25.0 [skip ci] ([`48245ac`](https://github.com/vasilistotskas/grooveshop-django-api/commit/48245ac21727a570d04f2721077e512236cbd053))
+
 ## v3.25.0 (2026-08-31)
 
 ### Chores

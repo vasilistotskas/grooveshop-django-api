@@ -14,6 +14,7 @@ from django.db import connection
 from django.test.client import Client
 from rest_framework.test import APIClient
 
+from tenant.cache import tenant_resolve_key
 from tenant.models import (
     TenantDomain,
     TenantMembershipRole,
@@ -366,7 +367,7 @@ class TestTenantResolveChatApiKey:
         after = resolve_client.get(url)
         assert "chatApiKey" not in after.json()
         assert "acpBearerToken" not in after.json()
-        cached = cache.get("global:tenant_resolve:chat-key.example")
+        cached = cache.get(tenant_resolve_key("chat-key.example"))
         assert cached is not None
         assert "chat_api_key" not in cached
         assert "acp_bearer_token" not in cached

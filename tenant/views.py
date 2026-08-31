@@ -18,6 +18,7 @@ from rest_framework.request import Request
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from tenant.cache import tenant_resolve_key
 from tenant.legal_identity import (
     merchant_legal_identity,
     missing_disclosure_fields,
@@ -72,7 +73,10 @@ def tenant_resolve(request: Request) -> Response:
     # DIFFERENT domain, while tenant/signals.py's invalidation always
     # fires from the public schema. A schema-prefixed key here would
     # almost never match that invalidation.
-    cache_key = f"global:tenant_resolve:{domain}"
+    # Keyed by payload SHAPE as well as domain — see
+    # ``tenant.cache.tenant_resolve_key``; a serializer field addition
+    # must never be served from an entry cached before it existed.
+    cache_key = tenant_resolve_key(domain)
     data = cache.get(cache_key)
     if data is None:
         # Always query from public schema

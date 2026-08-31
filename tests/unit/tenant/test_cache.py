@@ -17,7 +17,11 @@ from unittest.mock import patch
 import pytest
 from django.core.cache import cache
 
-from tenant.cache import GLOBAL_CACHE_PREFIX, make_tenant_key
+from tenant.cache import (
+    GLOBAL_CACHE_PREFIX,
+    make_tenant_key,
+    tenant_resolve_key,
+)
 from tenant.models import TenantDomain
 
 
@@ -142,7 +146,7 @@ class TestSignalInvalidationUsesGlobalKeys:
             tenant=tenant, domain="cache-invalidate.example", is_primary=True
         )
 
-        cache_key = f"global:tenant_resolve:{domain.domain}"
+        cache_key = tenant_resolve_key(domain.domain)
         # Simulate the write happening while resolving a request that
         # arrived on some OTHER tenant's domain.
         with patch("tenant.cache.connection") as conn:
@@ -174,7 +178,7 @@ class TestSignalInvalidationUsesGlobalKeys:
             domain="cache-invalidate-sib.example",
             is_primary=True,
         )
-        primary_key = f"global:tenant_resolve:{primary.domain}"
+        primary_key = tenant_resolve_key(primary.domain)
         cache.set(primary_key, {"schemaName": tenant.schema_name}, 3600)
         assert cache.get(primary_key) is not None
 
@@ -195,7 +199,7 @@ class TestSignalInvalidationUsesGlobalKeys:
             domain="cache-invalidate-del.example",
             is_primary=True,
         )
-        cache_key = f"global:tenant_resolve:{domain.domain}"
+        cache_key = tenant_resolve_key(domain.domain)
 
         with patch("tenant.cache.connection") as conn:
             conn.schema_name = "some_other_tenant"
@@ -271,7 +275,7 @@ class TestPayWayResolveInvalidation:
             domain="api.payway-invalidate.example",
             is_primary=False,
         )
-        keys = [f"global:tenant_resolve:{d.domain}" for d in (primary, alias)]
+        keys = [tenant_resolve_key(d.domain) for d in (primary, alias)]
         for key in keys:
             cache.set(key, {"schemaName": tenant.schema_name}, 3600)
             assert cache.get(key) is not None
@@ -289,7 +293,7 @@ class TestPayWayResolveInvalidation:
         storefront domains — purging there would be a wasted scan."""
         from tenant.signals import invalidate_resolve_on_pay_way_change
 
-        key = "global:tenant_resolve:untouched.example"
+        key = tenant_resolve_key("untouched.example")
         cache.set(key, {"schemaName": "public"}, 3600)
 
         with patch("django.db.connection") as conn:
@@ -297,3 +301,58 @@ class TestPayWayResolveInvalidation:
             invalidate_resolve_on_pay_way_change(None, None)
 
         assert cache.get(key) is not None
+
+
+class TestResolveKeyIsShapeVersioned:
+    """The cached tenant-resolve value is the SERIALIZED payload, so a
+    release that adds a field to ``TenantConfigSerializer`` would keep
+    serving the pre-release shape for the whole TTL. The storefront
+    validates that response against a generated Zod schema where the new
+    field is REQUIRED, so every resolve fails and the tenant middleware
+    turns it into a 404 "Store not found" sitewide.
+
+    Adding ``b2bEnabled`` did exactly that to production on 2026-08-31.
+    Keying by payload shape means the old entry is simply never read.
+    """
+
+    def test_added_serializer_field_changes_the_key(self):
+        from rest_framework import serializers
+
+        from tenant.cache import _tenant_config_shape
+        from tenant.serializers import TenantConfigSerializer
+
+        _tenant_config_shape.cache_clear()
+        before = tenant_resolve_key("shop.example")
+
+        real_get_fields = TenantConfigSerializer.get_fields
+
+        def with_extra_field(self):
+            fields = real_get_fields(self)
+            fields["brandNewFlag"] = serializers.BooleanField(read_only=True)
+            return fields
+
+        _tenant_config_shape.cache_clear()
+        try:
+            with patch.object(
+                TenantConfigSerializer, "get_fields", with_extra_field
+            ):
+                after = tenant_resolve_key("shop.example")
+        finally:
+            _tenant_config_shape.cache_clear()
+
+        assert after != before, (
+            "a new serializer field must not reuse the old cache key"
+        )
+
+    def test_key_is_stable_for_an_unchanged_shape(self):
+        """Otherwise every process would miss the cache permanently."""
+        assert tenant_resolve_key("shop.example") == tenant_resolve_key(
+            "shop.example"
+        )
+
+    def test_key_still_carries_the_domain_and_global_prefix(self):
+        """Ops scan/delete these by domain (``*tenant_resolve*``), and the
+        ``global:`` prefix is what makes the key schema-independent."""
+        key = tenant_resolve_key("shop.example")
+        assert key.startswith(f"{GLOBAL_CACHE_PREFIX}tenant_resolve:")
+        assert key.endswith(":shop.example")

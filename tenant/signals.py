@@ -4,6 +4,7 @@ from django.core.cache import cache
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
+from tenant.cache import tenant_resolve_key
 from tenant.models import Tenant, TenantDomain
 
 
@@ -26,10 +27,10 @@ def invalidate_domain_caches(sender, instance, **kwargs):
     staging 2026-08-19: images kept pointing at the derived dot-host
     for the full TTL).
     """
-    cache.delete(f"global:tenant_resolve:{instance.domain}")
+    cache.delete(tenant_resolve_key(instance.domain))
     if hasattr(instance, "tenant"):
         for sibling in instance.tenant.domains.values_list("domain", flat=True):
-            cache.delete(f"global:tenant_resolve:{sibling}")
+            cache.delete(tenant_resolve_key(sibling))
         cache.delete(f"global:tenant_domains:{instance.tenant.schema_name}")
 
 
@@ -37,7 +38,7 @@ def invalidate_domain_caches(sender, instance, **kwargs):
 def invalidate_tenant_caches(sender, instance, **kwargs):
     """Clear caches for all domains of a tenant when tenant config changes."""
     for domain in instance.domains.values_list("domain", flat=True):
-        cache.delete(f"global:tenant_resolve:{domain}")
+        cache.delete(tenant_resolve_key(domain))
     cache.delete(f"global:tenant_domains:{instance.schema_name}")
 
 
@@ -60,7 +61,7 @@ def _purge_resolve_for_current_schema():
         if tenant is None:
             return
         for domain in tenant.domains.values_list("domain", flat=True):
-            cache.delete(f"global:tenant_resolve:{domain}")
+            cache.delete(tenant_resolve_key(domain))
 
 
 @receiver(post_save, sender="extra_settings.Setting")

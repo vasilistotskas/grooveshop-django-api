@@ -29,6 +29,9 @@ carries the ``global:`` prefix the caller chose, e.g.
 
 from __future__ import annotations
 
+import hashlib
+from functools import lru_cache
+
 from django.db import connection
 
 GLOBAL_CACHE_PREFIX = "global:"
@@ -40,3 +43,37 @@ def make_tenant_key(key: str, key_prefix: str, version: int) -> str:
     else:
         schema = getattr(connection, "schema_name", "public")
     return f"{schema}:{key_prefix}:{version}:{key}"
+
+
+@lru_cache(maxsize=1)
+def _tenant_config_shape() -> str:
+    """Short fingerprint of ``TenantConfigSerializer``'s field names."""
+    from tenant.serializers import TenantConfigSerializer  # noqa: PLC0415
+
+    names = ",".join(sorted(TenantConfigSerializer().get_fields()))
+    return hashlib.blake2s(names.encode(), digest_size=4).hexdigest()
+
+
+def tenant_resolve_key(domain: str) -> str:
+    """Cache key for a domain's resolved ``TenantConfig`` payload.
+
+    The SHAPE fingerprint is load-bearing, not decoration. What is
+    cached is the SERIALIZED payload, so a release that adds a field to
+    ``TenantConfigSerializer`` keeps serving the old shape until the TTL
+    expires — and the storefront validates this response against a
+    generated Zod schema in which the new field is REQUIRED. The
+    frontend then rejects every resolve and the tenant middleware turns
+    that into a 404 "Store not found" on every route, for every tenant.
+
+    That is not hypothetical: adding ``b2bEnabled`` took production down
+    on 2026-08-31 until the stale key was deleted by hand. Deriving the
+    key from the field names means a changed payload shape simply reads
+    a different key — the old entry is never consulted again and ages
+    out on its own TTL, with no deploy step to remember.
+
+    Every reader AND invalidator must go through this helper, or a
+    signal's delete silently stops matching the writer's key.
+    """
+    return (
+        f"{GLOBAL_CACHE_PREFIX}tenant_resolve:{_tenant_config_shape()}:{domain}"
+    )

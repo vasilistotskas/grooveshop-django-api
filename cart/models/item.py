@@ -148,6 +148,13 @@ class CartItem(TimeStampMixinModel, UUIDModel):
             settings.DEFAULT_CURRENCY,
         )
 
+    @property
+    def total_vat_value(self) -> Money:
+        return Money(
+            self.quantity * self.vat_value.amount,
+            settings.DEFAULT_CURRENCY,
+        )
+
     def update_quantity(self, quantity: int):
         self.quantity = quantity
         self.save()

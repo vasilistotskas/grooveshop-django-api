@@ -93,7 +93,7 @@ class Cart(TimeStampMixinModel, UUIDModel):
             if "items" in getattr(self, "_prefetched_objects_cache", {})
             else self.get_items()
         )
-        total = sum(item.vat_value.amount for item in items)
+        total = sum(item.total_vat_value.amount for item in items)
         return Money(total, settings.DEFAULT_CURRENCY)
 
     @property

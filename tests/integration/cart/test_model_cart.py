@@ -64,12 +64,42 @@ class CartModelTestCase(TestCase):
             self.cart.total_discount_value.amount, expected_total_discount
         )
 
-    def test_total_vat_value(self):
+    def test_total_vat_value_multiplies_by_quantity(self):
+        """VAT must scale with quantity, like every other cart total.
+
+        Summing the per-UNIT ``vat_value`` under-reported VAT on any
+        line with quantity > 1, so the cart summary's net/VAT split
+        never added up to the (correct) total price.
+        """
         expected_total_vat = (
+            self.cart_item_1.vat_value.amount * self.cart_item_1.quantity
+            + self.cart_item_2.vat_value.amount * self.cart_item_2.quantity
+        )
+        self.assertEqual(self.cart.total_vat_value.amount, expected_total_vat)
+
+        per_unit_sum = (
             self.cart_item_1.vat_value.amount
             + self.cart_item_2.vat_value.amount
         )
-        self.assertEqual(self.cart.total_vat_value.amount, expected_total_vat)
+        self.assertNotEqual(self.cart.total_vat_value.amount, per_unit_sum)
+
+    def test_cart_totals_reconcile(self):
+        """(price x qty) + VAT - discount == total price.
+
+        Mirrors ``Product.final_price``. All three cart totals must
+        scale with quantity for this to hold, which is what caught the
+        per-unit VAT sum.
+        """
+        net = (
+            self.cart_item_1.price.amount * self.cart_item_1.quantity
+            + self.cart_item_2.price.amount * self.cart_item_2.quantity
+        )
+        self.assertEqual(
+            net
+            + self.cart.total_vat_value.amount
+            - self.cart.total_discount_value.amount,
+            self.cart.total_price.amount,
+        )
 
     def test_total_items(self):
         expected_total_items = (

@@ -3,6 +3,63 @@
 
 
 
+## v3.25.0 (2026-08-31)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.24.0 [skip ci] ([`23ff99c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/23ff99c0db4d3cc51b8dc25667f450282e5ee20b))
+
+### Features
+
+* feat: B2B wholesale program and invoice checkout upgrade
+
+Wholesale program (dark behind Tenant.b2b_enabled +
+B2B_WHOLESALE_ENABLED, 404 semantics, fail closed):
+
+- new b2b/ app: BusinessProfile approval workflow (VIES-verified via
+  the official REST API with 24h re-check cooldown, throttled submits,
+  row-locked transitions, merchant notification on new applications),
+  CustomerGroup (percent off net + minimum order value), PriceListItem
+  fixed overrides with textarea bulk import and CSV export
+- cart-context pricing engine: binds on EVERY cart materialization
+  (CartService, view for_detail reloads incl. prefetched items, item
+  endpoints, payment-intent creation) with lazy per-product resolution
+  so price_at_add and lock-window additions never fall back to retail;
+  OrderItem snapshots the bound price on both create paths, so the
+  PaymentIntent amount, fee/shipping thresholds, previews and the
+  charge always agree
+- catalog stays retail everywhere (SWR pages, cached product routes,
+  Meilisearch, RSS, agent gateway, feeds) — wholesale prices travel
+  only through the uncached cart/order pipeline and the new
+  authenticated GET /api/v1/b2b/prices
+- promotions don't stack unless B2B_ALLOW_PROMOTIONS: attached codes
+  surface as discount_code_combination_disallowed (non-blocking, ACP
+  vocabulary) and BxGY credits the bound unit price; loyalty accrual
+  skips wholesale-priced orders unless B2B_LOYALTY_ENABLED
+
+Invoice-at-checkout upgrade (all plans, existing B2B_INVOICING_ENABLED):
+
+- Order gains billing company name / tax office / activity + the
+  registered address; Greek VAT checksum validation; read-side
+  exposure (serializers, admin Billing tab, Wholesale filter and
+  group attribution); RECEIPT orders blank ALL billing identity so a
+  stale client can't put a company block on a retail receipt
+- invoice PDF buyer block with billing-country awareness, invoice
+  section on order emails, customer status emails
+- B2B_INVOICE_COMPANY_REQUIRED rollout shim keeps the currently
+  deployed storefront working until its release lands
+
+All migrations are additive and PreSync-safe. Greek translations added
+for every new user-facing string, plus a sweep of pre-existing
+untranslated checkout/order strings.
+
+DEPLOY ORDER: this ships FIRST — the storefront release validates
+tenant/cart contracts that require the new b2bEnabled and b2bPricing
+fields and would 503 without them.
+
+Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01X8CBdikFcL8Wthy41ZJcSD ([`d3db7ae`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d3db7ae5899bbacf0a0d2064253e3c3e54abc2db))
+
 ## v3.24.0 (2026-08-30)
 
 ### Chores

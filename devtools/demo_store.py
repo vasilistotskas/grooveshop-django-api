@@ -1026,11 +1026,12 @@ NAV_HEADER: list[dict[str, Any]] = [
         "to": "/products",
         "icon": "i-heroicons-shopping-bag",
     },
-    {
-        "label": "Προσφορές",
-        "to": "/products?ordering=-discount_percent",
-        "icon": "i-heroicons-tag",
-    },
+    # /offers is the real page now (GET /api/v1/promotion + the
+    # storefront's offers route). An operator-configured header REPLACES
+    # the code-level navbar, so the link has to live here too — the
+    # two-tier-gated code link never renders for a tenant that has a
+    # NavigationMenu header row.
+    {"label": "Προσφορές", "to": "/offers", "icon": "i-heroicons-tag"},
     {"label": "Blog", "to": "/blog", "icon": "i-heroicons-newspaper"},
     {"label": "Δωροκάρτες", "to": "/gift-cards", "icon": "i-heroicons-gift"},
     {
@@ -1062,6 +1063,7 @@ NAV_FOOTER: list[dict[str, Any]] = [
         "icon": "i-heroicons-shopping-bag",
         "children": [
             {"label": "Όλα τα προϊόντα", "to": "/products"},
+            {"label": "Προσφορές", "to": "/offers"},
             {"label": "Αξεσουάρ Κινητών", "to": "/products"},
             {"label": "Δωροκάρτες", "to": "/gift-cards"},
             {"label": "Πρόγραμμα Επιβράβευσης", "to": "/loyalty-program"},

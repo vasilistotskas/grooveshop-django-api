@@ -292,58 +292,112 @@ class TestContentPages(TestCase):
 class TestSeedFunctions(TestCase):
     """The two DB-touching behaviours worth pinning."""
 
-    def test_loyalty_dedupe_leaves_the_canonical_ladder_alone(self):
-        """The dedupe must key on the translated NAME, not merely on a
-        missing icon.
+    @staticmethod
+    def _ladder(*rows):
+        """Build an exact tier ladder: ``(required_level, name, mult)``.
 
-        The starting state here is the real one: migration
-        ``loyalty.0005_seed_default_loyalty_tiers`` has already seeded
-        Bronze/Silver/Gold/Platinum at levels 1/5/15/30, none of which
-        carries artwork. Every name is distinct, so a correct dedupe
-        deletes nothing — an implementation that keyed on the icon
-        instead would wipe three quarters of the ladder.
+        Clears the table first rather than building on top of whatever
+        the DB holds. ``loyalty.0005_seed_default_loyalty_tiers`` seeds
+        four tiers at migration time, but a ``TransactionTestCase``
+        anywhere in the suite truncates and does NOT restore
+        migration-seeded rows — so a test that assumed them passed or
+        failed depending on which files ran first under ``--dist
+        loadfile``.
         """
         from loyalty.models import LoyaltyTier
 
-        before = LoyaltyTier.objects.count()
-        assert before >= 4, "expected the seed migration's ladder"
+        LoyaltyTier.objects.all().delete()
+        created = []
+        for required_level, name, multiplier in rows:
+            tier = LoyaltyTier(
+                required_level=required_level, points_multiplier=multiplier
+            )
+            tier.set_current_language("el")
+            tier.name = name
+            tier.save()
+            created.append(tier)
+        return created
+
+    def test_loyalty_dedupe_leaves_a_distinctly_named_ladder_alone(self):
+        """The dedupe must key on the translated NAME, not merely on a
+        missing icon.
+
+        None of these rows carries artwork — the shape the seed
+        migration leaves behind — and every name is distinct, so a
+        correct dedupe deletes nothing. An implementation that keyed on
+        the icon instead would wipe the whole ladder.
+        """
+        from loyalty.models import LoyaltyTier
+
+        self._ladder(
+            (1, "Χάλκινο", "1.00"),
+            (5, "Ασημένιο", "1.25"),
+            (15, "Χρυσό", "1.50"),
+            (30, "Πλατινένιο", "2.00"),
+        )
 
         report = demo_store.dedupe_loyalty_tiers()
 
         assert report.get("deleted", 0) == 0
-        assert LoyaltyTier.objects.count() == before
+        assert LoyaltyTier.objects.count() == 4
 
     def test_loyalty_dedupe_removes_a_same_name_iconless_duplicate(self):
-        """This is the shape found on the live tenant: the migration
-        get-or-creates keyed on ``required_level``, so on a tenant that
+        """The shape found on the live tenant: the migration
+        get-or-creates keyed on ``required_level``, so on a store that
         already had a hand-curated ladder its rows landed alongside
-        rather than matching, leaving two tiers with one name.
+        rather than matching, leaving two tiers called Χρυσό.
         """
         from loyalty.models import LoyaltyTier
 
-        keeper = LoyaltyTier.objects.order_by("required_level").filter(
-            translations__language_code="el"
-        )[2]
-        name = keeper.safe_translation_getter("name", any_language=True)
-        before = LoyaltyTier.objects.count()
-
-        duplicate = LoyaltyTier(
-            required_level=keeper.required_level + 5,
-            points_multiplier=keeper.points_multiplier,
+        keeper, duplicate = self._ladder(
+            (10, "Χρυσό", "1.50"),
+            (15, "Χρυσό", "1.50"),
         )
-        duplicate.set_current_language("el")
-        duplicate.name = name
-        duplicate.save()
 
         report = demo_store.dedupe_loyalty_tiers()
 
         assert report.get("deleted", 0) == 1
-        assert LoyaltyTier.objects.count() == before
-        # The LOWER level survives, so a user who had reached the higher
-        # duplicate keeps the same tier NAME and the same
+        # The LOWER level survives, so a shopper who had reached the
+        # higher duplicate keeps the same tier NAME and the same
         # points_multiplier — nobody is demoted by the cleanup.
         assert LoyaltyTier.objects.filter(pk=keeper.pk).exists()
         assert not LoyaltyTier.objects.filter(pk=duplicate.pk).exists()
+
+    def test_loyalty_dedupe_keeps_a_duplicate_that_carries_artwork(self):
+        """A named duplicate WITH an icon is a deliberate ladder step,
+        not the migration's leftover, so it is left in place."""
+        from loyalty.models import LoyaltyTier
+
+        self._ladder((10, "Χρυσό", "1.50"), (15, "Χρυσό", "1.50"))
+        higher = LoyaltyTier.objects.get(required_level=15)
+        higher.icon = "uploads/loyalty/gold.png"
+        higher.save(update_fields=["icon"])
+
+        report = demo_store.dedupe_loyalty_tiers()
+
+        assert report.get("deleted", 0) == 0
+        assert report.get("kept_duplicate_with_icon") == 1
+
+    def test_loyalty_dedupe_resequences_colliding_sort_order(self):
+        """The duplicates collided on sort_order (two rows at 2, two at
+        3); the ladder must come out strictly increasing."""
+        from loyalty.models import LoyaltyTier
+
+        self._ladder(
+            (1, "Χάλκινο", "1.00"),
+            (5, "Ασημένιο", "1.25"),
+            (15, "Χρυσό", "1.50"),
+        )
+        LoyaltyTier.objects.update(sort_order=7)
+
+        demo_store.dedupe_loyalty_tiers()
+
+        orders = list(
+            LoyaltyTier.objects.order_by("required_level").values_list(
+                "sort_order", flat=True
+            )
+        )
+        assert orders == [0, 1, 2]
 
     def test_acp_token_is_not_rotated_when_one_exists(self):
         """Rotating would silently break an already-enrolled agent

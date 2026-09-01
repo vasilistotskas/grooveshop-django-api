@@ -263,6 +263,29 @@ def register_default_surfaces() -> None:
 
     register_surface(
         CacheSurface(
+            code="promotions",
+            label=_("Promotions"),
+            description=_(
+                "The public offers listing. An offer is a commercial"
+                " commitment with an end date, so a stale entry"
+                " advertises a discount the cart will refuse — purge"
+                " after editing a promotion, its codes, or its"
+                " schedule."
+            ),
+            # ``PublicPromotionListView`` is a plain APIView with no
+            # ``@cache_methods`` decorator, so there is no Django-side
+            # response cache to purge — only the Nuxt handler and the
+            # rendered /offers page.
+            django_patterns=(),
+            nuxt_patterns=_nuxt("PublicPromotionList")
+            + _nuxt_routes("/offers"),
+            icon="local_offer",
+            group="commerce",
+        )
+    )
+
+    register_surface(
+        CacheSurface(
             code="tags",
             label=_("Tags"),
             description=_(

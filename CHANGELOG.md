@@ -3,6 +3,46 @@
 
 
 
+## v3.26.2 (2026-09-01)
+
+### Bug fixes
+
+* fix(devtools): stop the demo seeder classifying a live tenant as safe (#23)
+
+``seed_demo_store`` ships in the production image — ``devtools`` is an
+installed app, so the command is on every pod. Its only safety control
+is ``_guard``, which refuses a tenant unless EVERY one of its domains
+carries a non-production marker.
+
+``grooveshop.space`` was one of those markers, on the reasoning that the
+platform hosts all live there. But a tenant can be sold a subdomain of
+it as well, and one already has been: tenant #2 has been live on
+``fyteia.grooveshop.space`` since 2026-08-28 while its own domain is
+pending. All three of its hostnames carry the string, so the guard's
+``live`` set came out empty and the command would have seeded demo
+settings, catalogue, layouts and navigation over a real store. Only
+``viva_wallet_live_mode`` stood behind it, and that is a payments flag,
+not an environment one.
+
+The marker bought nothing in return — the platform hosts belong to no
+tenant, so a tenant-scoped command never needed to recognise them.
+
+Staging is unaffected: every staging hostname carries ``staging``
+(verified against the live tenant table — webside, aurora and public).
+
+Nothing covered the guard before, which is why this reached main. Adds
+tests over the real hostnames on both sides, plus behavioural cover for
+the one-live-domain, live-payments and --force paths.
+
+
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S
+
+Co-authored-by: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`206a41d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/206a41dcb4996461e6e3e0f671960e0aea0a7639))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.26.1 [skip ci] ([`c3bd893`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c3bd8931917d9760e1cd7fc11b0c58d9f1f39381))
+
 ## v3.26.1 (2026-09-01)
 
 ### Bug fixes

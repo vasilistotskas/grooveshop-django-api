@@ -3,6 +3,345 @@
 
 
 
+## v3.26.0 (2026-09-01)
+
+### Bug fixes
+
+* fix(cache,tests): two dead cache patterns and the MT lane's shared test DB
+
+Both pre-existing, both found by auditing rather than by a failure.
+
+1. Two `django_patterns` matched zero cache keys.
+
+`cache_methods` builds each key prefix as `{ClassName}_{method}`, so
+`*SomeViewSet_*` only matches when SomeViewSet actually carries the
+decorator. Two patterns named classes that do not:
+
+* `*SettingsViewSet_*` on the settings surface — there is no such class
+  anywhere. The settings API is two plain @api_view functions
+  (core.api.views.list_settings / get_setting_by_key) with no cache_page
+  or cache_methods, so it has no Django response cache at all.
+* `*ContentPageViewSet_*` on the page_config surface I added an hour ago
+  — the class exists but page_config/views.py does not import
+  cache_methods, so my own comment claiming otherwise was wrong.
+
+A pattern that matches nothing makes the purge report success while
+stale content keeps being served, which is precisely what
+test_surface_patterns.py was written to prevent. Its sibling
+`*extra_settings_*` looked equally suspicious and is NOT: extra_settings'
+cache.py builds keys as f"extra_settings_{name}", and it matched 92 keys
+on staging.
+
+Added a registry-wide invariant so the next one cannot be hand-written
+in: every viewset-shaped pattern must name a class an AST scan finds
+decorated, and every decorated class must be reachable by some surface.
+The scan asserts it found known-good classes first, so it cannot pass
+vacuously.
+
+2. tests/ and tests_mt/ shared one test database, and built
+   incompatible layouts in it.
+
+Both defaulted to `test_<DB_NAME>`. `tests/` runs with
+DATABASE_ROUTERS = [] so every app's tables land in `public`;
+`tests_mt/` runs the real TenantSyncRouter, which keeps TENANT_APPS
+tables out of `public` entirely. So whichever lane built the database
+last decided whether this lane's isolation assertions could hold —
+running the main suite first made test_model_write_isolation and
+test_b2b_flag_isolation fail with "DID NOT RAISE ProgrammingError",
+because `public.product_product` existed after all.
+
+The tests were right and the database under them was wrong. tests_mt now
+sets its own TEST NAME, so neither lane can clobber the other and
+neither needs --create-db to recover. Verified by running the exact
+sequence that failed before — main lane, then the two isolation tests —
+which now passes, and the full MT lane is 11/11 green.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S ([`2bafe22`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2bafe22de837f971c3b146ba65f07dc69d2fa299))
+
+* fix(cache): a catalogue purge now reaches the gateway's feed cache
+
+Completes the fifth defect from the staging sweep. The catalog feeds are
+cached in the AGENT GATEWAY's Redis DB, which Django's cache backend
+cannot reach, and they survive gateway pod restarts — so a merchant's
+price change took up to six hours (FEED_FRESH_TTL) to reach Google, Meta
+and TikTok, with no purge path at all. On staging the feeds served 7
+items long after the catalogue held 35, and clearing it took a manual
+redis-cli UNLINK.
+
+core/cache/gateway.py calls the gateway's new
+POST /internal/feeds/invalidate, mirroring core/cache/nuxt.py: same
+"never raise, return a structured result" contract, because this runs
+from admin actions and a management command where an unreachable sidecar
+must not take the whole purge down. An unconfigured gateway
+(AGENT_GATEWAY_INTERNAL_URL empty) is a reported no-op, not a failure.
+
+CacheSurface gains `invalidates_gateway_feeds` — a declarative THIRD
+target rather than a key pattern, because there is no pattern Django can
+express for another service's Redis DB. Set on `products` and
+`categories`: the feeds embed product rows and the category names used
+for g:product_type. Deliberately NOT set on blog/settings/page_config/
+loyalty, so an unrelated purge does not pay a cross-service round trip.
+
+No dry-run form: the endpoint deletes or it does not, and reporting a
+speculative count would be worse than reporting nothing — so a dry run
+skips it entirely, which is asserted.
+
+15 tests, mutation-checked both ways: unflagging a surface and stopping
+the service from calling the gateway each fail specific tests.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S ([`1355db0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1355db05b2f3b8c3e9a67706ea9c74e05364b4d0))
+
+* fix(cache,product): three defects found while seeding staging
+
+All three were invisible until something that should have appeared on
+the storefront did not, and all three affect production.
+
+1. `manage.py clear_cache` purged nothing for any tenant.
+
+Django cache keys are schema-prefixed by tenant.cache.make_tenant_key,
+and CustomCache._make_pattern builds its SCAN pattern through the same
+function. That is right for the admin path — a request carries a tenant,
+so a tenant admin sees only its own keys. A management command carries
+no tenant: it ran in `public` and its SCAN never matched a tenant's keys,
+reporting success having deleted nothing.
+
+Measured on staging: `clear_cache --all` reported django=0 across all ten
+surfaces while the same surfaces under schema_context('webside') matched
+and purged 436 keys. With DEFAULT_CACHE_TTL at 7200s+, that is how long
+a merchant's edit could stay invisible after an operator "purged" it.
+
+The CLI now purges every active tenant by default, with --schema for one
+and --public-only for the control plane. An unknown --schema is an error
+rather than a silent no-op, since the old failure mode was precisely
+"looked like it worked". --prefixes needed no change:
+clear_by_prefixes already scans both raw layouts for exactly this
+reason.
+
+2. `_nuxt_routes("/")` was a catch-all, and the page builder had no
+   surface at all.
+
+Nitro stores "/" under the literal segment `index`, verified in the live
+keyspace as routes:_:index.<hash>:host.<hash>:xdeviceclass.<hash>.json.
+The helper stripped non-word characters, so "/" flattened to "" and the
+pattern degenerated to routes:_:** — a caller wanting to drop the
+homepage dropped every cached page render instead (9 keys on staging vs
+the 1 it wanted).
+
+With that fixed, a page_config surface can be precise: the pageConfig
+and navigation handlers, the ContentPage response cache, and the
+rendered HTML for exactly the page types usePageConfig can drive. Before
+this there was no surface covering the builder at all, so a layout edit
+sat behind Nitro's SSR cache for the rest of its TTL with no way to
+flush it — which is why /vision kept returning 200 for minutes after its
+layout was unpublished.
+
+3. Category tiles could never show their image.
+
+Product/Categories/Slider.vue renders item.mainImagePath, but no
+category serializer exposed it and it was absent from the OpenAPI
+contract, so the generated Zod stripped it. Every tile fell through to
+ImgWithFallback's placeholder no matter how many ProductCategoryImage
+rows the merchant had uploaded. Only visible now because the homepage
+has a category rail for the first time.
+
+main_image resolves per row, so publishing it on a LIST endpoint needed
+the prefetch too — CategoryQuerySet.with_main_image mirrors
+ProductQuerySet.with_main_image, with a filter matching
+get_main_image (MAIN + active) exactly so the prefetched list cannot
+disagree with the non-prefetched fallback.
+
+Existing clear_cache tests updated to pass the new options and stub
+schema_context, keeping them DB-free; schema selection has its own
+tests. Every new test mutation-checked.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S ([`0551749`](https://github.com/vasilistotskas/grooveshop-django-api/commit/055174928be2a98a2152beecfc5e7098f6c123c2))
+
+* fix(devtools): point the demo nav at /offers and harden the tier tests
+
+Two follow-ups to the demo seeder now that the offers page exists.
+
+The seeded header menu pointed "Προσφορές" at
+/products?ordering=-discount_percent, which was the best available
+target before there was an offers page. An operator-configured header
+REPLACES the code-level navbar (useNavigation → Navbar.vue: "Operator-
+configured header menu wins"), so the new two-tier-gated code link never
+renders for a tenant that has a NavigationMenu row — the link has to
+live in the seeded data too. Also adds it to the footer's shop column.
+
+The two loyalty-dedupe tests asserted against rows that
+loyalty.0005_seed_default_loyalty_tiers creates at migration time. That
+is not a stable fixture: a TransactionTestCase anywhere in the suite
+truncates and does NOT restore migration-seeded data, so the tests
+passed or failed depending on which files ran first under
+``--dist loadfile`` — observed failing after an unrelated run. They now
+build their own exact ladder and clear the table first.
+
+Two cases added while making them deterministic, both mutation-checked:
+a named duplicate that DOES carry artwork must be kept (it is a
+deliberate ladder step, not the migration's leftover), and the
+resequence pass must leave sort_order strictly increasing — that is the
+half of the fix that addresses the colliding orders, and nothing covered
+it before.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S ([`981b606`](https://github.com/vasilistotskas/grooveshop-django-api/commit/981b6068aa7957c3e73c477d6d089e69c6346a6b))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.25.3 [skip ci] ([`43b9cfc`](https://github.com/vasilistotskas/grooveshop-django-api/commit/43b9cfc88c3b013eb476957bcf70026991e28982))
+
+### Documentation
+
+* docs(promotion): explain the single-use-code rule, not just its effect
+
+Verifying the endpoint against real staging data surfaced a case that
+looks like a bug and is not: promotion "STAGE one-shot code" gets
+published even though its name says one-shot. Its CODE carries
+usage_limit=None; the cap is usage_limit_total=1 on the promotion, and
+that is re-checked live against the redemption count, so the offer drops
+off the page the moment it is taken.
+
+The old comments justified the usage_limit=1 exclusion by its effect
+("tells all but one about an offer they cannot use"), which invites
+exactly the wrong conclusion — that a usage_limit_total=1 promotion
+should be excluded too. The rule is about the MECHANIC: the field's own
+help text defines usage_limit=1 as a bulk single-use code, handed out
+individually by email or print, and publishing one of those on a
+crawlable page is wrong regardless of redemption state. A
+promotion-level total of 1 is the opposite — a genuine
+first-come-first-served offer that should be advertised while it lasts.
+
+No behaviour change; both are already correct. This is so the next
+reader does not "fix" it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S ([`67b62a4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/67b62a4605f5ffe05f5021c2600564aa1ad2b68a))
+
+### Features
+
+* feat(promotion): publish live offers on a public endpoint
+
+Automatic promotions were invisible until the cart already qualified: a
+shopper could not learn that spending 80 EUR earns a gift, or that a 2+1
+is running, before building the cart. The engine has been complete for a
+while — the discovery half was missing, and there were no
+/api/v1/promotion* endpoints at all because promotions only ever reached
+the client folded into the cart payload.
+
+GET /api/v1/promotion lists what a shopper can act on: every live
+AUTOMATIC promotion, plus CODE promotions carrying at least one publicly
+advertisable code.
+
+Excluded, and each for a reason:
+
+* Personal coupons (assigned_to / assigned_to_email). Filtered in the
+  queryset AND re-checked in the serializer, so a later queryset change
+  cannot leak one.
+* Single-use codes (usage_limit=1) — advertising a one-shot code to
+  every visitor tells all but the first about an offer they cannot
+  redeem.
+* Promotions at usage_limit_total, matching PromotionEngine's own check
+  so the page never advertises what the cart refuses with
+  USAGE_LIMIT_REACHED.
+
+Never serialized: usage_limit_total, usage_limit_per_customer, the code
+assignee, priority, and the exclusion M2Ms. Published deliberately:
+min_subtotal (the shopper cannot act without it), max_discount_amount
+(hiding the cap overstates the benefit), min_quantity and
+exclude_discounted_products (ordinary fine print), ends_at.
+
+Two SQL details are load-bearing and neither is obvious:
+
+* usage_limit is matched as `IS NULL OR > 1`, not `~Q(usage_limit=1)`.
+  A negated equality is not NULL-safe, and unlimited codes carry NULL —
+  the tidier form excludes exactly the codes most worth advertising.
+* The two Counts both use distinct=True. They span different
+  multi-valued relations, so without it each count is multiplied by the
+  other's row count.
+
+Gated on BOTH promotion tiers (plan flag + the new
+IsPromotionsRuntimeEnabled), 404 not 403, so a store with promotions off
+is indistinguishable from one that never had the route. That matters
+more here than on the cart's coupon endpoint because this page is
+crawlable.
+
+Every SerializerMethodField carries an explicit @extend_schema_field.
+The storefront generates its Zod validators from this schema, and the
+nullability on min_subtotal / max_discount_amount is what stops the
+proxy rejecting every offer without a threshold — which is most of them.
+Money fields return raw Decimal to match COERCE_DECIMAL_TO_STRING:
+False, so they render as JSON numbers like every other money field.
+
+Also registers a `promotions` cache surface: an offer is a commercial
+commitment with an end date, so a stale entry advertises a discount the
+cart will refuse.
+
+20 integration tests cover the exclusions and the NULL handling.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S ([`f1e1cc9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f1e1cc9f87ba16cdeeed8911a5b4837d9dd555fe))
+
+* feat(devtools): add seed_demo_store for non-production tenants
+
+A prod-data clone leaves most shipped features with nothing to render:
+no brands, no reviews, no tags, no navigation rows, unpublished content
+pages, no product carrying a discount or out of stock, and a homepage
+layout with no product sections at all. Every one of those is data, not
+code, so the features look broken on staging while being fine.
+
+Making it a command rather than admin work is the point:
+scripts/staging-refresh.sh DROPS the staging database and restores
+production over it, so anything entered by hand is gone at the next
+refresh.
+
+Deliberate non-scope, all recorded in devtools/demo_store.py:
+
+* No third-party credential of any kind. ACS, BoxNow, Meta CAPI, the
+  chat provider key and the social OAuth apps are per-environment
+  secrets and stay out of the repo.
+* MYDATA_ENABLED, ACS_DYNAMIC_PRICING_ENABLED and the live-mode payment
+  flags are never touched. myDATA talks to the Greek government's live
+  e-invoicing endpoint; ACS dynamic pricing calls the carrier on every
+  checkout quote, which on placeholder credentials is a guaranteed 403
+  on the hot path for no gain. A test asserts the settings map excludes
+  them.
+* products/blog page layouts stay empty. page_config.defaults records
+  why: a listing section there double-renders the page, because
+  products_grid mounts its own ProductsList over the page's own
+  breadcrumb, sidebar and list. A test asserts they stay out of the plan.
+* Only faq and shipping-info content pages are published. The other five
+  default slugs duplicate hardcoded Nuxt routes that already carry real
+  content, and the footer's LEGAL_PAGE_SLUGS dedup covers four of them
+  but not `about`.
+* home gets three sections, not twenty: it is SWR-cached with a tuned JS
+  budget and every extra section is another lazy chunk on the
+  highest-traffic route.
+
+Two things the seeder must do that are easy to get wrong. Section props
+and navigation payloads are validated with page_config.schemas before
+every write, because that validation is wired into the admin and the
+serializers but NOT the model, so a direct ORM write bypasses it and the
+mistake surfaces only as a silently-stripped prop. And factory_boy is
+never imported: it is dev-only and absent from the deployed image, so
+the Greek content is hand-authored.
+
+The loyalty step removes tiers that duplicate an existing tier's NAME.
+Migration loyalty.0005 get-or-creates keyed on required_level, so on a
+tenant that already had a curated ladder its canonical rows landed
+alongside rather than matching, leaving two tiers called Gold and two
+called Platinum with colliding sort_order. Safe by construction: nothing
+foreign-keys LoyaltyTier and tiers resolve by highest required_level <=
+level, so an affected user moves to the lower row of the same name with
+the same multiplier and nobody is demoted.
+
+35 tests pin the contracts that otherwise fail silently at runtime.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S ([`233b597`](https://github.com/vasilistotskas/grooveshop-django-api/commit/233b597fb71a8ad7c947d89ef904475ee8a49734))
+
 ## v3.25.3 (2026-08-31)
 
 ### Bug fixes

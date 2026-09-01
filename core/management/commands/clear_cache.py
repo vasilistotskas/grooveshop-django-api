@@ -184,8 +184,8 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"{prefix}Purged {report.total_django} Django + "
-                f"{report.total_nuxt} Nuxt keys "
-                f"across {len(report.surfaces)} surface(s)"
+                f"{report.total_nuxt} Nuxt + {report.total_gateway} feed "
+                f"keys across {len(report.surfaces)} surface(s)"
             )
         )
         for surface in report.surfaces:
@@ -194,10 +194,14 @@ class Command(BaseCommand):
                 f" nuxt={surface.nuxt_deleted}"
                 f" blocked={surface.django_blocked + surface.nuxt_blocked}"
             )
+            if surface.gateway_removed or surface.gateway_error:
+                line += f" feeds={surface.gateway_removed}"
             if surface.django_error:
                 line += f" django_error={surface.django_error}"
             if surface.nuxt_error:
                 line += f" nuxt_error={surface.nuxt_error}"
+            if surface.gateway_error:
+                line += f" gateway_error={surface.gateway_error}"
             self.stdout.write(line)
 
     def _list_surfaces(self) -> None:

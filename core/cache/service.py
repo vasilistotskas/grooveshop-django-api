@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterable
 
+from core.cache import gateway as gateway_client
 from core.cache import nuxt as nuxt_client
 from core.cache.protected import filter_protected
 from core.cache.registry import (
@@ -35,6 +36,8 @@ class SurfaceResult:
     nuxt_blocked: int = 0
     nuxt_error: str | None = None
     django_error: str | None = None
+    gateway_removed: int = 0
+    gateway_error: str | None = None
 
     @property
     def total_deleted(self) -> int:
@@ -53,6 +56,10 @@ class PurgeReport:
     @property
     def total_nuxt(self) -> int:
         return sum(s.nuxt_deleted for s in self.surfaces)
+
+    @property
+    def total_gateway(self) -> int:
+        return sum(s.gateway_removed for s in self.surfaces)
 
     @property
     def total_deleted(self) -> int:
@@ -158,6 +165,15 @@ class CacheService:
             result.nuxt_blocked += nuxt_result.blocked
             if nuxt_result.error:
                 result.nuxt_error = nuxt_result.error
+
+        if surface.invalidates_gateway_feeds and not dry_run:
+            # No dry-run equivalent: the gateway endpoint deletes or it
+            # does not, and reporting a speculative count would be worse
+            # than reporting nothing.
+            gateway_result = gateway_client.invalidate_feeds()
+            result.gateway_removed += gateway_result.removed
+            if gateway_result.error:
+                result.gateway_error = gateway_result.error
 
         return result
 

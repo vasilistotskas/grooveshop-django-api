@@ -184,6 +184,12 @@ def register_default_surfaces() -> None:
             # without this a price edit stayed visible for the whole TTL.
             + _nuxt_routes("/products"),
             related=("categories", "tags"),
+            # The catalog feeds embed product rows (and the
+            # category names used for g:product_type), and the
+            # gateway caches them for FEED_FRESH_TTL in its own
+            # Redis. Without this a price change took up to six
+            # hours to reach Google, Meta and TikTok.
+            invalidates_gateway_feeds=True,
             icon="inventory_2",
             group="catalog",
         )
@@ -206,6 +212,12 @@ def register_default_surfaces() -> None:
             # Category pages live under /products/category/**, which the
             # same escaped-path prefix covers.
             + _nuxt_routes("/products"),
+            # The catalog feeds embed product rows (and the
+            # category names used for g:product_type), and the
+            # gateway caches them for FEED_FRESH_TTL in its own
+            # Redis. Without this a price change took up to six
+            # hours to reach Google, Meta and TikTok.
+            invalidates_gateway_feeds=True,
             icon="category",
             group="catalog",
         )

@@ -3,6 +3,44 @@
 
 
 
+## v3.27.0 (2026-09-01)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.26.2 [skip ci] ([`232c441`](https://github.com/vasilistotskas/grooveshop-django-api/commit/232c4416bf4c8d80403f270894d33f96adb84d57))
+
+### Features
+
+* feat(tenant): is_demo opt-in so a showcase store can be seeded safely (#24)
+
+The public demo store will live on demo.grooveshop.space — a production
+host with no non-production marker — so seed_demo_store's guard refuses
+it. The two ways past that guard today are both wrong: --force is a
+blanket override that equally unlocks webside.gr, and re-adding a
+hostname substring is exactly what let the guard classify tenant #2's
+live fyteia.grooveshop.space as safe to seed over.
+
+is_demo is an explicit per-tenant opt-in, set in the admin on a row that
+takes no real orders. It suppresses the HOSTNAME heuristic only —
+viva_wallet_live_mode still refuses, because a store taking real money
+is live whatever a label says, and that signal is the more trustworthy
+of the two.
+
+Not a feature flag: it gates nothing a shopper sees (a demo store should
+look exactly like a real one), so it sits with is_active rather than
+under Features. Deliberately NOT added to TenantConfigSerializer — the
+storefront has no use for it, and every field added there has to outlive
+the cached payloads of the deploy that adds it (2026-08-31 outage).
+
+Also exposes b2b_enabled in the admin. It was absent entirely, so the
+wholesale plan gate could only be flipped from a shell while every other
+plan gate was editable — an oversight in the same fieldset.
+
+
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S
+
+Co-authored-by: Claude Opus 5 (1M context) <noreply@anthropic.com> ([`7d300bb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7d300bb89db8ea274b647ef085f5441d13996d05))
+
 ## v3.26.2 (2026-09-01)
 
 ### Bug fixes

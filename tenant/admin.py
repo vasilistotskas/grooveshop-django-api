@@ -503,6 +503,10 @@ class TenantAdmin(ModelAdmin):
                     "schema_name",
                     "owner_email",
                     "is_active",
+                    # Sits here rather than under Features on purpose:
+                    # it gates no storefront behaviour, it declares what
+                    # KIND of tenant this row is.
+                    "is_demo",
                     "suspended_at",
                     "suspended_reason",
                     "uuid",
@@ -560,6 +564,10 @@ class TenantAdmin(ModelAdmin):
                     "promotions_enabled",
                     "gift_cards_enabled",
                     "agent_commerce_enabled",
+                    # Was absent entirely, so the wholesale plan gate
+                    # could only be flipped from a shell — every other
+                    # plan gate is here.
+                    "b2b_enabled",
                 ]
             },
         ),

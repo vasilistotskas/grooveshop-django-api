@@ -155,19 +155,43 @@ class Command(BaseCommand):
 
     def _guard(self, tenant, domain_model, *, force: bool) -> None:
         """Refuse to seed a tenant whose domains look production."""
+        # ``is_demo`` is an explicit per-tenant opt-in that suppresses
+        # the HOSTNAME heuristic only. The public demo store runs on
+        # demo.grooveshop.space — a production host with no
+        # non-production marker — and the alternative would be --force,
+        # a blanket override that equally unlocks webside.gr.
+        #
+        # It deliberately does NOT suppress the live-payments signal
+        # below: a store taking real money is live whatever a label
+        # says, and that signal is the more trustworthy of the two.
+        is_demo = bool(getattr(tenant, "is_demo", False))
+
         domains = list(
             domain_model.objects.filter(tenant=tenant).values_list(
                 "domain", flat=True
             )
         )
-        live = [
-            domain
-            for domain in domains
-            if not any(marker in domain for marker in NON_PRODUCTION_MARKERS)
-        ]
+        live = (
+            []
+            if is_demo
+            else [
+                domain
+                for domain in domains
+                if not any(
+                    marker in domain for marker in NON_PRODUCTION_MARKERS
+                )
+            ]
+        )
         if tenant.viva_wallet_live_mode:
             live.append("viva_wallet_live_mode=True")
         if not live:
+            if is_demo:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"{tenant.schema_name!r} is flagged is_demo — "
+                        f"seeding a disposable showcase."
+                    )
+                )
             return
         if force:
             self.stdout.write(

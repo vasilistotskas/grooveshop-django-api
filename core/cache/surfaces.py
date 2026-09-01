@@ -63,11 +63,28 @@ def _nuxt_routes(*paths: str) -> tuple[str, ...]:
     """
 
     return tuple(
-        "cache:nitro:routes:_:*{}*".format(
-            "".join(ch for ch in path if ch.isalnum())[:16]
-        )
+        "cache:nitro:routes:_:*{}*".format(_escaped_pathname(path))
         for path in paths
     )
+
+
+def _escaped_pathname(path: str) -> str:
+    """Nitro's own escaping of a URL path, for key matching.
+
+    Non-word characters are stripped and the result truncated to 16
+    chars. The ONE special case is the site root: Nitro stores "/" under
+    the literal segment ``index``, not an empty string — verified in the
+    live keyspace as
+    ``cache:nitro:routes:_:index.<hash>:host.<hash>:xdeviceclass.<hash>.json``.
+
+    Without this branch, ``_nuxt_routes("/")`` returned
+    ``routes:_:**``, which matches EVERY cached page render — so a
+    caller wanting to drop the homepage silently dropped the whole
+    site's SSR cache instead.
+    """
+    if path in ("", "/"):
+        return "index"
+    return "".join(ch for ch in path if ch.isalnum())[:16]
 
 
 def _nuxt_functions(*names: str) -> tuple[str, ...]:
@@ -258,6 +275,41 @@ def register_default_surfaces() -> None:
             ),
             icon="loyalty",
             group="commerce",
+        )
+    )
+
+    register_surface(
+        CacheSurface(
+            code="page_config",
+            label=_("Pages & navigation"),
+            description=_(
+                "The page-builder layouts, the navigation menus and the"
+                " RENDERED pages built from them. Purge after editing a"
+                " layout, a section's props, a content page or a menu."
+            ),
+            # ``public_page_config`` / ``public_navigation`` are plain
+            # @api_view functions with no ``@cache_methods`` decorator;
+            # ContentPageViewSet is a BaseModelViewSet and does have one.
+            django_patterns=("*ContentPageViewSet_*",),
+            # Two halves, and BOTH are needed: purging the handler drops
+            # the JSON, purging the route drops the HTML already built
+            # from it. Without the route half a layout edit sits behind
+            # Nitro's SSR cache for the rest of its TTL.
+            #
+            # Only the page types the builder can actually drive
+            # (app/composables/usePageConfig.ts calls usePageConfig with
+            # a fixed set), so a layout edit does not evict the whole
+            # site's SSR cache. "/" resolves to Nitro's ``index``
+            # segment via _escaped_pathname.
+            nuxt_patterns=_nuxt(
+                "pageConfig",
+                "pageNavigation",
+                "ContentPageViewSet",
+                "ContentPageDetailViewSet",
+            )
+            + _nuxt_routes("/", "/about", "/contact", "/feedback", "/info"),
+            icon="dashboard_customize",
+            group="content",
         )
     )
 

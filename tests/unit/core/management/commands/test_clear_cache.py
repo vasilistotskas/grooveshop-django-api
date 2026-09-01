@@ -1,13 +1,27 @@
 from __future__ import annotations
 
 from io import StringIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from core.cache.service import PurgeReport, SurfaceResult
 from core.management.commands.clear_cache import Command
 
 
+@patch(
+    "core.management.commands.clear_cache.schema_context",
+    new=lambda schema: MagicMock(
+        __enter__=lambda s: None, __exit__=lambda *a: None
+    ),
+)
 class TestClearCacheCommand:
+    """Option pass-through and output formatting.
+
+    ``schema_context`` is stubbed and ``public_only=True`` is passed so
+    these stay DB-free — the command now purges per tenant schema, and
+    that selection logic has its own tests in
+    ``tests/unit/core/cache/test_clear_cache_command.py``.
+    """
+
     def test_no_args_lists_surfaces(self):
         out = StringIO()
         command = Command()
@@ -20,6 +34,8 @@ class TestClearCacheCommand:
             dry_run=False,
             no_related=False,
             prefixes=None,
+            schema=None,
+            public_only=True,
         )
 
         output = out.getvalue()
@@ -48,6 +64,8 @@ class TestClearCacheCommand:
             dry_run=False,
             no_related=False,
             prefixes=None,
+            schema=None,
+            public_only=True,
         )
 
         cache_service.purge.assert_called_once_with(
@@ -71,6 +89,8 @@ class TestClearCacheCommand:
             dry_run=True,
             no_related=False,
             prefixes=None,
+            schema=None,
+            public_only=True,
         )
 
         kwargs = cache_service.purge.call_args.kwargs
@@ -89,6 +109,8 @@ class TestClearCacheCommand:
             dry_run=False,
             no_related=False,
             prefixes=None,
+            schema=None,
+            public_only=True,
         )
 
         cache_service.purge_all.assert_called_once_with(dry_run=False)
@@ -107,6 +129,8 @@ class TestClearCacheCommand:
             dry_run=False,
             no_related=True,
             prefixes=None,
+            schema=None,
+            public_only=True,
         )
 
         kwargs = cache_service.purge.call_args.kwargs
@@ -131,6 +155,8 @@ class TestClearCacheCommand:
             dry_run=False,
             no_related=False,
             prefixes=["custom:"],
+            schema=None,
+            public_only=False,
         )
 
         mock_cache.clear_by_prefixes.assert_called_once_with(["custom:"])

@@ -84,6 +84,12 @@ class ProductCategory(
     def main_image(self):
         from product.models.category_image import ProductCategoryImage  # noqa: PLC0415, I001
 
+        # Use the prefetched main image when the queryset supplied one
+        # (CategoryQuerySet.with_main_image, mirroring Product) — without
+        # it, serializing a category LIST costs one query per row.
+        prefetched = getattr(self, "_prefetched_main_images", None)
+        if prefetched is not None:
+            return prefetched[0] if prefetched else None
         return ProductCategoryImage.get_main_image(self)
 
     @property

@@ -41844,6 +41844,9 @@ components:
         treeId:
           type: integer
           readOnly: true
+        mainImagePath:
+          type: string
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -41862,6 +41865,7 @@ components:
       - createdAt
       - id
       - level
+      - mainImagePath
       - slug
       - translations
       - treeId
@@ -41914,6 +41918,9 @@ components:
         treeId:
           type: integer
           readOnly: true
+        mainImagePath:
+          type: string
+          readOnly: true
         createdAt:
           type: string
           format: date-time
@@ -41953,6 +41960,7 @@ components:
       - createdAt
       - id
       - level
+      - mainImagePath
       - recursiveProductCount
       - slug
       - translations

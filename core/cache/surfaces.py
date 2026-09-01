@@ -320,9 +320,18 @@ def register_default_surfaces() -> None:
             # a fixed set), so a layout edit does not evict the whole
             # site's SSR cache. "/" resolves to Nitro's ``index``
             # segment via _escaped_pathname.
+            # These are ``defineCachedEventHandler`` NAMES from the Nuxt
+            # repo, not guesses — verified against the ``name:`` field of
+            # server/api/page-config/[pageType].get.ts,
+            # server/api/page-config/navigation.get.ts and
+            # server/api/content-pages/*.get.ts. The navigation handler
+            # is ``pageConfigNavigation``; a shorter "pageNavigation"
+            # matches nothing, which is how an operator's menu edit
+            # stayed invisible after the row was updated (caught on
+            # staging 2026-09-01).
             nuxt_patterns=_nuxt(
                 "pageConfig",
-                "pageNavigation",
+                "pageConfigNavigation",
                 "ContentPageViewSet",
                 "ContentPageDetailViewSet",
             )

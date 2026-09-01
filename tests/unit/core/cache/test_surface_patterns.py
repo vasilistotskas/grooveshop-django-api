@@ -141,6 +141,21 @@ class TestPageConfigSurface:
     behind Nitro's SSR cache for the rest of its TTL with no way to
     flush it."""
 
+    def test_names_the_real_nuxt_navigation_handler(self):
+        """``pageConfigNavigation``, not ``pageNavigation``.
+
+        The Nuxt handler names here are ``defineCachedEventHandler``
+        ``name:`` values from the storefront repo; there is no
+        cross-repo check, so a wrong one silently matches nothing. That
+        happened: an operator's menu edit stayed invisible on staging
+        because the purge named a handler that does not exist. Pinned
+        because the correct name is not guessable from this side.
+        """
+        patterns = get_surface("page_config").nuxt_patterns
+
+        assert "cache:nitro:handlers:pageConfigNavigation*" in patterns
+        assert "cache:nitro:handlers:pageNavigation*" not in patterns
+
     def test_purges_both_the_json_and_the_rendered_html(self):
         patterns = get_surface("page_config").nuxt_patterns
 

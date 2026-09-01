@@ -4,10 +4,10 @@
 
 ## Overview
 
-A headless e-commerce API built with Django 6.0 and Django REST Framework. Supports both
+A headless e-commerce API built with Django 6 and Django REST Framework. Supports both
 WSGI (Gunicorn) and ASGI (Daphne/Uvicorn) with real-time WebSocket notifications via
 Django Channels. Uses Knox + Django Allauth for authentication (token API + social/MFA),
-Celery with RabbitMQ broker for background tasks, PostgreSQL 17 for data storage, Redis
+Celery with RabbitMQ broker for background tasks, PostgreSQL 18 for data storage, Redis
 for caching and Channels layer, and Meilisearch for federated search. Features include
 multi-language support (Greek, English, German), Stripe payments via dj-stripe,
 comprehensive test coverage, and a Django Unfold admin panel.
@@ -52,13 +52,13 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 
 ## Technologies
 
-- **Frameworks**: Django 6.0, Django REST Framework 3.16
+- **Frameworks**: Django 6, Django REST Framework
 - **Authentication**: Django REST Knox (API tokens), Django Allauth (accounts, social, MFA)
-- **Database**: PostgreSQL 17
+- **Database**: PostgreSQL 18
 - **Cache / Channels**: Redis
 - **Task Management**: Celery
 - **Message Broker**: RabbitMQ
-- **Search**: Meilisearch v1.42.1
+- **Search**: Meilisearch
 - **Payments**: Stripe (dj-stripe)
 - **Server**: Uvicorn (ASGI), Gunicorn (WSGI), Daphne (Channels)
 - **Containerization**: Docker
@@ -69,11 +69,11 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 ### Prerequisites
 
 - Python 3.14 or higher
-- Django 6.0 or higher
-- PostgreSQL 17
+- Django 6
+- PostgreSQL 18
 - Redis
 - RabbitMQ
-- Meilisearch v1.42.1 or higher
+- Meilisearch or higher
 
 ### Meilisearch Setup
 

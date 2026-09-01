@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GrooveShop Django API — a headless e-commerce API built with Django 6.0 and Django REST Framework. Supports both WSGI (Gunicorn) and ASGI (Daphne/Uvicorn) with WebSocket notifications via Django Channels. Uses PostgreSQL 17, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14.2, managed with uv.
+GrooveShop Django API — a headless e-commerce API built with Django 6 and Django REST Framework. Supports both WSGI (Gunicorn) and ASGI (Daphne/Uvicorn) with WebSocket notifications via Django Channels. Uses PostgreSQL 18, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14, managed with uv.
 
 ## Common Commands
 
@@ -183,7 +183,7 @@ Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key
 
 ### Infrastructure (Docker)
 
-- `infra.compose.yml` — PostgreSQL 17, Redis, RabbitMQ, Meilisearch v1.42.1, pgAdmin, RedisInsight
+- `infra.compose.yml` — PostgreSQL 18, Redis, RabbitMQ, Meilisearch, pgAdmin, RedisInsight
 - `app.compose.yml` — backend-init (migrations), backend, celery_worker, celery_beat, celery_flower
 - `docker-compose.yml` — Combines both on `grooveshop-backbone` bridge network
 - `Dockerfile` — Multi-stage Alpine build (uv → tailwind CSS → Python deps → production)
@@ -193,7 +193,7 @@ Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key
 
 GitHub Actions (`.github/workflows/ci.yml`): 3-stage pipeline:
 1. **Quality** — Ruff format check
-2. **Testing** — PostgreSQL 17 + Redis + Meilisearch services, migrations, pytest with coverage (15 min timeout)
+2. **Testing** — PostgreSQL 18 + Redis + Meilisearch services, migrations, pytest with coverage (15 min timeout)
 3. **Release** — python-semantic-release cuts the version, changelog, and GitHub release with dist assets (main branch only); the Docker image workflow triggers on the published release. Not published to PyPI — this is a deployed application, not a library (dropped 2026-08 after the PyPI project hit its 10 GB size cap).
 
 ## Code Style
@@ -206,3 +206,20 @@ GitHub Actions (`.github/workflows/ci.yml`): 3-stage pipeline:
 - **Max function args**: 6 (pylint rule via ruff)
 - Migrations are excluded from linting (`**/migrations/**`)
 - Semantic release: `feat` → minor, `fix`/`perf` → patch
+
+## MCP servers
+
+`.mcp.json` declares only `context7`, because that is the one server every
+teammate can use as-is.
+
+**IDE bridges belong in user scope, not here.** A JetBrains MCP endpoint is a
+machine- and session-specific `http://127.0.0.1:<ephemeral-port>/stream`; a
+committed entry fails to connect for everyone else and reports an error on every
+session start. Add yours to your own config instead:
+
+```bash
+claude mcp add --scope user --transport http pycharm "http://127.0.0.1:<port>/stream"
+```
+
+The same applies to anything that points at a local tool, a personal token, or a
+path under your home directory.

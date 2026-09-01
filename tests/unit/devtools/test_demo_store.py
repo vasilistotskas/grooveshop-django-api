@@ -15,10 +15,15 @@ for everything except the two seed functions at the end.
 
 from __future__ import annotations
 
+from io import StringIO
+from types import SimpleNamespace
+
+from django.core.management.base import CommandError
 from django.test import TestCase
 
 from contact.models import FeedbackCategory
 from devtools import demo_store
+from devtools.management.commands import seed_demo_store
 from page_config.models import ComponentType, NavigationSlot
 from page_config.schemas import (
     validate_navigation_items,
@@ -429,3 +434,114 @@ class TestSeedFunctions(TestCase):
         assert report == {"minted": 1}
         assert tenant.acp_bearer_token.startswith("acp_demo_")
         assert saved == [["acp_bearer_token"]]
+
+
+class TestProductionGuard(TestCase):
+    """``seed_demo_store`` ships in the production image.
+
+    ``devtools`` is an installed app, so the command is present on every
+    pod including production. The only thing standing between a typo'd
+    ``--schema`` and a live store's catalogue being overwritten is
+    ``_guard``, and its whole verdict comes from substring-matching the
+    tenant's domains. Nothing else re-checks it, so the marker list is
+    load-bearing and gets tested like it.
+    """
+
+    # Real hostnames, not invented ones: the bug this class exists for
+    # was a marker that matched a LIVE tenant, and only real hosts can
+    # catch that class of mistake.
+    LIVE_HOSTS = (
+        "webside.gr",
+        "api.webside.gr",
+        # Tenant #2 — live since 2026-08-28 on a platform subdomain
+        # while its own domain is pending.
+        "fyteia.grooveshop.space",
+        "api.fyteia.grooveshop.space",
+        "www.fyteia.grooveshop.space",
+    )
+
+    NON_PRODUCTION_HOSTS = (
+        "staging.webside.gr",
+        "api-staging.webside.gr",
+        "tenant2-staging.webside.gr",
+        "platform-staging.grooveshop.space",
+        "localhost",
+    )
+
+    @staticmethod
+    def _looks_non_production(domain: str) -> bool:
+        return any(
+            marker in domain
+            for marker in seed_demo_store.NON_PRODUCTION_MARKERS
+        )
+
+    def test_no_marker_matches_a_live_hostname(self):
+        for host in self.LIVE_HOSTS:
+            with self.subTest(host=host):
+                self.assertFalse(
+                    self._looks_non_production(host),
+                    f"{host} is a LIVE storefront but the marker list "
+                    f"classifies it as safe to seed over",
+                )
+
+    def test_every_non_production_hostname_still_matches(self):
+        for host in self.NON_PRODUCTION_HOSTS:
+            with self.subTest(host=host):
+                self.assertTrue(
+                    self._looks_non_production(host),
+                    f"{host} is not production but the guard would "
+                    f"refuse to seed it",
+                )
+
+    def test_guard_refuses_a_tenant_with_one_live_domain(self):
+        # One unmarked domain is enough: a tenant reachable on a live
+        # host is a live store regardless of what else points at it.
+        with self.assertRaises(CommandError) as caught:
+            self._run_guard(["staging.webside.gr", "webside.gr"])
+
+        self.assertIn("looks like production", str(caught.exception))
+        self.assertIn("webside.gr", str(caught.exception))
+
+    def test_guard_allows_a_fully_marked_tenant(self):
+        self._run_guard(["staging.webside.gr", "api-staging.webside.gr"])
+
+    def test_guard_refuses_on_live_payments_even_with_safe_domains(self):
+        # Defence in depth: a tenant taking real card payments is live
+        # whatever its hostnames say.
+        with self.assertRaises(CommandError) as caught:
+            self._run_guard(["staging.webside.gr"], viva_live=True)
+
+        self.assertIn("viva_wallet_live_mode", str(caught.exception))
+
+    def test_force_overrides_but_names_every_signal(self):
+        # --force is the documented escape hatch; it must still print
+        # what it is overriding so the operator sees the store name.
+        command = self._run_guard(["webside.gr"], force=True)
+
+        self.assertIn("webside.gr", command.stdout.getvalue())
+
+    def _run_guard(self, domains, *, viva_live=False, force=False):
+        command = seed_demo_store.Command()
+        command.stdout = StringIO()
+        command._guard(
+            SimpleNamespace(
+                schema_name="demo", viva_wallet_live_mode=viva_live
+            ),
+            _StubDomainModel(domains),
+            force=force,
+        )
+        return command
+
+
+class _StubDomainModel:
+    """Stands in for ``TenantDomain`` so the guard needs no database."""
+
+    def __init__(self, domains):
+        self.objects = self
+        self._domains = domains
+
+    def filter(self, **_kwargs):
+        return self
+
+    def values_list(self, _field, flat=False):  # noqa: FBT002
+        return self._domains

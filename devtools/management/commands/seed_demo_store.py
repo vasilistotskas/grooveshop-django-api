@@ -39,12 +39,21 @@ from devtools import demo_store
 # A domain is treated as non-production when it carries one of these.
 # Everything else — webside.gr, a customer's own domain — is assumed
 # live.
+#
+# ``grooveshop.space`` is deliberately NOT a marker, even though the
+# PLATFORM hosts all live there. A tenant can be sold a subdomain of it
+# too, and one already is: tenant #2 has been live on
+# ``fyteia.grooveshop.space`` since 2026-08-28 while it waits for its
+# own domain. Every one of its hostnames carries the string, so listing
+# it here emptied the guard's ``live`` set and let this command seed
+# over a real store's settings, catalogue, layouts and navigation.
+# The platform hosts belong to no tenant, so the marker bought a
+# tenant-scoped command nothing in exchange.
 NON_PRODUCTION_MARKERS = (
     "staging",
     "localhost",
     ".local",
     ".invalid",
-    "grooveshop.space",
 )
 
 # (label, callable) — ordered by dependency: brands before products

@@ -3,6 +3,41 @@
 
 
 
+## v3.26.1 (2026-09-01)
+
+### Bug fixes
+
+* fix(cache): name the real Nuxt navigation handler in the page_config surface
+
+The surface purged `cache:nitro:handlers:pageNavigation*`, which matches
+nothing — the handler is named `pageConfigNavigation`
+(server/api/page-config/navigation.get.ts).
+
+Caught on staging while testing the deploy: after updating the seeded
+NavigationMenu row to point "Προσφορές" at the new /offers page, purging
+the page_config surface reported success and the storefront kept serving
+the old menu, because the one pattern that would have dropped the
+navigation JSON never matched.
+
+Same failure class as the two dead Django patterns fixed in the previous
+commit, on the other side of the wire. The Django half now has a
+registry-wide invariant; there is no equivalent for the Nuxt handler
+names because they live in another repo, so this one is pinned by an
+explicit test and the pattern list carries a comment naming the source
+files each name came from.
+
+Verified the remaining names against the storefront's actual
+`defineCachedEventHandler` `name:` values: pageConfig,
+ContentPageViewSet, ContentPageDetailViewSet and PublicPromotionList all
+exist; so does tenantLegalIdentity on the settings surface.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_018bRwKfBK7k4Ecqe2vCst2S ([`1a6db65`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1a6db6501407a6e5bf679f73b3df9911653a7eca))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.26.0 [skip ci] ([`4aab1cb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4aab1cbe45e52114f290e1953e81876fafc80ac1))
+
 ## v3.26.0 (2026-09-01)
 
 ### Bug fixes

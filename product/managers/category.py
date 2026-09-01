@@ -24,13 +24,36 @@ class CategoryQuerySet(TreeTranslatableQuerySet):
 
         return self.annotate(_products_count=Count("products", distinct=True))
 
+    def with_main_image(self) -> Self:
+        """Prefetch only the MAIN image to avoid N+1 in main_image_path.
+
+        Mirrors ``ProductQuerySet.with_main_image``. The filter matches
+        ``CategoryImageQuerySet.get_main_image`` exactly — image_type
+        MAIN and active — or the prefetched list would disagree with the
+        non-prefetched fallback.
+        """
+        from django.db.models import Prefetch
+
+        from product.enum.category import CategoryImageTypeEnum
+        from product.models.category_image import ProductCategoryImage
+
+        return self.prefetch_related(
+            Prefetch(
+                "images",
+                queryset=ProductCategoryImage.objects.filter(
+                    image_type=CategoryImageTypeEnum.MAIN, active=True
+                ),
+                to_attr="_prefetched_main_images",
+            )
+        )
+
     def for_list(self) -> Self:
         """
         Optimized queryset for list views.
 
-        Includes translations and parent.
+        Includes translations, parent and the main image.
         """
-        return self.with_translations().with_parent()
+        return self.with_translations().with_parent().with_main_image()
 
     def for_detail(self) -> Self:
         """

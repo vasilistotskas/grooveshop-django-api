@@ -1,6 +1,42 @@
+"""Purge cached keys, per tenant schema.
+
+WHY THIS IS PER-SCHEMA, and why the default changed:
+
+``CACHES["default"]["KEY_FUNCTION"]`` is ``tenant.cache.make_tenant_key``,
+which prefixes every Django cache key with the ACTIVE schema
+(``{schema}:{prefix}:{version}:{key}``), and ``CustomCache._make_pattern``
+builds its SCAN pattern through the same function. That is correct and
+deliberate for the admin path — a request carries a tenant, so a tenant
+admin only ever sees its own keys.
+
+A management command carries no tenant. It runs in ``public``, so its
+SCAN only ever matched public's keys and it reported ``django=0`` for
+every surface while a tenant held hundreds. Measured on staging
+2026-09-01: ``clear_cache --all`` reported 0 Django keys across all ten
+surfaces; the same surfaces under ``schema_context('webside')`` matched
+and purged 436. With ``DEFAULT_CACHE_TTL`` at 7200s+ that is how long a
+merchant's edit could stay invisible after an operator "purged" it.
+
+So the CLI now purges every active tenant by default. Use ``--schema``
+for one tenant, or ``--public-only`` for the old behaviour (the platform
+control-plane's own keys).
+
+The Nuxt half is unaffected by any of this — it goes over HTTP to the
+storefront's purge endpoint, which scopes by tenant HOST rather than by
+DB schema. Running per-schema does mean the Nuxt purge is issued once
+per tenant, which is what you want: each call carries that tenant's host.
+
+``--prefixes`` needs none of this: ``CustomCache.clear_by_prefixes``
+already scans both raw layouts (``{prefix}*`` and ``*:{prefix}*``)
+precisely so a platform-wide clear covers every schema. The gap was
+only ever in the surface path, which goes through the schema-scoped
+``_make_pattern``.
+"""
+
 from __future__ import annotations
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from django_tenants.utils import get_public_schema_name, schema_context
 
 from core.cache.service import CacheService
 
@@ -13,7 +49,8 @@ from django.core.cache import cache as cache_instance
 class Command(BaseCommand):
     help = (
         "Purge cached keys. By default targets registered cache surfaces"
-        " (recommended). Pass --prefixes for raw-prefix disaster recovery."
+        " (recommended) across every active tenant schema. Pass"
+        " --prefixes for raw-prefix disaster recovery."
     )
 
     def add_arguments(self, parser):
@@ -30,6 +67,23 @@ class Command(BaseCommand):
             "--all",
             action="store_true",
             help="Purge every non-Heavy surface (skips translations).",
+        )
+        parser.add_argument(
+            "--schema",
+            default=None,
+            help=(
+                "Limit the purge to one tenant schema. Defaults to every"
+                " active non-public tenant."
+            ),
+        )
+        parser.add_argument(
+            "--public-only",
+            action="store_true",
+            help=(
+                "Purge only the public schema (the platform control"
+                " plane). Django cache keys are schema-prefixed, so this"
+                " does NOT touch any tenant's keys."
+            ),
         )
         parser.add_argument(
             "--dry-run",
@@ -60,24 +114,78 @@ class Command(BaseCommand):
             self._raw_prefix_clear(options["prefixes"])
             return
 
+        if not options["all"] and not options["surfaces"]:
+            self._list_surfaces()
+            return
+
+        for schema in self._target_schemas(options):
+            self.stdout.write(self.style.MIGRATE_HEADING(f"\nschema: {schema}"))
+            with schema_context(schema):
+                self._purge_one(options)
+
+    def _target_schemas(self, options) -> list[str]:
+        """Which schemas to purge, in order.
+
+        Errors rather than silently purging nothing when ``--schema``
+        names a tenant that does not exist — the old behaviour's real
+        failure mode was reporting success having matched no keys.
+        """
+        from tenant.models import Tenant
+
+        public = get_public_schema_name()
+
+        if options["public_only"]:
+            if options["schema"]:
+                raise CommandError(
+                    "--public-only and --schema are mutually exclusive."
+                )
+            return [public]
+
+        if options["schema"]:
+            if options["schema"] == public:
+                return [public]
+            exists = Tenant.objects.filter(
+                schema_name=options["schema"], is_active=True
+            ).exists()
+            if not exists:
+                raise CommandError(
+                    f"No active tenant with schema "
+                    f"{options['schema']!r}. Use --public-only for the "
+                    f"platform control plane."
+                )
+            return [options["schema"]]
+
+        schemas = list(
+            Tenant.objects.filter(is_active=True)
+            .exclude(schema_name=public)
+            .order_by("schema_name")
+            .values_list("schema_name", flat=True)
+        )
+        if not schemas:
+            self.stdout.write(
+                self.style.WARNING(
+                    "No active tenants — falling back to the public schema."
+                )
+            )
+            return [public]
+        return schemas
+
+    def _purge_one(self, options) -> None:
         if options["all"]:
             report = CacheService.purge_all(dry_run=options["dry_run"])
-        elif options["surfaces"]:
+        else:
             report = CacheService.purge(
                 options["surfaces"],
                 dry_run=options["dry_run"],
                 include_related=not options["no_related"],
             )
-        else:
-            self._list_surfaces()
-            return
 
         prefix = "[dry-run] " if report.dry_run else ""
         self.stdout.write(
             self.style.SUCCESS(
                 f"{prefix}Purged {report.total_django} Django + "
-                f"{report.total_nuxt} Nuxt keys "
-                f"across {len(report.surfaces)} surface(s)"
+                f"{report.total_nuxt} Nuxt + {report.total_gateway} feed "
+                f"keys across {len(report.surfaces)} surface(s)"
             )
         )
         for surface in report.surfaces:
@@ -86,10 +194,14 @@ class Command(BaseCommand):
                 f" nuxt={surface.nuxt_deleted}"
                 f" blocked={surface.django_blocked + surface.nuxt_blocked}"
             )
+            if surface.gateway_removed or surface.gateway_error:
+                line += f" feeds={surface.gateway_removed}"
             if surface.django_error:
                 line += f" django_error={surface.django_error}"
             if surface.nuxt_error:
                 line += f" nuxt_error={surface.nuxt_error}"
+            if surface.gateway_error:
+                line += f" gateway_error={surface.gateway_error}"
             self.stdout.write(line)
 
     def _list_surfaces(self) -> None:
@@ -103,6 +215,12 @@ class Command(BaseCommand):
             "\nUsage: clear_cache <surface> [<surface> ...] [--dry-run]"
         )
         self.stdout.write("       clear_cache --all [--dry-run]")
+        self.stdout.write(
+            "       clear_cache --all --schema <tenant>   (one tenant)"
+        )
+        self.stdout.write(
+            "       clear_cache --all --public-only       (control plane)"
+        )
 
     def _raw_prefix_clear(self, prefixes: list[str]) -> None:
         self.stdout.write(

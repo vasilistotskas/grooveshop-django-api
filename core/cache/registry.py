@@ -23,6 +23,12 @@ class CacheSurface:
     surfaces that should be purged alongside it (e.g. invalidating
     ``pay_way`` should also invalidate the order serializer cache that
     embeds PayWay payloads).
+
+    ``invalidates_gateway_feeds`` is a THIRD target, and not expressible
+    as a key pattern: the catalog feeds are cached in the agent
+    gateway's own Redis DB, which Django's cache backend cannot reach.
+    The service calls the gateway's internal invalidate endpoint
+    instead — see ``core.cache.gateway``.
     """
 
     code: str
@@ -30,6 +36,7 @@ class CacheSurface:
     description: LazyStr
     django_patterns: tuple[str, ...] = ()
     nuxt_patterns: tuple[str, ...] = ()
+    invalidates_gateway_feeds: bool = False
     related: tuple[str, ...] = ()
     icon: str = "database"
     group: str = "general"

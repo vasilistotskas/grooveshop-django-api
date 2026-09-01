@@ -194,3 +194,21 @@ class IsB2BWholesaleEnabled(IsSettingEnabled):
 
     setting_key = "B2B_WHOLESALE_ENABLED"
     default = False
+
+
+class IsPromotionsRuntimeEnabled(IsSettingEnabled):
+    """404 when the merchant has switched promotions off at runtime.
+
+    The merchant tier of the promotions gate; ``IsPromotionsEnabled``
+    above is the plan tier. Stacked on the PUBLIC offers listing so a
+    store that turned promotions off does not keep advertising its
+    offers on a crawlable page — the storefront's coupon input already
+    requires both tiers (``Checkout/CouponInput.vue``), and a listing
+    that outlived the toggle would be a worse leak than an input,
+    because it is indexable.
+
+    Fails CLOSED like the other commercial gates.
+    """
+
+    setting_key = "PROMOTIONS_ENABLED"
+    default = False

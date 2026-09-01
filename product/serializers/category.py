@@ -17,6 +17,13 @@ class ProductCategorySerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[ProductCategory]
 ):
     translations = TranslatedFieldsFieldExtend(shared_model=ProductCategory)
+    # The storefront's category rail (Product/Categories/Slider.vue)
+    # renders ``item.mainImagePath``, but no category serializer exposed
+    # it — so every tile fell through to ImgWithFallback's placeholder,
+    # however many ProductCategoryImage rows the merchant had uploaded.
+    # Empty string when the category has no MAIN image, matching the
+    # model property.
+    main_image_path = serializers.CharField(read_only=True)
 
     class Meta:
         model = ProductCategory
@@ -28,6 +35,7 @@ class ProductCategorySerializer(
             "parent",
             "level",
             "tree_id",
+            "main_image_path",
             "created_at",
             "updated_at",
             "uuid",
@@ -36,6 +44,7 @@ class ProductCategorySerializer(
             "id",
             "level",
             "tree_id",
+            "main_image_path",
             "created_at",
             "updated_at",
             "uuid",

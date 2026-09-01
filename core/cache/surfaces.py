@@ -63,11 +63,28 @@ def _nuxt_routes(*paths: str) -> tuple[str, ...]:
     """
 
     return tuple(
-        "cache:nitro:routes:_:*{}*".format(
-            "".join(ch for ch in path if ch.isalnum())[:16]
-        )
+        "cache:nitro:routes:_:*{}*".format(_escaped_pathname(path))
         for path in paths
     )
+
+
+def _escaped_pathname(path: str) -> str:
+    """Nitro's own escaping of a URL path, for key matching.
+
+    Non-word characters are stripped and the result truncated to 16
+    chars. The ONE special case is the site root: Nitro stores "/" under
+    the literal segment ``index``, not an empty string — verified in the
+    live keyspace as
+    ``cache:nitro:routes:_:index.<hash>:host.<hash>:xdeviceclass.<hash>.json``.
+
+    Without this branch, ``_nuxt_routes("/")`` returned
+    ``routes:_:**``, which matches EVERY cached page render — so a
+    caller wanting to drop the homepage silently dropped the whole
+    site's SSR cache instead.
+    """
+    if path in ("", "/"):
+        return "index"
+    return "".join(ch for ch in path if ch.isalnum())[:16]
 
 
 def _nuxt_functions(*names: str) -> tuple[str, ...]:
@@ -167,6 +184,12 @@ def register_default_surfaces() -> None:
             # without this a price edit stayed visible for the whole TTL.
             + _nuxt_routes("/products"),
             related=("categories", "tags"),
+            # The catalog feeds embed product rows (and the
+            # category names used for g:product_type), and the
+            # gateway caches them for FEED_FRESH_TTL in its own
+            # Redis. Without this a price change took up to six
+            # hours to reach Google, Meta and TikTok.
+            invalidates_gateway_feeds=True,
             icon="inventory_2",
             group="catalog",
         )
@@ -189,6 +212,12 @@ def register_default_surfaces() -> None:
             # Category pages live under /products/category/**, which the
             # same escaped-path prefix covers.
             + _nuxt_routes("/products"),
+            # The catalog feeds embed product rows (and the
+            # category names used for g:product_type), and the
+            # gateway caches them for FEED_FRESH_TTL in its own
+            # Redis. Without this a price change took up to six
+            # hours to reach Google, Meta and TikTok.
+            invalidates_gateway_feeds=True,
             icon="category",
             group="catalog",
         )
@@ -263,6 +292,71 @@ def register_default_surfaces() -> None:
 
     register_surface(
         CacheSurface(
+            code="page_config",
+            label=_("Pages & navigation"),
+            description=_(
+                "The page-builder layouts, the navigation menus and the"
+                " RENDERED pages built from them. Purge after editing a"
+                " layout, a section's props, a content page or a menu."
+            ),
+            # NOTHING in page_config is ``@cache_methods``-decorated:
+            # public_page_config / public_navigation are plain @api_view
+            # functions, and ContentPageViewSet — despite being a
+            # BaseModelViewSet — carries no decorator either (checked
+            # against page_config/views.py, which does not import
+            # cache_methods at all). A ``*ContentPageViewSet_*`` pattern
+            # here would match zero keys and report success, which is
+            # the exact failure test_surface_patterns.py exists to
+            # prevent. So the Django half is empty by fact, not by
+            # oversight, and this surface purges Nuxt only.
+            django_patterns=(),
+            # Two halves, and BOTH are needed: purging the handler drops
+            # the JSON, purging the route drops the HTML already built
+            # from it. Without the route half a layout edit sits behind
+            # Nitro's SSR cache for the rest of its TTL.
+            #
+            # Only the page types the builder can actually drive
+            # (app/composables/usePageConfig.ts calls usePageConfig with
+            # a fixed set), so a layout edit does not evict the whole
+            # site's SSR cache. "/" resolves to Nitro's ``index``
+            # segment via _escaped_pathname.
+            nuxt_patterns=_nuxt(
+                "pageConfig",
+                "pageNavigation",
+                "ContentPageViewSet",
+                "ContentPageDetailViewSet",
+            )
+            + _nuxt_routes("/", "/about", "/contact", "/feedback", "/info"),
+            icon="dashboard_customize",
+            group="content",
+        )
+    )
+
+    register_surface(
+        CacheSurface(
+            code="promotions",
+            label=_("Promotions"),
+            description=_(
+                "The public offers listing. An offer is a commercial"
+                " commitment with an end date, so a stale entry"
+                " advertises a discount the cart will refuse — purge"
+                " after editing a promotion, its codes, or its"
+                " schedule."
+            ),
+            # ``PublicPromotionListView`` is a plain APIView with no
+            # ``@cache_methods`` decorator, so there is no Django-side
+            # response cache to purge — only the Nuxt handler and the
+            # rendered /offers page.
+            django_patterns=(),
+            nuxt_patterns=_nuxt("PublicPromotionList")
+            + _nuxt_routes("/offers"),
+            icon="local_offer",
+            group="commerce",
+        )
+    )
+
+    register_surface(
+        CacheSurface(
             code="tags",
             label=_("Tags"),
             description=_(
@@ -287,9 +381,19 @@ def register_default_surfaces() -> None:
                 " /api/settings proxy and the published seller identity."
             ),
             django_patterns=(
+                # django-extra-settings' own cache: cache.py builds its
+                # key as f"extra_settings_{name}", so this matches one
+                # key per Setting row (92 on a provisioned tenant).
                 "*extra_settings_*",
                 "*admin:dashboard*",
-                "*SettingsViewSet_*",
+                # NOTE: a "*SettingsViewSet_*" pattern used to sit here
+                # and matched nothing — there is no such class. The
+                # settings API is two plain @api_view functions
+                # (core.api.views.list_settings / get_setting_by_key)
+                # with no cache_page or cache_methods, so it has no
+                # Django response cache to purge. Do not re-add it:
+                # a pattern that matches nothing makes the purge report
+                # success while stale content keeps being served.
             ),
             # ``tenantLegalIdentity`` is the storefront's published seller
             # identity, and it is built from the INVOICE_SELLER_* rows in

@@ -299,10 +299,17 @@ def register_default_surfaces() -> None:
                 " RENDERED pages built from them. Purge after editing a"
                 " layout, a section's props, a content page or a menu."
             ),
-            # ``public_page_config`` / ``public_navigation`` are plain
-            # @api_view functions with no ``@cache_methods`` decorator;
-            # ContentPageViewSet is a BaseModelViewSet and does have one.
-            django_patterns=("*ContentPageViewSet_*",),
+            # NOTHING in page_config is ``@cache_methods``-decorated:
+            # public_page_config / public_navigation are plain @api_view
+            # functions, and ContentPageViewSet — despite being a
+            # BaseModelViewSet — carries no decorator either (checked
+            # against page_config/views.py, which does not import
+            # cache_methods at all). A ``*ContentPageViewSet_*`` pattern
+            # here would match zero keys and report success, which is
+            # the exact failure test_surface_patterns.py exists to
+            # prevent. So the Django half is empty by fact, not by
+            # oversight, and this surface purges Nuxt only.
+            django_patterns=(),
             # Two halves, and BOTH are needed: purging the handler drops
             # the JSON, purging the route drops the HTML already built
             # from it. Without the route half a layout edit sits behind
@@ -374,9 +381,19 @@ def register_default_surfaces() -> None:
                 " /api/settings proxy and the published seller identity."
             ),
             django_patterns=(
+                # django-extra-settings' own cache: cache.py builds its
+                # key as f"extra_settings_{name}", so this matches one
+                # key per Setting row (92 on a provisioned tenant).
                 "*extra_settings_*",
                 "*admin:dashboard*",
-                "*SettingsViewSet_*",
+                # NOTE: a "*SettingsViewSet_*" pattern used to sit here
+                # and matched nothing — there is no such class. The
+                # settings API is two plain @api_view functions
+                # (core.api.views.list_settings / get_setting_by_key)
+                # with no cache_page or cache_methods, so it has no
+                # Django response cache to purge. Do not re-add it:
+                # a pattern that matches nothing makes the purge report
+                # success while stale content keeps being served.
             ),
             # ``tenantLegalIdentity`` is the storefront's published seller
             # identity, and it is built from the INVOICE_SELLER_* rows in

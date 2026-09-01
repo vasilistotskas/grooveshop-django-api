@@ -27,6 +27,27 @@ from __future__ import annotations
 import pytest
 from django.conf import settings
 
+# ── its own test DATABASE, not just its own settings ────────────────
+# Both lanes defaulted to ``test_<DB_NAME>``, and they build INCOMPATIBLE
+# layouts in it: ``tests/`` runs with DATABASE_ROUTERS = [] so every
+# app's tables land in ``public``, while this lane runs the real
+# TenantSyncRouter, which keeps TENANT_APPS tables out of ``public``
+# entirely. Whichever lane created the database last therefore decided
+# whether this one's isolation assertions could hold — running the main
+# suite first made ``test_model_write_isolation`` and
+# ``test_b2b_flag_isolation`` fail, because ``public.product_product``
+# existed after all. Diagnosed 2026-09-01; the tests were correct and
+# the database underneath them was not.
+#
+# A distinct TEST NAME is the fix: pytest-django honours
+# ``DATABASES[alias]["TEST"]["NAME"]`` when deciding what to create, so
+# the two lanes can no longer clobber each other and neither needs
+# ``--create-db`` to recover from the other.
+settings.DATABASES["default"].setdefault("TEST", {})
+settings.DATABASES["default"]["TEST"]["NAME"] = (
+    f"test_mt_{settings.DATABASES['default']['NAME']}"
+)
+
 settings.PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
 ]

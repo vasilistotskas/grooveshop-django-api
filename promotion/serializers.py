@@ -77,9 +77,10 @@ def _publishable(code) -> bool:
     """Whether a shopper may be shown this code.
 
     A personal coupon (assigned to a user or an email) is not
-    advertisable, and neither is a single-use code — publishing a
-    ``usage_limit=1`` code to every visitor means all but the first are
-    told about an offer they cannot redeem.
+    advertisable, and neither is a single-use code: ``usage_limit=1``
+    means a bulk code handed out individually (see the field's help
+    text), not a first-come-first-served offer. See
+    ``promotion.views.publishable_code_q`` for the full reasoning.
     """
     return bool(
         code.is_active

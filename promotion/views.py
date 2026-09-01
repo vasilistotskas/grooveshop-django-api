@@ -41,8 +41,14 @@ def publishable_code_q(prefix: str = "") -> Q:
     """Codes a shopper may be shown.
 
     Excludes personal coupons (assigned to a user or an email) and
-    single-use codes — advertising a ``usage_limit=1`` code to every
-    visitor tells all but one of them about an offer they cannot use.
+    single-use codes. The ``usage_limit=1`` exclusion is about the
+    MECHANIC, not the remaining count: the field's own help text says
+    "1 for single-use bulk codes", i.e. codes minted in bulk and handed
+    out individually by email or print. Publishing any of those on a
+    crawlable page is wrong whether or not it has been redeemed yet.
+    A promotion-level ``usage_limit_total=1`` is the opposite case — a
+    genuine first-come-first-served offer — and stays listed until it is
+    actually taken, which the redemption filter below handles.
 
     ``prefix`` exists because the same condition is needed in two
     places with different anchors: a ``Count(filter=...)`` on

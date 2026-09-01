@@ -545,3 +545,59 @@ class _StubDomainModel:
 
     def values_list(self, _field, flat=False):  # noqa: FBT002
         return self._domains
+
+
+class TestDemoOptIn(TestCase):
+    """``is_demo`` is the sanctioned way past the hostname guard.
+
+    The public demo store runs on ``demo.grooveshop.space`` — a
+    production host with no non-production marker — so the guard has to
+    let it through somehow. It must be THIS way and not ``--force``:
+    ``--force`` is a blanket override that would equally unlock
+    webside.gr, while the flag is set per tenant, in the admin, on a
+    row that takes no real orders.
+    """
+
+    def test_demo_flag_lets_a_production_hostname_through(self):
+        command = seed_demo_store.Command()
+        command.stdout = StringIO()
+
+        command._guard(
+            SimpleNamespace(
+                schema_name="demo", viva_wallet_live_mode=False, is_demo=True
+            ),
+            _StubDomainModel(["demo.grooveshop.space"]),
+            force=False,
+        )
+
+        self.assertIn("is_demo", command.stdout.getvalue())
+
+    def test_flag_defaults_off_so_a_real_tenant_is_unaffected(self):
+        # getattr(..., False) is what protects every tenant row that
+        # predates the field, and the model default keeps new ones safe.
+        with self.assertRaises(CommandError):
+            command = seed_demo_store.Command()
+            command.stdout = StringIO()
+            command._guard(
+                SimpleNamespace(
+                    schema_name="webside", viva_wallet_live_mode=False
+                ),
+                _StubDomainModel(["webside.gr"]),
+                force=False,
+            )
+
+    def test_demo_flag_does_not_override_live_payments(self):
+        # A showcase must never be taking real money; if it somehow is,
+        # that is the signal to trust over the label.
+        with self.assertRaises(CommandError) as caught:
+            command = seed_demo_store.Command()
+            command.stdout = StringIO()
+            command._guard(
+                SimpleNamespace(
+                    schema_name="demo", viva_wallet_live_mode=True, is_demo=True
+                ),
+                _StubDomainModel(["demo.grooveshop.space"]),
+                force=False,
+            )
+
+        self.assertIn("viva_wallet_live_mode", str(caught.exception))

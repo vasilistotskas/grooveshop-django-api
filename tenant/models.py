@@ -251,6 +251,33 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         ),
     )
 
+    # Marks a tenant as a throwaway showcase rather than a real
+    # merchant. It is NOT a feature flag and gates nothing a shopper
+    # sees — the demo store is meant to look exactly like a real one.
+    #
+    # It exists because ``manage.py seed_demo_store`` refuses any tenant
+    # whose domains lack a non-production marker, and the public demo
+    # store lives on ``demo.grooveshop.space``, a production host with
+    # no such marker. The alternatives were both worse: ``--force`` is
+    # the blanket override that also unlocks every live store, and
+    # re-adding a hostname substring is what let the guard classify
+    # tenant #2's live ``fyteia.grooveshop.space`` as safe to seed over.
+    # An explicit per-tenant opt-in cannot be got wrong by accident.
+    #
+    # Deliberately NOT surfaced on TenantConfigSerializer: the storefront
+    # has no use for it, and every field added there has to outlive the
+    # cached payloads of the deploy that adds it (2026-08-31 outage).
+    is_demo = models.BooleanField(
+        _("Demo Store"),
+        default=False,
+        help_text=_(
+            "This tenant is a disposable showcase, not a real "
+            "merchant. Allows manage.py seed_demo_store to overwrite "
+            "its catalogue, layouts and navigation without --force. "
+            "Never set this on a store that takes real orders."
+        ),
+    )
+
     # Feature flags
     loyalty_enabled = models.BooleanField(_("Loyalty Enabled"), default=False)
     blog_enabled = models.BooleanField(_("Blog Enabled"), default=True)

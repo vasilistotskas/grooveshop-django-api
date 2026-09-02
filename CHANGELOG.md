@@ -3,6 +3,43 @@
 
 
 
+## v3.27.4 (2026-09-02)
+
+### Bug fixes
+
+* fix(shipping_acs): recover a pickup list ACS issued but did not report
+
+Found while fetching the stranded labels: ACS refused to print vouchers
+for orders 256 and 257 with "Δεν επιτρέπεται εκτύπωση voucher μετά την
+έκδοση λίστας παραλαβής" — they were already on an issued manifest.
+Querying ACS_Get_Pickup_Lists shows list 9803819281, 2 vouchers, created
+2026-09-02T16:30:01.793 by our own API user: the scheduled task's call.
+
+So that call SUCCEEDED at ACS and came back without a PickupList_No. The
+previous code believed the response, logged "assuming nothing to issue"
+and returned None, so the manifest existed at the courier while our DB
+had no row and no shipment linkage — and those vouchers could no longer
+even be printed, because printing is blocked once a voucher is listed.
+An issue response is therefore not the only source of truth.
+
+Before treating a missing PickupList_No as a failure, ask ACS what it
+actually holds for the date: ACS_Get_Pickup_Lists for the manifests,
+ACS_Pickup_List_Display_Voucher for the vouchers on each. Anything that
+matches a candidate is adopted — row persisted, shipments linked, warning
+logged. Only when ACS holds nothing does the call raise, and a
+reconciliation that cannot reach ACS never masks the original error.
+
+Phase 3 moves into _link_pickup_list, keyed on the unique
+pickup_list_no, so adopting a manifest we already know about is
+idempotent rather than an IntegrityError.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H6QHvSZHY35xi5VEvr5Au5 ([`3f17c75`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3f17c75419efb9a2f426490be7e8ebeb8590ba80))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.27.3 [skip ci] ([`da1af2c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/da1af2c8fc4cefc7225fef79ba1387d7c0e148c0))
+
 ## v3.27.3 (2026-09-02)
 
 ### Bug fixes

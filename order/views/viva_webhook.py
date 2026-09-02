@@ -402,18 +402,23 @@ def _verify_transaction(transaction_id):
 
 
 def _verify_viva_terminal_transaction(
-    order, transaction_id, expected_statuses, event_label
+    subject, transaction_id, expected_statuses, event_label
 ):
     """Verify a reversal (1797) / failed (1798) Viva event against the
-    Retrieve Transaction API before mutating ``payment_status`` (G0275).
+    Retrieve Transaction API before mutating financial state (G0275).
 
     The webhook endpoint is unauthenticated — there is no HMAC and the
     source-IP check is non-blocking — so the event body must not be trusted
     to flip financial state. A spoofed 1797 could otherwise mark any order
-    REFUNDED and fire the refund email + live toast + Meta CAPI Refund;
-    a spoofed 1798 could mark it FAILED. Mirroring the 1796 path, we confirm
-    with Viva that the transaction genuinely reached the expected terminal
-    state.
+    REFUNDED and fire the refund email + live toast + Meta CAPI Refund, or
+    void a paid-for gift card; a spoofed 1798 could mark either FAILED.
+    Mirroring the 1796 path, we confirm with Viva that the transaction
+    genuinely reached the expected terminal state.
+
+    *subject* is a human label for the thing being mutated ("order 42",
+    "gift-card purchase <uuid>") and is only used in the log lines: this
+    guard is shared by the order and gift-card branches, which have no
+    common model.
 
     Returns ``True`` to proceed. Returns ``False`` (skip, no mutation) when
     the event carries no ``TransactionId`` or the verified status is not one
@@ -424,10 +429,10 @@ def _verify_viva_terminal_transaction(
     """
     if not transaction_id:
         logger.error(
-            "Viva %s event for order %s carries no TransactionId — refusing "
+            "Viva %s event for %s carries no TransactionId — refusing "
             "to mutate payment state without verification",
             event_label,
-            order.id,
+            subject,
         )
         return False
 
@@ -447,10 +452,10 @@ def _verify_viva_terminal_transaction(
 
     if verified_status not in expected_statuses:
         logger.warning(
-            "Viva %s event for order %s: transaction %s verified status is "
+            "Viva %s event for %s: transaction %s verified status is "
             "%s, not in %s — skipping (event unverified or premature)",
             event_label,
-            order.id,
+            subject,
             transaction_id,
             verified_status,
             sorted(expected_statuses),
@@ -892,17 +897,40 @@ def _process_gift_card_purchase_event(
                         )
                         outcome = VivaWebhookEvent.OUTCOME_SKIPPED
             elif event_type_id == 1798:
-                if purchase.status == GiftCardPurchaseStatus.PENDING:
+                if purchase.status != GiftCardPurchaseStatus.PENDING:
+                    outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+                elif not _verify_viva_terminal_transaction(
+                    f"gift-card purchase {purchase.uuid}",
+                    transaction_id,
+                    {PaymentStatus.FAILED, PaymentStatus.CANCELED},
+                    "payment_failed",
+                ):
+                    outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+                else:
                     purchase.status = GiftCardPurchaseStatus.FAILED
                     purchase.save(update_fields=["status"])
                     logger.info(
                         "Gift card purchase %s marked FAILED via Viva webhook",
                         purchase.uuid,
                     )
-                else:
-                    outcome = VivaWebhookEvent.OUTCOME_SKIPPED
             elif event_type_id == 1797:
-                outcome = GiftCardService.handle_purchase_reversal(purchase)
+                # A reversal DESTROYS stored value — it cancels the purchase
+                # and voids every untouched card it issued. The event body is
+                # unauthenticated, and the Viva order code that resolves the
+                # purchase is visible to the buyer in the checkout URL, so
+                # this must never run on the event's say-so.
+                if not _verify_viva_terminal_transaction(
+                    f"gift-card purchase {purchase.uuid}",
+                    transaction_id,
+                    {
+                        PaymentStatus.REFUNDED,
+                        PaymentStatus.PARTIALLY_REFUNDED,
+                    },
+                    "reversal",
+                ):
+                    outcome = VivaWebhookEvent.OUTCOME_SKIPPED
+                else:
+                    outcome = GiftCardService.handle_purchase_reversal(purchase)
             else:
                 logger.info(
                     "Unhandled Viva event type %s for gift-card purchase %s",
@@ -1191,7 +1219,7 @@ def _handle_payment_failed(order, event_data, transaction_id):
     # Never trust the unauthenticated event body: confirm with Viva that the
     # transaction actually failed before flipping state (G0275).
     if not _verify_viva_terminal_transaction(
-        order,
+        f"order {order.id}",
         transaction_id,
         {PaymentStatus.FAILED, PaymentStatus.CANCELED},
         "payment_failed",
@@ -1246,7 +1274,7 @@ def _handle_reversal_created(order, event_data, transaction_id):
     # transaction was actually reversed/refunded before marking the order
     # REFUNDED and firing the refund email + toast + Meta CAPI Refund (G0275).
     if not _verify_viva_terminal_transaction(
-        order,
+        f"order {order.id}",
         transaction_id,
         {PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED},
         "reversal",

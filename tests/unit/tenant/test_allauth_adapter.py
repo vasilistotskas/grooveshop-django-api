@@ -424,3 +424,30 @@ class TestSocialLoginProviderFilter:
 
     def test_public_schema_never_restricts(self):
         assert self._allowed(["google"], schema_name="public") is None
+
+    def test_lookup_failure_fails_closed(self):
+        """The whitelist is a security control: an exception must not
+        re-enable every configured provider."""
+        from contextlib import nullcontext
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from tenant.allauth_adapter import TenantSocialAccountAdapter
+
+        with (
+            patch(
+                "tenant.allauth_adapter._resolve_tenant_from_request",
+                return_value=SimpleNamespace(schema_name="shop"),
+            ),
+            patch(
+                "django_tenants.utils.schema_context",
+                return_value=nullcontext(),
+            ),
+            patch(
+                "extra_settings.models.Setting.get",
+                side_effect=RuntimeError("db down"),
+            ),
+        ):
+            assert (
+                TenantSocialAccountAdapter._allowed_providers(object()) == set()
+            )

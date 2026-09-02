@@ -165,13 +165,16 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
             with schema_context(tenant.schema_name):
                 value = Setting.get("SOCIAL_LOGIN_PROVIDERS", default=None)
         except Exception:
-            logger.warning(
+            # Fail CLOSED: the whitelist is a security control. A DB blip
+            # or a half-provisioned schema disables social login for this
+            # request; it must never silently re-enable every configured
+            # provider the merchant switched off.
+            logger.exception(
                 "SOCIAL_LOGIN_PROVIDERS lookup failed for tenant %r — "
-                "not restricting",
+                "social login disabled for this request",
                 getattr(tenant, "schema_name", "?"),
-                exc_info=True,
             )
-            return None
+            return set()
         if not isinstance(value, list) or "*" in value:
             return None
         return {str(item) for item in value}

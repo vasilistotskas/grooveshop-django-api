@@ -20,10 +20,10 @@ class BlogPostFilterTest(APITestCase):
         self.category = BlogCategoryFactory()
 
         # These tests exercise filter behaviour against the full post set
-        # (including drafts and future-dated posts), so they run as staff.
-        # The public draft-visibility rule is covered by
-        # test_anonymous_cannot_see_unpublished_posts below.
-        self.staff = UserAccountFactory(is_staff=True)
+        # (including drafts and future-dated posts), so they run as a
+        # platform superuser. The public draft-visibility rule is covered
+        # by test_anonymous_cannot_see_unpublished_posts below.
+        self.staff = UserAccountFactory(is_superuser=True)
         self.client.force_authenticate(user=self.staff)
 
         self.now = timezone.now()

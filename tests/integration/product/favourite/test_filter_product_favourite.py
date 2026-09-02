@@ -17,10 +17,10 @@ class ProductFavouriteFilterTest(APITestCase):
         ProductFavourite.objects.all().delete()
 
         # Filter tests assert cross-user rows; ProductFavouriteViewSet now
-        # scopes to request.user for non-staff. Use a staff user so the
-        # list queryset returns every favourite regardless of owner.
+        # scopes to request.user for non-staff. Use a platform superuser
+        # so the list queryset returns every favourite regardless of owner.
         self.user1 = UserAccountFactory(
-            first_name="John", last_name="Doe", is_staff=True
+            first_name="John", last_name="Doe", is_superuser=True
         )
         self.user2 = UserAccountFactory(first_name="Jane", last_name="Smith")
         self.client.force_authenticate(user=self.user1)

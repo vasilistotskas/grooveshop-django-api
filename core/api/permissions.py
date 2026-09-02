@@ -1,6 +1,8 @@
+from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework.permissions import BasePermission, DjangoModelPermissions
-from django.contrib.auth import get_user_model
+
+from tenant.membership import is_store_staff
 
 User = get_user_model()
 
@@ -29,18 +31,13 @@ class IsPlatformSuperuser(BasePermission):
     (``tenant.auth_backends.PLATFORM_IDENTITY_ATTR``), which an API
     session can never carry.
 
-    So the API has no sound notion of "store staff", and these
-    endpoints have no first-party consumer: the storefront never writes
-    catalogue resources and the agent gateway only reads them. Store
-    operators administer their store through the Django admin, where
-    role-derived permissions apply properly.
-
-    Granting store operators programmatic write access needs a real
-    staff identity for the API — public-schema authentication plus
-    membership and role, mirroring the admin. That design is recorded
-    in ``docs/api-staff-identity.md``; until it exists, administrative
-    API routes stay platform-only rather than resting on a flag nobody
-    manages.
+    The API's notion of "store staff" is therefore
+    ``tenant.membership.is_store_staff`` — a provenance-stamped
+    platform identity with a staff-capable membership in the current
+    tenant (see ``docs/api-staff-identity.md``) — and ``is_staff`` is
+    never consulted on an API request. This class is the stricter,
+    platform-only gate for surfaces that no store operator should
+    reach.
     """
 
     message = _("Only platform superusers may perform this action.")
@@ -141,7 +138,7 @@ class IsOwnerOrAdmin(IsOwnerMixin, BasePermission):
         return bool(request.user and request.user.is_authenticated)
 
     def has_object_permission(self, request, view, obj):
-        if request.user.is_staff:
+        if is_store_staff(request.user):
             return True
 
         return self._is_owner(request.user, obj)
@@ -154,11 +151,7 @@ class IsOwnerOrAdminOrGuest(IsOwnerMixin, BasePermission):
         return True
 
     def has_object_permission(self, request, view, obj):
-        if (
-            request.user
-            and request.user.is_authenticated
-            and request.user.is_staff
-        ):
+        if is_store_staff(request.user):
             return True
 
         if hasattr(obj, "user"):

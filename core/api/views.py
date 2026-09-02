@@ -38,6 +38,7 @@ from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
 from core.utils.serializers import SerializersConfig
 from core.utils.views import TranslationsProcessingMixin
+from tenant.membership import is_store_staff
 
 logger = logging.getLogger(__name__)
 
@@ -634,11 +635,7 @@ def get_setting_by_key(request):
             )
 
         if key not in PUBLIC_SETTING_KEYS:
-            if not (
-                request.user
-                and request.user.is_authenticated
-                and request.user.is_staff
-            ):
+            if not is_store_staff(request.user):
                 return Response(
                     {"detail": _("Setting not found or access denied.")},
                     status=status.HTTP_404_NOT_FOUND,

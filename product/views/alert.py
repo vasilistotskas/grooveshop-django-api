@@ -17,6 +17,7 @@ from core.utils.serializers import (
 from product.models.alert import ProductAlert, ProductAlertKind
 from product.models.product import Product
 from product.serializers.alert import ProductAlertSerializer
+from tenant.membership import is_store_staff
 
 serializers_config: SerializersConfig = {
     "list": ActionConfig(response=ProductAlertSerializer),
@@ -70,7 +71,7 @@ class ProductAlertViewSet(BaseModelViewSet):
         user = getattr(self.request, "user", None)
         if user is None or not user.is_authenticated:
             return ProductAlert.objects.none()
-        if user.is_staff:
+        if is_store_staff(user):
             return ProductAlert.objects.all()
         return ProductAlert.objects.filter(user=user)
 

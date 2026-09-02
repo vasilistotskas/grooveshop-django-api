@@ -28,6 +28,7 @@ from product.serializers.review import (
     ProductReviewSerializer,
     ProductReviewWriteSerializer,
 )
+from tenant.membership import is_store_staff
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -95,7 +96,7 @@ class ProductReviewViewSet(BaseModelViewSet):
         else:
             queryset = ProductReview.objects.for_detail()
 
-        if self.request.user.is_superuser:
+        if is_store_staff(self.request.user):
             return queryset
 
         if self.request.user.is_authenticated:

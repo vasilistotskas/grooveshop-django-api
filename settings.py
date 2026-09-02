@@ -303,6 +303,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "core.urls"
 
+# security.W003 string-matches ``django.middleware.csrf.CsrfViewMiddleware``
+# and cannot see that ``tenant.middleware.TenantCsrfMiddleware`` subclasses
+# it, so the check is a false positive here.
+SILENCED_SYSTEM_CHECKS = ["security.W003"]
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",

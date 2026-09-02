@@ -182,12 +182,11 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
     def list_apps(self, request, provider=None, client_id=None):
         """Filter the (db ⊕ settings) app list by the tenant whitelist.
 
-        ``list_apps`` is the single funnel every consumer goes through:
-        the headless config's provider list (the login/signup buttons)
-        derives from it via ``list_providers``, and ``get_app`` — the
-        redirect/token auth flows — selects from it. Filtering here
-        therefore both hides disabled providers from the UI and rejects
-        direct flow attempts against them.
+        The headless config's provider list (the login/signup buttons)
+        derives from it via ``list_providers``, and allauth's own
+        ``get_app`` selects from it when no per-tenant ``SocialApp``
+        exists. The per-tenant branch of ``get_app`` returns before that
+        fallback, so it applies the same whitelist itself.
         """
         apps = super().list_apps(
             request, provider=provider, client_id=client_id
@@ -222,10 +221,17 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
             tenant is not None
             and getattr(tenant, "schema_name", "public") != "public"
         ):
+            from allauth.socialaccount.models import SocialApp  # noqa: PLC0415
+
+            allowed = self._allowed_providers(request)
+            if allowed is not None and provider not in allowed:
+                # Enforced here as well as in ``list_apps``: the per-tenant
+                # lookup below returns before allauth's own ``get_app``
+                # ever consults ``list_apps``, so a provider the merchant
+                # switched off was hidden from the login buttons yet still
+                # started OAuth when its redirect URL was hit directly.
+                raise SocialApp.DoesNotExist()
             try:
-                from allauth.socialaccount.models import (  # noqa: PLC0415
-                    SocialApp,
-                )
                 from django.contrib.sites.models import Site  # noqa: PLC0415
 
                 # Find the Site row whose domain matches this tenant's

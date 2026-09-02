@@ -378,6 +378,27 @@ class AcsClient:
         )
         return self._table_output(envelope)
 
+    def get_pickup_list_vouchers(
+        self, *, pickup_list_no: str, pickup_date: str
+    ) -> list[str]:
+        """Return the voucher numbers carried by ``pickup_list_no``.
+
+        ``ACS_Pickup_List_Display_Voucher`` is the only way to learn
+        which vouchers a manifest actually covers. Needed to reconcile a
+        list ACS created but did not echo back from
+        ``ACS_Issue_Pickup_List`` — see
+        ``AcsService._adopt_pickup_lists_from_acs``.
+        """
+        envelope = self._call(
+            "ACS_Pickup_List_Display_Voucher",
+            {"PickupList_No": pickup_list_no, "Pickup_Date": pickup_date},
+        )
+        return [
+            str(row.get("Voucher_no")).strip()
+            for row in self._table_output(envelope)
+            if str(row.get("Voucher_no") or "").strip()
+        ]
+
     # ------------------------------------------------------------------
     # Tracking
     # ------------------------------------------------------------------

@@ -24,7 +24,7 @@ from shipping.enum import ShippingKind
 from shipping.services import DELIVERY_NOTES_MAX_LEN, sanitize_delivery_notes
 from shipping_acs.client import AcsClient
 from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_acs.exceptions import AcsAPIError
+from shipping_acs.exceptions import AcsAPIError, AcsError
 from shipping_acs.models import (
     AcsPickupList,
     AcsShipment,
@@ -990,6 +990,27 @@ class AcsService:
             # returned SUCCESS to Celery, and left the courier with no
             # manifest for 14 days while 8 parcels sat uncollected
             # (silent on 2026-08-27/28/31 and 09-02; only 09-01 raised).
+            # ...but ACS may have created the manifest anyway and
+            # simply not echoed the number back. Observed in prod on
+            # 2026-09-02: THIS call created list 9803819281 over two
+            # vouchers at 16:30:01.793 and answered without a
+            # PickupList_No. Believing the response left the manifest
+            # invisible to us — no row, no shipment linkage — while ACS
+            # considered those parcels listed and refused to even print
+            # their labels ("Δεν επιτρέπεται εκτύπωση voucher μετά την
+            # έκδοση λίστας παραλαβής"). So ask ACS what it actually
+            # holds for the date before calling this a failure.
+            recovered = cls._adopt_pickup_lists_from_acs(
+                client,
+                the_date,
+                candidates=candidates,
+                billing_code=billing_code,
+                issued_by_id=issued_by_id,
+                issue_response=result,
+            )
+            if recovered is not None:
+                return recovered
+
             unprinted_count = result.get("Unprinted_Found")
             unprinted_vouchers = result.get("Unprinted_Vouchers") or []
             acs_message = (result.get("Error_Message") or "").strip()
@@ -1020,29 +1041,129 @@ class AcsService:
             )
 
         # --- Phase 3: persist atomically; re-confirm under lock ---
+        return cls._link_pickup_list(
+            pickup_list_no=pickup_list_no,
+            shipment_ids=candidates,
+            billing_code=billing_code,
+            issued_by_id=issued_by_id,
+            metadata={"issue_response": result},
+        )
+
+    @classmethod
+    def _link_pickup_list(
+        cls,
+        *,
+        pickup_list_no: str,
+        shipment_ids: list[int],
+        billing_code: str | None,
+        issued_by_id: int | None,
+        metadata: dict,
+    ) -> AcsPickupList:
+        """Persist one manifest and attach the shipments it covers.
+
+        Re-confirms membership under ``select_for_update`` so a
+        concurrent run cannot double-link a shipment, and keyed on the
+        unique ``pickup_list_no`` so adopting a manifest we already know
+        about is idempotent.
+        """
         from tenant.credentials import acs_credentials  # noqa: PLC0415
 
         billing = billing_code or acs_credentials()["billing_code"]
         with transaction.atomic():
             confirmed = list(
                 AcsShipment.objects.select_for_update()
-                .filter(id__in=candidates, pickup_list__isnull=True)
+                .filter(id__in=shipment_ids, pickup_list__isnull=True)
                 .values_list("id", flat=True)
             )
-            pickup_list = AcsPickupList.objects.create(
+            pickup_list, created = AcsPickupList.objects.get_or_create(
                 pickup_list_no=pickup_list_no,
-                issued_at=timezone.now(),
-                issued_by_id=issued_by_id,
-                billing_code=billing,
-                voucher_count=len(confirmed),
-                metadata={"issue_response": result},
+                defaults={
+                    "issued_at": timezone.now(),
+                    "issued_by_id": issued_by_id,
+                    "billing_code": billing,
+                    "voucher_count": len(confirmed),
+                    "metadata": metadata,
+                },
             )
             if confirmed:
                 AcsShipment.objects.filter(id__in=confirmed).update(
                     pickup_list=pickup_list
                 )
+                if not created:
+                    pickup_list.voucher_count += len(confirmed)
+                    pickup_list.save(
+                        update_fields=["voucher_count", "updated_at"]
+                    )
 
         return pickup_list
+
+    @classmethod
+    def _adopt_pickup_lists_from_acs(
+        cls,
+        client: AcsClient,
+        the_date: date,
+        *,
+        candidates: list[int],
+        billing_code: str | None,
+        issued_by_id: int | None,
+        issue_response: dict,
+    ) -> AcsPickupList | None:
+        """Adopt a manifest ACS holds but did not report back.
+
+        Returns the newest manifest adopted, or ``None`` when ACS has
+        none for the date — in which case the caller is right to treat
+        the issue as failed. Never raises: a reconciliation that cannot
+        reach ACS must not mask the original failure.
+        """
+        try:
+            lists = client.get_pickup_lists(pickup_date=the_date.isoformat())
+        except AcsError:
+            logger.exception(
+                "ACS_Get_Pickup_Lists failed while reconciling %s", the_date
+            )
+            return None
+
+        adopted: AcsPickupList | None = None
+        for row in lists:
+            number = str(row.get("PickupList_No") or "").strip()
+            if not number:
+                continue
+            try:
+                vouchers = client.get_pickup_list_vouchers(
+                    pickup_list_no=number,
+                    pickup_date=the_date.isoformat(),
+                )
+            except AcsError:
+                logger.exception(
+                    "ACS_Pickup_List_Display_Voucher failed for list %s",
+                    number,
+                )
+                continue
+            shipment_ids = list(
+                AcsShipment.objects.filter(
+                    id__in=candidates, voucher_no__in=vouchers
+                ).values_list("id", flat=True)
+            )
+            logger.warning(
+                "Adopted ACS pickup list %s for %s that the issue response "
+                "did not report: acs_vouchers=%s linking=%s shipment(s)",
+                number,
+                the_date,
+                vouchers,
+                len(shipment_ids),
+            )
+            adopted = cls._link_pickup_list(
+                pickup_list_no=number,
+                shipment_ids=shipment_ids,
+                billing_code=billing_code,
+                issued_by_id=issued_by_id,
+                metadata={
+                    "issue_response": issue_response,
+                    "adopted_from": "ACS_Get_Pickup_Lists",
+                    "acs_vouchers": vouchers,
+                },
+            )
+        return adopted
 
     # ------------------------------------------------------------------
     # Tracking poll

@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from order.factories.order import OrderFactory
 from shipping_acs.enum.shipment_state import AcsShipmentState
-from shipping_acs.exceptions import AcsAPIError
+from shipping_acs.exceptions import AcsAPIError, AcsError
 from shipping_acs.factories import (
     AcsPickupListFactory,
     AcsShipmentFactory,
@@ -720,7 +720,14 @@ class TestIssueDailyPickupList:
     # No pickup list was issued for 14 days and 8 parcels sat uncollected
     # while every dashboard stayed green.
 
-    def _client_returning(self, monkeypatch, payload):
+    def _client_returning(
+        self,
+        monkeypatch,
+        payload,
+        lists=None,
+        vouchers=None,
+        lists_error=False,
+    ):
         from shipping_acs import services
 
         class _RefusingClient:
@@ -728,6 +735,14 @@ class TestIssueDailyPickupList:
 
             def issue_pickup_list(self, *, pickup_date):
                 return payload
+
+            def get_pickup_lists(self, *, pickup_date):
+                if lists_error:
+                    raise AcsError("ACS unreachable")
+                return lists or []
+
+            def get_pickup_list_vouchers(self, *, pickup_list_no, pickup_date):
+                return (vouchers or {}).get(pickup_list_no, [])
 
         monkeypatch.setattr(services, "AcsClient", _RefusingClient)
 
@@ -832,6 +847,93 @@ class TestIssueDailyPickupList:
         # Names the unprinted one and only that one.
         assert "7227891111" in warnings[0]
         assert "7227891222" not in warnings[0]
+
+    # -- Reconciliation ----------------------------------------------------
+    #
+    # Prod 2026-09-02: the 16:30 call CREATED list 9803819281 over two
+    # vouchers and answered without a PickupList_No. Believing the
+    # response left the manifest invisible — no row, no linkage — while
+    # ACS refused to print those vouchers because they were already
+    # listed. The response is not the only source of truth; ACS's own
+    # records are.
+
+    def test_adopts_a_manifest_acs_created_but_did_not_report(
+        self, monkeypatch
+    ):
+        from shipping_acs.models import AcsPickupList
+
+        listed = self._candidate("7227891111")
+        untouched = self._candidate("7227899999")
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+            lists=[{"PickupList_No": "9803819281", "List_Vouchers_Count": 1}],
+            vouchers={"9803819281": ["7227891111"]},
+        )
+
+        result = AcsService.issue_daily_pickup_list()
+
+        assert result is not None
+        assert result.pickup_list_no == "9803819281"
+        assert AcsPickupList.objects.count() == 1
+        assert result.metadata["adopted_from"] == "ACS_Get_Pickup_Lists"
+
+        # Only the voucher ACS actually listed gets attached.
+        listed.refresh_from_db()
+        untouched.refresh_from_db()
+        assert listed.pickup_list_id == result.id
+        assert untouched.pickup_list_id is None
+
+    def test_adoption_is_idempotent_across_runs(self, monkeypatch):
+        from shipping_acs.models import AcsPickupList
+
+        self._candidate("7227891111")
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+            lists=[{"PickupList_No": "9803819281", "List_Vouchers_Count": 1}],
+            vouchers={"9803819281": ["7227891111"]},
+        )
+
+        first = AcsService.issue_daily_pickup_list()
+        # Second run: the shipment is already linked, so it is no longer a
+        # candidate — the run stops at the guard and must neither
+        # duplicate the manifest row nor double-count its vouchers.
+        second = AcsService.issue_daily_pickup_list()
+
+        assert second is None
+        assert AcsPickupList.objects.count() == 1
+        first.refresh_from_db()
+        assert first.voucher_count == 1
+
+    def test_raises_when_acs_holds_no_manifest_either(self, monkeypatch):
+        self._candidate("7227891111")
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+            lists=[],
+        )
+
+        with pytest.raises(AcsAPIError):
+            AcsService.issue_daily_pickup_list()
+
+    def test_unreachable_reconciliation_does_not_mask_the_failure(
+        self, monkeypatch
+    ):
+        self._candidate("7227891111")
+        self._client_returning(
+            monkeypatch,
+            {
+                "PickupList_No": None,
+                "Unprinted_Found": 1,
+                "Error_Message": "Unprinted vouchers found.",
+            },
+            lists_error=True,
+        )
+
+        with pytest.raises(AcsAPIError) as exc_info:
+            AcsService.issue_daily_pickup_list()
+        assert "Unprinted vouchers found" in str(exc_info.value)
 
 
 # ---------------------------------------------------------------------------

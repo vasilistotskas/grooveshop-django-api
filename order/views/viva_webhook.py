@@ -21,7 +21,11 @@ from django_tenants.utils import (
     tenant_context,
 )
 
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.models.history import OrderHistory
 from order.models.order import Order
 from order.tasks import (
@@ -166,14 +170,6 @@ def viva_order_code_q(order_code: object) -> Q:
 
 # Payment statuses representing a financially settled (terminal) state.
 # A stale or out-of-order Viva webhook event MUST NOT overwrite any of these.
-_SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
-    {
-        PaymentStatus.COMPLETED,
-        PaymentStatus.REFUNDED,
-        PaymentStatus.PARTIALLY_REFUNDED,
-        PaymentStatus.CANCELED,
-    }
-)
 
 # Viva Wallet production webhook source IPs (from official docs).
 # https://developer.viva.com/webhooks-for-payments/
@@ -1179,7 +1175,7 @@ def _handle_payment_failed(order, event_data, transaction_id):
     # Guard: a stale or out-of-order "payment failed" Viva event must not
     # overwrite a financially settled state.  Viva does NOT guarantee
     # delivery order.
-    if order.payment_status in _SETTLED_PAYMENT_STATUSES:
+    if order.payment_status in SETTLED_PAYMENT_STATUSES:
         logger.warning(
             "Ignoring stale payment_failed (Viva) for order %s: "
             "payment_status already %s",

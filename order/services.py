@@ -11,7 +11,11 @@ from django.utils.translation import get_language, gettext_lazy as _
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.exceptions import (
     InsufficientStockError,
     InvalidCouponError,
@@ -42,15 +46,6 @@ logger = logging.getLogger(__name__)
 # Stripe/Viva do NOT guarantee delivery order, so e.g. a delayed
 # ``payment_failed`` event could arrive after a ``charge.refunded`` event
 # that already moved the order to REFUNDED — that must not regress it to FAILED.
-SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
-    {
-        PaymentStatus.COMPLETED,
-        PaymentStatus.REFUNDED,
-        PaymentStatus.PARTIALLY_REFUNDED,
-        PaymentStatus.CANCELED,
-    }
-)
-
 __all__ = ["OrderService"]
 
 
@@ -2366,6 +2361,48 @@ class OrderService:
         return True, refund_response
 
     @classmethod
+    def _apply_polled_payment_status(
+        cls, order: Order, payment_status_enum: PaymentStatus
+    ) -> None:
+        """Write a POLLED provider status, unless the order is settled.
+
+        Polling reports the provider's view of the payment, which is not
+        the order's view of the money. A Stripe PaymentIntent stays
+        ``succeeded`` after the charge is refunded, so a settled order
+        polled by anyone — including a customer opening the order page,
+        which reaches this through the read-only ``payment_status``
+        action — would be written back to COMPLETED and lose the refund.
+
+        Same rule the webhook handlers already follow: a settled state is
+        final, and the row is re-read under lock so a concurrent webhook
+        either lands first or is seen.
+        """
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            if locked.payment_status in SETTLED_PAYMENT_STATUSES:
+                logger.warning(
+                    "Ignoring polled payment status %s for order %s: "
+                    "payment_status already settled as %s",
+                    payment_status_enum,
+                    order.id,
+                    locked.payment_status,
+                )
+                order.payment_status = locked.payment_status
+                return
+            if payment_status_enum == locked.payment_status:
+                order.payment_status = locked.payment_status
+                return
+            logger.info(
+                "Updating order %s payment status from %s to %s",
+                order.id,
+                locked.payment_status,
+                payment_status_enum,
+            )
+            locked.payment_status = payment_status_enum
+            locked.save(update_fields=["payment_status"])
+            order.payment_status = payment_status_enum
+
+    @classmethod
     def get_payment_status(
         cls,
         order: Order,
@@ -2387,14 +2424,7 @@ class OrderService:
         )
 
         if update_order and payment_status_enum != order.payment_status:
-            logger.info(
-                "Updating order %s payment status from %s to %s",
-                order.id,
-                order.payment_status,
-                payment_status_enum,
-            )
-            order.payment_status = payment_status_enum
-            order.save(update_fields=["payment_status"])
+            cls._apply_polled_payment_status(order, payment_status_enum)
 
         return payment_status_enum, status_data
 

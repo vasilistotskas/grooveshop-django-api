@@ -278,6 +278,20 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         ),
     )
 
+    # Protection is a row attribute rather than a list of schema names
+    # in code: the platform's own store and any merchant the operators
+    # choose are shielded from suspend/activate/destroy without a deploy,
+    # and no customer is named in the codebase. The public schema is
+    # protected by construction (tenant.lifecycle.is_protected_tenant).
+    is_protected = models.BooleanField(
+        _("Protected"),
+        default=False,
+        help_text=_(
+            "Never suspend, reactivate or destroy this tenant through "
+            "admin actions, the platform API or automation."
+        ),
+    )
+
     # Feature flags
     loyalty_enabled = models.BooleanField(_("Loyalty Enabled"), default=False)
     blog_enabled = models.BooleanField(_("Blog Enabled"), default=True)
@@ -850,17 +864,13 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
 
     auto_create_schema = True
 
-    # Schema names that may never be deleted through normal paths.
-    # Deletion of these tenants would destroy the platform itself.
-    _PROTECTED_SCHEMAS = frozenset({"public", "webside", "ekfyseosfyteias"})
-
     def delete(
         self, using=None, keep_parents=False, *, force_drop: bool = False
     ):
         """Block deletion of protected tenants.
 
-        Raises ``ValidationError`` when called on a tenant whose
-        ``schema_name`` is in ``_PROTECTED_SCHEMAS``. All other tenants
+        Raises ``ValidationError`` for a protected tenant
+        (``tenant.lifecycle.is_protected_tenant``). All other tenants
         pass through to the django-tenants ``TenantMixin.delete()``
         which respects the ``force_drop`` kwarg to optionally drop the
         Postgres schema.
@@ -872,7 +882,9 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             the row is removed. Defaults to False so that accidental
             row deletion does not silently destroy tenant data.
         """
-        if self.schema_name in self._PROTECTED_SCHEMAS:
+        from tenant.lifecycle import is_protected_tenant  # noqa: PLC0415
+
+        if is_protected_tenant(self):
             raise ValidationError(
                 _(
                     "Tenant '%(schema)s' is a protected system tenant "

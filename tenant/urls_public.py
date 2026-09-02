@@ -32,7 +32,11 @@ from tenant.views import TenantAdminViewSet
 
 # Manual path() patterns — consistent with the rest of the codebase which
 # uses explicit urlpatterns instead of DefaultRouter auto-registration.
-_admin_list = TenantAdminViewSet.as_view({"get": "list", "post": "create"})
+# Tenants are created through provisioning (``tenant_create`` and the
+# admin's New Store flow), never through a bare serializer POST —
+# ``schema_name`` is read-only there and the model validators would
+# not run, so the list route is read-only.
+_admin_list = TenantAdminViewSet.as_view({"get": "list"})
 _admin_detail = TenantAdminViewSet.as_view(
     {
         "get": "retrieve",

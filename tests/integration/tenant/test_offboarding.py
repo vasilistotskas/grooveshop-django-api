@@ -19,13 +19,25 @@ So these tests pin BOTH directions: what must go, and what must stay.
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
 from django.test import override_settings
+from django.utils import timezone
 
 from tenant import offboarding
+
+
+def _destroyable(schema_name: str, name: str = "Acme Store"):
+    """A tenant stand-in that passes every destroy gate."""
+    tenant = MagicMock()
+    tenant.schema_name = schema_name
+    tenant.name = name
+    tenant.is_active = False
+    tenant.is_protected = False
+    tenant.suspended_at = timezone.now() - timedelta(hours=25)
+    return tenant
 
 
 @pytest.fixture
@@ -175,9 +187,7 @@ class TestErasureRecord:
     def test_archive_records_basis_and_expiry(self, tenant_tree):
         from tenant.models import TenantArchive
 
-        tenant = MagicMock()
-        tenant.schema_name = "acme"
-        tenant.name = "Acme Store"
+        tenant = _destroyable("acme")
 
         with (
             patch.object(offboarding, "latest_invoice_year", return_value=2026),
@@ -200,9 +210,7 @@ class TestErasureRecord:
     def test_store_with_no_invoices_retains_nothing(self, tenant_tree):
         from tenant.models import TenantArchive
 
-        tenant = MagicMock()
-        tenant.schema_name = "acme"
-        tenant.name = "Acme Store"
+        tenant = _destroyable("acme")
 
         with (
             patch.object(offboarding, "latest_invoice_year", return_value=None),
@@ -217,15 +225,32 @@ class TestErasureRecord:
         assert archive.retained_invoice_path == ""
         assert archive.retention_basis == ""
 
-    def test_protected_schemas_are_refused(self):
-        from tenant.lifecycle import PROTECTED_SCHEMAS, destroy_tenant
+    def test_protected_tenants_are_refused(self):
+        from tenant.lifecycle import destroy_tenant
 
-        for schema in PROTECTED_SCHEMAS:
-            tenant = MagicMock()
-            tenant.schema_name = schema
-            with pytest.raises(ValueError):
+        public = _destroyable("public")
+        flagged = _destroyable("acme")
+        flagged.is_protected = True
+        for tenant in (public, flagged):
+            with pytest.raises(ValueError, match="protected"):
                 destroy_tenant(tenant)
             tenant.delete.assert_not_called()
+
+    def test_live_and_recently_suspended_tenants_are_refused(self):
+        """The gates are the lifecycle function's, whoever the caller is."""
+        from tenant.lifecycle import destroy_tenant
+
+        live = _destroyable("acme")
+        live.is_active = True
+        with pytest.raises(ValueError, match="suspended first"):
+            destroy_tenant(live)
+        live.delete.assert_not_called()
+
+        recent = _destroyable("acme")
+        recent.suspended_at = timezone.now() - timedelta(hours=1)
+        with pytest.raises(ValueError, match="less than"):
+            destroy_tenant(recent)
+        recent.delete.assert_not_called()
 
     def test_expired_retention_is_purged_and_stamped(self, tenant_tree):
         from django.utils import timezone

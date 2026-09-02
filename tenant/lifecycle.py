@@ -20,11 +20,51 @@ from __future__ import annotations
 
 import logging
 
-from django.utils import timezone
+from datetime import timedelta
 
-# Schemas that can never be suspended, activated, or destroyed through
-# admin actions or automation. Destroying these breaks the platform.
-PROTECTED_SCHEMAS = frozenset({"public", "webside", "ekfyseosfyteias"})
+from django.utils import timezone
+from django_tenants.utils import get_public_schema_name
+
+# Minimum time a tenant must be suspended before it can be destroyed:
+# an accidental suspension followed by an immediate destroy is the
+# irreversible mistake this window exists to prevent.
+SUSPEND_COOLDOWN = timedelta(hours=24)
+
+DESTROY_REFUSALS = {
+    "protected": "it is a protected tenant",
+    "not_suspended": "it must be suspended first",
+    "cooldown": f"it was suspended less than {SUSPEND_COOLDOWN} ago",
+}
+
+
+def is_protected_tenant(tenant) -> bool:
+    """True when *tenant* may never be suspended, activated or destroyed.
+
+    The public schema IS the platform, so it is protected by
+    construction. Every other protection is the ``Tenant.is_protected``
+    row flag, set by a platform superuser in the admin — no store is
+    named in code, and shielding a new merchant needs no deploy.
+    """
+    if tenant.schema_name == get_public_schema_name():
+        return True
+    return bool(getattr(tenant, "is_protected", False))
+
+
+def destroy_refusal(tenant, *, now=None) -> str | None:
+    """Why *tenant* cannot be destroyed right now, or ``None`` if it can.
+
+    ONE gate list for the admin action, the platform API and any future
+    script (keys of ``DESTROY_REFUSALS``): a protected tenant never; a
+    live store must be suspended first; and ``SUSPEND_COOLDOWN`` must
+    have elapsed since the suspension.
+    """
+    if is_protected_tenant(tenant):
+        return "protected"
+    if tenant.is_active or tenant.suspended_at is None:
+        return "not_suspended"
+    if (now or timezone.now()) - tenant.suspended_at < SUSPEND_COOLDOWN:
+        return "cooldown"
+    return None
 
 
 def suspend_tenant(tenant, *, reason: str) -> bool:
@@ -35,7 +75,7 @@ def suspend_tenant(tenant, *, reason: str) -> bool:
     cooldown and the original ``suspended_reason`` intact, so the
     billing task can never relabel an operator's abuse suspension.
     """
-    if tenant.schema_name in PROTECTED_SCHEMAS:
+    if is_protected_tenant(tenant):
         return False
     if not tenant.is_active and tenant.suspended_at is not None:
         return False
@@ -74,7 +114,7 @@ def activate_tenant(tenant) -> bool:
     Clears ``suspended_at`` (the destroy cooldown anchor) and
     ``suspended_reason`` together — an active tenant carries neither.
     """
-    if tenant.schema_name in PROTECTED_SCHEMAS:
+    if is_protected_tenant(tenant):
         return False
 
     tenant.is_active = True
@@ -174,19 +214,21 @@ def destroy_tenant(tenant, *, actor: str = "") -> dict:
 
     Invoices are deliberately NOT erased — see ``tenant.offboarding``.
 
-    Callers are responsible for their own authorisation and safety
-    gates (protected schema, suspended, cooldown); this function does
-    the work once those pass, and refuses protected schemas itself as a
-    last line of defence.
+    Authorisation is the caller's job; the safety gates are not.
+    ``destroy_refusal`` runs HERE, so no caller — the admin action, the
+    platform API or a future script — can skip the suspended-first and
+    cooldown rules the way the API once did.
     """
     from django.utils import timezone  # noqa: PLC0415
 
     from tenant import offboarding  # noqa: PLC0415
     from tenant.models import TenantArchive  # noqa: PLC0415
 
-    if tenant.schema_name in PROTECTED_SCHEMAS:
+    refusal = destroy_refusal(tenant)
+    if refusal is not None:
         raise ValueError(
-            f"Refusing to destroy protected schema {tenant.schema_name!r}."
+            f"Refusing to destroy {tenant.schema_name!r}: "
+            f"{DESTROY_REFUSALS[refusal]}."
         )
 
     schema_name = tenant.schema_name

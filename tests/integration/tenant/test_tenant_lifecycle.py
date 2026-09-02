@@ -133,18 +133,13 @@ class TestSuspendTenant:
         # suspended_at must remain the original early value
         assert tenant.suspended_at == early
 
-    def test_suspend_skips_protected_schemas(self):
-        # We cannot really create 'public' or 'webside' in tests — just
-        # verify the guard at model.delete() level covers them. Use a
-        # tenant whose schema_name is in the protected set by patching
-        # _PROTECTED in the admin module.
-        tenant = _make_tenant("suspend-guard")
+    def test_suspend_skips_protected_tenants(self):
+        tenant = _make_tenant("suspend-guard", is_protected=True)
         admin = _admin()
 
-        with patch("tenant.admin._PROTECTED", frozenset({tenant.schema_name})):
-            admin.suspend_tenants(
-                _admin_request(), Tenant.objects.filter(pk=tenant.pk)
-            )
+        admin.suspend_tenants(
+            _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+        )
 
         tenant.refresh_from_db()
         # Must remain active (was skipped)
@@ -184,18 +179,18 @@ class TestActivateTenant:
         tenant.refresh_from_db()
         assert tenant.suspended_at is None
 
-    def test_activate_skips_protected_schemas(self):
+    def test_activate_skips_protected_tenants(self):
         tenant = _make_tenant(
             "activate-guard",
             is_active=False,
+            is_protected=True,
             suspended_at=timezone.now() - timedelta(hours=2),
         )
         admin = _admin()
 
-        with patch("tenant.admin._PROTECTED", frozenset({tenant.schema_name})):
-            admin.activate_tenants(
-                _admin_request(), Tenant.objects.filter(pk=tenant.pk)
-            )
+        admin.activate_tenants(
+            _admin_request(), Tenant.objects.filter(pk=tenant.pk)
+        )
 
         tenant.refresh_from_db()
         # Must remain inactive (was skipped)
@@ -224,14 +219,13 @@ class TestTenantDeleteProtection:
         ):
             public_tenant.delete()
 
-    def test_delete_webside_raises_validation_error(self):
-        webside_tenant = _make_tenant("webside-del-test")
-        webside_tenant.schema_name = "webside"
+    def test_delete_flagged_tenant_raises_validation_error(self):
+        flagged = _make_tenant("flagged-del-test", is_protected=True)
         with (
             translation.override("en"),
             pytest.raises(ValidationError, match="protected system tenant"),
         ):
-            webside_tenant.delete()
+            flagged.delete()
 
     def test_delete_regular_tenant_does_not_raise(self):
         tenant = _make_tenant("deletable-tenant")
@@ -272,11 +266,8 @@ class TestDeletePermissionOnProtectedTenants:
         return request
 
     def test_protected_tenant_is_not_deletable(self):
-        tenant = _make_tenant("protected-del-perm")
-        with patch("tenant.admin._PROTECTED", frozenset({tenant.schema_name})):
-            assert (
-                _admin().has_delete_permission(self._request(), tenant) is False
-            )
+        tenant = _make_tenant("protected-del-perm", is_protected=True)
+        assert _admin().has_delete_permission(self._request(), tenant) is False
 
     def test_ordinary_tenant_stays_deletable(self):
         tenant = _make_tenant("ordinary-del-perm")
@@ -342,20 +333,20 @@ class TestDestroyTenants:
             )
             mock_delete.assert_called_once_with(force_drop=True)
 
-    def test_destroy_skips_protected_schemas(self):
+    def test_destroy_skips_protected_tenants(self):
         tenant = _make_tenant(
             "destroy-protected",
             is_active=False,
+            is_protected=True,
             suspended_at=timezone.now() - timedelta(hours=25),
         )
         admin = _admin()
-        with patch("tenant.admin._PROTECTED", frozenset({tenant.schema_name})):
-            with patch.object(Tenant, "delete") as mock_delete:
-                admin.destroy_tenants(
-                    _admin_request(post=_CONFIRMED),
-                    Tenant.objects.filter(pk=tenant.pk),
-                )
-                mock_delete.assert_not_called()
+        with patch.object(Tenant, "delete") as mock_delete:
+            admin.destroy_tenants(
+                _admin_request(post=_CONFIRMED),
+                Tenant.objects.filter(pk=tenant.pk),
+            )
+            mock_delete.assert_not_called()
 
     def test_destroy_no_suspended_at_is_refused(self):
         """Tenant that was never suspended (suspended_at is None)."""

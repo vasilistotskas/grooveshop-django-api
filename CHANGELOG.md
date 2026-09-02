@@ -3,6 +3,56 @@
 
 
 
+## v3.27.1 (2026-09-02)
+
+### Bug fixes
+
+* fix(core): pin pg client to PostgreSQL 18 and fail the backup task on error
+
+The runtime image installed postgresql17-client while the server runs
+PostgreSQL 18, so pg_dump aborted with "server version mismatch" every
+night since 2026-08-26. backup_database_task caught the CommandError and
+returned {"status": "error"}, which Celery recorded as SUCCESS: no
+retry, no ERROR log, and the chained cleanup_old_backups kept pruning
+until no valid scheduled dump remained, only zero-byte files.
+
+- Dockerfile: a POSTGRES_MAJOR build arg selects the matching
+  postgresql<major>-client; drop the unused postgresql17 server package
+  (psycopg[binary] ships its own libpq).
+- backup_database_task: let CommandError propagate so the task fails,
+  retries with backoff, and the retention cleanup does not run after a
+  failed dump.
+- backup_database: unlink the partial/empty output that pg_dump leaves
+  behind when it aborts, so a failed night is not mistaken for a backup.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H6QHvSZHY35xi5VEvr5Au5 ([`cffc34a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cffc34a39758e302565434f91062b0c11030e44d))
+
+### Chores
+
+* chore(claude): harden Claude Code config and correct stale docs
+
+Findings from the 2026-09-01 configuration audit across all five repos.
+
+- settings.json: deny destructive commands (rm -rf, git reset --hard,
+  git clean, force-push, npm/uv publish, kubectl delete namespace); ask on
+  git push and docker exec/run; deny reads of generated artifacts
+  (CHANGELOG.md, .test_durations, build output) that only burn context
+- block-sensitive hook rewritten to the RULES structure shared by every
+  repo: same universal rules, repo-specific ones below
+- untrack .claude/settings.local.json and one agent-memory file that
+  .gitignore already listed; the ignore was added after they were committed
+- .mcp.json: drop the PyCharm entry (an ephemeral 127.0.0.1 port that fails
+  for everyone else; it belongs in user scope) and pin context7 exactly
+- CLAUDE.md/README: PostgreSQL 18 (was 17); Meilisearch no longer pinned to a
+  version that CI and compose had already moved past; no minor/patch
+  versions in prose - pyproject.toml is the source of truth
+
+Co-Authored-By: Claude Code <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01W8KTt5yKTf7F2Lxhpp9ea6 ([`c5bad6c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c5bad6c47f4fa932d8b61e761746fab56e582db6))
+
+* chore(deps): sync uv.lock to 3.27.0 [skip ci] ([`5a619bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5a619bfe52618495b30a337829c11f4bdfa7ada6))
+
 ## v3.27.0 (2026-09-01)
 
 ### Chores

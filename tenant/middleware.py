@@ -7,32 +7,53 @@ from django.middleware.csrf import CsrfViewMiddleware
 TENANT_DOMAINS_CACHE_TTL = 300  # 5 minutes
 
 
+def tenant_domain_set(tenant) -> set[str]:
+    """The tenant's registered hostnames, cached schema-independently.
+
+    "global:" — schema-independent (tenant.cache.make_tenant_key): the
+    invalidating signal (tenant/signals.py) always fires from the public
+    schema, so a schema-prefixed key here would never be found by that
+    delete. A ``FakeTenant`` (``schema_context``) carries no ``domains``
+    manager and owns no hostnames.
+    """
+    manager = getattr(tenant, "domains", None)
+    if manager is None:
+        return set()
+    cache_key = f"global:tenant_domains:{tenant.schema_name}"
+    domains = cache.get(cache_key)
+    if domains is None:
+        domains = set(manager.values_list("domain", flat=True))
+        cache.set(cache_key, domains, TENANT_DOMAINS_CACHE_TTL)
+    return domains
+
+
+def origin_belongs_to_tenant(tenant, origin: str) -> bool:
+    """True when *origin* is ``https://`` or ``http://`` + one of the
+    tenant's registered domains.
+
+    ONE rule for CSRF (``TenantCsrfMiddleware``) and CORS
+    (``tenant.signals.allow_tenant_origin``): a browser on the tenant's
+    storefront may make credentialed requests to the tenant's API and
+    nobody else may.
+    """
+    if not origin or tenant is None:
+        return False
+    return any(
+        origin in (f"https://{d}", f"http://{d}")
+        for d in tenant_domain_set(tenant)
+    )
+
+
 class TenantCsrfMiddleware(CsrfViewMiddleware):
     """Dynamic CSRF trusted origins per tenant domain."""
 
     def _origin_verified(self, request):
         if super()._origin_verified(request):
             return True
-
-        tenant = getattr(connection, "tenant", None)
-        if tenant is None:
-            return False
-
-        origin = request.META.get("HTTP_ORIGIN", "")
-        if not origin:
-            return False
-
-        # "global:" — schema-independent (tenant.cache.make_tenant_key):
-        # the invalidating signal (tenant/signals.py) always fires from
-        # the public schema, so a schema-prefixed key here would never
-        # be found by that delete.
-        cache_key = f"global:tenant_domains:{tenant.schema_name}"
-        domains = cache.get(cache_key)
-        if domains is None:
-            domains = set(tenant.domains.values_list("domain", flat=True))
-            cache.set(cache_key, domains, TENANT_DOMAINS_CACHE_TTL)
-
-        return any(origin in (f"https://{d}", f"http://{d}") for d in domains)
+        return origin_belongs_to_tenant(
+            getattr(connection, "tenant", None),
+            request.META.get("HTTP_ORIGIN", ""),
+        )
 
 
 class TenantCookieDomainMiddleware:

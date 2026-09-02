@@ -1,12 +1,35 @@
 from __future__ import annotations
 
+from corsheaders.signals import check_request_enabled
 from django.core.cache import cache
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from tenant.cache import tenant_resolve_key
+from tenant.middleware import origin_belongs_to_tenant
 from tenant.models import Tenant, TenantDomain
+
+
+@receiver(check_request_enabled, dispatch_uid="tenant.allow_tenant_origin")
+def allow_tenant_origin(sender, request, **kwargs) -> bool:
+    """CORS allow for the CURRENT tenant's own domains.
+
+    ``CORS_ALLOWED_ORIGINS`` holds the platform origins; every tenant
+    storefront is a distinct origin that only its ``TenantDomain`` rows
+    know, so the static list cannot cover them and an allow-all would
+    hand credentialed CORS to the whole internet. django-cors-headers
+    echoes the Origin (with credentials) when a receiver returns True.
+    ``CorsMiddleware`` sits after ``TenantMainMiddleware``, so the tenant
+    is bound; ``connection.tenant`` rather than ``get_current_tenant``
+    so the platform console's own domain rows count on the public
+    schema too. Server-to-server callers (Nuxt SSR, the agent gateway,
+    media-stream) send no Origin and never reach this.
+    """
+    origin = request.headers.get("Origin", "")
+    if not origin:
+        return False
+    return origin_belongs_to_tenant(getattr(connection, "tenant", None), origin)
 
 
 @receiver(

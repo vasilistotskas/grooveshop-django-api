@@ -283,9 +283,15 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
     # choose are shielded from suspend/activate/destroy without a deploy,
     # and no customer is named in the codebase. The public schema is
     # protected by construction (tenant.lifecycle.is_protected_tenant).
+    # ``db_default`` as well as ``default``: Django drops the column
+    # default right after ADD COLUMN unless one is declared, and the
+    # PreSync hook migrates BEFORE the new image rolls — old pods still
+    # inserting Tenant history rows without this column would fail for
+    # the length of the rollout (and after any image rollback).
     is_protected = models.BooleanField(
         _("Protected"),
         default=False,
+        db_default=False,
         help_text=_(
             "Never suspend, reactivate or destroy this tenant through "
             "admin actions, the platform API or automation."

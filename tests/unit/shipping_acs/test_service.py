@@ -4,6 +4,7 @@ from __future__ import annotations
 
 
 import pytest
+from django.utils import timezone
 
 from order.factories.order import OrderFactory
 from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -710,6 +711,199 @@ class TestIssueDailyPickupList:
 
         assert result is None
         mock_unlocked.assert_not_called()
+
+    # -- Failure surfacing -------------------------------------------------
+    #
+    # Regression guard for the 2026-08-20 → 09-03 outage: with candidate
+    # vouchers waiting, ACS returning no PickupList_No was logged as an
+    # INFO "assuming nothing to issue" and reported to Celery as SUCCESS.
+    # No pickup list was issued for 14 days and 8 parcels sat uncollected
+    # while every dashboard stayed green.
+
+    def _client_returning(self, monkeypatch, payload):
+        from shipping_acs import services
+
+        class _RefusingClient:
+            billing_code = "TEST_BILLING"
+
+            def issue_pickup_list(self, *, pickup_date):
+                return payload
+
+        monkeypatch.setattr(services, "AcsClient", _RefusingClient)
+
+    def _candidate(self, voucher_no, printed_at=None):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        return AcsShipmentFactory(
+            order=order,
+            voucher_no=voucher_no,
+            shipment_state=AcsShipmentState.NEW,
+            label_printed_at=printed_at,
+        )
+
+    def test_raises_when_acs_issues_no_list_despite_candidates(
+        self, monkeypatch
+    ):
+        self._candidate("7227891111")
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": None, "Unprinted_Found": 0, "Error_Message": ""},
+        )
+
+        with pytest.raises(AcsAPIError) as exc_info:
+            AcsService.issue_daily_pickup_list()
+
+        # No ACS message to quote, so the fallback has to carry enough to
+        # act on: which date, and how many vouchers went unclaimed.
+        assert "no PickupList_No" in str(exc_info.value)
+        assert "1 candidate voucher(s)" in str(exc_info.value)
+
+    def test_raises_with_acs_message_and_offending_voucher_numbers(
+        self, monkeypatch
+    ):
+        self._candidate("7227891111")
+        self._candidate("7227891222")
+        self._client_returning(
+            monkeypatch,
+            {
+                "PickupList_No": None,
+                "Unprinted_Found": 2,
+                "Error_Message": "Αδύνατη η έκδοση λίστας παραλαβής.",
+                "Unprinted_Vouchers": ["7227891111", "7227891222"],
+            },
+        )
+
+        with pytest.raises(AcsAPIError) as exc_info:
+            AcsService.issue_daily_pickup_list()
+
+        error = exc_info.value
+        assert "Αδύνατη η έκδοση" in str(error)
+        # The raw envelope must survive onto the exception: the voucher
+        # numbers are the only actionable part of ACS's rejection.
+        assert error.raw["Unprinted_Vouchers"] == [
+            "7227891111",
+            "7227891222",
+        ]
+
+    def test_no_pickup_list_row_is_created_on_refusal(self, monkeypatch):
+        from shipping_acs.models import AcsPickupList
+
+        shipment = self._candidate("7227891111")
+        self._client_returning(
+            monkeypatch,
+            {"PickupList_No": "", "Unprinted_Found": 1, "Error_Message": "no"},
+        )
+
+        with pytest.raises(AcsAPIError):
+            AcsService.issue_daily_pickup_list()
+
+        assert not AcsPickupList.objects.exists()
+        shipment.refresh_from_db()
+        assert shipment.pickup_list_id is None
+
+    def test_warns_which_candidates_are_unprinted_before_calling_acs(
+        self, monkeypatch, caplog
+    ):
+        import logging
+
+        self._candidate("7227891111")
+        self._candidate("7227891222", printed_at=timezone.now())
+        self._client_returning(
+            monkeypatch,
+            {
+                "PickupList_No": "9999000111",
+                "Unprinted_Found": 0,
+                "Error_Message": "",
+            },
+        )
+
+        with caplog.at_level(logging.WARNING, logger="shipping_acs.services"):
+            AcsService.issue_daily_pickup_list()
+
+        warnings = [
+            r.getMessage()
+            for r in caplog.records
+            if "label_printed_at" in r.getMessage()
+        ]
+        assert len(warnings) == 1
+        # Names the unprinted one and only that one.
+        assert "7227891111" in warnings[0]
+        assert "7227891222" not in warnings[0]
+
+
+# ---------------------------------------------------------------------------
+# fetch_label_bytes — the local mirror of ACS-side "printed" state
+# ---------------------------------------------------------------------------
+
+
+class TestFetchLabelBytes:
+    @staticmethod
+    def _client(monkeypatch, calls):
+        from shipping_acs import services
+
+        class _PrintingClient:
+            billing_code = "TEST_BILLING"
+
+            def print_voucher(self, voucher_no, print_type):
+                calls.append((voucher_no, print_type))
+                return b"%PDF-1.4 label"
+
+        monkeypatch.setattr(services, "AcsClient", _PrintingClient)
+
+    def _shipment(self):
+        from order.enum.status import OrderStatus, PaymentStatus
+
+        order = OrderFactory(
+            status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
+        )
+        return AcsShipmentFactory(
+            order=order,
+            voucher_no="7227891111",
+            shipment_state=AcsShipmentState.NEW,
+        )
+
+    def test_stamps_label_printed_at(self, monkeypatch):
+        calls: list = []
+        self._client(monkeypatch, calls)
+        shipment = self._shipment()
+        assert shipment.label_printed_at is None
+
+        pdf = AcsService.fetch_label_bytes(shipment)
+
+        assert pdf == b"%PDF-1.4 label"
+        assert calls == [("7227891111", 1)]
+        shipment.refresh_from_db()
+        assert shipment.label_printed_at is not None
+
+    def test_first_print_wins(self, monkeypatch):
+        calls: list = []
+        self._client(monkeypatch, calls)
+        shipment = self._shipment()
+
+        AcsService.fetch_label_bytes(shipment)
+        shipment.refresh_from_db()
+        first = shipment.label_printed_at
+
+        AcsService.fetch_label_bytes(shipment)
+        shipment.refresh_from_db()
+        assert shipment.label_printed_at == first
+
+    def test_never_stamps_without_a_voucher(self, monkeypatch):
+        calls: list = []
+        self._client(monkeypatch, calls)
+        shipment = self._shipment()
+        shipment.voucher_no = None
+        shipment.save(update_fields=["voucher_no"])
+
+        with pytest.raises(AcsAPIError):
+            AcsService.fetch_label_bytes(shipment)
+
+        shipment.refresh_from_db()
+        assert shipment.label_printed_at is None
+        assert calls == []
 
 
 # ---------------------------------------------------------------------------

@@ -943,13 +943,14 @@ class AcsService:
         the_date = pickup_date or timezone.localdate()
 
         # --- Phase 1: collect candidates, no lock ---
-        candidates = list(
+        candidate_rows = list(
             AcsShipment.objects.filter(
                 voucher_no__isnull=False,
                 pickup_list__isnull=True,
                 shipment_state=AcsShipmentState.NEW,
-            ).values_list("id", flat=True)
+            ).values_list("id", "voucher_no", "label_printed_at")
         )
+        candidates = [row[0] for row in candidate_rows]
         if not candidates:
             logger.info(
                 "issue_daily_pickup_list: no candidate shipments for %s",
@@ -957,30 +958,66 @@ class AcsService:
             )
             return None
 
+        # Advisory pre-flight: ACS is the authority on what "printed"
+        # means (a label printed from their portal never reaches us), so
+        # this never blocks the call — it just puts the likely reason for
+        # a rejection in the log BEFORE ACS returns it.
+        unprinted_locally = [row[1] for row in candidate_rows if row[2] is None]
+        if unprinted_locally:
+            logger.warning(
+                "issue_daily_pickup_list: %s of %s candidate voucher(s) have "
+                "no local label_printed_at for %s — ACS rejects a pickup "
+                "list containing unprinted vouchers: %s",
+                len(unprinted_locally),
+                len(candidates),
+                the_date,
+                unprinted_locally,
+            )
+
         # --- Phase 2: ACS API call, outside any transaction ---
         client = AcsClient()
         result = client.issue_pickup_list(pickup_date=the_date.isoformat())
 
         pickup_list_no = (result.get("PickupList_No") or "").strip()
         if not pickup_list_no:
-            unprinted = result.get("Unprinted_Found")
-            if unprinted:
-                # ACS partial-issue path — surface the error message
-                # so admins can fix the offending vouchers.
-                raise AcsAPIError(
-                    alias="ACS_Issue_Pickup_List",
-                    error_message=(
-                        result.get("Error_Message")
-                        or "ACS_Issue_Pickup_List rejected unprinted vouchers."
-                    ),
-                    raw=result,
-                )
-            logger.info(
-                "ACS_Issue_Pickup_List returned no PickupList_No for "
-                "date=%s — assuming nothing to issue.",
+            # Past the candidate guard above there ARE vouchers waiting,
+            # so ACS declining to return a PickupList_No is a FAILURE —
+            # never "nothing to issue". The manual documents exactly two
+            # shapes for this call (docs/_acs-web-services.txt): a
+            # PickupList_No on success, or null + Unprinted_Found > 0
+            # with Error_Message and the offending numbers in the table.
+            # Treating anything else as a no-op logged one INFO line,
+            # returned SUCCESS to Celery, and left the courier with no
+            # manifest for 14 days while 8 parcels sat uncollected
+            # (silent on 2026-08-27/28/31 and 09-02; only 09-01 raised).
+            unprinted_count = result.get("Unprinted_Found")
+            unprinted_vouchers = result.get("Unprinted_Vouchers") or []
+            acs_message = (result.get("Error_Message") or "").strip()
+            logger.error(
+                "ACS_Issue_Pickup_List issued no list for date=%s with %s "
+                "candidate voucher(s): unprinted_found=%s "
+                "unprinted_vouchers=%s error_message=%r raw=%r",
                 the_date,
+                len(candidates),
+                unprinted_count,
+                unprinted_vouchers,
+                acs_message,
+                result,
             )
-            return None
+            if not acs_message:
+                acs_message = (
+                    f"ACS rejected {unprinted_count} unprinted voucher(s)."
+                    if unprinted_count
+                    else (
+                        f"ACS returned no PickupList_No for {the_date} with "
+                        f"{len(candidates)} candidate voucher(s)."
+                    )
+                )
+            raise AcsAPIError(
+                alias="ACS_Issue_Pickup_List",
+                error_message=acs_message,
+                raw=result,
+            )
 
         # --- Phase 3: persist atomically; re-confirm under lock ---
         from tenant.credentials import acs_credentials  # noqa: PLC0415
@@ -1313,11 +1350,31 @@ class AcsService:
         cache_key = f"acs:label:{shipment.voucher_no}:pt{pt}"
         cached = cache.get(cache_key)
         if cached:
+            # Stamp on the cache-hit path too: the entry may predate the
+            # column, and a warm cache must not leave a printed voucher
+            # looking unprinted for the rest of the hour.
+            cls._mark_label_printed(shipment)
             return cached
 
         pdf = AcsClient().print_voucher(shipment.voucher_no, print_type=pt)
         cache.set(cache_key, pdf, timeout=_LABEL_CACHE_TTL)
+        cls._mark_label_printed(shipment)
         return pdf
+
+    @staticmethod
+    def _mark_label_printed(shipment: AcsShipment) -> None:
+        """Record that ACS_Print_Voucher has run for this voucher.
+
+        Every label download in the codebase funnels through
+        ``fetch_label_bytes`` (admin action, order API, carrier
+        adapter), so this is the one choke point where "the merchant
+        printed it" is observable. Idempotent — the first print wins and
+        later views are free.
+        """
+        if shipment.label_printed_at is not None:
+            return
+        shipment.label_printed_at = timezone.now()
+        shipment.save(update_fields=["label_printed_at", "updated_at"])
 
     @classmethod
     def fetch_pickup_list_pdf(cls, pickup_list: AcsPickupList) -> bytes:

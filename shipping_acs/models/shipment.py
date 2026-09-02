@@ -70,6 +70,20 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
         related_name="shipments",
         verbose_name=_("Pickup list"),
     )
+    label_printed_at = models.DateTimeField(
+        _("Label printed at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When ACS_Print_Voucher was last run for this voucher. ACS "
+            "refuses to issue the daily pickup list while any voucher on "
+            "it is unprinted, and that state lives on ACS's side — this "
+            "column is the local mirror so unprinted vouchers are visible "
+            "BEFORE the 16:30 manifest run rejects them. Advisory only: a "
+            "label printed from ACS's own portal never reaches this code, "
+            "so nothing gates on it."
+        ),
+    )
 
     # ── Destination (Phase 2 = locker; Phase 1 always None) ─────────
     station_destination = models.ForeignKey(

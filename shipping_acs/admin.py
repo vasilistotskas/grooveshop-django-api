@@ -153,17 +153,23 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "shipment_state_label",
         "delivery_kind",
         "pickup_list",
+        "label_printed_at",
         "last_polled_at",
     )
     list_filter = (
         AcsShipmentStateFilter,
         "delivery_kind",
+        # "Label printed at: empty" is the pre-flight view for the 16:30
+        # manifest run — ACS rejects a pickup list that contains any
+        # unprinted voucher, so this is where you find them first.
+        ("label_printed_at", admin.EmptyFieldListFilter),
         ("created_at", RangeDateTimeFilter),
     )
     search_fields = ("voucher_no", "order__id", "order__email")
     readonly_fields = (
         "voucher_no",
         "shipment_state",
+        "label_printed_at",
         "last_polled_at",
         "last_event_at",
         "stale_alert_sent",

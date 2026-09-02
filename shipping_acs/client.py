@@ -335,13 +335,26 @@ class AcsClient:
 
         ``pickup_date`` must be ``YYYY-MM-DD``.  Returns the first
         ``ACSValueOutput`` row containing ``PickupList_No`` (or an
-        ``Error_Message`` when no vouchers are eligible).
+        ``Error_Message`` when no vouchers are eligible), plus an
+        ``Unprinted_Vouchers`` list lifted out of ``ACSTableOutput``.
+
+        That list is the whole point of the rejection response: the
+        manual (``docs/_acs-web-services.txt``) documents a refusal as
+        ``PickupList_No: null`` + ``Unprinted_Found: N`` in the value
+        row, with the offending voucher numbers ONLY in the table
+        rows. Returning the value row alone threw away the one field
+        that says which vouchers to go and print.
         """
         envelope = self._call(
             "ACS_Issue_Pickup_List",
             {"Pickup_Date": pickup_date, "MyData": None},
         )
-        return self._value_output(envelope)
+        unprinted = [
+            str(row.get("Unprinted_Vouchers")).strip()
+            for row in self._table_output(envelope)
+            if str(row.get("Unprinted_Vouchers") or "").strip()
+        ]
+        return {**self._value_output(envelope), "Unprinted_Vouchers": unprinted}
 
     def print_pickup_list(
         self,

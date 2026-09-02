@@ -298,6 +298,41 @@ class TestPickupList:
 
         result = client.issue_pickup_list(pickup_date="2026-04-29")
         assert result["PickupList_No"] == "7227889830"
+        assert result["Unprinted_Vouchers"] == []
+
+    def test_issue_pickup_list_lifts_unprinted_vouchers_from_table(self):
+        # ACS puts the refusal count in the value row but the offending
+        # voucher NUMBERS only in ACSTableOutput (manual: "Unprinted
+        # vouchers" response). Returning the value row alone discarded
+        # the one field that says what to go and print.
+        client = _make_client()
+        client._session.post.return_value = _make_response(
+            200,
+            {
+                "ACSExecution_HasError": False,
+                "ACSOutputResponce": {
+                    "ACSValueOutput": [
+                        {
+                            "PickupList_No": None,
+                            "Unprinted_Found": 2,
+                            "Error_Message": "Unprinted vouchers found.",
+                        }
+                    ],
+                    "ACSTableOutput": {
+                        "Table_Data": [
+                            {"Unprinted_Vouchers": "7227889841"},
+                            {"Unprinted_Vouchers": "7227889874"},
+                        ]
+                    },
+                },
+            },
+        )
+
+        result = client.issue_pickup_list(pickup_date="2026-04-29")
+
+        assert result["PickupList_No"] is None
+        assert result["Unprinted_Found"] == 2
+        assert result["Unprinted_Vouchers"] == ["7227889841", "7227889874"]
 
 
 # ---------------------------------------------------------------------------

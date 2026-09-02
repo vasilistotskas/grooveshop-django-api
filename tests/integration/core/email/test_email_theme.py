@@ -84,6 +84,38 @@ class TestNoCssCustomProperties:
         )
 
 
+class TestNoLeakedTemplateComments:
+    """Django's ``{# … #}`` comment does not span lines.
+
+    The comment token is matched per line, so a comment wrapped onto a
+    second line is never recognised and Django emits it verbatim. One
+    such comment sat in the header block of ``email_base.html``, which
+    every transactional email extends, so its full text was printed
+    above the logo in every message that went out. Multi-line commentary
+    belongs in ``{% comment %}``/``{% endcomment %}``, which is a real
+    block tag.
+    """
+
+    COMMENT_SUFFIXES = ("*.html", "*.txt")
+
+    def test_no_template_opens_a_comment_it_does_not_close(self):
+        offenders = []
+        for root in SWEPT_ROOTS:
+            for pattern in self.COMMENT_SUFFIXES:
+                for path in root.rglob(pattern):
+                    text = path.read_text(encoding="utf-8")
+                    for lineno, line in enumerate(text.splitlines(), 1):
+                        head, sep, tail = line.partition("{#")
+                        if sep and "#}" not in tail:
+                            offenders.append(
+                                f"{path.relative_to(root)}:{lineno}"
+                            )
+        assert offenders == [], (
+            "{# #} is single-line only — a comment that wraps is rendered "
+            f"to the recipient; use {{% comment %}} instead: {offenders}"
+        )
+
+
 @pytest.mark.django_db
 class TestRenderedOutput:
     def test_rendered_email_contains_no_unresolved_css(self):

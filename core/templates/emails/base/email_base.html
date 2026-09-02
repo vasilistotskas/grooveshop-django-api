@@ -323,10 +323,12 @@
             <!-- Header with Logo -->
             <div class="email-header">
                 {% block email_header %}
-                {# SITE_LOGO_URL is tenant-scoped (build_email_context):
-                   tenant logo, platform logo only for the platform
-                   tenant, empty for an unbranded tenant — which gets a
-                   text wordmark instead of another store's brand. #}
+                {% comment %}
+                SITE_LOGO_URL is tenant-scoped (build_email_context):
+                tenant logo, platform logo only for the platform tenant,
+                empty for an unbranded tenant — which gets a text
+                wordmark instead of another store's brand.
+                {% endcomment %}
                 {% if SITE_LOGO_URL %}<img src="{{ SITE_LOGO_URL }}" alt="{{ SITE_NAME }}" class="email-logo">{% else %}<span class="email-logo" style="font-size: 22px; font-weight: 700;">{{ SITE_NAME }}</span>{% endif %}
                 {% endblock %}
             </div>

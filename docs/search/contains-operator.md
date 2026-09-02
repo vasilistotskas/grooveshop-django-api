@@ -212,7 +212,7 @@ CONTAINS filtering may be slower than exact match or prefix matching, especially
    ```python
    # Prefer this for general search
    results = ProductTranslation.meilisearch.search("laptop")
-   
+
    # Use CONTAINS for specific substring filtering
    results = ProductTranslation.meilisearch.filter(name__contains="X1")
    ```
@@ -425,16 +425,16 @@ def test_contains_filter_with_real_data():
         name="Gaming Laptop X1",
         language_code="en"
     )
-    
+
     # Sync to Meilisearch
     ProductTranslation.meilisearch.sync()
-    
+
     # Test CONTAINS filter
     results = ProductTranslation.meilisearch.filter(
         name__contains="laptop",
         language_code="en"
     )
-    
+
     assert len(results) == 2
     assert all("laptop" in r.name.lower() for r in results)
 ```

@@ -1,12 +1,11 @@
-[![Coverage Status](https://coveralls.io/repos/github/vasilistotskas/grooveshop-django-api/badge.svg?branch=main)](https://coveralls.io/github/vasilistotskas/grooveshop-django-api?branch=main)
-
 # Grooveshop Django API
 
 ## Overview
 
-A headless e-commerce API built with Django 6 and Django REST Framework. Supports both
-WSGI (Gunicorn) and ASGI (Daphne/Uvicorn) with real-time WebSocket notifications via
-Django Channels. Uses Knox + Django Allauth for authentication (token API + social/MFA),
+A headless, multi-tenant e-commerce API built with Django 6 and Django REST
+Framework. Served as ASGI (Gunicorn managing Uvicorn workers) with real-time WebSocket
+notifications via Django Channels; each store is a django-tenants schema resolved from
+the request host. Uses Knox + Django Allauth for authentication (token API + social/MFA),
 Celery with RabbitMQ broker for background tasks, PostgreSQL 18 for data storage, Redis
 for caching and Channels layer, and Meilisearch for federated search. Features include
 multi-language support (Greek, English, German), Stripe payments via dj-stripe,
@@ -17,10 +16,18 @@ comprehensive test coverage, and a Django Unfold admin panel.
 All Django apps live at the project root (flat structure, no `src/` directory):
 
 - **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing
+- **tenant/** — Multi-tenancy control plane: tenant/domain models, provisioning, billing, lifecycle, staff identity, per-tenant credentials
 - **user/** — User accounts, authentication, and profile management
 - **product/** — Product catalog, categories, reviews, favourites, images, and stock management
 - **order/** — Order processing and management
 - **cart/** — Shopping cart functionalities
+- **promotion/** — Rule-based promotion engine with coupons and automatic discounts
+- **giftcard/** — Stored-value gift cards: purchase, redemption, ledger
+- **b2b/** — Wholesale program: business profiles, VIES validation, group pricing
+- **shipping/**, **shipping_acs/**, **shipping_boxnow/** — Carrier abstraction and the ACS / BoxNow integrations
+- **page_config/** — Merchant-editable storefront layouts, navigation and content pages
+- **meta_capi/** — Meta Conversions API event dispatch
+- **agent/** — OAuth-scoped API surface for AI agents (via the agent gateway)
 - **blog/** — Blog posts, categories, comments, authors, and tags
 - **search/** — Meilisearch integration with federated search, Greeklish transliteration, and analytics
 - **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
@@ -60,7 +67,7 @@ All Django apps live at the project root (flat structure, no `src/` directory):
 - **Message Broker**: RabbitMQ
 - **Search**: Meilisearch
 - **Payments**: Stripe (dj-stripe)
-- **Server**: Uvicorn (ASGI), Gunicorn (WSGI), Daphne (Channels)
+- **Server**: Gunicorn process manager running Uvicorn ASGI workers (Daphne only serves `runserver`)
 - **Containerization**: Docker
 - **Package Management**: uv
 
@@ -86,14 +93,14 @@ docker run -d \
   -p 7700:7700 \
   -e MEILI_MASTER_KEY=YOUR_MASTER_KEY \
   -v $(pwd)/meili_data:/meili_data \
-  getmeili/meilisearch:v1.42.1
+  getmeili/meilisearch:v1.53.1
 ```
 
 **Using Docker Compose:**
 ```yaml
 services:
   meilisearch:
-    image: getmeili/meilisearch:v1.42.1
+    image: getmeili/meilisearch:v1.53.1
     ports:
       - "7700:7700"
     environment:
@@ -158,17 +165,8 @@ python manage.py meilisearch_update_ranking \
 python manage.py meilisearch_sync_all_indexes
 
 # Or sync specific indexes
-python manage.py meilisearch_sync_index --model ProductTranslation
-python manage.py meilisearch_sync_index --model BlogPostTranslation
-```
-
-#### Test Federated Search
-
-```bash
-python manage.py meilisearch_test_federated \
-    --query "laptop" \
-    --language-code en \
-    --limit 20
+python manage.py meilisearch_sync_index product.ProductTranslation
+python manage.py meilisearch_sync_index blog.BlogPostTranslation
 ```
 
 ### OpenAPI Schema Generation
@@ -217,7 +215,7 @@ uv run python manage.py spectacular --color --file schema.yml
 
 # Meilisearch index management
 uv run python manage.py meilisearch_sync_all_indexes
-uv run python manage.py meilisearch_sync_index --model ProductTranslation
+uv run python manage.py meilisearch_sync_index product.ProductTranslation
 
 # Celery (local development)
 celery -A core beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
@@ -233,10 +231,9 @@ docker compose up -d --build
 ### Index Management
 ```bash
 uv run python manage.py meilisearch_sync_all_indexes
-uv run python manage.py meilisearch_sync_index --model ProductTranslation
-uv run python manage.py meilisearch_clear_index --index ProductTranslation
-uv run python manage.py meilisearch_drop --index ProductTranslation
-uv run python manage.py meilisearch_inspect_index --index ProductTranslation
+uv run python manage.py meilisearch_sync_index product.ProductTranslation
+uv run python manage.py meilisearch_drop --recreate
+uv run python manage.py meilisearch_inspect_index --index product --show-settings
 ```
 
 ### Configuration
@@ -244,13 +241,11 @@ uv run python manage.py meilisearch_inspect_index --index ProductTranslation
 uv run python manage.py meilisearch_enable_experimental --feature containsFilter
 uv run python manage.py meilisearch_update_index_settings --index ProductTranslation --max-total-hits 50000 --search-cutoff-ms 1500
 uv run python manage.py meilisearch_update_ranking --index ProductTranslation --rules "words,typo,proximity,attribute,sort,stock:desc,discount_percent:desc,exactness"
+uv run python manage.py meilisearch_apply_settings
 ```
 
-### Testing and Analytics
-```bash
-uv run python manage.py meilisearch_test_federated --query "laptop" --language-code en --limit 20
-uv run python manage.py meilisearch_export_analytics --start-date 2024-01-01 --end-date 2024-12-31 --output analytics.json
-```
+Every index command accepts `--tenant <schema>` or `--all-tenants`; without either it
+runs against the schema bound to the current connection.
 
 For detailed documentation, see:
 - [Search API Documentation](docs/api/search.md)

@@ -31,7 +31,7 @@ def _resolve_tenant_from_request(request):
     Under Daphne/Channels ``database_sync_to_async`` reuses threads
     across requests, so a pooled worker can hold a stale
     ``connection.tenant`` from an earlier request and hand back another
-    tenant's OAuth app config (H7 in MULTI_TENANT_AUDIT.md). Reading the
+    tenant's OAuth app config. Reading the
     host bypasses the thread-local entirely.
     """
     if request is None:
@@ -211,7 +211,7 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
         ``connection.tenant``. Under Daphne/Channels with
         ``database_sync_to_async`` thread pooling, ``connection.tenant``
         can be stale and would return a different tenant's OAuth app
-        config (H7 in MULTI_TENANT_AUDIT.md — same fix pattern as
+        config (same fix pattern as
         ``pre_login``).
         """
         tenant = _resolve_tenant_from_request(request)

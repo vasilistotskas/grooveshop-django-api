@@ -3,6 +3,36 @@
 
 
 
+## v3.27.2 (2026-09-02)
+
+### Bug fixes
+
+* fix(email): a wrapped {# #} comment printed itself above every logo
+
+Django matches the {# #} comment token per line, so a comment that
+wraps onto a second line is never recognised as a comment and is
+emitted verbatim. The note explaining SITE_LOGO_URL's tenant scoping
+sat in the email_header block of email_base.html, which all 37
+transactional templates extend, so its full text was rendered above
+the logo in every message that reached a customer — order received,
+password reset, gift card delivery, the lot.
+
+Moved it into {% comment %}/{% endcomment %}, which is a real block
+tag and does span lines. The header now renders only the tenant logo,
+or the text wordmark for an unbranded tenant.
+
+The failure is silent — no exception, no broken markup, just prose in
+the customer's inbox — so it is guarded by a sweep over both email
+template roots that rejects any {# opened without a #} on the same
+line. Verified failing on the old template and passing on the new.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GHyzyKDydY86gDjJRXQ9C8 ([`042204b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/042204bed4ca9adb798ab6924b10357bb0eab406))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.27.1 [skip ci] ([`e0184fa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e0184fabd83ffce3a91fb0ddd687fcf9b9c20e82))
+
 ## v3.27.1 (2026-09-02)
 
 ### Bug fixes

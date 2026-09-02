@@ -551,6 +551,7 @@ class StockManager:
         delta: int,
         reason: str = "admin order item edit",
         performed_by=None,
+        order_id: int | None = None,
     ) -> None:
         """
         Adjust a product's stock by a signed delta with a full audit log.
@@ -568,6 +569,11 @@ class StockManager:
                           consume.
             reason:       Human-readable reason written to StockLog.
             performed_by: Optional UserAccount instance (None for system ops).
+            order_id:     Order this movement belongs to, when there is one.
+                          ``cancel_order`` restores stock by summing the
+                          physical movements logged AGAINST THE ORDER, so an
+                          unattributed adjustment is stock the order can never
+                          give back.
         """
         if delta == 0:
             return
@@ -589,7 +595,7 @@ class StockManager:
 
         StockLog.objects.create(
             product=locked,
-            order=None,
+            order_id=order_id,
             operation_type=operation_type,
             quantity_delta=delta,
             stock_before=stock_before,

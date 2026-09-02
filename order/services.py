@@ -5,7 +5,7 @@ from typing import Any, ClassVar
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Sum
 from django.utils import timezone
 from django.utils.translation import get_language, gettext_lazy as _
 from djmoney.money import Money
@@ -30,6 +30,7 @@ from order.exceptions import (
 from order.models.item import OrderItem
 from order.models.order import Order
 from promotion.services import CouponService, PromotionEngine
+from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
 from order.signals import order_refunded
 from order.stock import StockManager
@@ -2111,31 +2112,60 @@ class OrderService:
                     )
                     # Continue with other reservations even if one fails
 
-            # Restore stock for order items using StockManager
-            for item in order.items.select_related("product").all():
-                product = item.product
-                if hasattr(product, "stock"):
-                    try:
-                        StockManager.increment_stock(
-                            product_id=product.id,
-                            quantity=item.quantity,
-                            order_id=order.id,
-                            reason=f"Order {order.id} canceled: {reason}",
-                        )
-                        logger.info(
-                            "Restored stock for product %s: +%s (order %s canceled)",
-                            product.id,
-                            item.quantity,
-                            order.id,
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Failed to restore stock for product %s: %s",
-                            product.id,
-                            e,
-                            exc_info=True,
-                        )
-                        # Continue with other items even if one fails
+            # Restore the stock this order is actually HOLDING, which is
+            # not the same as the quantities it lists. Only two operations
+            # move physical stock — decrement_stock and
+            # convert_reservation_to_sale, both logged as DECREMENT against
+            # the order — while an OrderItem created any other way (the
+            # standalone OrderItem admin, a repair script) never decremented
+            # anything: handle_order_item_post_save deliberately skips it to
+            # avoid double-counting the checkout path. Restoring per listed
+            # item therefore invented stock that never left the shelf.
+            #
+            # Summing the order's own physical movements gets every case
+            # right: nothing taken restores nothing, a partially restored
+            # order restores only the remainder, and cancelling twice is a
+            # no-op because the first restore's INCREMENT rows net it out.
+            # RESERVE/RELEASE rows are excluded — a reservation is a logical
+            # hold and leaves physical stock untouched (stock_before ==
+            # stock_after).
+            outstanding = (
+                StockLog.objects.filter(
+                    order_id=order.id,
+                    operation_type__in=(
+                        StockLog.OPERATION_DECREMENT,
+                        StockLog.OPERATION_INCREMENT,
+                    ),
+                )
+                .values("product_id")
+                .annotate(net=Sum("quantity_delta"))
+            )
+            for row in outstanding:
+                quantity = -(row["net"] or 0)
+                if quantity <= 0:
+                    continue
+                product_id = row["product_id"]
+                try:
+                    StockManager.increment_stock(
+                        product_id=product_id,
+                        quantity=quantity,
+                        order_id=order.id,
+                        reason=f"Order {order.id} canceled: {reason}",
+                    )
+                    logger.info(
+                        "Restored stock for product %s: +%s (order %s canceled)",
+                        product_id,
+                        quantity,
+                        order.id,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to restore stock for product %s: %s",
+                        product_id,
+                        e,
+                        exc_info=True,
+                    )
+                    # Continue with other products even if one fails
 
             old_status = order.status
             order.status = OrderStatus.CANCELED

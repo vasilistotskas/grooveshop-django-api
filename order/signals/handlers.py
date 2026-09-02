@@ -502,6 +502,7 @@ def handle_order_item_post_save(
             delta=stock_difference,
             reason="admin order item edit",
             performed_by=None,
+            order_id=instance.order_id,
         )
 
         OrderItemHistory.log_quantity_change(

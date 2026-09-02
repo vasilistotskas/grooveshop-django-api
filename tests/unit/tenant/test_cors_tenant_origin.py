@@ -144,7 +144,7 @@ class TestOriginRule:
         assert origin_belongs_to_tenant(tenant, TENANT_ORIGIN) is True
         assert (
             origin_belongs_to_tenant(tenant, "http://shop.cors-tenant.example")
-            is True
+            is False
         )
         assert (
             origin_belongs_to_tenant(
@@ -158,6 +158,14 @@ class TestOriginRule:
             )
             is False
         )
+
+    def test_plain_http_is_a_debug_only_door(self, tenant, settings):
+        """Production storefronts are HTTPS-only; a plain-http origin is
+        admitted for local development alone."""
+        origin = "http://shop.cors-tenant.example"
+        assert origin_belongs_to_tenant(tenant, origin) is False
+        settings.DEBUG = True
+        assert origin_belongs_to_tenant(tenant, origin) is True
 
     def test_fake_tenant_owns_no_origins(self):
         from django_tenants.utils import get_public_schema_name

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.middleware.csrf import CsrfViewMiddleware
@@ -27,9 +28,22 @@ def tenant_domain_set(tenant) -> set[str]:
     return domains
 
 
+def _origin_schemes() -> tuple[str, ...]:
+    """``https`` only, plus ``http`` under ``DEBUG``.
+
+    A credentialed origin must be at least as secure as the credential:
+    production storefronts are HTTPS-only (SSL redirect + HSTS) and the
+    session cookie is ``Secure``, so a plain-http origin can never carry
+    a legitimate session there — trusting it would only serve someone
+    able to answer for the tenant's hostname over http. Local
+    development runs the storefront over http, hence the ``DEBUG`` door.
+    """
+    return ("https", "http") if settings.DEBUG else ("https",)
+
+
 def origin_belongs_to_tenant(tenant, origin: str) -> bool:
-    """True when *origin* is ``https://`` or ``http://`` + one of the
-    tenant's registered domains.
+    """True when *origin* is an admitted scheme (``_origin_schemes``)
+    plus one of the tenant's registered domains.
 
     ONE rule for CSRF (``TenantCsrfMiddleware``) and CORS
     (``tenant.signals.allow_tenant_origin``): a browser on the tenant's
@@ -38,9 +52,11 @@ def origin_belongs_to_tenant(tenant, origin: str) -> bool:
     """
     if not origin or tenant is None:
         return False
+    schemes = _origin_schemes()
     return any(
-        origin in (f"https://{d}", f"http://{d}")
-        for d in tenant_domain_set(tenant)
+        origin == f"{scheme}://{domain}"
+        for domain in tenant_domain_set(tenant)
+        for scheme in schemes
     )
 
 

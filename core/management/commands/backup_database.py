@@ -37,6 +37,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
+        backup_path: Path | None = None
         try:
             self.stdout.write("Closing Django database connections...")
             connections.close_all()
@@ -51,11 +52,25 @@ class Command(BaseCommand):
             self._report_success(backup_path)
 
         except subprocess.TimeoutExpired as e:
+            self._discard_partial_backup(backup_path)
             raise CommandError("Database backup timed out") from e
         except Exception as e:
+            self._discard_partial_backup(backup_path)
             raise CommandError(f"Backup failed: {e!s}") from e
         finally:
             connections.close_all()
+
+    @staticmethod
+    def _discard_partial_backup(backup_path: Path | None) -> None:
+        # pg_dump ``--file`` creates the output before it connects, so a
+        # dump that aborts (server version mismatch, auth, timeout) leaves
+        # a zero-byte or truncated file behind. Left in place it is
+        # indistinguishable from a backup in a directory listing and it
+        # displaces real dumps inside cleanup_old_backups' retention
+        # window — prod held eight empty nightly files and no valid
+        # scheduled backup on 2026-09-02.
+        if backup_path is not None:
+            backup_path.unlink(missing_ok=True)
 
     def _setup_backup_path(self, options: dict[str, Any]) -> Path:
         output_dir = Path(settings.BASE_DIR) / options["output_dir"]

@@ -1,6 +1,14 @@
 ARG PYTHON_VERSION=3.14.7
 ARG ALPINE_VERSION=3.23
 ARG UV_VERSION=0.12.5
+# PostgreSQL major of the CLIENT tools baked into the runtime image.
+# pg_dump refuses to dump a server NEWER than itself ("aborting because
+# of server version mismatch"), so this must track the server major:
+# prod is grooveshop-infrastructure manifests/app-constructs/grooveshop/
+# base/backend-database.yaml ``postgresql.version``; local dev is
+# infra.compose.yml. It drifted to 17 after the PG18 upgrade and the
+# nightly backup_database_task failed every night until 2026-09-02.
+ARG POSTGRES_MAJOR=18
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:${UV_VERSION}
 ARG UID=1000
 ARG GID=1000
@@ -52,10 +60,13 @@ FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION} AS production
 ARG UID
 ARG GID
 ARG APP_PATH
+ARG POSTGRES_MAJOR
 
+# Only the client tools: backup_database shells out to pg_dump (and
+# gzip for --compress). psycopg[binary] bundles its own libpq, and the
+# server package that used to sit next to the client was never used.
 RUN apk add --no-cache \
-    postgresql17 \
-    postgresql17-client \
+    postgresql${POSTGRES_MAJOR}-client \
     gzip \
     # WeasyPrint runtime shared libraries — cairo/pango/gdk-pixbuf are
     # dlopen'd at PDF-generation time, so the runtime image needs them

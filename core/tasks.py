@@ -785,15 +785,15 @@ def backup_database_task(
             },
         }
 
-    except management.CommandError as e:
-        logger.error(f"Django command error in backup_database: {e}")
-        return {
-            "status": "error",
-            "result_message": str(e),
-            "error_type": "CommandError",
-        }
     except Exception:
-        logger.exception("Unexpected error in backup_database")
+        # A failed dump has to surface as a FAILED task. Catching
+        # CommandError here and returning ``{"status": "error"}`` made
+        # Celery record SUCCESS, MonitoredTask.on_success log "completed
+        # successfully", the autoretry never fire, and the chained
+        # cleanup_old_backups keep pruning the retention window — so a
+        # pg_dump/server major mismatch went unnoticed for a week while
+        # the backup PVC drained to zero (2026-09-02).
+        logger.exception("Database backup failed")
         raise
 
 

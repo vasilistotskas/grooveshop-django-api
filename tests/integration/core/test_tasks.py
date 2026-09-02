@@ -852,11 +852,13 @@ class TestBackupDatabaseTask:
     ):
         mock_call_command.side_effect = CommandError("Backup failed")
 
-        result = backup_database_task()
+        # Must propagate: a swallowed CommandError reported SUCCESS to
+        # Celery and let the chained cleanup prune old backups after a
+        # failed dump.
+        with pytest.raises(CommandError, match="Backup failed"):
+            backup_database_task()
 
-        assert result["status"] == "error"
-        assert result["error_type"] == "CommandError"
-        assert "Backup failed" in result["result_message"]
+        mock_logger.exception.assert_called_once()
 
     @patch("core.tasks.management.call_command")
     @patch("core.tasks.Path")

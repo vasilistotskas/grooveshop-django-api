@@ -3,6 +3,75 @@
 
 
 
+## v3.27.3 (2026-09-02)
+
+### Bug fixes
+
+* fix(shipping_acs): fail loudly when ACS issues no pickup list
+
+Past the candidate guard there are vouchers waiting, so ACS returning no
+PickupList_No is a failure. The code logged one INFO line ("assuming
+nothing to issue"), returned None, and the task reported {'status':
+'noop'} — a Celery SUCCESS. No pickup list was issued for 14 days while
+8 parcels sat uncollected, and every dashboard stayed green: silent on
+2026-08-27, 08-28, 08-31 and 09-02; only 09-01 raised, because that is
+the one day ACS set the Unprinted_Found flag.
+
+The manual (docs/_acs-web-services.txt) documents two shapes for this
+call: a PickupList_No on success, or null + Unprinted_Found > 0 with
+Error_Message and the offending voucher numbers in ACSTableOutput.
+There is no documented "nothing to issue" shape, so the assumption the
+code was built on never held.
+
+- client: lift Unprinted_Vouchers out of the table output. The value row
+  carries only the count; the numbers you actually need to go and print
+  were being discarded with the rest of the envelope.
+- service: log the ACS error message, the offending vouchers and the raw
+  response at ERROR, then raise AcsAPIError. AcsAPIError is not
+  retryable, so the task fails permanently and visibly — a human has to
+  print the labels.
+- service: warn before the call listing candidates with no local
+  label_printed_at, so the likely reason is in the log before ACS
+  answers.
+- model/admin: AcsShipment.label_printed_at, stamped in
+  fetch_label_bytes (the single choke point every label download goes
+  through), with an empty-field filter so unprinted vouchers are visible
+  before the 16:30 run rather than discovered by its rejection.
+  Advisory only — ACS stays the authority, nothing gates on it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H6QHvSZHY35xi5VEvr5Au5 ([`cb8960b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cb8960b3f6b230c7a5039710ed471818280a2a85))
+
+### Chores
+
+* chore(deps): raise the tornado CVE floor to 6.5.8
+
+CVE-2026-82397 (HIGH) was published against tornado 6.5.7 and fixed in
+6.5.8. Trivy started failing every branch on the unchanged lock file,
+which is what a scanner database update looks like: nothing in the tree
+moved. tornado is transitive through flower, so the floor goes in the
+same override-dependencies block as the other CVE floors.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`68b7779`](https://github.com/vasilistotskas/grooveshop-django-api/commit/68b7779057fd7f1688519d4647424498d3947b8a))
+
+* chore(deps): sync uv.lock to 3.27.2 [skip ci] ([`7073272`](https://github.com/vasilistotskas/grooveshop-django-api/commit/70732729aef0cdd1021fb0c2ee27833a89cae59e))
+
+### Testing
+
+* test(cart): pin a non-zero VAT so the quantity-scaling assertion can fail
+
+test_total_vat_value_multiplies_by_quantity guards its real assertion
+with assertNotEqual(total_vat, per_unit_sum). ProductFactory draws a
+random existing Vat row and 0 is one of VatFactory's values, so when
+both products landed on 0% the guard compared 0.00 with 0.00 and the
+test failed for reasons unrelated to VAT scaling. Seen once in a full
+local run.
+
+Both products now get an explicit 24% rate, which makes the assertion
+deterministic and actually about quantity.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`a250aa6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a250aa681049f4df747c79b19f4404c8aeed4150))
+
 ## v3.27.2 (2026-09-02)
 
 ### Bug fixes

@@ -1326,12 +1326,9 @@ version = "3.28.1"
 source = { virtual = "." }
 dependencies = [
     { name = "argon2-cffi" },
-    { name = "asgiref" },
     { name = "celery", extra = ["redis"] },
     { name = "channels", extra = ["daphne"] },
     { name = "channels-redis" },
-    { name = "charset-normalizer" },
-    { name = "cryptography" },
     { name = "defusedxml" },
     { name = "disposable-email-domains" },
     { name = "dj-stripe" },
@@ -1362,18 +1359,15 @@ dependencies = [
     { name = "fido2" },
     { name = "flower" },
     { name = "gunicorn" },
-    { name = "importlib-resources" },
     { name = "measurement" },
     { name = "meilisearch" },
     { name = "nh3" },
     { name = "phonenumbers" },
     { name = "pillow" },
     { name = "psycopg", extra = ["binary", "pool"] },
-    { name = "pyjwt" },
     { name = "python-dotenv" },
     { name = "qrcode" },
     { name = "requests" },
-    { name = "twisted", extra = ["http2", "tls"] },
     { name = "urllib3" },
     { name = "uvicorn" },
     { name = "uvicorn-worker" },
@@ -1391,7 +1385,6 @@ dev = [
     { name = "djangorestframework-stubs" },
     { name = "factory-boy" },
     { name = "faker" },
-    { name = "gitpython" },
     { name = "hypothesis" },
     { name = "pre-commit" },
     { name = "psutil" },
@@ -1405,18 +1398,14 @@ dev = [
     { name = "python-semantic-release" },
     { name = "ruff" },
     { name = "ty" },
-    { name = "types-setuptools" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "argon2-cffi", specifier = ">=25.1.0" },
-    { name = "asgiref", specifier = "==3.12.1" },
     { name = "celery", extras = ["redis"], specifier = ">=5.6.3,<6.0.0" },
     { name = "channels", extras = ["daphne"], specifier = "==4.3.2" },
     { name = "channels-redis", specifier = "==4.3.0" },
-    { name = "charset-normalizer", specifier = "==3.5.1" },
-    { name = "cryptography", specifier = "==50.0.0" },
     { name = "defusedxml", specifier = ">=0.7.1" },
     { name = "disposable-email-domains", specifier = "==0.0.241" },
     { name = "dj-stripe", specifier = "==2.11.0" },
@@ -1447,18 +1436,15 @@ requires-dist = [
     { name = "fido2", specifier = "==2.2.1" },
     { name = "flower", specifier = "==2.1.0" },
     { name = "gunicorn", specifier = "==26.1.0" },
-    { name = "importlib-resources", specifier = "==6.5.2" },
     { name = "measurement", specifier = "==3.2.2" },
     { name = "meilisearch", specifier = "==0.43.0" },
     { name = "nh3", specifier = ">=0.3.6" },
     { name = "phonenumbers", specifier = "==9.0.37" },
     { name = "pillow", specifier = "==12.3.0" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = "==3.3.4" },
-    { name = "pyjwt", specifier = "==2.13.0" },
     { name = "python-dotenv", specifier = "==1.2.3" },
     { name = "qrcode", specifier = "==8.2" },
     { name = "requests", specifier = "==2.34.2" },
-    { name = "twisted", extras = ["http2", "tls"], specifier = "==26.4.0" },
     { name = "urllib3", specifier = "==2.7.0" },
     { name = "uvicorn", specifier = "==0.52.4" },
     { name = "uvicorn-worker", specifier = ">=0.4.0" },
@@ -1476,7 +1462,6 @@ dev = [
     { name = "djangorestframework-stubs", specifier = "==3.16.9" },
     { name = "factory-boy", specifier = "==3.3.3" },
     { name = "faker", specifier = "==40.15.0" },
-    { name = "gitpython", specifier = "==3.1.50" },
     { name = "hypothesis", specifier = "==6.152.6" },
     { name = "pre-commit", specifier = "==4.6.0" },
     { name = "psutil", specifier = "==7.2.2" },
@@ -1487,10 +1472,9 @@ dev = [
     { name = "pytest-split", specifier = "==0.11.0" },
     { name = "pytest-timeout", specifier = "==2.4.0" },
     { name = "pytest-xdist", specifier = "==3.8.0" },
-    { name = "python-semantic-release", specifier = "==10.5.3" },
+    { name = "python-semantic-release", specifier = "==10.6.2" },
     { name = "ruff", specifier = "==0.15.12" },
     { name = "ty", specifier = "==0.0.35" },
-    { name = "types-setuptools", specifier = "==82.0.0.20260508" },
 ]
 
 [[package]]
@@ -1591,15 +1575,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/6f/6d/0703ccc57f3a7233505399edb88de3cbd678da106337b9fcde432b65ed60/idna-3.11.tar.gz", hash = "sha256:795dafcc9c04ed0c1fb032c2aa73654d8e8c5023a7df64a53f39190ada629902", size = 194582, upload-time = "2025-10-12T14:55:20.501Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0e/61/66938bbb5fc52dbdf84594873d5b51fb1f7c7794e9c0f5bd885f30bc507b/idna-3.11-py3-none-any.whl", hash = "sha256:771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea", size = 71008, upload-time = "2025-10-12T14:55:18.883Z" },
-]
-
-[[package]]
-name = "importlib-resources"
-version = "6.5.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/cf/8c/f834fbf984f691b4f7ff60f50b514cc3de5cc08abfc3295564dd89c5e2e7/importlib_resources-6.5.2.tar.gz", hash = "sha256:185f87adef5bcc288449d98fb4fba07cea78bc036455dd44c5fc4a2fe78fed2c", size = 44693, upload-time = "2025-01-03T18:51:56.698Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a4/ed/1f1afb2e9e7f38a545d628f864d562a5ae64fe6f7a10e28ffb9b185b4e89/importlib_resources-6.5.2-py3-none-any.whl", hash = "sha256:789cfdc3ed28c78b67a06acb8126751ced69a3d5f79c095a98298cd8a760ccec", size = 37461, upload-time = "2025-01-03T18:51:54.306Z" },
 ]
 
 [[package]]
@@ -2490,7 +2465,7 @@ wheels = [
 
 [[package]]
 name = "python-semantic-release"
-version = "10.5.3"
+version = "10.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -2498,7 +2473,6 @@ dependencies = [
     { name = "deprecated" },
     { name = "dotty-dict" },
     { name = "gitpython" },
-    { name = "importlib-resources" },
     { name = "jinja2" },
     { name = "pydantic" },
     { name = "python-gitlab" },
@@ -2507,9 +2481,9 @@ dependencies = [
     { name = "shellingham" },
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/19/3a/7332b822825ed0e902c6e950e0d1e90e8f666fd12eb27855d1c8b6677eff/python_semantic_release-10.5.3.tar.gz", hash = "sha256:de4da78635fa666e5774caaca2be32063cae72431eb75e2ac23b9f2dfd190785", size = 618034, upload-time = "2025-12-14T22:37:29.782Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/43/b5/5d45f47204604ee0f4522070e06ead23d5d343d6932fcb194f9e4dee4885/python_semantic_release-10.6.2.tar.gz", hash = "sha256:ae35cde167c407deab88759da942712a32e6abf1759273740581a4d1d6601a7b", size = 628792, upload-time = "2026-08-28T20:23:03.465Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/01/ada29a1215df601bded0a2efd3b6d53864a0a9e0a9ea52aeaebe14fd03fd/python_semantic_release-10.5.3-py3-none-any.whl", hash = "sha256:1be0e07c36fa1f1ec9da4f438c1f6bbd7bc10eb0d6ac0089b0643103708c2823", size = 152716, upload-time = "2025-12-14T22:37:28.089Z" },
+    { url = "https://files.pythonhosted.org/packages/56/3b/228224f38e672d945de79cc5756fe2be57129660f6e755768f0f2560f8d9/python_semantic_release-10.6.2-py3-none-any.whl", hash = "sha256:4f430cf5efe9ac0587c6bd7b8b2bb689baf6cb92da8bb50827a1923163371a12", size = 156461, upload-time = "2026-08-28T20:23:01.954Z" },
 ]
 
 [[package]]
@@ -2610,15 +2584,15 @@ wheels = [
 
 [[package]]
 name = "rich"
-version = "14.2.0"
+version = "15.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markdown-it-py" },
     { name = "pygments" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fb/d2/8920e102050a0de7bfabeb4c4614a49248cf8d5d7a8d01885fbb24dc767a/rich-14.2.0.tar.gz", hash = "sha256:73ff50c7c0c1c77c8243079283f4edb376f0f6442433aecb8ce7e6d0b92d1fe4", size = 219990, upload-time = "2025-10-09T14:16:53.064Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz", hash = "sha256:edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36", size = 230680, upload-time = "2026-04-12T08:24:00.75Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/25/7a/b0178788f8dc6cafce37a212c99565fa1fe7872c70c6c9c1e1a372d9d88f/rich-14.2.0-py3-none-any.whl", hash = "sha256:76bc51fe2e57d2b1be1f96c524b890b816e334ab4c1e45888799bfaab0021edd", size = 243393, upload-time = "2025-10-09T14:16:51.245Z" },
+    { url = "https://files.pythonhosted.org/packages/82/3b/64d4899d73f91ba49a8c18a8ff3f0ea8f1c1d75481760df8c68ef5235bf5/rich-15.0.0-py3-none-any.whl", hash = "sha256:33bd4ef74232fb73fe9279a257718407f169c09b78a87ad3d296f548e27de0bb", size = 310654, upload-time = "2026-04-12T08:24:02.83Z" },
 ]
 
 [[package]]
@@ -2803,11 +2777,11 @@ wheels = [
 
 [[package]]
 name = "tomlkit"
-version = "0.13.3"
+version = "0.15.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/cc/18/0bbf3884e9eaa38819ebe46a7bd25dcd56b67434402b66a58c4b8e552575/tomlkit-0.13.3.tar.gz", hash = "sha256:430cf247ee57df2b94ee3fbe588e71d362a941ebb545dec29b53961d61add2a1", size = 185207, upload-time = "2025-06-05T07:13:44.947Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/96/e07752635b98536177fa1f37671c8f3cdde2e724c6bcf6034b2cfb571565/tomlkit-0.15.1.tar.gz", hash = "sha256:e25bbf38843005246210a12982776f27f99cb9be67160e14434d0c0d21ee1e97", size = 180129, upload-time = "2026-07-17T01:48:04.562Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/75/8539d011f6be8e29f339c42e633aae3cb73bffa95dd0f9adec09b9c58e85/tomlkit-0.13.3-py3-none-any.whl", hash = "sha256:c89c649d79ee40629a9fda55f8ace8c6a1b42deb912b2a8fd8d942ddadb606b0", size = 38901, upload-time = "2025-06-05T07:13:43.546Z" },
+    { url = "https://files.pythonhosted.org/packages/13/bc/8c13eb66537dce1d2bd3a57132902f38d0e7f5bb46fa9f4daed9fe9d76ee/tomlkit-0.15.1-py3-none-any.whl", hash = "sha256:177a05aece5a8ca5266fd3c448abb47b8d352f09d477d3ca8332db4d89b24304", size = 49449, upload-time = "2026-07-17T01:48:05.728Z" },
 ]
 
 [[package]]
@@ -2897,15 +2871,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7e/69/3c51b36d04da19b92f9e815be12753125bd8bc247ba0470a982e6979e71c/types_pyyaml-6.0.12.20250915.tar.gz", hash = "sha256:0f8b54a528c303f0e6f7165687dd33fafa81c807fcac23f632b63aa624ced1d3", size = 17522, upload-time = "2025-09-15T03:01:00.728Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bd/e0/1eed384f02555dde685fff1a1ac805c1c7dcb6dd019c916fe659b1c1f9ec/types_pyyaml-6.0.12.20250915-py3-none-any.whl", hash = "sha256:e7d4d9e064e89a3b3cae120b4990cd370874d2bf12fa5f46c97018dd5d3c9ab6", size = 20338, upload-time = "2025-09-15T03:00:59.218Z" },
-]
-
-[[package]]
-name = "types-setuptools"
-version = "82.0.0.20260508"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a3/53/8c7ca2263165f13b493f5258a317acb09cab02742e816c38cd5fe6f09e5a/types_setuptools-82.0.0.20260508.tar.gz", hash = "sha256:e76ade6f42ba9b4211636b84b65a8e55948a67ffe81f9a44e66b8af93d57e77e", size = 44919, upload-time = "2026-05-08T04:47:48.32Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/67/f49414a00fc61a4bc64bd0ff879bb230818b68e62c5cf91fc7c098912aac/types_setuptools-82.0.0.20260508-py3-none-any.whl", hash = "sha256:ba1d863bbd11526d7232bca8d5a4aebe1d38fa1677a550f47a2692b7d5776900", size = 68395, upload-time = "2026-05-08T04:47:47.391Z" },
 ]
 
 [[package]]

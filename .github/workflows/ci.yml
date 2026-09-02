@@ -526,22 +526,18 @@ jobs:
 
       - name: Python Semantic Release
         id: release
-        # Inline replacement for the python-semantic-release ACTION:
-        # its Docker image pip-installs dependencies UNPINNED at
-        # workflow runtime, and GitPython 3.1.60 (released 2026-08-25)
-        # removed Actor.name_email_regex, crashing PSR 10.x everywhere.
-        # Same PSR version, GitPython pinned to the release that
-        # shipped this morning's v3.10.0. Revert to the action once a
-        # PSR release is compatible with GitPython >= 3.1.60.
+        # Inline instead of the python-semantic-release ACTION: its
+        # Docker image pip-installs dependencies UNPINNED at workflow
+        # runtime, so a transitive release can break every run at once
+        # (GitPython 3.1.60 did exactly that in 2026-08). uvx pins the
+        # exact PSR version, which is the same one in the dev group.
         env:
           GH_TOKEN: ${{ secrets.DJANGO_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           before=$(git describe --tags --abbrev=0)
-          uvx --from "python-semantic-release==10.5.3" \
-              --with "gitpython==3.1.59" \
-              semantic-release -v version
+          uvx --from "python-semantic-release==10.6.2"               semantic-release -v version
           after=$(git describe --tags --abbrev=0)
           echo "version=${after#v}" >> "$GITHUB_OUTPUT"
           if [ "$before" != "$after" ]; then

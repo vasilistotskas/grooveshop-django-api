@@ -533,13 +533,26 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def is_paid(self) -> bool:
-        return bool(
-            (
-                self.payment_status
-                and self.payment_status == PaymentStatus.COMPLETED
-            )
-            and (self.paid_amount and self.paid_amount.amount > 0)
-        )
+        """True when the order owes nothing.
+
+        ``payment_status`` is the settlement authority — only
+        ``mark_as_paid`` and the provider webhooks set it COMPLETED.
+        Requiring ``paid_amount > 0`` on top of it broke the one case
+        where a settled order legitimately charges zero: deductions
+        (gift card, 100% promotion, full loyalty redemption) covering
+        the whole total. ``OrderService`` settles those without ever
+        involving a provider, and ``paid_amount`` is the REMAINDER the
+        customer owed, which is exactly 0.00 there — so the order
+        reported itself unpaid forever, ``awaits_online_payment`` stayed
+        True, and the checkout endpoints happily opened a zero-amount
+        provider session for it.
+
+        A COMPLETED order can only carry a zero ``paid_amount`` in that
+        case: ``mark_as_paid`` backfills the field from the order total
+        whenever it is unset or zero, so any order that owed money ends
+        up positive.
+        """
+        return self.payment_status == PaymentStatus.COMPLETED
 
     @property
     def awaits_online_payment(self) -> bool:

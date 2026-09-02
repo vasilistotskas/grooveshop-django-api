@@ -529,15 +529,17 @@ jobs:
         # Inline instead of the python-semantic-release ACTION: its
         # Docker image pip-installs dependencies UNPINNED at workflow
         # runtime, so a transitive release can break every run at once
-        # (GitPython 3.1.60 did exactly that in 2026-08). uvx pins the
-        # exact PSR version, which is the same one in the dev group.
+        # (GitPython 3.1.60 did exactly that in 2026-08). PSR is a dev
+        # dependency, so run it from the LOCKED environment: every
+        # transitive pin comes from uv.lock, and --locked refuses to run
+        # if the lock is stale. --only-group dev skips the runtime deps.
         env:
           GH_TOKEN: ${{ secrets.DJANGO_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           before=$(git describe --tags --abbrev=0)
-          uvx --from "python-semantic-release==10.6.2"               semantic-release -v version
+          uv run --locked --only-group dev semantic-release -v version
           after=$(git describe --tags --abbrev=0)
           echo "version=${after#v}" >> "$GITHUB_OUTPUT"
           if [ "$before" != "$after" ]; then

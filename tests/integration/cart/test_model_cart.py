@@ -9,6 +9,7 @@ from cart.factories.item import CartItemFactory
 from cart.models import Cart, CartItem
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
+from vat.factories import VatFactory
 
 if TYPE_CHECKING:
     from product.models.product import Product
@@ -18,7 +19,15 @@ User = get_user_model()
 
 class CartModelTestCase(TestCase):
     def setUp(self):
-        products = ProductFactory.create_batch(2, num_images=0, num_reviews=0)
+        # An explicit non-zero VAT rate on both products. ProductFactory
+        # draws a random existing Vat row and 0 is one of the factory's
+        # values, so leaving it to chance let both products land on 0%
+        # — which makes total VAT and the per-unit sum both zero and
+        # collapses the quantity-scaling assertion below into 0 == 0.
+        vat = VatFactory(value=24)
+        products = ProductFactory.create_batch(
+            2, num_images=0, num_reviews=0, vat=vat
+        )
         product_1: Product = products[0]
         product_2: Product = products[1]
 

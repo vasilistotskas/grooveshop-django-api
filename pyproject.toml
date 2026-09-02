@@ -268,7 +268,8 @@ markers = [
 override-dependencies = [
     # CVE-2026-35536, CVE-2026-31958 (HIGH) — fixed in 6.5.5
     # CVE-2026-49855, CVE-2026-49853 (HIGH) — fixed in 6.5.6
-    "tornado>=6.5.6",
+    # CVE-2026-82397 (HIGH) — fixed in 6.5.8
+    "tornado>=6.5.8",
     # CVE-2026-30922, CVE-2026-23490 (HIGH) — fixed in 0.6.3 / 0.6.2
     # CVE-2026-59885, CVE-2026-59886 (HIGH) — fixed in 0.6.4
     "pyasn1>=0.6.4",

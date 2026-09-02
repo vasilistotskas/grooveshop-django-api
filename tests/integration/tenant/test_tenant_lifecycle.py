@@ -333,6 +333,23 @@ class TestDestroyTenants:
             )
             mock_delete.assert_called_once_with(force_drop=True)
 
+    def test_destroy_judges_the_row_as_it_is_now(self):
+        """The gate re-reads the row under lock: a store protected (or
+        re-activated) after the caller loaded its instance is refused."""
+        from tenant.lifecycle import destroy_tenant
+
+        stale = _make_tenant(
+            "destroy-stale",
+            is_active=False,
+            suspended_at=timezone.now() - timedelta(hours=25),
+        )
+        Tenant.objects.filter(pk=stale.pk).update(is_protected=True)
+        with patch.object(Tenant, "delete") as mock_delete:
+            with pytest.raises(ValueError, match="Refusing to destroy"):
+                destroy_tenant(stale)
+            mock_delete.assert_not_called()
+        assert Tenant.objects.filter(pk=stale.pk).exists()
+
     def test_destroy_skips_protected_tenants(self):
         tenant = _make_tenant(
             "destroy-protected",

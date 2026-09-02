@@ -27,17 +27,32 @@ from django.test import override_settings
 from django.utils import timezone
 
 from tenant import offboarding
+from tenant.models import Tenant
+from tests.utils.staff import store_tenant
 
 
-def _destroyable(schema_name: str, name: str = "Acme Store"):
-    """A tenant stand-in that passes every destroy gate."""
-    tenant = MagicMock()
-    tenant.schema_name = schema_name
-    tenant.name = name
-    tenant.is_active = False
-    tenant.is_protected = False
-    tenant.suspended_at = timezone.now() - timedelta(hours=25)
-    return tenant
+def _destroyable(schema_name: str, name: str = "Acme Store", **overrides):
+    """A saved tenant row (no schema DDL) that passes every destroy gate.
+
+    A real row, not a stand-in: ``destroy_tenant`` re-reads the tenant
+    under lock before judging the gates, so only what is in the database
+    counts.
+    """
+    fields = {
+        "name": name,
+        "is_active": False,
+        "is_protected": False,
+        "suspended_at": timezone.now() - timedelta(hours=25),
+    }
+    fields.update(overrides)
+    return store_tenant(schema_name, **fields)
+
+
+def _public_tenant():
+    """The public-schema row, which is protected by construction."""
+    return Tenant.objects.filter(schema_name="public").first() or store_tenant(
+        "public"
+    )
 
 
 @pytest.fixture
@@ -192,6 +207,7 @@ class TestErasureRecord:
         with (
             patch.object(offboarding, "latest_invoice_year", return_value=2026),
             patch("tenant.lifecycle.has_tenant_export", return_value=True),
+            patch.object(Tenant, "delete") as mock_delete,
             override_settings(TENANT_INVOICE_RETENTION_YEARS=6),
         ):
             from tenant.lifecycle import destroy_tenant
@@ -205,7 +221,7 @@ class TestErasureRecord:
         assert archive.retention_until == date(2032, 12, 31)
         assert "4987/2022" in archive.retention_basis
         assert archive.purged_at is None
-        tenant.delete.assert_called_once_with(force_drop=True)
+        mock_delete.assert_called_once_with(force_drop=True)
 
     def test_store_with_no_invoices_retains_nothing(self, tenant_tree):
         from tenant.models import TenantArchive
@@ -215,6 +231,7 @@ class TestErasureRecord:
         with (
             patch.object(offboarding, "latest_invoice_year", return_value=None),
             patch("tenant.lifecycle.has_tenant_export", return_value=False),
+            patch.object(Tenant, "delete"),
         ):
             from tenant.lifecycle import destroy_tenant
 
@@ -228,29 +245,28 @@ class TestErasureRecord:
     def test_protected_tenants_are_refused(self):
         from tenant.lifecycle import destroy_tenant
 
-        public = _destroyable("public")
-        flagged = _destroyable("acme")
-        flagged.is_protected = True
-        for tenant in (public, flagged):
-            with pytest.raises(ValueError, match="protected"):
-                destroy_tenant(tenant)
-            tenant.delete.assert_not_called()
+        public = _public_tenant()
+        flagged = _destroyable("acme", is_protected=True)
+        with patch.object(Tenant, "delete") as mock_delete:
+            for tenant in (public, flagged):
+                with pytest.raises(ValueError, match="protected"):
+                    destroy_tenant(tenant)
+            mock_delete.assert_not_called()
 
     def test_live_and_recently_suspended_tenants_are_refused(self):
         """The gates are the lifecycle function's, whoever the caller is."""
         from tenant.lifecycle import destroy_tenant
 
-        live = _destroyable("acme")
-        live.is_active = True
-        with pytest.raises(ValueError, match="suspended first"):
-            destroy_tenant(live)
-        live.delete.assert_not_called()
-
-        recent = _destroyable("acme")
-        recent.suspended_at = timezone.now() - timedelta(hours=1)
-        with pytest.raises(ValueError, match="less than"):
-            destroy_tenant(recent)
-        recent.delete.assert_not_called()
+        live = _destroyable("acme", is_active=True)
+        recent = _destroyable(
+            "acme_recent", suspended_at=timezone.now() - timedelta(hours=1)
+        )
+        with patch.object(Tenant, "delete") as mock_delete:
+            with pytest.raises(ValueError, match="suspended first"):
+                destroy_tenant(live)
+            with pytest.raises(ValueError, match="less than"):
+                destroy_tenant(recent)
+            mock_delete.assert_not_called()
 
     def test_expired_retention_is_purged_and_stamped(self, tenant_tree):
         from django.utils import timezone

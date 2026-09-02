@@ -219,49 +219,59 @@ def destroy_tenant(tenant, *, actor: str = "") -> dict:
     platform API or a future script — can skip the suspended-first and
     cooldown rules the way the API once did.
     """
+    from django.db import transaction  # noqa: PLC0415
     from django.utils import timezone  # noqa: PLC0415
 
     from tenant import offboarding  # noqa: PLC0415
-    from tenant.models import TenantArchive  # noqa: PLC0415
+    from tenant.models import Tenant, TenantArchive  # noqa: PLC0415
 
-    refusal = destroy_refusal(tenant)
-    if refusal is not None:
-        raise ValueError(
-            f"Refusing to destroy {tenant.schema_name!r}: "
-            f"{DESTROY_REFUSALS[refusal]}."
+    with transaction.atomic():
+        # Judge the row as it is NOW, under lock — not the caller's
+        # snapshot. Between an operator loading the changelist and
+        # confirming, someone else may have re-activated or protected
+        # the store; the gate must see that write, and the lock holds a
+        # concurrent activate off until the drop has committed.
+        tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+        refusal = destroy_refusal(tenant)
+        if refusal is not None:
+            raise ValueError(
+                f"Refusing to destroy {tenant.schema_name!r}: "
+                f"{DESTROY_REFUSALS[refusal]}."
+            )
+
+        schema_name = tenant.schema_name
+        tenant_name = tenant.name
+
+        invoice_year = offboarding.latest_invoice_year(schema_name)
+        retention_date = (
+            offboarding.retention_until(invoice_year)
+            if invoice_year is not None
+            else None
         )
 
-    schema_name = tenant.schema_name
-    tenant_name = tenant.name
+        archive, _created = TenantArchive.objects.update_or_create(
+            schema_name=schema_name,
+            defaults={
+                "tenant_name": tenant_name,
+                "destroyed_at": timezone.now(),
+                "destroyed_by": actor,
+                "data_exported": has_tenant_export(tenant),
+                "retained_invoice_path": (
+                    offboarding.tenant_invoice_dir(schema_name)
+                    if retention_date
+                    else ""
+                ),
+                "retention_until": retention_date,
+                "retention_basis": (
+                    offboarding.INVOICE_RETENTION_BASIS
+                    if retention_date
+                    else ""
+                ),
+                "purged_at": None,
+            },
+        )
 
-    invoice_year = offboarding.latest_invoice_year(schema_name)
-    retention_date = (
-        offboarding.retention_until(invoice_year)
-        if invoice_year is not None
-        else None
-    )
-
-    archive, _created = TenantArchive.objects.update_or_create(
-        schema_name=schema_name,
-        defaults={
-            "tenant_name": tenant_name,
-            "destroyed_at": timezone.now(),
-            "destroyed_by": actor,
-            "data_exported": has_tenant_export(tenant),
-            "retained_invoice_path": (
-                offboarding.tenant_invoice_dir(schema_name)
-                if retention_date
-                else ""
-            ),
-            "retention_until": retention_date,
-            "retention_basis": (
-                offboarding.INVOICE_RETENTION_BASIS if retention_date else ""
-            ),
-            "purged_at": None,
-        },
-    )
-
-    tenant.delete(force_drop=True)
+        tenant.delete(force_drop=True)
 
     indexes = offboarding.purge_search_indexes(schema_name)
     files = offboarding.purge_tenant_files(schema_name)

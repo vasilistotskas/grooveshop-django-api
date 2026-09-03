@@ -1541,14 +1541,6 @@ EXTRA_SETTINGS_DEFAULTS = [
         "type": "bool",
         "value": False,
     },
-    # Rollout shim: require company name/ΔΟΥ/activity on INVOICE
-    # orders. Stays False until the storefront release that sends
-    # those fields is live, else the deployed checkout breaks.
-    {
-        "name": "B2B_INVOICE_COMPANY_REQUIRED",
-        "type": "bool",
-        "value": False,
-    },
     {
         "name": "ORDER_AUTO_CANCEL_FAILED_PAYMENT_MINUTES",
         "type": "int",

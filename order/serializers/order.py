@@ -845,11 +845,9 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
             "valid ``billing_vat_id``."
         ),
     )
-    # Company requisites for the invoice document. Optional at the
-    # field level; ``validate()`` requires the identity trio for
-    # INVOICE orders once the merchant flips
-    # ``B2B_INVOICE_COMPANY_REQUIRED`` (rollout shim — the deployed
-    # storefront release predating these fields sends only the ΑΦΜ).
+    # Company requisites for the invoice document. Optional at the field
+    # level because a RECEIPT order has no use for them; ``validate()``
+    # requires the identity trio on INVOICE orders.
     billing_company_name = serializers.CharField(
         max_length=255,
         required=False,
@@ -1107,20 +1105,18 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                 }
             )
         if document_type == "INVOICE":
-            # Company identity trio — enforced only after the merchant
-            # confirms the new storefront is live (rollout shim; the
-            # previous release sends only the ΑΦΜ).
-            if Setting.get("B2B_INVOICE_COMPANY_REQUIRED", default=False):
-                errors = {}
-                for field, label in (
-                    ("billing_company_name", _("Company name is required.")),
-                    ("billing_tax_office", _("Tax office (ΔΟΥ) is required.")),
-                    ("billing_activity", _("Business activity is required.")),
-                ):
-                    if not (attrs.get(field) or "").strip():
-                        errors[field] = label
-                if errors:
-                    raise serializers.ValidationError(errors)
+            # A Greek invoice must name the counterparty: company,
+            # tax office and activity, alongside the ΑΦΜ checked above.
+            errors = {}
+            for field, label in (
+                ("billing_company_name", _("Company name is required.")),
+                ("billing_tax_office", _("Tax office (ΔΟΥ) is required.")),
+                ("billing_activity", _("Business activity is required.")),
+            ):
+                if not (attrs.get(field) or "").strip():
+                    errors[field] = label
+            if errors:
+                raise serializers.ValidationError(errors)
             # Blank billing address ⇒ the buyer said "same as delivery".
             # Copy EXPLICITLY so the Order row snapshots the invoice
             # address instead of relying on read-time fallbacks. A

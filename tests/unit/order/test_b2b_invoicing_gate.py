@@ -80,6 +80,11 @@ class B2BInvoicingGateTestCase(TestCase):
                 **BASE_PAYLOAD,
                 "document_type": "INVOICE",
                 "billing_vat_id": "123456783",
+                # An INVOICE must name the counterparty; this test
+                # is about the gate itself.
+                "billing_company_name": "Acme MON IKE",
+                "billing_tax_office": "Alpha Athinon",
+                "billing_activity": "Retail trade",
             }
         )
         # ΑΦΜ 123456783 is checksum-valid; pay_way_id lookup happens

@@ -189,41 +189,70 @@ def handle_order_post_save(
         )
 
 
-def _clear_cart_for_order(order: Order) -> None:
-    """Delete the cart the order was built from, if it still exists."""
+def _cart_for_order(order: Order):
+    """The cart this order was built from, or None."""
     from cart.models import Cart  # noqa: PLC0415
 
+    if order.user:
+        return Cart.objects.filter(user=order.user).first()
+
+    # For guest orders, read the cart UUID from the cart snapshot both
+    # creation paths write into order metadata
+    # (OrderService.create_order_from_cart[_offline]). The integer PK is
+    # internal only, so the lookup uses the UUID.
+    cart_uuid = (
+        order.metadata.get("cart_snapshot", {}).get("cart_uuid")
+        if order.metadata
+        else None
+    )
+    if not cart_uuid:
+        logger.debug("Guest order %s - no cart_uuid in metadata", order.id)
+        return None
+    return Cart.objects.filter(uuid=cart_uuid, user__isnull=True).first()
+
+
+def _clear_cart_for_order(order: Order) -> None:
+    """Take THIS ORDER's lines out of the cart, and drop the cart if that
+    empties it.
+
+    Not "delete the cart": an online order deliberately leaves the cart
+    standing until the payment lands (``handle_order_created`` skips the
+    clear while ``awaits_online_payment``, so a shopper who presses Back
+    still has a basket), and a hosted session can stay open for hours.
+    Anything the shopper puts in the cart during that window is theirs,
+    not part of the order being paid for, and deleting the row took it
+    with no trace. The cart is a per-user singleton, so matching it by
+    id would not have helped — only the LINES distinguish the two.
+
+    Lines the order has but the cart does not (promotion gifts injected
+    at creation) simply find nothing to remove.
+    """
     try:
-        if order.user:
-            cart = Cart.objects.filter(user=order.user).first()
-            if cart:
-                cart.delete()  # Delete entire cart, not just items
-                logger.debug(
-                    "Cleared cart for user %s after order %s",
-                    order.user.id,
-                    order.id,
-                )
+        cart = _cart_for_order(order)
+        if cart is None:
             return
 
-        # For guest orders, read the cart UUID from the cart snapshot
-        # both creation paths write into order metadata
-        # (OrderService.create_order_from_cart[_offline]). The integer
-        # PK is internal only (M18 in MULTI_TENANT_AUDIT.md), so the
-        # lookup uses the UUID.
-        cart_uuid = (
-            order.metadata.get("cart_snapshot", {}).get("cart_uuid")
-            if order.metadata
-            else None
-        )
-        if not cart_uuid:
-            logger.debug("Guest order %s - no cart_uuid in metadata", order.id)
-            return
-        cart = Cart.objects.filter(uuid=cart_uuid, user__isnull=True).first()
-        if cart:
-            cart.delete()  # Delete entire cart
+        for item in order.items.all():
+            cart_item = cart.items.filter(product_id=item.product_id).first()
+            if cart_item is None:
+                continue
+            if cart_item.quantity > item.quantity:
+                cart_item.quantity -= item.quantity
+                cart_item.save(update_fields=["quantity"])
+            else:
+                cart_item.delete()
+
+        if cart.items.exists():
             logger.info(
-                "Cleared guest cart %s after order %s", cart_uuid, order.id
+                "Cart %s kept after order %s — it holds items the order "
+                "did not include",
+                cart.uuid,
+                order.id,
             )
+            return
+
+        cart.delete()
+        logger.debug("Cleared cart %s after order %s", cart.uuid, order.id)
     except Exception as e:
         logger.error(
             "Error clearing cart for order %s: %s", order.id, e, exc_info=True

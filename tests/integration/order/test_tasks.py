@@ -13,7 +13,6 @@ from order.models.order import Order
 from pay_way.factories import PayWayFactory
 from order.tasks import (
     CONFIRMATION_EMAIL_SENT_AT_KEY,
-    CONFIRMATION_EMAIL_SENT_FLAG,
     _confirmation_already_sent,
     _release_confirmation_email,
     check_pending_orders,
@@ -335,38 +334,25 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             self.order.metadata.get(CONFIRMATION_EMAIL_SENT_AT_KEY),
             "permanent sent_at timestamp must be set after successful send",
         )
-        # The legacy boolean key (``CONFIRMATION_EMAIL_SENT_FLAG``) is
-        # no longer dual-written — new writes use only the timestamp.
-        # The reader's fallback at ``_confirmation_already_sent`` still
-        # honours the boolean for pre-timestamp DB rows.
-        self.assertNotIn(CONFIRMATION_EMAIL_SENT_FLAG, self.order.metadata)
-
         # Third call: permanent DB flag present → skip without touching Redis.
         mock_email_instance.send.reset_mock()
         result_already_sent = send_order_confirmation_email(self.order.id)
         self.assertTrue(result_already_sent)
         mock_email_instance.send.assert_not_called()
 
-    def test_confirmation_already_sent_dedupes_via_either_key(self):
-        """The reader honours BOTH the timestamp key (current writers
-        set this) AND the boolean key (older DB rows have only this).
-        Guards the load-bearing promise made when the dual-write was
-        dropped: new writes use only the timestamp, but the boolean
-        fallback ensures older rows never re-fire the confirmation
-        email."""
-        # Current writer shape: timestamp set, no boolean.
+    def test_confirmation_dedupe_reads_the_timestamp(self):
+        """One spelling of "already sent": the timestamp key.
+
+        Migration 0051 rewrote the older boolean rows into it, so the
+        reader no longer has to know two shapes for one fact.
+        """
         self.assertTrue(
             _confirmation_already_sent(
                 {CONFIRMATION_EMAIL_SENT_AT_KEY: "2026-01-01T00:00:00+00:00"}
             )
         )
-        # Older DB rows: boolean only, no timestamp. The fallback at
-        # the end of ``_confirmation_already_sent`` honours these.
-        self.assertTrue(
-            _confirmation_already_sent({CONFIRMATION_EMAIL_SENT_FLAG: True})
-        )
-        # Brand-new order with no email-sent state yet — neither key
-        # set, dedupe must return False so the first send fires.
+        # Brand-new order with no email-sent state yet — dedupe must
+        # return False so the first send fires.
         self.assertFalse(_confirmation_already_sent({}))
         self.assertFalse(_confirmation_already_sent(None))
 

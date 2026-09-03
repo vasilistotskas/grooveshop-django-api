@@ -68,27 +68,14 @@ CONFIRMATION_EMAIL_LOCK_PREFIX = "order:confirm_email_lock:"
 # enough that a dead worker's lock expires quickly so a retry can proceed.
 CONFIRMATION_EMAIL_LOCK_TTL = 90  # seconds
 
-# Legacy flag name — kept so existing metadata rows are still readable
-# by _release_confirmation_email (used in existing tests).
-CONFIRMATION_EMAIL_SENT_FLAG = "confirmation_email_sent"
-
 
 def _confirmation_lock_key(order_id: int) -> str:
     return f"{CONFIRMATION_EMAIL_LOCK_PREFIX}{order_id}"
 
 
 def _confirmation_already_sent(metadata: dict | None) -> bool:
-    """Return True if the permanent DB timestamp shows the email was sent.
-
-    The boolean ``CONFIRMATION_EMAIL_SENT_FLAG`` is checked as a
-    fallback because pre-timestamp-key orders persisted in the DB
-    only have that key set. New writes use the timestamp only.
-    """
-    meta = metadata or {}
-    return bool(
-        meta.get(CONFIRMATION_EMAIL_SENT_AT_KEY)
-        or meta.get(CONFIRMATION_EMAIL_SENT_FLAG)
-    )
+    """Return True if the permanent DB timestamp shows the email was sent."""
+    return bool((metadata or {}).get(CONFIRMATION_EMAIL_SENT_AT_KEY))
 
 
 def _mark_confirmation_sent(order_id: int) -> None:
@@ -116,14 +103,7 @@ def _release_confirmation_email(order_id: int) -> None:
         order = Order.objects.select_for_update().filter(id=order_id).first()
         if order is None or not order.metadata:
             return
-        changed = False
-        for key in (
-            CONFIRMATION_EMAIL_SENT_AT_KEY,
-            CONFIRMATION_EMAIL_SENT_FLAG,
-        ):
-            if order.metadata.pop(key, None) is not None:
-                changed = True
-        if changed:
+        if order.metadata.pop(CONFIRMATION_EMAIL_SENT_AT_KEY, None) is not None:
             order.save(update_fields=["metadata"])
     cache.delete(_confirmation_lock_key(order_id))
 
@@ -534,7 +514,7 @@ PAYMENT_FAILED_EMAIL_SENT_FLAG = "payment_failed_email_sent"
 def _reserve_payment_failed_email(order_id: int) -> bool:
     """Atomically claim the payment-failed-email slot for an order.
 
-    Mirrors `_reserve_confirmation_email` so concurrent webhook
+    Reserve-before-send, so concurrent webhook
     deliveries (Stripe + Viva, or retries) cannot both send the email.
     Returns True if this caller won the race and should proceed,
     False if another caller already claimed it. Raises
@@ -1026,7 +1006,7 @@ SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG = "shipping_notification_email_sent"
 def _reserve_shipping_notification_email(order_id: int) -> bool:
     """Atomically claim the shipping-notification-email slot for an order.
 
-    Mirrors ``_reserve_confirmation_email`` so concurrent fires of the
+    Reserve-before-send, so concurrent fires of the
     ``order_shipment_dispatched`` signal (e.g. an admin manually
     re-saving tracking + a carrier event arriving in the same window)
     can't email the customer twice. Raises ``Order.DoesNotExist`` if
@@ -1280,7 +1260,7 @@ INVOICE_EMAIL_SENT_FLAG = "invoice_email_sent"
 
 
 def _reserve_invoice_email(order_id: int) -> bool:
-    """Mirror of ``_reserve_confirmation_email`` for the invoice email.
+    """Reserve-before-send for the invoice email.
 
     Returns ``True`` when this caller won the race. The flag lives
     under ``Order.metadata`` so it survives task retries and

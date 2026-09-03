@@ -1281,11 +1281,8 @@ class OrderViewSet(BaseModelViewSet):
             # Reset per-flow idempotency flags so the confirmation
             # email can fire again on the (expected) new
             # payment_intent.succeeded, and the customer can be
-            # re-notified of any new failure. Both the boolean key
-            # (set on pre-timestamp orders) and the timestamp key
-            # (current) are popped so a retried payment always
-            # re-arms the email regardless of which key is set.
-            locked_order.metadata.pop("confirmation_email_sent", None)
+            # re-notified of any new failure, so the sent-at stamp is
+            # cleared and the confirmation re-arms.
             locked_order.metadata.pop("confirmation_email_sent_at", None)
             locked_order.metadata.pop("payment_failed_email_sent", None)
             locked_order.save(

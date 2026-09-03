@@ -193,9 +193,18 @@ class StockManager:
         # Lock the reservation row so a concurrent release / convert-to-sale
         # can't both pass the already-consumed check below and double-process
         # it (G0289).
+        #
+        # ``of=("self",)`` so ONLY the reservation is locked. Django locks
+        # every row a select_for_update query selects, "including those
+        # from related objects" — so the plain select_related("product")
+        # here also took a FOR UPDATE on the product, which this method
+        # explicitly does not touch. That gave the codebase two lock
+        # orders for the same pair of rows (reserve_stock and
+        # decrement_stock take product first, then reservations) and a
+        # deadlock window on any contended product.
         try:
             reservation = (
-                StockReservation.objects.select_for_update()
+                StockReservation.objects.select_for_update(of=("self",))
                 .select_related("product")
                 .get(id=reservation_id)
             )
@@ -272,15 +281,33 @@ class StockManager:
             ... )
             # Reservation marked as consumed, stock decremented, audit log created
         """
-        # Lock the reservation row (then the product below) so a concurrent
-        # release / convert can't both pass the consumed/expired checks and
-        # double-decrement stock (G0289).
+        # PRODUCT FIRST, then the reservation — the same order
+        # ``reserve_stock`` and ``decrement_stock(respect_reservations=True)``
+        # use. Taking the reservation first (which the plain
+        # select_related also locked the product through, since Django
+        # locks related rows too) gave two opposite lock orders for one
+        # pair of rows: a checkout converting a reservation and a cart
+        # reserving the same hot product could each hold what the other
+        # was waiting for, and PostgreSQL aborted one of them.
+        #
+        # The product id is read without a lock purely to know WHICH
+        # product row to lock; every check that matters happens after
+        # both locks are held.
         try:
-            reservation = (
-                StockReservation.objects.select_for_update()
-                .select_related("product")
-                .get(id=reservation_id)
+            product_id = StockReservation.objects.values_list(
+                "product_id", flat=True
+            ).get(id=reservation_id)
+        except StockReservation.DoesNotExist:
+            raise StockReservationError(
+                f"Reservation {reservation_id} not found"
             )
+
+        product = Product.objects.select_for_update().get(id=product_id)
+
+        try:
+            reservation = StockReservation.objects.select_for_update(
+                of=("self",)
+            ).get(id=reservation_id)
         except StockReservation.DoesNotExist:
             raise StockReservationError(
                 f"Reservation {reservation_id} not found"
@@ -298,13 +325,6 @@ class StockManager:
             raise StockReservationError(
                 f"Reservation {reservation_id} has expired at {reservation.expires_at}"
             )
-
-        # Lock the product row using SELECT FOR UPDATE to prevent race conditions
-        # This ensures no other transaction can modify the product's stock
-        # until this transaction completes
-        product = Product.objects.select_for_update().get(
-            id=reservation.product_id
-        )
 
         # Validate sufficient stock
         # This should always pass if the reservation was valid, but we check

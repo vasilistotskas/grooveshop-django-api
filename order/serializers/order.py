@@ -17,7 +17,6 @@ from order.serializers.item import (
     OrderItemDetailSerializer,
 )
 from pay_way.models import PayWay
-from product.models.product import Product
 from region.models import Region
 from shipping_acs.serializers.shipment import AcsShipmentDetailSerializer
 from shipping_boxnow.serializers.shipment import (
@@ -1223,7 +1222,14 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
 
 
 class OrderWriteSerializer(serializers.ModelSerializer[Order]):
-    items = OrderItemCreateSerializer(many=True)
+    # Read-only: this serializer is wired to ``update``/``partial_update``
+    # only, and ``update()`` deliberately discards ``items`` because a
+    # line carries a committed stock movement and a price snapshot
+    # (G0222). Leaving the field writable meant PUT — the shape
+    # OrderDetailSerializer hands back — demanded a payload it would throw
+    # away AND gated on live stock for products it would never touch, so
+    # an address edit was impossible once any line had sold out.
+    items = OrderItemCreateSerializer(many=True, read_only=True)
     paid_amount = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     shipping_price = MoneyField(max_digits=11, decimal_places=2, read_only=True)
     payment_method_fee = MoneyField(
@@ -1237,20 +1243,6 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
     )
     phone = PhoneNumberField()
 
-    def validate_items(self, value: list[dict]) -> list[dict]:
-        if not value:
-            raise serializers.ValidationError(
-                _("At least one item is required.")
-            )
-
-        for item_data in value:
-            if item_data.get("quantity", 0) <= 0:
-                raise serializers.ValidationError(
-                    _("Item quantity must be greater than zero.")
-                )
-
-        return value
-
     def validate_email(self, value: str) -> str:
         if not value:
             raise serializers.ValidationError(_("Email is required."))
@@ -1261,60 +1253,6 @@ class OrderWriteSerializer(serializers.ModelSerializer[Order]):
                 _("Try using a different email address.")
             )
         return value
-
-    def validate(self, attrs):
-        items_data = attrs.get("items", [])
-
-        # Batch-fetch all products in a single query to avoid N+1.
-        product_ids = []
-        for item_data in items_data:
-            product = item_data.get("product")
-            pid = product.id if hasattr(product, "id") else product
-            product_ids.append(pid)
-
-        products_map = {
-            p.pk: p for p in Product.objects.filter(pk__in=product_ids)
-        }
-
-        for item_data in items_data:
-            raw = item_data.get("product")
-            product_id = raw.id if hasattr(raw, "id") else raw
-            quantity = item_data.get("quantity", 0)
-
-            product = products_map.get(product_id)
-            if product is None:
-                raise serializers.ValidationError(
-                    _("Product with id '{product_id}' does not exist.").format(
-                        product_id=product_id
-                    )
-                )
-
-            if not product.active:
-                raise serializers.ValidationError(
-                    _(
-                        "Product with id '{product_name}' is not available."
-                    ).format(
-                        product_name=product.safe_translation_getter(
-                            "name", any_language=True
-                        )
-                    )
-                )
-
-            if product.stock < quantity:
-                raise serializers.ValidationError(
-                    _(
-                        "Not enough stock for '{product_name}'."
-                        " Available: {product_stock}, Requested: {quantity}"
-                    ).format(
-                        product_name=product.safe_translation_getter(
-                            "name", any_language=True
-                        ),
-                        product_stock=product.stock,
-                        quantity=quantity,
-                    )
-                )
-
-        return attrs
 
     def update(self, instance, validated_data):
         # Order line items are immutable after creation: each carries a

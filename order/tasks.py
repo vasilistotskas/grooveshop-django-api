@@ -569,7 +569,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
     retry URL so the customer can attempt the payment again without
     starting a new order.
     """
-    reserved_this_call = False
+    email_sent = False
     try:
         if self.request.retries == 0:
             if not _reserve_payment_failed_email(order_id):
@@ -578,7 +578,6 @@ def send_payment_failed_email(self, order_id: int) -> bool:
                     order_id,
                 )
                 return True
-            reserved_this_call = True
 
         order = (
             Order.objects.select_related("user", "pay_way")
@@ -614,6 +613,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()
+        email_sent = True
 
         OrderHistory.log_note(
             order=order,
@@ -639,10 +639,30 @@ def send_payment_failed_email(self, order_id: int) -> bool:
             f"Error sending payment-failed email for order #{order_id}: {e!s}",
             extra={"order_id": order_id, "error": str(e)},
         )
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second payment-failed email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "payment-failed email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
-        if reserved_this_call:
-            _release_payment_failed_email(order_id)
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_payment_failed_email(order_id)
         return False
 
 
@@ -704,7 +724,7 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
     ``order_status_generic.html``'s REFUNDED branch). Reuses the
     transactional ``List-Unsubscribe`` headers added in PR #4.
     """
-    reserved_this_call = False
+    email_sent = False
     try:
         if self.request.retries == 0:
             try:
@@ -715,7 +735,6 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
                         order_id,
                     )
                     return True
-                reserved_this_call = True
             except Order.DoesNotExist:
                 logger.error(
                     "Could not reserve refund confirmation email — Order #%s "
@@ -761,6 +780,7 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()
+        email_sent = True
 
         OrderHistory.log_note(
             order=order,
@@ -789,10 +809,30 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             e,
             extra={"order_id": order_id, "error": str(e)},
         )
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second refund confirmation email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "refund confirmation email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
-        if reserved_this_call:
-            _release_refund_confirmation_email(order_id)
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_refund_confirmation_email(order_id)
         return False
 
 
@@ -814,7 +854,7 @@ def send_order_status_update_email(
     On permanent failure the reservation is released so an admin can
     trigger a manual resend.
     """
-    reserved_this_call = False
+    email_sent = False
     try:
         # Only reserve on the first attempt to prevent the flag from
         # blocking legitimate retries after a transient failure.
@@ -827,7 +867,6 @@ def send_order_status_update_email(
                     status,
                 )
                 return True
-            reserved_this_call = True
 
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
@@ -898,6 +937,7 @@ def send_order_status_update_email(
         msg.attach_alternative(html_content, "text/html")
 
         msg.send()
+        email_sent = True
 
         logger.info(
             f"Order status update email sent for order #{order.id} - Status: {status}",
@@ -928,6 +968,21 @@ def send_order_status_update_email(
             extra={"order_id": order_id, "status": status, "error": str(e)},
         )
 
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second order status update email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "order status update email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             logger.info(
                 f"Retrying send_order_status_update_email for order #{order_id} "
@@ -935,8 +990,13 @@ def send_order_status_update_email(
             )
             raise self.retry(exc=e) from e
 
-        if reserved_this_call:
-            _release_status_update_email(order_id, status)
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_status_update_email(order_id, status)
 
         return False
 
@@ -967,10 +1027,33 @@ def _reserve_shipping_notification_email(order_id: int) -> bool:
     return True
 
 
+def _release_shipping_notification_email(order_id: int) -> None:
+    """Clear the shipping-notification reservation on permanent failure.
+
+    Without this the flag outlives the send it was standing in for: the
+    four attempts span ~35 minutes, and if the relay is down for all of
+    them the order keeps ``shipping_notification_email_sent`` forever.
+    The customer is never told the parcel shipped and never gets the
+    tracking number, and re-saving the tracking in the admin is
+    short-circuited by the same flag. The deferral paths above already
+    take care NOT to reserve for exactly this reason.
+    """
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None or not order.metadata:
+            return
+        if (
+            order.metadata.pop(SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG, None)
+            is not None
+        ):
+            order.save(update_fields=["metadata"])
+
+
 @celery_app.task(
     base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
 )
 def send_shipping_notification_email(self, order_id: int) -> bool:
+    email_sent = False
     try:
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
@@ -1050,6 +1133,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         msg.attach_alternative(html_content, "text/html")
 
         msg.send()
+        email_sent = True
 
         logger.info(
             f"Shipping confirmation email sent for order #{order.id}",
@@ -1081,9 +1165,31 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             extra={"order_id": order_id, "error": str(e)},
         )
 
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second shipping notification email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "shipping notification email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
 
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_shipping_notification_email(order_id)
         return False
 
 
@@ -1193,7 +1299,7 @@ def send_invoice_email(self, order_id: int) -> bool:
     a retry or a re-fired ``order_completed`` signal doesn't re-send.
     Released on permanent failure so an admin can resend manually.
     """
-    reserved_this_call = False
+    email_sent = False
     try:
         if self.request.retries == 0:
             if not _reserve_invoice_email(order_id):
@@ -1202,7 +1308,6 @@ def send_invoice_email(self, order_id: int) -> bool:
                     order_id,
                 )
                 return True
-            reserved_this_call = True
 
         order = Order.objects.select_related(
             "user", "country", "region", "pay_way"
@@ -1255,6 +1360,7 @@ def send_invoice_email(self, order_id: int) -> bool:
         )
 
         msg.send()
+        email_sent = True
 
         logger.info(
             "Invoice email sent for order #%s (%s)",
@@ -1282,10 +1388,30 @@ def send_invoice_email(self, order_id: int) -> bool:
             extra={"order_id": order_id, "error": str(e)},
             exc_info=True,
         )
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second invoice email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "invoice email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
-        if reserved_this_call:
-            _release_invoice_email(order_id)
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_invoice_email(order_id)
         return False
 
 

@@ -27,6 +27,15 @@ from order.managers.order import OrderManager
 from shipping.enum import ShippingKind
 
 
+# Stamped on ``Order.metadata`` when a provider confirms a charge whose
+# amount does not match the order total. The money HAS left the customer,
+# so ``auto_cancel_stuck_pending_orders`` must leave the order for a human
+# rather than closing it with ``refund_payment=False``. Lives here rather
+# than beside either writer: the Viva webhook writes it and a Celery task
+# reads it, and a task must not import a view.
+AMOUNT_MISMATCH_FLAG = "viva_amount_mismatch"
+
+
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     """
     Order model representing a customer purchase.

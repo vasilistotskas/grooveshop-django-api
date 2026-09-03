@@ -28,7 +28,7 @@ from order.enum.status import (
     PaymentStatus,
 )
 from order.models.history import OrderHistory
-from order.models.order import Order
+from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.tasks import (
     send_order_confirmation_email,
     send_payment_failed_email,
@@ -168,12 +168,6 @@ def viva_order_code_q(order_code: object) -> Q:
         metadata__contains={"viva_order_codes": [code]}
     )
 
-
-# Stamped on ``Order.metadata`` when Viva confirms a charge whose amount
-# does not match the order total. The money HAS left the customer, so
-# ``auto_cancel_stuck_pending_orders`` must leave the order for a human
-# rather than cancelling it with ``refund_payment=False``.
-AMOUNT_MISMATCH_FLAG = "viva_amount_mismatch"
 
 # Payment statuses representing a financially settled (terminal) state.
 # A stale or out-of-order Viva webhook event MUST NOT overwrite any of these.

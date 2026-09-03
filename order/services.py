@@ -2159,7 +2159,9 @@ class OrderService:
                 .annotate(net=Sum("quantity_delta"))
             )
             for row in outstanding:
-                quantity = -(row["net"] or 0)
+                # ``net`` is a Sum over a non-null column, and every row
+                # here IS a group, so it is always an int.
+                quantity = -row["net"]
                 if quantity <= 0:
                     continue
                 product_id = row["product_id"]
@@ -3049,7 +3051,7 @@ class OrderService:
             logger.error(
                 "Pay-way %s fee is in %s but the order is in %s — charging "
                 "no fee rather than re-labelling the amount",
-                getattr(pay_way, "id", None),
+                pay_way.pk,
                 pay_way.cost.currency,
                 order_value.currency,
             )

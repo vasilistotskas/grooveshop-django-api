@@ -72,11 +72,14 @@ class ActionConfig:
 
     request: type[serializers.Serializer] | None = None
     response: type[serializers.Serializer] | None = None
-    # ``OpenApiTypes`` belongs here too: an action that streams a file
-    # declares ``{200: OpenApiTypes.BINARY}`` rather than a serializer.
+    # Keys are a status code, or a ``(status, media_type)`` pair when the
+    # action does not answer in JSON — that pair is what makes the schema
+    # say ``application/pdf`` for a label download instead of inheriting
+    # the view's JSON renderer. Values allow ``OpenApiTypes`` so a file
+    # stream can be declared as binary rather than as a serializer.
     responses: (
         dict[
-            int,
+            int | tuple[int, str],
             type[serializers.Serializer] | dict | OpenApiTypes | None,
         ]
         | None

@@ -27,8 +27,13 @@ BATCH = 500
 ZERO = Decimal("0")
 
 
-def _amount(money):
-    return Decimal(str(getattr(money, "amount", money) or 0))
+def _amount(money) -> Decimal:
+    """The decimal behind a MoneyField value.
+
+    Every field read here is a non-null MoneyField with a default, so the
+    value is always a Money — no defensive unwrapping.
+    """
+    return Decimal(str(money.amount))
 
 
 def backfill_components(apps, schema_editor):

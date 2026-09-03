@@ -268,9 +268,11 @@ serializers_config: SerializersConfig = {
     "shipment_label": ActionConfig(
         # Streams application/pdf. Declaring OrderDetailSerializer here
         # put a JSON 200 in schema.yml, so the generated storefront
-        # client expected a body it never receives. The two carrier
-        # specific label actions declare no response for the same reason.
-        responses={200: OpenApiTypes.BINARY},
+        # client expected a body it never receives. The (status,
+        # media_type) key is what makes the schema say application/pdf
+        # instead of inheriting the view's JSON renderer — verified
+        # against the generated output, not assumed.
+        responses={(200, "application/pdf"): OpenApiTypes.BINARY},
         operation_id="getShipmentLabelForOrder",
         summary=_("Download the carrier label PDF for an order"),
         description=_(

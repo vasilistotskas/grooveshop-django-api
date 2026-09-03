@@ -29,6 +29,7 @@ from tenant.credentials import (
 )
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
+from order.models.order import AMOUNT_MISMATCH_FLAG
 from order.services import OrderService
 from user.utils.subscription import (
     build_list_unsubscribe_headers,
@@ -1865,8 +1866,6 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
     # the total moved) and stamps AMOUNT_MISMATCH_FLAG instead. Cancelling
     # it here would close a CHARGED order with refund_payment=False and
     # email the customer that it was cancelled. It needs a human.
-    from order.views.viva_webhook import AMOUNT_MISMATCH_FLAG  # noqa: PLC0415
-
     charged = Order.objects.filter(
         metadata__has_key=AMOUNT_MISMATCH_FLAG
     ).values_list("id", flat=True)

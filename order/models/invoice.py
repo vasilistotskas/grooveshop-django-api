@@ -22,6 +22,7 @@ provides:
 from __future__ import annotations
 
 import os
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -227,6 +228,37 @@ class Invoice(TimeStampMixinModel, UUIDModel):
         max_digits=11,
         decimal_places=2,
         default=0,
+    )
+    # ``db_default`` as well as ``default``: Django drops the column
+    # default straight after ADD COLUMN unless the field declares one,
+    # and migrations run BEFORE the new image rolls (Argo PreSync), so
+    # the pods still on the old code would INSERT an invoice without
+    # these columns and hit a not-null violation. Same trap as
+    # ``Tenant.is_protected``.
+    shipping = MoneyField(
+        _("Shipping"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=Decimal("0"),
+    )
+    payment_fee = MoneyField(
+        _("Payment Method Fee"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=Decimal("0"),
+    )
+    discount = MoneyField(
+        _("Discount"),
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+        db_default=Decimal("0"),
+        help_text=_(
+            "Informational only — the line values are already net of the "
+            "allocation, so this never enters the total arithmetic."
+        ),
     )
     total = MoneyField(
         _("Total (incl. VAT)"),

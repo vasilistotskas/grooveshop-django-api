@@ -405,9 +405,19 @@ def _persist_invoice_row(
         # possibly-changed order, or the PDF would disagree with the
         # AADE-registered invoice (G0263).
         vat_breakdown = existing.vat_breakdown
+        # EVERY key ``_order_totals`` produces, or the PDF silently loses
+        # rows: the template renders shipping/payment_fee/discount behind
+        # ``{% if %}`` and then prints ``totals.total`` unconditionally.
+        # Carrying only three keys printed a total that still contained
+        # the shipping and the fee while their rows were gone, so a
+        # legally registered document went out to the customer with
+        # arithmetic that does not add up.
         totals = {
             "subtotal": existing.subtotal,
             "total_vat": existing.total_vat,
+            "shipping": existing.shipping,
+            "payment_fee": existing.payment_fee,
+            "discount": existing.discount,
             "total": existing.total,
         }
     else:
@@ -426,6 +436,9 @@ def _persist_invoice_row(
     invoice.vat_breakdown = vat_breakdown
     invoice.subtotal = totals["subtotal"]
     invoice.total_vat = totals["total_vat"]
+    invoice.shipping = totals["shipping"]
+    invoice.payment_fee = totals["payment_fee"]
+    invoice.discount = totals["discount"]
     invoice.total = totals["total"]
     invoice.currency = currency
     # Save so ``invoice.pk`` exists when the upload_to callable builds

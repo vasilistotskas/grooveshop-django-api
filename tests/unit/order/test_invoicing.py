@@ -236,9 +236,7 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         # frozen branch and hands the totals to the template.
         from order.invoicing import _persist_invoice_row
 
-        _regenerated, _breakdown, totals = _persist_invoice_row(
-            order, invoice, force=True
-        )
+        _regenerated, _breakdown, totals = _persist_invoice_row(order, invoice)
 
         for key in (
             "subtotal",

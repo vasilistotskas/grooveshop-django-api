@@ -368,7 +368,7 @@ def _render_pdf_bytes(context: dict[str, Any]) -> bytes:
 
 @transaction.atomic
 def _persist_invoice_row(
-    order: Order, existing: Invoice | None, *, force: bool
+    order: Order, existing: Invoice | None
 ) -> tuple[Invoice, list[dict[str, Any]], dict[str, Any]]:
     """Allocate the number and persist the Invoice row (no PDF).
 
@@ -478,9 +478,7 @@ def generate_invoice(order: Order, *, force: bool = False) -> Invoice:
         )
         return existing
 
-    invoice, vat_breakdown, totals = _persist_invoice_row(
-        order, existing, force=force
-    )
+    invoice, vat_breakdown, totals = _persist_invoice_row(order, existing)
 
     # Render under the buyer's preferred language so e.g. a German
     # shopper gets a German-labelled invoice even though the seller

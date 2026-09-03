@@ -774,9 +774,14 @@ class StockManager:
 
         # Bulk-mark all expired reservations as consumed in a single UPDATE.
         reservation_ids = [r.id for r in expired_reservations]
-        StockReservation.objects.filter(id__in=reservation_ids).update(
-            consumed=True, updated_at=now
-        )
+        # ``consumed=False`` in the filter as well as the SELECT above: a
+        # reservation converted to a sale in between must not be re-marked
+        # here. (A converted one can still get a RELEASE audit row from the
+        # loop below — a spurious log line in a narrow race, not a stock
+        # error, since neither operation moves physical stock.)
+        StockReservation.objects.filter(
+            id__in=reservation_ids, consumed=False
+        ).update(consumed=True, updated_at=now)
 
         # Build StockLog entries for the audit trail.
         # Releasing a reservation does not change physical stock — stock_before

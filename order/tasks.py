@@ -582,11 +582,9 @@ def send_payment_failed_email(self, order_id: int) -> bool:
                 )
                 return True
 
-        order = (
-            Order.objects.select_related("user", "pay_way")
-            .prefetch_related("items__product__translations")
-            .get(id=order_id)
-        )
+        # No item prefetch: this email neither passes ``items`` into the
+        # context nor renders a line table.
+        order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
         retry_url = get_tenant_frontend_url(f"/account/orders/{order.id}")
 

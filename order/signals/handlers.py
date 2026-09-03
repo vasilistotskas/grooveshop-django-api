@@ -129,15 +129,12 @@ def handle_order_post_save(
     # tracking number. Without the equality check the signal would
     # fire a second time and the shopper would get a duplicate
     # "Tracking available" notification.
-    tracking_unchanged = (
-        (
-            instance.tracking_number == instance._original_tracking_number
-            and instance.shipping_carrier == instance._original_shipping_carrier
-        )
-        if hasattr(instance, "_original_tracking_number")
-        else False
-    )
-
+    # Fires only on the transition INTO having tracking: at least one
+    # field was empty before and both are set now. That already rules out
+    # a re-save with identical values — if the old value equalled the new
+    # non-empty one, the old one was non-empty too, which the "not both
+    # set before" term excludes. An extra equality check read as a second
+    # safeguard but could never change the outcome.
     tracking_dispatched = (
         hasattr(instance, "_original_tracking_number")
         and hasattr(instance, "_original_shipping_carrier")
@@ -147,7 +144,6 @@ def handle_order_post_save(
         )
         and bool(instance.tracking_number)
         and bool(instance.shipping_carrier)
-        and not tracking_unchanged
     )
     if tracking_dispatched:
 
@@ -179,11 +175,13 @@ def handle_order_post_save(
     if settings.AGENT_GATEWAY_INTERNAL_URL and (
         status_changed or payment_status_changed or tracking_dispatched
     ):
-        # ``_schema`` captured at lambda-build time — by the time
+        # ``_schema`` was captured at the top of this function and is
+        # bound into the lambda below as a default — by the time
         # on_commit fires the schema context has exited and TenantTask
         # would stamp the public schema (same contract as every other
-        # dispatch in this module).
-        _schema = connection.schema_name
+        # dispatch in this module). It is NOT re-read here: the three
+        # closures above reference ``_schema`` as a free variable, so
+        # rebinding the name would retroactively change what they see.
         transaction.on_commit(
             lambda oid=instance.id, s=_schema: (
                 push_order_event_to_gateway.apply_async(
@@ -556,9 +554,12 @@ def handle_order_item_post_save(
                 exc_info=True,
             )
 
+    # ``is not None`` rather than truthiness: ``Money(0, "EUR")`` is
+    # falsy, so correcting a line priced at zero — a free-gift line, or a
+    # data-entry fix — produced no history entry at all.
     if (
         hasattr(instance, "_original_price")
-        and instance._original_price
+        and instance._original_price is not None
         and instance._original_price != instance.price
     ):
         OrderItemHistory.log_price_update(

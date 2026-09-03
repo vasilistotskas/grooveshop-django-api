@@ -42,7 +42,7 @@ def _resolve_tenant_candidates(order_code: str) -> list:
     the HTTP layer for machine-to-machine callers), so ownership is
     found by iterating tenants and looking the order up via
     ``viva_order_code_q`` — matching both the latest
-    ``metadata.viva_order_code`` AND the ``viva_order_codes`` history
+    the ``viva_order_codes`` history
     array, because every ``create_checkout_session`` mints a fresh code
     and a shopper on a stale tab may pay an earlier one.
 
@@ -149,9 +149,7 @@ def viva_order_code_q(order_code: object) -> Q:
     """Match an Order by ANY Viva orderCode ever issued for it.
 
     Each ``create_checkout_session`` mints a fresh Viva orderCode and
-    appends it to ``metadata['viva_order_codes']`` (the most recent is
-    also mirrored in the legacy singular ``metadata['viva_order_code']``
-    for the return endpoint's documented ``s`` fallback). A shopper can
+    appends it to ``metadata['viva_order_codes']``. A shopper can
     complete payment on an earlier session (stale tab, back button,
     retry) whose orderCode is not the latest, so both the webhook and
     the browser-return lookup MUST resolve any issued code. Matching
@@ -163,10 +161,7 @@ def viva_order_code_q(order_code: object) -> Q:
     lookup (well-supported on PostgreSQL) rather than a key-transform
     ``__contains``.
     """
-    code = str(order_code)
-    return Q(metadata__viva_order_code=code) | Q(
-        metadata__contains={"viva_order_codes": [code]}
-    )
+    return Q(metadata__contains={"viva_order_codes": [str(order_code)]})
 
 
 # Payment statuses representing a financially settled (terminal) state.
@@ -564,7 +559,7 @@ def _handle_webhook_event(request):
             )
         logger.error(
             "Order not found for Viva Wallet order code: %s | "
-            "(no tenant matched metadata.viva_order_code + "
+            "(no tenant matched metadata.viva_order_codes + "
             "viva_order_codes[])",
             order_code,
         )
@@ -687,7 +682,7 @@ def _process_event_in_tenant(
     if not order:
         logger.error(
             "Viva webhook: tenant schema=%s resolved but Order vanished "
-            "(order_code=%s, searched metadata.viva_order_code + "
+            "(order_code=%s, searched metadata.viva_order_codes + "
             "viva_order_codes[])",
             connection.schema_name,
             order_code,
@@ -964,9 +959,6 @@ def order_viva_codes(order) -> set[str]:
     codes = {
         str(code) for code in (metadata.get("viva_order_codes") or []) if code
     }
-    singular = metadata.get("viva_order_code")
-    if singular:
-        codes.add(str(singular))
     # ``_resolve_tenant_candidates`` also resolves an order by
     # ``payment_id``, so a code stored there counts as issued too — the
     # two must agree on what "belongs to this order" means.

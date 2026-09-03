@@ -1412,10 +1412,9 @@ class OrderViewSet(BaseModelViewSet):
         # concurrent checkout-session creation (double-click, retry)
         # can't lose-update the metadata JSON. For Viva every issued
         # orderCode must survive: the shopper may complete payment on any
-        # session, and the webhook + return endpoint resolve the order by
-        # whichever code was actually paid (see viva_order_code_q). The
-        # singular ``viva_order_code`` stays the latest for the return
-        # endpoint's documented ``s`` fallback.
+        # session, and both the webhook and the return endpoint resolve
+        # the order by whichever code was actually paid, from the one
+        # list (see viva_order_code_q).
         with transaction.atomic():
             locked = Order.objects.select_for_update().get(pk=order.pk)
             metadata = locked.metadata or {}
@@ -1425,7 +1424,6 @@ class OrderViewSet(BaseModelViewSet):
                 if new_code not in codes:
                     codes.append(new_code)
                 metadata["viva_order_codes"] = codes
-                metadata["viva_order_code"] = new_code
             else:
                 metadata["stripe_checkout_session_id"] = checkout_response[
                     "session_id"
@@ -1668,7 +1666,7 @@ class OrderViewSet(BaseModelViewSet):
             "the storefront can forward the customer to the canonical "
             "``/checkout/success/{uuid}`` route. ``t`` resolves via "
             "``payment_id`` (set by the webhook, may lag the redirect); "
-            "``s`` resolves via the ``viva_order_code`` stored at "
+            "``s`` resolves via the ``viva_order_codes`` recorded at "
             "session creation, so it works during the webhook race. "
             "Permission is open because both keys are unguessable "
             "Viva-generated identifiers and the response carries no PII "
@@ -1716,8 +1714,10 @@ class OrderViewSet(BaseModelViewSet):
 
         1. ``t`` → ``payment_id``: authoritative, but only populated
            once the webhook has fired (can lag by tens of seconds).
-        2. ``s`` → ``metadata.viva_order_code``: written at session
-           creation, so it resolves during the webhook race window.
+        2. ``s`` → ``metadata.viva_order_codes``: every code this
+           order has issued, recorded at session creation, so it
+           resolves during the webhook race window — and a shopper
+           who pays on an earlier session still resolves.
 
         ``eventId`` is deliberately NOT a lookup key — an earlier
         revision assumed it echoed ``merchantTrns`` (our order UUID),

@@ -29,7 +29,7 @@ class VivaWebhookMoneyPathTestCase(TestCase):
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             num_order_items=1,
-            metadata={"viva_order_code": "OC123"},
+            metadata={"viva_order_codes": ["OC123"]},
         )
         # Multi-tenant scaffolding — same pattern as
         # tests/integration/tenant/test_multi_tenant_invariants.py: the
@@ -146,17 +146,14 @@ class VivaWebhookMoneyPathTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_payment_on_earlier_session_code_is_resolved(self):
-        # Multi-session: the order was re-checked-out, so the singular
-        # ``viva_order_code`` holds the LATEST code while an earlier
-        # session's code survives only in ``viva_order_codes[]``. A
-        # payment completed on the earlier session MUST still resolve
-        # the order — previously the webhook matched only the latest
-        # code, 200'd as "not found", and the payment was silently lost
-        # (Viva treats a 200 as handled and never retries).
-        self.order.metadata = {
-            "viva_order_code": "OC_NEW",
-            "viva_order_codes": ["OC_OLD", "OC_NEW"],
-        }
+        # Multi-session: the order was re-checked-out, so an earlier
+        # session's code sits alongside the newest in
+        # ``viva_order_codes``. A payment completed on the earlier
+        # session MUST still resolve the order — previously the webhook
+        # matched only the latest code, 200'd as "not found", and the
+        # payment was silently lost (Viva treats a 200 as handled and
+        # never retries).
+        self.order.metadata = {"viva_order_codes": ["OC_OLD", "OC_NEW"]}
         self.order.save(update_fields=["metadata"])
 
         with patch(

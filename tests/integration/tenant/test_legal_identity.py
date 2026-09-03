@@ -35,12 +35,28 @@ from tenant.legal_identity import (
 
 
 def _set(key: str, value, type_="string"):
+    """Write a setting and confirm it reads back through the same
+    accessor the endpoint uses.
+
+    The read-back is not ceremony. These tests failed once in a full
+    parallel run with the endpoint publishing the seeded blank instead of
+    the value written here, and the cause was never established — the
+    settings cache is inert under the test cache config, each xdist
+    worker has its own database, and nothing re-seeds during a request.
+    Asserting at the write turns a recurrence into "the row did not
+    land", pointing at the writer, instead of an opaque empty string at
+    the assertion twenty lines later.
+    """
     Setting.objects.update_or_create(
         name=key,
         defaults={
             "value_string" if type_ == "string" else "value_bool": value,
             "value_type": type_,
         },
+    )
+    readback = Setting.get(key, default=None)
+    assert readback == value, (
+        f"{key} was written as {value!r} but reads back as {readback!r}"
     )
 
 

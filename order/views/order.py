@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -9,7 +8,6 @@ from django.db import transaction
 from django.http import FileResponse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from djmoney.money import Money
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -79,8 +77,6 @@ from order.serializers.order import (
     OrderSerializer,
     OrderWriteSerializer,
     PaymentStatusResponseSerializer,
-    RefundOrderRequestSerializer,
-    RefundOrderResponseSerializer,
     ReorderResponseSerializer,
     UpdateStatusSerializer,
     VivaReturnLookupResponseSerializer,
@@ -175,17 +171,6 @@ serializers_config: SerializersConfig = {
             "platform (ACP/UCP delegated payments) for this order. "
             "Only available when agent-delegated payments are enabled "
             "for the store and the order's payment method is Stripe."
-        ),
-        tags=["Orders"],
-    ),
-    "refund_order": ActionConfig(
-        request=RefundOrderRequestSerializer,
-        response=RefundOrderResponseSerializer,
-        operation_id="refundOrder",
-        summary=_("Refund an order payment"),
-        description=_(
-            "Process a full or partial refund for an order's payment. "
-            "Only available for paid orders with valid payment providers."
         ),
         tags=["Orders"],
     ),
@@ -401,7 +386,6 @@ class OrderViewSet(BaseModelViewSet):
             "destroy",
             "add_tracking",
             "update_status",
-            "refund_order",
             "boxnow_cancel",
             "acs_cancel",
             "shipment_cancel",
@@ -432,8 +416,9 @@ class OrderViewSet(BaseModelViewSet):
         elif self.action in public_actions:
             self.permission_classes = []
         else:
-            # ``list`` (every order in the store) and any future
-            # unclassified action: staff surface, method-mapped.
+            # Any future unclassified action: staff surface,
+            # method-mapped. (``list`` does NOT reach here — it is in
+            # owner_or_admin_actions above.)
             self.permission_classes = [StoreStaffModelPermissions]
 
         return super().get_permissions()
@@ -488,22 +473,11 @@ class OrderViewSet(BaseModelViewSet):
     def get_object(self):
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
         order_id: str = self.kwargs[lookup_url_kwarg]
-        max_order_id_length = 8
 
         try:
-            if (
-                isinstance(order_id, str)
-                and len(order_id) > max_order_id_length
-                and "-" in order_id
-            ):
-                try:
-                    uuid.UUID(order_id)
-                    obj = OrderService.get_order_by_uuid(order_id)
-                    self.check_object_permissions(self.request, obj)
-                    return obj
-                except ValueError, TypeError:
-                    pass
-
+            # No UUID branch: every route in order/urls.py binds
+            # ``<int:pk>``, so a UUID string can never reach this lookup.
+            # Guest access by UUID is its own route (retrieve_by_uuid).
             obj = OrderService.get_order_by_id(int(order_id))
             self.check_object_permissions(self.request, obj)
             return obj
@@ -2056,78 +2030,6 @@ class OrderViewSet(BaseModelViewSet):
             logger.error("Error updating order status: %s", e, exc_info=True)
             return Response(
                 {"detail": _("An unexpected error occurred")},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    @action(detail=True, methods=["POST"])
-    def refund_order(self, request, *args, **kwargs):
-        """Process full or partial refund for an order."""
-        order = self.get_object()
-
-        request_serializer_class = self.get_request_serializer()
-        request_serializer = request_serializer_class(data=request.data)
-        request_serializer.is_valid(raise_exception=True)
-
-        validated_data = request_serializer.validated_data
-
-        refund_amount = None
-        if validated_data.get("amount"):
-            currency = validated_data.get(
-                "currency", str(order.total_price.currency)
-            )
-            refund_amount = Money(validated_data["amount"], currency)
-
-        try:
-            success, response_data = OrderService.refund_order(
-                order=order,
-                amount=refund_amount,
-                reason=validated_data.get("reason", ""),
-                refunded_by=request.user.id
-                if request.user.is_authenticated
-                else None,
-            )
-
-            if not success:
-                return Response(
-                    {
-                        "detail": _("Failed to process refund."),
-                        "error": response_data.get("error"),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            response_data["success"] = True
-            response_data["message"] = _("Refund processed successfully.")
-
-            response_serializer_class = self.get_response_serializer()
-            response_serializer = response_serializer_class(data=response_data)
-            response_serializer.is_valid(raise_exception=True)
-
-            return Response(response_serializer.validated_data)
-
-        except ValueError as e:
-            logger.warning(
-                "Refund validation error for order %s: %s",
-                order.id,
-                e,
-            )
-            return Response(
-                {"detail": _("Unable to process refund for this order.")},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as e:
-            logger.error(
-                "Error processing refund for order %s: %s",
-                order.id,
-                e,
-                exc_info=True,
-            )
-            return Response(
-                {
-                    "detail": _(
-                        "An error occurred while processing the refund."
-                    ),
-                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

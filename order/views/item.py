@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -100,12 +100,11 @@ class OrderItemViewSet(BaseModelViewSet):
         )
 
     def get_object(self):
-        try:
-            obj = super().get_object()
-            self.check_order_permission(obj.order)
-            return obj
-        except OrderItem.DoesNotExist as e:
-            raise NotFound(_("Order item not found.")) from e
+        # No DoesNotExist handler: DRF's generic get_object goes through
+        # get_object_or_404, so a missing row is already an Http404.
+        obj = super().get_object()
+        self.check_order_permission(obj.order)
+        return obj
 
     def check_order_permission(self, order):
         user = self.request.user
@@ -123,11 +122,11 @@ class OrderItemViewSet(BaseModelViewSet):
         # (or staff); otherwise any authenticated user could add items to
         # arbitrary orders by posting a foreign order id.
         self.check_order_permission(serializer.validated_data["order"])
+        # ``price`` is not a writable field on OrderItemWriteSerializer,
+        # so the line price always comes from the product here — a
+        # client cannot name its own price.
         product = serializer.validated_data["product"]
-        if not serializer.validated_data.get("price"):
-            serializer.save(price=product.price)
-        else:
-            serializer.save()
+        serializer.save(price=product.price)
 
     def perform_update(self, serializer):
         # `order` is a writable FK, so an update could reassign the item to a
@@ -175,12 +174,16 @@ class OrderItemViewSet(BaseModelViewSet):
         reason = serializer.validated_data.get("reason", "")
 
         try:
+            # Refund FIRST, then record why. Writing the reason up front
+            # left "Refund reason: ..." on an item whose refund then
+            # failed validation, so the notes claimed a refund that never
+            # happened.
+            refunded_amount = order_item.refund(quantity)
+
             if reason:
                 notes = order_item.notes or ""
                 order_item.notes = f"{notes}\nRefund reason: {reason}".strip()
                 order_item.save(update_fields=["notes"])
-
-            refunded_amount = order_item.refund(quantity)
 
             response_data = {
                 "detail": _("Refund processed successfully."),

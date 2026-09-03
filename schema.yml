@@ -38360,15 +38360,10 @@ components:
         customerNotes:
           type: string
           title: Σημειώσεις Πελάτη
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/OrderItemCreateRequest'
       required:
       - city
       - email
       - firstName
-      - items
       - lastName
       - phone
       - street
@@ -40323,10 +40318,6 @@ components:
         customerNotes:
           type: string
           title: Σημειώσεις Πελάτη
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/OrderItemCreateRequest'
     PatchedPageLayoutRequest:
       type: object
       properties:

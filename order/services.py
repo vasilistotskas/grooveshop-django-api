@@ -46,6 +46,16 @@ logger = logging.getLogger(__name__)
 # Stripe/Viva do NOT guarantee delivery order, so e.g. a delayed
 # ``payment_failed`` event could arrive after a ``charge.refunded`` event
 # that already moved the order to REFUNDED — that must not regress it to FAILED.
+# Statuses for which a courier shipment is still meaningful. Anything
+# else has either not been paid for yet or is already done with its
+# voucher; see handle_payment_succeeded.
+_SHIPMENT_DISPATCHABLE_STATUSES: frozenset[str] = frozenset(
+    {
+        OrderStatus.PENDING,
+        OrderStatus.PROCESSING,
+    }
+)
+
 __all__ = ["OrderService"]
 
 
@@ -1402,8 +1412,18 @@ class OrderService:
                         e,
                         exc_info=True,
                     )
-                    # Don't fail the order creation, just log the error
-                    # The points won't be redeemed if this fails
+                    # Fail loud, like the payment-first path. The offline
+                    # providers (COD, Viva) have no amount guard, so
+                    # swallowing this charged the shopper the undiscounted
+                    # total while the checkout sidebar had shown the
+                    # discount and the points stayed unspent — the exact
+                    # outcome _evaluate_promotions' docstring says a
+                    # refused discount must never produce. Raising rolls
+                    # the whole creation back so the shopper retries and
+                    # sees a price that matches what they are charged.
+                    raise InvalidOrderDataError(
+                        str(_("Loyalty redemption failed."))
+                    ) from e
 
             # Step 6.6: Record promotion redemptions (rows + metadata)
             # for the evaluation done under lock at Step 2.5.
@@ -2873,7 +2893,24 @@ class OrderService:
         # ShippingService.dispatch_create_shipment_task wraps the
         # delay() in transaction.on_commit so the worker only sees the
         # committed row.
-        cls._dispatch_shipment_creation_task(order)
+        #
+        # Only for an order that still has a delivery ahead of it. The
+        # CANCELED early-return above exists because minting a courier
+        # shipment for a dead order is wrong (G0281), and an order that
+        # already SHIPPED, was DELIVERED, RETURNED or REFUNDED is just as
+        # done with its voucher. A duplicate provider success event — a
+        # different event id for the same intent is not caught by the
+        # webhook_processed_{event_id} flag — would otherwise re-enqueue
+        # carrier work against a finished order.
+        if order.status in _SHIPMENT_DISPATCHABLE_STATUSES:
+            cls._dispatch_shipment_creation_task(order)
+        else:
+            logger.info(
+                "Not dispatching shipment creation for order %s: status is "
+                "%s, which has no delivery ahead of it",
+                order.id,
+                order.status,
+            )
 
         publish_payment_status(order)
         logger.info("Order %s marked as paid successfully", order.id)

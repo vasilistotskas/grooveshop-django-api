@@ -1817,6 +1817,28 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
         pay_way__is_online_payment=True,
     )
 
+    # Never auto-cancel an order Viva confirmed a charge for. The webhook
+    # refuses to mark such an order paid when the amount does not match
+    # the total (usually a shopper paying on a stale checkout tab after
+    # the total moved) and stamps AMOUNT_MISMATCH_FLAG instead. Cancelling
+    # it here would close a CHARGED order with refund_payment=False and
+    # email the customer that it was cancelled. It needs a human.
+    from order.views.viva_webhook import AMOUNT_MISMATCH_FLAG  # noqa: PLC0415
+
+    charged = Order.objects.filter(
+        metadata__has_key=AMOUNT_MISMATCH_FLAG
+    ).values_list("id", flat=True)
+    charged_ids = list(charged)
+    if charged_ids:
+        logger.warning(
+            "Skipping auto-cancel for %s order(s) with a confirmed Viva "
+            "charge that did not match the order total: %s",
+            len(charged_ids),
+            charged_ids,
+        )
+        failed_qs = failed_qs.exclude(id__in=charged_ids)
+        pending_qs = pending_qs.exclude(id__in=charged_ids)
+
     canceled_failed = 0
     canceled_pending = 0
     errors = 0

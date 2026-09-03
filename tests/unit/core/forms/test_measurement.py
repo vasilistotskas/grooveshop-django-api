@@ -1,8 +1,13 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django import forms
 from django.test import SimpleTestCase
 from measurement.measures import Distance, Speed, Weight
+
+from unfold.widgets import (
+    UnfoldAdminSelectWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 from core.forms.measurement import MeasurementFormField, MeasurementWidget
 
@@ -54,28 +59,17 @@ class TestMeasurementWidget(SimpleTestCase):
     def setUp(self):
         self.unit_choices = [("kg", "Kilogram"), ("g", "Gram"), ("lb", "Pound")]
 
-    @patch("core.forms.measurement.UNFOLD_AVAILABLE", False)
-    def test_widget_init_without_unfold(self):
+    def test_widget_uses_the_unfold_widgets(self):
+        """django-unfold is the admin theme this project runs on, and a
+        hard dependency — there is no "without unfold" mode. The pair of
+        tests that used to cover both sides of an availability flag went
+        with the flag."""
         widget = MeasurementWidget(unit_choices=self.unit_choices)
 
         self.assertEqual(len(widget.widgets), 2)
-        self.assertIsInstance(widget.widgets[0], forms.TextInput)
-        self.assertIsInstance(widget.widgets[1], forms.Select)
+        self.assertIsInstance(widget.widgets[0], UnfoldAdminTextInputWidget)
+        self.assertIsInstance(widget.widgets[1], UnfoldAdminSelectWidget)
         self.assertEqual(widget.unit_choices, self.unit_choices)
-
-    @patch("core.forms.measurement.UNFOLD_AVAILABLE", True)
-    @patch("core.forms.measurement.UnfoldAdminTextInputWidget")
-    @patch("core.forms.measurement.UnfoldAdminSelectWidget")
-    def test_widget_init_with_unfold(
-        self, mock_select_widget, mock_text_widget
-    ):
-        mock_text_widget.return_value = MagicMock()
-        mock_select_widget.return_value = MagicMock()
-
-        MeasurementWidget(unit_choices=self.unit_choices)
-
-        mock_text_widget.assert_called_once()
-        mock_select_widget.assert_called_once()
 
     def test_widget_init_with_custom_widgets(self):
         custom_float_widget = forms.NumberInput()

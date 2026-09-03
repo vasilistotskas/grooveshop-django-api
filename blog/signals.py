@@ -30,11 +30,12 @@ def reindex_blog_post_translations(sender, instance, **kwargs):
     if settings.MEILISEARCH.get("OFFLINE", False):
         return
 
-    try:
-        from blog.models.post import BlogPostTranslation
-        from meili.tasks import index_document_task
-    except ImportError:
-        return
+    # No import guard: both modules are in this project and celery is a
+    # hard dependency, so the import cannot fail. Swallowing it meant a
+    # real breakage would have silently skipped indexing altogether,
+    # leaving stale documents searchable with nothing logged.
+    from blog.models.post import BlogPostTranslation  # noqa: PLC0415
+    from meili.tasks import index_document_task  # noqa: PLC0415
 
     translation_pks = list(
         BlogPostTranslation.get_meilisearch_queryset()

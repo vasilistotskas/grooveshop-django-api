@@ -18,15 +18,13 @@ class MeiliConfig(AppConfig):
         from ._client import client as _client  # noqa: PLC0415
         from .models import IndexMixin  # noqa: PLC0415
 
-        # Try to import tasks, but don't fail if Celery isn't configured
-        index_document_task = None
-        delete_document_task = None
-        try:
-            from .tasks import index_document_task, delete_document_task  # noqa: PLC0415
-
-            celery_available = True
-        except ImportError:
-            celery_available = False
+        # No import guard: celery is a hard runtime dependency, so this
+        # cannot fail. Guarding it left the app silently indexing
+        # synchronously with no way to tell why.
+        from .tasks import (  # noqa: PLC0415
+            delete_document_task,
+            index_document_task,
+        )
 
         def add_model(**kwargs):
             """Signal handler for indexing documents on save.
@@ -41,11 +39,9 @@ class MeiliConfig(AppConfig):
             if settings.MEILISEARCH.get("OFFLINE", False):
                 return
 
-            # Use async Celery task for non-DEBUG mode if available
+            # Async outside DEBUG, when the setting allows it.
             use_async = (
-                not settings.DEBUG
-                and celery_available
-                and settings.MEILISEARCH["ASYNC_INDEXING"]
+                not settings.DEBUG and settings.MEILISEARCH["ASYNC_INDEXING"]
             )
             if use_async:
 
@@ -132,11 +128,9 @@ class MeiliConfig(AppConfig):
             if settings.MEILISEARCH.get("OFFLINE", False):
                 return
 
-            # Use async Celery task for non-DEBUG mode if available
+            # Async outside DEBUG, when the setting allows it.
             use_async = (
-                not settings.DEBUG
-                and celery_available
-                and settings.MEILISEARCH["ASYNC_INDEXING"]
+                not settings.DEBUG and settings.MEILISEARCH["ASYNC_INDEXING"]
             )
             if use_async:
 

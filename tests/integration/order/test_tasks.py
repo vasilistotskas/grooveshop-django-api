@@ -2,6 +2,7 @@ from datetime import timedelta
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+from django.template import TemplateDoesNotExist
 from django.test import TestCase as DjangoTestCase
 from django.test import override_settings
 from django.utils import timezone
@@ -446,9 +447,12 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
 
         def render_side_effect(template_name, context):
             if "order_delivered" in template_name:
-                raise Exception("Template not found")
-            else:
-                return "Generic email content"
+                # What a missing template actually raises. Raising a bare
+                # Exception here used to pass because the handler caught
+                # everything — which is exactly how a real render bug got
+                # downgraded to the generic copy in silence.
+                raise TemplateDoesNotExist(template_name)
+            return "Generic email content"
 
         mock_render.side_effect = render_side_effect
 
@@ -620,10 +624,17 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
         self.assertTrue(result2)
         self.assertEqual(len(mail.outbox), 1)
 
-    def test_send_invoice_email_without_rendered_pdf_skips(self):
-        """If the PDF is missing (e.g. generation hasn't run yet), the
-        task returns False and releases the flag so a later generation
-        can re-trigger the email."""
+    def test_send_invoice_email_without_rendered_pdf_retries(self):
+        """An invoice row with no PDF is recoverable, so retry first.
+
+        The myDATA path re-renders after the MARK lands, and that
+        re-render deletes the stored PDF before rendering its
+        replacement. If the render fails the only copy is gone, and
+        giving up on the first look left the customer with no invoice
+        and nothing recording that one was owed.
+        """
+        from celery.exceptions import Retry
+
         from order.models.invoice import Invoice, InvoiceCounter
 
         InvoiceCounter.objects.create(year=2026, next_number=1)
@@ -631,10 +642,23 @@ class OrderTasksSimpleTestCase(DjangoTestCase):
             order=self.order, invoice_number="INV-2026-000001"
         )
 
-        result = send_invoice_email(self.order.id)
+        with self.assertRaises(Retry):
+            send_invoice_email(self.order.id)
+
+    def test_send_invoice_email_gives_up_after_its_retries(self):
+        """On the last attempt it releases the flag and logs loudly so an
+        admin can resend by hand."""
+        from order.models.invoice import Invoice, InvoiceCounter
+
+        InvoiceCounter.objects.create(year=2026, next_number=1)
+        Invoice.objects.create(
+            order=self.order, invoice_number="INV-2026-000001"
+        )
+
+        result = send_invoice_email.apply(args=[self.order.id], retries=3).get()
+
         self.assertFalse(result)
         self.order.refresh_from_db()
-        # Flag cleared so a later re-trigger can proceed.
         self.assertFalse(
             (self.order.metadata or {}).get("invoice_email_sent"),
         )

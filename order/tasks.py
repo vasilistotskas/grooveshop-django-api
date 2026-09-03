@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from django.db import connection, transaction
 from django.db.models import F
+from django.template import TemplateDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import strip_tags
@@ -399,8 +400,10 @@ def send_dispute_notification_email(
             html_content = render_to_string(
                 "emails/order/dispute_notification.html", context
             )
-        except Exception:
-            # Fallback plain-text if template not yet authored
+        except TemplateDoesNotExist:
+            # ONLY a missing template. Both dispute templates exist, so
+            # catching every exception here could only mask a real render
+            # bug behind an inline plain-text body nobody would notice.
             text_content = (
                 f"A Stripe dispute has been opened for Order #{order_id}.\n"
                 f"Dispute ID: {dispute_id}\n"
@@ -748,12 +751,24 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             "user", "country", "region", "pay_way"
         ).get(id=order_id)
 
+        # The label must resolve INSIDE the override below.
+        # get_FOO_display() calls force_str(..., strings_only=True) on the
+        # choice label, and a gettext_lazy proxy is not a protected type —
+        # so it resolved eagerly here, under whatever locale the worker
+        # last left active, and a German customer got a German email with
+        # a Greek status word. PaymentStatus labels are lazy, so passing
+        # the proxy through lets the render resolve it. Its sibling
+        # send_order_status_update_email already does exactly this with
+        # OrderStatus(status).label.
+        status_label = (
+            PaymentStatus(order.payment_status).label
+            if order.payment_status
+            else PaymentStatus.REFUNDED.label
+        )
         context = build_email_context(
             order=order,
             status="REFUNDED",
-            status_display=order.get_payment_status_display()
-            if order.payment_status
-            else "Refunded",
+            status_display=status_label,
             items=order.items.all(),
         )
 
@@ -914,7 +929,12 @@ def send_order_status_update_email(
                 html_content = render_to_string(
                     f"{template_base}.html", context
                 )
-            except Exception:
+            except TemplateDoesNotExist:
+                # ONLY a missing template. Catching everything meant a
+                # real render bug in a status template — a bad tag, a
+                # missing context key — silently downgraded the customer
+                # to the generic copy, and nothing ever surfaced that the
+                # specific template was broken.
                 logger.warning(
                     f"Template {template_base} not found, using generic template",
                     extra={"order_id": order_id, "status": status},
@@ -1314,12 +1334,26 @@ def send_invoice_email(self, order_id: int) -> bool:
         ).get(id=order_id)
         invoice = getattr(order, "invoice", None)
         if invoice is None or not invoice.has_document():
-            # No PDF to attach — release the flag so a later generation
-            # can trigger the email.
+            # An invoice row with no PDF is recoverable, so retry rather
+            # than give up on the first look. The myDATA path re-renders
+            # after the MARK lands, and that re-render DELETES the stored
+            # PDF before rendering the replacement — if the render then
+            # fails, the only copy is gone and this task used to release
+            # the flag and return, leaving the customer with no invoice
+            # and nothing recording that one was owed.
+            if invoice is not None and self.request.retries < self.max_retries:
+                logger.warning(
+                    "Invoice PDF for order #%s is not ready — retrying",
+                    order_id,
+                )
+                raise self.retry(countdown=self.default_retry_delay)
+
             _release_invoice_email(order_id)
-            logger.warning(
-                "Invoice email skipped for order #%s — PDF not ready",
+            logger.error(
+                "Invoice email abandoned for order #%s — no PDF after %s "
+                "attempt(s); the invoice needs regenerating by hand",
                 order_id,
+                self.request.retries + 1,
             )
             return False
 
@@ -1650,11 +1684,21 @@ def check_pending_orders() -> int:
     # "complete your order" for those is wrong-audience (prod orders
     # 31/36/38/39 received exactly that in April 2026 while stuck on
     # a failed ACS mint).
-    pending_orders = Order.objects.filter(
-        status=OrderStatus.PENDING,
-        created_at__lt=one_day_ago,
-        reminder_count__lt=max_reminders,
-        pay_way__is_online_payment=True,
+    # Annotated and eager-loaded: the reminder template prints
+    # ``order.total_price``, and Order.total_price_items falls back to an
+    # aggregate query whenever the items_total annotation is absent —
+    # once per order, plus a user dereference for the language. On a
+    # daily sweep over a few hundred stale orders that is thousands of
+    # queries, each swallowed by the per-order try/except.
+    pending_orders = (
+        Order.objects.filter(
+            status=OrderStatus.PENDING,
+            created_at__lt=one_day_ago,
+            reminder_count__lt=max_reminders,
+            pay_way__is_online_payment=True,
+        )
+        .select_related("user", "pay_way")
+        .with_total_amounts()
     )
 
     count = 0

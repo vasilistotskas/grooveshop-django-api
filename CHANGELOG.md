@@ -3,6 +3,33 @@
 
 
 
+## v3.27.5 (2026-09-03)
+
+### Bug fixes
+
+* fix(shipping_acs): link only the vouchers ACS put on the manifest
+
+ACS scopes a pickup list by Pickup_Date, so vouchers minted on earlier
+days are not covered by today's list. On 2026-09-02 it listed 2 of the 9
+candidates. Phase 3 attached every candidate to the returned
+PickupList_No regardless, which would have filed seven parcels under a
+manifest the courier never received them on — and, worse, hidden them
+from the next run, the one that could still get them collected.
+
+Ask ACS_Pickup_List_Display_Voucher which vouchers the manifest actually
+carries and link only those, warning about the ones left behind so they
+are visible rather than silently absorbed. An unreadable membership
+response is treated as unknown, not empty, and falls back to the old
+link-everything behaviour with a warning: a transient failure must not
+leave a real manifest with nothing attached.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H6QHvSZHY35xi5VEvr5Au5 ([`5c0bfd8`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5c0bfd80010ae8cc120888bf088e454b3ccb17b4))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.27.4 [skip ci] ([`6830065`](https://github.com/vasilistotskas/grooveshop-django-api/commit/68300652dfdeb42d5c68f37827f42a439b449b71))
+
 ## v3.27.4 (2026-09-02)
 
 ### Bug fixes

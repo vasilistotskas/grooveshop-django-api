@@ -1409,12 +1409,54 @@ class UpdateStatusSerializer(serializers.Serializer):
 
 
 class CreatePaymentIntentRequestSerializer(serializers.Serializer):
+    """Request body for ``create_payment_intent`` and ``retry_payment``.
+
+    The three named fields are declared because both views read them off
+    ``validated_data`` — undeclared, DRF dropped them and the branches
+    that copy them into ``payment_data`` could never fire.
+    """
+
     payment_data = serializers.DictField(
         required=False,
         default=dict,
         child=serializers.CharField(max_length=500),
         help_text=_("Additional payment data required by the payment provider"),
     )
+    payment_method_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=255,
+        help_text=_("Provider payment-method id to charge"),
+    )
+    customer_id = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=255,
+        help_text=_("Provider customer id to attach the payment to"),
+    )
+    return_url = serializers.URLField(
+        required=False,
+        allow_blank=True,
+        max_length=500,
+        help_text=_("Where the provider should send the shopper back to"),
+    )
+
+    # ``payment_data`` is splatted into PayWayService.process_payment as
+    # keyword arguments, so a key that collides with one of the call's own
+    # parameters raised TypeError and surfaced as a 500 on a payment
+    # endpoint. Reject those by name instead.
+    RESERVED_PAYMENT_DATA_KEYS = frozenset(
+        {"pay_way", "order", "amount", "order_id"}
+    )
+
+    def validate_payment_data(self, value):
+        clashes = sorted(self.RESERVED_PAYMENT_DATA_KEYS & set(value))
+        if clashes:
+            raise serializers.ValidationError(
+                _("These keys are reserved and cannot be sent: %(keys)s")
+                % {"keys": ", ".join(clashes)}
+            )
+        return value
 
 
 class CreatePaymentIntentResponseSerializer(serializers.Serializer):

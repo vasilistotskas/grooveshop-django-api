@@ -448,6 +448,11 @@ REST_FRAMEWORK = {
         "payment_anon": None if DEBUG else "5/minute",
         "cart_mutation": None if DEBUG else "60/minute",
         "cart_mutation_anon": None if DEBUG else "30/minute",
+        # Order creation moves stock, can mint a courier voucher and can
+        # open a provider payment session — and guest checkout means the
+        # anonymous budget is the one that matters.
+        "order_create": None if DEBUG else "20/minute",
+        "order_create_anon": None if DEBUG else "10/minute",
         # Coupon apply is a code-guessing oracle — keep the budget tight.
         "coupon_apply": None if DEBUG else "10/minute",
         # Gift-card balance check exposes a bearer secret's validity.

@@ -10,6 +10,7 @@ from django.http import FileResponse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
@@ -35,6 +36,8 @@ from core.api.permissions import (
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
+    OrderCreateAnonThrottle,
+    OrderCreateThrottle,
     PaymentAttemptAnonThrottle,
     PaymentAttemptThrottle,
     VivaReturnThrottle,
@@ -250,9 +253,10 @@ serializers_config: SerializersConfig = {
         summary=_("Download the BoxNow parcel label PDF for an order"),
         description=_(
             "Streams the BoxNow label PDF through Django auth. "
-            "Accessible by the order owner, staff, or a guest with the "
-            "order UUID. Returns 404 when no BoxNow shipment exists for "
-            "the order or the parcel ID has not yet been assigned."
+            "Accessible by the order owner or store staff; guest "
+            "orders cannot download labels. Returns 404 when no BoxNow "
+            "shipment exists for the order or the parcel ID has not yet "
+            "been assigned."
         ),
         tags=["Orders"],
     ),
@@ -270,14 +274,18 @@ serializers_config: SerializersConfig = {
         summary=_("Download the ACS voucher label PDF for an order"),
         description=_(
             "Streams the ACS label PDF through Django auth. "
-            "Accessible by the order owner, staff, or a guest with the "
-            "order UUID. Returns 404 when no ACS shipment exists for "
-            "the order or the voucher has not been minted yet."
+            "Accessible by the order owner or store staff; guest orders "
+            "cannot download labels. Returns 404 when no ACS shipment "
+            "exists for the order or the voucher has not been minted yet."
         ),
         tags=["Orders"],
     ),
     "shipment_label": ActionConfig(
-        response=OrderDetailSerializer,
+        # Streams application/pdf. Declaring OrderDetailSerializer here
+        # put a JSON 200 in schema.yml, so the generated storefront
+        # client expected a body it never receives. The two carrier
+        # specific label actions declare no response for the same reason.
+        responses={200: OpenApiTypes.BINARY},
         operation_id="getShipmentLabelForOrder",
         summary=_("Download the carrier label PDF for an order"),
         description=_(
@@ -583,6 +591,19 @@ class OrderViewSet(BaseModelViewSet):
                     ]
                 }
             )
+
+    def get_throttles(self):
+        # Guest checkout is AllowAny, and creating an order moves stock,
+        # can mint a courier voucher and can open a provider payment
+        # session. The global anon/user budgets are day-scale ceilings
+        # and do not bound a burst, so this action carries its own.
+        if self.action == "create":
+            return [
+                OrderCreateThrottle(),
+                OrderCreateAnonThrottle(),
+                *super().get_throttles(),
+            ]
+        return super().get_throttles()
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):

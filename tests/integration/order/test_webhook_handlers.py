@@ -688,6 +688,47 @@ class TestHandleStripeCheckoutCompleted:
         }
         return event
 
+    def test_processing_error_propagates(self):
+        """A processing error must PROPAGATE out of this receiver (G0231).
+
+        It runs inside dj-stripe's webhook atomic block. Swallowing the
+        error let dj-stripe commit the Event row for a session the
+        customer had already paid: the mutations roll back to their
+        savepoint, Stripe's redelivery early-returns on the existing
+        event id, and the charged order sits at PENDING until
+        auto_cancel_stuck_pending_orders cancels it with no refund.
+        """
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PENDING,
+            metadata={},
+        )
+
+        with (
+            patch(
+                "shipping.services.ShippingService."
+                "dispatch_create_shipment_task",
+                side_effect=Exception("carrier adapter missing"),
+            ),
+            patch(
+                "order.signals.handlers.send_order_confirmation_email.apply_async"
+            ),
+            pytest.raises(Exception, match="carrier adapter missing"),
+        ):
+            handle_stripe_checkout_completed(
+                sender=None, event=self._checkout_event(order.id)
+            )
+
+    def test_malformed_payload_is_dropped_not_retried(self):
+        """A redelivery carries the same bad body, so spinning on it is
+        pointless — this one case is logged and dropped."""
+        event = Mock(spec=Event)
+        event.id = "evt_cs_bad"
+        event.type = "checkout.session.completed"
+        event.data = {}
+
+        handle_stripe_checkout_completed(sender=None, event=event)
+
     def test_paid_checkout_dispatches_shipment(self):
         order = OrderFactory(
             status=OrderStatus.PENDING,

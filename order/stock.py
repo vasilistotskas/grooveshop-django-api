@@ -593,14 +593,27 @@ class StockManager:
         locked._change_reason = "StockManager: adjust_stock"
         locked.save(update_fields=["stock", "updated_at"])
 
+        # Log what MOVED, not what was asked for. The floor above can
+        # make those differ (2 on the shelf, delta -5, stock lands on 0
+        # having moved 2), and the log is read back as fact:
+        # ``cancel_order`` restores an order by summing its
+        # ``quantity_delta`` rows, so recording -5 there would put three
+        # units on the shelf that never left it. Keeping
+        # ``stock_before + quantity_delta == stock_after`` true is the
+        # whole point of an audit row.
+        applied = locked.stock - stock_before
         StockLog.objects.create(
             product=locked,
             order_id=order_id,
             operation_type=operation_type,
-            quantity_delta=delta,
+            quantity_delta=applied,
             stock_before=stock_before,
             stock_after=locked.stock,
-            reason=reason,
+            reason=(
+                reason
+                if applied == delta
+                else f"{reason} (requested {delta}, floored at 0)"
+            ),
             performed_by=performed_by,
         )
 

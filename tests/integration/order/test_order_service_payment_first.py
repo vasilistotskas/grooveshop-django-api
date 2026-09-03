@@ -731,3 +731,79 @@ class TestCancelOrderWithStockManager:
         # Verify reservation was released
         reservation.refresh_from_db()
         assert reservation.consumed is True  # Marked as consumed (released)
+
+
+@pytest.mark.django_db
+class TestAdjustStockAuditRow:
+    """``StockLog`` is read back as fact — ``cancel_order`` restores an
+    order by summing its rows — so a row must record what MOVED."""
+
+    def test_a_floored_decrement_logs_only_what_moved(self):
+        from order.models import StockLog
+        from order.stock import StockManager
+        from product.factories import ProductFactory
+
+        product = ProductFactory(stock=2)
+
+        StockManager.adjust_stock(
+            product=product, delta=-5, reason="oversized correction"
+        )
+
+        product.refresh_from_db()
+        log = StockLog.objects.filter(product=product).latest("id")
+        assert product.stock == 0
+        assert log.quantity_delta == -2, (
+            "logging the requested -5 would let a later restore invent "
+            "three units that never left the shelf"
+        )
+        assert log.stock_before + log.quantity_delta == log.stock_after
+        assert "floored" in log.reason
+
+    def test_an_unfloored_adjustment_is_logged_verbatim(self):
+        from order.models import StockLog
+        from order.stock import StockManager
+        from product.factories import ProductFactory
+
+        product = ProductFactory(stock=10)
+
+        StockManager.adjust_stock(
+            product=product, delta=-3, reason="admin order item edit"
+        )
+
+        log = StockLog.objects.filter(product=product).latest("id")
+        assert log.quantity_delta == -3
+        assert log.reason == "admin order item edit"
+        assert log.stock_before + log.quantity_delta == log.stock_after
+
+    def test_a_floored_decrement_cannot_inflate_stock_on_cancel(self):
+        """The two defects compose: an over-large admin edit followed by
+        a cancellation."""
+        from order.factories import OrderFactory
+        from order.models import OrderItem
+        from order.stock import StockManager
+        from product.factories import ProductFactory
+
+        product = ProductFactory(stock=2)
+        order = OrderFactory(status=OrderStatus.PENDING, num_order_items=0)
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            quantity=5,
+            price=product.price,
+            sort_order=1,
+        )
+        StockManager.adjust_stock(
+            product=product,
+            delta=-5,
+            reason="admin order item edit",
+            order_id=order.id,
+        )
+        product.refresh_from_db()
+        assert product.stock == 0
+
+        OrderService.cancel_order(
+            order=order, reason="Customer request", refund_payment=False
+        )
+
+        product.refresh_from_db()
+        assert product.stock == 2, "cancel restored stock that never moved"

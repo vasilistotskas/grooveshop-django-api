@@ -1378,7 +1378,20 @@ def handle_stripe_dispute_created(sender, **kwargs):
 @djstripe_receiver("checkout.session.completed")
 @with_tenant_schema_from_event
 def handle_stripe_checkout_completed(sender, **kwargs):
-    """Handle Stripe checkout session completion webhook."""
+    """Handle Stripe checkout session completion webhook.
+
+    This receiver runs inside dj-stripe's webhook ``transaction.atomic``
+    block, so processing errors must PROPAGATE (G0231), exactly as in
+    ``handle_stripe_payment_succeeded``. Swallowing them let dj-stripe
+    commit the ``Event`` row for a session the customer had already paid
+    for: the mutations here roll back to their savepoint, Stripe's
+    redelivery early-returns on the existing event id, and the order sits
+    at PENDING until ``auto_cancel_stuck_pending_orders`` cancels it a day
+    later with no refund and no alert. The sibling
+    ``payment_intent.succeeded`` event is not a safety net — it resolves
+    the order by ``payment_id``, which only ``mark_as_paid`` writes, inside
+    the block that rolled back.
+    """
     logger.debug("Processing checkout.session.completed webhook")
 
     try:
@@ -1388,161 +1401,163 @@ def handle_stripe_checkout_completed(sender, **kwargs):
         payment_intent_id = session_data.get("payment_intent")
         payment_status = session_data.get("payment_status")
         event_id = event.id
+    except (KeyError, TypeError) as e:
+        # Malformed payload — a redelivery carries the same bad body, so
+        # propagating would only spin. Drop it, like the sibling handler.
+        logger.error(
+            "Malformed checkout.session.completed payload: %s",
+            e,
+            exc_info=True,
+        )
+        return
 
-        logger.info("Checkout session completed: %s", session_id)
+    logger.info("Checkout session completed: %s", session_id)
 
-        order_id = session_data.get("metadata", {}).get("order_id")
+    order_id = session_data.get("metadata", {}).get("order_id")
 
-        if not order_id:
-            logger.warning("No order_id in session metadata: %s", session_id)
+    if not order_id:
+        logger.warning("No order_id in session metadata: %s", session_id)
+        return
+
+    # Atomic idempotency check-and-mark with row lock, then perform all
+    # state mutations inside the same transaction to prevent double-save
+    # and parallel duplicate processing.
+    with transaction.atomic():
+        try:
+            order = Order.objects.select_for_update().get(id=order_id)
+        except Order.DoesNotExist:
+            logger.error(
+                "Order %s not found for session %s", order_id, session_id
+            )
             return
 
-        # Atomic idempotency check-and-mark with row lock, then perform all
-        # state mutations inside the same transaction to prevent double-save
-        # and parallel duplicate processing.
-        with transaction.atomic():
-            try:
-                order = Order.objects.select_for_update().get(id=order_id)
-            except Order.DoesNotExist:
-                logger.error(
-                    "Order %s not found for session %s", order_id, session_id
+        if order.metadata and order.metadata.get(
+            f"webhook_processed_{event_id}"
+        ):
+            logger.info(
+                "Webhook %s already processed for order %s, skipping",
+                event_id,
+                order.id,
+            )
+            return
+
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[f"webhook_processed_{event_id}"] = True
+
+        if payment_status == "paid" and payment_intent_id:
+            from order.payment_events import publish_payment_status
+            from shipping.services import ShippingService
+
+            # Settled-state guard: Stripe does not guarantee event
+            # delivery order, so a delayed checkout.session.completed
+            # must never un-refund / un-cancel an order that already
+            # reached a settled financial state. Mirrors
+            # OrderService.handle_payment_succeeded.
+            if order.payment_status in {
+                PaymentStatus.REFUNDED,
+                PaymentStatus.PARTIALLY_REFUNDED,
+                PaymentStatus.CANCELED,
+            }:
+                logger.warning(
+                    "Ignoring checkout.session.completed for order %s: "
+                    "payment_status already %s",
+                    order.id,
+                    order.payment_status,
                 )
+                # Persist the webhook_processed flag set above so a
+                # Stripe redelivery short-circuits on the idempotency
+                # check instead of re-running this guard (harmless, but
+                # avoids duplicate warning logs on every retry).
+                order.save(update_fields=["metadata"])
                 return
 
-            if order.metadata and order.metadata.get(
-                f"webhook_processed_{event_id}"
-            ):
-                logger.info(
-                    "Webhook %s already processed for order %s, skipping",
-                    event_id,
+            order.mark_as_paid(
+                payment_id=payment_intent_id, payment_method="stripe"
+            )
+
+            order.metadata["stripe_checkout_session_id"] = session_id
+            order.metadata["stripe_payment_intent_id"] = payment_intent_id
+            order.save(update_fields=["metadata"])
+
+            OrderHistory.log_payment_update(
+                order=order,
+                previous_value={"payment_status": "pending"},
+                new_value={
+                    "payment_status": "completed",
+                    "payment_id": payment_intent_id,
+                    "checkout_session_id": session_id,
+                },
+            )
+
+            if order.status == OrderStatus.CANCELED:
+                # Payment landed for an already-CANCELED order (the
+                # customer cancelled before the webhook, or the two
+                # raced). Record the receipt for reconciliation and
+                # page staff (ERROR is the monitored channel) for a
+                # manual refund — but do NOT advance status or mint a
+                # shipment for a cancelled order. Mirrors
+                # handle_payment_succeeded (G0281).
+                order.metadata["payment_after_cancel"] = {
+                    "payment_id": payment_intent_id,
+                    "recorded_at": timezone.now().isoformat(),
+                }
+                order.save(update_fields=["metadata"])
+                logger.error(
+                    "Payment %s received via checkout session for "
+                    "CANCELED order %s — manual refund required; NOT "
+                    "dispatching shipment creation",
+                    payment_intent_id,
                     order.id,
                 )
+                publish_payment_status(order)
                 return
 
-            if not order.metadata:
-                order.metadata = {}
-            order.metadata[f"webhook_processed_{event_id}"] = True
+            if order.status == OrderStatus.PENDING:
+                OrderService.update_order_status(order, OrderStatus.PROCESSING)
 
-            if payment_status == "paid" and payment_intent_id:
-                from order.payment_events import publish_payment_status
-                from shipping.services import ShippingService
+            # Stripe's guidance is to fulfil hosted Checkout Sessions on
+            # checkout.session.completed (not payment_intent.succeeded).
+            # Dispatch the courier task here so a Stripe-Checkout order
+            # isn't left paid-but-never-shipped when the PaymentIntent
+            # event's payment_id lookup races/misses. Idempotent on the
+            # shipment row; wrapped in on_commit by ShippingService.
+            ShippingService.dispatch_create_shipment_task(order)
 
-                # Settled-state guard: Stripe does not guarantee event
-                # delivery order, so a delayed checkout.session.completed
-                # must never un-refund / un-cancel an order that already
-                # reached a settled financial state. Mirrors
-                # OrderService.handle_payment_succeeded.
-                if order.payment_status in {
-                    PaymentStatus.REFUNDED,
-                    PaymentStatus.PARTIALLY_REFUNDED,
-                    PaymentStatus.CANCELED,
-                }:
-                    logger.warning(
-                        "Ignoring checkout.session.completed for order %s: "
-                        "payment_status already %s",
-                        order.id,
-                        order.payment_status,
-                    )
-                    # Persist the webhook_processed flag set above so a
-                    # Stripe redelivery short-circuits on the idempotency
-                    # check instead of re-running this guard (harmless, but
-                    # avoids duplicate warning logs on every retry).
-                    order.save(update_fields=["metadata"])
-                    return
+            publish_payment_status(order)
 
-                order.mark_as_paid(
-                    payment_id=payment_intent_id, payment_method="stripe"
-                )
+            logger.info(
+                "Order %s marked as paid via checkout session %s",
+                order_id,
+                session_id,
+            )
 
-                order.metadata["stripe_checkout_session_id"] = session_id
-                order.metadata["stripe_payment_intent_id"] = payment_intent_id
-                order.save(update_fields=["metadata"])
-
-                OrderHistory.log_payment_update(
-                    order=order,
-                    previous_value={"payment_status": "pending"},
-                    new_value={
-                        "payment_status": "completed",
-                        "payment_id": payment_intent_id,
-                        "checkout_session_id": session_id,
-                    },
-                )
-
-                if order.status == OrderStatus.CANCELED:
-                    # Payment landed for an already-CANCELED order (the
-                    # customer cancelled before the webhook, or the two
-                    # raced). Record the receipt for reconciliation and
-                    # page staff (ERROR is the monitored channel) for a
-                    # manual refund — but do NOT advance status or mint a
-                    # shipment for a cancelled order. Mirrors
-                    # handle_payment_succeeded (G0281).
-                    order.metadata["payment_after_cancel"] = {
-                        "payment_id": payment_intent_id,
-                        "recorded_at": timezone.now().isoformat(),
-                    }
-                    order.save(update_fields=["metadata"])
-                    logger.error(
-                        "Payment %s received via checkout session for "
-                        "CANCELED order %s — manual refund required; NOT "
-                        "dispatching shipment creation",
-                        payment_intent_id,
-                        order.id,
-                    )
-                    publish_payment_status(order)
-                    return
-
-                if order.status == OrderStatus.PENDING:
-                    OrderService.update_order_status(
-                        order, OrderStatus.PROCESSING
-                    )
-
-                # Stripe's guidance is to fulfil hosted Checkout Sessions on
-                # checkout.session.completed (not payment_intent.succeeded).
-                # Dispatch the courier task here so a Stripe-Checkout order
-                # isn't left paid-but-never-shipped when the PaymentIntent
-                # event's payment_id lookup races/misses. Idempotent on the
-                # shipment row; wrapped in on_commit by ShippingService.
-                ShippingService.dispatch_create_shipment_task(order)
-
-                publish_payment_status(order)
-
-                logger.info(
-                    "Order %s marked as paid via checkout session %s",
-                    order_id,
-                    session_id,
-                )
-
-                # Payment confirmed via Stripe Checkout — send the
-                # confirmation email now (idempotent).
-                # ``_schema`` captured at lambda-build time; see C1 in
-                # MULTI_TENANT_AUDIT.md.
-                _schema = connection.schema_name
-                transaction.on_commit(
-                    lambda oid=order.id, s=_schema: (
-                        send_order_confirmation_email.apply_async(
-                            args=[oid], headers={"_schema_name": s}
-                        )
+            # Payment confirmed via Stripe Checkout — send the
+            # confirmation email now (idempotent).
+            # ``_schema`` captured at lambda-build time; see C1 in
+            # MULTI_TENANT_AUDIT.md.
+            _schema = connection.schema_name
+            transaction.on_commit(
+                lambda oid=order.id, s=_schema: (
+                    send_order_confirmation_email.apply_async(
+                        args=[oid], headers={"_schema_name": s}
                     )
                 )
+            )
 
-            elif payment_status == "unpaid":
-                order.payment_status = PaymentStatus.PENDING
-                order.save(update_fields=["payment_status", "metadata"])
+        elif payment_status == "unpaid":
+            order.payment_status = PaymentStatus.PENDING
+            order.save(update_fields=["payment_status", "metadata"])
 
-                OrderHistory.log_note(
-                    order=order,
-                    note=f"Checkout session completed but payment is unpaid: {session_id}",
-                )
+            OrderHistory.log_note(
+                order=order,
+                note=f"Checkout session completed but payment is unpaid: {session_id}",
+            )
 
-                logger.warning(
-                    "Checkout session completed but payment is unpaid: %s",
-                    session_id,
-                )
-
-    except Exception as e:
-        logger.error(
-            "Error handling checkout.session.completed: %s", e, exc_info=True
-        )
+            logger.warning(
+                "Checkout session completed but payment is unpaid: %s",
+                session_id,
+            )
 
 
 @djstripe_receiver("checkout.session.expired")

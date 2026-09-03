@@ -1056,12 +1056,36 @@ def _handle_payment_created(order, event_data, transaction_id):
     verified_amount_raw = (
         verified_data.get("amount") if isinstance(verified_data, dict) else None
     )
+    # Currency first: an amount only means something once we know it is
+    # denominated in the order's currency. Viva reports ISO 4217 in its
+    # NUMERIC form ("978"); the provider normalises that to the
+    # alphabetic code, so this compares like with like.
+    order_total = order.calculate_order_total_amount()
+    verified_currency = (
+        verified_data.get("currency")
+        if isinstance(verified_data, dict)
+        else None
+    )
+    if verified_currency and verified_currency != order_total.currency.code:
+        logger.error(
+            "Viva transaction %s is in %s but order %s is in %s — refusing "
+            "to mark as paid",
+            transaction_id,
+            verified_currency,
+            order.id,
+            order_total.currency.code,
+        )
+        _flag_amount_mismatch(
+            order, transaction_id, verified_currency, order_total.currency.code
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+
     if verified_amount_raw is not None:
         try:
             from decimal import Decimal  # noqa: PLC0415
 
             verified_amount = Decimal(str(verified_amount_raw))
-            expected_amount = order.calculate_order_total_amount().amount
+            expected_amount = order_total.amount
             # Allow a 1-cent tolerance for any provider-side rounding.
             if abs(verified_amount - expected_amount) > Decimal("0.01"):
                 logger.error(

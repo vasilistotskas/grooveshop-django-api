@@ -154,3 +154,62 @@ class TestChargedOrderIsNotAutoCancelled:
 
         order.refresh_from_db()
         assert order.status == OrderStatus.CANCELED
+
+
+class TestCurrencyIsCompared:
+    """Viva reports ISO 4217 in NUMERIC form ("978"); the order stores the
+    alphabetic code. Until the provider normalised that, the two could not
+    be compared at all, so a charge in the wrong currency was matched on
+    its number alone."""
+
+    def test_a_charge_in_another_currency_does_not_settle_the_order(self):
+        order = _order()
+        expected = order.calculate_order_total_amount().amount
+
+        provider = patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(
+                PaymentStatus.COMPLETED,
+                {"amount": str(expected), "currency": "USD"},
+            ),
+        )
+        with provider:
+            outcome = _handle_payment_created(
+                order, {"StatusId": "F"}, "txn-usd"
+            )
+
+        order.refresh_from_db()
+        assert outcome == VivaWebhookEvent.OUTCOME_SKIPPED
+        assert order.payment_status == PaymentStatus.PENDING
+        assert AMOUNT_MISMATCH_FLAG in order.metadata
+
+    def test_the_orders_own_currency_settles(self):
+        order = _order()
+        expected = order.calculate_order_total_amount()
+
+        provider = patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(
+                PaymentStatus.COMPLETED,
+                {
+                    "amount": str(expected.amount),
+                    "currency": expected.currency.code,
+                },
+            ),
+        )
+        with provider:
+            _handle_payment_created(order, {"StatusId": "F"}, "txn-eur")
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.COMPLETED
+
+
+def test_viva_numeric_currency_codes_normalise():
+    """Grounded in docs/viva-payment-api.yaml: Retrieve Transaction
+    returns ``currencyCode: "978"``."""
+    from order.payment import _alpha_currency
+
+    assert _alpha_currency("978") == "EUR"
+    assert _alpha_currency("840") == "USD"
+    assert _alpha_currency("EUR") == "EUR"
+    assert _alpha_currency(None) is None

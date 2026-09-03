@@ -1600,9 +1600,10 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             # The same settled-state guard the "paid" arm carries, and
             # here it includes COMPLETED: writing PENDING over ANY
             # settled state is a regression. Stripe retries a failed
-            # delivery for up to three days, which is long enough for
-            # auto_cancel_stuck_pending_orders to cancel the order first
-            # — the late retry would then put a cancelled order back to
+            # delivery 24 times — one attempt plus 23 hourly retries
+            # until a 2xx — which reaches as far as
+            # auto_cancel_stuck_pending_orders' own 24h default. A late
+            # retry would otherwise put a cancelled order back to
             # "awaiting payment" and let the checkout endpoints open a
             # fresh provider session for it.
             if order.payment_status in SETTLED_PAYMENT_STATUSES:

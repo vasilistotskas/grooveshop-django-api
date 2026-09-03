@@ -5,6 +5,7 @@ from typing import Any
 import stripe
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+import moneyed
 from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
@@ -568,6 +569,35 @@ class StripePaymentProvider(PaymentProvider):
             return PaymentStatus.FAILED, {"error": str(e)}
 
 
+_ISO_NUMERIC_TO_ALPHA: dict[str, str] = {
+    numeric: currency.code
+    for currency in moneyed.CURRENCIES.values()
+    if (numeric := getattr(currency, "numeric", None))
+}
+
+
+def _alpha_currency(reported: str | None) -> str | None:
+    """Normalise Viva's currency code to the alphabetic form we store.
+
+    Viva reports ISO 4217 in its NUMERIC form as a string — ``"978"`` for
+    the euro (see ``docs/viva-payment-api.yaml``, Retrieve Transaction).
+    Everything on our side is alphabetic, so returning Viva's value raw
+    meant the field held two different vocabularies depending on the
+    call, and nothing could compare it. The table comes from the money
+    library's own ISO data rather than a hand-written map.
+
+    Returns ``None`` when the code is absent or unknown: a currency we
+    cannot name is not a currency we should silently assume is the
+    shop's own.
+    """
+    if not reported:
+        return None
+    code = str(reported).strip()
+    if code.isdigit():
+        return _ISO_NUMERIC_TO_ALPHA.get(code.zfill(3))
+    return code.upper() or None
+
+
 class VivaWalletPaymentProvider(PaymentProvider):
     DEMO_AUTH_URL = "https://demo-accounts.vivapayments.com/connect/token"
     LIVE_AUTH_URL = "https://accounts.vivapayments.com/connect/token"
@@ -898,7 +928,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "raw_status": status_id,
                 "provider": "viva_wallet",
                 "amount": data.get("amount"),
-                "currency": data.get("currencyCode", "EUR"),
+                "currency": _alpha_currency(data.get("currencyCode")),
                 "order_code": data.get("orderCode"),
                 "created": data.get("insDate"),
             }

@@ -49,6 +49,11 @@ logger = logging.getLogger(__name__)
 # Statuses for which a courier shipment is still meaningful. Anything
 # else has either not been paid for yet or is already done with its
 # voucher; see handle_payment_succeeded.
+# Online providers that settle by redirecting the shopper off-site: the
+# order is created BEFORE any money moves, so a partial deduction is not
+# the client error it is for the intent-first providers.
+_REDIRECT_PROVIDER_CODES: frozenset[str] = frozenset({"viva_wallet"})
+
 _SHIPMENT_DISPATCHABLE_STATUSES: frozenset[str] = frozenset(
     {
         OrderStatus.PENDING,
@@ -254,6 +259,10 @@ class OrderService:
                     quantity=gift.quantity,
                     order_id=order.id,
                     reason="promotion_gift",
+                    # Same rule as the paid-line shortfall below (G0284):
+                    # a free gift must not be taken out of stock another
+                    # session is actively holding.
+                    respect_reservations=True,
                 )
             except Exception as exc:
                 logger.warning(
@@ -1489,9 +1498,10 @@ class OrderService:
                     payment_id=settle_id,
                     payment_method=settle_method,
                 )
-            elif pay_way.is_online_payment and pay_way.provider_code not in {
-                "viva_wallet"
-            }:
+            elif (
+                pay_way.is_online_payment
+                and pay_way.provider_code not in _REDIRECT_PROVIDER_CODES
+            ):
                 if gift_card_codes:
                     raise InvalidGiftCardError(
                         reason="gift_card_insufficient",
@@ -1798,90 +1808,83 @@ class OrderService:
         SHIPPED → RETURNED must not tell the customer "your order is on
         the way" moments before the return notification.
         """
-        try:
-            if not new_status:
-                raise ValueError("New status cannot be empty")
+        if not new_status:
+            raise ValueError("New status cannot be empty")
 
-            # Lock + re-read the CURRENT status so concurrent transitions
-            # serialize and validate against the committed row, not the
-            # caller's stale snapshot (G0285). Sync the caller's object to
-            # the committed status so callers that read ``order`` after this
-            # (rather than the returned instance) stay consistent.
-            current_status = (
-                Order.objects.select_for_update()
-                .values_list("status", flat=True)
-                .get(pk=order.pk)
-            )
-            order.status = current_status
+        # Lock + re-read the CURRENT status so concurrent transitions
+        # serialize and validate against the committed row, not the
+        # caller's stale snapshot (G0285). Sync the caller's object to
+        # the committed status so callers that read ``order`` after this
+        # (rather than the returned instance) stay consistent.
+        current_status = (
+            Order.objects.select_for_update()
+            .values_list("status", flat=True)
+            .get(pk=order.pk)
+        )
+        order.status = current_status
 
-            if order.status == new_status:
-                logger.info(
-                    "Order %s status is already %s", order.id, new_status
-                )
-                return order
-
-            allowed_transitions = {
-                OrderStatus.PENDING: [
-                    OrderStatus.PROCESSING,
-                    OrderStatus.CANCELED,
-                ],
-                OrderStatus.PROCESSING: [
-                    OrderStatus.SHIPPED,
-                    OrderStatus.CANCELED,
-                ],
-                OrderStatus.SHIPPED: [
-                    OrderStatus.DELIVERED,
-                    OrderStatus.RETURNED,
-                ],
-                OrderStatus.DELIVERED: [
-                    OrderStatus.COMPLETED,
-                    OrderStatus.RETURNED,
-                ],
-                OrderStatus.CANCELED: [],
-                OrderStatus.COMPLETED: [],
-                OrderStatus.RETURNED: [OrderStatus.REFUNDED],
-                OrderStatus.REFUNDED: [],
-            }
-
-            if new_status not in allowed_transitions.get(order.status, []):
-                logger.warning(
-                    "Invalid status transition for order %s: from %s to %s",
-                    order.id,
-                    order.status,
-                    new_status,
-                )
-                raise InvalidStatusTransitionError(
-                    current_status=order.status,
-                    new_status=new_status,
-                    allowed=[
-                        str(s)
-                        for s in allowed_transitions.get(order.status, [])
-                    ],
-                )
-
-            old_status = order.status
-
-            if silent_for_customer:
-                cls._suppress_customer_status_notifications(order, new_status)
-
-            order.status = new_status
-            order.status_updated_at = timezone.now()
-            order.save(update_fields=["status", "status_updated_at"])
-
-            # Note: order_status_changed signal is sent automatically by
-            # handle_order_post_save when the status changes.
-
-            logger.info(
-                "Order %s status updated from %s to %s",
-                order.id,
-                old_status,
-                new_status,
-            )
-
+        if order.status == new_status:
+            logger.info("Order %s status is already %s", order.id, new_status)
             return order
 
-        except InvalidStatusTransitionError:
-            raise
+        allowed_transitions = {
+            OrderStatus.PENDING: [
+                OrderStatus.PROCESSING,
+                OrderStatus.CANCELED,
+            ],
+            OrderStatus.PROCESSING: [
+                OrderStatus.SHIPPED,
+                OrderStatus.CANCELED,
+            ],
+            OrderStatus.SHIPPED: [
+                OrderStatus.DELIVERED,
+                OrderStatus.RETURNED,
+            ],
+            OrderStatus.DELIVERED: [
+                OrderStatus.COMPLETED,
+                OrderStatus.RETURNED,
+            ],
+            OrderStatus.CANCELED: [],
+            OrderStatus.COMPLETED: [],
+            OrderStatus.RETURNED: [OrderStatus.REFUNDED],
+            OrderStatus.REFUNDED: [],
+        }
+
+        if new_status not in allowed_transitions.get(order.status, []):
+            logger.warning(
+                "Invalid status transition for order %s: from %s to %s",
+                order.id,
+                order.status,
+                new_status,
+            )
+            raise InvalidStatusTransitionError(
+                current_status=order.status,
+                new_status=new_status,
+                allowed=[
+                    str(s) for s in allowed_transitions.get(order.status, [])
+                ],
+            )
+
+        old_status = order.status
+
+        if silent_for_customer:
+            cls._suppress_customer_status_notifications(order, new_status)
+
+        order.status = new_status
+        order.status_updated_at = timezone.now()
+        order.save(update_fields=["status", "status_updated_at"])
+
+        # Note: order_status_changed signal is sent automatically by
+        # handle_order_post_save when the status changes.
+
+        logger.info(
+            "Order %s status updated from %s to %s",
+            order.id,
+            old_status,
+            new_status,
+        )
+
+        return order
 
     @classmethod
     def _suppress_customer_status_notifications(
@@ -2462,15 +2465,19 @@ class OrderService:
         if not auto_update_status:
             return order
 
-        final_statuses = {
+        # Not "final" — SHIPPED is mid-flight, and the documented
+        # terminal set is COMPLETED/CANCELED/REFUNDED. These are the
+        # statuses that need no advance when tracking lands: already at
+        # or past SHIPPED, or ended somewhere this must not walk out of.
+        no_advance_needed = {
+            OrderStatus.SHIPPED,
             OrderStatus.DELIVERED,
             OrderStatus.COMPLETED,
             OrderStatus.RETURNED,
             OrderStatus.REFUNDED,
-            OrderStatus.SHIPPED,
         }
 
-        if order.status in final_statuses:
+        if order.status in no_advance_needed:
             pass
         elif order.status == OrderStatus.PROCESSING:
             cls.update_order_status(order, OrderStatus.SHIPPED)
@@ -2566,30 +2573,6 @@ class OrderService:
             .first()
         )
         return picked.code if picked is not None else None
-
-    @classmethod
-    def _extract_shipment_payload(
-        cls, order_data: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Pop carrier-specific keys off ``order_data`` and return them.
-
-        Mutates ``order_data`` in place — the popped keys would otherwise
-        cause ``Order.objects.create(**order_data)`` to crash with an
-        unexpected-kwarg ``TypeError``.  The returned dict is handed to
-        the carrier registry so each adapter reads what it needs.
-
-        The key list is the union of every registered carrier's
-        ``payload_keys`` ClassVar, so adding a new carrier (ELTA,
-        Speedex …) means writing one new adapter file with its
-        ``payload_keys`` declared — no edit to ``order/services.py``.
-        """
-        from shipping.interfaces import all_payload_keys
-
-        return {
-            key: order_data.pop(key)
-            for key in all_payload_keys()
-            if key in order_data
-        }
 
     @staticmethod
     def _seed_language_code(order_data: dict[str, Any]) -> None:
@@ -3059,5 +3042,17 @@ class OrderService:
             if order_value.amount >= pay_way.free_threshold.amount:
                 return Money(0, order_value.currency)
 
-        # Return payment method cost in order currency
+        # Same currency only. Re-labelling would turn a fee configured
+        # in one currency into the same NUMBER in another — charging a
+        # different sum rather than converting it.
+        if pay_way.cost.currency != order_value.currency:
+            logger.error(
+                "Pay-way %s fee is in %s but the order is in %s — charging "
+                "no fee rather than re-labelling the amount",
+                getattr(pay_way, "id", None),
+                pay_way.cost.currency,
+                order_value.currency,
+            )
+            return Money(0, order_value.currency)
+
         return Money(pay_way.cost.amount, order_value.currency)

@@ -41,11 +41,18 @@ class PayWayFilterTest(APITestCase):
         self.stripe_payment.sort_order = 1
         self.stripe_payment.save()
 
+        # An arbitrary online provider_code the platform cannot charge
+        # through: what these tests filter on is the *field*, and an
+        # ungated code keeps the row visible in the shopper-facing list
+        # (``is_provider_configured`` hides stripe/viva without keys).
+        # Its configuration is explicit — only "stripe" gets one from the
+        # factory — because test_configuration_filters asserts it has one.
         self.paypal_payment = PayWayFactory.create_online_payment(
             provider_code="paypal",
             active=True,
             cost=Money(Decimal("3.00"), "EUR"),
             free_threshold=Money(Decimal("75.00"), "EUR"),
+            configuration={"merchant_id": "test_merchant"},
         )
         self.paypal_payment.created_at = self.now - timedelta(days=15)
         self.paypal_payment.updated_at = self.now - timedelta(days=2)

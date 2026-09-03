@@ -964,46 +964,11 @@ class VivaWalletPaymentProvider(PaymentProvider):
             return PaymentStatus.FAILED, {"error": str(e)}
 
 
-class PayPalPaymentProvider(PaymentProvider):
-    def __init__(self):
-        self.client_id = getattr(settings, "PAYPAL_CLIENT_ID", "")
-        self.client_secret = getattr(settings, "PAYPAL_CLIENT_SECRET", "")
-
-    def create_checkout_session(
-        self, amount: Money, order_id: str, **kwargs
-    ) -> tuple[bool, dict[str, Any]]:
-        raise NotImplementedError(
-            "PayPal provider is not yet implemented; use Stripe or Viva"
-        )
-
-    def process_payment(
-        self, amount: Money, order_id: str, **kwargs
-    ) -> tuple[bool, dict[str, Any]]:
-        raise NotImplementedError(
-            "PayPal provider is not yet implemented; use Stripe or Viva"
-        )
-
-    def refund_payment(
-        self, payment_id: str, amount: Money | None = None
-    ) -> tuple[bool, dict[str, Any]]:
-        raise NotImplementedError(
-            "PayPal provider is not yet implemented; use Stripe or Viva"
-        )
-
-    def get_payment_status(
-        self, payment_id: str
-    ) -> tuple[PaymentStatus, dict[str, Any]]:
-        raise NotImplementedError(
-            "PayPal provider is not yet implemented; use Stripe or Viva"
-        )
-
-
 def get_payment_provider(provider_name: str) -> PaymentProvider:
-    # PayPalPaymentProvider is intentionally absent: it is an
-    # unimplemented stub (every method raises NotImplementedError).
-    # Keeping it out means a mis-seeded "paypal" PayWay fails fast here
-    # with a clear "Unknown payment provider" instead of blowing up
-    # mid-checkout at get_payment_status(). Register it when implemented.
+    # Every code a PayWay row can carry that is NOT here — "paypal",
+    # "cash", "" — fails fast with "Unknown payment provider" instead of
+    # reaching a half-built charge path. Callers gate on
+    # PayWayService.is_provider_configured() before they get this far.
     providers = {
         "stripe": StripePaymentProvider,
         "viva_wallet": VivaWalletPaymentProvider,

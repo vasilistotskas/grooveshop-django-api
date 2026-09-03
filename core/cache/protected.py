@@ -10,7 +10,7 @@ import re
 #   - Bull queue keys (media-stream)
 #   - Image processing cache
 #   - Circuit breaker state
-#   - dj-stripe + dj-paypal customer sync
+#   - dj-stripe customer sync
 #   - Sessions
 #   - Anything that, if dropped, would log users out, drop in-flight jobs,
 #     or fingerprint as suspicious activity to security middleware.
@@ -24,7 +24,6 @@ PROTECTED_FRAGMENTS: tuple[str, ...] = (
     "image:",
     "circuit_breaker:",
     "dj_stripe:",
-    "dj_paypal:",
     "ratelimit:",
     "rate-limit:",
     "boxnow_widget_token:",

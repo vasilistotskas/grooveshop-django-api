@@ -35,21 +35,28 @@ from order.views.viva_webhook import (
 pytestmark = pytest.mark.django_db
 
 
+ORDER_CODE = "1234567890123456"
+
+
 def _order(total="50.00"):
     order = OrderFactory(num_order_items=0)
     Order.objects.filter(pk=order.pk).update(
         status=OrderStatus.PENDING,
         payment_status=PaymentStatus.PENDING,
-        metadata={},
+        # The codes this order actually issued. Viva's guidance is to
+        # confirm a result with the COMBINATION of OrderCode and
+        # TransactionId, so a verified transaction has to name one of
+        # these for the order to be touched at all.
+        metadata={"viva_order_codes": [ORDER_CODE]},
     )
     order.refresh_from_db()
     return order
 
 
-def _verified(status, amount):
+def _verified(status, amount, order_code=ORDER_CODE):
     return patch(
         "order.views.viva_webhook._verify_transaction",
-        return_value=(status, {"amount": amount}),
+        return_value=(status, {"amount": amount, "order_code": order_code}),
     )
 
 
@@ -170,7 +177,11 @@ class TestCurrencyIsCompared:
             "order.views.viva_webhook._verify_transaction",
             return_value=(
                 PaymentStatus.COMPLETED,
-                {"amount": str(expected), "currency": "USD"},
+                {
+                    "amount": str(expected),
+                    "currency": "USD",
+                    "order_code": ORDER_CODE,
+                },
             ),
         )
         with provider:
@@ -194,6 +205,7 @@ class TestCurrencyIsCompared:
                 {
                     "amount": str(expected.amount),
                     "currency": expected.currency.code,
+                    "order_code": ORDER_CODE,
                 },
             ),
         )
@@ -213,3 +225,71 @@ def test_viva_numeric_currency_codes_normalise():
     assert _alpha_currency("840") == "USD"
     assert _alpha_currency("EUR") == "EUR"
     assert _alpha_currency(None) is None
+
+
+class TestTransactionMustBelongToTheOrder:
+    """Viva's instruction is to confirm a payment with the COMBINATION of
+    OrderCode and TransactionId, then check StatusId and Amount
+    (developer.viva.com/webhooks-for-payments/transaction-payment-created).
+
+    Only the last two were checked. The webhook body is unauthenticated,
+    so anyone could post their OWN real TransactionId against SOMEONE
+    ELSE'S OrderCode: we resolved the victim's order, verified the
+    attacker's genuinely-COMPLETED transaction, and settled the victim's
+    order the moment the two amounts happened to agree — which costs an
+    attacker nothing to arrange.
+    """
+
+    def test_someone_elses_transaction_cannot_settle_this_order(self):
+        order = _order()
+        expected = order.calculate_order_total_amount()
+
+        with _verified(
+            PaymentStatus.COMPLETED,
+            str(expected.amount),
+            order_code="9999999999999999",
+        ):
+            outcome = _handle_payment_created(
+                order, {"StatusId": "F"}, "txn-not-ours"
+            )
+
+        order.refresh_from_db()
+        assert outcome == VivaWebhookEvent.OUTCOME_SKIPPED
+        assert order.payment_status == PaymentStatus.PENDING, (
+            "an unrelated transaction of the same amount settled the order"
+        )
+
+    def test_a_response_without_an_order_code_is_retried_not_acked(self):
+        """Viva documents orderCode in the Retrieve Transaction response,
+        so its absence is an abnormal answer. Raising has Viva redeliver;
+        acking would strand a real payment."""
+        order = _order()
+
+        with (
+            patch(
+                "order.views.viva_webhook._verify_transaction",
+                return_value=(PaymentStatus.COMPLETED, {"amount": "10.00"}),
+            ),
+            pytest.raises(RuntimeError, match="orderCode"),
+        ):
+            _handle_payment_created(order, {"StatusId": "F"}, "txn-no-code")
+
+    def test_an_earlier_session_code_still_settles(self):
+        """A shopper may pay on a stale tab, so ANY code the order issued
+        counts — not only the most recent."""
+        order = _order()
+        Order.objects.filter(pk=order.pk).update(
+            metadata={"viva_order_codes": ["OLD-CODE", ORDER_CODE]}
+        )
+        order.refresh_from_db()
+        expected = order.calculate_order_total_amount()
+
+        with _verified(
+            PaymentStatus.COMPLETED,
+            str(expected.amount),
+            order_code="OLD-CODE",
+        ):
+            _handle_payment_created(order, {"StatusId": "F"}, "txn-old")
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.COMPLETED

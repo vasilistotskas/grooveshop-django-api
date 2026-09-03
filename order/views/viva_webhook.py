@@ -442,6 +442,24 @@ def _verify_viva_terminal_transaction(
             f"Viva transaction verification unavailable for {transaction_id}"
         )
 
+    # Viva's own instruction is to confirm the result with the
+    # COMBINATION of OrderCode and TransactionId
+    # (developer.viva.com/webhooks-for-payments/transaction-payment-created),
+    # then check StatusId and Amount. Without the first half, anyone can
+    # post their own real TransactionId against someone else's OrderCode.
+    if not _transaction_belongs_to_order(order, verified_data):
+        logger.error(
+            "Viva %s event: transaction %s reports order_code %r, which is "
+            "not one of order %s's issued codes — refusing to mutate state",
+            event_label,
+            transaction_id,
+            verified_data.get("order_code")
+            if isinstance(verified_data, dict)
+            else None,
+            order.id,
+        )
+        return False
+
     if verified_status not in expected_statuses:
         logger.warning(
             "Viva %s event for order %s: transaction %s verified status is "
@@ -934,6 +952,65 @@ def _process_gift_card_purchase_event(
     return JsonResponse({"status": "ok"})
 
 
+def order_viva_codes(order) -> set[str]:
+    """Every Viva orderCode ever issued for this order.
+
+    The mirror of :func:`viva_order_code_q`, evaluated in Python: each
+    ``create_checkout_session`` mints a fresh code and appends it to
+    ``metadata['viva_order_codes']``, with the most recent also mirrored
+    in the singular key.
+    """
+    metadata = order.metadata or {}
+    codes = {
+        str(code) for code in (metadata.get("viva_order_codes") or []) if code
+    }
+    singular = metadata.get("viva_order_code")
+    if singular:
+        codes.add(str(singular))
+    # ``_resolve_tenant_candidates`` also resolves an order by
+    # ``payment_id``, so a code stored there counts as issued too — the
+    # two must agree on what "belongs to this order" means.
+    if order.payment_id:
+        codes.add(str(order.payment_id))
+    return codes
+
+
+def _transaction_belongs_to_order(order, verified_data) -> bool:
+    """Does the VERIFIED transaction actually belong to this order?
+
+    Viva's own guidance is to retrieve the transaction and validate the
+    orderCode, statusId AND amount from that response
+    (developer.viva.com/webhooks-for-payments/setting-up-webhooks). We
+    checked statusId and amount but only logged the orderCode, which
+    leaves the substitution the amount guard cannot see: the webhook body
+    is unauthenticated, so anyone may post their OWN real TransactionId
+    against SOMEONE ELSE'S OrderCode. We would resolve the victim's
+    order, verify the attacker's transaction — genuinely COMPLETED — and
+    settle the victim's order as soon as the two amounts happen to
+    match, which costs the attacker nothing to arrange.
+
+    An absent orderCode in the response is NOT treated as a match: the
+    whole point is to confirm the link, and a confirmation we did not
+    receive is not one we can assume.
+    """
+    reported = (
+        verified_data.get("order_code")
+        if isinstance(verified_data, dict)
+        else None
+    )
+    if not reported:
+        # Viva documents orderCode as part of the Retrieve Transaction
+        # response, so its absence is an abnormal answer rather than a
+        # mismatch. Raise instead of refusing: a 500 has Viva redeliver,
+        # where a skip would ack the event and strand a real payment.
+        raise RuntimeError(
+            f"Viva transaction {verified_data.get('payment_id')!r} was "
+            "verified without an orderCode — cannot confirm it belongs to "
+            f"order {order.id}"
+        )
+    return str(reported) in order_viva_codes(order)
+
+
 def _flag_amount_mismatch(
     order, transaction_id, verified_amount, expected_amount
 ) -> None:
@@ -1056,6 +1133,20 @@ def _handle_payment_created(order, event_data, transaction_id):
     verified_amount_raw = (
         verified_data.get("amount") if isinstance(verified_data, dict) else None
     )
+    # The transaction must be THIS order's before its amount or status
+    # mean anything (Viva's documented three-way check).
+    if not _transaction_belongs_to_order(order, verified_data):
+        logger.error(
+            "Viva transaction %s reports order_code %r, which is not one of "
+            "order %s's issued codes — refusing to mark as paid",
+            transaction_id,
+            verified_data.get("order_code")
+            if isinstance(verified_data, dict)
+            else None,
+            order.id,
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+
     # Currency first: an amount only means something once we know it is
     # denominated in the order's currency. Viva reports ISO 4217 in its
     # NUMERIC form ("978"); the provider normalises that to the

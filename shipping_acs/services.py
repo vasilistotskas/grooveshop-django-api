@@ -1041,13 +1041,70 @@ class AcsService:
             )
 
         # --- Phase 3: persist atomically; re-confirm under lock ---
+        # Link only what ACS actually put on the manifest. ACS scopes the
+        # list by Pickup_Date, so vouchers minted on earlier days are
+        # simply not covered: on 2026-09-02 it listed 2 of the 9
+        # candidates. Linking every candidate would file seven parcels
+        # under a manifest the courier never received them on, and would
+        # hide them from the next run, which is the one that could still
+        # get them collected.
+        listed = cls._vouchers_on_list(client, pickup_list_no, the_date)
+        if listed is None:
+            logger.warning(
+                "Could not read the membership of manifest %s — linking all "
+                "%s candidate(s); verify in the ACS portal.",
+                pickup_list_no,
+                len(candidates),
+            )
+            shipment_ids = candidates
+        else:
+            shipment_ids = list(
+                AcsShipment.objects.filter(
+                    id__in=candidates, voucher_no__in=listed
+                ).values_list("id", flat=True)
+            )
+            left_behind = len(candidates) - len(shipment_ids)
+            if left_behind:
+                logger.warning(
+                    "ACS manifest %s covers %s of %s candidate voucher(s) "
+                    "for %s — %s still unlisted and will not be collected "
+                    "until a list is issued for their own pickup date.",
+                    pickup_list_no,
+                    len(shipment_ids),
+                    len(candidates),
+                    the_date,
+                    left_behind,
+                )
+
         return cls._link_pickup_list(
             pickup_list_no=pickup_list_no,
-            shipment_ids=candidates,
+            shipment_ids=shipment_ids,
             billing_code=billing_code,
             issued_by_id=issued_by_id,
-            metadata={"issue_response": result},
+            metadata={"issue_response": result, "acs_vouchers": listed},
         )
+
+    @classmethod
+    def _vouchers_on_list(
+        cls, client: AcsClient, pickup_list_no: str, the_date: date
+    ) -> list[str] | None:
+        """Voucher numbers ACS reports on ``pickup_list_no``.
+
+        ``None`` means the question could not be answered — callers must
+        treat that as "unknown", never as "empty", or they would unlink
+        a manifest's entire contents on a transient ACS error.
+        """
+        try:
+            return client.get_pickup_list_vouchers(
+                pickup_list_no=pickup_list_no,
+                pickup_date=the_date.isoformat(),
+            )
+        except AcsError:
+            logger.exception(
+                "ACS_Pickup_List_Display_Voucher failed for list %s",
+                pickup_list_no,
+            )
+            return None
 
     @classmethod
     def _link_pickup_list(
@@ -1128,16 +1185,8 @@ class AcsService:
             number = str(row.get("PickupList_No") or "").strip()
             if not number:
                 continue
-            try:
-                vouchers = client.get_pickup_list_vouchers(
-                    pickup_list_no=number,
-                    pickup_date=the_date.isoformat(),
-                )
-            except AcsError:
-                logger.exception(
-                    "ACS_Pickup_List_Display_Voucher failed for list %s",
-                    number,
-                )
+            vouchers = cls._vouchers_on_list(client, number, the_date)
+            if vouchers is None:
                 continue
             shipment_ids = list(
                 AcsShipment.objects.filter(

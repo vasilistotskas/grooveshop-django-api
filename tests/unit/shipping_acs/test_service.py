@@ -80,6 +80,18 @@ def acs_client_mock(monkeypatch):
                 "Error_Message": "",
             }
 
+        def get_pickup_lists(self, *, pickup_date):
+            return []
+
+        def get_pickup_list_vouchers(self, *, pickup_list_no, pickup_date):
+            from shipping_acs.models import AcsShipment
+
+            return list(
+                AcsShipment.objects.filter(
+                    voucher_no__isnull=False, pickup_list__isnull=True
+                ).values_list("voucher_no", flat=True)
+            )
+
         def tracking_summary(self, voucher_no):
             return {
                 "delivery_flag": 0,
@@ -693,6 +705,63 @@ class TestIssueDailyPickupList:
             voucher_no__in=["7227891111", "7227891222"]
         ):
             assert shipment.pickup_list_id == result.id
+
+    def test_links_only_the_vouchers_acs_put_on_the_manifest(self, monkeypatch):
+        # ACS scopes a manifest by Pickup_Date, so vouchers minted on
+        # earlier days are not covered: on 2026-09-02 it listed 2 of 9
+        # candidates. Linking every candidate would file the other seven
+        # under a manifest the courier never received them on, and hide
+        # them from the run that could still get them collected.
+        today = self._candidate("7227891111")
+        straggler = self._candidate("7227899999")
+        self._client_returning(
+            monkeypatch,
+            {
+                "PickupList_No": "9803819281",
+                "Unprinted_Found": 0,
+                "Error_Message": "",
+            },
+            vouchers={"9803819281": ["7227891111"]},
+        )
+
+        result = AcsService.issue_daily_pickup_list()
+
+        assert result.pickup_list_no == "9803819281"
+        today.refresh_from_db()
+        straggler.refresh_from_db()
+        assert today.pickup_list_id == result.id
+        assert straggler.pickup_list_id is None
+        assert result.voucher_count == 1
+
+    def test_links_every_candidate_when_membership_is_unreadable(
+        self, monkeypatch
+    ):
+        # A transient failure of the membership call must not be read as
+        # "the manifest is empty" — that would leave a real manifest with
+        # nothing attached.
+        from shipping_acs import services
+
+        shipment = self._candidate("7227891111")
+
+        class _NoDisplayClient:
+            billing_code = "TEST_BILLING"
+
+            def issue_pickup_list(self, *, pickup_date):
+                return {
+                    "PickupList_No": "9803819281",
+                    "Unprinted_Found": 0,
+                    "Error_Message": "",
+                }
+
+            def get_pickup_list_vouchers(self, *, pickup_list_no, pickup_date):
+                raise AcsError("display voucher unavailable")
+
+        monkeypatch.setattr(services, "AcsClient", _NoDisplayClient)
+
+        result = AcsService.issue_daily_pickup_list()
+
+        shipment.refresh_from_db()
+        assert shipment.pickup_list_id == result.id
 
     def test_skips_when_single_flight_lock_held(self, acs_client_mock):
         # When another run (beat vs. admin "issue now") already holds the

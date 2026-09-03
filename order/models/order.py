@@ -345,7 +345,15 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         verbose_name_plural = _("Orders")
         ordering = ["-created_at"]
         indexes = [
+            # Both splats are load-bearing: declaring ``indexes`` here
+            # REPLACES the abstract parents' list rather than extending
+            # it, so an index a mixin declares only exists on the tables
+            # that name it. MetaDataModel's pair was missing, which left
+            # the Viva webhook's ``metadata__contains`` lookup — run on
+            # every delivery, from an external retrying caller — as a
+            # sequential scan of the whole orders table.
             *TimeStampMixinModel.Meta.indexes,
+            *MetaDataModel.Meta.indexes,
             BTreeIndex(fields=["status"], name="order_status_ix"),
             BTreeIndex(fields=["document_type"], name="order_doc_type_ix"),
             BTreeIndex(

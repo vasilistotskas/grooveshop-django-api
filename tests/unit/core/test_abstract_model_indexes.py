@@ -12,6 +12,11 @@ left the Viva webhook's ``metadata__contains`` lookup — run on every
 delivery of an event Viva retries hourly — scanning the whole orders
 table, while ``Product`` (which splats both) was indexed all along.
 
+Two escape hatches, kept apart on purpose: ``_DELIBERATE`` for an
+omission someone decided on and wrote down, ``_KNOWN_DRIFT`` for one
+nobody has looked at yet. A third test fails if either entry stops being
+necessary, so neither list can outlive its reason.
+
 This walks the MRO rather than naming models, so a new mixin or a new
 subclass is covered the day it is written.
 """
@@ -23,18 +28,28 @@ from django.apps import apps
 from django.db import models
 
 
-# Models that drop a parent's indexes TODAY. Each is a real finding, not
-# a decision: all eight lose ``TimeStampMixinModel``'s created_at /
-# updated_at pair, and five of them (Contact, Feedback,
-# CartPromotionCode, MetaCapiEventLog, and TenantArchive via
-# destroyed_at) order every list query by a timestamp column that is
-# therefore unindexed.
+# Indexes a model drops ON PURPOSE, with the reason. Distinct from
+# _KNOWN_DRIFT below: nothing here is waiting to be fixed.
+_DELIBERATE: dict[str, str] = {
+    "order.Order": (
+        "Takes MetaDataModel's `metadata` GIN index explicitly but not "
+        "its `private_metadata` one: no query reads that column on an "
+        "order (MetaDataFilterMixin, which exposes the only lookup, is "
+        "not among OrderFilter's bases), and a GIN index costs a "
+        "pending-list write on every order INSERT and UPDATE."
+    ),
+}
+
+# Models that drop a parent's indexes TODAY without having decided to.
+# All eight lose ``TimeStampMixinModel``'s created_at/updated_at pair,
+# and five of them (Contact, Feedback, CartPromotionCode,
+# MetaCapiEventLog, and TenantArchive via destroyed_at) order every list
+# query by a timestamp column that is therefore unindexed.
 #
-# They are recorded rather than fixed here because each belongs to a
-# different app — tenant, contact, promotion, page_config, meta_capi —
-# and each needs its own migration and its own "is this index worth its
-# write cost on this table" call. This list must only ever shrink;
-# anything new fails the test above.
+# Recorded rather than fixed here because each belongs to a different app
+# — tenant, contact, promotion, page_config, meta_capi — and each needs
+# its own migration and its own "is this index worth its write cost on
+# this table" call. This list must only ever shrink.
 _KNOWN_DRIFT: frozenset[str] = frozenset(
     {
         "tenant.Tenant",
@@ -98,7 +113,10 @@ def _dropped(model: type[models.Model]) -> list[str]:
 
 @pytest.mark.parametrize("model", _concrete_models(), ids=_label)
 def test_concrete_model_keeps_its_abstract_parents_indexes(model):
-    if _label(model) in _KNOWN_DRIFT:
+    label = _label(model)
+    if label in _DELIBERATE:
+        pytest.skip(_DELIBERATE[label])
+    if label in _KNOWN_DRIFT:
         pytest.skip("known drift, see _KNOWN_DRIFT")
 
     assert not _dropped(model), (
@@ -109,15 +127,37 @@ def test_concrete_model_keeps_its_abstract_parents_indexes(model):
     )
 
 
-@pytest.mark.parametrize("label", sorted(_KNOWN_DRIFT))
-def test_known_drift_list_only_shrinks(label):
-    """A model that has been fixed must be removed from the allowlist.
+@pytest.mark.parametrize("label", sorted(_KNOWN_DRIFT | frozenset(_DELIBERATE)))
+def test_every_exception_is_still_needed(label):
+    """An exempted model that no longer drops anything must be un-exempted.
 
-    Without this, the allowlist would keep silencing the check long after
+    Without this, either list would keep silencing the check long after
     the reason for it is gone.
     """
     model = apps.get_model(label)
     assert _dropped(model), (
         f"{label} no longer drops a parent index — remove it from "
-        f"_KNOWN_DRIFT so the check guards it from now on."
+        f"_KNOWN_DRIFT / _DELIBERATE so the check guards it from now on."
+    )
+
+
+def test_order_still_has_the_index_the_viva_webhook_needs():
+    """The half of MetaDataModel's pair that Order DOES take.
+
+    ``_DELIBERATE`` exempts Order from the parent-index check, so without
+    this the exemption would also hide the loss of ``order_meta_ix``
+    itself — the thing the whole exercise was about.
+    """
+    from django.contrib.postgres.indexes import GinIndex
+
+    order = apps.get_model("order.Order")
+    metadata_indexes = [
+        i
+        for i in order._meta.indexes
+        if isinstance(i, GinIndex) and i.fields == ["metadata"]
+    ]
+    assert metadata_indexes, (
+        "Order lost its GIN index on `metadata`. The Viva webhook "
+        "resolves every delivery through metadata__contains; without it "
+        "that is a sequential scan of the whole orders table."
     )

@@ -345,15 +345,23 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         verbose_name_plural = _("Orders")
         ordering = ["-created_at"]
         indexes = [
-            # Both splats are load-bearing: declaring ``indexes`` here
-            # REPLACES the abstract parents' list rather than extending
-            # it, so an index a mixin declares only exists on the tables
-            # that name it. MetaDataModel's pair was missing, which left
-            # the Viva webhook's ``metadata__contains`` lookup — run on
-            # every delivery, from an external retrying caller — as a
-            # sequential scan of the whole orders table.
+            # Declaring ``indexes`` REPLACES the abstract parents' list
+            # rather than extending it, so an index a mixin declares
+            # only reaches the tables that splat it back in.
             *TimeStampMixinModel.Meta.indexes,
-            *MetaDataModel.Meta.indexes,
+            # MetaDataModel's ``metadata`` half, named to match what it
+            # would have produced. It was missing entirely, which left
+            # the Viva webhook's ``metadata__contains`` lookup — run on
+            # every delivery, by a caller that retries hourly — as a
+            # sequential scan of the whole orders table.
+            #
+            # Its ``private_metadata`` half is deliberately NOT taken:
+            # no query in this codebase reads that column on an order
+            # (``MetaDataFilterMixin``, which exposes the only lookup,
+            # is not in OrderFilter's bases), and a GIN index still
+            # costs a pending-list write on every order INSERT and
+            # UPDATE. See tests/unit/core/test_abstract_model_indexes.py.
+            GinIndex(fields=["metadata"], name="order_meta_ix"),
             BTreeIndex(fields=["status"], name="order_status_ix"),
             BTreeIndex(fields=["document_type"], name="order_doc_type_ix"),
             BTreeIndex(

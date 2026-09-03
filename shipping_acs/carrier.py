@@ -159,15 +159,7 @@ class AcsCarrier(ShippingCarrierInterface):
         from shipping_acs.enum.charge_type import AcsChargeType
         from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
 
-        try:
-            from shipping_acs.models import AcsShipment, AcsStation
-        except ImportError:
-            logger.warning(
-                "shipping_acs app not available — skipping ACS shipment "
-                "creation for order %s",
-                order.id,
-            )
-            return
+        from shipping_acs.models import AcsShipment, AcsStation
 
         if AcsShipment.objects.filter(order=order).exists():
             return
@@ -255,15 +247,7 @@ class AcsCarrier(ShippingCarrierInterface):
         self, order: Order, *, schema_name: str | None = None
     ) -> None:
         """Enqueue the ACS create-voucher Celery task for ``order``."""
-        try:
-            from shipping_acs.tasks import create_acs_voucher_for_order
-        except ImportError:
-            logger.warning(
-                "shipping_acs app not available — skipping ACS task "
-                "dispatch for order %s",
-                order.id,
-            )
-            return
+        from shipping_acs.tasks import create_acs_voucher_for_order
 
         logger.info(
             "ACS dispatch: queued voucher mint for order=%s",

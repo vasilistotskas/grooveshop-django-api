@@ -1085,6 +1085,15 @@ def get_celery_beat_schedule():
         # Issue the daily ACS pickup list Mon-Fri at 16:30 Athens.
         # Beats the close of the courier's daily collection window and
         # keeps the path matched to admin's manual override.
+        # 45 minutes before the manifest, so an unprinted label is
+        # still fixable while it matters. ACS rejects the WHOLE list if
+        # any voucher on it is unprinted and offers no way to issue a
+        # partial one, so one late order blocks every other parcel.
+        "warn-unprinted-acs-vouchers": {
+            "task": "tenant.tasks.fanout_warn_unprinted_acs_vouchers",
+            "schedule": crontab(hour="15", minute="45", day_of_week="mon-fri"),
+            "options": {"queue": "celery", "expires": 300},
+        },
         "issue-acs-pickup-list": {
             # Fanout: AcsShipment is per-tenant; a direct beat call would
             # query the empty public schema and never present vouchers to

@@ -4,6 +4,8 @@ Schedule (registered in ``settings.CELERY_BEAT_SCHEDULE``):
 
 * ``sync-acs-stations`` — daily 03:00 Europe/Athens (Phase 2 only).
 * ``issue-acs-pickup-list`` — Mon–Fri 16:30 Europe/Athens.
+* ``warn-unprinted-acs-vouchers`` — Mon–Fri 15:45 Europe/Athens, 45
+  minutes ahead of the manifest so there is time to act on it.
 * ``poll-acs-tracking`` — every 15 minutes.
 
 Idempotency:
@@ -201,6 +203,139 @@ def sync_acs_stations(self) -> dict[str, int]:
     return totals
 
 
+def _unprinted_rows(voucher_numbers: list[str] | None = None) -> list[dict]:
+    """Order/voucher pairs for vouchers still awaiting a printed label.
+
+    ``voucher_numbers`` scopes the lookup to the vouchers ACS itself
+    named in a rejection; without it the local ``label_printed_at``
+    mirror decides. ACS is authoritative, so its list wins when present.
+    """
+    from shipping_acs.enum.shipment_state import AcsShipmentState
+    from shipping_acs.models import AcsShipment
+
+    queryset = AcsShipment.objects.filter(
+        voucher_no__isnull=False,
+        pickup_list__isnull=True,
+        shipment_state=AcsShipmentState.NEW,
+    )
+    if voucher_numbers:
+        queryset = queryset.filter(voucher_no__in=voucher_numbers)
+    else:
+        queryset = queryset.filter(label_printed_at__isnull=True)
+
+    return [
+        {"voucher_no": s.voucher_no, "order_id": s.order_id}
+        for s in queryset.order_by("order_id")
+    ]
+
+
+def _alert_unprinted_vouchers(
+    rows: list[dict], *, blocked: bool, acs_message: str = ""
+) -> dict[str, Any]:
+    """Email the tenant's admins the vouchers that need a printed label.
+
+    ``blocked`` distinguishes the two moments this matters: the 15:45
+    heads-up, where there is still time to print, and the 16:30
+    rejection, where the manifest did not go out. Both name the exact
+    orders, because "print the labels" is only actionable with the list.
+    """
+    from django.core.mail import send_mail
+    from django.template.loader import render_to_string
+    from django.utils.translation import gettext as _
+
+    from core.utils.email_context import build_email_context
+    from tenant.credentials import (
+        tenant_admin_recipients,
+        tenant_from_email,
+        tenant_site_name,
+    )
+
+    if not rows:
+        return {"alerted": 0}
+
+    recipients = tenant_admin_recipients()
+    if not recipients:
+        logger.warning(
+            "ACS unprinted-voucher alert: no recipients configured — "
+            "%s voucher(s) still need printing",
+            len(rows),
+        )
+        return {"alerted": 0, "reason": "no_recipients"}
+
+    context = build_email_context(
+        vouchers=rows, blocked=blocked, acs_message=acs_message
+    )
+    if blocked:
+        subject = _(
+            "ACS pickup list NOT issued — {n} voucher(s) need printing"
+        ).format(n=len(rows))
+    else:
+        subject = _(
+            "Print {n} ACS voucher(s) before today's pickup list"
+        ).format(n=len(rows))
+
+    try:
+        send_mail(
+            subject=f"[{tenant_site_name()}] {subject}",
+            message=render_to_string(
+                "emails/shipping_acs/unprinted_vouchers_alert.txt", context
+            ),
+            from_email=tenant_from_email() or None,
+            recipient_list=recipients,
+            html_message=render_to_string(
+                "emails/shipping_acs/unprinted_vouchers_alert.html", context
+            ),
+        )
+    except Exception as exc:
+        # Never let a mail failure mask the underlying problem: the
+        # caller still raises, and the ERROR log already carries the
+        # vouchers.
+        logger.error(
+            "ACS unprinted-voucher alert: failed to send email: %s",
+            exc,
+            exc_info=True,
+        )
+        return {"alerted": 0, "error": str(exc)}
+
+    logger.info(
+        "ACS unprinted-voucher alert sent (blocked=%s) for %s voucher(s)",
+        blocked,
+        len(rows),
+    )
+    return {"alerted": len(rows)}
+
+
+@shared_task(bind=True, base=TenantTask)
+def warn_unprinted_acs_vouchers(self) -> dict[str, Any]:
+    """Flag vouchers with no printed label, ahead of the manifest run.
+
+    ACS refuses the WHOLE pickup list when any voucher on it is
+    unprinted, and its API takes a pickup date with no voucher list —
+    so there is no partial manifest to fall back on. One order placed
+    shortly before 16:30 therefore blocks every other parcel that day
+    (observed 2026-09-03: one late voucher held up six ready ones).
+
+    Running 45 minutes early turns that into something a human can fix
+    while it still matters.
+    """
+    if _skip_if_acs_unconfigured("warn_unprinted_acs_vouchers"):
+        return {"status": "skipped_unconfigured"}
+
+    rows = _unprinted_rows()
+    if not rows:
+        logger.info("warn_unprinted_acs_vouchers: every candidate is printed")
+        return {"status": "ok", "unprinted": 0}
+
+    logger.warning(
+        "warn_unprinted_acs_vouchers: %s voucher(s) still unprinted before "
+        "today's pickup list: %s",
+        len(rows),
+        [r["voucher_no"] for r in rows],
+    )
+    result = _alert_unprinted_vouchers(rows, blocked=False)
+    return {"status": "ok", "unprinted": len(rows), **result}
+
+
 @shared_task(
     bind=True,
     base=TenantTask,
@@ -216,7 +351,21 @@ def issue_daily_acs_pickup_list(self) -> dict[str, Any]:
 
     from shipping_acs.services import AcsService
 
-    pickup_list = AcsService.issue_daily_pickup_list()
+    try:
+        pickup_list = AcsService.issue_daily_pickup_list()
+    except AcsAPIError as exc:
+        # The manifest did not go out. The service has already logged
+        # ACS's reason; turn it into something the merchant actually
+        # sees, naming the orders to print, then re-raise so the task
+        # still fails.
+        unprinted = (exc.raw or {}).get("Unprinted_Vouchers") or []
+        _alert_unprinted_vouchers(
+            _unprinted_rows(unprinted),
+            blocked=True,
+            acs_message=exc.error_message,
+        )
+        raise
+
     if pickup_list is None:
         logger.info("issue_daily_acs_pickup_list: nothing to issue")
         return {"status": "noop"}

@@ -182,6 +182,11 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "updated_at",
     )
     inlines = [AcsTrackingEventInline]
+    # Changelist-level, and deliberately on the SHIPMENT admin rather
+    # than AcsPickupListAdmin: that one is IsSuperuserOnlyModelAdmin, so
+    # the merchant who prints the labels cannot open it. This is the
+    # page they already work on, next to the "not printed" filter.
+    actions_list = ["issue_pickup_list_now"]
     actions_row = ["repoll_tracking", "issue_voucher_now"]
     actions = ["bulk_repoll_tracking", "retire_shipments"]
     list_select_related = ("order", "pickup_list")
@@ -262,6 +267,62 @@ class AcsShipmentAdmin(BaseModelAdmin):
             url=reverse("admin:order_order_change", args=[obj.order_id]),
             id=obj.order_id,
         )
+
+    @action(
+        description=str(_("Issue ACS pickup list now")),
+        variant=ActionVariant.PRIMARY,
+    )
+    def issue_pickup_list_now(self, request):
+        """Re-run the daily manifest without waiting for 16:30.
+
+        ACS rejects the whole pickup list when any voucher on it is
+        unprinted, and its API has no voucher-list parameter, so a
+        single late order blocks every other parcel that day. Printing
+        the missing label clears it in seconds — this is the button that
+        turns that into a same-day fix instead of a wait until tomorrow.
+        """
+        from django.shortcuts import redirect
+
+        from shipping_acs.exceptions import AcsError
+        from shipping_acs.services import AcsService
+
+        changelist = redirect(
+            reverse("admin:shipping_acs_acsshipment_changelist")
+        )
+        try:
+            pickup_list = AcsService.issue_daily_pickup_list(
+                issued_by_id=request.user.id
+                if request.user.is_authenticated
+                else None
+            )
+        except AcsError as exc:
+            # Surface ACS's own words: they name what has to be printed.
+            self.message_user(
+                request,
+                _("ACS did not issue the pickup list: %(err)s")
+                % {"err": str(exc)},
+                messages.ERROR,
+            )
+            return changelist
+
+        if pickup_list is None:
+            self.message_user(
+                request,
+                _("No vouchers are waiting for a pickup list."),
+                messages.INFO,
+            )
+            return changelist
+
+        self.message_user(
+            request,
+            _("Pickup list %(no)s issued for %(n)s voucher(s).")
+            % {
+                "no": pickup_list.pickup_list_no,
+                "n": pickup_list.voucher_count,
+            },
+            messages.SUCCESS,
+        )
+        return changelist
 
     @action(
         description=str(_("Re-poll ACS tracking")),

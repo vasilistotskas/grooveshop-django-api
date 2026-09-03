@@ -388,23 +388,28 @@ class TestHandleStripePaymentFailed:
         # Verify service was called but no error raised
         mock_service.assert_called_once_with(payment_intent_id)
 
-    def test_handles_service_exception_gracefully(self, mock_failed_event):
+    def test_service_exception_propagates(self, mock_failed_event):
+        """A processing error must PROPAGATE out of the receiver (G0231).
+
+        This used to assert the opposite — that the handler swallowed the
+        error — which is the behaviour that loses the event. The receiver
+        runs inside dj-stripe's webhook atomic block: returning normally
+        after a failure commits the Event row, and Stripe's redelivery
+        early-returns on the existing event id, so nothing ever retries.
+        Letting it escape rolls the Event row back instead.
         """
-        Test that handler catches and logs exceptions from OrderService.
-        """
-        # Setup
         payment_intent_id = "pi_test_failed_456"
 
-        # Execute
         with patch(
             "order.signals.handlers.OrderService.handle_payment_failed"
         ) as mock_service:
             mock_service.side_effect = Exception("Database error")
 
-            # Should not raise exception (caught and logged)
-            handle_stripe_payment_failed(sender=None, event=mock_failed_event)
+            with pytest.raises(Exception, match="Database error"):
+                handle_stripe_payment_failed(
+                    sender=None, event=mock_failed_event
+                )
 
-        # Verify service was called
         mock_service.assert_called_once_with(payment_intent_id)
 
     def test_extracts_payment_intent_id_correctly(self, mock_failed_event):
@@ -687,6 +692,41 @@ class TestHandleStripeCheckoutCompleted:
             }
         }
         return event
+
+    def test_unpaid_does_not_regress_a_settled_order(self):
+        """Stripe retries a failed delivery for up to three days, long
+        enough for auto_cancel_stuck_pending_orders to cancel the order
+        first. A late "unpaid" must not put it back to awaiting payment,
+        which would let the checkout endpoints open a fresh session for a
+        cancelled order."""
+        order = OrderFactory(
+            status=OrderStatus.CANCELED,
+            payment_status=PaymentStatus.CANCELED,
+            metadata={},
+        )
+
+        handle_stripe_checkout_completed(
+            sender=None,
+            event=self._checkout_event(order.id, payment_status="unpaid"),
+        )
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.CANCELED
+
+    def test_unpaid_still_moves_an_unsettled_order_to_pending(self):
+        order = OrderFactory(
+            status=OrderStatus.PENDING,
+            payment_status=PaymentStatus.PROCESSING,
+            metadata={},
+        )
+
+        handle_stripe_checkout_completed(
+            sender=None,
+            event=self._checkout_event(order.id, payment_status="unpaid"),
+        )
+
+        order.refresh_from_db()
+        assert order.payment_status == PaymentStatus.PENDING
 
     def test_processing_error_propagates(self):
         """A processing error must PROPAGATE out of this receiver (G0231).

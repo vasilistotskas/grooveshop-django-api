@@ -13,7 +13,11 @@ from djstripe.models import Event
 from order.signals._tenant import with_tenant_schema_from_event
 
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -1066,9 +1070,14 @@ def handle_stripe_payment_failed(sender, **kwargs):
                     )
                 )
 
-    except Exception as e:
+    except (KeyError, TypeError) as e:
+        # Malformed payload only — see charge.refunded above. A failure in
+        # the processing below must reach dj-stripe so the Event row rolls
+        # back and Stripe redelivers.
         logger.error(
-            "Error handling payment_intent.payment_failed: %s", e, exc_info=True
+            "Malformed payment_intent.payment_failed payload: %s",
+            e,
+            exc_info=True,
         )
 
 
@@ -1277,8 +1286,15 @@ def handle_stripe_charge_refunded(sender, **kwargs):
         if is_full_refund:
             order_refunded.send(sender=Order, order=order)
 
-    except Exception as e:
-        logger.error("Error handling charge.refunded: %s", e, exc_info=True)
+    except (KeyError, TypeError) as e:
+        # Malformed payload only. Everything else must PROPAGATE (G0231):
+        # this runs inside dj-stripe's webhook atomic, so swallowing
+        # commits the Event row and Stripe never redelivers. The history
+        # write and ``order_refunded`` above run AFTER the inner atomic
+        # has committed the refund, so losing them leaves an order that
+        # reads REFUNDED while the customer is never emailed about the
+        # money coming back.
+        logger.error("Malformed charge.refunded payload: %s", e, exc_info=True)
 
 
 @djstripe_receiver("charge.dispute.created")
@@ -1398,9 +1414,13 @@ def handle_stripe_dispute_created(sender, **kwargs):
             )
         )
 
-    except Exception as e:
+    except (KeyError, TypeError) as e:
+        # Malformed payload only — see charge.refunded above. A swallowed
+        # failure here flags the dispute in the DB and then loses the
+        # staff notification, so nobody works the chargeback before
+        # Stripe's evidence deadline.
         logger.error(
-            "Error handling charge.dispute.created: %s", e, exc_info=True
+            "Malformed charge.dispute.created payload: %s", e, exc_info=True
         )
 
 
@@ -1483,11 +1503,12 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             # must never un-refund / un-cancel an order that already
             # reached a settled financial state. Mirrors
             # OrderService.handle_payment_succeeded.
-            if order.payment_status in {
-                PaymentStatus.REFUNDED,
-                PaymentStatus.PARTIALLY_REFUNDED,
-                PaymentStatus.CANCELED,
-            }:
+            # COMPLETED is excluded on purpose: a "paid" event landing on
+            # an already-completed order is a redelivery, and processing
+            # it again is a harmless no-op rather than a regression.
+            if order.payment_status in (
+                SETTLED_PAYMENT_STATUSES - {PaymentStatus.COMPLETED}
+            ):
                 logger.warning(
                     "Ignoring checkout.session.completed for order %s: "
                     "payment_status already %s",
@@ -1575,6 +1596,24 @@ def handle_stripe_checkout_completed(sender, **kwargs):
             )
 
         elif payment_status == "unpaid":
+            # The same settled-state guard the "paid" arm carries, and
+            # here it includes COMPLETED: writing PENDING over ANY
+            # settled state is a regression. Stripe retries a failed
+            # delivery for up to three days, which is long enough for
+            # auto_cancel_stuck_pending_orders to cancel the order first
+            # — the late retry would then put a cancelled order back to
+            # "awaiting payment" and let the checkout endpoints open a
+            # fresh provider session for it.
+            if order.payment_status in SETTLED_PAYMENT_STATUSES:
+                logger.warning(
+                    "Ignoring unpaid checkout.session.completed for order "
+                    "%s: payment_status already %s",
+                    order.id,
+                    order.payment_status,
+                )
+                order.save(update_fields=["metadata"])
+                return
+
             order.payment_status = PaymentStatus.PENDING
             order.save(update_fields=["payment_status", "metadata"])
 

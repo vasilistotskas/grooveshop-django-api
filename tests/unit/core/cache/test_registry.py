@@ -4,11 +4,11 @@ import pytest
 
 from core.cache.registry import (
     CacheSurface,
+    _reset_for_tests,
     expand_with_related,
     get_surface,
     iter_surfaces,
     register_surface,
-    _reset_for_tests,
 )
 
 

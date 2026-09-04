@@ -5,9 +5,9 @@ from django_filters import rest_framework as filters
 
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import UUIDFilterMixin
+from order.enum.status import OrderStatus, PaymentStatus
 from order.models.item import OrderItem
 from order.models.order import Order
-from order.enum.status import OrderStatus, PaymentStatus
 
 
 class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
@@ -373,8 +373,9 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
 
     def filter_recent_orders(self, queryset, name, value):
         if value is True:
-            from django.utils import timezone
             from datetime import timedelta
+
+            from django.utils import timezone
 
             thirty_days_ago = timezone.now() - timedelta(days=30)
             return queryset.filter(created_at__gte=thirty_days_ago)
@@ -661,8 +662,9 @@ class OrderItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
 
     def filter_recent_items(self, queryset, name, value):
         if value is True:
-            from django.utils import timezone
             from datetime import timedelta
+
+            from django.utils import timezone
 
             seven_days_ago = timezone.now() - timedelta(days=7)
             return queryset.filter(created_at__gte=seven_days_ago)

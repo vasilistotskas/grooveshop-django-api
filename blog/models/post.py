@@ -8,10 +8,14 @@ from tinymce.models import HTMLField
 
 from blog.managers.post import BlogPostManager
 from core.fields.image import ImageAndSvgField
-from core.models import PublishableModel, TimeStampMixinModel, UUIDModel
+from core.models import (
+    PublishableModel,
+    SeoModel,
+    TimeStampMixinModel,
+    UUIDModel,
+)
 from core.utils.generators import SlugifyConfig, unique_slugify
 from meili.models import IndexMixin
-from core.models import SeoModel
 from search.transliteration import (
     greeklish_shadow,
     greeklish_shadow_alt,

@@ -1,15 +1,16 @@
-import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
-from order.stock import StockManager
-from order.services import OrderService
-from order.models import StockLog, Order
-from order.enum.status import OrderStatus, PaymentStatus
-from product.factories import ProductFactory
+import pytest
+
 from cart.factories import CartFactory, CartItemFactory
-from pay_way.factories import PayWayFactory
-from user.factories import UserAccountFactory
 from country.factories import CountryFactory
+from order.enum.status import OrderStatus, PaymentStatus
+from order.models import Order, StockLog
+from order.services import OrderService
+from order.stock import StockManager
+from pay_way.factories import PayWayFactory
+from product.factories import ProductFactory
+from user.factories import UserAccountFactory
 
 
 @pytest.mark.django_db
@@ -431,19 +432,21 @@ class TestPaymentConfirmationConvertsReservations:
 
         from order.exceptions import InsufficientStockError
 
-        with patch.object(
-            StockManager,
-            "convert_reservation_to_sale",
-            side_effect=mock_convert_with_failure,
+        with (
+            patch.object(
+                StockManager,
+                "convert_reservation_to_sale",
+                side_effect=mock_convert_with_failure,
+            ),
+            pytest.raises(InsufficientStockError),
         ):
-            with pytest.raises(InsufficientStockError):
-                OrderService.create_order_from_cart(
-                    cart=cart,
-                    shipping_address=shipping_address,
-                    payment_intent_id="pi_test_atomic",
-                    pay_way=pay_way,
-                    user=user,
-                )
+            OrderService.create_order_from_cart(
+                cart=cart,
+                shipping_address=shipping_address,
+                payment_intent_id="pi_test_atomic",
+                pay_way=pay_way,
+                user=user,
+            )
 
         # Verify: Neither reservation was consumed (atomicity)
         reservation1.refresh_from_db()

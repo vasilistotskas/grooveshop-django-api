@@ -11,7 +11,6 @@ from blog.factories.tag import BlogTagFactory
 from blog.models.post import BlogPost
 from devtools.factories import CustomDjangoModelFactory
 
-
 fake = Faker()
 
 available_languages = [

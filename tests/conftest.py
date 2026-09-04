@@ -1,13 +1,13 @@
 import os
 
 import pytest
-from redis.exceptions import ConnectionError as RedisConnectionError
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import caches
 from django.db import connection, connections, reset_queries
 from hypothesis import HealthCheck
 from hypothesis import settings as hypothesis_settings
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 # Hypothesis profiles for different environments
 hypothesis_settings.register_profile(

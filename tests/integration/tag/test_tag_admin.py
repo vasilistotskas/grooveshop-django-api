@@ -1,24 +1,24 @@
-import pytest
 from unittest.mock import Mock, patch
 
+import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.test import RequestFactory
 from django.utils import translation
 
+from product.factories import ProductFactory
 from tag.admin import (
+    ContentTypeFilter,
     TagAdmin,
     TaggedItemAdmin,
+    TagInLine,
     TagStatusFilter,
     TagUsageFilter,
-    ContentTypeFilter,
-    TagInLine,
 )
 from tag.factories import TagFactory
 from tag.factories.tagged_item import TaggedProductFactory
 from tag.models import Tag, TaggedItem
-from product.factories import ProductFactory
 
 User = get_user_model()
 

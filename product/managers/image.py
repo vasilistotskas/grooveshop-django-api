@@ -84,15 +84,16 @@ class ProductImageQuerySet(TranslatableOptimizedQuerySet):
         return self.order_by("sort_order", "created_at")
 
     def get_products_needing_images(self, max_images=5):
-        from product.models.product import Product  # noqa: PLC0415
+        from product.models.product import Product
 
         return Product.objects.annotate(image_count=Count("images")).filter(
             image_count__lt=max_images
         )
 
     def get_products_without_main_image(self):
-        from django.db.models import Count  # noqa: PLC0415
-        from product.models.product import Product  # noqa: PLC0415
+        from django.db.models import Count
+
+        from product.models.product import Product
 
         products_with_main_ids = set(
             self.main_images().values_list("product", flat=True)

@@ -170,7 +170,7 @@ def relative_time(dt: datetime | None, now: datetime | None = None) -> str:
     if dt is None:
         return "—"
     if now is None:
-        from django.utils import timezone  # noqa: PLC0415
+        from django.utils import timezone
 
         now = timezone.now()
     delta: timedelta = now - dt

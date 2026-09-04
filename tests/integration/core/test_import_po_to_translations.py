@@ -20,7 +20,6 @@ from django.core.management import call_command
 
 from core.models import Translation
 
-
 PO_TEMPLATE = """\
 msgid ""
 msgstr ""

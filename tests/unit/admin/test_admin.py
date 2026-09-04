@@ -13,8 +13,8 @@ User = get_user_model()
 
 
 def _attach_messages(request):
-    setattr(request, "session", {})
-    setattr(request, "_messages", FallbackStorage(request))
+    request.session = {}
+    request._messages = FallbackStorage(request)
     return request
 
 

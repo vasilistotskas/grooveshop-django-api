@@ -1,8 +1,10 @@
 """Unit tests for email template preview service."""
 
-import pytest
 from unittest.mock import Mock, patch
-from core.email.preview_service import EmailTemplatePreviewService, EmailPreview
+
+import pytest
+
+from core.email.preview_service import EmailPreview, EmailTemplatePreviewService
 from order.models import Order
 
 

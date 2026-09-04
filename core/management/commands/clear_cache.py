@@ -35,15 +35,14 @@ only ever in the surface path, which goes through the schema-scoped
 
 from __future__ import annotations
 
-from django.core.management.base import BaseCommand, CommandError
-from django_tenants.utils import get_public_schema_name, schema_context
-
-from core.cache.service import CacheService
-
 # The default backend is core.caches.CustomCache (see CACHES) —
 # the proxy delegates its raw-key helpers (keys/delete_raw_keys/
 # clear_by_prefixes) to it.
 from django.core.cache import cache as cache_instance
+from django.core.management.base import BaseCommand, CommandError
+from django_tenants.utils import get_public_schema_name, schema_context
+
+from core.cache.service import CacheService
 
 
 class Command(BaseCommand):

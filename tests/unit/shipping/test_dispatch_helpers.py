@@ -123,12 +123,14 @@ def test_dispatch_task_does_not_fire_when_outer_txn_rolls_back():
     )
     _attach_provider(order, "boxnow")
 
-    with patch(
-        "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
-    ) as mock_dispatch:
-        with transaction.atomic():
-            ShippingService.dispatch_create_shipment_task(order)
-            transaction.set_rollback(True)
+    with (
+        patch(
+            "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
+        ) as mock_dispatch,
+        transaction.atomic(),
+    ):
+        ShippingService.dispatch_create_shipment_task(order)
+        transaction.set_rollback(True)
 
     assert mock_dispatch.call_count == 0, (
         "BoxNowCarrier.dispatch_create_shipment_task fired despite the "
@@ -146,11 +148,13 @@ def test_dispatch_task_fires_when_outer_txn_commits():
     )
     _attach_provider(order, "boxnow")
 
-    with patch(
-        "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
-    ) as mock_dispatch:
-        with transaction.atomic():
-            ShippingService.dispatch_create_shipment_task(order)
+    with (
+        patch(
+            "shipping_boxnow.carrier.BoxNowCarrier.dispatch_create_shipment_task"
+        ) as mock_dispatch,
+        transaction.atomic(),
+    ):
+        ShippingService.dispatch_create_shipment_task(order)
         # Atomic block exited cleanly → on_commit fires here.
 
     assert mock_dispatch.call_count == 1

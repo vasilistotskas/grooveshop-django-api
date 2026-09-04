@@ -1,5 +1,6 @@
 from urllib.parse import urlsplit
 
+from allauth.idp.oidc import views as oidc_views
 from django.conf import settings
 from django.conf.urls.i18n import i18n_patterns
 from django.conf.urls.static import static
@@ -7,13 +8,14 @@ from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import include, path
 from django.utils.translation import gettext_lazy as _
-from allauth.idp.oidc import views as oidc_views
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
 
+import core.filters.camel_case_filters
+import core.filters.camel_case_ordering  # noqa
 from core.api.views import (
     get_setting_by_key,
     health_check,
@@ -29,9 +31,6 @@ from core.views import (
 )
 from order.views.viva_webhook import viva_wallet_webhook
 from shipping_boxnow.views.webhook import BoxNowWebhookView
-
-import core.filters.camel_case_filters  # noqa
-import core.filters.camel_case_ordering  # noqa
 
 app_name = "core"
 

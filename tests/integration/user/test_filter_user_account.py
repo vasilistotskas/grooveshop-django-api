@@ -1,8 +1,9 @@
 from datetime import timedelta
+
+import pytest
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APIClient
-import pytest
 
 from country.factories import CountryFactory
 from region.factories import RegionFactory

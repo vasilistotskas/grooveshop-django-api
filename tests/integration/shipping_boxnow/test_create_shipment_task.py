@@ -54,8 +54,9 @@ class TestCreateBoxNowShipmentTask:
         drives the loop to the cap and the order_not_found return
         path executes.
         """
-        from celery.exceptions import Retry
         from unittest.mock import patch
+
+        from celery.exceptions import Retry
 
         retry_count = [0]
 
@@ -125,21 +126,23 @@ class TestCreateBoxNowShipmentTask:
             retry_count[0] += 1
             raise Retry()
 
-        with patch(
-            "shipping_boxnow.services.BoxNowService.create_shipment_for_order",
-            side_effect=BoxNowRetryableError(503, message="upstream 5xx"),
-        ):
-            with patch.object(
+        with (
+            patch(
+                "shipping_boxnow.services.BoxNowService.create_shipment_for_order",
+                side_effect=BoxNowRetryableError(503, message="upstream 5xx"),
+            ),
+            patch.object(
                 create_boxnow_shipment_for_order,
                 "retry",
                 side_effect=fake_retry,
-            ):
-                create_boxnow_shipment_for_order.push_request(retries=0)
-                try:
-                    with pytest.raises(Retry):
-                        create_boxnow_shipment_for_order(order.id)
-                finally:
-                    create_boxnow_shipment_for_order.pop_request()
+            ),
+        ):
+            create_boxnow_shipment_for_order.push_request(retries=0)
+            try:
+                with pytest.raises(Retry):
+                    create_boxnow_shipment_for_order(order.id)
+            finally:
+                create_boxnow_shipment_for_order.pop_request()
 
         # autoretry was triggered (not swallowed into a returned dict).
         assert retry_count[0] == 1

@@ -5,10 +5,10 @@ from rest_framework.test import APITestCase
 
 from cart.factories.cart import CartFactory
 from cart.factories.item import CartItemFactory
-from tests.utils import TestURLFixerMixin
 from order.models import StockReservation
 from order.stock import StockManager
 from product.factories.product import ProductFactory
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()

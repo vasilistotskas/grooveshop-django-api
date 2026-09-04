@@ -28,13 +28,13 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from core.utils.email_context import build_email_context
+from core.utils.i18n import get_order_language
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsConfigError,
     AcsRetryableError,
 )
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_order_language
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -590,7 +590,7 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             stale_alert_sent=True
         )
 
-    from tenant.credentials import (  # noqa: PLC0415
+    from tenant.credentials import (
         tenant_admin_recipients,
         tenant_from_email,
         tenant_site_name,

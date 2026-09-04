@@ -5,7 +5,6 @@ from extra_settings.models import Setting
 
 from order.serializers.order import OrderCreateFromCartSerializer
 
-
 BASE_PAYLOAD = {
     "pay_way_id": 1,
     "first_name": "Nikos",

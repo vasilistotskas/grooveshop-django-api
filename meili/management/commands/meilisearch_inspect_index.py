@@ -8,8 +8,8 @@ from django.utils.translation import gettext as _
 from meilisearch.errors import MeilisearchApiError
 
 from blog.models.post import BlogPostTranslation
-from meili._client import client
 from core.management.tenant_mixin import TenantCommandMixin
+from meili._client import client
 from product.models.product import ProductTranslation
 
 

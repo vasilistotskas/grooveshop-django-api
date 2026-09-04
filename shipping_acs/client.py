@@ -77,7 +77,7 @@ class AcsClient:
         timeout: int | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        from tenant.credentials import acs_credentials  # noqa: PLC0415
+        from tenant.credentials import acs_credentials
 
         creds = acs_credentials()
         self.api_key = api_key or creds["api_key"]

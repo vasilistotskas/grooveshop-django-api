@@ -54,7 +54,7 @@ _DEFAULT_SHOP_KINDS_BY_COUNTRY: dict[str, list[int]] = {
 }
 _DEFAULT_NEAREST_LIMIT = 20
 _DEFAULT_MIN_WEIGHT_KG = Decimal("0.5")
-_DEFAULT_MAX_WEIGHT_KG = Decimal("999")
+_DEFAULT_MAX_WEIGHT_KG = Decimal(999)
 _DEFAULT_VOUCHER_LANGUAGE = "GR"
 # ACS_Print_Voucher Print_Type values (per the ACS REST API PDF):
 # 1 = thermal/roll printer (single voucher per page); 2 = laser
@@ -213,7 +213,7 @@ def is_configured() -> bool:
     entirely when False) and the ACS fanout Celery tasks (skip an
     unconfigured tenant cleanly instead of raising ``AcsConfigError``).
     """
-    from tenant.credentials import acs_credentials  # noqa: PLC0415
+    from tenant.credentials import acs_credentials
 
     creds = acs_credentials()
     return bool(
@@ -253,7 +253,7 @@ def station_origin() -> str | None:
     if explicit:
         return str(explicit).strip().upper() or None
 
-    from tenant.credentials import acs_credentials  # noqa: PLC0415
+    from tenant.credentials import acs_credentials
 
     creds = acs_credentials()
     tenant_station = (creds.get("station_origin") or "").strip().upper()

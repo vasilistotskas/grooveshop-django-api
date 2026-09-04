@@ -38,7 +38,7 @@ def user(db):
     return User.objects.create_user(
         username="bob-adapter",
         email="bob-adapter@example.com",
-        password="p",  # noqa: S106
+        password="p",
     )
 
 
@@ -123,7 +123,7 @@ class TestSignupGrantsNoMembership:
         new_user = User.objects.create_user(
             username="new-signup",
             email="new-signup@example.com",
-            password="p",  # noqa: S106
+            password="p",
         )
 
         monkeypatch.setattr(
@@ -153,7 +153,7 @@ class TestSignupGrantsNoMembership:
         new_user = User.objects.create_user(
             username="social-new",
             email="social-new@example.com",
-            password="p",  # noqa: S106
+            password="p",
         )
         monkeypatch.setattr(
             "user.adapter.SocialAccountAdapter.save_user",

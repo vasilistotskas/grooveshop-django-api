@@ -15,7 +15,6 @@ from hypothesis import strategies as st
 from loyalty.enum import PriceBasis, TransactionType
 from loyalty.services import LoyaltyService
 
-
 # ---------------------------------------------------------------------------
 # Hypothesis strategies
 # ---------------------------------------------------------------------------
@@ -273,9 +272,8 @@ class TestRedemptionDiscount:
 
         **Validates: Requirements 4.1**
         """
-        from user.factories.account import UserAccountFactory
-
         from loyalty.models.transaction import PointsTransaction
+        from user.factories.account import UserAccountFactory
 
         user = UserAccountFactory()
 
@@ -345,9 +343,8 @@ class TestBalanceEqualsTransactionSum:
 
         **Validates: Requirements 5.2**
         """
-        from user.factories.account import UserAccountFactory
-
         from loyalty.models.transaction import PointsTransaction
+        from user.factories.account import UserAccountFactory
 
         user = UserAccountFactory()
 

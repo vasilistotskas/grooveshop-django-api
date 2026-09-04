@@ -67,7 +67,7 @@ def _action_source_website():
     return ActionSource.WEBSITE
 
 
-def _decimal_to_float(value: Decimal | float | int | None) -> float | None:
+def _decimal_to_float(value: Decimal | float | None) -> float | None:
     if value is None:
         return None
     return float(value)

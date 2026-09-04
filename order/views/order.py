@@ -1343,7 +1343,7 @@ class OrderViewSet(BaseModelViewSet):
         # hides unconfigured providers, but a stale client (or a key
         # removed mid-session) could still submit one — refuse before
         # the provider constructor raises ImproperlyConfigured.
-        from pay_way.services import PayWayService  # noqa: PLC0415
+        from pay_way.services import PayWayService
 
         if not PayWayService.is_provider_configured(
             order.pay_way.provider_code
@@ -1454,12 +1454,12 @@ class OrderViewSet(BaseModelViewSet):
         Gated by ``AGENT_STRIPE_DELEGATED_ENABLED`` (off until Stripe
         Agentic Commerce enrollment completes).
         """
-        from order.enum.status import PaymentStatus
-
         # Per-store commercial capability: the Tenant flag enables the
         # SPT flow for THIS store; the platform env stays as a legacy
         # enable-all switch for the pre-multi-tenant deployment.
         from django.db import connection as _connection
+
+        from order.enum.status import PaymentStatus
 
         tenant_enabled = getattr(
             getattr(_connection, "tenant", None),
@@ -1479,7 +1479,7 @@ class OrderViewSet(BaseModelViewSet):
 
         # The SPT is granted against a specific merchant account, so it
         # must be confirmed with THIS tenant's own Stripe identity.
-        from pay_way.services import PayWayService  # noqa: PLC0415
+        from pay_way.services import PayWayService
 
         if not PayWayService.is_provider_configured("stripe"):
             return Response(
@@ -1779,7 +1779,7 @@ class OrderViewSet(BaseModelViewSet):
             # the storefront can route the buyer to the gift-card
             # confirmation instead of a dead order lookup.
             if order_code:
-                from giftcard.models import (  # noqa: PLC0415
+                from giftcard.models import (
                     GiftCardPurchase,
                 )
 

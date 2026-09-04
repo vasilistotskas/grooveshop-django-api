@@ -99,7 +99,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         context = getattr(obj, "_b2b_pricing", None)
         if context is None:
             return None
-        from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
+        from b2b.services import B2BPricingService, B2BService
 
         return {
             "applied": True,
@@ -126,7 +126,7 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
         # promotion fields all read from it.
         cache = self.context.setdefault("_promotion_results", {})
         if obj.pk not in cache:
-            from promotion.services import PromotionEngine  # noqa: PLC0415
+            from promotion.services import PromotionEngine
 
             cache[obj.pk] = PromotionEngine.evaluate(obj, user=obj.user)
         return cache[obj.pk]
@@ -279,7 +279,7 @@ class CartDetailSerializer(CartSerializer):
                 categories.add(item.product.category)
 
         if categories:
-            from product.models.product import Product  # noqa: PLC0415
+            from product.models.product import Product
 
             recommendations = (
                 Product.objects.filter(category__in=categories, active=True)

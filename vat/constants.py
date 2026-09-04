@@ -30,13 +30,13 @@ from decimal import Decimal
 # ``order/mydata/builder.py`` can map to an AADE ``vatCategory``.
 MYDATA_SUPPORTED_VAT_RATES: frozenset[Decimal] = frozenset(
     {
-        Decimal("24"),
-        Decimal("17"),
-        Decimal("13"),
-        Decimal("9"),
-        Decimal("6"),
-        Decimal("4"),
-        Decimal("3"),
-        Decimal("0"),
+        Decimal(24),
+        Decimal(17),
+        Decimal(13),
+        Decimal(9),
+        Decimal(6),
+        Decimal(4),
+        Decimal(3),
+        Decimal(0),
     }
 )

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 from django.utils.translation import gettext_lazy as _
 

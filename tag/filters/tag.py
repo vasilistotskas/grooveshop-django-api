@@ -2,9 +2,9 @@ from django.db.models import Count, Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
-from tag.models.tag import Tag
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
-from core.filters.core import UUIDFilterMixin, SortableFilterMixin
+from core.filters.core import SortableFilterMixin, UUIDFilterMixin
+from tag.models.tag import Tag
 
 
 class TagFilter(

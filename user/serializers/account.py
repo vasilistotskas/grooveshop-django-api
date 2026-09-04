@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
-from django.utils.translation import gettext_lazy as _
 
 if TYPE_CHECKING:
     from user.models.account import UserAccount as User
@@ -20,7 +20,7 @@ class UserSerializer(serializers.ModelSerializer[User]):
         if "allauth.account" not in settings.INSTALLED_APPS:
             return username
 
-        from allauth.account.adapter import get_adapter  # noqa: PLC0415
+        from allauth.account.adapter import get_adapter
 
         username = get_adapter().clean_username(username)
         return username

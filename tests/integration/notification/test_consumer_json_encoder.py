@@ -6,7 +6,7 @@ Decimal, datetime, and UUID values without raising TypeError.
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -57,7 +57,7 @@ async def test_send_notification_serializes_datetime():
 
     consumer.send = fake_send  # type: ignore[method-assign]
 
-    dt = datetime(2026, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+    dt = datetime(2026, 1, 15, 10, 30, 0, tzinfo=UTC)
     event = {
         "type": "send_notification",
         "created_at": dt,

@@ -1,16 +1,17 @@
-import pytest
 from datetime import timedelta
 from unittest.mock import Mock, patch
+
+import pytest
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from djmoney.money import Money
 
-from order.services import OrderService
+from order.enum.status import OrderStatus, PaymentStatus
 from order.exceptions import (
     InvalidOrderDataError,
     PaymentVerificationError,
 )
-from order.enum.status import OrderStatus, PaymentStatus
+from order.services import OrderService
 
 pytestmark = pytest.mark.assert_english
 
@@ -33,11 +34,11 @@ class TestCreateOrderFromCart:
         - Cart is cleared
         """
         from cart.factories import CartFactory, CartItemFactory
-        from product.factories import ProductFactory
-        from pay_way.factories import PayWayFactory
-        from user.factories import UserAccountFactory
         from country.factories import CountryFactory
         from order.stock import StockManager
+        from pay_way.factories import PayWayFactory
+        from product.factories import ProductFactory
+        from user.factories import UserAccountFactory
 
         # Setup
         user = UserAccountFactory()
@@ -139,10 +140,10 @@ class TestCreateOrderFromCart:
         - No errors occur when reservations are missing
         """
         from cart.factories import CartFactory, CartItemFactory
-        from product.factories import ProductFactory
-        from pay_way.factories import PayWayFactory
-        from user.factories import UserAccountFactory
         from country.factories import CountryFactory
+        from pay_way.factories import PayWayFactory
+        from product.factories import ProductFactory
+        from user.factories import UserAccountFactory
 
         # Setup
         user = UserAccountFactory()
@@ -200,8 +201,8 @@ class TestCreateOrderFromCart:
         Test that missing payment_intent_id raises InvalidOrderDataError.
         """
         from cart.factories import CartFactory, CartItemFactory
-        from product.factories import ProductFactory
         from pay_way.factories import PayWayFactory
+        from product.factories import ProductFactory
         from user.factories import UserAccountFactory
 
         # Setup
@@ -246,10 +247,10 @@ class TestCreateOrderFromCart:
         or truly uninitialized (requires_payment_method without any payment attempt).
         """
         from cart.factories import CartFactory, CartItemFactory
-        from product.factories import ProductFactory
-        from pay_way.factories import PayWayFactory
-        from user.factories import UserAccountFactory
         from country.factories import CountryFactory
+        from pay_way.factories import PayWayFactory
+        from product.factories import ProductFactory
+        from user.factories import UserAccountFactory
 
         # Setup
         user = UserAccountFactory()
@@ -304,10 +305,10 @@ class TestCreateOrderFromCart:
         Validates that stock validation prevents overselling during cart validation phase.
         """
         from cart.factories import CartFactory, CartItemFactory
-        from product.factories import ProductFactory
-        from pay_way.factories import PayWayFactory
-        from user.factories import UserAccountFactory
         from country.factories import CountryFactory
+        from pay_way.factories import PayWayFactory
+        from product.factories import ProductFactory
+        from user.factories import UserAccountFactory
 
         # Setup
         user = UserAccountFactory()
@@ -671,8 +672,8 @@ class TestCancelOrderWithStockManager:
         - Order status is updated to CANCELED
         """
         from order.factories import OrderFactory
+        from order.models import OrderItem, StockReservation
         from product.factories import ProductFactory
-        from order.models import StockReservation, OrderItem
 
         # Setup
         product = ProductFactory(stock=5)

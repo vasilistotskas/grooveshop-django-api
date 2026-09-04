@@ -40,7 +40,6 @@ from tenant.models import (
     UserTenantMembership,
 )
 
-
 User = get_user_model()
 
 

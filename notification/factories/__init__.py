@@ -1,5 +1,4 @@
-from .notification import NotificationFactory
-from .notification import NotificationTranslationFactory
+from .notification import NotificationFactory, NotificationTranslationFactory
 from .user import NotificationUserFactory
 
 __all__ = [

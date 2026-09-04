@@ -65,7 +65,7 @@ class AgentAPIView(APIView):
     authentication_classes = [AgentTokenAuthentication]
 
     def get_permissions(self):
-        from tenant.permissions import (  # noqa: PLC0415
+        from tenant.permissions import (
             IsAgentCommerceEnabled,
             IsAgentCommerceRuntimeEnabled,
         )

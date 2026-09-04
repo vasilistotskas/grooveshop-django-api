@@ -1,5 +1,5 @@
-from os import getenv
 import uuid
+from os import getenv
 
 from django.test import TestCase
 

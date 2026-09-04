@@ -9,7 +9,6 @@ from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.order import Order
-from pay_way.factories import PayWayFactory
 from order.signals import (
     order_canceled,
     order_completed,
@@ -19,6 +18,7 @@ from order.signals import (
     order_shipped,
     order_status_changed,
 )
+from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 
 

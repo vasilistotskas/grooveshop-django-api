@@ -4,7 +4,6 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from django.conf import settings
 
@@ -246,7 +245,7 @@ class EmailTemplateRegistry:
         """Get all registered templates."""
         return list(self._templates.values())
 
-    def get_template(self, name: str) -> Optional[EmailTemplateInfo]:
+    def get_template(self, name: str) -> EmailTemplateInfo | None:
         """Get specific template by name."""
         return self._templates.get(name)
 

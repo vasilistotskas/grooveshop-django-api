@@ -17,12 +17,12 @@ pytestmark = pytest.mark.django_db
 
 
 def _bound_cart(price="100.00", quantity=1, **group_kwargs):
-    group = CustomerGroupFactory(discount_percent=Decimal("10"), **group_kwargs)
+    group = CustomerGroupFactory(discount_percent=Decimal(10), **group_kwargs)
     cart = CartFactory(is_guest=True)
     cart.items.all().delete()
     product = ProductFactory(
         price=Money(Decimal(price), "EUR"),
-        discount_percent=Decimal("0"),
+        discount_percent=Decimal(0),
         vat=None,
         stock=100,
         active=True,

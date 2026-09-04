@@ -87,7 +87,7 @@ def self_service_tenant(request):
     if getattr(user, "is_superuser", False):
         return None
 
-    from tenant.membership import get_current_tenant  # noqa: PLC0415
+    from tenant.membership import get_current_tenant
 
     return get_current_tenant()
 
@@ -124,7 +124,7 @@ _STATE_BADGES: dict[str, tuple[Any, str, str]] = {
 
 
 def _unfold_label(text, tone: str, icon: str | None = None) -> str:
-    from django.template.loader import render_to_string  # noqa: PLC0415
+    from django.template.loader import render_to_string
 
     return render_to_string(
         "unfold/helpers/label.html",
@@ -133,7 +133,7 @@ def _unfold_label(text, tone: str, icon: str | None = None) -> str:
 
 
 def _public_schema_context():
-    from django_tenants.utils import (  # noqa: PLC0415
+    from django_tenants.utils import (
         get_public_schema_name,
         schema_context,
     )
@@ -246,9 +246,7 @@ class TenantAdmin(ModelAdmin):
     @display(description=_("Plan"), ordering="plan")
     def display_plan(self, obj):
         icon, tone = _PLAN_BADGES.get(obj.plan, ("help", "info"))
-        return mark_safe(  # noqa: S308 - fixed strings, no user input
-            _unfold_label(obj.get_plan_display(), tone, icon)
-        )
+        return mark_safe(_unfold_label(obj.get_plan_display(), tone, icon))
 
     @display(description=_("Status"), ordering="is_active")
     def display_status(self, obj):
@@ -259,29 +257,25 @@ class TenantAdmin(ModelAdmin):
         both as a bare boolean hid that difference.
         """
         if obj.suspended_at is not None:
-            return mark_safe(  # noqa: S308 - fixed strings
+            return mark_safe(
                 _unfold_label(_("Suspended"), "danger", "pause_circle")
             )
         if not obj.is_active:
-            return mark_safe(  # noqa: S308 - fixed strings
+            return mark_safe(
                 _unfold_label(_("Inactive"), "warning", "visibility_off")
             )
-        return mark_safe(  # noqa: S308 - fixed strings
-            _unfold_label(_("Live"), "success", "check_circle")
-        )
+        return mark_safe(_unfold_label(_("Live"), "success", "check_circle"))
 
     @display(description=_("Billing"))
     def display_billing_state(self, obj):
         """The same classifier the Plan & Billing page renders (see
         ``tenant.billing.billing_state``) — surfaced here too so a
         past-due store is visible without leaving the Tenants list."""
-        from tenant.billing import billing_state  # noqa: PLC0415
+        from tenant.billing import billing_state
 
         state = billing_state(obj, timezone.localdate())
         label, tone, icon = _STATE_BADGES[state]
-        return mark_safe(  # noqa: S308 - fixed strings, no user input
-            _unfold_label(str(label), tone, icon)
-        )
+        return mark_safe(_unfold_label(str(label), tone, icon))
 
     @display(description=_("Last activity"))
     def display_last_activity(self, obj):
@@ -296,19 +290,19 @@ class TenantAdmin(ModelAdmin):
         TENANT_APPS-only app, so the public schema has no orders table
         to query at all.
         """
-        from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+        from django_tenants.utils import get_public_schema_name
 
-        from admin.platform_dashboard import _schema_exists  # noqa: PLC0415
+        from admin.platform_dashboard import _schema_exists
 
         if obj.schema_name == get_public_schema_name():
             return "—"
         if not _schema_exists(obj.schema_name):
             return "—"
 
-        from django.apps import apps  # noqa: PLC0415
-        from django_tenants.utils import tenant_context  # noqa: PLC0415
+        from django.apps import apps
+        from django_tenants.utils import tenant_context
 
-        from admin.displays import format_dt  # noqa: PLC0415
+        from admin.displays import format_dt
 
         try:
             with tenant_context(obj):
@@ -318,7 +312,7 @@ class TenantAdmin(ModelAdmin):
                     .values_list("created_at", flat=True)
                     .first()
                 )
-        except Exception:  # noqa: BLE001 - never break the changelist
+        except Exception:
             return "—"
 
         return format_dt(latest) if latest is not None else "—"
@@ -342,7 +336,7 @@ class TenantAdmin(ModelAdmin):
         if self_service_tenant(request) is None:
             return readonly
 
-        from tenant.role_scopes import (  # noqa: PLC0415
+        from tenant.role_scopes import (
             TENANT_SELF_EDITABLE_FIELDS,
         )
 
@@ -415,7 +409,7 @@ class TenantAdmin(ModelAdmin):
         )
 
     def _provision_new_tenant(self, request, tenant_pk) -> None:
-        from tenant.provisioning import provision_tenant  # noqa: PLC0415
+        from tenant.provisioning import provision_tenant
 
         try:
             tenant = Tenant.objects.get(pk=tenant_pk)
@@ -424,7 +418,7 @@ class TenantAdmin(ModelAdmin):
 
         try:
             result = provision_tenant(tenant)
-        except Exception as exc:  # noqa: BLE001 - never break the add response
+        except Exception as exc:
             self.message_user(
                 request,
                 _(
@@ -754,7 +748,7 @@ class TenantAdmin(ModelAdmin):
         operation, since it needs the old endpoint disabled in the
         Stripe dashboard first).
         """
-        from tenant.provisioning import provision_stripe  # noqa: PLC0415
+        from tenant.provisioning import provision_stripe
 
         level_by_status = {
             "created": messages.SUCCESS,
@@ -768,7 +762,7 @@ class TenantAdmin(ModelAdmin):
                 continue
             try:
                 result = provision_stripe(tenant)
-            except Exception as exc:  # noqa: BLE001 — surfaced to operator
+            except Exception as exc:
                 self.message_user(
                     request,
                     _("%(store)s: Stripe provisioning failed — %(error)s")
@@ -808,7 +802,7 @@ class TenantAdmin(ModelAdmin):
         browser, so it is an operator step in the offboarding runbook
         rather than a self-service download.
         """
-        from tenant.lifecycle import export_tenant_data  # noqa: PLC0415
+        from tenant.lifecycle import export_tenant_data
 
         for tenant in queryset:
             if is_protected_tenant(tenant):
@@ -817,7 +811,7 @@ class TenantAdmin(ModelAdmin):
                 path = export_tenant_data(
                     tenant, actor=getattr(request.user, "email", "") or ""
                 )
-            except Exception as exc:  # noqa: BLE001 — surfaced to operator
+            except Exception as exc:
                 self.message_user(
                     request,
                     _("%(store)s: export failed — %(error)s")
@@ -991,7 +985,7 @@ class TenantAdmin(ModelAdmin):
                 # schema, files and search indexes, RETAINS invoices
                 # under their statutory period, and records the erasure
                 # in TenantArchive.
-                from tenant.lifecycle import destroy_tenant  # noqa: PLC0415
+                from tenant.lifecycle import destroy_tenant
 
                 result = destroy_tenant(
                     tenant, actor=getattr(request.user, "email", "") or ""
@@ -1011,7 +1005,7 @@ class TenantAdmin(ModelAdmin):
                         },
                         level=messages.INFO,
                     )
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.message_user(
                     request,
                     _("Error destroying %(name)s: %(error)s")
@@ -1166,7 +1160,7 @@ class UserTenantMembershipAdmin(ModelAdmin):
         if obj.role != TenantMembershipRole.OWNER:
             return True
 
-        from tenant.membership import get_membership  # noqa: PLC0415
+        from tenant.membership import get_membership
 
         membership = get_membership(request.user, scope)
         return (
@@ -1179,7 +1173,7 @@ class UserTenantMembershipAdmin(ModelAdmin):
         if db_field.name == "role":
             scope = self_service_tenant(request)
             if scope is not None:
-                from tenant.membership import get_membership  # noqa: PLC0415
+                from tenant.membership import get_membership
 
                 membership = get_membership(request.user, scope)
                 is_owner = (

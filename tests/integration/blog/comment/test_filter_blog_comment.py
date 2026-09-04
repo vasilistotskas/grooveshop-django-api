@@ -2,8 +2,8 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.db.models import signals
-from django.utils import timezone
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from blog.factories.author import BlogAuthorFactory
@@ -20,10 +20,10 @@ class BlogCommentFilterTest(APITestCase):
         super().setUpClass()
 
     def setUp(self):
-        from blog.models.comment import BlogComment
-        from blog.models.post import BlogPost
         from blog.models.author import BlogAuthor
         from blog.models.category import BlogCategory
+        from blog.models.comment import BlogComment
+        from blog.models.post import BlogPost
         from user.models.account import UserAccount
 
         BlogComment.objects.all().delete()

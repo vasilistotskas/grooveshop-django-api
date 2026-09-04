@@ -98,9 +98,7 @@ class CartDiscountResult:
     @property
     def discount_total(self) -> Money:
         currency = settings.DEFAULT_CURRENCY
-        total = sum(
-            (entry.amount.amount for entry in self.applied), Decimal("0")
-        )
+        total = sum((entry.amount.amount for entry in self.applied), Decimal(0))
         return Money(total, currency)
 
     @property
@@ -135,7 +133,7 @@ class PromotionEngine:
         during order create, which runs with no permission classes.
         See tenant.membership.tenant_plan_allows.
         """
-        from tenant.membership import tenant_plan_allows  # noqa: PLC0415
+        from tenant.membership import tenant_plan_allows
 
         if not tenant_plan_allows("promotions_enabled"):
             return False
@@ -173,7 +171,7 @@ class PromotionEngine:
         # apply_coupon gets a clear refusal instead of silently
         # attaching a dead code, while order create proceeds without a
         # discount — exactly what the preview showed.
-        from b2b.services import (  # noqa: PLC0415
+        from b2b.services import (
             B2BPricingService,
             B2BService,
         )
@@ -196,7 +194,7 @@ class PromotionEngine:
 
         currency = settings.DEFAULT_CURRENCY
         items_total = sum(
-            (item.total_price.amount for item in cart_items), Decimal("0")
+            (item.total_price.amount for item in cart_items), Decimal(0)
         )
 
         candidates, rejected = cls._collect_candidates(cart, lock=lock)
@@ -265,11 +263,11 @@ class PromotionEngine:
         chosen = cls._resolve_stacking(monetary, result)
 
         # Never discount below zero items value.
-        running = Decimal("0")
+        running = Decimal(0)
         for entry in chosen:
             available = items_total - running
             if available <= 0:
-                entry.amount = Money(Decimal("0"), currency)
+                entry.amount = Money(Decimal(0), currency)
                 continue
             clamped = min(entry.amount.amount, available)
             entry.amount = Money(_quantize(clamped), currency)
@@ -289,7 +287,7 @@ class PromotionEngine:
         """
         if not result.gift_items:
             return 0
-        from shipping.utils import (  # noqa: PLC0415
+        from shipping.utils import (
             compute_total_weight_grams,
         )
 
@@ -444,7 +442,7 @@ class PromotionEngine:
                 return str(CouponRejectionReason.MINIMUM_NOT_MET)
 
         if promotion.first_order_only:
-            from order.models.order import Order  # noqa: PLC0415
+            from order.models.order import Order
 
             if user is not None and getattr(user, "is_authenticated", False):
                 has_orders = Order.objects.filter(user=user).exists()
@@ -528,13 +526,13 @@ class PromotionEngine:
                 item.total_price.amount
                 for item in cls._matching_items(promotion, cart_items)
             ),
-            Decimal("0"),
+            Decimal(0),
         )
         if base <= 0:
-            return Money(Decimal("0"), currency)
+            return Money(Decimal(0), currency)
 
         if promotion.benefit_type == BenefitType.PERCENTAGE:
-            amount = base * promotion.benefit_value / Decimal("100")
+            amount = base * promotion.benefit_value / Decimal(100)
         else:  # FIXED_AMOUNT
             amount = min(promotion.benefit_value, base)
 
@@ -546,7 +544,7 @@ class PromotionEngine:
 
     @classmethod
     def _expanded_category_ids(cls, categories_qs) -> set[int]:
-        from product.models.category import ProductCategory  # noqa: PLC0415
+        from product.models.category import ProductCategory
 
         ids = list(categories_qs.values_list("id", flat=True))
         if not ids:
@@ -651,7 +649,7 @@ class PromotionEngine:
         buy_qty = promotion.buy_quantity or 0
         get_qty = promotion.get_quantity or 0
         if buy_qty < 1 or get_qty < 1:
-            return Money(Decimal("0"), currency)
+            return Money(Decimal(0), currency)
 
         buy_units = cls._unit_prices(cls._matching_items(promotion, cart_items))
         reward_ids = set(promotion.get_products.values_list("id", flat=True))
@@ -660,21 +658,21 @@ class PromotionEngine:
             group_size = buy_qty + get_qty
             applications = len(buy_units) // group_size
             if applications < 1:
-                return Money(Decimal("0"), currency)
+                return Money(Decimal(0), currency)
             discounted_units = sorted(buy_units)[: applications * get_qty]
         else:
             applications = len(buy_units) // buy_qty
             if applications < 1:
-                return Money(Decimal("0"), currency)
+                return Money(Decimal(0), currency)
             reward_units = cls._unit_prices(
                 [item for item in cart_items if item.product_id in reward_ids]
             )
             if not reward_units:
-                return Money(Decimal("0"), currency)
+                return Money(Decimal(0), currency)
             discounted_units = sorted(reward_units)[: applications * get_qty]
 
-        pct = promotion.get_discount_percent / Decimal("100")
-        amount = sum(discounted_units, Decimal("0")) * pct
+        pct = promotion.get_discount_percent / Decimal(100)
+        amount = sum(discounted_units, Decimal(0)) * pct
         if promotion.max_discount_amount:
             amount = min(
                 amount, Decimal(str(promotion.max_discount_amount.amount))
@@ -711,7 +709,7 @@ class PromotionEngine:
         )
         non_stackables = [e for e in monetary if not e.promotion.stackable]
 
-        stack_total = sum((e.amount.amount for e in stackables), Decimal("0"))
+        stack_total = sum((e.amount.amount for e in stackables), Decimal(0))
         best_single = max(
             non_stackables, key=lambda e: e.amount.amount, default=None
         )

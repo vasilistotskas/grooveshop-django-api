@@ -1,44 +1,44 @@
-import pytest
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
+import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from django.utils import translation
 
 from product.admin import (
-    ProductCategoryAdmin,
-    ProductAdmin,
-    ProductReviewAdmin,
-    ProductFavouriteAdmin,
-    ProductCategoryImageAdmin,
-    ProductImageAdmin,
-    StockStatusFilter,
-    PriceRangeFilter,
     DiscountStatusFilter,
-    PopularityFilter,
     LikesCountFilter,
-    ReviewAverageFilter,
-    ProductImageInline,
+    PopularityFilter,
+    PriceRangeFilter,
+    ProductAdmin,
+    ProductCategoryAdmin,
+    ProductCategoryImageAdmin,
     ProductCategoryImageInline,
-)
-from product.factories import (
-    ProductFactory,
-    ProductCategoryFactory,
-    ProductReviewFactory,
-    ProductFavouriteFactory,
-    ProductImageFactory,
-    ProductCategoryImageFactory,
+    ProductFavouriteAdmin,
+    ProductImageAdmin,
+    ProductImageInline,
+    ProductReviewAdmin,
+    ReviewAverageFilter,
+    StockStatusFilter,
 )
 from product.enum.category import CategoryImageTypeEnum
+from product.factories import (
+    ProductCategoryFactory,
+    ProductCategoryImageFactory,
+    ProductFactory,
+    ProductFavouriteFactory,
+    ProductImageFactory,
+    ProductReviewFactory,
+)
 from product.models import (
     Product,
     ProductCategory,
-    ProductReview,
+    ProductCategoryImage,
     ProductFavourite,
     ProductImage,
-    ProductCategoryImage,
+    ProductReview,
 )
 from tag.admin import TaggedItemInline
 from user.factories import UserAccountFactory

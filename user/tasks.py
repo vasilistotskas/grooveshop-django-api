@@ -243,7 +243,7 @@ def delete_user_account_task(self, user_id: int) -> dict:
 
     from user.services.gdpr import anonymise_and_delete_user
 
-    User = get_user_model()  # noqa: N806
+    User = get_user_model()
 
     try:
         user = User.objects.get(id=user_id)

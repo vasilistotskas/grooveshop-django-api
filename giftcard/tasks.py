@@ -2,12 +2,11 @@ import logging
 
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
-from django.utils import timezone
 
 # See order/tasks.py for rationale — eager gettext over lazy for email
 # subjects: the string must resolve INSIDE the recipient-language
 # override, not whenever the lazy proxy happens to be formatted.
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext as _
 
 from core import celery_app

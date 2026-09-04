@@ -20,10 +20,10 @@ from core.tasks import (
     cleanup_old_backups,
     cleanup_old_guest_carts,
     clear_all_cache_task,
+    clear_development_log_files_task,
     clear_duplicate_history_task,
     clear_expired_notifications_task,
     clear_expired_sessions_task,
-    clear_development_log_files_task,
     clear_old_history_task,
     monitor_system_health,
     scheduled_database_backup,
@@ -386,9 +386,7 @@ class TestClearLogFilesTask:
         }.get(key, default)
 
         def mock_exists_side_effect(path):
-            if path == "/.dockerenv":
-                return True
-            elif path == self.logs_path:
+            if path == "/.dockerenv" or path == self.logs_path:
                 return True
             return False
 
@@ -502,9 +500,7 @@ class TestClearLogFilesTask:
         }.get(key, default)
 
         def mock_exists_side_effect(path):
-            if path == "/.dockerenv":
-                return True
-            elif path == self.logs_path:
+            if path == "/.dockerenv" or path == self.logs_path:
                 return True
             return False
 

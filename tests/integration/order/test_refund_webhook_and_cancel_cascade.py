@@ -18,7 +18,6 @@ from order.models.order import Order
 from order.services import OrderService
 from order.signals.handlers import handle_stripe_charge_refunded
 
-
 # ---------------------------------------------------------------------------
 # I — charge.refunded webhook
 # ---------------------------------------------------------------------------
@@ -253,6 +252,7 @@ class TestRefundOrderConcurrencyGuard:
 
     def test_refund_rechecks_locked_row_and_skips_provider(self):
         from djmoney.money import Money
+
         from pay_way.factories import PayWayFactory
 
         order = OrderFactory(

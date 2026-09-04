@@ -62,7 +62,7 @@ def billing_state(tenant: Any, today: date) -> str:
     in-term trial reads "trial", an expiring or lapsed one reads
     "expiring"/"past_due" so it enters the same dunning pipeline.
     """
-    from tenant.models import TenantPlan  # noqa: PLC0415
+    from tenant.models import TenantPlan
 
     is_trial = tenant.plan == TenantPlan.TRIAL
     if tenant.suspended_at is not None:
@@ -99,12 +99,12 @@ _STAGES: dict[int, tuple[str, bool]] = {
 
 def _stage_subject(tenant: Any, stage: int) -> str:
     """Subject line, built INSIDE the caller's translation override."""
-    from django.utils.formats import date_format  # noqa: PLC0415
+    from django.utils.formats import date_format
 
     # Aliased to ``_`` (not ``_g``): xgettext extraction is lexical and
     # only recognises the standard keywords, so a ``_g("...")`` string
     # silently never reaches the .po files.
-    from django.utils.translation import gettext as _  # noqa: PLC0415
+    from django.utils.translation import gettext as _
 
     store = tenant.store_name or tenant.name
     if stage == 1:
@@ -123,15 +123,15 @@ def _send_stage_email(tenant: Any, stage: int, *, grace_days: int) -> None:
     Platform → merchant mail: the platform's own sender
     (``DEFAULT_FROM_EMAIL``), rendered in the tenant's default locale.
     """
-    from django.core.mail import (  # noqa: PLC0415
+    from django.core.mail import (
         EmailMultiAlternatives,
         mail_admins,
     )
-    from django.template.loader import render_to_string  # noqa: PLC0415
-    from django.utils import translation  # noqa: PLC0415
+    from django.template.loader import render_to_string
+    from django.utils import translation
 
-    from core.utils.email_context import build_email_context  # noqa: PLC0415
-    from tenant.models import TenantPlan  # noqa: PLC0415
+    from core.utils.email_context import build_email_context
+    from tenant.models import TenantPlan
 
     slug, copy_admins = _STAGES[stage]
     context = build_email_context(
@@ -182,14 +182,14 @@ def run_billing_cycle() -> dict[str, int]:
     written only AFTER a successful send — at-least-once semantics: a
     crashed run re-sends rather than silently skipping a notice.
     """
-    from django.utils import timezone  # noqa: PLC0415
-    from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+    from django.utils import timezone
+    from django_tenants.utils import get_public_schema_name
 
-    from tenant.lifecycle import (  # noqa: PLC0415
+    from tenant.lifecycle import (
         is_protected_tenant,
         suspend_tenant,
     )
-    from tenant.models import SuspendedReason, Tenant  # noqa: PLC0415
+    from tenant.models import SuspendedReason, Tenant
 
     conf = billing_config()
     warn = int(conf["WARN_DAYS"])

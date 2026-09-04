@@ -29,7 +29,7 @@ def _order_with_lines(lines, discount=None, loyalty=None):
     for price, quantity in lines:
         product = ProductFactory(
             price=M(Decimal(str(price)), "EUR"),
-            discount_percent=Decimal("0"),
+            discount_percent=Decimal(0),
             vat=None,
             stock=100,
         )
@@ -53,8 +53,8 @@ class TestAllocation:
         allocation = discounted_line_gross(order)
 
         assert sorted(allocation.values()) == [
-            Decimal("5"),
-            Decimal("20"),
+            Decimal(5),
+            Decimal(20),
         ]
 
     def test_allocated_lines_sum_exactly_to_discounted_total(self):

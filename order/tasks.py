@@ -10,11 +10,9 @@ from django.db import connection, transaction
 from django.db.models import F
 from django.template import TemplateDoesNotExist
 from django.template.loader import render_to_string
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.html import strip_tags
 from django.utils.translation import gettext as _
-from django.utils import translation
-
 from extra_settings.models import Setting
 
 from core import celery_app
@@ -22,15 +20,15 @@ from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language, get_user_language
 from core.utils.tenant_urls import get_tenant_frontend_url
+from order.enum.status import OrderStatus, PaymentStatus
+from order.models import Order, OrderHistory
+from order.models.order import AMOUNT_MISMATCH_FLAG
+from order.services import OrderService
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
     tenant_site_name,
 )
-from order.enum.status import OrderStatus, PaymentStatus
-from order.models import Order, OrderHistory
-from order.models.order import AMOUNT_MISMATCH_FLAG
-from order.services import OrderService
 from user.utils.subscription import (
     build_list_unsubscribe_headers,
     build_transactional_list_headers,
@@ -1556,7 +1554,7 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
     # preserves ``invoice_number`` + ``issue_date`` (no counter gap).
     try:
         generate_invoice(order, force=True)
-    except Exception as exc:  # noqa: BLE001 — never block the email
+    except Exception as exc:
         logger.error(
             "Failed to re-render PDF with MARK for order #%s: %s",
             order_id,
@@ -1587,6 +1585,8 @@ def cancel_mydata_invoice(self, order_id: int) -> bool:
     from order.mydata import (
         MyDataError,
         MyDataTransportError,
+    )
+    from order.mydata import (
         cancel_invoice as _cancel,
     )
 

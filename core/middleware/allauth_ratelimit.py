@@ -8,7 +8,7 @@ Uses Django's Redis cache for counters (already configured in settings).
 
 import hashlib
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from django.conf import settings
 from django.core.cache import cache

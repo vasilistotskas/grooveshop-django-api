@@ -65,7 +65,7 @@ def _serialize(order: Order) -> str:
 def _get_client() -> Any:
     global _redis_client
     if _redis_client is None:
-        from redis import Redis  # noqa: PLC0415
+        from redis import Redis
 
         _redis_client = Redis.from_url(settings.REDIS_URL, max_connections=4)
     return _redis_client
@@ -95,7 +95,7 @@ def publish_payment_status(order: Order) -> None:
     receivers, or service methods — duplicate publishes are idempotent
     from the subscriber's perspective (same payload).
     """
-    from django.db import connection  # noqa: PLC0415
+    from django.db import connection
 
     # Capture the schema NOW: ``on_commit`` fires after the enclosing
     # tenant/schema context may have unwound, so reading it inside the

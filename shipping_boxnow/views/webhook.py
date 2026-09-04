@@ -28,12 +28,11 @@ from django_tenants.utils import (
     schema_context,
     tenant_context,
 )
+from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from drf_spectacular.utils import extend_schema
 
 from shipping_boxnow.serializers import (
     BoxNowWebhookEnvelopeSerializer,
@@ -66,8 +65,8 @@ def _resolve_tenant_for_parcel(parcel_id: str):
     if not parcel_id:
         return None
 
-    from shipping_boxnow.models import BoxNowShipment  # noqa: PLC0415
-    from tenant.models import Tenant  # noqa: PLC0415
+    from shipping_boxnow.models import BoxNowShipment
+    from tenant.models import Tenant
 
     # Skip suspended tenants — mirrors the Viva webhook resolver;
     # BoxNow retries will resolve once the operator reactivates.
@@ -217,7 +216,7 @@ class BoxNowWebhookView(APIView):
         # ------------------------------------------------------------------ #
         # 7. Verify signature inside the tenant schema (per-tenant secret).   #
         # ------------------------------------------------------------------ #
-        from tenant.credentials import box_now_credentials  # noqa: PLC0415
+        from tenant.credentials import box_now_credentials
 
         with tenant_context(tenant):
             secret: str = box_now_credentials()["webhook_secret"]

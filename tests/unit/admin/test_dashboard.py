@@ -26,7 +26,6 @@ from admin.dashboard import (
     dashboard_callback,
 )
 
-
 User = get_user_model()
 
 
@@ -142,7 +141,6 @@ class RevenuePeriodsTests(TestCase):
 
     def _paid_order(self, amount: int, days_ago: int):
         from django.conf import settings as dj_settings
-
         from djmoney.money import Money
 
         from order.enum.status import PaymentStatus
@@ -186,7 +184,6 @@ class RevenuePeriodsTests(TestCase):
 
     def test_unpaid_orders_excluded(self):
         from django.conf import settings as dj_settings
-
         from djmoney.money import Money
 
         from order.enum.status import PaymentStatus

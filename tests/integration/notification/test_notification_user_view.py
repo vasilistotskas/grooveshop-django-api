@@ -6,7 +6,6 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from tests.utils import TestURLFixerMixin
 from notification.enum import (
     NotificationKindEnum,
 )
@@ -17,6 +16,7 @@ from notification.serializers.user import (
     NotificationUserDetailSerializer,
     NotificationUserSerializer,
 )
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()

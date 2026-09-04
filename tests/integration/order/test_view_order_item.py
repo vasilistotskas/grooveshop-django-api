@@ -4,13 +4,6 @@ from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from tests.utils import TestURLFixerMixin
-from tests.utils.staff import (
-    bind_store_tenant,
-    store_staff,
-    store_tenant,
-    unbind_store_tenant,
-)
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.models.item import OrderItem
@@ -20,6 +13,13 @@ from order.serializers.item import (
 )
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
+from tests.utils import TestURLFixerMixin
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_staff,
+    store_tenant,
+    unbind_store_tenant,
+)
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()

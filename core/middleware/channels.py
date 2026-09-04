@@ -43,8 +43,8 @@ def authenticate_ticket(ticket: str, tenant=None):
     ticket minting and WS connect, the connection is denied even though
     the ticket itself is still valid.
     """
-    from django_tenants.utils import tenant_context  # noqa: PLC0415
-    from knox.models import get_token_model  # noqa: PLC0415
+    from django_tenants.utils import tenant_context
+    from knox.models import get_token_model
 
     if not ticket:
         return AnonymousUser()

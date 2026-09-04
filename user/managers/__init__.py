@@ -8,12 +8,12 @@ from .subscription import (
 )
 
 __all__ = [
+    "SubscriptionTopicManager",
+    "SubscriptionTopicQuerySet",
     "UserAccountManager",
     "UserAccountQuerySet",
     "UserAddressManager",
     "UserAddressQuerySet",
-    "SubscriptionTopicManager",
-    "SubscriptionTopicQuerySet",
     "UserSubscriptionManager",
     "UserSubscriptionQuerySet",
 ]

@@ -28,7 +28,7 @@ def test_b2b_rows_are_schema_local(mt_tenant):
 
     with schema_context(mt_tenant.schema_name):
         CustomerGroup.objects.create(
-            name="mt-probe-wholesale", discount_percent=Decimal("10")
+            name="mt-probe-wholesale", discount_percent=Decimal(10)
         )
         assert CustomerGroup.objects.filter(name="mt-probe-wholesale").exists()
 

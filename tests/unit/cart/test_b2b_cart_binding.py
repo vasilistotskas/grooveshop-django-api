@@ -28,7 +28,7 @@ def _cart_with_line(price="100.00", quantity=2, vat_rate="24"):
     cart.items.all().delete()
     product = ProductFactory(
         price=Money(Decimal(price), "EUR"),
-        discount_percent=Decimal("0"),
+        discount_percent=Decimal(0),
         vat=VatFactory(value=Decimal(vat_rate)),
         stock=100,
         active=True,
@@ -51,7 +51,7 @@ def _bind(cart, group):
 class TestBoundProperties:
     def test_bound_prices(self):
         cart, item, _product = _cart_with_line()
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         _bind(cart, group)
 
         item = cart.items.select_related("product").first()
@@ -62,7 +62,7 @@ class TestBoundProperties:
         assert item.total_price.amount == Decimal("223.20")
         assert item.discount_value.amount == Decimal("10.00")  # net saving
         assert item.total_discount_value.amount == Decimal("20.00")
-        assert item.discount_percent == Decimal("10")
+        assert item.discount_percent == Decimal(10)
 
     def test_unbound_cart_stays_retail(self):
         cart, _item, product = _cart_with_line()
@@ -75,7 +75,7 @@ class TestBoundProperties:
 
     def test_cart_totals_read_bound_lines(self):
         cart, _item, _product = _cart_with_line()
-        group = CustomerGroupFactory(discount_percent=Decimal("50"))
+        group = CustomerGroupFactory(discount_percent=Decimal(50))
         _bind(cart, group)
 
         # Cart.total_price sums item.total_price — the payment-intent
@@ -85,12 +85,12 @@ class TestBoundProperties:
 
     def test_price_at_add_snapshots_bound_price(self):
         cart, _item, _product = _cart_with_line()
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         _bind(cart, group)
 
         extra_product = ProductFactory(
             price=Money(Decimal("50.00"), "EUR"),
-            discount_percent=Decimal("0"),
+            discount_percent=Decimal(0),
             vat=None,
             stock=100,
             active=True,
@@ -107,13 +107,13 @@ class TestBindCart:
     def test_bind_cart_resolves_group_from_user(
         self,
     ):
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         profile = BusinessProfileFactory(approved=True, customer_group=group)
         cart = CartFactory(user=profile.user)
         cart.items.all().delete()
         product = ProductFactory(
             price=Money(Decimal("100.00"), "EUR"),
-            discount_percent=Decimal("0"),
+            discount_percent=Decimal(0),
             vat=None,
             stock=10,
             active=True,

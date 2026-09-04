@@ -141,7 +141,7 @@ class StripePaymentAmountTestCase(TestCase):
 
         provider = StripePaymentProvider()
         total = Money(Decimal("55.00"), settings.DEFAULT_CURRENCY)
-        shipping = Money(Decimal("0"), settings.DEFAULT_CURRENCY)
+        shipping = Money(Decimal(0), settings.DEFAULT_CURRENCY)
 
         success, data = provider.create_checkout_session(
             total,
@@ -187,7 +187,7 @@ class ShippingCostCalculationTestCase(TestCase):
 
         cart_total = Money(Decimal("60.00"), "EUR")
         shipping = OrderService.calculate_shipping_cost(cart_total)
-        self.assertEqual(shipping.amount, Decimal("0"))
+        self.assertEqual(shipping.amount, Decimal(0))
 
     def test_payment_method_fee_below_threshold(self):
         """Payment method fee is charged when order is below threshold."""
@@ -211,7 +211,7 @@ class ShippingCostCalculationTestCase(TestCase):
 
         order_value = Money(Decimal("150.00"), "EUR")
         fee = OrderService.calculate_payment_method_fee(pay_way, order_value)
-        self.assertEqual(fee.amount, Decimal("0"))
+        self.assertEqual(fee.amount, Decimal(0))
 
     @mock.patch("extra_settings.models.Setting.get")
     def test_total_payment_amount_includes_all_components(self, mock_setting):
@@ -296,7 +296,7 @@ class ShippingCostCalculationTestCase(TestCase):
             shipping_provider_code="boxnow",
             shipping_kind="pickup_point",
         )
-        self.assertEqual(shipping.amount, Decimal("0"))
+        self.assertEqual(shipping.amount, Decimal(0))
 
     @mock.patch("extra_settings.models.Setting.get")
     def test_boxnow_shipping_ignores_country_region_adjustments(

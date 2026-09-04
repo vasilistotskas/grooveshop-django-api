@@ -3,8 +3,8 @@ from contextlib import nullcontext as _nullcontext
 from django.apps import apps
 from django.core.management.base import BaseCommand
 
-from meili._client import client as _client
 from core.management.tenant_mixin import TenantCommandMixin
+from meili._client import client as _client
 from meili.models import IndexMixin
 
 

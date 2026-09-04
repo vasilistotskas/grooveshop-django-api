@@ -49,15 +49,17 @@ def _app_modules():
 
 def _is_staff_reads(tree: ast.AST):
     for node in ast.walk(tree):
-        if isinstance(node, ast.Attribute) and node.attr == "is_staff":
-            yield node.lineno
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "getattr"
-            and len(node.args) >= 2
-            and isinstance(node.args[1], ast.Constant)
-            and node.args[1].value == "is_staff"
+        if (
+            isinstance(node, ast.Attribute)
+            and node.attr == "is_staff"
+            or (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "getattr"
+                and len(node.args) >= 2
+                and isinstance(node.args[1], ast.Constant)
+                and node.args[1].value == "is_staff"
+            )
         ):
             yield node.lineno
 

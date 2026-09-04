@@ -1235,6 +1235,7 @@ class TestManagementCommandsExecution:
         would wipe filterable/sortable/searchable/synonyms (G0172).
         """
         from io import StringIO
+
         from django.core.management import call_command
 
         with patch("meili._client.client.client.index") as mock_index:
@@ -1266,6 +1267,7 @@ class TestManagementCommandsExecution:
         """The command must update ONLY the ranking rules via the dedicated
         endpoint â€” never the full-payload update_settings (G0172)."""
         from io import StringIO
+
         from django.core.management import call_command
 
         with patch("meili._client.client.client.index") as mock_index:

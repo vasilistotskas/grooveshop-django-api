@@ -8,12 +8,12 @@ from product.views.product import ProductViewSet
 from product.views.review import ProductReviewViewSet
 
 __all__ = [
-    "AttributeViewSet",
     "AttributeValueViewSet",
-    "ProductCategoryViewSet",
+    "AttributeViewSet",
     "ProductCategoryImageViewSet",
+    "ProductCategoryViewSet",
     "ProductFavouriteViewSet",
     "ProductImageViewSet",
-    "ProductViewSet",
     "ProductReviewViewSet",
+    "ProductViewSet",
 ]

@@ -3,7 +3,6 @@ from __future__ import annotations
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
-
 from rest_framework.response import Response
 
 from core.api.permissions import IsOwnerOrAdmin

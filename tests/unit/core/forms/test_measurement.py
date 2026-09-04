@@ -3,7 +3,6 @@ from unittest.mock import patch
 from django import forms
 from django.test import SimpleTestCase
 from measurement.measures import Distance, Speed, Weight
-
 from unfold.widgets import (
     UnfoldAdminSelectWidget,
     UnfoldAdminTextInputWidget,
@@ -307,7 +306,7 @@ class TestMeasurementFormField(SimpleTestCase):
         with self.assertRaises(ValueError) as cm:
             MeasurementFormField(measurement=dict)
 
-        expected_msg = "{} must be a subclass of MeasureBase".format(dict)
+        expected_msg = f"{dict} must be a subclass of MeasureBase"
         self.assertEqual(str(cm.exception), expected_msg)
 
 

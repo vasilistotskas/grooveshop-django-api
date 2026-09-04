@@ -38,7 +38,7 @@ def test_a_mismatched_currency_charges_nothing():
         Money(Decimal("45.00"), "EUR"),
     )
 
-    assert fee == Money(Decimal("0"), "EUR"), (
+    assert fee == Money(Decimal(0), "EUR"), (
         "the USD amount was re-labelled as EUR, charging a different sum"
     )
 
@@ -52,4 +52,4 @@ def test_the_free_threshold_still_applies():
         Money(Decimal("45.00"), "EUR"),
     )
 
-    assert fee == Money(Decimal("0"), "EUR")
+    assert fee == Money(Decimal(0), "EUR")

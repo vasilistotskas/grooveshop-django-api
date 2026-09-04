@@ -8,10 +8,10 @@ from loyalty.serializers.loyalty import (
 from loyalty.serializers.tier import LoyaltyTierSerializer
 
 __all__ = [
-    "LoyaltyTierSerializer",
     "LoyaltySummarySerializer",
+    "LoyaltyTierSerializer",
     "PointsTransactionSerializer",
+    "ProductPointsSerializer",
     "RedeemPointsRequestSerializer",
     "RedeemPointsResponseSerializer",
-    "ProductPointsSerializer",
 ]

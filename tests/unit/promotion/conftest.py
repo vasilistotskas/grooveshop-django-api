@@ -35,7 +35,7 @@ def make_cart(db):
         for price, quantity in lines:
             product = ProductFactory(
                 price=Money(Decimal(str(price)), "EUR"),
-                discount_percent=Decimal("0"),
+                discount_percent=Decimal(0),
                 vat=None,
                 stock=1000,
                 active=True,

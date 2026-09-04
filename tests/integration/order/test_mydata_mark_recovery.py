@@ -368,8 +368,7 @@ class MarkRecoveryTestCase(TestCase):
             # Page 1 (no continuation supplied): a non-matching doc plus a
             # continuationToken pointing at page 2.
             if not kwargs.get("next_partition_key"):
-                return (
-                    """<?xml version="1.0" encoding="UTF-8"?>
+                return b"""<?xml version="1.0" encoding="UTF-8"?>
 <RequestedDoc xmlns="http://www.aade.gr/myDATA/invoice/v1.0">
     <continuationToken>
         <nextPartitionKey>PK1</nextPartitionKey>
@@ -382,7 +381,6 @@ class MarkRecoveryTestCase(TestCase):
         </invoice>
     </invoicesDoc>
 </RequestedDoc>"""
-                ).encode()
             # Page 2 (continuation supplied): the matching doc, no token.
             return _make_transmitted_xml_with_uid(real_uid)
 

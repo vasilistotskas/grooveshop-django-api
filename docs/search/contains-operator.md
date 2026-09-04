@@ -49,20 +49,14 @@ The CONTAINS operator is available through the `__contains` lookup in the IndexQ
 from product.models import ProductTranslation
 
 # Find products with "laptop" anywhere in the name
-results = ProductTranslation.meilisearch.filter(
-    name__contains="laptop"
-)
+results = ProductTranslation.meilisearch.filter(name__contains="laptop")
 
 # Find products with "pro" in the description
-results = ProductTranslation.meilisearch.filter(
-    description__contains="pro"
-)
+results = ProductTranslation.meilisearch.filter(description__contains="pro")
 
 # Combine with other filters
 results = ProductTranslation.meilisearch.filter(
-    name__contains="laptop",
-    language_code="en",
-    active=True
+    name__contains="laptop", language_code="en", active=True
 )
 ```
 
@@ -134,20 +128,16 @@ from product.models import ProductTranslation
 
 # Find all laptops (matches "Laptop", "Gaming Laptop", "Laptop Pro", etc.)
 laptops = ProductTranslation.meilisearch.filter(
-    name__contains="laptop",
-    language_code="en"
+    name__contains="laptop", language_code="en"
 )
 
 # Find products with "wireless" in description
 wireless_products = ProductTranslation.meilisearch.filter(
-    description__contains="wireless",
-    active=True
+    description__contains="wireless", active=True
 )
 
 # Find products with model numbers containing "X1"
-x1_products = ProductTranslation.meilisearch.filter(
-    name__contains="X1"
-)
+x1_products = ProductTranslation.meilisearch.filter(name__contains="X1")
 ```
 
 ### Blog Post Search
@@ -157,14 +147,12 @@ from blog.models import BlogPostTranslation
 
 # Find blog posts with "tutorial" in title
 tutorials = BlogPostTranslation.meilisearch.filter(
-    title__contains="tutorial",
-    is_published=True
+    title__contains="tutorial", is_published=True
 )
 
 # Find posts mentioning "Python" in body
 python_posts = BlogPostTranslation.meilisearch.filter(
-    body__contains="Python",
-    language_code="en"
+    body__contains="Python", language_code="en"
 )
 ```
 
@@ -177,13 +165,12 @@ results = ProductTranslation.meilisearch.filter(
     final_price__gte=500,
     final_price__lte=2000,
     language_code="en",
-    active=True
+    active=True,
 )
 
 # Multiple CONTAINS filters
 results = ProductTranslation.meilisearch.filter(
-    name__contains="laptop",
-    description__contains="gaming"
+    name__contains="laptop", description__contains="gaming"
 )
 ```
 
@@ -204,7 +191,7 @@ CONTAINS filtering may be slower than exact match or prefix matching, especially
    # Better performance
    results = ProductTranslation.meilisearch.filter(
        category="Computers",  # Narrow down first
-       name__contains="laptop"  # Then apply CONTAINS
+       name__contains="laptop",  # Then apply CONTAINS
    )
    ```
 
@@ -221,15 +208,11 @@ CONTAINS filtering may be slower than exact match or prefix matching, especially
 
 ```python
 # ❌ Slow: CONTAINS on large text field without other filters
-results = ProductTranslation.meilisearch.filter(
-    description__contains="the"
-)
+results = ProductTranslation.meilisearch.filter(description__contains="the")
 
 # ✅ Better: Combine with specific filters
 results = ProductTranslation.meilisearch.filter(
-    category="Electronics",
-    active=True,
-    description__contains="wireless"
+    category="Electronics", active=True, description__contains="wireless"
 )
 
 # ✅ Best: Use full-text search for general queries
@@ -246,9 +229,7 @@ from product.models import ProductTranslation
 try:
     # This will raise TypeError — the VALUE (99, an int) is not a string.
     # A string value like final_price__contains="99" would NOT raise here.
-    results = ProductTranslation.meilisearch.filter(
-        final_price__contains=99
-    )
+    results = ProductTranslation.meilisearch.filter(final_price__contains=99)
 except TypeError as e:
     print(f"Error: {e}")
     # Error: CONTAINS operator only supports string values, not int. ...
@@ -260,9 +241,7 @@ If the experimental feature is not enabled, Meilisearch will return an error:
 
 ```python
 try:
-    results = ProductTranslation.meilisearch.filter(
-        name__contains="laptop"
-    )
+    results = ProductTranslation.meilisearch.filter(name__contains="laptop")
 except Exception as e:
     print(f"Error: {e}")
     # Error: The `CONTAINS` filter operator is experimental and must be enabled
@@ -319,10 +298,7 @@ Always combine CONTAINS with other filters to improve performance:
 
 ```python
 # Good: Narrow down by category first
-ProductTranslation.meilisearch.filter(
-    category="Laptops",
-    name__contains="pro"
-)
+ProductTranslation.meilisearch.filter(category="Laptops", name__contains="pro")
 
 # Bad: CONTAINS on entire index
 ProductTranslation.meilisearch.filter(name__contains="pro")
@@ -337,9 +313,9 @@ Use full-text search for general text queries:
 ProductTranslation.meilisearch.search("gaming laptop")
 
 # ❌ Don't use CONTAINS for general search
-ProductTranslation.meilisearch.filter(
-    name__contains="gaming"
-).filter(name__contains="laptop")
+ProductTranslation.meilisearch.filter(name__contains="gaming").filter(
+    name__contains="laptop"
+)
 ```
 
 ### 4. Set Search Cutoff
@@ -361,17 +337,17 @@ date field won't raise in Python, but it's still the wrong tool for the job:
 
 ```python
 # ✅ String fields, string values
-name__contains="laptop"
-description__contains="wireless"
-sku__contains="ELEC"
+name__contains = "laptop"
+description__contains = "wireless"
+sku__contains = "ELEC"
 
 # ⚠️ Doesn't raise, but semantically wrong — use range/exact lookups instead
-price__contains="99"  # Use price__gte, price__lte instead
-active__contains="true"  # Use active=True instead
-created_at__contains="2024"  # Use date range filters instead
+price__contains = "99"  # Use price__gte, price__lte instead
+active__contains = "true"  # Use active=True instead
+created_at__contains = "2024"  # Use date range filters instead
 
 # ❌ Non-string VALUE - raises TypeError
-price__contains=99
+price__contains = 99
 ```
 
 ## Testing
@@ -382,12 +358,12 @@ price__contains=99
 import pytest
 from product.models import ProductTranslation
 
+
 def test_contains_filter_on_string_field():
     """Test CONTAINS operator on string field."""
-    results = ProductTranslation.meilisearch.filter(
-        name__contains="laptop"
-    )
+    results = ProductTranslation.meilisearch.filter(name__contains="laptop")
     assert all("laptop" in r.name.lower() for r in results)
+
 
 def test_contains_filter_case_insensitive():
     """Test CONTAINS is case-insensitive."""
@@ -399,6 +375,7 @@ def test_contains_filter_case_insensitive():
     )
     assert list(results_lower) == list(results_upper)
 
+
 def test_contains_filter_on_non_string_value_raises_error():
     """Test CONTAINS with a non-string VALUE raises TypeError.
 
@@ -406,9 +383,7 @@ def test_contains_filter_on_non_string_value_raises_error():
     does NOT raise — only a non-string value does, regardless of field.
     """
     with pytest.raises(TypeError, match="only supports string values"):
-        ProductTranslation.meilisearch.filter(
-            final_price__contains=99
-        )
+        ProductTranslation.meilisearch.filter(final_price__contains=99)
 ```
 
 ### Integration Tests
@@ -417,13 +392,9 @@ def test_contains_filter_on_non_string_value_raises_error():
 def test_contains_filter_with_real_data():
     """Test CONTAINS filter with real Meilisearch data."""
     # Create test products
+    ProductTranslation.objects.create(name="Laptop Pro 15", language_code="en")
     ProductTranslation.objects.create(
-        name="Laptop Pro 15",
-        language_code="en"
-    )
-    ProductTranslation.objects.create(
-        name="Gaming Laptop X1",
-        language_code="en"
+        name="Gaming Laptop X1", language_code="en"
     )
 
     # Sync to Meilisearch
@@ -431,8 +402,7 @@ def test_contains_filter_with_real_data():
 
     # Test CONTAINS filter
     results = ProductTranslation.meilisearch.filter(
-        name__contains="laptop",
-        language_code="en"
+        name__contains="laptop", language_code="en"
     )
 
     assert len(results) == 2
@@ -464,10 +434,7 @@ non-string value like `final_price__contains=99` (an int) does.
 ProductTranslation.meilisearch.filter(final_price__contains=99)
 
 # ✅ Correct
-ProductTranslation.meilisearch.filter(
-    final_price__gte=99,
-    final_price__lte=999
-)
+ProductTranslation.meilisearch.filter(final_price__gte=99, final_price__lte=999)
 ```
 
 ### Slow Query Performance

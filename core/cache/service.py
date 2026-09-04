@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
+
+# The default backend is core.caches.CustomCache (see CACHES) —
+# the proxy delegates its raw-key helpers (keys/delete_raw_keys/
+# clear_by_prefixes) to it.
+from django.core.cache import cache as cache_instance
 
 from core.cache import gateway as gateway_client
 from core.cache import nuxt as nuxt_client
@@ -13,11 +19,6 @@ from core.cache.registry import (
     get_surface,
     iter_surfaces,
 )
-
-# The default backend is core.caches.CustomCache (see CACHES) —
-# the proxy delegates its raw-key helpers (keys/delete_raw_keys/
-# clear_by_prefixes) to it.
-from django.core.cache import cache as cache_instance
 
 if TYPE_CHECKING:
     from django.contrib.auth.models import AbstractBaseUser
@@ -100,7 +101,7 @@ class CacheService:
         codes: Iterable[str],
         *,
         dry_run: bool = False,
-        actor: "AbstractBaseUser | None" = None,
+        actor: AbstractBaseUser | None = None,
         include_related: bool = True,
     ) -> PurgeReport:
         report = PurgeReport(dry_run=dry_run)
@@ -177,7 +178,7 @@ class CacheService:
     def purge_all(
         *,
         dry_run: bool = False,
-        actor: "AbstractBaseUser | None" = None,
+        actor: AbstractBaseUser | None = None,
     ) -> PurgeReport:
         codes = [s.code for s in iter_surfaces() if not s.danger]
         return CacheService.purge(
@@ -189,7 +190,7 @@ class CacheService:
 
     @staticmethod
     def _log_audit(
-        report: PurgeReport, *, actor: "AbstractBaseUser | None"
+        report: PurgeReport, *, actor: AbstractBaseUser | None
     ) -> None:
         try:
             from core.cache.models import CachePurgeLog

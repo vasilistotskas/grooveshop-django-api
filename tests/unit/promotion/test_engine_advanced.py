@@ -21,7 +21,7 @@ class TestExclusions:
         cart, products = make_cart([(100, 1), (50, 1)])
         promotion = PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
         )
         promotion.excluded_products.add(products[0])
 
@@ -46,7 +46,7 @@ class TestExclusions:
 
         promotion = PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
         )
         promotion.excluded_categories.add(parent)
 
@@ -56,12 +56,12 @@ class TestExclusions:
 
     def test_exclude_discounted_products(self, enable_promotions, make_cart):
         cart, products = make_cart([(100, 1), (50, 1)])
-        products[0].discount_percent = Decimal("20")
+        products[0].discount_percent = Decimal(20)
         products[0].save(update_fields=["discount_percent"])
 
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
             exclude_discounted_products=True,
         )
 
@@ -78,7 +78,7 @@ class TestMinQuantity:
         cart, _ = make_cart([(20, 2)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
             min_quantity=3,
         )
 
@@ -87,7 +87,7 @@ class TestMinQuantity:
         cart2, _ = make_cart([(20, 3)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
             min_quantity=3,
         )
         assert PromotionEngine.evaluate(cart2).discount_total.amount > 0
@@ -141,7 +141,7 @@ class TestBxgy:
             benefit_type=BenefitType.BXGY,
             buy_quantity=2,
             get_quantity=1,
-            get_discount_percent=Decimal("50"),
+            get_discount_percent=Decimal(50),
         )
         # Buy side = the 40 EUR product; reward pool = the 16 EUR one.
         promotion.products.clear()
@@ -174,8 +174,8 @@ class TestFreeGift:
         from product.factories import ProductFactory
 
         gift_product = ProductFactory(
-            price=Money(Decimal("15"), "EUR"),
-            discount_percent=Decimal("0"),
+            price=Money(Decimal(15), "EUR"),
+            discount_percent=Decimal(0),
             vat=None,
             stock=5,
             active=True,
@@ -185,7 +185,7 @@ class TestFreeGift:
             trigger=PromotionTrigger.AUTOMATIC,
             benefit_type=BenefitType.FREE_GIFT,
             get_quantity=1,
-            min_subtotal=Money(Decimal("50"), "EUR"),
+            min_subtotal=Money(Decimal(50), "EUR"),
         )
         promotion.get_products.add(gift_product)
 
@@ -194,7 +194,7 @@ class TestFreeGift:
         assert len(result.gift_items) == 1
         assert result.gift_items[0].product == gift_product
         assert result.gift_items[0].quantity == 1
-        assert result.discount_total.amount == Decimal("0")
+        assert result.discount_total.amount == Decimal(0)
         assert (promotion, None) in [
             (promo, code) for promo, code in result.non_monetary
         ]
@@ -221,8 +221,8 @@ class TestNearMiss:
         cart, _ = make_cart([(30, 1)])
         promotion = PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
-            min_subtotal=Money(Decimal("50"), "EUR"),
+            benefit_value=Decimal(10),
+            min_subtotal=Money(Decimal(50), "EUR"),
         )
 
         result = PromotionEngine.evaluate(cart)
@@ -238,8 +238,8 @@ class TestNearMiss:
         cart, _ = make_cart([(60, 1)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
-            min_subtotal=Money(Decimal("50"), "EUR"),
+            benefit_value=Decimal(10),
+            min_subtotal=Money(Decimal(50), "EUR"),
         )
 
         result = PromotionEngine.evaluate(cart)

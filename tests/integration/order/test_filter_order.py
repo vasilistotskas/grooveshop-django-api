@@ -1,17 +1,18 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from datetime import timedelta
 from django.utils import timezone
-from rest_framework.test import APITestCase
 from djmoney.money import Money
+from rest_framework.test import APITestCase
 
+from country.factories import CountryFactory
+from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
-from order.enum.status import OrderStatus, PaymentStatus
-from user.factories.account import UserAccountFactory
-from country.factories import CountryFactory
-from region.factories import RegionFactory
 from pay_way.factories import PayWayFactory
+from region.factories import RegionFactory
+from user.factories.account import UserAccountFactory
 
 User = get_user_model()
 

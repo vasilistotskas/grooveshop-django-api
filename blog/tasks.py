@@ -77,10 +77,10 @@ def notify_comment_liked_task(
                     ),
                 },
                 "el": {
-                    "title": "Το σχόλιό σου πήρε like!",  # noqa: RUF001
+                    "title": "Το σχόλιό σου πήρε like!",
                     "message": (
-                        f"Στον χρήστη {liker_label} άρεσε το σχόλιό σου. "  # noqa: RUF001
-                        f"Πάτα εδώ για να δεις τη συζήτηση."  # noqa: RUF001
+                        f"Στον χρήστη {liker_label} άρεσε το σχόλιό σου. "
+                        f"Πάτα εδώ για να δεις τη συζήτηση."
                     ),
                 },
             },

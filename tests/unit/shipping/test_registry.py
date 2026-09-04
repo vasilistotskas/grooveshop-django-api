@@ -9,8 +9,8 @@ import pytest
 from shipping.enum import ShippingKind
 from shipping.exceptions import ShippingProviderNotFoundError
 from shipping.interfaces import (
-    ShippingCarrierInterface,
     _REGISTRY,
+    ShippingCarrierInterface,
     get_provider,
     is_registered,
     register_provider,

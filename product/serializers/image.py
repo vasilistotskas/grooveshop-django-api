@@ -185,7 +185,7 @@ class ProductImageWriteSerializer(
         read_only_fields = ("sort_order",)
 
     def validate_image(self, value: ImageFieldFile) -> ImageFieldFile:
-        from PIL import Image as PILImage  # noqa: PLC0415
+        from PIL import Image as PILImage
 
         if not value:
             raise serializers.ValidationError("Image file is required.")

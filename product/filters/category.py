@@ -2,8 +2,8 @@ from django_filters import rest_framework as filters
 
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import (
-    UUIDFilterMixin,
     SortableFilterMixin,
+    UUIDFilterMixin,
 )
 from product.models.category import ProductCategory
 

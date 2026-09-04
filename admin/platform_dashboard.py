@@ -32,8 +32,8 @@ from django.utils.translation import gettext_lazy as _
 
 def _tenant_rows() -> list[dict[str, Any]]:
     """One row per tenant, with its order count and revenue."""
-    from django.apps import apps  # noqa: PLC0415
-    from django_tenants.utils import (  # noqa: PLC0415
+    from django.apps import apps
+    from django_tenants.utils import (
         get_public_schema_name,
         tenant_context,
     )
@@ -68,9 +68,9 @@ def _tenant_rows() -> list[dict[str, Any]]:
         if _schema_exists(tenant.schema_name):
             try:
                 with tenant_context(tenant):
-                    from django.db.models import Sum  # noqa: PLC0415
+                    from django.db.models import Sum
 
-                    from order.enum.status import PaymentStatus  # noqa: PLC0415
+                    from order.enum.status import PaymentStatus
 
                     Order = apps.get_model("order", "Order")
                     row["orders"] = Order.objects.count()
@@ -82,14 +82,14 @@ def _tenant_rows() -> list[dict[str, Any]]:
                         payment_status=PaymentStatus.COMPLETED
                     ).aggregate(total=Sum("paid_amount"))["total"]
                     row["revenue"] = float(total) if total is not None else 0.0
-            except Exception:  # noqa: BLE001 - never hard-fail the console
+            except Exception:
                 pass
         rows.append(row)
     return rows
 
 
 def _schema_exists(schema_name: str) -> bool:
-    from django.db import connection  # noqa: PLC0415
+    from django.db import connection
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -106,7 +106,7 @@ def _tenants_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
     component escapes ``content``, so a tenant-supplied store name can
     never inject markup into the control plane.
     """
-    from admin.displays import money  # noqa: PLC0415
+    from admin.displays import money
 
     table_rows = []
     for row in rows:
@@ -154,8 +154,8 @@ def _tenants_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def dashboard_callback(request, context):
     """Inject control-plane figures into the platform dashboard."""
-    from django.apps import apps  # noqa: PLC0415
-    from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+    from django.apps import apps
+    from django_tenants.utils import get_public_schema_name
 
     Tenant = apps.get_model("tenant", "Tenant")
     public = get_public_schema_name()
@@ -184,7 +184,7 @@ def dashboard_callback(request, context):
         context["platform_periodic_tasks"] = PeriodicTask.objects.filter(
             enabled=True
         ).count()
-    except Exception:  # noqa: BLE001
+    except Exception:
         context["platform_periodic_tasks"] = None
 
     return context

@@ -1,17 +1,16 @@
 import json
 import logging
-from django.core.exceptions import ImproperlyConfigured
+
 from celery.exceptions import CeleryError
-from core.api.permissions import IsPlatformSuperuser
-from core.celery import celery_app
 from django.conf import settings
-from django.db import DatabaseError, connection
+from django.core.exceptions import ImproperlyConfigured
+from django.db import DatabaseError, connection, transaction
 from django.middleware.csrf import get_token
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
+    OpenApiParameter,
     extend_schema,
     extend_schema_view,
-    OpenApiParameter,
 )
 from redis import Redis, RedisError
 from rest_framework import status
@@ -22,17 +21,19 @@ from rest_framework.decorators import (
     permission_classes,
     throttle_classes,
 )
-from rest_framework.permissions import AllowAny
 from rest_framework.metadata import SimpleMetadata
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-from django.db import transaction
+
+from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import (
     ErrorResponseSerializer,
     HealthCheckResponseSerializer,
     SettingDetailSerializer,
     SettingSerializer,
 )
+from core.celery import celery_app
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
@@ -135,11 +136,9 @@ class RequestResponseSerializerMixin:
             return self.serializer_class
 
         raise ImproperlyConfigured(
-            "No serializer found for action '{action}' and no default serializer defined. "
-            "Define {cls}.serializers_config['{action}'] or set {cls}.serializer_class, "
-            "or override {cls}.get_serializer_class().".format(
-                action=current_action, cls=self.__class__.__name__
-            )
+            f"No serializer found for action '{current_action}' and no default serializer defined. "
+            f"Define {self.__class__.__name__}.serializers_config['{current_action}'] or set {self.__class__.__name__}.serializer_class, "
+            f"or override {self.__class__.__name__}.get_serializer_class()."
         )
 
     def get_request_serializer(self, *args, **kwargs):

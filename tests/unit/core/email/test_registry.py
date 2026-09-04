@@ -1,7 +1,8 @@
 """Unit tests for email template registry."""
 
 import pytest
-from core.email.registry import EmailTemplateRegistry, EmailTemplateInfo
+
+from core.email.registry import EmailTemplateInfo, EmailTemplateRegistry
 from order.enum.status import OrderStatus
 
 
@@ -77,8 +78,8 @@ class TestEmailTemplateRegistry:
 
     def test_template_paths_exist(self, registry):
         """Test that template paths point to existing files."""
-        from django.template.loader import get_template
         from django.template import TemplateDoesNotExist
+        from django.template.loader import get_template
 
         templates = registry.get_all_templates()
         for template in templates:

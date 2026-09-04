@@ -1,10 +1,10 @@
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 
+from product.factories.product import ProductFactory
 from tag.factories.tag import TagFactory
 from tag.factories.tagged_item import TaggedProductFactory
 from tag.models.tagged_item import TaggedItem
-from product.factories.product import ProductFactory
 
 
 class TaggedItemModelTestCase(TestCase):

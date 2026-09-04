@@ -211,7 +211,7 @@ class SettingCategoryFilter(admin.SimpleListFilter):
         value = self.value()
         if not value:
             return queryset
-        from django.db.models import Q  # noqa: PLC0415
+        from django.db.models import Q
 
         prefix_map = dict(SETTING_CATEGORIES)
         if value == "Other":
@@ -313,7 +313,7 @@ class SettingAdmin(ModelAdmin):
 
     @admin.display(description=_("Category"))
     def category_badge(self, obj):
-        from django.utils.html import format_html  # noqa: PLC0415
+        from django.utils.html import format_html
 
         return format_html(
             '<span class="setting-type-badge" data-type="{category}">'
@@ -323,7 +323,7 @@ class SettingAdmin(ModelAdmin):
 
     @admin.display(description=_("Type"))
     def value_type_badge(self, obj):
-        from django.utils.html import format_html  # noqa: PLC0415
+        from django.utils.html import format_html
 
         return format_html(
             '<span class="setting-type-badge" data-type="{type}">{type}</span>',

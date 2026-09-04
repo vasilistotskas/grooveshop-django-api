@@ -22,9 +22,9 @@ Usage:
     print(f"Query count: {counter.count}")
 """
 
+from collections.abc import Callable
 from contextlib import contextmanager
 from functools import wraps
-from typing import Callable, Optional
 
 from django.db import connection, reset_queries
 from django.test.utils import CaptureQueriesContext
@@ -51,9 +51,9 @@ class QueryCountAssertion:
 
     def __init__(
         self,
-        max_queries: Optional[int] = None,
+        max_queries: int | None = None,
         verbose: bool = False,
-        fail_message: Optional[str] = None,
+        fail_message: str | None = None,
     ):
         """
         Initialize the query counter.
@@ -69,9 +69,9 @@ class QueryCountAssertion:
         self.fail_message = fail_message
         self.count = 0
         self.queries: list = []
-        self._context: Optional[CaptureQueriesContext] = None
+        self._context: CaptureQueriesContext | None = None
 
-    def __enter__(self) -> "QueryCountAssertion":
+    def __enter__(self) -> QueryCountAssertion:
         reset_queries()
         self._context = CaptureQueriesContext(connection)
         self._context.__enter__()
@@ -161,7 +161,7 @@ def count_queries(verbose: bool = False):
 def assert_max_queries(
     max_queries: int,
     verbose: bool = False,
-    fail_message: Optional[str] = None,
+    fail_message: str | None = None,
 ) -> Callable:
     """
     Decorator to assert maximum query count for a test function.

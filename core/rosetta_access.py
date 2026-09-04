@@ -24,14 +24,13 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.db import connection
-
 from rosetta.access import is_superuser_staff_or_in_translators_group
 
 
 def _allowed_schemas() -> set[str]:
     raw = getattr(settings, "ROSETTA_ALLOWED_SCHEMAS", None)
     if not raw:
-        from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+        from django_tenants.utils import get_public_schema_name
 
         raw = get_public_schema_name()
     return {s.strip() for s in raw.split(",") if s.strip()}

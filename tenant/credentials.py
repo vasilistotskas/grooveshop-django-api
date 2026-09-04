@@ -122,7 +122,7 @@ def tenant_contact_email() -> str:
     if tenant_email:
         return tenant_email
     try:
-        from extra_settings.models import Setting  # noqa: PLC0415
+        from extra_settings.models import Setting
 
         setting_value = Setting.get("CONTACT_EMAIL", default="") or ""
         if setting_value:
@@ -214,7 +214,7 @@ def _customised(field: str) -> str:
     tenant that customised nothing emits nothing. Case-insensitive for
     the same reason it is there — the hex fields are free text.
     """
-    from tenant.models import Tenant  # noqa: PLC0415
+    from tenant.models import Tenant
 
     value = (_get_tenant_field(field) or "").strip()
     if not value:

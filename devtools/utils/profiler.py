@@ -31,7 +31,7 @@ class ProfileLevel(Enum):
 class MetricsExporter(Protocol):
     """Protocol for metrics exporters"""
 
-    def export(self, metrics: "SessionMetrics", path: Path) -> None:
+    def export(self, metrics: SessionMetrics, path: Path) -> None:
         """Export metrics to a file"""
         ...
 

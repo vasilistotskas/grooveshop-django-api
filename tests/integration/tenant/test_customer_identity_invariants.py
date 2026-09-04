@@ -104,7 +104,7 @@ class TestCustomerAccessIsNotMembershipGated:
     """
 
     def test_knox_auth_does_not_check_membership(self):
-        import core.api.tokens as tokens
+        from core.api import tokens
 
         source = inspect.getsource(tokens)
         code = "\n".join(
@@ -115,7 +115,7 @@ class TestCustomerAccessIsNotMembershipGated:
         assert "user_has_tenant_access" not in code
 
     def test_agent_views_do_not_check_membership(self):
-        import agent.views as views
+        from agent import views
 
         assert "HasTenantAccess" not in _referenced_names(views)
 

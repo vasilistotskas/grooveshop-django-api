@@ -157,6 +157,7 @@ class TestCreateVoucherPersistsMetadataWhenDbSaveFails:
         on the first ``update_fields=['voucher_no', ...]`` call.
         """
         from django.db import IntegrityError
+
         from shipping_acs import services
 
         order = OrderFactory(
@@ -383,6 +384,7 @@ class TestCancelVoucherClaimPattern:
         voucher at ACS.  A recovery pass can use this to detect the state.
         """
         from django.db import IntegrityError
+
         from shipping_acs import services
 
         order = OrderFactory(

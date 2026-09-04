@@ -10,7 +10,6 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
-from tests.utils import TestURLFixerMixin
 from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
@@ -22,7 +21,7 @@ from order.serializers.order import (
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from region.factories import RegionFactory
-from tests.utils import count_queries
+from tests.utils import TestURLFixerMixin, count_queries
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()

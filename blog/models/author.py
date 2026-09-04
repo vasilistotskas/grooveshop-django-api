@@ -50,7 +50,7 @@ class BlogAuthor(TranslatableModel, TimeStampMixinModel, UUIDModel):
         serialized on an ``AllowAny`` endpoint, so they must not count
         drafts.
         """
-        from blog.models.post import BlogPost  # noqa: PLC0415
+        from blog.models.post import BlogPost
 
         return BlogPost.objects.filter(author=self).published()
 

@@ -7,6 +7,7 @@ from django.test import TestCase
 from rest_framework import serializers
 from rest_framework.test import APIRequestFactory
 from rest_framework.viewsets import ModelViewSet
+
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,

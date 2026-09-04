@@ -26,6 +26,7 @@ def _configured(settings):
 @pytest.fixture
 def bound_tenant(db, monkeypatch):
     from django.db import connection
+
     from tenant.models import Tenant, TenantDomain
 
     tenant = Tenant(

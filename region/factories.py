@@ -7,8 +7,8 @@ from faker import Faker
 
 from devtools.factories import (
     CustomDjangoModelFactory,
-    custom_seeding,
     SeedingResult,
+    custom_seeding,
 )
 from region.models import Region
 
@@ -122,7 +122,9 @@ class RegionFactory(CustomDjangoModelFactory):
                         )
 
                 except Exception as e:
-                    error_msg = f"Failed to create region {region_data['alpha']}: {str(e)}"
+                    error_msg = (
+                        f"Failed to create region {region_data['alpha']}: {e!s}"
+                    )
                     result.errors.append(error_msg)
                     if verbose:
                         print(f"Error: {error_msg}")

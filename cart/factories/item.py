@@ -23,7 +23,7 @@ def get_or_create_product():
 
 
 def get_or_create_cart(is_guest=False):
-    from cart.factories.cart import CartFactory  # noqa: PLC0415
+    from cart.factories.cart import CartFactory
 
     if apps.get_model("cart", "Cart").objects.exists():
         if is_guest:

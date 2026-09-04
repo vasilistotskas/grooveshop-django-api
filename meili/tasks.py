@@ -68,7 +68,7 @@ def index_document_task(
     Returns:
         Dict with task status and details
     """
-    from meili._client import client as _client  # noqa: PLC0415
+    from meili._client import client as _client
 
     try:
         # Get the model class
@@ -171,7 +171,7 @@ def delete_document_task(
     Returns:
         Dict with task status and details
     """
-    from meili._client import client as _client  # noqa: PLC0415
+    from meili._client import client as _client
 
     try:
         task = _client.get_index(index_name).delete_document(document_pk)
@@ -231,7 +231,7 @@ def reindex_model_task(
     Returns:
         Dict with task status and statistics
     """
-    from meili._client import client as _client  # noqa: PLC0415
+    from meili._client import client as _client
 
     batch_size = batch_size or settings.MEILISEARCH.get(
         "DEFAULT_BATCH_SIZE", 1000

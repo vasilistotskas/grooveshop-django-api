@@ -7,7 +7,8 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import QuerySet, Sum
 from django.utils import timezone
-from django.utils.translation import get_language, gettext_lazy as _
+from django.utils.translation import get_language
+from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -33,11 +34,11 @@ from order.exceptions import (
 )
 from order.models.item import OrderItem
 from order.models.order import Order
-from promotion.services import CouponService, PromotionEngine
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
 from order.signals import order_refunded
 from order.stock import StockManager
+from promotion.services import CouponService, PromotionEngine
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +226,7 @@ class OrderService:
         due after promotions and loyalty. Returns the settled amount."""
         if not gift_card_codes:
             return Money(0, settings.DEFAULT_CURRENCY)
-        from giftcard.services import (  # noqa: PLC0415
+        from giftcard.services import (
             GiftCardError,
             GiftCardService,
         )
@@ -249,7 +250,7 @@ class OrderService:
         """
         if not promo_result.gift_items:
             return
-        from order.stock import StockManager  # noqa: PLC0415
+        from order.stock import StockManager
 
         skipped = []
         for gift in promo_result.gift_items:
@@ -304,9 +305,9 @@ class OrderService:
             or user is None
             or not getattr(user, "is_authenticated", False)
         ):
-            return Decimal("0")
+            return Decimal(0)
 
-        from loyalty.services import LoyaltyService  # noqa: PLC0415
+        from loyalty.services import LoyaltyService
 
         try:
             return LoyaltyService.preview_redemption(
@@ -331,7 +332,7 @@ class OrderService:
         """Payment-first path: lock the cards and compute the plan the
         PaymentIntent verification AND the later recording both use —
         one plan, no drift between the verified and redeemed amounts."""
-        from giftcard.services import (  # noqa: PLC0415
+        from giftcard.services import (
             GiftCardError,
             GiftCardService,
         )
@@ -408,7 +409,7 @@ class OrderService:
             ... )
         """
         try:
-            from cart.models import Cart  # noqa: PLC0415
+            from cart.models import Cart
 
             # Lock the Cart row immediately so concurrent checkouts on the
             # same cart are serialised.  Must happen before any reads so
@@ -433,7 +434,10 @@ class OrderService:
             # payment fee, item price snapshots, PaymentIntent amount
             # verification) must see the same prices the cart preview
             # showed. Kept in lockstep with the offline path.
-            from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
+            from b2b.services import (
+                B2BPricingService,
+                B2BService,
+            )
 
             B2BPricingService.bind_cart(cart, user)
 
@@ -556,9 +560,7 @@ class OrderService:
                 _cart_total.currency,
                 max_discount=_cart_total.amount,
             )
-            _expected_total = max(
-                _expected_total - loyalty_preview, Decimal("0")
-            )
+            _expected_total = max(_expected_total - loyalty_preview, Decimal(0))
             # Gift cards settle part of the total LAST (payment, not
             # discount) — the plan locks the card rows until commit so
             # the amount verified here is exactly what gets redeemed
@@ -1090,7 +1092,7 @@ class OrderService:
             ... )
         """
         try:
-            from cart.models import Cart  # noqa: PLC0415
+            from cart.models import Cart
 
             # Lock the Cart row immediately so concurrent checkouts on the
             # same cart are serialised.  Must happen before any reads so
@@ -1111,7 +1113,10 @@ class OrderService:
 
             # Step 2.4: Re-bind wholesale pricing on the LOCKED cart
             # (see the payment-first path for the rationale).
-            from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
+            from b2b.services import (
+                B2BPricingService,
+                B2BService,
+            )
 
             B2BPricingService.bind_cart(cart, user)
 
@@ -2761,8 +2766,6 @@ class OrderService:
     @classmethod
     @transaction.atomic
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
-        from order.payment_events import publish_payment_status
-
         # Acquire a row lock and hydrate related objects in one query.
         # ``for_detail()`` adds COUNT/SUM annotations which Postgres
         # rejects under FOR UPDATE (aggregate in locked query). We
@@ -2771,6 +2774,7 @@ class OrderService:
         from django.db.models import Prefetch
 
         from order.models.history import OrderHistory
+        from order.payment_events import publish_payment_status
 
         # ``of=("self",)`` restricts the row lock to the Order table.
         # Without it Postgres rejects the query with ``FOR UPDATE cannot

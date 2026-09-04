@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from django.contrib.messages import storage as messages_storage
 from django.contrib.auth import get_user_model
+from django.contrib.messages import storage as messages_storage
 from django.core.exceptions import ValidationError
 from django.utils import timezone, translation
 
@@ -234,7 +234,7 @@ class TestTenantDeleteProtection:
         # gracefully when force_drop=False).
         try:
             tenant.delete()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             # If django-tenants raises due to missing schema during tests
             # that's acceptable — the guard itself didn't block us.
             assert "protected" not in str(exc).lower(), (

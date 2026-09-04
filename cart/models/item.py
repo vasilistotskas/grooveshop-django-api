@@ -4,8 +4,8 @@ from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from djmoney.money import Money
 from djmoney.models.fields import MoneyField
+from djmoney.money import Money
 
 from cart.managers.item import CartItemManager
 from core.models import TimeStampMixinModel, UUIDModel

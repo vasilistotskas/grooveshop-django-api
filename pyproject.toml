@@ -86,11 +86,11 @@ dev = [
     "pytest-timeout==2.4.0",
     "pytest-cov==7.1.0",
     "python-semantic-release==10.6.2",
-    "ruff==0.15.12",
+    "ruff==0.16.6",
     "celery-stubs==0.1.3",
     "psutil==7.2.2",
     "hypothesis==6.167.1",
-    "ty==0.0.35",
+    "ty==0.0.78",
     "pytest-split==0.11.0",
 ]
 
@@ -280,6 +280,59 @@ django_settings_module = "settings"
 target-version = "py314"
 line-length = 80
 exclude = ["**/migrations/**"]
+
+[tool.ruff.lint]
+# Ruff 0.16 turned on a much broader default set, which is what every
+# contributor's editor shows out of the box — so that is the baseline
+# here rather than a hand-picked `select`. Before this, the section did
+# not exist at all: only the 59 legacy defaults ran, which is why 364
+# `# noqa` comments in the tree suppressed rules that were never on.
+extend-select = [
+    # Dropped from 0.16's defaults, re-added: each is a real bug shape,
+    # and all six are already at zero findings here, so enforcing them
+    # costs nothing and stops a regression.
+    "E402", # module import not at top of file
+    "E722", # bare except
+    "E731", # lambda assigned to a name
+    "E741", # ambiguous variable name (l, I, O)
+    "F403", # `from x import *`
+    "F405", # name may be undefined, or defined from star imports
+    "A",    # builtin shadowing
+    "DJ",   # Django-specific correctness
+    "ERA",  # commented-out code
+    "PLR0913", # too many arguments — makes `max-args` below real
+    "T20",  # print / pprint left in the tree
+    "TID",  # banned and relative imports
+]
+ignore = [
+    # Lazy imports are the house pattern: modules import inside
+    # functions to stay importable before the app registry is ready and
+    # to break circular imports between apps. 1744 of them.
+    "PLC0415",
+    # Django and DRF declare mutable class attributes by design —
+    # `Meta.indexes`, `serializers_config`, `fields`. 661 of them.
+    "RUF012",
+    # Greek copy is the product's default locale, so "ambiguous"
+    # Cyrillic/Greek lookalikes are simply the correct characters.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    # Signal receivers, DRF hooks and Celery task bodies take arguments
+    # the framework passes and the body does not read.
+    "ARG",
+    # Magic values are overwhelmingly test fixtures and HTTP status
+    # codes; the signal-to-noise does not justify 819 suppressions.
+    "PLR2004",
+    # 120 blind `except Exception` handlers. Each needs a judgement
+    # about what it is really catching, which is the Phase 4 triage —
+    # not something to settle with a blanket autofix here.
+    "BLE001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, and pytest rewrites those asserts — 6527 of them.
+"tests/**" = ["S101"]
+"tests_mt/**" = ["S101"]
 
 [tool.ruff.lint.pylint]
 max-args = 6

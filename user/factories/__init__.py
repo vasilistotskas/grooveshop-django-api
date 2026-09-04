@@ -3,8 +3,8 @@ from .address import UserAddressFactory
 from .subscription import SubscriptionTopicFactory, UserSubscriptionFactory
 
 __all__ = [
+    "SubscriptionTopicFactory",
     "UserAccountFactory",
     "UserAddressFactory",
-    "SubscriptionTopicFactory",
     "UserSubscriptionFactory",
 ]

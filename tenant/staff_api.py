@@ -59,13 +59,13 @@ class PlatformStaffLoginView(APIView):
         summary="Obtain a platform staff API token",
     )
     def post(self, request):
-        from django_tenants.utils import (  # noqa: PLC0415
+        from django_tenants.utils import (
             get_public_schema_name,
             schema_context,
         )
 
-        from tenant.auth_backends import PlatformStaffBackend  # noqa: PLC0415
-        from tenant.models import (  # noqa: PLC0415
+        from tenant.auth_backends import PlatformStaffBackend
+        from tenant.models import (
             PlatformStaffToken,
             UserTenantMembership,
         )
@@ -100,7 +100,7 @@ class PlatformStaffLoginView(APIView):
             # Same per-user cap the customer token strategy enforces
             # (core.api.tokens.SessionTokenStrategy) — oldest out first.
             limit = None
-            from knox.settings import knox_settings  # noqa: PLC0415
+            from knox.settings import knox_settings
 
             limit = knox_settings.TOKEN_LIMIT_PER_USER
             if limit is not None:
@@ -130,7 +130,7 @@ class PlatformStaffLogoutView(APIView):
         summary="Revoke the current platform staff API token",
     )
     def post(self, request):
-        from django_tenants.utils import (  # noqa: PLC0415
+        from django_tenants.utils import (
             get_public_schema_name,
             schema_context,
         )

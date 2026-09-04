@@ -1053,7 +1053,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                     "(optionally prefixed with EL or GR)."
                 )
             )
-        from b2b.validators import is_valid_greek_vat  # noqa: PLC0415
+        from b2b.validators import is_valid_greek_vat
 
         if not is_valid_greek_vat(cleaned):
             raise serializers.ValidationError(

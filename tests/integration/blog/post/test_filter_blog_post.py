@@ -1,8 +1,10 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from datetime import timedelta
 from django.utils import timezone
 from rest_framework.test import APITestCase
+
 from blog.factories.author import BlogAuthorFactory
 from blog.factories.category import BlogCategoryFactory
 from blog.factories.post import BlogPostFactory

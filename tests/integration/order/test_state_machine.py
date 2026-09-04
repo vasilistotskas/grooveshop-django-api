@@ -9,7 +9,6 @@ from order.exceptions import InvalidStatusTransitionError
 from order.factories import OrderFactory
 from order.services import OrderService
 
-
 # Define the allowed transitions from the OrderService
 ALLOWED_TRANSITIONS = {
     OrderStatus.PENDING: [

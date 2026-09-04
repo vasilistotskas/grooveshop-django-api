@@ -2,10 +2,10 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
+import moneyed
 import stripe
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-import moneyed
 from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
@@ -53,7 +53,7 @@ class StripePaymentProvider(PaymentProvider):
     """
 
     def __init__(self):
-        from tenant.credentials import stripe_credentials  # noqa: PLC0415
+        from tenant.credentials import stripe_credentials
 
         creds = stripe_credentials()
         self.api_key: str = creds["secret_key"]
@@ -610,7 +610,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
     LIVE_TRANSACTIONS_URL = "https://www.vivapayments.com"
 
     def __init__(self):
-        from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+        from tenant.credentials import viva_wallet_credentials
 
         creds = viva_wallet_credentials()
         self.merchant_id = creds["merchant_id"]

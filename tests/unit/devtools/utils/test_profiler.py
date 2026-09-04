@@ -1,18 +1,18 @@
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 from django.test import TestCase
 
 from devtools.utils.profiler import (
-    ProfileLevel,
     FactoryExecutionMetrics,
-    SessionMetrics,
-    JSONMetricsExporter,
-    QueryProfiler,
-    MemoryProfiler,
-    ProfilerConfig,
     FactoryProfiler,
+    JSONMetricsExporter,
+    MemoryProfiler,
+    ProfileLevel,
+    ProfilerConfig,
+    QueryProfiler,
     ReportBuilder,
+    SessionMetrics,
 )
 
 

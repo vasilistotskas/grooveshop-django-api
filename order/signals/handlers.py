@@ -10,8 +10,6 @@ from django_tenants.utils import schema_context
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
-from order.signals._tenant import with_tenant_schema_from_event
-
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -21,6 +19,13 @@ from order.enum.status import (
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
+from order.notifications import (
+    notify_order_created_live,
+    notify_order_refunded_live,
+    notify_order_status_changed_live,
+    notify_payment_confirmed_live,
+    notify_payment_failed_live,
+)
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -34,13 +39,7 @@ from order.signals import (
     order_shipped,
     order_status_changed,
 )
-from order.notifications import (
-    notify_order_created_live,
-    notify_order_refunded_live,
-    notify_order_status_changed_live,
-    notify_payment_confirmed_live,
-    notify_payment_failed_live,
-)
+from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
     generate_order_invoice,
     push_order_event_to_gateway,
@@ -193,7 +192,7 @@ def handle_order_post_save(
 
 def _cart_for_order(order: Order):
     """The cart this order was built from, or None."""
-    from cart.models import Cart  # noqa: PLC0415
+    from cart.models import Cart
 
     if order.user:
         return Cart.objects.filter(user=order.user).first()
@@ -524,7 +523,7 @@ def handle_order_item_post_save(
         hasattr(instance, "_original_quantity")
         and instance._original_quantity != instance.quantity
     ):
-        from order.stock import StockManager  # noqa: PLC0415
+        from order.stock import StockManager
 
         product = instance.product
         stock_difference = instance._original_quantity - instance.quantity

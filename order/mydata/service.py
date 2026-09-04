@@ -32,7 +32,6 @@ from typing import Any
 
 from django.db import transaction
 from django.utils import timezone
-
 from extra_settings.models import Setting
 
 from order.mydata.builder import build_invoice_xml
@@ -124,7 +123,7 @@ def submit_invoice(invoice: Any) -> ResponseRow | None:
 
     try:
         validate_invoice_doc(built.xml_bytes)
-    except Exception as exc:  # noqa: BLE001 — xmlschema raises many subtypes
+    except Exception as exc:
         # XSD validation error is terminal: the payload does not
         # match the pinned schema. Fall into the same rejection
         # bucket as a server-side ValidationError so ops can see

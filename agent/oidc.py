@@ -1,6 +1,5 @@
-from django.utils.translation import gettext_lazy as _
-
 from allauth.idp.oidc.adapter import DefaultOIDCAdapter
+from django.utils.translation import gettext_lazy as _
 
 # Scopes AI agents may request when linking a shopper's account. The
 # per-client granted set lives on each ``allauth.idp.oidc.Client`` row;

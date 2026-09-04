@@ -1,5 +1,6 @@
-import pytest
 from decimal import Decimal
+
+import pytest
 from djmoney.money import Money
 
 from order.factories import OrderFactory

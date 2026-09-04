@@ -119,21 +119,23 @@ class CreateUserNotificationTestCase(TestCase):
         create_user_notification must roll back the Notification row
         when a translation save crashes mid-loop."""
         initial_count = Notification.objects.count()
-        with patch(
-            "notification.services.supported_notification_languages",
-            return_value=["en", "el"],
-        ):
-            with patch.object(
+        with (
+            patch(
+                "notification.services.supported_notification_languages",
+                return_value=["en", "el"],
+            ),
+            patch.object(
                 Notification, "save", side_effect=[None, RuntimeError("boom")]
-            ):
-                with self.assertRaises(RuntimeError):
-                    create_user_notification(
-                        self.user,
-                        translations={
-                            "en": {"title": "A", "message": "B"},
-                            "el": {"title": "Γ", "message": "Δ"},
-                        },
-                    )
+            ),
+            self.assertRaises(RuntimeError),
+        ):
+            create_user_notification(
+                self.user,
+                translations={
+                    "en": {"title": "A", "message": "B"},
+                    "el": {"title": "Γ", "message": "Δ"},
+                },
+            )
         self.assertEqual(Notification.objects.count(), initial_count)
 
     @override_settings(

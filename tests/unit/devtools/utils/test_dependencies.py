@@ -6,9 +6,9 @@ from django.db.models.fields.related import ForeignKey, OneToOneField
 from django.test import TestCase
 
 from devtools.utils.dependencies import (
-    DependencyNode,
     CircularDependencyError,
     DependencyAnalyzer,
+    DependencyNode,
     FactoryOrchestrator,
     analyze_factory_dependencies,
 )

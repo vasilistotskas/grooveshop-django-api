@@ -11,10 +11,9 @@ class CoreConfig(AppConfig):
     def ready(self):
         from django.core.exceptions import ImproperlyConfigured
 
+        import core.signals.rosetta  # noqa: F401
         from core.admin import override_third_party_admins
         from core.tasks import validate_task_configuration
-
-        import core.signals.rosetta  # noqa: F401
 
         override_third_party_admins()
 
@@ -97,5 +96,5 @@ def _install_parler_admin_save_fix() -> None:
             setattr(translation, field_name, value)
         translation.save()
 
-    setattr(TranslatableAdmin, "save_model", save_model)
-    setattr(TranslatableAdmin, "_grooveshop_save_fix_installed", True)
+    TranslatableAdmin.save_model = save_model
+    TranslatableAdmin._grooveshop_save_fix_installed = True

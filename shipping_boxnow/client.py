@@ -57,7 +57,7 @@ class BoxNowClient:
         timeout: int | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        from tenant.credentials import box_now_credentials  # noqa: PLC0415
+        from tenant.credentials import box_now_credentials
 
         creds = box_now_credentials()
         self.client_id = client_id or creds["client_id"]

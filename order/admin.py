@@ -10,8 +10,6 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
-
-from admin.base import BaseModelAdmin
 from unfold.contrib.filters.admin import (
     AutocompleteSelectFilter,
     DropdownFilter,
@@ -23,6 +21,7 @@ from unfold.contrib.filters.admin import (
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from admin.base import BaseModelAdmin
 from admin.displays import (
     ORDER_STATUS_VARIANT,
     PAYMENT_STATUS_VARIANT,
@@ -678,13 +677,13 @@ class OrderAdmin(BaseModelAdmin):
         # still lives on the order itself and can be reviewed from
         # the change form fields.
         if provider_code == "boxnow":
-            from shipping_boxnow.admin import (  # noqa: PLC0415
+            from shipping_boxnow.admin import (
                 BoxNowShipmentOrderInline,
             )
 
             inlines.append(BoxNowShipmentOrderInline)
         elif provider_code == "acs":
-            from shipping_acs.admin import (  # noqa: PLC0415
+            from shipping_acs.admin import (
                 AcsShipmentOrderInline,
             )
 
@@ -982,7 +981,7 @@ class OrderAdmin(BaseModelAdmin):
 
         try:
             invoice = generate_invoice(order)
-        except Exception as exc:  # noqa: BLE001 — surface all errors in admin
+        except Exception as exc:
             logger.exception(
                 "Admin invoice generation failed for order %s", order.id
             )
@@ -1031,7 +1030,7 @@ class OrderAdmin(BaseModelAdmin):
 
         try:
             invoice = generate_invoice(order, force=True)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception(
                 "Admin invoice regeneration failed for order %s", order.id
             )
@@ -1166,9 +1165,9 @@ class OrderAdmin(BaseModelAdmin):
         the order has no carrier attached or the carrier hasn't yet
         minted a voucher.
         """
-        from django.http import HttpResponse  # noqa: PLC0415
+        from django.http import HttpResponse
 
-        from shipping.services import ShippingService  # noqa: PLC0415
+        from shipping.services import ShippingService
 
         try:
             order = Order.objects.get(pk=object_id)
@@ -1235,7 +1234,7 @@ class OrderAdmin(BaseModelAdmin):
 
         try:
             pdf_bytes = adapter.fetch_label_bytes(shipment)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.exception(
                 "Admin download_shipping_voucher failed for order %s",
                 order.id,

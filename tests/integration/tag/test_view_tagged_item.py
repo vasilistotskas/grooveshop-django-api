@@ -3,10 +3,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+
+from product.factories.product import ProductFactory
 from tag.factories.tag import TagFactory
 from tag.factories.tagged_item import TaggedProductFactory
 from tag.models.tagged_item import TaggedItem
-from product.factories.product import ProductFactory
 from tests.utils import TestURLFixerMixin
 
 User = get_user_model()

@@ -31,5 +31,3 @@ class AttributeQuerySet(TranslatableQuerySet):
 
 class AttributeManager(TranslatableManager.from_queryset(AttributeQuerySet)):
     """Custom manager for Attribute model with optimized queries."""
-
-    pass

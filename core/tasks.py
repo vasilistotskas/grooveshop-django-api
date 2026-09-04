@@ -13,21 +13,18 @@ from django.core.mail import EmailMultiAlternatives, mail_admins
 from django.db import connections, transaction
 from django.db.models import F
 from django.template.loader import render_to_string
-from django.utils import timezone
 
 # See order/tasks.py for rationale — eager gettext over lazy for email subjects.
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext as _
-
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_user_language
-from tenant.credentials import tenant_contact_email, tenant_from_email
-
 from extra_settings.models import Setting
 
 from cart.models import Cart
 from core import celery_app
+from core.utils.email_context import build_email_context
+from core.utils.i18n import get_user_language
 from tenant.celery import TenantTask
+from tenant.credentials import tenant_contact_email, tenant_from_email
 
 User = get_user_model()
 

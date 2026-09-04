@@ -1,14 +1,15 @@
 from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from user.factories.account import UserAccountFactory
 from user.factories.subscription import (
     SubscriptionTopicFactory,
     UserSubscriptionFactory,
 )
-from user.factories.account import UserAccountFactory
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
 User = get_user_model()

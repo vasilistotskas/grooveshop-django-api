@@ -38,7 +38,7 @@ before they are rendered.
 
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from django.contrib.admin.models import LogEntry
 from django.contrib.auth import get_user_model

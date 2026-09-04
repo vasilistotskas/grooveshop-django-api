@@ -57,7 +57,7 @@ def build_ticket_cache_key(ticket: str) -> str:
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_websocket_ticket(request):
-    from knox.models import get_token_model  # noqa: PLC0415
+    from knox.models import get_token_model
 
     # Guard against the edge case where Knox tokens were revoked between
     # the moment the HTTP request was authenticated (DRF Knox auth) and

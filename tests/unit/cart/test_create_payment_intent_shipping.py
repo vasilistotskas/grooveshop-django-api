@@ -173,7 +173,7 @@ def test_acs_pi_calc_returns_zero_in_mismatch_range(per_carrier_below_generic):
         shipping_kind="home_delivery",
         weight_grams=500,
     )
-    assert quote.amount == Decimal("0")
+    assert quote.amount == Decimal(0)
 
 
 def test_boxnow_pi_calc_returns_zero_in_mismatch_range(
@@ -186,7 +186,7 @@ def test_boxnow_pi_calc_returns_zero_in_mismatch_range(
         shipping_kind="pickup_point",
         weight_grams=500,
     )
-    assert quote.amount == Decimal("0")
+    assert quote.amount == Decimal(0)
 
 
 def test_legacy_generic_fallback_unchanged(per_carrier_below_generic):
@@ -262,7 +262,7 @@ def test_home_delivery_without_explicit_code_uses_acs_threshold(
         # NOTE: shipping_provider_code intentionally omitted — that's
         # the production frontend's behaviour for home_delivery.
     )
-    assert quote.amount == Decimal("0"), (
+    assert quote.amount == Decimal(0), (
         "home_delivery without explicit code must auto-resolve to ACS "
         f"and use its 30€ threshold; got {quote.amount} EUR"
     )
@@ -325,4 +325,4 @@ def test_free_shipping_info_min_matches_carrier_at_threshold(
         shipping_kind="pickup_point",
         weight_grams=500,
     )
-    assert quote.amount == Decimal("0")
+    assert quote.amount == Decimal(0)

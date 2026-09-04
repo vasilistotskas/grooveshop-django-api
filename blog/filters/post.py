@@ -99,7 +99,7 @@ class BlogPostFilter(
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from blog.models import BlogCategory, BlogAuthor, BlogTag
+        from blog.models import BlogAuthor, BlogCategory, BlogTag
 
         self.filters["category"].queryset = BlogCategory.objects.all()
         self.filters["author"].queryset = BlogAuthor.objects.all()

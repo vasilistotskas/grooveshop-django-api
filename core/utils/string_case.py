@@ -10,6 +10,8 @@ import re
 
 from djangorestframework_camel_case.util import (
     camelize_re,
+)
+from djangorestframework_camel_case.util import (
     underscore_to_camel as underscore_to_camel_callback,
 )
 

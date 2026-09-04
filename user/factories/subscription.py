@@ -1,8 +1,8 @@
 import factory
-from factory import fuzzy
-from faker import Faker
 from django.conf import settings
 from django.db import IntegrityError
+from factory import fuzzy
+from faker import Faker
 
 from user.models.subscription import SubscriptionTopic, UserSubscription
 

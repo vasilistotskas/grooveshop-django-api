@@ -26,7 +26,7 @@ def is_store_section(request) -> bool:
     commands, the same positive-knowledge rule the model-level guard
     uses.
     """
-    from tenant.console import is_platform_console  # noqa: PLC0415
+    from tenant.console import is_platform_console
 
     return not is_platform_console(request)
 
@@ -37,7 +37,7 @@ def is_platform_section(request) -> bool:
     The inverse of ``is_store_section`` for groups (tenants, platform
     settings) that make no sense inside a single store's admin.
     """
-    from tenant.console import is_platform_console  # noqa: PLC0415
+    from tenant.console import is_platform_console
 
     return is_platform_console(request)
 

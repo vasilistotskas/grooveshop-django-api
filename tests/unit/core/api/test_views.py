@@ -1,5 +1,6 @@
 from unittest.mock import Mock, patch
-from django.test import TestCase, RequestFactory
+
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.request import Request
@@ -7,12 +8,12 @@ from rest_framework.test import APIClient
 
 from core.api.views import (
     BaseModelViewSet,
-    PaginationModelViewSet,
     Metadata,
+    PaginationModelViewSet,
 )
-from core.pagination.page_number import PageNumberPaginator
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
+from core.pagination.page_number import PageNumberPaginator
 from product.serializers.product import ProductSerializer
 
 

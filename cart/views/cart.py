@@ -13,10 +13,9 @@ from drf_spectacular.utils import (
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
-
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from core.api.permissions import StoreStaffModelPermissions
 from cart.filters.cart import CartFilter
 from cart.models import Cart
 from cart.serializers.cart import (
@@ -31,18 +30,15 @@ from cart.serializers.cart import (
     ReleaseReservationsResponseSerializer,
     ReserveStockResponseSerializer,
 )
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
-
 from cart.services import CartService
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
     CartMutationAnonThrottle,
     CartMutationThrottle,
     CouponApplyThrottle,
 )
-from tenant.permissions import IsPromotionsEnabled
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -53,6 +49,7 @@ from order.models import StockReservation
 from order.services import OrderService
 from order.stock import StockManager
 from tenant.membership import is_store_staff
+from tenant.permissions import IsPromotionsEnabled
 
 logger = logging.getLogger(__name__)
 
@@ -673,7 +670,7 @@ class CartViewSet(BaseModelViewSet):
         # Wholesale minimum-order-value gate — refuse to mint an intent
         # order-create would reject AFTER the customer confirmed (and
         # possibly captured) the payment.
-        from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
+        from b2b.services import B2BPricingService, B2BService
 
         unmet_minimum = B2BPricingService.min_order_value_unmet(cart)
         if unmet_minimum is not None:

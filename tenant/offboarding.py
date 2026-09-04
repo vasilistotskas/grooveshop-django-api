@@ -135,7 +135,7 @@ def purge_search_indexes(schema_name: str) -> list[str]:
     prefix = f"{schema_name}__"
     deleted: list[str] = []
     try:
-        from meili._client import client as meili_client  # noqa: PLC0415
+        from meili._client import client as meili_client
 
         for index in meili_client.get_indexes():
             if index.uid.startswith(prefix):
@@ -203,11 +203,11 @@ def latest_invoice_year(schema_name: str) -> int | None:
     guessing "no invoices" would delete records that may exist, and of
     the two possible mistakes only over-retention is recoverable.
     """
-    from django_tenants.utils import schema_context  # noqa: PLC0415
+    from django_tenants.utils import schema_context
 
     try:
         with schema_context(schema_name):
-            from order.models.invoice import Invoice  # noqa: PLC0415
+            from order.models.invoice import Invoice
 
             latest = (
                 Invoice.objects.exclude(document_file="")

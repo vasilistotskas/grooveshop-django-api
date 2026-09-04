@@ -8,23 +8,23 @@ from uuid import uuid4
 from django.conf import settings as django_settings
 from django.core.cache import caches
 from django.db.models import Avg, Count, Max
-from extra_settings.models import Setting
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.decorators import (
     api_view,
     permission_classes,
     throttle_classes,
 )
-from rest_framework.permissions import AllowAny
 from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
-from core.api.permissions import IsPlatformSuperuser
 from blog.models.post import BlogPostTranslation
+from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
 from meili._client import client as meili_client
@@ -662,7 +662,7 @@ def federated_search(request):
                 relaxed_query = relaxed
 
     except Exception as e:
-        logger.error(f"Federated search failed: {str(e)}")
+        logger.error(f"Federated search failed: {e!s}")
         raise ValidationError(
             {"error": _("Search failed. Please try again later.")}
         )

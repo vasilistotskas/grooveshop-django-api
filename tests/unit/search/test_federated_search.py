@@ -14,7 +14,6 @@ from django.test import RequestFactory
 
 from search.views import federated_search
 
-
 # Mock _meilisearch attribute for models
 MOCK_PRODUCT_MEILISEARCH = {"base_index_name": "ProductTranslation"}
 MOCK_BLOG_MEILISEARCH = {"base_index_name": "BlogPostTranslation"}

@@ -16,7 +16,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from django.core.management import call_command
 
-
 # Mock _meilisearch attribute for models
 MOCK_PRODUCT_MEILISEARCH = {"base_index_name": "ProductTranslation"}
 MOCK_BLOG_MEILISEARCH = {"base_index_name": "BlogPostTranslation"}

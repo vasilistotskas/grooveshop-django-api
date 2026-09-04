@@ -17,8 +17,8 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from order.factories.order import OrderFactory
 from order.enum.status import OrderStatus, PaymentStatus
+from order.factories.order import OrderFactory
 
 
 class VivaReturnEndpointTestCase(APITestCase):

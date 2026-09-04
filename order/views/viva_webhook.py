@@ -1,9 +1,9 @@
 import hashlib
 import ipaddress
-from decimal import InvalidOperation
 import json
 import logging
 from base64 import b64encode
+from decimal import InvalidOperation
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -67,8 +67,8 @@ def _resolve_tenant_candidates(order_code: str) -> list:
     if not order_code:
         return []
 
-    from giftcard.models import GiftCardPurchase  # noqa: PLC0415
-    from tenant.models import Tenant  # noqa: PLC0415
+    from giftcard.models import GiftCardPurchase
+    from tenant.models import Tenant
 
     public = get_public_schema_name()
     candidates = []
@@ -114,7 +114,7 @@ def _order_exists_on_unavailable_tenant(order_code: object) -> bool:
     if not order_code:
         return False
 
-    from tenant.models import Tenant  # noqa: PLC0415
+    from tenant.models import Tenant
 
     public = get_public_schema_name()
     unavailable = Tenant.objects.filter(
@@ -123,7 +123,7 @@ def _order_exists_on_unavailable_tenant(order_code: object) -> bool:
     for tenant in unavailable.exclude(schema_name=public).distinct():
         try:
             with schema_context(tenant.schema_name):
-                from giftcard.models import (  # noqa: PLC0415
+                from giftcard.models import (
                     GiftCardPurchase,
                 )
 
@@ -240,7 +240,7 @@ def _handle_verification(request):
         request.META.get("REMOTE_ADDR", ""),
         request.META.get("HTTP_X_FORWARDED_FOR", ""),
     )
-    from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+    from tenant.credentials import viva_wallet_credentials
 
     creds = viva_wallet_credentials()
     verification_key = creds["webhook_verification_key"]
@@ -271,9 +271,9 @@ def _handle_verification(request):
 
 
 def _fetch_verification_key(
-    creds: "VivaWalletCredentials | None" = None,
+    creds: VivaWalletCredentials | None = None,
 ):
-    from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+    from tenant.credentials import viva_wallet_credentials
 
     if creds is None:
         creds = viva_wallet_credentials()
@@ -327,7 +327,7 @@ def _check_source_ip(request) -> tuple[bool, str]:
     ``schema_context`` so ``live_mode`` reflects THIS tenant's Viva
     account — there is no platform-wide live/demo mode setting.
     """
-    from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+    from tenant.credentials import viva_wallet_credentials
 
     live_mode = viva_wallet_credentials()["live_mode"]
     allowed_networks = (
@@ -924,13 +924,14 @@ def _process_gift_card_purchase_event(
                         )
                         outcome = VivaWebhookEvent.OUTCOME_SKIPPED
             elif event_type_id == 1798:
-                if purchase.status != GiftCardPurchaseStatus.PENDING:
-                    outcome = VivaWebhookEvent.OUTCOME_SKIPPED
-                elif not _verify_viva_terminal_transaction(
-                    f"gift-card purchase {purchase.uuid}",
-                    transaction_id,
-                    {PaymentStatus.FAILED, PaymentStatus.CANCELED},
-                    "payment_failed",
+                if (
+                    purchase.status != GiftCardPurchaseStatus.PENDING
+                    or not _verify_viva_terminal_transaction(
+                        f"gift-card purchase {purchase.uuid}",
+                        transaction_id,
+                        {PaymentStatus.FAILED, PaymentStatus.CANCELED},
+                        "payment_failed",
+                    )
                 ):
                     outcome = VivaWebhookEvent.OUTCOME_SKIPPED
                 else:
@@ -1047,7 +1048,7 @@ def _flag_amount_mismatch(
     order, transaction_id, verified_amount, expected_amount
 ) -> None:
     """Record a verified charge whose amount does not match the order."""
-    from django.utils import timezone  # noqa: PLC0415
+    from django.utils import timezone
 
     if not order.metadata:
         order.metadata = {}
@@ -1061,11 +1062,11 @@ def _flag_amount_mismatch(
 
 
 def _handle_payment_created(order, event_data, transaction_id):
-    from order.models.viva_webhook_event import (  # noqa: PLC0415
+    from django.utils import timezone
+
+    from order.models.viva_webhook_event import (
         VivaWebhookEvent,
     )
-
-    from django.utils import timezone
 
     logger.info(
         "_handle_payment_created START | order=%s | transaction_id=%s | "
@@ -1205,7 +1206,7 @@ def _handle_payment_created(order, event_data, transaction_id):
 
     if verified_amount_raw is not None:
         try:
-            from decimal import Decimal  # noqa: PLC0415
+            from decimal import Decimal
 
             verified_amount = Decimal(str(verified_amount_raw))
             expected_amount = order_total.amount

@@ -177,7 +177,7 @@ class B2BViewSet(BaseModelViewSet):
         group = B2BService.resolve_group(request.user)
         payload = []
         if group is not None and product_ids:
-            from product.models.product import Product  # noqa: PLC0415
+            from product.models.product import Product
 
             products = Product.objects.select_related("vat").filter(
                 pk__in=product_ids, active=True

@@ -1,7 +1,9 @@
 """Unit tests for sample order data generator."""
 
-import pytest
 from decimal import Decimal
+
+import pytest
+
 from core.email.sample_data import SampleOrderDataGenerator
 from order.enum.status import OrderStatus
 

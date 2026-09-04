@@ -79,12 +79,14 @@ class TestVivaReversalVerification:
         raise so the outer atomic rolls back and Viva retries — never a
         silent state flip."""
         order = self._order()
-        with patch(
-            "order.views.viva_webhook._verify_transaction",
-            return_value=(PaymentStatus.FAILED, {"viva_error": True}),
+        with (
+            patch(
+                "order.views.viva_webhook._verify_transaction",
+                return_value=(PaymentStatus.FAILED, {"viva_error": True}),
+            ),
+            pytest.raises(RuntimeError),
         ):
-            with pytest.raises(RuntimeError):
-                _handle_reversal_created(order, {}, "forged_txn")
+            _handle_reversal_created(order, {}, "forged_txn")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.COMPLETED
@@ -139,12 +141,14 @@ class TestVivaPaymentFailedVerification:
         ``error`` key — that must be treated as unavailable (raise), not as
         a confirmed failure."""
         order = self._order()
-        with patch(
-            "order.views.viva_webhook._verify_transaction",
-            return_value=(PaymentStatus.FAILED, {"error": "timeout"}),
+        with (
+            patch(
+                "order.views.viva_webhook._verify_transaction",
+                return_value=(PaymentStatus.FAILED, {"error": "timeout"}),
+            ),
+            pytest.raises(RuntimeError),
         ):
-            with pytest.raises(RuntimeError):
-                _handle_payment_failed(order, {}, "viva_txn_2")
+            _handle_payment_failed(order, {}, "viva_txn_2")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PENDING
@@ -184,24 +188,28 @@ class TestVivaPaymentCreatedVerification:
         account maps to (FAILED, {viva_error: True}) — must raise, not
         skip."""
         order = self._order()
-        with patch(
-            "order.views.viva_webhook._verify_transaction",
-            return_value=(PaymentStatus.FAILED, {"viva_error": True}),
+        with (
+            patch(
+                "order.views.viva_webhook._verify_transaction",
+                return_value=(PaymentStatus.FAILED, {"viva_error": True}),
+            ),
+            pytest.raises(RuntimeError),
         ):
-            with pytest.raises(RuntimeError):
-                _handle_payment_created(order, {"StatusId": "F"}, "foreign_txn")
+            _handle_payment_created(order, {"StatusId": "F"}, "foreign_txn")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PENDING
 
     def test_raises_when_verification_reports_error(self):
         order = self._order()
-        with patch(
-            "order.views.viva_webhook._verify_transaction",
-            return_value=(PaymentStatus.FAILED, {"error": "timeout"}),
+        with (
+            patch(
+                "order.views.viva_webhook._verify_transaction",
+                return_value=(PaymentStatus.FAILED, {"error": "timeout"}),
+            ),
+            pytest.raises(RuntimeError),
         ):
-            with pytest.raises(RuntimeError):
-                _handle_payment_created(order, {"StatusId": "F"}, "txn")
+            _handle_payment_created(order, {"StatusId": "F"}, "txn")
 
         order.refresh_from_db()
         assert order.payment_status == PaymentStatus.PENDING

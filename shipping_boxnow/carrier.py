@@ -8,8 +8,8 @@ class so behaviour is unchanged from the pre-abstraction code path.
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.enum import ShippingKind
@@ -17,7 +17,6 @@ from shipping.interfaces import ShippingCarrierInterface, register_provider
 
 if TYPE_CHECKING:
     from order.models.order import Order
-
     from shipping_boxnow.models import BoxNowShipment
 
 logger = logging.getLogger(__name__)
@@ -155,7 +154,6 @@ class BoxNowCarrier(ShippingCarrierInterface):
         weight bracket).
         """
         from shipping.utils import compute_total_weight_grams
-
         from shipping_boxnow.models import BoxNowLocker, BoxNowShipment
 
         if kind != ShippingKind.PICKUP_POINT:
@@ -219,7 +217,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
         )
         # Stamp the caller-captured tenant schema — see the base
         # method's contract.
-        from django.db import connection  # noqa: PLC0415
+        from django.db import connection
 
         create_boxnow_shipment_for_order.apply_async(
             args=[order.id],

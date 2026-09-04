@@ -32,8 +32,6 @@ class OrderServiceError(Exception):
     specific exception types for detailed error handling.
     """
 
-    pass
-
 
 class StockError(OrderServiceError):
     """
@@ -42,8 +40,6 @@ class StockError(OrderServiceError):
     Raised when operations involving product inventory fail. This includes
     insufficient stock, reservation failures, and other stock management issues.
     """
-
-    pass
 
 
 class InsufficientStockError(StockError):
@@ -292,8 +288,6 @@ class PaymentError(OrderServiceError):
     payment intent creation, verification, webhook processing, and other
     payment-related issues.
     """
-
-    pass
 
 
 class PaymentNotFoundError(PaymentError):

@@ -90,14 +90,16 @@ class TestDisabledSystem:
 
         user = UserAccountFactory()
 
-        with patch(
-            "loyalty.services.Setting.get",
-            side_effect=self._mock_settings_disabled,
+        with (
+            patch(
+                "loyalty.services.Setting.get",
+                side_effect=self._mock_settings_disabled,
+            ),
+            pytest.raises(ValidationError, match="disabled"),
         ):
-            with pytest.raises(ValidationError, match="disabled"):
-                LoyaltyService.redeem_points(
-                    user, 100, "EUR", max_discount=Decimal("99999")
-                )
+            LoyaltyService.redeem_points(
+                user, 100, "EUR", max_discount=Decimal(99999)
+            )
 
     def test_get_product_potential_points_returns_zero(self):
         """get_product_potential_points returns 0 when disabled."""
@@ -398,7 +400,7 @@ class TestOverRedemptionRejection:
                 ValidationError, match="Insufficient points balance"
             ):
                 LoyaltyService.redeem_points(
-                    user, 100, "EUR", max_discount=Decimal("99999")
+                    user, 100, "EUR", max_discount=Decimal(99999)
                 )
 
         # No REDEEM transaction should have been created
@@ -427,10 +429,10 @@ class TestOverRedemptionRejection:
 
         with patch("loyalty.services.Setting.get", side_effect=mock_settings):
             discount = LoyaltyService.redeem_points(
-                user, 50, "EUR", max_discount=Decimal("99999")
+                user, 50, "EUR", max_discount=Decimal(99999)
             )
 
-        assert discount == Decimal("50") / Decimal("100")
+        assert discount == Decimal(50) / Decimal(100)
         assert LoyaltyService.get_user_balance(user) == 0
 
 
@@ -465,7 +467,7 @@ class TestInvalidCurrency:
         with patch("loyalty.services.Setting.get", side_effect=mock_settings):
             with pytest.raises(ValidationError, match="Unsupported currency"):
                 LoyaltyService.redeem_points(
-                    user, 50, "GBP", max_discount=Decimal("99999")
+                    user, 50, "GBP", max_discount=Decimal(99999)
                 )
 
 
@@ -495,7 +497,7 @@ class TestNegativePointsAmount:
                 ValidationError, match="Points amount must be positive"
             ):
                 LoyaltyService.redeem_points(
-                    user, -10, "EUR", max_discount=Decimal("99999")
+                    user, -10, "EUR", max_discount=Decimal(99999)
                 )
 
     def test_zero_points_raises_error(self):
@@ -514,7 +516,7 @@ class TestNegativePointsAmount:
                 ValidationError, match="Points amount must be positive"
             ):
                 LoyaltyService.redeem_points(
-                    user, 0, "EUR", max_discount=Decimal("99999")
+                    user, 0, "EUR", max_discount=Decimal(99999)
                 )
 
 
@@ -553,17 +555,17 @@ class TestOrderMetadataIntegration:
 
         with patch("loyalty.services.Setting.get", side_effect=mock_settings):
             discount = LoyaltyService.redeem_points(
-                user, 150, "EUR", max_discount=Decimal("99999"), order=order
+                user, 150, "EUR", max_discount=Decimal(99999), order=order
             )
 
         # Verify discount calculation
-        assert discount == Decimal("150") / Decimal("100")
+        assert discount == Decimal(150) / Decimal(100)
 
         # Verify metadata stored in order
         order.refresh_from_db()
         assert order.metadata["loyalty_points_redeemed"] == 150
         assert order.metadata["loyalty_discount"] == str(
-            Decimal("150") / Decimal("100")
+            Decimal(150) / Decimal(100)
         )
 
     def test_redeem_with_order_sets_reference_order_on_transaction(self):
@@ -590,7 +592,7 @@ class TestOrderMetadataIntegration:
 
         with patch("loyalty.services.Setting.get", side_effect=mock_settings):
             LoyaltyService.redeem_points(
-                user, 50, "EUR", max_discount=Decimal("99999"), order=order
+                user, 50, "EUR", max_discount=Decimal(99999), order=order
             )
 
         redeem_tx = PointsTransaction.objects.get(
@@ -621,10 +623,10 @@ class TestOrderMetadataIntegration:
 
         with patch("loyalty.services.Setting.get", side_effect=mock_settings):
             discount = LoyaltyService.redeem_points(
-                user, 50, "EUR", max_discount=Decimal("99999")
+                user, 50, "EUR", max_discount=Decimal(99999)
             )
 
-        assert discount == Decimal("50") / Decimal("100")
+        assert discount == Decimal(50) / Decimal(100)
 
         # REDEEM transaction should have no reference_order
         redeem_tx = PointsTransaction.objects.get(
@@ -656,10 +658,10 @@ class TestOrderMetadataIntegration:
 
         with patch("loyalty.services.Setting.get", side_effect=mock_settings):
             discount = LoyaltyService.redeem_points(
-                user, 200, "USD", max_discount=Decimal("99999"), order=order
+                user, 200, "USD", max_discount=Decimal(99999), order=order
             )
 
-        expected_discount = Decimal("200") / Decimal("50")
+        expected_discount = Decimal(200) / Decimal(50)
         assert discount == expected_discount
 
         order.refresh_from_db()

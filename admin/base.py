@@ -80,7 +80,7 @@ class BaseModelAdmin(ModelAdmin):
         403, which is the honest answer: that model does not belong to
         this host.
         """
-        from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+        from django_tenants.utils import get_public_schema_name
 
         tenant = getattr(request, "tenant", None)
         if tenant is None:
@@ -88,7 +88,7 @@ class BaseModelAdmin(ModelAdmin):
         if getattr(tenant, "schema_name", None) != get_public_schema_name():
             return False
 
-        from tenant.app_labels import tenant_only_app_labels  # noqa: PLC0415
+        from tenant.app_labels import tenant_only_app_labels
 
         return self.model._meta.app_label in set(tenant_only_app_labels())
 

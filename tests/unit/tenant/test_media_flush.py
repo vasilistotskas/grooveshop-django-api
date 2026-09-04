@@ -55,12 +55,14 @@ class TestFlushTenantMedia:
             post.assert_not_called()
 
     def test_raises_on_http_error_for_task_retry(self, _configured):
-        with mock.patch(
-            "tenant.media_flush.requests.post",
-            side_effect=requests.ConnectionError("media-stream down"),
+        with (
+            mock.patch(
+                "tenant.media_flush.requests.post",
+                side_effect=requests.ConnectionError("media-stream down"),
+            ),
+            pytest.raises(requests.RequestException),
         ):
-            with pytest.raises(requests.RequestException):
-                flush_tenant_media("acme")
+            flush_tenant_media("acme")
 
 
 class TestSuspendDispatchesFlush:

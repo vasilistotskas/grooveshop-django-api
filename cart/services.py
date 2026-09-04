@@ -100,7 +100,7 @@ class CartService:
         non-approved users and disabled tenants.
         """
         if cart is not None:
-            from b2b.services import B2BPricingService  # noqa: PLC0415
+            from b2b.services import B2BPricingService
 
             B2BPricingService.bind_cart(cart, self.request.user)
         return cart

@@ -3,7 +3,8 @@ import logging
 import time
 import traceback
 from collections import defaultdict, deque
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -58,7 +59,7 @@ class SeedingOptions:
     debug: bool = False
 
     @classmethod
-    def from_dict(cls, options: dict[str, Any]) -> "SeedingOptions":
+    def from_dict(cls, options: dict[str, Any]) -> SeedingOptions:
         """Create SeedingOptions from command options dict"""
         return cls(**{k: v for k, v in options.items() if hasattr(cls, k)})
 
@@ -902,7 +903,7 @@ class Command(BaseCommand):
             return True
 
         if hasattr(factory_class, "custom_seed") and callable(
-            getattr(factory_class, "custom_seed")
+            factory_class.custom_seed
         ):
             return True
 
@@ -974,7 +975,7 @@ class Command(BaseCommand):
 
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR(f"  [ERROR] Custom seeding failed: {str(e)}")
+                self.style.ERROR(f"  [ERROR] Custom seeding failed: {e!s}")
             )
             raise
 

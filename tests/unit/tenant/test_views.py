@@ -200,12 +200,12 @@ class TestMyMemberships:
         user = User.objects.create_user(
             username="memberships-alice",
             email="memberships-alice@example.com",
-            password="p",  # noqa: S106
+            password="p",
         )
         other = User.objects.create_user(
             username="memberships-bob",
             email="memberships-bob@example.com",
-            password="p",  # noqa: S106
+            password="p",
         )
         tenant_a = tenant_factory("memb-a")
         tenant_b = tenant_factory("memb-b")
@@ -243,7 +243,7 @@ class TestMyMemberships:
         user = User.objects.create_user(
             username="memb-inactive",
             email="memb-inactive@example.com",
-            password="p",  # noqa: S106
+            password="p",
         )
         tenant = tenant_factory("memb-inactive-t")
         TenantDomain.objects.create(
@@ -267,7 +267,7 @@ class TestMyMemberships:
         user = User.objects.create_user(
             username="memb-tenant-off",
             email="memb-tenant-off@example.com",
-            password="p",  # noqa: S106
+            password="p",
         )
         tenant = tenant_factory("memb-tenant-off-t")
         tenant.is_active = False
@@ -310,7 +310,7 @@ class TestTenantResolveOnPublicSchema:
         # legitimately enters the RESOLVED tenant's schema (agent
         # feature settings) and django-tenants restores the bound
         # tenant afterwards.
-        from types import SimpleNamespace  # noqa: PLC0415
+        from types import SimpleNamespace
 
         sentinel_tenant = SimpleNamespace(schema_name="public")
         monkeypatch.setattr(

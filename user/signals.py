@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from allauth.account.signals import (
     authentication_step_completed,
@@ -9,20 +10,16 @@ from allauth.account.signals import (
     password_reset,
     user_signed_up,
 )
+from django.contrib.auth import get_user_model
 from django.contrib.auth.signals import (
     user_logged_in,
     user_logged_out,
     user_login_failed,
 )
-from django.dispatch import receiver
-
-from typing import TYPE_CHECKING
-
-from django.contrib.auth import get_user_model
-from django.db.models.signals import post_save
-from django.utils.crypto import get_random_string
-
 from django.db import transaction
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.utils.crypto import get_random_string
 
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
@@ -103,7 +100,7 @@ def log_auth_logout(sender, request, user, **kwargs):
 
 def _revoke_knox_tokens(user) -> int:
     """Delete all Knox tokens for *user* and return the count removed."""
-    from knox.models import get_token_model  # noqa: PLC0415
+    from knox.models import get_token_model
 
     result = get_token_model().objects.filter(user=user).delete()
     return result[0]
@@ -118,11 +115,11 @@ def _broadcast_force_logout(user) -> None:
     a request/response cycle where TenantMiddleware has already switched
     the connection to the right schema.
     """
-    from asgiref.sync import async_to_sync  # noqa: PLC0415
-    from channels.layers import get_channel_layer  # noqa: PLC0415
-    from django.db import connection  # noqa: PLC0415
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+    from django.db import connection
 
-    from notification.groups import user_group  # noqa: PLC0415
+    from notification.groups import user_group
 
     layer = get_channel_layer()
     if layer:
@@ -228,7 +225,7 @@ def populate_profile(
         # always read the new user row.  (Social signups run inside an
         # atomic block; firing bare .delay() risks the task reading before
         # the INSERT is visible to the Celery worker's DB connection.)
-        from user.tasks import download_social_avatar_task  # noqa: PLC0415
+        from user.tasks import download_social_avatar_task
 
         transaction.on_commit(
             lambda url=picture_url: download_social_avatar_task.delay(

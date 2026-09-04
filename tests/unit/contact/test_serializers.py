@@ -7,7 +7,6 @@ from rest_framework.exceptions import ValidationError
 from contact.models import Contact
 from contact.serializers import ContactWriteSerializer
 
-
 pytestmark = pytest.mark.assert_english
 
 

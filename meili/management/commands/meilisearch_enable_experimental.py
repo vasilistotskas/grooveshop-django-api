@@ -129,4 +129,4 @@ class Command(BaseCommand):
                 )
             )
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"✗ Unexpected error: {str(e)}"))
+            self.stdout.write(self.style.ERROR(f"✗ Unexpected error: {e!s}"))

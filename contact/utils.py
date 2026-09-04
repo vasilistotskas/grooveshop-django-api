@@ -117,9 +117,11 @@ def validate_feedback_content(
                     "Disposable / temporary email addresses are not allowed"
                 )
 
-    if not isinstance(rating, int) or isinstance(rating, bool):
-        errors["rating"] = _("Rating must be between 1 and 5")
-    elif not 1 <= rating <= 5:
+    if (
+        not isinstance(rating, int)
+        or isinstance(rating, bool)
+        or not 1 <= rating <= 5
+    ):
         errors["rating"] = _("Rating must be between 1 and 5")
 
     if detect_spam_patterns(message, email, name):

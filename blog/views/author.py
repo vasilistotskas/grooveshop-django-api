@@ -6,7 +6,6 @@ from drf_spectacular.utils import extend_schema_view
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 
-from core.api.permissions import StoreStaffModelPermissions
 from blog.filters.author import BlogAuthorFilter
 from blog.filters.post import BlogPostFilter
 from blog.models.author import BlogAuthor
@@ -17,10 +16,9 @@ from blog.serializers.author import (
     BlogAuthorWriteSerializer,
 )
 from blog.serializers.post import BlogPostSerializer
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from tenant.permissions import IsBlogEnabled
-
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -28,6 +26,7 @@ from core.utils.serializers import (
     crud_config,
 )
 from core.utils.views import cache_methods
+from tenant.permissions import IsBlogEnabled
 
 serializers_config: SerializersConfig = {
     **crud_config(

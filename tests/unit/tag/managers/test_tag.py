@@ -1,10 +1,10 @@
 from django.test import TestCase
 
+from product.factories.product import ProductFactory
 from tag.factories.tag import TagFactory
 from tag.factories.tagged_item import TaggedProductFactory
 from tag.managers import TagManager
 from tag.models.tag import Tag
-from product.factories.product import ProductFactory
 
 
 class TestTagManager(TestCase):

@@ -200,7 +200,9 @@ class TestPrintType:
         # otherwise admins flipping thermal→laser would still get
         # the cached thermal PDF for an hour.
         from unittest.mock import MagicMock, patch
+
         from django.core.cache import cache
+
         from shipping_acs.factories import AcsShipmentFactory
         from shipping_acs.services import AcsService
 

@@ -60,7 +60,7 @@ def user(db):
     return User.objects.create_user(
         username="alice-unit",
         email="alice-unit@example.com",
-        password="password",  # noqa: S106
+        password="password",
     )
 
 

@@ -43,9 +43,9 @@ from core.models import TimeStampMixinModel, UUIDModel
 
 
 class YourModel(
-    TranslatableModel,       # Only if multilingual
-    TimeStampMixinModel,     # Almost always
-    UUIDModel,               # If needed for external access
+    TranslatableModel,  # Only if multilingual
+    TimeStampMixinModel,  # Almost always
+    UUIDModel,  # If needed for external access
 ):
     id = models.BigAutoField(primary_key=True)
     slug = models.SlugField(max_length=255, unique=True)
@@ -85,6 +85,7 @@ def likes_count(self) -> int:
     if "likes_count" in self.__dict__:
         return self.__dict__["likes_count"]
     return self.likes.count()
+
 
 @likes_count.setter
 def likes_count(self, value: int) -> None:
@@ -173,7 +174,10 @@ class YourCategoryManager(TreeTranslatableManager):
 Add `SoftDeleteQuerySetMixin` from `core.mixins.queryset`:
 
 ```python
-from core.managers.base import TranslatableOptimizedManager, TranslatableOptimizedQuerySet
+from core.managers.base import (
+    TranslatableOptimizedManager,
+    TranslatableOptimizedQuerySet,
+)
 from core.mixins.queryset import SoftDeleteQuerySetMixin
 
 
@@ -234,6 +238,7 @@ Every serializer module that handles translatable models defines a local subclas
 from drf_spectacular.utils import extend_schema_field
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
+
 
 @extend_schema_field(generate_schema_multi_lang(YourModel))
 class TranslatedFieldsFieldExtend(TranslatedFieldExtended):
@@ -327,7 +332,9 @@ class YourModelDetailSerializer(YourModelSerializer):
 class YourModelWriteSerializer(
     TranslatableModelSerializer, serializers.ModelSerializer[YourModel]
 ):
-    translations = TranslatedFieldsFieldExtend(shared_model=YourModel)  # Reuse from same module
+    translations = TranslatedFieldsFieldExtend(
+        shared_model=YourModel
+    )  # Reuse from same module
     # Use PrimaryKeyRelatedField for ForeignKeys in write
     category = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all()
@@ -358,7 +365,9 @@ class YourModelWriteSerializer(
 ### SerializerMethodField with Annotation Fallback
 
 ```python
-class YourModelSerializer(TranslatableModelSerializer, serializers.ModelSerializer):
+class YourModelSerializer(
+    TranslatableModelSerializer, serializers.ModelSerializer
+):
     item_count = serializers.SerializerMethodField()
 
     def get_item_count(self, obj) -> int:
@@ -392,6 +401,7 @@ class YourActionRequestSerializer(serializers.Serializer):
         help_text=_("List of item IDs"),
     )
 
+
 class YourActionResponseSerializer(serializers.Serializer):
     item_ids = serializers.ListField(
         child=serializers.IntegerField(),
@@ -409,10 +419,13 @@ from core.api.serializers import MeasurementSerializerField
 price = MoneyField(max_digits=11, decimal_places=2)
 
 # Measurement (weight, dimensions)
-weight = MeasurementSerializerField(measurement=Weight, unit_choices=WeightUnits.CHOICES)
+weight = MeasurementSerializerField(
+    measurement=Weight, unit_choices=WeightUnits.CHOICES
+)
 
 # Image + SVG
 from core.fields.image import ImageAndSvgField
+
 image = ImageAndSvgField(upload_to="uploads/your_app/")
 ```
 
@@ -488,6 +501,7 @@ class YourModelFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from your_app.models import Category
+
         self.filters["category"].queryset = Category.objects.all()
 ```
 
@@ -498,6 +512,7 @@ min_likes = filters.NumberFilter(
     method="filter_min_likes",
     help_text=_("Minimum likes count"),
 )
+
 
 def filter_min_likes(self, queryset, name, value):
     if value is not None:
@@ -585,8 +600,7 @@ from django.conf import settings
 
 @extend_schema_view(...)
 @cache_methods(settings.DEFAULT_CACHE_TTL, methods=["list", "retrieve"])
-class YourModelViewSet(BaseModelViewSet):
-    ...
+class YourModelViewSet(BaseModelViewSet): ...
 ```
 
 ### Custom Action Patterns
@@ -624,7 +638,9 @@ def reviews(self, request, pk=None):
 **Non-paginated list action:**
 
 ```python
-@action(detail=False, methods=["GET"], pagination_class=None, filter_backends=[])
+@action(
+    detail=False, methods=["GET"], pagination_class=None, filter_backends=[]
+)
 def all(self, request):
     queryset = self.get_queryset()
     serializer = YourModelSerializer(
@@ -660,6 +676,7 @@ def get_filterset_class(self):
     if self.action in ["reviews", "images", "tags"]:
         return None
     return YourModelFilter
+
 
 @property
 def filterset_class(self):
@@ -714,12 +731,14 @@ urlpatterns = [
     # Retrieve + Update + Delete
     path(
         "your-model/<int:pk>",
-        YourModelViewSet.as_view({
-            "get": "retrieve",
-            "put": "update",
-            "patch": "partial_update",
-            "delete": "destroy",
-        }),
+        YourModelViewSet.as_view(
+            {
+                "get": "retrieve",
+                "put": "update",
+                "patch": "partial_update",
+                "delete": "destroy",
+            }
+        ),
         name="your-model-detail",
     ),
 ]
@@ -731,25 +750,31 @@ urlpatterns = format_suffix_patterns(urlpatterns)
 
 ```python
 # Detail action (with pk)
-path(
-    "your-model/<int:pk>/reviews",
-    YourModelViewSet.as_view({"get": "reviews"}),
-    name="your-model-reviews",
-),
+(
+    path(
+        "your-model/<int:pk>/reviews",
+        YourModelViewSet.as_view({"get": "reviews"}),
+        name="your-model-reviews",
+    ),
+)
 
 # Non-detail action (no pk)
-path(
-    "your-model/trending",
-    YourModelViewSet.as_view({"get": "trending"}),
-    name="your-model-trending",
-),
+(
+    path(
+        "your-model/trending",
+        YourModelViewSet.as_view({"get": "trending"}),
+        name="your-model-trending",
+    ),
+)
 
 # POST action on detail
-path(
-    "your-model/<int:pk>/update_view_count",
-    YourModelViewSet.as_view({"post": "update_view_count"}),
-    name="your-model-update-view-count",
-),
+(
+    path(
+        "your-model/<int:pk>/update_view_count",
+        YourModelViewSet.as_view({"post": "update_view_count"}),
+        name="your-model-update-view-count",
+    ),
+)
 ```
 
 ### URL Naming Convention
@@ -762,9 +787,21 @@ path(
 
 ```python
 # Blog app uses path prefix
-path("blog/post", BlogPostViewSet.as_view({...}), name="blog-post-list"),
-path("blog/post/<int:pk>", BlogPostViewSet.as_view({...}), name="blog-post-detail"),
-path("blog/category", BlogCategoryViewSet.as_view({...}), name="blog-category-list"),
+(path("blog/post", BlogPostViewSet.as_view({...}), name="blog-post-list"),)
+(
+    path(
+        "blog/post/<int:pk>",
+        BlogPostViewSet.as_view({...}),
+        name="blog-post-detail",
+    ),
+)
+(
+    path(
+        "blog/category",
+        BlogCategoryViewSet.as_view({...}),
+        name="blog-category-list",
+    ),
+)
 ```
 
 ### Core URL Registration
@@ -772,7 +809,7 @@ path("blog/category", BlogCategoryViewSet.as_view({...}), name="blog-category-li
 In `core/urls.py`, new apps are registered under `api/v1/`:
 
 ```python
-path("api/v1/", include("your_app.urls")),
+(path("api/v1/", include("your_app.urls")),)
 ```
 
 ---
@@ -829,9 +866,7 @@ class YourModelTranslationFactory(factory.django.DjangoModelFactory):
     language_code = factory.Iterator(available_languages)
     name = factory.Faker("word")
     description = factory.Faker("text", max_nb_chars=200)
-    master = factory.SubFactory(
-        "your_app.factories.YourModelFactory"
-    )
+    master = factory.SubFactory("your_app.factories.YourModelFactory")
 
     class Meta:
         model = apps.get_model("your_app", "YourModelTranslation")
@@ -930,7 +965,7 @@ class YourAppConfig(AppConfig):
 Add URL inclusion inside `i18n_patterns(...)`:
 
 ```python
-path("api/v1/", include("your_app.urls")),
+(path("api/v1/", include("your_app.urls")),)
 ```
 
 ---
@@ -1028,7 +1063,9 @@ from mptt.models import MPTTModel, TreeForeignKey
 
 # Money
 from djmoney.models.fields import MoneyField
-from djmoney.contrib.django_rest_framework import MoneyField as MoneySerializerField
+from djmoney.contrib.django_rest_framework import (
+    MoneyField as MoneySerializerField,
+)
 
 # History
 from simple_history.models import HistoricalRecords

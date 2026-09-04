@@ -6,10 +6,10 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from user.serializers.account import UserDetailsSerializer
 from blog.models.author import BlogAuthor
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
+from user.serializers.account import UserDetailsSerializer
 
 
 @extend_schema_field(generate_schema_multi_lang(BlogAuthor))
@@ -74,7 +74,7 @@ class BlogAuthorDetailSerializer(BlogAuthorSerializer):
         lazy_serializer("blog.serializers.post.BlogPostSerializer")(many=True)
     )
     def get_recent_posts(self, obj: BlogAuthor):
-        from blog.serializers.post import BlogPostSerializer  # noqa: PLC0415, I001
+        from blog.serializers.post import BlogPostSerializer
 
         recent_posts = obj.blog_posts.order_by("-created_at")[:3]
         return BlogPostSerializer(
@@ -85,7 +85,7 @@ class BlogAuthorDetailSerializer(BlogAuthorSerializer):
         lazy_serializer("blog.serializers.post.BlogPostSerializer")(many=True)
     )
     def get_top_posts(self, obj: BlogAuthor):
-        from blog.serializers.post import BlogPostSerializer  # noqa: PLC0415, I001
+        from blog.serializers.post import BlogPostSerializer
 
         top_posts = obj.blog_posts.annotate(
             likes_count_field=models.Count("likes")

@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 
 from order.models import Order
+
 from .preview_service import EmailTemplatePreviewService
 
 logger = logging.getLogger(__name__)

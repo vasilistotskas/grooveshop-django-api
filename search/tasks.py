@@ -242,8 +242,9 @@ def anonymize_old_search_queries(days: int = 90) -> int:
     keeping the aggregate analytics value (query text, counts, timing).
     Registered as a periodic beat task.
     """
-    from django.utils import timezone
     from datetime import timedelta
+
+    from django.utils import timezone
 
     from search.models import SearchQuery
 

@@ -1,7 +1,7 @@
 import pytest
 from django.core.exceptions import ValidationError
-from order.services import OrderService
 
+from order.services import OrderService
 
 pytestmark = pytest.mark.assert_english
 

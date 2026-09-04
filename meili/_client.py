@@ -1,3 +1,4 @@
+from datetime import UTC
 from typing import Self
 
 from meilisearch.client import Client as _Client
@@ -75,7 +76,7 @@ class Client:
         if cached is not None and cached[1] > time.monotonic():
             return cached[0]
 
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         if self._search_key_uid is None:
             # The /keys/{key} endpoint accepts the key value itself and
@@ -88,7 +89,7 @@ class Client:
             self._search_key_uid,
             {f"{schema_name}__*": {}},
             api_key=self.settings.search_key,
-            expires_at=datetime.now(tz=timezone.utc)
+            expires_at=datetime.now(tz=UTC)
             + timedelta(seconds=self._TENANT_TOKEN_TTL_SECONDS),
         )
         tenant_client = _Client(

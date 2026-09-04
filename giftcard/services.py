@@ -67,7 +67,7 @@ class GiftCardService:
         (public action, for guest checkout), so redemption bypassed the
         endpoint gate entirely. See tenant.membership.tenant_plan_allows.
         """
-        from tenant.membership import tenant_plan_allows  # noqa: PLC0415
+        from tenant.membership import tenant_plan_allows
 
         if not tenant_plan_allows("gift_cards_enabled"):
             return False
@@ -240,7 +240,7 @@ class GiftCardService:
             else:
                 per_card[-1] = (card, take - trim)
 
-        planned = sum((take for _, take in per_card), start=Decimal("0"))
+        planned = sum((take for _, take in per_card), start=Decimal(0))
         return RedemptionPlan(Money(planned, currency), per_card)
 
     @classmethod
@@ -400,7 +400,7 @@ class GiftCardService:
         constraint on (gift_card, order) for REFUND_CREDIT rows makes
         a racing duplicate insert impossible — the loser skips the
         card instead of double-crediting it."""
-        from django.db import IntegrityError, transaction  # noqa: PLC0415
+        from django.db import IntegrityError, transaction
 
         redeems = GiftCardTransaction.objects.filter(
             order=order, kind=GiftCardTransactionKind.REDEEM
@@ -410,7 +410,7 @@ class GiftCardService:
                 order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
             ).values_list("gift_card_id", flat=True)
         )
-        credited = Decimal("0")
+        credited = Decimal(0)
         for redeem in redeems:
             if redeem.gift_card_id in already:
                 continue

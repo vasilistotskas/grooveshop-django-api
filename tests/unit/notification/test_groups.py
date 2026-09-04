@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from notification.groups import user_group
 
 

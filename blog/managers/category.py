@@ -46,9 +46,9 @@ class BlogCategoryQuerySet(TreeTranslatableQuerySet):
         ``is_published`` alone counted future-dated posts that the posts
         listing itself hides, so the badge disagreed with the page.
         """
-        from django.utils import timezone  # noqa: PLC0415
+        from django.utils import timezone
 
-        from blog.models.category import BlogCategory  # noqa: PLC0415
+        from blog.models.category import BlogCategory
 
         children_subquery = BlogCategory.objects.filter(
             parent=OuterRef("pk")

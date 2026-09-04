@@ -1,6 +1,5 @@
 import pytest
 
-
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models import OrderHistory
@@ -332,6 +331,7 @@ class TestPaymentConfirmationActualTransition:
         - No interference between order processing
         """
         import uuid
+
         from order.models import OrderItem
 
         # Create multiple orders with unique payment IDs

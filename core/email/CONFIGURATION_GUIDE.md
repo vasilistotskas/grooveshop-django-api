@@ -18,22 +18,26 @@ The email template management system is now fully **configuration-driven** and *
 ```python
 # core/email/config.py
 
+
 @dataclass
 class TemplateCategory:
-    name: str                    # Display name
-    path: str                    # Subdirectory path (empty for root)
-    context_generator: str       # Method name to generate context
-    templates: dict              # Template configurations
+    name: str  # Display name
+    path: str  # Subdirectory path (empty for root)
+    context_generator: str  # Method name to generate context
+    templates: dict  # Template configurations
+
 
 @dataclass
 class TemplateConfig:
-    name: str                    # Template file name
-    category_name: str           # Display category
-    description: str             # Template description
-    subject_template: str        # Subject with {variables}
-    is_used: bool               # Whether actively used
-    context_keys: list          # Required context keys
-    order_statuses: list = None # Associated order statuses (optional, only for order templates)
+    name: str  # Template file name
+    category_name: str  # Display category
+    description: str  # Template description
+    subject_template: str  # Subject with {variables}
+    is_used: bool  # Whether actively used
+    context_keys: list  # Required context keys
+    order_statuses: list = (
+        None  # Associated order statuses (optional, only for order templates)
+    )
 ```
 
 ## Adding a New Template
@@ -156,9 +160,15 @@ Update `_get_context_data_for_category` method:
 ```python
 generator_map = {
     "generate_order_context": lambda: self._get_context_data(order_id),
-    "generate_subscription_context": lambda: (self._get_sample_subscription_context(), True),
+    "generate_subscription_context": lambda: (
+        self._get_sample_subscription_context(),
+        True,
+    ),
     "generate_user_context": lambda: (self._get_sample_user_context(), True),
-    "generate_payment_context": lambda: (self._get_sample_payment_context(), True),  # NEW
+    "generate_payment_context": lambda: (
+        self._get_sample_payment_context(),
+        True,
+    ),  # NEW
 }
 ```
 
@@ -168,19 +178,19 @@ Subject lines support variable substitution:
 
 ### Simple Variables
 ```python
-subject_template="Welcome, {user[first_name]}!"
+subject_template = "Welcome, {user[first_name]}!"
 # Result: "Welcome, John!"
 ```
 
 ### Nested Dictionary Access
 ```python
-subject_template="Order #{order[id]} - {order[status]}"
+subject_template = "Order #{order[id]} - {order[status]}"
 # Result: "Order #12345 - Shipped"
 ```
 
 ### Multiple Variables
 ```python
-subject_template="{user[first_name]}, your order #{order[id]} is ready!"
+subject_template = "{user[first_name]}, your order #{order[id]} is ready!"
 # Result: "John, your order #12345 is ready!"
 ```
 
@@ -194,7 +204,7 @@ The `context_keys` list defines required context variables for each template. Th
 
 Example:
 ```python
-context_keys=["user", "order", "items", "tracking_number"]
+context_keys = ["user", "order", "items", "tracking_number"]
 ```
 
 ## Benefits of Configuration-Driven Approach

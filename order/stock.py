@@ -1,5 +1,4 @@
 from datetime import timedelta
-from typing import Optional
 
 from django.db import transaction
 from django.utils import timezone
@@ -55,7 +54,7 @@ class StockManager:
         product_id: int,
         quantity: int,
         session_id: str,
-        user_id: Optional[int] = None,
+        user_id: int | None = None,
     ) -> StockReservation:
         """
         Reserve stock for checkout process.
@@ -641,7 +640,7 @@ class StockManager:
     def get_available_stock(
         cls,
         product_id: int,
-        exclude_session_id: Optional[str] = None,
+        exclude_session_id: str | None = None,
     ) -> int:
         """
         Calculate available stock for a product.

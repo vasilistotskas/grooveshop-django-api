@@ -1,5 +1,6 @@
 from datetime import timedelta
-from django.db.models import Count, Sum, Q, F, DecimalField
+
+from django.db.models import Count, DecimalField, F, Q, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -144,9 +145,7 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         """Filter by specific cart type."""
         if value == "user":
             return queryset.filter(user__isnull=False)
-        elif value == "guest":
-            return queryset.filter(user__isnull=True)
-        elif value == "anonymous":
+        elif value == "guest" or value == "anonymous":
             return queryset.filter(user__isnull=True)
         return queryset
 

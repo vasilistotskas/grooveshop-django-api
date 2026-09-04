@@ -100,7 +100,7 @@ class MeasurementField(FloatField):
         value = self.value_from_object(obj)
         if not isinstance(value, self.MEASURE_BASES):
             return value
-        return "{}:{}".format(value.value, value.unit)
+        return f"{value.value}:{value.unit}"
 
     def deserialize_value_from_string(self, value_str: str):
         try:
@@ -125,14 +125,7 @@ class MeasurementField(FloatField):
 
         return_unit = self.get_default_unit()
 
-        msg = 'You assigned a {} instead of {} to {}.{}.{}, unit was guessed to be "{}".'.format(
-            type(value).__name__,
-            str(self.measurement.__name__),
-            self.model.__module__,
-            self.model.__name__,
-            self.name,
-            return_unit,
-        )
+        msg = f'You assigned a {type(value).__name__} instead of {self.measurement.__name__!s} to {self.model.__module__}.{self.model.__name__}.{self.name}, unit was guessed to be "{return_unit}".'
         logger.warning(msg)
         return get_measurement(
             measure=self.measurement,

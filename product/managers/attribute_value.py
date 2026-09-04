@@ -27,5 +27,3 @@ class AttributeValueManager(
     TranslatableManager.from_queryset(AttributeValueQuerySet)
 ):
     """Custom manager for AttributeValue model with optimized queries."""
-
-    pass

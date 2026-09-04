@@ -283,7 +283,7 @@ def compile_user_data(user) -> dict[str, Any]:
             }
             for t in PointsTransaction.objects.filter(user=user)
         ]
-    except Exception:  # noqa: BLE001 — loyalty app is optional
+    except Exception:
         pass
 
     # Search history the user generated while authenticated — the query
@@ -414,6 +414,7 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     cannot be scrubbed retroactively without invalidating the invoice.
     """
     from knox.models import AuthToken
+
     from order.models.order import Order
     from product.models.alert import ProductAlert
 
@@ -466,7 +467,7 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
         counts["social_accounts"] = SocialAccount.objects.filter(
             user=user
         ).delete()[0]
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.exception("Failed to purge allauth records for user %s", user.pk)
 
     try:
@@ -475,7 +476,7 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
         counts["authenticators"] = Authenticator.objects.filter(
             user=user
         ).delete()[0]
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
 
     try:
@@ -484,7 +485,7 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
         counts["user_sessions"] = UserSession.objects.filter(
             user=user
         ).delete()[0]
-    except Exception:  # noqa: BLE001
+    except Exception:
         pass
 
     user_id = user.id

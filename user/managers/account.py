@@ -18,8 +18,6 @@ class UserAccountQuerySet:
     These methods are mixed into the manager.
     """
 
-    pass
-
 
 class UserAccountManager(BaseUserManager["UserAccount"]):
     """

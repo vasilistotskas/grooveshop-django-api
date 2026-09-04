@@ -1579,8 +1579,9 @@ def seed_b2b() -> dict[str, int]:
     missing — REJECTED and SUSPENDED — so the approval workflow has
     every state represented.
     """
-    from b2b.models import BusinessProfile, CustomerGroup, PriceListItem
     from django.contrib.auth import get_user_model
+
+    from b2b.models import BusinessProfile, CustomerGroup, PriceListItem
     from product.models import Product
 
     report: dict[str, int] = {}

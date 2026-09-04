@@ -31,7 +31,7 @@ def send_ops_alert(*, subject: str, message: str) -> bool:
     Raises on SMTP errors — callers wrap in try/except so a mail
     failure never masks the original carrier error.
     """
-    from tenant.credentials import (  # noqa: PLC0415
+    from tenant.credentials import (
         tenant_admin_recipients,
         tenant_from_email,
         tenant_site_name,

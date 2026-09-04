@@ -7,11 +7,10 @@ from mptt.models import MPTTModel
 from parler.models import TranslatableModel, TranslatedFields
 from tinymce.models import HTMLField
 
-from core.models import SortableModel, TimeStampMixinModel, UUIDModel
+from core.models import SeoModel, SortableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
 from product.managers.category import CategoryManager
 from product.models.product import Product
-from core.models import SeoModel
 
 
 class ProductCategory(
@@ -81,7 +80,7 @@ class ProductCategory(
 
     @property
     def main_image(self):
-        from product.models.category_image import ProductCategoryImage  # noqa: PLC0415, I001
+        from product.models.category_image import ProductCategoryImage  # noqa: I001
 
         # Use the prefetched main image when the queryset supplied one
         # (CategoryQuerySet.with_main_image, mirroring Product) — without

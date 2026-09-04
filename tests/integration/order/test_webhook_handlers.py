@@ -1,16 +1,17 @@
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 from djstripe.models import Event
 
 from order.enum.status import OrderStatus, PaymentStatus
+from order.factories import OrderFactory
 from order.models import OrderHistory
 from order.signals.handlers import (
-    handle_stripe_payment_succeeded,
-    handle_stripe_payment_failed,
-    handle_stripe_dispute_created,
     handle_stripe_checkout_completed,
+    handle_stripe_dispute_created,
+    handle_stripe_payment_failed,
+    handle_stripe_payment_succeeded,
 )
-from order.factories import OrderFactory
 
 
 @pytest.fixture

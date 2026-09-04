@@ -131,7 +131,7 @@ class ProductFavouriteViewSetTestCase(APITestCase):
                 expected_fields.issubset(set(favourite_data.keys()))
             )
 
-            if "product" in favourite_data and favourite_data["product"]:
+            if favourite_data.get("product"):
                 product_fields = {"id", "translations", "price"}
                 self.assertTrue(
                     product_fields.issubset(

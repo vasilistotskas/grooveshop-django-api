@@ -64,7 +64,7 @@ def invalidate_feeds(
     gateway requires it explicitly rather than inferring anything —
     guessing would drop another tenant's feeds.
     """
-    from django.db import connection  # noqa: PLC0415
+    from django.db import connection
 
     schema = schema_name or getattr(connection, "schema_name", None)
     if not schema:

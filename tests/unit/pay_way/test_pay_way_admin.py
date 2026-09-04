@@ -12,8 +12,8 @@ from pay_way.admin import (
     ConfigurationStatusFilter,
     CostRangeFilter,
     FreeThresholdFilter,
-    PayWayAdmin,
     PaymentTypeFilter,
+    PayWayAdmin,
 )
 from pay_way.models import PayWay
 

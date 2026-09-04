@@ -2,16 +2,15 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from django.conf import settings
 from django.template.loader import render_to_string
 
 from core.email.config import EmailTemplateConfig
-from core.utils.email_context import build_email_context
-from tenant.credentials import tenant_site_name
 from core.email.sample_data import SampleOrderDataGenerator
+from core.utils.email_context import build_email_context
 from order.models import Order
+from tenant.credentials import tenant_site_name
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +24,9 @@ class EmailPreview:
     html_content: str
     text_content: str
     context_data: dict
-    order_id: Optional[int]
+    order_id: int | None
     is_sample_data: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class EmailTemplatePreviewService:
@@ -41,7 +40,7 @@ class EmailTemplatePreviewService:
     def generate_preview(
         self,
         template_name: str,
-        order_id: Optional[int] = None,
+        order_id: int | None = None,
         language: str = "el",
     ) -> EmailPreview:
         """Generate preview for a template."""
@@ -108,7 +107,7 @@ class EmailTemplatePreviewService:
             translation.activate(current_language)
 
     def _get_context_data_for_category(
-        self, template_name: str, order_id: Optional[int] = None
+        self, template_name: str, order_id: int | None = None
     ) -> tuple[dict, bool]:
         """Get context data for template rendering based on configuration."""
         # Resolve the generator from the template's REAL directory, not
@@ -162,7 +161,7 @@ class EmailTemplatePreviewService:
         return self._get_context_data(order_id, template_name)
 
     def _get_context_data(
-        self, order_id: Optional[int], template_name: str = ""
+        self, order_id: int | None, template_name: str = ""
     ) -> tuple[dict, bool]:
         """Get context data for order templates."""
         if order_id:
@@ -326,7 +325,7 @@ class EmailTemplatePreviewService:
             )
             return f"Error rendering template: {e!s}"
 
-    def _extract_category(self, template_name: str) -> Optional[str]:
+    def _extract_category(self, template_name: str) -> str | None:
         """Resolve a template's directory from the REGISTRY, not its name.
 
         This used to call ``EmailTemplateConfig.get_category_for_template``,
@@ -342,7 +341,7 @@ class EmailTemplatePreviewService:
         registry found on disk, so reading it back cannot disagree with
         reality and cannot regress when a directory is added.
         """
-        from core.email.registry import EmailTemplateRegistry  # noqa: PLC0415
+        from core.email.registry import EmailTemplateRegistry
 
         info = EmailTemplateRegistry().get_template(template_name)
         if info is not None:
@@ -356,6 +355,7 @@ class EmailTemplatePreviewService:
     def _get_available_template_list(self) -> list[str]:
         """Get list of available email templates for error messages."""
         import os
+
         from django.conf import settings
 
         templates = []

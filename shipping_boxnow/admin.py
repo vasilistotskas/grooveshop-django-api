@@ -323,7 +323,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         icon="cancel",
     )
     def cancel_parcels(self, request, queryset):
-        from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
+        from shipping_boxnow.services import BoxNowService
 
         cancelable = queryset.filter(parcel_state=BoxNowParcelState.NEW)
         skipped = queryset.exclude(parcel_state=BoxNowParcelState.NEW).count()
@@ -337,7 +337,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                     shipment, reason="admin bulk cancel"
                 )
                 success_count += 1
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.exception(
                     "Admin cancel_parcels failed for shipment %s",
                     shipment.pk,
@@ -374,7 +374,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         icon="download",
     )
     def resync_label(self, request, queryset):
-        from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
+        from shipping_boxnow.services import BoxNowService
 
         success_count = 0
         error_count = 0
@@ -383,7 +383,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             try:
                 BoxNowService.fetch_label_bytes(shipment)
                 success_count += 1
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.exception(
                     "Admin resync_label failed for shipment %s",
                     shipment.pk,
@@ -428,12 +428,12 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         BoxNow API has no voucher to issue yet).
         """
 
-        import io  # noqa: PLC0415
-        import zipfile  # noqa: PLC0415
+        import io
+        import zipfile
 
-        from django.http import HttpResponse  # noqa: PLC0415
+        from django.http import HttpResponse
 
-        from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
+        from shipping_boxnow.services import BoxNowService
 
         eligible = queryset.exclude(parcel_id__isnull=True).exclude(
             parcel_id__exact=""
@@ -454,7 +454,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
             for shipment in eligible:
                 try:
                     pdf = BoxNowService.fetch_label_bytes(shipment)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     logger.exception(
                         "download_labels_zip failed for shipment %s",
                         shipment.pk,
@@ -509,10 +509,10 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
         has no parcel_id yet (e.g. ``parcel_state=pending_creation``)
         rather than 404'ing — admins are usually triaging stuck rows.
         """
-        from django.http import HttpResponse  # noqa: PLC0415
-        from django.shortcuts import redirect  # noqa: PLC0415
+        from django.http import HttpResponse
+        from django.shortcuts import redirect
 
-        from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
+        from shipping_boxnow.services import BoxNowService
 
         try:
             shipment = BoxNowShipment.objects.get(pk=object_id)
@@ -544,7 +544,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
 
         try:
             pdf_bytes = BoxNowService.fetch_label_bytes(shipment)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception(
                 "Admin download_voucher_action failed for shipment %s",
                 shipment.pk,
@@ -574,9 +574,9 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
     )
     def cancel_parcel_action(self, request, object_id):
         """Cancel a single shipment from the detail page."""
-        from django.shortcuts import redirect  # noqa: PLC0415
+        from django.shortcuts import redirect
 
-        from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
+        from shipping_boxnow.services import BoxNowService
 
         try:
             shipment = BoxNowShipment.objects.get(pk=object_id)
@@ -615,7 +615,7 @@ class BoxNowShipmentAdmin(BaseModelAdmin):
                 _("Parcel %(parcel_id)s canceled successfully.")
                 % {"parcel_id": shipment.parcel_id},
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception(
                 "Admin cancel_parcel_action failed for shipment %s",
                 shipment.pk,
@@ -721,7 +721,7 @@ class BoxNowLockerAdmin(BaseModelAdmin):
         The queryset is intentionally ignored — ``sync_lockers()`` always
         fetches and upserts the full set of active APM locations.
         """
-        from shipping_boxnow.services import BoxNowService  # noqa: PLC0415
+        from shipping_boxnow.services import BoxNowService
 
         try:
             result = BoxNowService.sync_lockers()
@@ -737,7 +737,7 @@ class BoxNowLockerAdmin(BaseModelAdmin):
                     "deactivated": result.get("deactivated", 0),
                 },
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.exception("BoxNow locker sync failed")
             messages.error(
                 request,

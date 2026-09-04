@@ -43,9 +43,9 @@ def post_create_historical_record_callback(
         discount = price_amount * discount_pct / 100
         return price_amount + vat - discount
 
-    from decimal import Decimal  # noqa: PLC0415
+    from decimal import Decimal
 
-    vat_rate = instance.vat_percent if instance.vat_id else Decimal("0")
+    vat_rate = instance.vat_percent if instance.vat_id else Decimal(0)
 
     old_price = _customer_price(
         prev_record.price.amount,
@@ -146,7 +146,7 @@ def reindex_product_translations(sender, instance, **kwargs):
     # is an installed app, so this import cannot fail. Guarding it meant
     # a genuine breakage would have degraded silently to synchronous
     # indexing instead of surfacing.
-    from meili.tasks import index_document_task  # noqa: PLC0415
+    from meili.tasks import index_document_task
 
     use_async = not settings.DEBUG and settings.MEILISEARCH.get(
         "ASYNC_INDEXING", True
@@ -301,7 +301,7 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
     # is an installed app, so this import cannot fail. Guarding it meant
     # a genuine breakage would have degraded silently to synchronous
     # indexing instead of surfacing.
-    from meili.tasks import index_document_task  # noqa: PLC0415
+    from meili.tasks import index_document_task
 
     use_async = not settings.DEBUG and settings.MEILISEARCH.get(
         "ASYNC_INDEXING", True

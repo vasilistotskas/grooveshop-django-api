@@ -8,13 +8,12 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework import serializers, status
 from rest_framework.decorators import action
-
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from core.api.permissions import IsOwnerOrAdmin
-from core.api.serializers import ErrorResponseSerializer, DetailSerializer
+from core.api.serializers import DetailSerializer, ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
     ActionConfig,
@@ -122,7 +121,7 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
-        from tenant.permissions import (  # noqa: PLC0415
+        from tenant.permissions import (
             IsNewsletterEnabled,
         )
 
@@ -221,7 +220,7 @@ class SubscriptionTopicViewSet(BaseModelViewSet):
             # Queue it, don't block the request on SMTP — and dispatch
             # only after commit so the worker can't read the row before
             # it is persisted. Mirrors the signup path in user/signals.py.
-            from user.tasks import (  # noqa: PLC0415
+            from user.tasks import (
                 send_subscription_confirmation_email_task,
             )
 
@@ -305,7 +304,7 @@ class UserSubscriptionViewSet(BaseModelViewSet):
     permission_classes = [IsOwnerOrAdmin]
 
     def get_permissions(self):
-        from tenant.permissions import (  # noqa: PLC0415
+        from tenant.permissions import (
             IsNewsletterEnabled,
         )
 

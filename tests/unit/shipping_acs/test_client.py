@@ -63,21 +63,23 @@ class TestConfig:
         """
         from django.test import override_settings
 
-        with override_settings(
-            ACS_API_KEY="",
-            ACS_COMPANY_ID="",
-            ACS_COMPANY_PASSWORD="",
-            ACS_USER_ID="",
-            ACS_USER_PASSWORD="",
+        with (
+            override_settings(
+                ACS_API_KEY="",
+                ACS_COMPANY_ID="",
+                ACS_COMPANY_PASSWORD="",
+                ACS_USER_ID="",
+                ACS_USER_PASSWORD="",
+            ),
+            pytest.raises(AcsConfigError),
         ):
-            with pytest.raises(AcsConfigError):
-                AcsClient(
-                    api_key="",
-                    company_id="x",
-                    company_password="x",
-                    user_id="x",
-                    user_password="x",
-                )
+            AcsClient(
+                api_key="",
+                company_id="x",
+                company_password="x",
+                user_id="x",
+                user_password="x",
+            )
 
 
 # ---------------------------------------------------------------------------

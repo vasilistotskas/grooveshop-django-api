@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 from tenant.serializers import TenantAdminSerializer, TenantConfigSerializer
 
 

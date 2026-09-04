@@ -15,7 +15,6 @@ need to be added in one place.
 from __future__ import annotations
 
 from typing import Any
-
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -70,7 +69,7 @@ def _is_platform_tenant() -> bool:
         return True
     try:
         primary = domains_manager.filter(is_primary=True).first()
-    except Exception:  # noqa: BLE001 — fall through to platform
+    except Exception:
         return True
     if primary is None or not getattr(primary, "domain", ""):
         return True

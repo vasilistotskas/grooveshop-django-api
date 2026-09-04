@@ -10,12 +10,12 @@ from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from user.serializers.account import UserDetailsSerializer
 from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from tenant.membership import is_store_staff
+from user.serializers.account import UserDetailsSerializer
 
 User = get_user_model()
 
@@ -135,7 +135,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
         lazy_serializer("blog.serializers.post.BlogPostSerializer")()
     )
     def get_post(self, obj: BlogComment):
-        from blog.serializers.post import BlogPostSerializer  # noqa: PLC0415, I001
+        from blog.serializers.post import BlogPostSerializer
 
         return BlogPostSerializer(obj.post, context=self.context).data
 

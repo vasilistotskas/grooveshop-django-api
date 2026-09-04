@@ -119,6 +119,7 @@ def mt_public_tenant(django_db_setup, django_db_blocker):
     """
     with django_db_blocker.unblock():
         from django_tenants.utils import get_public_schema_name
+
         from tenant.models import Tenant
 
         public_schema = get_public_schema_name()

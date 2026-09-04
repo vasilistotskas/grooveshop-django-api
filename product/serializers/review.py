@@ -4,13 +4,13 @@ from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
-from user.serializers.account import UserDetailsSerializer
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from product.enum.review import RateEnum
 from product.models.product import Product
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
+from user.serializers.account import UserDetailsSerializer
 
 User = get_user_model()
 

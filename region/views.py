@@ -11,7 +11,6 @@ from rest_framework.response import Response
 from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,

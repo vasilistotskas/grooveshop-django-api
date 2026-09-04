@@ -8,15 +8,15 @@ from django.core.cache import cache
 from django.db import connection
 from django.db.models import Prefetch
 from django.utils.cache import patch_vary_headers
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import (
     api_view,
     permission_classes,
 )
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.request import Request
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from tenant.cache import tenant_resolve_key
@@ -144,7 +144,7 @@ def internal_domains(request: Request) -> Response:
 
         raise Http404
 
-    from tenant.internal import build_domains_payload  # noqa: PLC0415
+    from tenant.internal import build_domains_payload
 
     return Response(build_domains_payload())
 
@@ -249,7 +249,7 @@ class IsPlatformOperator(IsAdminUser):
             return False
         if not getattr(request.user, "is_superuser", False):
             return False
-        from tenant.auth_backends import (  # noqa: PLC0415
+        from tenant.auth_backends import (
             is_platform_staff_session,
         )
 

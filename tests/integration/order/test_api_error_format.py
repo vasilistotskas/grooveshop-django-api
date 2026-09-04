@@ -1,12 +1,12 @@
 import pytest
 from django.contrib.auth import get_user_model
+from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APIClient
-from djmoney.money import Money
 
 from order.factories import OrderFactory
-from product.factories import ProductFactory
 from pay_way.factories import PayWayFactory
+from product.factories import ProductFactory
 
 User = get_user_model()
 

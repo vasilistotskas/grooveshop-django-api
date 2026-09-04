@@ -49,16 +49,16 @@ def checkout():
     cart.items.all().delete()
     product = ProductFactory(
         stock=10,
-        price=Money(Decimal("100"), "EUR"),
-        discount_percent=Decimal("0"),
+        price=Money(Decimal(100), "EUR"),
+        discount_percent=Decimal(0),
         vat=None,
         active=True,
     )
     CartItemFactory(cart=cart, product=product, quantity=1)
     pay_way = PayWayFactory(
         is_online_payment=False,
-        cost=Money(Decimal("0"), "EUR"),
-        free_threshold=Money(Decimal("0"), "EUR"),
+        cost=Money(Decimal(0), "EUR"),
+        free_threshold=Money(Decimal(0), "EUR"),
     )
     shipping_address = {
         "first_name": "Nikos",
@@ -93,7 +93,7 @@ class TestSplitPayment:
     def test_partial_coverage_leaves_remainder_for_cod(
         self, enable_gift_cards, checkout
     ):
-        card = GiftCardFactory(initial_value=Money(Decimal("30"), "EUR"))
+        card = GiftCardFactory(initial_value=Money(Decimal(30), "EUR"))
 
         order = _create_order(checkout, [card.code])
 
@@ -103,7 +103,7 @@ class TestSplitPayment:
             "30.00"
         )
         assert order.payment_status != "COMPLETED"
-        assert card.balance.amount == Decimal("0")
+        assert card.balance.amount == Decimal(0)
         redeem = card.transactions.get(kind=GiftCardTransactionKind.REDEEM)
         assert redeem.order == order
         assert order.metadata["gift_cards"][0]["code"] == card.code
@@ -111,19 +111,19 @@ class TestSplitPayment:
     def test_full_coverage_settles_without_provider(
         self, enable_gift_cards, checkout
     ):
-        card = GiftCardFactory(initial_value=Money(Decimal("500"), "EUR"))
+        card = GiftCardFactory(initial_value=Money(Decimal(500), "EUR"))
 
         order = _create_order(checkout, [card.code])
 
         order.refresh_from_db()
         total = order.total_price.amount
         assert order.gift_card_amount.amount == total
-        assert order.paid_amount.amount == Decimal("0")
+        assert order.paid_amount.amount == Decimal(0)
         assert order.payment_status == "COMPLETED"
         assert order.payment_id == f"GIFTCARD_{order.uuid}"
         assert order.payment_method == "gift_card"
         # The card keeps whatever the order didn't need.
-        assert card.balance.amount == Decimal("500") - total
+        assert card.balance.amount == Decimal(500) - total
 
     def test_insufficient_cards_block_intent_less_online_checkout(
         self, enable_gift_cards, checkout
@@ -131,10 +131,10 @@ class TestSplitPayment:
         online = PayWayFactory(
             provider_code="stripe",
             is_online_payment=True,
-            cost=Money(Decimal("0"), "EUR"),
-            free_threshold=Money(Decimal("0"), "EUR"),
+            cost=Money(Decimal(0), "EUR"),
+            free_threshold=Money(Decimal(0), "EUR"),
         )
-        card = GiftCardFactory(initial_value=Money(Decimal("10"), "EUR"))
+        card = GiftCardFactory(initial_value=Money(Decimal(10), "EUR"))
 
         with pytest.raises(InvalidGiftCardError) as excinfo:
             OrderService.create_order_from_cart_offline(
@@ -148,10 +148,10 @@ class TestSplitPayment:
         assert excinfo.value.reason == "gift_card_insufficient"
 
     def test_refund_credits_the_source_card(self, enable_gift_cards, checkout):
-        card = GiftCardFactory(initial_value=Money(Decimal("30"), "EUR"))
+        card = GiftCardFactory(initial_value=Money(Decimal(30), "EUR"))
         order = _create_order(checkout, [card.code])
-        assert card.balance.amount == Decimal("0")
+        assert card.balance.amount == Decimal(0)
 
         GiftCardService.credit_refund(order)
 
-        assert card.balance.amount == Decimal("30")
+        assert card.balance.amount == Decimal(30)

@@ -81,6 +81,7 @@ def test_factory_with_post_generation(self):
     self.assertEqual(instance.tags.count(), 3)
     self.assertEqual(instance.comments.count(), 5)
 
+
 def test_factory_without_post_generation(self):
     """Default: no related objects unless requested."""
     instance = YourModelFactory(num_tags=0, num_comments=0)
@@ -136,16 +137,19 @@ def test_default_queryset_excludes_deleted(self):
     qs = YourModel.objects.all()
     self.assertNotIn(self.instance1, qs)
 
+
 def test_all_with_deleted_includes_deleted(self):
     self.instance1.delete()
     qs = YourModel.objects.all_with_deleted()
     self.assertIn(self.instance1, qs)
+
 
 def test_deleted_only_returns_deleted(self):
     self.instance1.delete()
     qs = YourModel.objects.deleted_only()
     self.assertEqual(qs.count(), 1)
     self.assertIn(self.instance1, qs)
+
 
 def test_restore(self):
     self.instance1.delete()
@@ -267,7 +271,13 @@ class YourModelViewSetTestCase(TestURLFixerMixin, APITestCase):
         response = self.client.get(url)
 
         first_result = response.data["results"][0]
-        expected_fields = {"id", "translations", "slug", "createdAt", "updatedAt"}
+        expected_fields = {
+            "id",
+            "translations",
+            "slug",
+            "createdAt",
+            "updatedAt",
+        }
         self.assertTrue(
             expected_fields.issubset(set(first_result.keys())),
             f"Missing fields: {expected_fields - set(first_result.keys())}",
@@ -361,11 +371,13 @@ def test_custom_detail_action(self):
     response = self.client.post(url)
     self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+
 def test_custom_list_action_paginated(self):
     url = reverse("your-model-trending")
     response = self.client.get(url)
     self.assertEqual(response.status_code, status.HTTP_200_OK)
     self.assertIn("results", response.data)
+
 
 def test_custom_action_with_request_body(self):
     self.client.force_authenticate(user=self.user)
@@ -386,10 +398,12 @@ def test_search_by_name(self):
     self.assertEqual(response.status_code, status.HTTP_200_OK)
     self.assertGreaterEqual(response.data["count"], 1)
 
+
 def test_filter_by_field(self):
     url = self.get_list_url()
     response = self.client.get(url, {"slug": self.instance.slug})
     self.assertEqual(response.status_code, status.HTTP_200_OK)
+
 
 def test_ordering(self):
     url = self.get_list_url()
@@ -411,11 +425,16 @@ class YourModelMutationTestCase(TestURLFixerMixin, APITestCase):
     def test_create_then_retrieve(self):
         # Creates data — needs fresh setup per test
         url = reverse("your-model-list")
-        data = {"slug": "mutation-test", "translations": {"en": {"name": "Test"}}}
+        data = {
+            "slug": "mutation-test",
+            "translations": {"en": {"name": "Test"}},
+        }
         create_response = self.client.post(url, data, format="json")
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
 
-        detail_url = reverse("your-model-detail", args=[create_response.data["id"]])
+        detail_url = reverse(
+            "your-model-detail", args=[create_response.data["id"]]
+        )
         retrieve_response = self.client.get(detail_url)
         self.assertEqual(retrieve_response.status_code, status.HTTP_200_OK)
 ```
@@ -459,9 +478,7 @@ class TestSignalSideEffects(TestCase):
 
     def test_signal_creates_notification(self):
         """Test that a signal creates the expected side effects."""
-        with patch.object(
-            Notification.objects, "create"
-        ) as mock_create:
+        with patch.object(Notification.objects, "create") as mock_create:
             mock_create.return_value = MagicMock()
 
             your_signal_handler(
@@ -621,6 +638,7 @@ def test_list_unauthenticated(self):
     response = self.client.get(self.get_list_url())
     self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+
 def test_create_requires_authentication(self):
     """Write endpoints should require auth."""
     self.client.force_authenticate(user=None)
@@ -629,6 +647,7 @@ def test_create_requires_authentication(self):
         response.status_code,
         [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN],
     )
+
 
 def test_update_own_resource(self):
     """Owners can update their own resources."""
@@ -640,6 +659,7 @@ def test_update_own_resource(self):
     response = self.client.patch(url, {"slug": "new"}, format="json")
     self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+
 def test_update_other_user_resource_denied(self):
     """Non-owners cannot update other users' resources."""
     owner = UserAccountFactory()
@@ -650,6 +670,7 @@ def test_update_other_user_resource_denied(self):
     url = self.get_detail_url(instance.pk)
     response = self.client.patch(url, {"slug": "new"}, format="json")
     self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
 
 def test_admin_can_access_any_resource(self):
     """Admins have full access."""
@@ -689,6 +710,7 @@ def test_something(count_queries):
 ```python
 from tests.conftest import requires_meilisearch
 
+
 @requires_meilisearch
 def test_search_integration():
     """Only runs when Meilisearch is available."""
@@ -715,11 +737,11 @@ The API returns a paginated envelope:
 {
     "links": {"next": ..., "previous": ...},
     "count": 45,
-    "totalPages": 4,       # camelCase in API response
+    "totalPages": 4,  # camelCase in API response
     "pageSize": 12,
     "pageTotalResults": 12,
     "page": 1,
-    "results": [...]
+    "results": [...],
 }
 ```
 

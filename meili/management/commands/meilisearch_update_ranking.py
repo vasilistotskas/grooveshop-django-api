@@ -11,8 +11,8 @@ from django.core.management.base import BaseCommand
 from django.utils.translation import gettext as _
 
 from blog.models.post import BlogPostTranslation
-from meili._client import client as meili_client
 from core.management.tenant_mixin import TenantCommandMixin
+from meili._client import client as meili_client
 from product.models.product import ProductTranslation
 
 
@@ -136,7 +136,7 @@ class Command(TenantCommandMixin, BaseCommand):
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(
-                    f"✗ Failed to update {index_name} ranking rules: {str(e)}"
+                    f"✗ Failed to update {index_name} ranking rules: {e!s}"
                 )
             )
 

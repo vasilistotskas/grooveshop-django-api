@@ -18,7 +18,6 @@ from unfold.enums import ActionVariant
 from admin.base import BaseTranslatableAdmin
 from admin.displays import header_two_line
 from admin.export import ExportActionMixin
-
 from blog.models.author import BlogAuthor
 from blog.models.category import BlogCategory
 from blog.models.comment import BlogComment

@@ -37,7 +37,7 @@ def _product(price="100.00", discount="0", vat_rate=None, **kwargs):
 class TestPercentPricing:
     def test_percent_off_net_with_vat(self):
         product = _product("100.00", vat_rate=24)
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
 
         resolved = B2BPricingService.resolve(product, group)
 
@@ -46,7 +46,7 @@ class TestPercentPricing:
 
     def test_zero_percent_group_matches_retail(self):
         product = _product("100.00", vat_rate=24)
-        group = CustomerGroupFactory(discount_percent=Decimal("0"))
+        group = CustomerGroupFactory(discount_percent=Decimal(0))
 
         resolved = B2BPricingService.resolve(product, group)
 
@@ -54,7 +54,7 @@ class TestPercentPricing:
 
     def test_no_vat_final_equals_net(self):
         product = _product("50.00")
-        group = CustomerGroupFactory(discount_percent=Decimal("20"))
+        group = CustomerGroupFactory(discount_percent=Decimal(20))
 
         resolved = B2BPricingService.resolve(product, group)
 
@@ -64,7 +64,7 @@ class TestPercentPricing:
     def test_quantization_half_up(self):
         # 16.12 × 75% = 12.09; × 1.24 = 14.9916 → 14.99
         product = _product("16.12", vat_rate=24)
-        group = CustomerGroupFactory(discount_percent=Decimal("25"))
+        group = CustomerGroupFactory(discount_percent=Decimal(25))
 
         resolved = B2BPricingService.resolve(product, group)
 
@@ -75,7 +75,7 @@ class TestPercentPricing:
 class TestFixedOverride:
     def test_override_wins_over_percent(self):
         product = _product("100.00", vat_rate=24)
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         PriceListItemFactory(
             group=group, product=product, net_price=Money("80.00", "EUR")
         )
@@ -88,7 +88,7 @@ class TestFixedOverride:
     def test_resolve_map_mixes_overrides_and_percent(self):
         with_override = _product("100.00")
         without_override = _product("100.00")
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         PriceListItemFactory(
             group=group,
             product=with_override,
@@ -111,7 +111,7 @@ class TestNoStackingAndFloor:
         # final is 100+24-20 = 104.00, cheaper than the naive 111.60,
         # so the buyer gets the better one.
         product = _product("100.00", discount="20", vat_rate=24)
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
 
         resolved = B2BPricingService.resolve(product, group)
 
@@ -122,7 +122,7 @@ class TestNoStackingAndFloor:
 
     def test_deep_retail_sale_floors_fixed_override(self):
         product = _product("100.00", discount="50", vat_rate=24)
-        group = CustomerGroupFactory(discount_percent=Decimal("0"))
+        group = CustomerGroupFactory(discount_percent=Decimal(0))
         PriceListItemFactory(
             group=group, product=product, net_price=Money("90.00", "EUR")
         )
@@ -134,7 +134,7 @@ class TestNoStackingAndFloor:
 
     def test_wholesale_below_sale_price_wins(self):
         product = _product("100.00", discount="10", vat_rate=24)
-        group = CustomerGroupFactory(discount_percent=Decimal("40"))
+        group = CustomerGroupFactory(discount_percent=Decimal(40))
 
         resolved = B2BPricingService.resolve(product, group)
 

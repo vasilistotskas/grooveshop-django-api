@@ -127,7 +127,7 @@ class TenantRolePermissionBackend(BaseBackend):
 
     def authenticate(self, request, **kwargs):
         """Never authenticates — this backend only answers permissions."""
-        return None
+        return
 
     def get_all_permissions(self, user_obj, obj=None) -> set[str]:
         # Object-level permissions are not modelled here; returning an
@@ -140,7 +140,7 @@ class TenantRolePermissionBackend(BaseBackend):
         if not getattr(user_obj, PLATFORM_IDENTITY_ATTR, False):
             return set()
 
-        from tenant.membership import (  # noqa: PLC0415
+        from tenant.membership import (
             get_current_tenant,
             get_membership,
         )
@@ -189,8 +189,8 @@ def _permissions_for_apps(
     search path — and so a model added later is covered without a
     migration or a data fixture.
     """
-    from django.apps import apps as django_apps  # noqa: PLC0415
-    from django.contrib.auth import get_permission_codename  # noqa: PLC0415
+    from django.apps import apps as django_apps
+    from django.contrib.auth import get_permission_codename
 
     perms: set[str] = set()
     for model in django_apps.get_models():
@@ -215,8 +215,8 @@ def _permissions_for_apps(
 
 def _permissions_for_role(role: str) -> set[str]:
     """The permission set a role grants inside its tenant."""
-    from tenant.models import TenantMembershipRole  # noqa: PLC0415
-    from tenant.role_scopes import (  # noqa: PLC0415
+    from tenant.models import TenantMembershipRole
+    from tenant.role_scopes import (
         operational_app_labels,
         store_app_labels,
     )

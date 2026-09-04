@@ -19,6 +19,7 @@ abstraction *dynamic*: adding a new provider is one new app + one
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.exceptions import ShippingProviderNotFoundError
@@ -86,7 +87,7 @@ class ShippingCarrierInterface(ABC):
 
     @abstractmethod
     def serialize_shipment(
-        self, shipment: Any, *, context: dict
+        self, shipment: Any, *, context: Mapping[str, Any]
     ) -> dict | None:
         """Return the provider's detail-serializer dict for ``shipment``."""
 

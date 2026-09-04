@@ -249,7 +249,7 @@ class IndexMixin(models.Model):
         # produce a ``{schema}__{base_name}`` index. Auto-creating here at
         # Django class-load time fires in the public schema and would
         # produce a bare ``ProductTranslation`` index that no tenant ever
-        # reads (see C6 in MULTI_TENANT_AUDIT.md).
+        # reads.
         return
 
     class _MeilisearchDescriptor:

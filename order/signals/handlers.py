@@ -208,7 +208,7 @@ def _clear_cart_for_order(order: Order) -> None:
         # For guest orders, read the cart UUID from the cart snapshot
         # both creation paths write into order metadata
         # (OrderService.create_order_from_cart[_offline]). The integer
-        # PK is internal only (M18 in MULTI_TENANT_AUDIT.md), so the
+        # PK is internal only (it is enumerable), so the
         # lookup uses the UUID.
         cart_uuid = (
             order.metadata.get("cart_snapshot", {}).get("cart_uuid")
@@ -745,7 +745,7 @@ def handle_order_refunded(
         # schema_context has exited and connection.schema_name is back
         # to public. Without explicit capture, TenantTask.apply_async
         # would stamp _schema_name=public on the email + live-notification
-        # tasks (same bug class as C1 in MULTI_TENANT_AUDIT.md).
+        # tasks and the worker would run against the wrong schema.
         _schema = connection.schema_name
 
         # Live notification so the shopper learns about the refund without
@@ -1358,7 +1358,7 @@ def handle_stripe_dispute_created(sender, **kwargs):
         # ``transaction.on_commit`` fires after the surrounding
         # @with_tenant_schema_from_event schema_context has exited, so
         # without capture the dispatcher would stamp _schema_name=public
-        # — matching C1 in MULTI_TENANT_AUDIT.md.
+        # and the worker would run against the wrong schema.
         _schema = connection.schema_name
         transaction.on_commit(
             lambda oid=order.id, did=dispute_id, s=_schema: (
@@ -1513,8 +1513,8 @@ def handle_stripe_checkout_completed(sender, **kwargs):
 
                 # Payment confirmed via Stripe Checkout — send the
                 # confirmation email now (idempotent).
-                # ``_schema`` captured at lambda-build time; see C1 in
-                # MULTI_TENANT_AUDIT.md.
+                # ``_schema`` captured at lambda-build time; on_commit
+                # fires after the schema_context has exited.
                 _schema = connection.schema_name
                 transaction.on_commit(
                     lambda oid=order.id, s=_schema: (

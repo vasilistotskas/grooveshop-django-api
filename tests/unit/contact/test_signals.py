@@ -9,7 +9,7 @@ from contact.signals import send_email_notification
 
 
 # The contact notification task now routes to the tenant's contact
-# email (H23 in MULTI_TENANT_AUDIT.md). In unit tests there is no
+# email. In unit tests there is no
 # active tenant, so the helper falls back through extra_settings to
 # ``settings.INFO_EMAIL``. The tests override that setting alongside
 # the legacy ``ADMINS`` list so the recipient list is deterministic

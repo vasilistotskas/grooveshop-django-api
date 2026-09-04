@@ -4,7 +4,7 @@ import json
 from contextlib import nullcontext as _nullcontext
 
 from django.core.management.base import BaseCommand
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext as _
 from meilisearch.errors import MeilisearchApiError
 
 from blog.models.post import BlogPostTranslation

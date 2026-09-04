@@ -106,7 +106,7 @@ class AllAuthRateLimitMiddleware:
             client = _client_key(request)
             # Explicit schema prefix on the cache key gives defence in
             # depth — tenant scoping must NOT depend on KEY_FUNCTION
-            # alone (H11 in MULTI_TENANT_AUDIT.md). Two tenants behind
+            # alone. Two tenants behind
             # a NAT will share an IP, but with the schema in the key
             # they cannot exhaust each other's quota.
             schema = getattr(connection, "schema_name", "public") or "public"

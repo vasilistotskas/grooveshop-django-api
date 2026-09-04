@@ -108,7 +108,7 @@ class TestHandleStripePaymentSucceeded:
         mock_email.assert_called_once()
         assert mock_email.call_args.kwargs["args"] == [order.id]
         # Schema captured at lambda-build time so the worker enters the
-        # owning tenant's schema, not public (C1 in MULTI_TENANT_AUDIT.md).
+        # owning tenant's schema, not public.
         assert "_schema_name" in mock_email.call_args.kwargs["headers"]
 
     def test_successful_payment_skips_email_when_order_missing(

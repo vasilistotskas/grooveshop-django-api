@@ -299,11 +299,12 @@ class PaginationModelViewSet(ModelViewSet):
 
 class TranslationsModelViewSet(TranslationsProcessingMixin, ModelViewSet):
     def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["language_code"] = self.request.query_params.get(
-            "language_code", default_language
-        )
-        return context
+        return {
+            **super().get_serializer_context(),
+            "language_code": self.request.query_params.get(
+                "language_code", default_language
+            ),
+        }
 
     def create(self, request, *args, **kwargs):
         request = self.process_translations_data(request)

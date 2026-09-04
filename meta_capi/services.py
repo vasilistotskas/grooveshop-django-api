@@ -134,7 +134,11 @@ def is_capi_enabled() -> bool:
         return False
     # Tenant-only credentials, no platform fallback — an unconfigured
     # tenant is simply "disabled", not an error.
-    return tenant_meta_pixel_id() and tenant_meta_capi_access_token()
+    # `bool(...)`, not the bare `and`: `and` yields its last truthy
+    # operand, so this function annotated `-> bool` was returning the CAPI
+    # access token itself. Any caller comparing `is True` saw False, and
+    # the secret travelled somewhere only a flag was expected.
+    return bool(tenant_meta_pixel_id() and tenant_meta_capi_access_token())
 
 
 def _build_user_data(order: Order) -> Any:

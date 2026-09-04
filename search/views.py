@@ -148,7 +148,18 @@ def _relaxed_query(query: str) -> str | None:
     return " ".join(parts[1:])
 
 
-@extend_schema(
+# `@extend_schema` over `@api_view` is drf-spectacular's own documented
+# pattern (see its FAQ). The suppressions on the decorators below are a ty
+# limitation, not a defect here: `djangorestframework-stubs` declares
+# `AsView` as `Protocol[_View]` with `__call__: _View` — an attribute
+# annotated with the class's own TypeVar — and ty will not resolve that
+# into callability when checking `TypeVar F, bound=Callable[..., Any]`.
+# Reduced to 25 lines with no Django involved: the same Protocol with a
+# concrete `__call__: Callable[..., Any]` passes, the generic form fails.
+# Upstream master still declares it the same way, so a stubs bump does
+# not help. Suppressed per line rather than per file so real
+# argument-type errors in these modules are still reported.
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Search blog posts"),
     description=_(
         "Search blog posts using MeiliSearch. Provides full-text search with "
@@ -259,7 +270,7 @@ def blog_post_meili_search(request):
     )
 
 
-@extend_schema(
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Search products with advanced filters"),
     description=_(
         "Search products using MeiliSearch with support for full-text search, "
@@ -503,7 +514,7 @@ def product_meili_search(request):
     return Response(response_data, status=status.HTTP_200_OK)
 
 
-@extend_schema(
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Federated search across products and blog posts"),
     description=_(
         "Search multiple content types simultaneously using Meilisearch "
@@ -760,7 +771,7 @@ def federated_search(request):
     )
 
 
-@extend_schema(
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Log a click on a search result"),
     description=_(
         "Attribute a click on a search result to the query that produced "
@@ -793,7 +804,7 @@ def search_click(request):
     return Response({"detail": _("Accepted.")}, status=status.HTTP_202_ACCEPTED)
 
 
-@extend_schema(
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Get search analytics metrics"),
     description=_(
         "Retrieve aggregated search analytics including top queries, "
@@ -1037,7 +1048,7 @@ _TRENDING_MAX_LIMIT = 20
 _TRENDING_WINDOW_HOURS = 24
 
 
-@extend_schema(
+@extend_schema(  # ty: ignore[invalid-argument-type]
     operation_id="listTrendingSearches",
     tags=["Search"],
     summary=_("List trending search queries"),

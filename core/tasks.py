@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -77,6 +77,14 @@ class MonitoredTask(TenantTask):
                 self.name,
                 einfo.traceback,
             )
+
+
+class _DeletedLogFile(TypedDict):
+    """One pruned development log file, as reported in the task's `extra`."""
+
+    filename: str
+    size: int
+    modified: str
 
 
 @celery_app.task(
@@ -388,7 +396,10 @@ def clear_development_log_files_task(days=7):
             "path": logs_path,
         }
 
-    deleted_files = []
+    # Typed record, not a bare dict literal: `{"filename": str, "size":
+    # int, ...}` infers a value type of `str | int`, so `sum(f["size"]
+    # for f in deleted_files)` cannot be shown to be summing numbers.
+    deleted_files: list[_DeletedLogFile] = []
     errors = []
     cutoff_date = timezone.now() - timedelta(days=days)
 
@@ -418,11 +429,11 @@ def clear_development_log_files_task(days=7):
                     file_size = os.path.getsize(file_path)
                     os.remove(file_path)
                     deleted_files.append(
-                        {
-                            "filename": filename,
-                            "size": file_size,
-                            "modified": file_date.isoformat(),
-                        }
+                        _DeletedLogFile(
+                            filename=filename,
+                            size=file_size,
+                            modified=file_date.isoformat(),
+                        )
                     )
 
             except OSError as e:

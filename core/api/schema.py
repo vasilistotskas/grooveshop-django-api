@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.openapi import AutoSchema as SpectacularAutoSchema
@@ -33,20 +35,28 @@ class AutoSchema(SpectacularAutoSchema):
         return super()._get_paginator()
 
 
-def generate_schema_multi_lang(model_instance):
-    fields = {}
+def generate_schema_multi_lang(model_instance) -> dict[str, Any]:
     translated_fields = model_instance._parler_meta.get_all_fields()
     languages = settings.PARLER_LANGUAGES[settings.SITE_ID]
 
     if not translated_fields or not languages:
         return {"type": "object", "properties": {}}
 
-    for language in languages:
-        fields[language["code"]] = {"type": "object", "properties": {}}
-        for translated_field in translated_fields:
-            fields[language["code"]]["properties"][translated_field] = {
-                "type": "string"
-            }
+    # The per-language properties are built as their own dict rather than
+    # reached through `fields[code]["properties"][name]`. That chain
+    # indexes back into a heterogeneous literal — `{"type": str,
+    # "properties": dict}` — whose value type is `str | dict`, so every
+    # reader (and every type checker) has to prove which one it got.
+    fields: dict[str, Any] = {
+        language["code"]: {
+            "type": "object",
+            "properties": {
+                translated_field: {"type": "string"}
+                for translated_field in translated_fields
+            },
+        }
+        for language in languages
+    }
     return {"type": "object", "properties": fields}
 
 

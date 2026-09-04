@@ -34,7 +34,18 @@ def build_ticket_cache_key(ticket: str) -> str:
     return f"{WS_TICKET_CACHE_PREFIX}{ticket}"
 
 
-@extend_schema(
+# `@extend_schema` over `@api_view` is drf-spectacular's own documented
+# pattern (see its FAQ). The suppressions on the decorators below are a ty
+# limitation, not a defect here: `djangorestframework-stubs` declares
+# `AsView` as `Protocol[_View]` with `__call__: _View` — an attribute
+# annotated with the class's own TypeVar — and ty will not resolve that
+# into callability when checking `TypeVar F, bound=Callable[..., Any]`.
+# Reduced to 25 lines with no Django involved: the same Protocol with a
+# concrete `__call__: Callable[..., Any]` passes, the generic form fails.
+# Upstream master still declares it the same way, so a stubs bump does
+# not help. Suppressed per line rather than per file so real
+# argument-type errors in these modules are still reported.
+@extend_schema(  # ty: ignore[invalid-argument-type]
     operation_id="createWebSocketTicket",
     summary="Mint a short-lived WebSocket ticket",
     description=(

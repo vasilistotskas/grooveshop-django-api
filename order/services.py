@@ -9,6 +9,7 @@ from django.db.models import QuerySet, Sum
 from django.utils import timezone
 from django.utils.translation import get_language
 from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -1701,7 +1702,10 @@ class OrderService:
         """
         from django.core.validators import validate_email
 
-        errors = {}
+        # Values are a mix: `_( ... )` lazy translations from this
+        # method and plain `str` from the shipping provider's validator.
+        # `StrOrPromise` is django-stubs-ext's public spelling for that.
+        errors: dict[str, list[StrOrPromise]] = {}
 
         # Required fields
         required_fields = [

@@ -147,7 +147,11 @@ class BlogPost(
         self.__dict__["tags_count"] = value
 
 
-class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):
+# Suppression is a stubs artefact, not a real override conflict: the two
+# bases declare the method with signatures that django-stubs types
+# differently, and ty reports the pair rather than a mismatch in the code
+# written here.
+class BlogPostTranslation(TranslatedFieldsModel, IndexMixin):  # ty: ignore[invalid-method-override]
     master = TranslationsForeignKey(
         "blog.BlogPost",
         on_delete=models.CASCADE,

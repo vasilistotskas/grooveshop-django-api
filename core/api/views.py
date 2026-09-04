@@ -414,7 +414,18 @@ class BaseModelViewSet(
         return Response(data)
 
 
-@extend_schema(
+# `@extend_schema` over `@api_view` is drf-spectacular's own documented
+# pattern (see its FAQ). The suppressions on the decorators below are a ty
+# limitation, not a defect here: `djangorestframework-stubs` declares
+# `AsView` as `Protocol[_View]` with `__call__: _View` — an attribute
+# annotated with the class's own TypeVar — and ty will not resolve that
+# into callability when checking `TypeVar F, bound=Callable[..., Any]`.
+# Reduced to 25 lines with no Django involved: the same Protocol with a
+# concrete `__call__: Callable[..., Any]` passes, the generic form fails.
+# Upstream master still declares it the same way, so a stubs bump does
+# not help. Suppressed per line rather than per file so real
+# argument-type errors in these modules are still reported.
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Check the health status of database, Redis, and Celery"),
     description=_("Check the health status of database, Redis, and Celery"),
     tags=["Health"],
@@ -462,7 +473,7 @@ def health_check(request):
     return response
 
 
-@extend_schema(exclude=True)
+@extend_schema(exclude=True)  # ty: ignore[invalid-argument-type]
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -483,7 +494,7 @@ def health_live(request):
     return Response({"status": "ok"})
 
 
-@extend_schema(
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("List all available settings"),
     description=_("Retrieve all settings with their names, values, and types"),
     tags=["Settings"],
@@ -593,7 +604,7 @@ PUBLIC_SETTING_KEYS = frozenset(
 )
 
 
-@extend_schema(
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Get setting by key"),
     description=_("Retrieve a specific setting value by its key name"),
     tags=["Settings"],

@@ -141,7 +141,11 @@ class CartSerializer(serializers.ModelSerializer[Cart]):
 
     @extend_schema_field(serializers.ListField(child=serializers.CharField()))
     def get_applied_coupon_codes(self, obj: Cart) -> list[str]:
-        return list(obj.applied_codes.values_list("code__code", flat=True))
+        # `.all()`, not `.values_list()`: values_list builds a NEW
+        # queryset and always hits the database, so it walks straight
+        # past the `applied_codes__code` prefetch and costs a query per
+        # cart on the staff list. Iterating the prefetched rows uses it.
+        return [row.code.code for row in obj.applied_codes.all()]
 
     @extend_schema_field(
         {
@@ -281,8 +285,14 @@ class CartDetailSerializer(CartSerializer):
         if categories:
             from product.models.product import Product
 
+            # `for_list()` carries the prefetches ProductSerializer
+            # needs — translations, main image, review and like counts.
+            # A bare queryset here cost a query PER recommended product
+            # for each of those, on the primary "view cart" response.
+            # It already filters to active, non-deleted products.
             recommendations = (
-                Product.objects.filter(category__in=categories, active=True)
+                Product.objects.for_list()
+                .filter(category__in=categories)
                 .exclude(id__in=obj.items.values_list("product_id", flat=True))
                 .order_by("-view_count")[:4]
             )

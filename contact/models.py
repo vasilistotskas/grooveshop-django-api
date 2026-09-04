@@ -31,6 +31,12 @@ class Contact(
         verbose_name_plural = _("Contacts")
         ordering = ["-created_at"]
         indexes = [
+            # Both halves of the parent's pair are earned here: the list
+            # orders by created_at and paginates it, `date_hierarchy`
+            # range-scans it, RecentContactFilter issues four
+            # `created_at__gte` variants, and the admin exposes a
+            # RangeDateTimeFilter on updated_at as well.
+            *TimeStampMixinModel.Meta.indexes,
             BTreeIndex(fields=["email"], name="contact_email_ix"),
         ]
 
@@ -72,6 +78,11 @@ class Feedback(
         verbose_name_plural = _("Feedback")
         ordering = ["-created_at"]
         indexes = [
+            # created_at only: the list orders by it and `date_hierarchy`
+            # range-scans it. updated_at is shown in the admin but never
+            # sorted or filtered, and an index nobody reads is a write
+            # cost on every row.
+            BTreeIndex(fields=["created_at"], name="feedback_created_at_ix"),
             BTreeIndex(fields=["category"], name="feedback_category_ix"),
             BTreeIndex(fields=["rating"], name="feedback_rating_ix"),
         ]

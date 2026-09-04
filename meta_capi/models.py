@@ -95,6 +95,12 @@ class MetaCapiEventLog(TimeStampMixinModel):
         verbose_name_plural = _("Meta CAPI Events")
         ordering = ("-created_at",)
         indexes = [
+            # A standalone created_at index despite the two composites
+            # below: both LEAD with another column, so Postgres cannot
+            # use either for the admin's plain `ORDER BY -created_at`
+            # or for `date_hierarchy`. This is the fastest-growing table
+            # here — one row per dispatch attempt.
+            models.Index(fields=("-created_at",)),
             models.Index(fields=("event_name", "-created_at")),
             models.Index(fields=("status", "-created_at")),
         ]

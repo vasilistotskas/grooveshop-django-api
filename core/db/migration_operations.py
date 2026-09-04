@@ -10,14 +10,19 @@ operation is the one thing that has to be shared rather than copied,
 because duplicating the logic below into every migration that needs it is
 how the copies drift apart.
 
-Extracted from ``order/migrations/0053_order_metadata_gin_indexes``, where
-this was written and verified against real tenant schemas first.
+``AddIndexAdaptively`` was extracted from
+``order/migrations/0053_order_metadata_gin_indexes``, where it was written
+and verified against real tenant schemas first.
 """
 
 from __future__ import annotations
 
+import logging
+
 from django.db.migrations.operations.base import Operation
 from django.db.migrations.operations.models import AddIndex, RemoveIndex
+
+logger = logging.getLogger(__name__)
 
 
 class AddIndexAdaptively(Operation):
@@ -170,3 +175,175 @@ def _drop_if_invalid(cursor, index_name: str) -> None:
     )
     if cursor.fetchone():
         cursor.execute(f'DROP INDEX IF EXISTS "{index_name}"')
+
+
+class BackfillNullStringsToEmpty(Operation):
+    """Rewrite NULL to ``''`` on string columns, in bounded batches.
+
+    A string column that allows NULL has two spellings for "no value"
+    (Django's own field docs say to avoid it, and ruff's ``DJ001`` flags
+    it). Removing the NULL spelling is a **two-release** change under the
+    Argo CD PreSync hook, because migrations land before the new image:
+    the ALTER would run while pods that still write NULL are serving. So
+    the first release stops producing NULL and backfills what is there —
+    this operation — and only the second may add the constraint.
+
+    **State-free on purpose.** It changes no field, so it emits no
+    ``AlterField`` into the migration state; the model still declares
+    ``null=True`` at this point, and that is exactly right.
+
+    Written as a pk-range walk rather than the usual
+    ``WHERE ctid IN (SELECT … LIMIT n)`` loop. That idiom re-scans from
+    the top on every batch, traversing every row it already fixed, which
+    is quadratic on the one table here that actually grows (search
+    analytics). Walking the primary key uses its index, touches each row
+    once, and bounds how many rows any single statement locks — which is
+    what matters when the store is still serving on the old pods.
+
+    ``COALESCE`` per column, so a row that is NULL in one column and
+    already populated in another keeps the populated one.
+
+    The migration using this MUST set ``atomic = False``: one transaction
+    around every batch would hold every row lock to the end and defeat
+    the batching. Tenant PROVISIONING is the exception that proves it —
+    ``Tenant.save()`` replays the history inline inside a transaction, so
+    the batching degenerates to one transaction there. Harmless, because
+    the schema is new and the walk returns on the first ``MIN(pk)``.
+
+    Backwards is a deliberate **no-op** — unapplyable rather than truly
+    reversible. A column holding ``''`` cannot say which of those were
+    NULL before, and nothing needs it to: the code being rolled back to
+    treats ``''`` and NULL alike, since every reader tests these columns
+    for truth. ``reversible = True`` so ``migrate <app> zero`` still runs.
+
+    **Not sufficient on its own as the final sweep before ``SET NOT
+    NULL``.** ``MIN``/``MAX`` are read once, so a row whose pk falls
+    below ``MAX`` but whose INSERT commits after the batch covering it
+    has passed is never visited — two writers drawing pks 100 and 101
+    where 101 commits first. Under READ COMMITTED no lock closes that.
+    The release that adds the constraint must therefore stop the writers
+    BEFORE it sweeps:
+
+        1. ``ADD CONSTRAINT … CHECK (col IS NOT NULL) NOT VALID`` —
+           instant, no scan, and from here no writer can insert a NULL;
+        2. this operation, now racing nobody;
+        3. ``VALIDATE CONSTRAINT`` — scans without blocking writes;
+        4. ``SET NOT NULL``, whose own scan the valid CHECK lets Postgres
+           skip;
+        5. drop the CHECK.
+    """
+
+    reduces_to_sql = False
+    reversible = True
+
+    # A batch that waits on a row lock is worse than a batch that fails:
+    # the connection carries `statement_timeout=30000`, so a collision
+    # with a live UPDATE would block a customer's request for the full
+    # thirty seconds. Failing fast instead surfaces the collision, and
+    # the PreSync Job's own retry resumes — the walk is idempotent.
+    lock_timeout = "3s"
+
+    def __init__(
+        self,
+        model_name: str,
+        fields: list[str],
+        *,
+        batch_size: int = 5000,
+    ):
+        if batch_size < 1:
+            # A zero step never advances `start`: an infinite loop inside
+            # the PreSync hook, ended only by `activeDeadlineSeconds`.
+            raise ValueError(f"batch_size must be >= 1, got {batch_size!r}")
+        self.model_name = model_name
+        self.fields = fields
+        self.batch_size = batch_size
+
+    def state_forwards(self, app_label, state):
+        pass
+
+    def database_forwards(self, app_label, schema_editor, from_state, to_state):
+        connection = schema_editor.connection
+        model = to_state.apps.get_model(app_label, self.model_name)
+        schema = getattr(connection, "schema_name", "public")
+        target = f"{schema}.{model._meta.db_table}"
+        # Raw SQL bypasses the router; Django's own operations make this
+        # check for us, so doing it by hand is the price of raw SQL.
+        if not self.allow_migrate_model(connection.alias, model):
+            logger.info(
+                "BackfillNullStringsToEmpty: %s — router declined, skipped",
+                target,
+            )
+            return
+
+        pk = model._meta.pk.column
+        # `search_path` is `"<schema>", public` while a tenant migrates,
+        # so an UNQUALIFIED name silently falls through to the public
+        # schema's copy of the table when a tenant lacks its own —
+        # rewriting public's rows once per tenant. Qualify it.
+        table = f'"{schema}"."{model._meta.db_table}"'
+        columns = [model._meta.get_field(f).column for f in self.fields]
+        assignments = ", ".join(
+            f'"{c}" = COALESCE("{c}", \'\')' for c in columns
+        )
+        predicate = " OR ".join(f'"{c}" IS NULL' for c in columns)
+
+        with connection.cursor() as cursor:
+            cursor.execute(f'SELECT MIN("{pk}"), MAX("{pk}") FROM {table}')
+            low, high = cursor.fetchone()
+            if low is None:
+                logger.info(
+                    "BackfillNullStringsToEmpty: %s — empty table, nothing "
+                    "to rewrite",
+                    target,
+                )
+                return
+            if not isinstance(low, int):
+                # The walk steps by adding an integer to the pk.
+                raise TypeError(
+                    f"{target} has a non-integer primary key "
+                    f"({type(low).__name__}); the pk-range walk cannot "
+                    f"step over it."
+                )
+
+            cursor.execute("SHOW lock_timeout")
+            previous_lock_timeout = cursor.fetchone()[0]
+            cursor.execute("SET lock_timeout = %s", [self.lock_timeout])
+            try:
+                updated = 0
+                start = low
+                while start <= high:
+                    stop = start + self.batch_size
+                    cursor.execute(
+                        f"UPDATE {table} SET {assignments} "
+                        f'WHERE "{pk}" >= %s AND "{pk}" < %s '
+                        f"AND ({predicate})",
+                        [start, stop],
+                    )
+                    updated += cursor.rowcount
+                    start = stop
+            finally:
+                cursor.execute("SET lock_timeout = %s", [previous_lock_timeout])
+
+        logger.info(
+            "BackfillNullStringsToEmpty: %s (%s) — %s rows rewritten across "
+            "pk %s..%s",
+            target,
+            ", ".join(self.fields),
+            updated,
+            low,
+            high,
+        )
+
+    def database_backwards(
+        self, app_label, schema_editor, from_state, to_state
+    ):
+        return
+
+    def describe(self):
+        return (
+            f"Backfill NULL to '' on {self.model_name}.{', '.join(self.fields)}"
+        )
+
+    @property
+    def migration_name_fragment(self):
+        return f"backfill_{self.model_name.lower()}_empty_strings"

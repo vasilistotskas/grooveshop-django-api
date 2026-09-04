@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from django.db import transaction
 
 from cart.models import Cart, CartItem
+from order.models.stock_reservation import StockReservation
 
 logger = logging.getLogger(__name__)
 
@@ -202,18 +203,35 @@ class CartService:
             self.cart_items = self.cart.get_items()
 
         source_uuid = source_cart.uuid
+        # Stock holds are keyed by the CART UUID (`session_id`), and the
+        # source cart is about to stop existing. Left behind, the guest's
+        # own holds become unreachable AND keep counting against
+        # availability: `decrement_stock(respect_reservations=True)`
+        # subtracts every active reservation, so the shopper who placed
+        # them is the one blocked from checking out — with the last units
+        # of a scarce product, by exactly their own quantity. They cannot
+        # even be released, since `release_reservations` matches on
+        # `reserved_by` (null for a guest) or the CURRENT cart's uuid.
+        # So they move with the cart, and gain the owner they now have.
+        rehomed = StockReservation.objects.filter(
+            session_id=str(source_uuid), consumed=False
+        ).update(
+            session_id=str(target_cart.uuid),
+            reserved_by=target_cart.user,
+        )
         source_cart.delete()
         # One line per merge answers "why did my cart change after
         # logging in" without DB archaeology — especially which lines
         # were quantity-capped at stock.
         logger.info(
             "Merged guest cart %s into cart %s: moved=%s combined=%s "
-            "capped_at_stock=%s",
+            "capped_at_stock=%s rehomed_reservations=%s",
             source_uuid,
             target_cart.id,
             lines_moved,
             lines_combined,
             lines_capped,
+            rehomed,
         )
 
     def get_cart_by_id(self, cart_uuid: str | uuid.UUID):

@@ -33,11 +33,5 @@ class ProductAttributeQuerySet(models.QuerySet):
             )
         )
 
-    def by_attribute(self, attribute_id) -> Self:
-        """Return all product-attribute assignments for a specific attribute."""
-        return self.filter(
-            attribute_value__attribute_id=attribute_id
-        ).select_related("product", "attribute_value")
-
 
 ProductAttributeManager = models.Manager.from_queryset(ProductAttributeQuerySet)

@@ -10,8 +10,6 @@ from redis.retry import Retry
 
 logger = logging.getLogger(__name__)
 
-ONE_HOUR = 60 * 60
-ONE_DAY = ONE_HOUR * 24
 
 _SCAN_BATCH_SIZE = 500
 

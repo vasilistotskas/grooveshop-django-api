@@ -349,32 +349,6 @@ class IndexQuerySet[T: Model]:
         self._state.facets = list(facet_fields)
         return self
 
-    def highlight(
-        self,
-        *attributes: str,
-        pre_tag: str = "<mark>",
-        post_tag: str = "</mark>",
-    ) -> Self:
-        """Configure highlighting for search results."""
-        self._state.attributes_to_highlight = (
-            list(attributes) if attributes else ["*"]
-        )
-        self._state.highlight_pre_tag = pre_tag
-        self._state.highlight_post_tag = post_tag
-        return self
-
-    def crop(
-        self,
-        *attributes: str,
-        length: int = 10,
-        marker: str = "...",
-    ) -> Self:
-        """Configure cropping for long text fields."""
-        self._state.attributes_to_crop = list(attributes)
-        self._state.crop_length = length
-        self._state.crop_marker = marker
-        return self
-
     def only(self, *attributes: str) -> Self:
         """Limit which attributes are returned in results."""
         self._state.attributes_to_retrieve = list(attributes)
@@ -409,27 +383,6 @@ class IndexQuerySet[T: Model]:
             response_data["facetStats"] = results["facetStats"]
 
         return response_data
-
-    def raw_search(self, q: str = "") -> dict:
-        """
-        Execute search and return raw Meilisearch results without ORM enrichment.
-
-        Useful for performance-critical scenarios or when you don't need Django objects.
-        """
-        search_params = {
-            "filter": self._state.filters,
-            "facets": self._state.facets,
-            "offset": self._state.offset,
-            "limit": self._state.limit,
-            "attributesToRetrieve": self._state.attributes_to_retrieve,
-            "sort": self._state.sort,
-            "matchingStrategy": self._state.matching_strategy,
-        }
-
-        if self._state.locales:
-            search_params["locales"] = self._state.locales
-
-        return self.search_index.search(q, search_params)
 
     def _build_search_params(self) -> dict:
         """Build the search parameters dictionary."""

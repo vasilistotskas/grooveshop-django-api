@@ -6,13 +6,30 @@ from typing import Any
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
-from django.db.models import F, JSONField, Max, Q
+from django.db.models import F, Func, JSONField, Max, Q, Value
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 
 from core.cache.models import CachePurgeLog  # noqa: F401
 from core.fields.plain_text import PlainTextField
+
+
+class JSONBConcat(Func):
+    """Postgres jsonb ``||`` — a shallow merge of the right into the left.
+
+    Django has no built-in for the operator. Rendering it as an
+    expression keeps the merge server-side, which is the whole point:
+    the row is never read into Python first, so there is no window in
+    which another writer's keys can be lost.
+
+    Shallow by design, matching ``dict.update``: a nested object on both
+    sides is replaced, not deep-merged.
+    """
+
+    arg_joiner = " || "
+    template = "%(expressions)s"
+    output_field = JSONField()
 
 
 class SeoModel(models.Model):
@@ -168,12 +185,6 @@ class TimeStampMixinModel(models.Model):
             BTreeIndex(fields=["updated_at"], name="%(class)s_updated_at_ix"),
         ]
 
-    def get_duration_since_created(self):
-        return timezone.now() - self.created_at
-
-    def get_duration_since_updated(self):
-        return timezone.now() - self.updated_at
-
 
 class UUIDModel(models.Model):
     """
@@ -255,37 +266,36 @@ class MetaDataModel(models.Model):
             self.metadata = {}
         super().save(*args, **kwargs)
 
-    def get_value_from_private_metadata(self, key: str, default: Any = None):
-        return self.private_metadata.get(key, default)
-
-    def store_value_in_private_metadata(self, items: dict):
-        if items:
-            for key, value in items.items():
-                self.private_metadata[key] = value
-            self.save(update_fields=["private_metadata"])
-
-    def clear_private_metadata(self):
-        self.private_metadata = {}
-
-    def delete_value_from_private_metadata(self, key: str):
-        if key in self.private_metadata:
-            del self.private_metadata[key]
-
-    def get_value_from_metadata(self, key: str, default: Any = None):
-        return self.metadata.get(key, default)
-
     def store_value_in_metadata(self, items: dict):
-        if items:
-            for key, value in items.items():
-                self.metadata[key] = value
-            self.save(update_fields=["metadata"])
+        """Merge ``items`` into ``metadata`` with a set-based UPDATE.
 
-    def clear_metadata(self):
-        self.metadata = {}
+        ``metadata`` is ONE jsonb column, so writing it back from this
+        instance would replace the whole document — losing every key
+        another transaction committed since the instance was loaded.
+        Postgres' ``||`` merges server-side instead, against whatever
+        the row holds at UPDATE time, so only the keys named here move.
 
-    def delete_value_from_metadata(self, key: str):
-        if key in self.metadata:
-            del self.metadata[key]
+        This is not theoretical: ``POST /api/v1/loyalty/redeem`` loads
+        the order with a bare ``.get()`` — no ``select_for_update``, no
+        surrounding atomic — validates, and only then writes. A Viva
+        checkout session minted in that window appends
+        ``viva_order_codes``, which is how the webhook later finds the
+        order; clobbering it strands a PAID order as unmatched until the
+        auto-cancel sweep cancels it.
+        """
+        if not items:
+            return
+        type(self)._base_manager.filter(pk=self.pk).update(
+            metadata=JSONBConcat(
+                F("metadata"),
+                Value(items, JSONField(encoder=DjangoJSONEncoder)),
+            )
+        )
+        # Keep the in-memory copy usable — callers go on to set more
+        # keys on it (see ``order/services.py`` right after
+        # ``redeem_points``). It reflects this write, not any concurrent
+        # one; ``refresh_from_db`` if you need the row's full state.
+        self.metadata.update(items)
 
 
 class SoftDeleteMixin(models.Model):

@@ -16,10 +16,6 @@ class AttributeValueQuerySet(TranslatableQuerySet):
         """Return only active attribute values."""
         return self.filter(active=True)
 
-    def for_attribute(self, attribute_id) -> Self:
-        """Return values for a specific attribute."""
-        return self.filter(attribute_id=attribute_id)
-
     def with_usage_count(self) -> Self:
         """Annotate with count of products using this value."""
         return self.annotate(

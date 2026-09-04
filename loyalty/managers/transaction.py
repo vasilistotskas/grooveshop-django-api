@@ -47,12 +47,6 @@ class PointsTransactionQuerySet(OptimizedQuerySet):
             points__gt=0,
         ).exclude(Exists(has_expire))
 
-    def has_earn_transactions(self, user) -> bool:
-        """Check if user has any EARN transactions (for new customer bonus check)."""
-        return self.filter(
-            user=user, transaction_type=TransactionType.EARN
-        ).exists()
-
     def for_list(self) -> Self:
         return self.select_related("user", "reference_order", "created_by")
 

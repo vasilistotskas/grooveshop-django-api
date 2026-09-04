@@ -66,7 +66,12 @@ class ProductCategoryImageModelTestCase(TestCase):
         )
 
         retrieved_main = ProductCategoryImage.get_main_image(self.category)
-        retrieved_banner = ProductCategoryImage.get_banner_image(self.category)
+        # Every type other than MAIN goes through the generic accessor;
+        # the per-type `get_banner_image` / `get_icon_image` wrappers it
+        # subsumes had no caller and are gone.
+        retrieved_banner = ProductCategoryImage.get_image_by_type(
+            self.category, CategoryImageTypeEnum.BANNER
+        )
         retrieved_by_type = ProductCategoryImage.get_image_by_type(
             self.category, CategoryImageTypeEnum.MAIN
         )

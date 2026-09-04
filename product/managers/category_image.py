@@ -31,43 +31,11 @@ class CategoryImageQuerySet(TranslatableOptimizedQuerySet):
         """Filter by image type."""
         return self.filter(image_type=image_type)
 
-    def main_images(self) -> Self:
-        """Filter main images."""
-        return self.filter(image_type=CategoryImageTypeEnum.MAIN)
-
-    def banner_images(self) -> Self:
-        """Filter banner images."""
-        return self.filter(image_type=CategoryImageTypeEnum.BANNER)
-
-    def icon_images(self) -> Self:
-        """Filter icon images."""
-        return self.filter(image_type=CategoryImageTypeEnum.ICON)
-
-    def gallery_images(self) -> Self:
-        """Filter gallery images."""
-        return self.filter(image_type=CategoryImageTypeEnum.GALLERY)
-
     def get_main_image(self, category):
         """Get the main image for a category."""
         return self.filter(
             category=category,
             image_type=CategoryImageTypeEnum.MAIN,
-            active=True,
-        ).first()
-
-    def get_banner_image(self, category):
-        """Get the banner image for a category."""
-        return self.filter(
-            category=category,
-            image_type=CategoryImageTypeEnum.BANNER,
-            active=True,
-        ).first()
-
-    def get_icon_image(self, category):
-        """Get the icon image for a category."""
-        return self.filter(
-            category=category,
-            image_type=CategoryImageTypeEnum.ICON,
             active=True,
         ).first()
 

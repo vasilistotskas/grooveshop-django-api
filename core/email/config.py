@@ -225,19 +225,3 @@ class EmailTemplateConfig:
             Template configuration or None
         """
         return cls.TEMPLATES.get(template_name)
-
-    @classmethod
-    def get_all_categories(cls) -> list[str]:
-        """Get all category names."""
-        return list(set(t.category_name for t in cls.TEMPLATES.values()))
-
-    @classmethod
-    def get_templates_by_category(
-        cls, category_name: str
-    ) -> list[TemplateConfig]:
-        """Get all templates in a category."""
-        return [
-            config
-            for config in cls.TEMPLATES.values()
-            if config.category_name == category_name
-        ]

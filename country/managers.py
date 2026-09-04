@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from django.db import models
 
 from core.managers import (
     TranslatableOptimizedManager,
@@ -24,30 +23,6 @@ class CountryQuerySet(TranslatableOptimizedQuerySet):
     def with_regions(self) -> Self:
         """Prefetch regions with their translations."""
         return self.prefetch_related("regions", "regions__translations")
-
-    def active_countries(self) -> Self:
-        """Filter countries with ISO country code."""
-        return self.filter(iso_cc__isnull=False)
-
-    def by_continent(self, continent) -> Self:
-        """Filter countries by continent."""
-        return self
-
-    def with_phone_code(self) -> Self:
-        """Filter countries that have a phone code."""
-        return self.filter(phone_code__isnull=False)
-
-    def search_by_name(self, query) -> Self:
-        """Search countries by name in translations."""
-        return self.filter(translations__name__icontains=query)
-
-    def search_by_code(self, query) -> Self:
-        """Search countries by alpha-2 or alpha-3 code."""
-        query_upper = query.upper()
-        return self.filter(
-            models.Q(alpha_2__icontains=query_upper)
-            | models.Q(alpha_3__icontains=query_upper)
-        )
 
     def for_list(self) -> Self:
         """

@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from django.db.models import Q
-from django.utils import timezone
 
 from core.managers import (
     TranslatableOptimizedManager,
@@ -31,10 +28,6 @@ class BlogAuthorQuerySet(TranslatableOptimizedQuerySet):
         """Select related user."""
         return self.select_related("user")
 
-    def with_posts_prefetch(self) -> Self:
-        """Prefetch blog posts."""
-        return self.prefetch_related("blog_posts")
-
     def with_posts_details(self) -> Self:
         """Prefetch blog posts with full details."""
         return self.prefetch_related(
@@ -59,25 +52,6 @@ class BlogAuthorQuerySet(TranslatableOptimizedQuerySet):
         Includes everything from for_list() plus posts details.
         """
         return self.for_list().with_posts_details()
-
-    def with_posts(self):
-        """Filter authors who have at least one blog post."""
-        return self.filter(blog_posts__isnull=False).distinct()
-
-    def without_posts(self):
-        return self.filter(blog_posts__isnull=True)
-
-    def active(self):
-        cutoff_date = timezone.now() - timedelta(days=180)
-        return self.filter(blog_posts__created_at__gte=cutoff_date).distinct()
-
-    def with_website(self):
-        return self.exclude(Q(website="") | Q(website__isnull=True))
-
-    def with_bio(self):
-        return self.exclude(
-            Q(translations__bio__isnull=True) | Q(translations__bio__exact="")
-        ).distinct()
 
 
 class BlogAuthorManager(TranslatableOptimizedManager):

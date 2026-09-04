@@ -114,6 +114,55 @@ class TestAutomaticPromotions:
             > 0
         )
 
+    def test_first_order_only_sees_the_shoppers_guest_history(
+        self, enable_promotions, make_cart
+    ):
+        """Registering after a guest checkout must not reset eligibility.
+
+        A guest order is written with `user=None, email=...`, and nothing
+        backfills the account onto it when the shopper later registers.
+        Checking only `user=` once they are authenticated therefore could
+        not see their own history, and handed the first-order discount to
+        a returning customer.
+        """
+        from order.factories.order import OrderFactory
+        from user.factories import UserAccountFactory
+
+        shopper = UserAccountFactory(email="repeat@example.com")
+        # The earlier purchase, made before they had an account.
+        OrderFactory(user=None, email="repeat@example.com")
+
+        PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC, first_order_only=True
+        )
+        cart, _ = make_cart([(50, 1)], user=shopper)
+
+        assert PromotionEngine.evaluate(cart, user=shopper).applied == []
+
+    def test_per_customer_limit_counts_guest_redemptions(
+        self, enable_promotions, make_cart
+    ):
+        """Same identity switch, against `usage_limit_per_customer`."""
+        from promotion.models.redemption import PromotionRedemption
+        from user.factories import UserAccountFactory
+
+        shopper = UserAccountFactory(email="repeat2@example.com")
+        promotion = PromotionFactory(
+            trigger=PromotionTrigger.AUTOMATIC,
+            usage_limit_per_customer=1,
+        )
+        # Redeemed once as a guest, under the same email.
+        PromotionRedemption.objects.create(
+            promotion=promotion,
+            user=None,
+            email="repeat2@example.com",
+            amount=Money(Decimal(5), "EUR"),
+        )
+
+        cart, _ = make_cart([(50, 1)], user=shopper)
+
+        assert PromotionEngine.evaluate(cart, user=shopper).applied == []
+
     def test_first_order_only_guest_unknown_identity_is_conservative(
         self, enable_promotions, make_cart
     ):

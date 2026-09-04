@@ -301,16 +301,6 @@ class TestWebSocketGroupIsolation:
         assert "tenant_alpha" in a
         assert "tenant_beta" in b
 
-    def test_admin_group_name_includes_tenant_schema(self) -> None:
-        from notification.groups import admins_group
-
-        a = admins_group("tenant_alpha")
-        b = admins_group("tenant_beta")
-
-        assert a != b
-        assert "tenant_alpha" in a
-        assert "tenant_beta" in b
-
 
 # ---------------------------------------------------------------------------
 # Page-config tenant admin permission

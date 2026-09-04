@@ -31,30 +31,36 @@ products in a live catalogue is not a recoverable mistake.
 
 from __future__ import annotations
 
+import re
+
 from django.core.management.base import BaseCommand, CommandError
 from django_tenants.utils import schema_context
 
 from devtools import demo_store
 
-# A domain is treated as non-production when it carries one of these.
-# Everything else — webside.gr, a customer's own domain — is assumed
-# live.
-#
-# ``grooveshop.space`` is deliberately NOT a marker, even though the
-# PLATFORM hosts all live there. A tenant can be sold a subdomain of it
-# too, and one already is: tenant #2 has been live on
-# ``fyteia.grooveshop.space`` since 2026-08-28 while it waits for its
-# own domain. Every one of its hostnames carries the string, so listing
-# it here emptied the guard's ``live`` set and let this command seed
-# over a real store's settings, catalogue, layouts and navigation.
-# The platform hosts belong to no tenant, so the marker bought a
-# tenant-scoped command nothing in exchange.
-NON_PRODUCTION_MARKERS = (
-    "staging",
-    "localhost",
+# Hostnames that never belong to a live store. Matching is anchored
+# on whole labels and reserved suffixes — a substring test once let
+# ``stagingear.gr``-style production names through, and the platform's
+# own apex (``grooveshop.space``) is deliberately NOT a marker: tenants
+# are sold subdomains of it (``fyteia.grooveshop.space`` has been live
+# since 2026-08-28), so any rule keyed on it unlocked real stores.
+_STAGING_LABEL = re.compile(r"(?:[a-z0-9-]+-)?staging(?:-[a-z0-9-]+)?")
+_NON_PRODUCTION_SUFFIXES = (
+    ".localhost",
     ".local",
     ".invalid",
+    ".test",
+    ".example",
 )
+
+
+def is_non_production_domain(domain: str) -> bool:
+    """True only for hosts that cannot be a live store."""
+    host = domain.strip().lower().rstrip(".")
+    if host == "localhost" or host.endswith(_NON_PRODUCTION_SUFFIXES):
+        return True
+    return any(_STAGING_LABEL.fullmatch(label) for label in host.split("."))
+
 
 # (label, callable) — ordered by dependency: brands before products
 # (products reference them), products before reviews/tags/price lists.
@@ -123,7 +129,12 @@ class Command(BaseCommand):
         # name is reported on its own rather than hidden behind a
         # --force prompt the operator then has to reason about.
         steps = self._resolve_steps(options)
-        self._guard(tenant, TenantDomain, force=options["force"])
+        domains = list(
+            TenantDomain.objects.filter(tenant=tenant).values_list(
+                "domain", flat=True
+            )
+        )
+        self._guard(tenant, domains, force=options["force"])
 
         self.stdout.write(
             self.style.MIGRATE_HEADING(
@@ -153,8 +164,8 @@ class Command(BaseCommand):
             )
         )
 
-    def _guard(self, tenant, domain_model, *, force: bool) -> None:
-        """Refuse to seed a tenant whose domains look production."""
+    def _guard(self, tenant, domains: list[str], *, force: bool) -> None:
+        """Refuse to seed a tenant that is not provably non-production."""
         # ``is_demo`` is an explicit per-tenant opt-in that suppresses
         # the HOSTNAME heuristic only. The public demo store runs on
         # demo.grooveshop.space — a production host with no
@@ -166,22 +177,18 @@ class Command(BaseCommand):
         # says, and that signal is the more trustworthy of the two.
         is_demo = bool(getattr(tenant, "is_demo", False))
 
-        domains = list(
-            domain_model.objects.filter(tenant=tenant).values_list(
-                "domain", flat=True
-            )
-        )
-        live = (
-            []
-            if is_demo
-            else [
+        if is_demo:
+            live = []
+        elif not domains:
+            # No hostname to classify: a tenant created before its
+            # TenantDomain rows land is unknown, not safe.
+            live = ["no TenantDomain rows — cannot tell staging from live"]
+        else:
+            live = [
                 domain
                 for domain in domains
-                if not any(
-                    marker in domain for marker in NON_PRODUCTION_MARKERS
-                )
+                if not is_non_production_domain(domain)
             ]
-        )
         if tenant.viva_wallet_live_mode:
             live.append("viva_wallet_live_mode=True")
         if not live:

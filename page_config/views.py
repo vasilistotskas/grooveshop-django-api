@@ -30,6 +30,7 @@ from page_config.serializers import (
     PageLayoutAdminSerializer,
     PageLayoutSerializer,
 )
+from tenant.membership import is_store_staff
 
 
 @extend_schema(
@@ -199,8 +200,7 @@ class ContentPageViewSet(BaseModelViewSet):
         # are AllowAny, so without this filter anonymous callers could
         # enumerate unpublished pages by slug — mirrors
         # ``BlogPostViewSet.get_queryset``.
-        user = self.request.user
-        if not (user and user.is_authenticated and user.is_staff):
+        if not is_store_staff(self.request.user):
             queryset = queryset.published()
 
         return queryset

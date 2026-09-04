@@ -24,6 +24,7 @@ from product.serializers.favourite import (
     ProductFavouriteSerializer,
     ProductFavouriteWriteSerializer,
 )
+from tenant.membership import is_store_staff
 
 serializers_config: SerializersConfig = {
     "list": ActionConfig(response=ProductFavouriteSerializer),
@@ -105,9 +106,9 @@ class ProductFavouriteViewSet(BaseModelViewSet):
         # queryset in that case (DRF won't actually invoke list/retrieve
         # without a real request, so this only affects introspection).
         request = getattr(self, "request", None)
-        is_staff = bool(request and request.user.is_staff)
+        staff_view = bool(request and is_store_staff(request.user))
 
-        if is_staff or request is None:
+        if staff_view or request is None:
             if self.action == "list":
                 return ProductFavourite.objects.for_list()
             return ProductFavourite.objects.for_detail()

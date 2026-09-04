@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-from notification.groups import admins_group, user_group
+from notification.groups import user_group
 
 
 class TestUserGroup:
@@ -22,17 +22,6 @@ class TestUserGroup:
 
     def test_different_users_produce_different_groups(self):
         assert user_group("webside", 1) != user_group("webside", 2)
-
-
-class TestAdminsGroup:
-    def test_basic(self):
-        assert admins_group("webside") == "tenant_webside_admins"
-
-    def test_public_schema(self):
-        assert admins_group("public") == "tenant_public_admins"
-
-    def test_different_schemas_differ(self):
-        assert admins_group("a") != admins_group("b")
 
 
 class TestConsumerGroupNameConsistency:

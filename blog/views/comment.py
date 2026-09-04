@@ -32,6 +32,7 @@ from core.utils.serializers import (
     create_schema_view_config,
     crud_config,
 )
+from tenant.membership import is_store_staff
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -134,7 +135,7 @@ class BlogCommentViewSet(BaseModelViewSet):
         else:
             queryset = BlogComment.objects.for_detail()
 
-        if not self.request.user.is_staff:
+        if not is_store_staff(self.request.user):
             queryset = queryset.filter(approved=True)
 
         return queryset.annotate(
@@ -191,7 +192,7 @@ class BlogCommentViewSet(BaseModelViewSet):
     def thread(self, request, pk=None):
         comment = self.get_object()
 
-        if self.request.user.is_staff:
+        if is_store_staff(self.request.user):
             ancestors = comment.get_ancestors().select_related("user", "post")
             descendants = comment.get_descendants().select_related(
                 "user", "post"
@@ -264,7 +265,7 @@ class BlogCommentViewSet(BaseModelViewSet):
         user = request.user
 
         queryset = BlogComment.objects.filter(id__in=comment_ids, likes=user)
-        if not self.request.user.is_staff:
+        if not is_store_staff(self.request.user):
             queryset = queryset.filter(approved=True)
 
         liked_ids = list(queryset.values_list("id", flat=True))

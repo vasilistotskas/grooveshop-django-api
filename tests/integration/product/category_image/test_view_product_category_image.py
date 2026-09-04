@@ -30,9 +30,16 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
             category=self.category,
             image_type=CategoryImageTypeEnum.MAIN,
         )
-        self.user = User.objects.create_user(
+        # Writes are store-staff operations; a platform superuser is the
+        # simplest identity that passes StoreStaffModelPermissions.
+        self.user = User.objects.create_superuser(
             email="test@example.com",
             username="testuser",
+            password="testpass123",
+        )
+        self.customer = User.objects.create_user(
+            email="customer@example.com",
+            username="customer",
             password="testpass123",
         )
         self.client.force_authenticate(user=self.user)
@@ -485,3 +492,69 @@ class ProductCategoryImageViewSetTestCase(APITestCase):
 
                 self.assertEqual(response.status_code, status.HTTP_201_CREATED)
                 self.assertEqual(response.data["image_type"], image_type)
+
+
+class ProductCategoryImagePermissionTests(APITestCase):
+    """Writes are gated on store staff; reads stay public."""
+
+    def setUp(self):
+        self.category = ProductCategoryFactory()
+        self.image = ProductCategoryImageFactory(
+            category=self.category,
+            image_type=CategoryImageTypeEnum.MAIN,
+        )
+        self.customer = User.objects.create_user(
+            email="customer@example.com",
+            username="customer",
+            password="testpass123",
+        )
+
+    def test_anonymous_can_list_and_retrieve(self):
+        self.client.force_authenticate(user=None)
+        list_response = self.client.get(reverse("product-category-image-list"))
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        detail_response = self.client.get(
+            reverse("product-category-image-detail", args=[self.image.pk])
+        )
+        self.assertEqual(detail_response.status_code, status.HTTP_200_OK)
+
+    def test_customer_cannot_write(self):
+        self.client.force_authenticate(user=self.customer)
+        detail_url = reverse(
+            "product-category-image-detail", args=[self.image.pk]
+        )
+
+        create = self.client.post(
+            reverse("product-category-image-list"),
+            {"category": self.category.pk, "image_type": "BANNER"},
+            format="json",
+        )
+        self.assertEqual(create.status_code, status.HTTP_403_FORBIDDEN)
+
+        update = self.client.patch(detail_url, {"active": False}, format="json")
+        self.assertEqual(update.status_code, status.HTTP_403_FORBIDDEN)
+
+        delete = self.client.delete(detail_url)
+        self.assertEqual(delete.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(
+            ProductCategoryImage.objects.filter(pk=self.image.pk).exists()
+        )
+
+    def test_is_staff_residue_cannot_bulk_update(self):
+        residue = User.objects.create_user(
+            email="residue@example.com",
+            username="residue",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_authenticate(user=residue)
+
+        response = self.client.patch(
+            reverse("product-category-image-bulk-update"),
+            {"image_ids": [self.image.pk], "active": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.image.refresh_from_db()
+        self.assertTrue(self.image.active)

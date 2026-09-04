@@ -51,6 +51,7 @@ from user.serializers.account import (
 from user.serializers.address import UserAddressSerializer
 from user.serializers.subscription import UserSubscriptionSerializer
 from user.utils.subscription import get_user_subscription_summary
+from tenant.membership import is_store_staff
 
 User = get_user_model()
 
@@ -289,7 +290,7 @@ class UserAccountViewSet(BaseModelViewSet):
             case _:
                 queryset = (
                     User.objects.all()
-                    if self.request.user.is_staff
+                    if is_store_staff(self.request.user)
                     else User.objects.filter(id=self.request.user.id)
                 )
 
@@ -572,7 +573,7 @@ class UserAccountViewSet(BaseModelViewSet):
 
         user = self.get_object()
 
-        if request.user != user and not request.user.is_staff:
+        if request.user != user and not is_store_staff(request.user):
             return Response(
                 {"detail": _("You can only delete your own account.")},
                 status=status.HTTP_403_FORBIDDEN,

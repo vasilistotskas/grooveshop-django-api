@@ -131,17 +131,13 @@ class TestPageLayoutAdminViewSet(TestCase):
         assert response.status_code == 200
 
     def test_a_store_operator_is_refused(self):
-        """Administrative API routes are platform-only.
+        """An unstamped operator is refused even with an ADMIN membership.
 
-        A store ADMIN with an active membership — the strongest
-        non-platform identity there is — must still be refused. The API
-        has no sound notion of store staff (an API session
-        authenticates against the TENANT schema, so membership would be
-        matched by pk across schemas); granting it needs the design in
-        ``docs/api-staff-identity.md``.
-
-        Pinned as a test so the deferral is enforced rather than
-        remembered.
+        This identity is a tenant-schema session: it carries no platform
+        provenance stamp, so its membership must not be matched by pk
+        across schemas. Only ``StaffBearer`` tokens and platform-staff
+        sessions (``docs/api-staff-identity.md``) reach the store-scoped
+        administrative routes.
         """
         operator = UserAccountFactory(is_staff=True, is_superuser=False)
         UserTenantMembership.objects.create(

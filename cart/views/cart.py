@@ -52,6 +52,7 @@ from order.exceptions import InsufficientStockError, StockReservationError
 from order.models import StockReservation
 from order.services import OrderService
 from order.stock import StockManager
+from tenant.membership import is_store_staff
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +282,7 @@ class CartViewSet(BaseModelViewSet):
         """
         user = self.request.user
 
-        if user.is_staff:
+        if is_store_staff(user):
             return Cart.objects.for_list()
         elif user.is_authenticated:
             return Cart.objects.for_detail().filter(user=user)

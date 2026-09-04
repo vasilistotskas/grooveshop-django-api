@@ -28,7 +28,6 @@ Lifecycle actions also write ``LogEntry``/``HistoricalRecords`` rows
 
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import Any
 
 from django import forms
@@ -47,8 +46,10 @@ from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
 from tenant.lifecycle import (
-    PROTECTED_SCHEMAS,
+    SUSPEND_COOLDOWN,
     activate_tenant,
+    destroy_refusal,
+    is_protected_tenant,
     suspend_tenant,
 )
 from tenant.models import (
@@ -59,15 +60,6 @@ from tenant.models import (
     TenantMembershipRole,
     UserTenantMembership,
 )
-
-# Schemas that can never be suspended, activated, or destroyed via the
-# admin. Destroying these would break the platform. Aliased from
-# tenant.lifecycle (the shared source of truth) so the admin's guards
-# and the billing task's can never disagree.
-_PROTECTED = PROTECTED_SCHEMAS
-
-# Minimum time a tenant must be suspended before it can be destroyed.
-_SUSPEND_COOLDOWN = timedelta(hours=24)
 
 
 class TenantDomainInline(admin.TabularInline):
@@ -379,7 +371,7 @@ class TenantAdmin(ModelAdmin):
         """
         if self_service_tenant(request) is not None:
             return False
-        if obj is not None and obj.schema_name in _PROTECTED:
+        if obj is not None and is_protected_tenant(obj):
             return False
         return super().has_delete_permission(request, obj)
 
@@ -507,6 +499,7 @@ class TenantAdmin(ModelAdmin):
                     # it gates no storefront behaviour, it declares what
                     # KIND of tenant this row is.
                     "is_demo",
+                    "is_protected",
                     "suspended_at",
                     "suspended_reason",
                     "uuid",
@@ -771,7 +764,7 @@ class TenantAdmin(ModelAdmin):
         }
 
         for tenant in queryset:
-            if tenant.schema_name in _PROTECTED:
+            if is_protected_tenant(tenant):
                 continue
             try:
                 result = provision_stripe(tenant)
@@ -818,7 +811,7 @@ class TenantAdmin(ModelAdmin):
         from tenant.lifecycle import export_tenant_data  # noqa: PLC0415
 
         for tenant in queryset:
-            if tenant.schema_name in _PROTECTED:
+            if is_protected_tenant(tenant):
                 continue
             try:
                 path = export_tenant_data(
@@ -862,7 +855,7 @@ class TenantAdmin(ModelAdmin):
         suspended = []
 
         for tenant in queryset:
-            if tenant.schema_name in _PROTECTED:
+            if is_protected_tenant(tenant):
                 skipped.append(tenant.name)
                 continue
             if suspend_tenant(tenant, reason=SuspendedReason.MANUAL):
@@ -904,7 +897,7 @@ class TenantAdmin(ModelAdmin):
         activated = []
 
         for tenant in queryset:
-            if tenant.schema_name in _PROTECTED:
+            if is_protected_tenant(tenant):
                 skipped.append(tenant.name)
                 continue
             if activate_tenant(tenant):
@@ -945,10 +938,14 @@ class TenantAdmin(ModelAdmin):
            page (see ``_destroy_confirmation_page``) — a second,
            deliberate click, not just the one that opened the bulk
            action dropdown.
-        1. Schema is not in ``_PROTECTED`` (public / webside).
+        1. The tenant is not protected (``is_protected_tenant``).
         2. Tenant is suspended (``is_active=False``).
-        3. ``suspended_at`` is at least 24 hours in the past —
+        3. ``suspended_at`` is at least ``SUSPEND_COOLDOWN`` in the past —
            prevents accidental destruction immediately after suspension.
+
+        Gates 1-3 are ``tenant.lifecycle.destroy_refusal``; they are
+        evaluated here only to bucket the operator messages, and
+        ``destroy_tenant`` enforces them again itself.
 
         This action is **irreversible**. The Postgres schema and all
         tenant data are permanently gone after this runs.
@@ -963,19 +960,16 @@ class TenantAdmin(ModelAdmin):
         destroyed = []
 
         for tenant in queryset:
-            if tenant.schema_name in _PROTECTED:
+            refusal = destroy_refusal(tenant, now=now)
+            if refusal == "protected":
                 skipped_protected.append(tenant.name)
                 continue
-
-            if tenant.is_active or tenant.suspended_at is None:
+            if refusal == "not_suspended":
                 skipped_not_suspended.append(tenant.name)
                 continue
-
-            age = now - tenant.suspended_at
-            if age < _SUSPEND_COOLDOWN:
-                remaining_minutes = int(
-                    (_SUSPEND_COOLDOWN - age).total_seconds() // 60
-                )
+            if refusal == "cooldown":
+                remaining = SUSPEND_COOLDOWN - (now - tenant.suspended_at)
+                remaining_minutes = int(remaining.total_seconds() // 60)
                 skipped_cooldown.append(
                     f"{tenant.name} ({remaining_minutes} min remaining)"
                 )

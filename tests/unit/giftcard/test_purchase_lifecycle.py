@@ -190,12 +190,131 @@ class TestVivaPurchaseWebhookBranch:
         purchase.refresh_from_db()
         assert purchase.status == GiftCardPurchaseStatus.PENDING
 
+    def _paid_purchase(self, payment_id):
+        """A PAID purchase with one issued, untouched card."""
+        purchase = GiftCardPurchaseFactory(
+            amount=Money(Decimal("40"), "EUR"), provider_code="viva_wallet"
+        )
+        purchase.payment_id = payment_id
+        purchase.save(update_fields=["payment_id"])
+        card = GiftCardService.complete_purchase(purchase, "txn-paid")
+        return purchase, card
+
+    def test_reversal_without_a_verified_refund_voids_nothing(
+        self, enable_gift_cards
+    ):
+        """The endpoint is unauthenticated and the Viva order code is
+        visible to the buyer, so an unverified 1797 must not be able to
+        cancel a purchase and disable the card it paid for."""
+        from order.enum.status import PaymentStatus
+
+        purchase, card = self._paid_purchase("5234567890123456")
+
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(PaymentStatus.COMPLETED, {"amount": "40.00"}),
+        ):
+            response = self._event(purchase, 1797)
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert response.status_code == 200
+        assert purchase.status == GiftCardPurchaseStatus.PAID
+        assert card.status == GiftCardStatus.ACTIVE
+        assert card.balance.amount == Decimal("40")
+
+    def test_reversal_without_a_transaction_id_voids_nothing(
+        self, enable_gift_cards
+    ):
+        from order.views.viva_webhook import (
+            _process_gift_card_purchase_event,
+        )
+
+        purchase, card = self._paid_purchase("6234567890123456")
+
+        response = _process_gift_card_purchase_event(
+            purchase=purchase,
+            event_type_id=1797,
+            event_data={"StatusId": "F"},
+            transaction_id="",
+            txn_hash="deadbeef",
+            order_code=purchase.payment_id,
+        )
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert response.status_code == 200
+        assert purchase.status == GiftCardPurchaseStatus.PAID
+        assert card.status == GiftCardStatus.ACTIVE
+
+    def test_verified_reversal_voids_the_untouched_card(
+        self, enable_gift_cards
+    ):
+        from order.enum.status import PaymentStatus
+
+        purchase, card = self._paid_purchase("7234567890123456")
+
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(PaymentStatus.REFUNDED, {"amount": "40.00"}),
+        ):
+            response = self._event(purchase, 1797)
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert response.status_code == 200
+        assert purchase.status == GiftCardPurchaseStatus.CANCELED
+        assert card.status == GiftCardStatus.DISABLED
+        assert card.balance.amount == Decimal("0")
+
+    def test_unverifiable_reversal_returns_500_and_voids_nothing(
+        self, enable_gift_cards
+    ):
+        purchase, card = self._paid_purchase("8234567890123456")
+
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(None, {"error": "boom", "viva_error": True}),
+        ):
+            response = self._event(purchase, 1797)
+
+        purchase.refresh_from_db()
+        card.refresh_from_db()
+        assert response.status_code == 500
+        assert purchase.status == GiftCardPurchaseStatus.PAID
+        assert card.status == GiftCardStatus.ACTIVE
+
+    def test_payment_failed_needs_a_verified_failure(self, enable_gift_cards):
+        """A 1798 whose transaction actually succeeded must not flip a
+        purchase to FAILED under the buyer's feet."""
+        from order.enum.status import PaymentStatus
+
+        purchase = GiftCardPurchaseFactory(provider_code="viva_wallet")
+        purchase.payment_id = "9234567890123456"
+        purchase.save(update_fields=["payment_id"])
+
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(PaymentStatus.COMPLETED, {}),
+        ):
+            response = self._event(purchase, 1798, status_id="")
+
+        purchase.refresh_from_db()
+        assert response.status_code == 200
+        assert purchase.status == GiftCardPurchaseStatus.PENDING
+
     def test_payment_failed_marks_failed(self, enable_gift_cards):
+        from order.enum.status import PaymentStatus
+
         purchase = GiftCardPurchaseFactory(provider_code="viva_wallet")
         purchase.payment_id = "4234567890123456"
         purchase.save(update_fields=["payment_id"])
 
-        response = self._event(purchase, 1798, status_id="")
+        with patch(
+            "order.views.viva_webhook._verify_transaction",
+            return_value=(PaymentStatus.FAILED, {}),
+        ):
+            response = self._event(purchase, 1798, status_id="")
 
         purchase.refresh_from_db()
         assert response.status_code == 200

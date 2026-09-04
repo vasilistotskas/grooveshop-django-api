@@ -132,8 +132,15 @@ class CartItemDetailSerializer(CartItemSerializer):
 
         from product.models.product import Product
 
-        products = Product.objects.filter(id__in=product_ids).exclude(
-            id=obj.product.id
+        # `for_list()` for the same reason as the cart-detail
+        # recommendations: serialization happens OUTSIDE the ID cache,
+        # so every render paid a query per product for translations, the
+        # main image and the review/like counts. This serializer is also
+        # the add-to-cart and quantity-change response, not just a read.
+        products = (
+            Product.objects.for_list()
+            .filter(id__in=product_ids)
+            .exclude(id=obj.product.id)
         )
         return ProductSerializer(products, many=True, context=self.context).data
 

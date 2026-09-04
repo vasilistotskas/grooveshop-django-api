@@ -65,6 +65,15 @@ class CartQuerySet(OptimizedQuerySet):
             models.Prefetch("items", queryset=CartItem.objects.for_list())
         )
 
+    def with_applied_codes(self) -> Self:
+        """Prefetch the coupon rows the serializer lists per cart.
+
+        `get_applied_coupon_codes` walks `obj.applied_codes` and follows
+        `code__code`, so without this the staff cart LIST paid one query
+        per row — and one more per row for the coupon itself.
+        """
+        return self.prefetch_related("applied_codes__code")
+
     def with_totals(self) -> Self:
         """Annotate with total quantity and items count."""
         return self.annotate(
@@ -76,9 +85,14 @@ class CartQuerySet(OptimizedQuerySet):
         """
         Optimized queryset for list views.
 
-        Includes user, items with product data, and totals.
+        Includes user, items with product data, applied codes, totals.
         """
-        return self.with_user().with_items_prefetch().with_totals()
+        return (
+            self.with_user()
+            .with_items_prefetch()
+            .with_applied_codes()
+            .with_totals()
+        )
 
     def for_detail(self) -> Self:
         """
@@ -86,7 +100,12 @@ class CartQuerySet(OptimizedQuerySet):
 
         Includes everything from for_list() plus full item details.
         """
-        return self.with_user().with_items_prefetch().with_totals()
+        return (
+            self.with_user()
+            .with_items_prefetch()
+            .with_applied_codes()
+            .with_totals()
+        )
 
     def expired(self, days=30) -> Self:
         cutoff_date = timezone.now() - timedelta(days=days)

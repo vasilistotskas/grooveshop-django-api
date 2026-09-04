@@ -3,6 +3,302 @@
 
 
 
+## v3.28.6 (2026-09-04)
+
+### Bug fixes
+
+* fix(types): clear the ty diagnostics — four real, the rest a stubs shape
+
+CI runs `uv run ty check`, which exited 1 after the 0.0.78 upgrade, so
+the Code Quality job was red independently of the lint work. Now clean.
+
+Four were genuine code defects, fixed rather than annotated around:
+
+- `meta_capi.is_capi_enabled()` is annotated `-> bool` and ended with
+  `return pixel_id and access_token`. `and` yields its last truthy
+  operand, so on the enabled path it returned the CAPI ACCESS TOKEN.
+  Callers comparing `is True` saw False, and a secret travelled where
+  only a flag was expected.
+- `core/api/schema.py` reached through
+  `fields[code]["properties"][name]`, indexing back into a
+  `{"type": str, "properties": dict}` literal whose value type is
+  `str | dict`. The per-language properties are now built as their own
+  comprehension — shorter, and no reader has to prove which branch they
+  got.
+- `core/tasks.py` appended bare dict literals, making `f["size"]` infer
+  as `str | int` so `sum(...)` could not be shown to sum numbers. Now a
+  `_DeletedLogFile` TypedDict.
+- `order/services.py` genuinely mixes lazy translations and plain
+  strings in one error dict; annotated with `django_stubs_ext`'s public
+  `StrOrPromise` rather than widened to Any.
+
+The remaining 22 are a stub shape ty cannot resolve, and the evidence is
+recorded at each site rather than left for the next reader to re-derive:
+
+- `@extend_schema` over `@api_view` is drf-spectacular's own documented
+  FAQ pattern, so the code is right.
+- Reduced to 25 lines with no Django: a generic `Protocol[_View]` whose
+  `__call__` is annotated with the class's own TypeVar is not resolved
+  into callability against `TypeVar F, bound=Callable[..., Any]`. The
+  concrete `__call__: Callable[..., Any]` form passes.
+- `djangorestframework-stubs` master still declares `AsView` that way,
+  so bumping 3.18.0 -> 3.18.1 would not have helped.
+
+Suppressed per LINE, never per file or per rule: these are large view
+modules and silencing `invalid-argument-type` across them would hide
+real argument errors. `# ty: ignore[...]` is the existing convention
+here (agent/views.py, loyalty/signals.py).
+
+Full suite 6909 passed / 12 skipped.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`b7e2b25`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b7e2b25ba746a903fec79dddd51c56c32c573858))
+
+* fix: name the exceptions, stop the schema leak, and finish the lint sweep
+
+Findings 135 -> 32; what remains is PLR0913 (19) and DJ001 (13), both
+judgement calls rather than cleanup.
+
+**A cross-test schema leak, fixed at the source.** Five tests failed at
+setup with "Can't create tenant outside the public schema. Current schema
+is test-acs-tenant" — a failure with no visible connection to whichever
+test actually leaked. `bind_tenant` unwinds `connection.tenant` via
+monkeypatch, but any code path entering `schema_context` (every eager
+`TenantTask`) rewrites `connection.schema_name` on exit through a real
+`set_tenant(previous)` call, which monkeypatch does not track. The worker
+was then left outside the public schema for every later test on it.
+
+The fix was already in the tree — `tests/unit/admin/test_admin_login_flow.py`
+pins `schema_name` alongside `tenant` and documents exactly this
+mechanism. It simply had not been applied to the other seven copies of
+the fixture. Now all of them pin it, so monkeypatch restores it at
+teardown. Verified with a probe that emulates the `set_tenant` mutation:
+it fails before the change and passes after.
+
+**Two untranslatable messages.** `_(f"...")` resolves the f-string before
+gettext sees it, so the msgid carried live values and never matched the
+catalogue — the order refund error and the username help text both
+reached Greek users in English. The help text also lost a space,
+concatenating to "fewer.Letters". Fixed with `format_lazy`, NOT `%`:
+`lazy % dict` returns a plain str, which would resolve the translation at
+import time and freeze one language into a model field. Migration 0027 is
+metadata-only — verified `_field_should_be_altered()` returns False for a
+help_text-only change and True for a real one, so it emits no DDL.
+
+**A conditional with identical branches.** The `clear-all-cache` beat
+entry read `X if not DEBUG else X`. Every sibling reads
+`else "every_hour"`. Collapsed rather than "corrected" to match them,
+because that would start clearing the whole cache hourly in development —
+a behaviour change to decide deliberately, not to infer.
+
+**A silently skipped tenant.** `viva_webhook`'s resolution loop swallowed
+into `continue`. That loop is how an unauthenticated webhook finds its
+tenant; a tenant skipped by an unexpected error was indistinguishable
+from one that simply did not hold the order code.
+
+Also: TypeError for a failed type check (TRY004, with the two tests that
+pinned ValueError updated), IntegrityError instead of blind Exception in
+two shipping tests (they still pass, which confirms that is what is
+raised), builtin shadowing renamed — including four f-strings in
+`shipping_boxnow/client.py` that still interpolated `{type}` after the
+parameter rename and would have built `label.<class 'type'>`.
+
+Two suppressions are deliberate and documented at the site: DJ007 on the
+`Setting` admin form (a third-party model with 20 editable fields, staff
+gated, where enumerating them would silently drop one on upgrade) and
+A002 on `crud_config(list=...)` (the three keyword names ARE the DRF
+action names, across 28 call sites, and the body never calls the
+builtin).
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`c2f25f5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2f25f57eef93437398227c4c91cab15d6392bf3))
+
+* fix: stop swallowing failures, and give the raises a type
+
+Second Phase 1 batch. Findings 341 -> 135, but three of these are real
+defects rather than lint cleanup.
+
+**GDPR erasure claimed completion it had not achieved.**
+`anonymise_and_delete_user` wraps the authenticator and session deletes
+in `except Exception: pass`, then logs "GDPR deletion complete". Its own
+docstring promises "a failure halfway through leaves the user intact",
+so swallowing contradicted the documented design: a failed DELETE left
+those records in place while the log asserted erasure. Only `ImportError`
+is tolerated now — that genuinely means the optional allauth app is not
+installed — and an operational failure propagates, aborting the
+transaction exactly as the docstring says it should. The same shape in
+the export path silently dropped a category of personal data from a
+right-of-access response that still presented itself as complete.
+
+**The retention clock read the server's date.** `latest_invoice_year`
+fell back to `date.today().year`. UTC lags Europe/Athens, so around New
+Year that returns the EARLIER year — shortening a legal retention window,
+which that function's docstring calls the unrecoverable direction of the
+two possible mistakes. Now `timezone.localdate().year`, with the test
+following rather than pinning the old behaviour. The rest of DTZ went the
+same way: `USE_TZ` is True, so Django's `timezone.now()` is the correct
+call, not ruff's suggested `datetime.now(tz=...)`.
+
+**`meili` raised bare `Exception` on every failed task**, and
+`meili/apps.py` raised `Exception` then caught `Exception` one line
+later — so a genuine `TypeError` in that block was indistinguishable from
+an indexing failure. New `meili/exceptions.py` and `core/exceptions.py`
+follow the per-app convention `order`/`shipping*`/`meta_capi` already
+use. The core ones matter because those tasks declare
+`autoretry_for=(Exception,)`: "the monitored dependency is down" is worth
+retrying, "this task has a bug" is not, and there was no way to tell them
+apart.
+
+Also narrowed `tenant/credentials.py` (its comment always claimed to
+guard a missing optional app; as written it also hid a database failure,
+and that function decides the From address on every outbound email) and
+made the platform dashboard say so when a tenant's revenue cannot be
+read, instead of reporting 0.00 — indistinguishable from a store that
+took no money.
+
+RUF046 removed `int()` around `round(Decimal)` in the Stripe and Viva
+cents conversion. Verified equivalent across bankers-rounding boundaries
+(0.005, 2.5, 3.5, 19.995, negatives) before applying: `round(Decimal)`
+already returns an int.
+
+Test exemptions are measured, not assumed — TRY002, DJ008 and S110 are
+100% test-only, and each conftest swallow already carried a comment
+saying it emulates `on_commit(robust=True)`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`3480f66`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3480f66f8e2f7d75fdb8fe6b3dd9f5756fe50155))
+
+### Chores
+
+* chore(repo): mark manage.py executable, as its shebang claims
+
+CI's Code Quality job failed on `EXE001 Shebang is present but file is
+not executable`. Not version drift — the action resolved the same ruff
+0.16.6 this branch pins. EXE001 inspects the POSIX executable bit, which
+does not exist on Windows, so a local `ruff check` on this machine can
+never report it.
+
+`manage.py` carries `#!/usr/bin/env python`, which is what Django's
+`startproject` generates and which only means anything if the file is
+executable. The bit was lost at some point — Git records mode 100644 —
+so the shebang was decoration. Restoring 100755 makes `./manage.py` work
+as the line promises, rather than deleting a shebang Django puts there
+on purpose.
+
+It is the only file in the repository with a shebang, so there is
+nothing else to align.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`5678c42`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5678c429c15e5dd9fe5d2e5250a669d0f0e1351c))
+
+* chore(tooling): defer DJ001 with its reasoning and inventory recorded
+
+All 13 DJ001 findings are real — a nullable CharField/TextField/URLField
+gives "no data" two spellings, `None` and `""`, and every reader has to
+check both. They are deferred rather than dismissed, and the config
+records why and exactly which fields.
+
+Making a string column NOT NULL is a two-RELEASE change under the Argo CD
+PreSync hook. Migrations run BEFORE the new image, so the ALTER lands
+while pods that still write NULL are serving requests: the first release
+has to stop writing NULL and backfill the existing rows, and only the
+second may add the constraint. Squeezing that into a lint pass would
+either break the rollout or produce a migration nobody reviewed as a
+schema change.
+
+The worst of them is `order.Order.payment_id`, which carries `null=True`
+AND `default=""` at once — the two-representations problem the rule
+exists to catch, in a single field. Verified against the live dev schema:
+zero NULL rows there today, so the backfill is small, but the write path
+still has to be closed first.
+
+With this, the branch's gates are all green: `ruff check` clean,
+`ruff format --check` clean, `ty check` clean,
+`makemigrations --check` clean, full suite 6909 passed / 12 skipped.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`c2bb531`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c2bb531b73b144d0b5241246f32ca64042fd525d))
+
+* chore(tooling): make the lint config real — ruff 0.16.6, ty 0.0.78
+
+`[tool.ruff]` had no `lint` section at all, so only the 59 legacy defaults
+ran. Two consequences: `[tool.ruff.lint.pylint] max-args = 6` was inert
+despite CLAUDE.md documenting it as enforced, and 364 `# noqa` comments
+suppressed rules that were never switched on.
+
+Ruff 0.16 turns on a far broader default set, which is what a
+contributor's editor shows out of the box, so that is the baseline here
+rather than a hand-picked `select`. On top of it: six rules 0.16 dropped
+from its defaults are re-added (E402, E722, E731, E741, F403, F405 — all
+already at zero findings, so enforcing them is free), plus A, DJ, ERA,
+PLR0913, T20 and TID.
+
+The ignores are house patterns, each measured before being excused:
+PLC0415 (1744 lazy imports for app-registry and circular-import safety),
+RUF012 (661 — Django and DRF declare mutable class attributes by
+design), ARG (1618 — signal receivers take framework arguments they do
+not read), PLR2004 (819, overwhelmingly fixtures and status codes),
+RUF001-003 (396 — Greek is the product's default locale) and BLE001
+(120, each needing the Phase 4 judgement rather than a blanket fix).
+`tests/**` ignores S101, since pytest rewrites asserts.
+
+2184 findings became 1520 under that config; 1205 safe autofixes leave
+341 for hand review. The autofix is verified, not assumed: full suite
+6909 passed / 12 skipped, byte-identical to the pre-change baseline, and
+`makemigrations --check` reports no drift.
+
+One thing worth recording, because it looked alarming in the diff:
+FURB157 rewrites `Decimal` constructors, which in a money codebase could
+change an exponent and therefore formatting. It only touched
+integer-valued strings (`Decimal("0")` -> `Decimal(0)`, exponent
+identical). Counted across the tree: 699 fractional `Decimal("n.n")`
+literals before and 699 after, none rewritten, and zero float-argument
+`Decimal(n.n)`. The `Decimal("20.00")` lines that appear on both sides
+of the diff are SIM117 re-indenting nested `with` blocks.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`b18ec98`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b18ec9833ebb7149fdc541971bcd6ea93d4bd8c9))
+
+* chore(deps): sync uv.lock to 3.28.5 [skip ci] ([`abb35c2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/abb35c2cdfcf293b0b1ba38f7715dc066345decb))
+
+### Refactoring
+
+* refactor: measure the argument hazard, not the argument count
+
+`PLR0913` counts EVERY parameter, so it fires just as loudly on a
+function whose arguments are all keyword-only — the shape that removes
+the hazard, since a keyword argument cannot be mixed up at a call site.
+Ruff's own `PLR0917` documentation recommends exactly that migration as
+the remedy, so `PLR0913` penalises its own cure.
+
+Measured before deciding: of the fourteen production functions it
+flagged, TEN were already keyword-only (<=2 positional parameters). The
+rule was reporting the fix.
+
+Swapped to `PLR0917` with `max-positional-args = 6`, which leaves three
+real offenders — and one was worth catching. `save_search_query` took
+ELEVEN positional arguments including `session_key`, `ip_address` and
+`user_agent`, three adjacent `str | None`s: transposing any two at a call
+site would have stored the wrong analytics with no error anywhere.
+
+All three are now keyword-only. Every call site was checked first and all
+of them already passed by keyword, so this is a pure tightening with no
+call-site churn — it only stops a FUTURE caller passing positionally.
+
+Tests are exempt for a structural reason, not convenience: pytest injects
+fixtures positionally and `@mock.patch` passes each mock as a positional
+argument in bottom-up order, so three of the five test findings cannot be
+given keyword-only parameters at all.
+
+CLAUDE.md claimed "Max function args: 6 (pylint rule via ruff)" — inert
+before this branch, and wrong after it. It now documents the real rule
+and why it is that rule.
+
+Ruff: 13 findings left, all DJ001. ty: clean.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`11ff1e0`](https://github.com/vasilistotskas/grooveshop-django-api/commit/11ff1e0b101676dc205bb6831454443b48b9c185))
+
 ## v3.28.5 (2026-09-04)
 
 ### Chores

@@ -59,7 +59,7 @@ class UserAccount(
         _("Last Name"), max_length=255, blank=True, default=""
     )
     phone = PhoneNumberField(
-        _("Phone Number"), null=True, blank=True, default=None
+        _("Phone Number"), null=True, blank=True, default=""
     )
     city = models.CharField(_("City"), max_length=255, blank=True, default="")
     zipcode = models.CharField(
@@ -91,13 +91,25 @@ class UserAccount(
     is_active = models.BooleanField(_("Active"), default=True)
     is_staff = models.BooleanField(_("Staff"), default=False)
     birth_date = models.DateField(_("Birth Date"), blank=True, null=True)
-    twitter = models.URLField(_("Twitter Profile"), blank=True, null=True)
-    linkedin = models.URLField(_("LinkedIn Profile"), blank=True, null=True)
-    facebook = models.URLField(_("Facebook Profile"), blank=True, null=True)
-    instagram = models.URLField(_("Instagram Profile"), blank=True, null=True)
-    website = models.URLField(_("Website"), blank=True, null=True)
-    youtube = models.URLField(_("Youtube Profile"), blank=True, null=True)
-    github = models.URLField(_("Github Profile"), blank=True, null=True)
+    twitter = models.URLField(
+        _("Twitter Profile"), blank=True, null=True, default=""
+    )
+    linkedin = models.URLField(
+        _("LinkedIn Profile"), blank=True, null=True, default=""
+    )
+    facebook = models.URLField(
+        _("Facebook Profile"), blank=True, null=True, default=""
+    )
+    instagram = models.URLField(
+        _("Instagram Profile"), blank=True, null=True, default=""
+    )
+    website = models.URLField(_("Website"), blank=True, null=True, default="")
+    youtube = models.URLField(
+        _("Youtube Profile"), blank=True, null=True, default=""
+    )
+    github = models.URLField(
+        _("Github Profile"), blank=True, null=True, default=""
+    )
     bio = models.TextField(_("Bio"), blank=True, default="")
     total_xp = models.PositiveBigIntegerField(_("Total XP"), default=0)
     reengagement_email_count = models.PositiveSmallIntegerField(

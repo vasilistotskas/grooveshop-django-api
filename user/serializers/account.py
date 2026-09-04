@@ -38,7 +38,7 @@ class UserSerializer(serializers.ModelSerializer[User]):
 
 
 class UserWriteSerializer(UserSerializer):
-    phone = PhoneNumberField(required=False, allow_blank=True, allow_null=True)
+    phone = PhoneNumberField(required=False, allow_blank=True)
 
     class Meta(UserSerializer.Meta):
         # The base fields are spread in, so they are not repeated here —
@@ -71,6 +71,26 @@ class UserWriteSerializer(UserSerializer):
             "updated_at",
             "uuid",
         )
+        # `null` is not a second way to say "no value" on these columns.
+        # DRF derives `allow_null` straight from the model's `null=True`
+        # (rest_framework/utils/field_mapping.py), so without this a
+        # `PATCH {"website": null}` writes NULL past the model's
+        # `default=""` — the one hole the backfill migrations cannot
+        # close, because it stays open after they have run. Clearing a
+        # value is spelled "", as it already is for `bio`, `city` and
+        # every other blankable string on this model.
+        extra_kwargs = {
+            field: {"allow_null": False}
+            for field in (
+                "twitter",
+                "linkedin",
+                "facebook",
+                "instagram",
+                "website",
+                "youtube",
+                "github",
+            )
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -103,7 +123,7 @@ class UserWriteSerializer(UserSerializer):
 
 
 class UserDetailsSerializer(UserSerializer):
-    phone = PhoneNumberField(required=False, allow_blank=True, allow_null=True)
+    phone = PhoneNumberField(required=False, allow_blank=True)
     twitter = serializers.SerializerMethodField()
     linkedin = serializers.SerializerMethodField()
     facebook = serializers.SerializerMethodField()

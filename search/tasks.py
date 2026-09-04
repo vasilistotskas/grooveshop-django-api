@@ -32,10 +32,17 @@ def save_search_query(
     user_id: int | None,
     session_key: str | None,
     ip_address: str | None,
-    user_agent: str,
+    user_agent: str | None,
     query_uuid: str | None = None,
 ) -> None:
-    """Persist a SearchQuery analytics record asynchronously."""
+    """Persist a SearchQuery analytics record asynchronously.
+
+    The three string identifiers are normalised HERE rather than trusted
+    from the caller. The middleware already sends "", but a message
+    queued before that shipped is executed by a worker that has: the
+    broker outlives the rollout, and an explicit None beats the model's
+    default. So the task is null-proof regardless of who produced it.
+    """
     from search.models import SearchQuery
 
     user = None
@@ -56,15 +63,15 @@ def save_search_query(
         # CharField(max_length=500) is only enforced by the database on
         # .create(); an unbounded pasted query must not kill the task.
         query=query[:500],
-        language_code=language_code,
+        language_code=language_code or "",
         content_type=content_type,
         results_count=results_count,
         estimated_total_hits=estimated_total_hits,
         processing_time_ms=processing_time_ms,
         user=user,
-        session_key=session_key,
+        session_key=session_key or "",
         ip_address=ip_address,
-        user_agent=user_agent,
+        user_agent=user_agent or "",
     )
 
 
@@ -254,16 +261,20 @@ def anonymize_old_search_queries(days: int = 90) -> int:
         SearchQuery.objects.filter(
             timestamp__lt=cutoff,
         )
+        # "Already scrubbed" is now spelled with the empty string.
+        # A row scrubbed by an earlier release still holds NULL, so it
+        # fails this exclusion and gets scrubbed again — an idempotent
+        # re-write that converges it onto the one spelling.
         .exclude(
             ip_address__isnull=True,
             user_agent="",
-            session_key__isnull=True,
+            session_key="",
             user__isnull=True,
         )
         .update(
             ip_address=None,
             user_agent="",
-            session_key=None,
+            session_key="",
             user=None,
         )
     )

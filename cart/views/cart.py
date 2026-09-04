@@ -937,10 +937,8 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_200_OK,
             )
 
-        except Exception as e:
-            logger.error(
-                f"Error creating payment intent from cart: {e}", exc_info=True
-            )
+        except Exception:
+            logger.exception("Error creating payment intent from cart")
             return Response(
                 {"detail": "An error occurred while creating payment intent"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

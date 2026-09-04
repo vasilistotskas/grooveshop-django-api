@@ -22,8 +22,8 @@ class MockMeasureBase:
     def __init__(self, **kwargs):
         for unit, value in kwargs.items():
             setattr(self, unit, value)
-        self.unit = list(kwargs.keys())[0]
-        self.value = list(kwargs.values())[0]
+        self.unit = next(iter(kwargs.keys()))
+        self.value = next(iter(kwargs.values()))
 
 
 class MockBidimensionalMeasure:
@@ -50,8 +50,8 @@ class MockBidimensionalMeasure:
     def __init__(self, **kwargs):
         for unit, value in kwargs.items():
             setattr(self, unit, value)
-        self.unit = list(kwargs.keys())[0]
-        self.value = list(kwargs.values())[0]
+        self.unit = next(iter(kwargs.keys()))
+        self.value = next(iter(kwargs.values()))
 
 
 class TestMeasurementWidget(SimpleTestCase):

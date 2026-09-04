@@ -85,7 +85,7 @@ def mt_tenant(django_db_setup, django_db_blocker):
     with django_db_blocker.unblock():
         from tenant.models import Tenant, TenantDomain
 
-        tenant, created = Tenant.objects.get_or_create(
+        tenant, _created = Tenant.objects.get_or_create(
             schema_name=MT_TENANT_SCHEMA,
             defaults={
                 "name": "MT Smoke Tenant",

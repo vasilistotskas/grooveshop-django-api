@@ -1016,12 +1016,12 @@ class ProductAdmin(
 
         # Check if we need likes_count or review_average based on filters/ordering
         needs_likes = (
-            any("likes_count" in str(param) for param in request.GET.keys())
+            any("likes_count" in str(param) for param in request.GET)
             or request.GET.get("o", "").find("likes") != -1
         )
 
         needs_reviews = (
-            any("review_average" in str(param) for param in request.GET.keys())
+            any("review_average" in str(param) for param in request.GET)
             or request.GET.get("o", "").find("review") != -1
         )
 

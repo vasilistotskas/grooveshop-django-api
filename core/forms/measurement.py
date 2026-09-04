@@ -54,7 +54,7 @@ class MeasurementWidget(forms.MultiWidget):
                     ]
                 return [float(magnitude), unit]
             elif isinstance(value, MeasureBase):
-                choice_units = set([u for u, n in self.unit_choices])
+                choice_units = {u for u, n in self.unit_choices}
                 unit = value.STANDARD_UNIT
                 if unit not in choice_units:
                     unit = choice_units.pop()

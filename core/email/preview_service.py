@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from django.conf import settings
 from django.template.loader import render_to_string
+from django.utils import timezone
 
 from core.email.config import EmailTemplateConfig
 from core.email.sample_data import SampleOrderDataGenerator
@@ -303,25 +304,23 @@ class EmailTemplatePreviewService:
             return f"Template not found: {template_path}. Please check that the template file exists."
         except TemplateSyntaxError as e:
             # Template has syntax errors
-            logger.error(
-                f"Template syntax error in {template_path}: {e!s}",
+            logger.exception(
+                f"Template syntax error in {template_path}",
                 extra={
                     "template_path": template_path,
                     "error": str(e),
                     "line_number": getattr(e, "lineno", None),
                 },
-                exc_info=True,
             )
             return f"Template syntax error: {e!s}"
         except Exception as e:
             # Other rendering errors
-            logger.error(
-                f"Error rendering template {template_path}: {e!s}",
+            logger.exception(
+                f"Error rendering template {template_path}",
                 extra={
                     "template_path": template_path,
                     "context_keys": list(context.keys()),
                 },
-                exc_info=True,
             )
             return f"Error rendering template: {e!s}"
 
@@ -384,12 +383,12 @@ class EmailTemplatePreviewService:
                 "first_name": "John",
                 "last_name": "Doe",
                 "email": "john.doe@example.com",
-                "date_joined": datetime.now() - timedelta(days=180),
-                "last_login": datetime.now() - timedelta(days=45),
+                "date_joined": timezone.now() - timedelta(days=180),
+                "last_login": timezone.now() - timedelta(days=45),
             },
             "app_base_url": settings.NUXT_BASE_URL,
-            "week_start": datetime.now() - timedelta(days=7),
-            "week_end": datetime.now(),
+            "week_start": timezone.now() - timedelta(days=7),
+            "week_end": timezone.now(),
             "featured_articles": [
                 {
                     "title": "New Product Launch",
@@ -422,7 +421,7 @@ class EmailTemplatePreviewService:
                 "id": 67890,
                 "plan": "Premium",
                 "status": "active",
-                "start_date": datetime.now(),
+                "start_date": timezone.now(),
                 "billing_cycle": "monthly",
                 "amount": "€9.99",
             },

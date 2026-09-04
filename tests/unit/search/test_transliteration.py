@@ -91,10 +91,14 @@ class TestGreekToGreeklishAlt:
             # tolerance (first-char insertion counts as two typos, plus
             # a b→p substitution: three total).
             (
-                "Γιατί τελειώνει γρήγορα η μπαταρία του κινητού "
-                "και τι να κάνεις",
-                "giati teleionei grigora i bataria tou kinitou "
-                "kai ti na kaneis",
+                (
+                    "Γιατί τελειώνει γρήγορα η μπαταρία του κινητού "
+                    "και τι να κάνεις"
+                ),
+                (
+                    "giati teleionei grigora i bataria tou kinitou "
+                    "kai ti na kaneis"
+                ),
             ),
             (
                 "Μπλοκάρισμα διαφημίσεων στο κινητό: Πως να το κάνεις",

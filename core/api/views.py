@@ -516,8 +516,8 @@ def list_settings(request):
         serializer = SettingSerializer(settings_list, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    except Exception as e:
-        logger.error(f"Error listing settings: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error listing settings")
 
         return Response(
             {"detail": _("Failed to retrieve settings")},
@@ -670,8 +670,8 @@ def get_setting_by_key(request):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-    except Exception as e:
-        logger.error(f"Error retrieving setting: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error retrieving setting")
 
         return Response(
             {"detail": _("Failed to retrieve setting")},

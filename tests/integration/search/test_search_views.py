@@ -1045,9 +1045,7 @@ class TestOpenAPISchemaGeneration:
 
         # Check for federated search endpoint (various possible path formats)
         federated_paths = [
-            path
-            for path in schema["paths"].keys()
-            if "federated" in path.lower()
+            path for path in schema["paths"] if "federated" in path.lower()
         ]
 
         assert len(federated_paths) > 0, (
@@ -1104,9 +1102,7 @@ class TestOpenAPISchemaGeneration:
 
         # Check for analytics endpoint
         analytics_paths = [
-            path
-            for path in schema["paths"].keys()
-            if "analytics" in path.lower()
+            path for path in schema["paths"] if "analytics" in path.lower()
         ]
 
         assert len(analytics_paths) > 0, (
@@ -1169,7 +1165,7 @@ class TestOpenAPISchemaGeneration:
         # Look for federated search response schema
         federated_schemas = [
             name
-            for name in schemas.keys()
+            for name in schemas
             if "federated" in name.lower() and "response" in name.lower()
         ]
 
@@ -1188,7 +1184,7 @@ class TestOpenAPISchemaGeneration:
         # Look for analytics response schema
         analytics_schemas = [
             name
-            for name in schemas.keys()
+            for name in schemas
             if "analytics" in name.lower() and "response" in name.lower()
         ]
 

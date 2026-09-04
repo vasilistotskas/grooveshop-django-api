@@ -134,9 +134,7 @@ def is_capi_enabled() -> bool:
         return False
     # Tenant-only credentials, no platform fallback — an unconfigured
     # tenant is simply "disabled", not an error.
-    if not (tenant_meta_pixel_id() and tenant_meta_capi_access_token()):
-        return False
-    return True
+    return tenant_meta_pixel_id() and tenant_meta_capi_access_token()
 
 
 def _build_user_data(order: Order) -> Any:

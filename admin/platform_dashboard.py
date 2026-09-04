@@ -13,9 +13,12 @@ trap that made tenant-only admin pages 500 before they were withheld.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from django.utils.translation import gettext_lazy as _
+
+logger = logging.getLogger(__name__)
 
 # ``gettext_lazy`` under its module-level canonical name, not a local
 # ``gettext as _g`` alias: xgettext's keyword scan (what
@@ -83,7 +86,14 @@ def _tenant_rows() -> list[dict[str, Any]]:
                     ).aggregate(total=Sum("paid_amount"))["total"]
                     row["revenue"] = float(total) if total is not None else 0.0
             except Exception:
-                pass
+                # Leave `revenue` at whatever the row already carries and
+                # say so: silently reporting 0.0 for a tenant whose schema
+                # could not be read is indistinguishable from a tenant that
+                # genuinely took no money.
+                logger.exception(
+                    "Platform dashboard: could not read revenue for tenant %s",
+                    row.get("schema_name"),
+                )
         rows.append(row)
     return rows
 

@@ -15,24 +15,24 @@ __all__ = [
     # Attribute Value
     "AttributeValueManager",
     "AttributeValueQuerySet",
-    # Category
-    "CategoryManager",
-    "CategoryQuerySet",
     # Category Image
     "CategoryImageManager",
     "CategoryImageQuerySet",
+    # Category
+    "CategoryManager",
+    "CategoryQuerySet",
     # Favourite
     "FavouriteManager",
     "FavouriteQuerySet",
+    # Product Attribute
+    "ProductAttributeManager",
+    "ProductAttributeQuerySet",
     # Image
     "ProductImageManager",
     "ProductImageQuerySet",
     # Product
     "ProductManager",
     "ProductQuerySet",
-    # Product Attribute
-    "ProductAttributeManager",
-    "ProductAttributeQuerySet",
     # Review
     "ProductReviewManager",
     "ProductReviewQuerySet",

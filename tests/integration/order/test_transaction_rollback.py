@@ -357,7 +357,7 @@ class TestTransactionFailuresRollbackCompletely:
             side_effect=Exception("Stock increment failed"),
         ):
             # Service should NOT raise - it logs the error and continues
-            canceled_order, refund_info = OrderService.cancel_order(
+            _canceled_order, _refund_info = OrderService.cancel_order(
                 order, reason="Test cancellation", refund_payment=False
             )
 

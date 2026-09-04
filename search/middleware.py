@@ -158,11 +158,10 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                 results_count,
             )
 
-        except Exception as e:
+        except Exception:
             # Log error but don't break the request
-            logger.error(
-                f"Failed to track search analytics: {e!s}",
-                exc_info=True,
+            logger.exception(
+                "Failed to track search analytics",
                 extra={
                     "path": request.path,
                     "query": request.GET.get("query", ""),

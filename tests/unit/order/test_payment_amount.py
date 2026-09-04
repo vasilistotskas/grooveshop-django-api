@@ -62,7 +62,7 @@ class StripePaymentAmountTestCase(TestCase):
         with mock.patch("order.payment.PaymentIntent.sync_from_stripe_data"):
             provider = StripePaymentProvider()
             amount = Money(Decimal("0.65"), settings.DEFAULT_CURRENCY)
-            success, data = provider.process_payment(amount, "order_1")
+            success, _data = provider.process_payment(amount, "order_1")
 
             self.assertTrue(success)
             call_kwargs = mock_stripe_create.call_args[1]
@@ -105,7 +105,7 @@ class StripePaymentAmountTestCase(TestCase):
         total = Money(Decimal("30.00"), settings.DEFAULT_CURRENCY)
         shipping = Money(Decimal("3.00"), settings.DEFAULT_CURRENCY)
 
-        success, data = provider.create_checkout_session(
+        success, _data = provider.create_checkout_session(
             total,
             "order_1",
             success_url="https://example.com/success",
@@ -143,7 +143,7 @@ class StripePaymentAmountTestCase(TestCase):
         total = Money(Decimal("55.00"), settings.DEFAULT_CURRENCY)
         shipping = Money(Decimal(0), settings.DEFAULT_CURRENCY)
 
-        success, data = provider.create_checkout_session(
+        success, _data = provider.create_checkout_session(
             total,
             "order_1",
             success_url="https://example.com/success",

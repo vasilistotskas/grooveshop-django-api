@@ -270,9 +270,14 @@ def compile_user_data(user) -> dict[str, Any]:
     ]
 
     loyalty: dict[str, Any] = {"transactions": [], "points_balance": None}
+    # As above: a missing app is expected, a failed read is not. An export
+    # that quietly drops a category of personal data still presents itself
+    # as the complete record the subject asked for.
     try:
         from loyalty.models import PointsTransaction
-
+    except ImportError:
+        logger.debug("loyalty not installed — no transactions to export")
+    else:
         loyalty["transactions"] = [
             {
                 "id": t.id,
@@ -283,8 +288,6 @@ def compile_user_data(user) -> dict[str, Any]:
             }
             for t in PointsTransaction.objects.filter(user=user)
         ]
-    except Exception:
-        pass
 
     # Search history the user generated while authenticated — the query
     # text plus the IP/user-agent captured at search time are all personal
@@ -470,23 +473,31 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     except Exception:
         logger.exception("Failed to purge allauth records for user %s", user.pk)
 
+    # Only ImportError is tolerated: it means the optional allauth app is
+    # not installed, so there is nothing of that kind to erase. A failure
+    # of the DELETE itself must NOT be swallowed — this function documents
+    # that "a failure halfway through leaves the user intact", and it goes
+    # on to log "GDPR deletion complete". Swallowing turned that line into
+    # a claim of erasure for records that are still there.
     try:
         from allauth.mfa.models import Authenticator
-
+    except ImportError:
+        logger.debug("allauth.mfa not installed — no authenticators to erase")
+    else:
         counts["authenticators"] = Authenticator.objects.filter(
             user=user
         ).delete()[0]
-    except Exception:
-        pass
 
     try:
         from allauth.usersessions.models import UserSession
-
+    except ImportError:
+        logger.debug(
+            "allauth.usersessions not installed — no sessions to erase"
+        )
+    else:
         counts["user_sessions"] = UserSession.objects.filter(
             user=user
         ).delete()[0]
-    except Exception:
-        pass
 
     user_id = user.id
     user.delete()

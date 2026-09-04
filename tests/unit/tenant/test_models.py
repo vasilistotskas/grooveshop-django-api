@@ -152,12 +152,12 @@ def test_same_user_can_belong_to_two_tenants(user):
 
 def _unsaved_tenant(**kwargs) -> Tenant:
     """Return an unsaved Tenant instance for clean() testing (no DB needed)."""
-    defaults = dict(
-        schema_name="clean_test",
-        name="Clean Test",
-        slug="clean-test",
-        owner_email="owner@clean.example.com",
-    )
+    defaults = {
+        "schema_name": "clean_test",
+        "name": "Clean Test",
+        "slug": "clean-test",
+        "owner_email": "owner@clean.example.com",
+    }
     defaults.update(kwargs)
     t = Tenant(**defaults)
     t.auto_create_schema = False

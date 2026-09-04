@@ -1333,9 +1333,11 @@ class BoxNowService:
 
                     seen_external_ids.add(external_id)
 
-                    locker, was_created = BoxNowLocker.objects.update_or_create(
-                        external_id=external_id,
-                        defaults=cls._locker_defaults_from_dest(dest),
+                    _locker, was_created = (
+                        BoxNowLocker.objects.update_or_create(
+                            external_id=external_id,
+                            defaults=cls._locker_defaults_from_dest(dest),
+                        )
                     )
                     if was_created:
                         created_count += 1

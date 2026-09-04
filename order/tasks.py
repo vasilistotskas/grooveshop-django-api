@@ -1220,12 +1220,10 @@ def generate_order_invoice(self, order_id: int) -> bool:
     try:
         invoice = generate_invoice(order)
     except Exception as e:
-        logger.error(
-            "Error generating invoice for order #%s: %s",
+        logger.exception(
+            "Error generating invoice for order #%s",
             order_id,
-            e,
             extra={"order_id": order_id, "error": str(e)},
-            exc_info=True,
         )
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
@@ -1392,12 +1390,10 @@ def send_invoice_email(self, order_id: int) -> bool:
         return False
 
     except Exception as e:
-        logger.error(
-            "Error sending invoice email for order #%s: %s",
+        logger.exception(
+            "Error sending invoice email for order #%s",
             order_id,
-            e,
             extra={"order_id": order_id, "error": str(e)},
-            exc_info=True,
         )
         if email_sent:
             # The message is already with the relay. Whatever failed
@@ -1554,12 +1550,10 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
     # preserves ``invoice_number`` + ``issue_date`` (no counter gap).
     try:
         generate_invoice(order, force=True)
-    except Exception as exc:
-        logger.error(
-            "Failed to re-render PDF with MARK for order #%s: %s",
+    except Exception:
+        logger.exception(
+            "Failed to re-render PDF with MARK for order #%s",
             order_id,
-            exc,
-            exc_info=True,
         )
 
     OrderHistory.log_note(
@@ -1739,10 +1733,9 @@ def check_pending_orders() -> int:
 
             count += 1
         except Exception:
-            logger.error(
+            logger.exception(
                 "Pending-order reminder failed for order %s",
                 order.id,
-                exc_info=True,
             )
 
     return count
@@ -1784,10 +1777,9 @@ def cleanup_expired_stock_reservations() -> int:
         return count
 
     except Exception as e:
-        logger.error(
-            f"Error cleaning up expired stock reservations: {e!s}",
+        logger.exception(
+            "Error cleaning up expired stock reservations",
             extra={"error": str(e)},
-            exc_info=True,
         )
         return 0
 
@@ -1890,13 +1882,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
                 "Auto-canceled: payment failed and not retried",
             ):
                 canceled_failed += 1
-        except Exception as e:
+        except Exception:
             errors += 1
-            logger.error(
-                "Auto-cancel (failed-payment) error for order %s: %s",
+            logger.exception(
+                "Auto-cancel (failed-payment) error for order %s",
                 order.id,
-                e,
-                exc_info=True,
             )
 
     for order in pending_qs.iterator():
@@ -1906,13 +1896,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
                 "Auto-canceled: payment never completed",
             ):
                 canceled_pending += 1
-        except Exception as e:
+        except Exception:
             errors += 1
-            logger.error(
-                "Auto-cancel (stale-pending) error for order %s: %s",
+            logger.exception(
+                "Auto-cancel (stale-pending) error for order %s",
                 order.id,
-                e,
-                exc_info=True,
             )
 
     total = canceled_failed + canceled_pending
@@ -2048,12 +2036,10 @@ def send_checkout_abandonment_emails() -> int:
                 abandonment_notified=True
             )
             sent += 1
-        except Exception as e:
-            logger.error(
-                "Error sending checkout-abandonment email for cart %s: %s",
+        except Exception:
+            logger.exception(
+                "Error sending checkout-abandonment email for cart %s",
                 cart.id,
-                e,
-                exc_info=True,
             )
 
     if sent:

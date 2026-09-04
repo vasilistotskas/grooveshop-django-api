@@ -570,7 +570,7 @@ class OrderService:
                 Money(_expected_total, _cart_total.currency),
             )
             _expected_total -= gift_plan.amount.amount
-            calculated_total_cents = int(round(_expected_total * 100))
+            calculated_total_cents = round(_expected_total * 100)
             # The Stripe provider returns amount already divided by 100
             # (see payment.py StripePaymentProvider.get_payment_status) and
             # also returns a currency code. Some providers/tests return a
@@ -579,7 +579,7 @@ class OrderService:
             expected_currency = settings.DEFAULT_CURRENCY.lower()
 
             if "amount" in payment_data and payment_data["amount"] is not None:
-                provider_amount_cents = int(round(payment_data["amount"] * 100))
+                provider_amount_cents = round(payment_data["amount"] * 100)
                 if provider_amount_cents != calculated_total_cents:
                     # Log the full input set that produced the mismatch so
                     # root-causing doesn't require re-running the checkout
@@ -923,11 +923,9 @@ class OrderService:
                 except ValidationError:
                     raise
                 except Exception as e:
-                    logger.error(
-                        "Failed to apply loyalty discount to order %s: %s",
+                    logger.exception(
+                        "Failed to apply loyalty discount to order %s",
                         order.id,
-                        e,
-                        exc_info=True,
                     )
                     # The PaymentIntent was verified WITH the loyalty
                     # discount (Step 2.6) — silently dropping it here
@@ -1020,10 +1018,8 @@ class OrderService:
         ):
             raise
         except Exception as e:
-            logger.error(
-                "Unexpected error creating order from cart: %s",
-                e,
-                exc_info=True,
+            logger.exception(
+                "Unexpected error creating order from cart",
             )
             raise InvalidOrderDataError(
                 _("Failed to create order: {error}").format(error=str(e))
@@ -1420,11 +1416,9 @@ class OrderService:
                 except ValidationError:
                     raise
                 except Exception as e:
-                    logger.error(
-                        "Failed to apply loyalty discount to order %s: %s",
+                    logger.exception(
+                        "Failed to apply loyalty discount to order %s",
                         order.id,
-                        e,
-                        exc_info=True,
                     )
                     # Fail loud, like the payment-first path. The offline
                     # providers (COD, Viva) have no amount guard, so
@@ -1568,10 +1562,8 @@ class OrderService:
         ):
             raise
         except Exception as e:
-            logger.error(
-                "Unexpected error creating order from cart (order-first): %s",
-                e,
-                exc_info=True,
+            logger.exception(
+                "Unexpected error creating order from cart (order-first)",
             )
             raise InvalidOrderDataError(
                 _("Failed to create order: {error}").format(error=str(e))
@@ -2183,12 +2175,10 @@ class OrderService:
                         quantity,
                         order.id,
                     )
-                except Exception as e:
-                    logger.error(
-                        "Failed to restore stock for product %s: %s",
+                except Exception:
+                    logger.exception(
+                        "Failed to restore stock for product %s",
                         product_id,
-                        e,
-                        exc_info=True,
                     )
                     # Continue with other products even if one fails
 
@@ -2269,12 +2259,10 @@ class OrderService:
                             ),
                             "message": "Order canceled but refund failed",
                         }
-                except Exception as refund_error:
-                    logger.error(
-                        "Error processing refund for canceled order %s: %s",
+                except Exception:
+                    logger.exception(
+                        "Error processing refund for canceled order %s",
                         order.id,
-                        refund_error,
-                        exc_info=True,
                     )
                     refund_info = {
                         "refunded": False,
@@ -2285,9 +2273,7 @@ class OrderService:
             return order, refund_info
 
         except Exception as e:
-            logger.error(
-                "Error canceling order %s: %s", order.id, e, exc_info=True
-            )
+            logger.exception("Error canceling order %s", order.id)
             raise OrderCancellationError(
                 order_id=order.id,
                 reason=_("Failed to cancel order: {error}").format(

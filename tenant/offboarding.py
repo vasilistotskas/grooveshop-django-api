@@ -42,6 +42,7 @@ import shutil
 from datetime import date
 
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +222,7 @@ def latest_invoice_year(schema_name: str) -> int | None:
             "records exist and retaining them",
             schema_name,
         )
-        return date.today().year
+        return timezone.localdate().year
     if latest is None:
         return None
     return latest.year

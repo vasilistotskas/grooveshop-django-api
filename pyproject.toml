@@ -331,8 +331,16 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # Tests assert, and pytest rewrites those asserts — 6527 of them.
-"tests/**" = ["S101"]
-"tests_mt/**" = ["S101"]
+# TRY002: a test that simulates "something arbitrary went wrong" raises
+#   `Exception` on purpose; a bespoke class would assert less, not more.
+# DJ008: `__str__` on the throwaway models declared inside
+#   test_manager_delegation.py to exercise manager delegation.
+# S110: the conftest deliberately swallows — it emulates
+#   `on_commit(..., robust=True)` and closes connections best-effort;
+#   each site already carries a `# pragma: no cover` saying so.
+# All four are 100% test-only — measured, not assumed.
+"tests/**" = ["S101", "TRY002", "DJ008", "S110"]
+"tests_mt/**" = ["S101", "TRY002", "DJ008", "S110"]
 
 [tool.ruff.lint.pylint]
 max-args = 6

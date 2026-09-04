@@ -12,6 +12,7 @@ from celery import shared_task
 from django.apps import apps
 from django.conf import settings
 
+from meili.exceptions import MeiliTaskFailed
 from tenant.celery import TenantTask
 
 logger = logging.getLogger(__name__)
@@ -134,7 +135,7 @@ def index_document_task(
         finished = _client.wait_for_task(task.task_uid, timeout_in_ms=5000)
 
         if finished.status == "failed":
-            raise Exception(f"Meilisearch indexing failed: {finished.error}")
+            raise MeiliTaskFailed(finished.error, operation="index")
 
         logger.info(f"Indexed {app_label}.{model_name} pk={pk} to {index_name}")
 
@@ -186,7 +187,7 @@ def delete_document_task(
                     f"Document {document_pk} not found in {index_name}"
                 )
                 return {"status": "skipped", "reason": "document_not_found"}
-            raise Exception(f"Meilisearch deletion failed: {finished.error}")
+            raise MeiliTaskFailed(finished.error, operation="delete")
 
         logger.info(f"Deleted document {document_pk} from {index_name}")
 
@@ -246,7 +247,7 @@ def reindex_model_task(
             task = _client.get_index(index_name).delete_all_documents()
             finished = _client.wait_for_task(task.task_uid)
             if finished.status == "failed":
-                raise Exception(f"Failed to clear index: {finished.error}")
+                raise MeiliTaskFailed(finished.error, operation="clear index")
             logger.info(f"Cleared index {index_name}")
 
         # Get queryset — force pk ordering so PostgreSQL slicing is

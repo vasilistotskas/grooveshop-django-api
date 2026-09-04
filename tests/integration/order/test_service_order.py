@@ -286,7 +286,7 @@ class OrderServiceTestCase(TestCase):
         )
 
         refund_amount = Money(amount=Decimal("25.00"), currency=test_currency)
-        success, response = OrderService.refund_order(
+        success, _response = OrderService.refund_order(
             order=order,
             amount=refund_amount,
             reason="Partial refund",

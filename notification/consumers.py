@@ -61,8 +61,8 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         except KeyError as e:
             logger.error(f"KeyError in connect: {e}")
             await self.close(code=4000)
-        except Exception as e:
-            logger.exception(f"Unexpected error in connect: {e}")
+        except Exception:
+            logger.exception("Unexpected error in connect")
             await self.close(code=4500)
 
     async def disconnect(self, code):

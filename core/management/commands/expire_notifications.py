@@ -66,7 +66,7 @@ class Command(TenantCommandMixin, BaseCommand):
                 )
                 return
 
-            deleted_count, deleted_details = expired_notifications.delete()
+            deleted_count, _deleted_details = expired_notifications.delete()
 
         self.stdout.write(
             self.style.SUCCESS(

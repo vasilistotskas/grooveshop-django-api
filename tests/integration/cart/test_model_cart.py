@@ -158,9 +158,14 @@ class CartModelTestCase(TestCase):
         self.cart.refresh_from_db(fields=["last_activity"])
         db_utc = self.cart.last_activity.utctimetuple()
         # Both must represent the same UTC second.
+        # Naive on purpose: both sides are rebuilt from UTC tuples and
+        # compared only against each other, so attaching a tzinfo would
+        # add nothing and obscure that they are already the same instant.
         self.assertEqual(
-            datetime.datetime(*in_memory_utc[:6]).replace(microsecond=0),
-            datetime.datetime(*db_utc[:6]).replace(microsecond=0),
+            datetime.datetime(*in_memory_utc[:6]).replace(  # noqa: DTZ001
+                microsecond=0
+            ),
+            datetime.datetime(*db_utc[:6]).replace(microsecond=0),  # noqa: DTZ001
         )
 
     def test_refresh_last_activity_does_not_fire_save_signals(self):

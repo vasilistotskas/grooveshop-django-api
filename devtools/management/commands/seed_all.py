@@ -909,10 +909,9 @@ class Command(BaseCommand):
 
         from devtools.factories import SeedingStrategyRegistry
 
-        if SeedingStrategyRegistry.has_strategy(factory_class.__name__):
-            return True
-
-        return False
+        return bool(
+            SeedingStrategyRegistry.has_strategy(factory_class.__name__)
+        )
 
     def _execute_custom_seeding(
         self,
@@ -1087,7 +1086,10 @@ class Command(BaseCommand):
 
         logger.error(
             "Fatal seeding error",
-            exc_info=True,
+            # The exception is passed in, so name it rather than relying
+            # on sys.exc_info(): this helper is called from the handler,
+            # but nothing in its signature says it has to be.
+            exc_info=error,
             extra={
                 "session_duration": time.time() - self.session_start_time
                 if self.session_start_time

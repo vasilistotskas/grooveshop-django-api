@@ -812,10 +812,8 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        except Exception as e:
-            logger.error(
-                "Unexpected error creating order: %s", e, exc_info=True
-            )
+        except Exception:
+            logger.exception("Unexpected error creating order")
             return Response(
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1641,8 +1639,8 @@ class OrderViewSet(BaseModelViewSet):
             raise ValidationError(
                 {"detail": _("Unable to cancel this order.")}
             ) from e
-        except Exception as e:
-            logger.error("Error canceling order: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Error canceling order")
             return Response(
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1968,10 +1966,8 @@ class OrderViewSet(BaseModelViewSet):
             )
             return Response(response_serializer.data)
 
-        except Exception as e:
-            logger.error(
-                "Error adding tracking information: %s", e, exc_info=True
-            )
+        except Exception:
+            logger.exception("Error adding tracking information")
             return Response(
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -2022,8 +2018,8 @@ class OrderViewSet(BaseModelViewSet):
                     )
                 }
             ) from e
-        except Exception as e:
-            logger.error("Error updating order status: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Error updating order status")
             return Response(
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -2057,12 +2053,10 @@ class OrderViewSet(BaseModelViewSet):
                 {"detail": _("Unable to retrieve payment status.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        except Exception as e:
-            logger.error(
-                "Error getting payment status for order %s: %s",
+        except Exception:
+            logger.exception(
+                "Error getting payment status for order %s",
                 order.id,
-                e,
-                exc_info=True,
             )
             return Response(
                 {

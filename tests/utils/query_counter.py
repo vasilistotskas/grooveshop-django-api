@@ -25,6 +25,7 @@ Usage:
 from collections.abc import Callable
 from contextlib import contextmanager
 from functools import wraps
+from typing import Self
 
 from django.db import connection, reset_queries
 from django.test.utils import CaptureQueriesContext
@@ -71,7 +72,7 @@ class QueryCountAssertion:
         self.queries: list = []
         self._context: CaptureQueriesContext | None = None
 
-    def __enter__(self) -> QueryCountAssertion:
+    def __enter__(self) -> Self:
         reset_queries()
         self._context = CaptureQueriesContext(connection)
         self._context.__enter__()
@@ -93,8 +94,10 @@ class QueryCountAssertion:
     def _build_error_message(self) -> str:
         """Build a detailed error message for assertion failures."""
         parts = [
-            f"Expected at most {self.max_queries} queries, "
-            f"but {self.count} were executed."
+            (
+                f"Expected at most {self.max_queries} queries, "
+                f"but {self.count} were executed."
+            )
         ]
 
         if self.fail_message:

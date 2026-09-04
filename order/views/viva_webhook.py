@@ -384,12 +384,8 @@ def _verify_transaction(transaction_id):
             data.get("raw_status") if isinstance(data, dict) else None,
         )
         return status, data
-    except Exception as exc:
-        logger.exception(
-            "_verify_transaction: FAILED for %s | error=%s",
-            transaction_id,
-            exc,
-        )
+    except Exception:
+        logger.exception("_verify_transaction: FAILED for %s", transaction_id)
         return None, {}
 
 
@@ -976,12 +972,10 @@ def _process_gift_card_purchase_event(
                     status_id=event_data.get("StatusId", "") or "",
                     outcome=outcome,
                 )
-    except Exception as exc:
-        logger.error(
-            "Viva gift-card webhook processing failed for purchase %s: %s",
+    except Exception:
+        logger.exception(
+            "Viva gift-card webhook processing failed for purchase %s",
             purchase.uuid,
-            exc,
-            exc_info=True,
         )
         return JsonResponse({"error": "processing failed"}, status=500)
 

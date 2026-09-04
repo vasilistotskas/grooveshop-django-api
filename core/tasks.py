@@ -21,6 +21,7 @@ from extra_settings.models import Setting
 
 from cart.models import Cart
 from core import celery_app
+from core.exceptions import HealthCheckFailed, ManagementCommandFailed
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_user_language
 from tenant.celery import TenantTask
@@ -399,11 +400,9 @@ def clear_development_log_files_task(days=7):
                 continue
 
             should_cleanup = (
-                filename.endswith(".log")
+                filename.endswith((".log", ".bak", ".old"))
                 or ".log." in filename
                 or "backup" in filename.lower()
-                or filename.endswith(".bak")
-                or filename.endswith(".old")
             )
 
             if not should_cleanup:
@@ -430,8 +429,8 @@ def clear_development_log_files_task(days=7):
                 logger.error(f"Error processing file {filename}: {e}")
                 errors.append({"file": filename, "error": str(e)})
 
-    except OSError as e:
-        logger.exception(f"Error accessing logs directory: {e}")
+    except OSError:
+        logger.exception("Error accessing logs directory")
         raise
 
     message = f"Deleted {len(deleted_files)} development log files older than {days} days"
@@ -618,7 +617,7 @@ def monitor_system_health():
             health_checks["cache"] = True
             logger.debug("Cache health check passed")
         else:
-            raise Exception("Cache read/write test failed")
+            raise HealthCheckFailed("cache", "read/write test failed")
 
     except Exception as e:
         error_msg = f"Cache health check failed: {e}"
@@ -681,7 +680,9 @@ def monitor_system_health():
     logger.info("System health check completed", extra=result)
 
     if not critical_passed:
-        raise Exception("Critical system health check failed")
+        raise HealthCheckFailed(
+            "system", "a critical component reported unhealthy"
+        )
 
     return result
 
@@ -970,8 +971,7 @@ def sync_meilisearch_indexes():
             "timestamp": timezone.now().isoformat(),
         }
     except SystemExit as e:
-        logger.error(f"Meilisearch sync command exited with code: {e.code}")
-        raise Exception(f"Command exited with code {e.code}")
+        raise ManagementCommandFailed("meilisearch sync", e.code) from e
     except management.CommandError as e:
         logger.error(f"Django command error in sync_meilisearch_indexes: {e}")
         raise

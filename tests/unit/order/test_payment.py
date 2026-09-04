@@ -324,7 +324,7 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         order_uuid = "550e8400-e29b-41d4-a716-446655440000"
 
         # Execute with order_uuid
-        success, payment_data = provider.process_payment(
+        success, _payment_data = provider.process_payment(
             amount, order_id, order_uuid=order_uuid
         )
 
@@ -369,7 +369,7 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         order_id = "12345"
 
         # Execute without order_uuid
-        success, payment_data = provider.process_payment(amount, order_id)
+        success, _payment_data = provider.process_payment(amount, order_id)
 
         # Verify success
         self.assertTrue(success)
@@ -408,7 +408,7 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         order_id = "12345"
 
         # Execute with cart_item_ids as string
-        success, payment_data = provider.process_payment(
+        _success, _payment_data = provider.process_payment(
             amount, order_id, cart_item_ids="101,102,103"
         )
 
@@ -449,7 +449,7 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         order_id = "12345"
 
         # Execute without optional metadata
-        success, payment_data = provider.process_payment(amount, order_id)
+        success, _payment_data = provider.process_payment(amount, order_id)
 
         # Verify success
         self.assertTrue(success)
@@ -496,7 +496,7 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         order_uuid = "550e8400-e29b-41d4-a716-446655440000"
 
         # Execute with all parameters
-        success, payment_data = provider.process_payment(
+        success, _payment_data = provider.process_payment(
             amount,
             order_id,
             order_uuid=order_uuid,
@@ -554,7 +554,7 @@ class StripePaymentIntentMetadataTestCase(TestCase):
         order_id = "12345"
 
         # Execute with empty cart_item_ids list
-        success, payment_data = provider.process_payment(
+        success, _payment_data = provider.process_payment(
             amount, order_id, cart_item_ids=[]
         )
 

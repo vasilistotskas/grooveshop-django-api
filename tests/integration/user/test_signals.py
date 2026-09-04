@@ -50,7 +50,7 @@ class CreateDefaultSubscriptionsSignalTest(TransactionTestCase):
         subscriptions = UserSubscription.objects.filter(user=user)
         self.assertEqual(subscriptions.count(), 3)
 
-        subscribed_topics = set(sub.topic for sub in subscriptions)
+        subscribed_topics = {sub.topic for sub in subscriptions}
         expected_topics = set(self.default_topics)
         self.assertEqual(subscribed_topics, expected_topics)
 

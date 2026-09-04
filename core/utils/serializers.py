@@ -25,7 +25,7 @@ class TranslatedFieldExtended(TranslatedFieldsField):
         """Convert null values to empty strings in translations."""
         result = super().to_representation(value)
         if isinstance(result, dict):
-            for lang_code, fields in result.items():
+            for fields in result.values():
                 if isinstance(fields, dict):
                     for field_name, field_value in fields.items():
                         if field_value is None:

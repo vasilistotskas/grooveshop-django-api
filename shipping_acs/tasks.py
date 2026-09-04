@@ -290,10 +290,8 @@ def _alert_unprinted_vouchers(
         # Never let a mail failure mask the underlying problem: the
         # caller still raises, and the ERROR log already carries the
         # vouchers.
-        logger.error(
-            "ACS unprinted-voucher alert: failed to send email: %s",
-            exc,
-            exc_info=True,
+        logger.exception(
+            "ACS unprinted-voucher alert: failed to send email",
         )
         return {"alerted": 0, "error": str(exc)}
 
@@ -645,10 +643,8 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             html_message=html_content,
         )
     except Exception as exc:
-        logger.error(
-            "check_stale_acs_shipments: failed to send alert email: %s",
-            exc,
-            exc_info=True,
+        logger.exception(
+            "check_stale_acs_shipments: failed to send alert email",
         )
         AcsShipment.objects.filter(id__in=shipment_ids).update(
             stale_alert_sent=False

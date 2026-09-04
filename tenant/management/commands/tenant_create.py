@@ -194,7 +194,7 @@ class Command(BaseCommand):
             )
             return
 
-        membership, created = result
+        _membership, created = result
         verb = "Created" if created else "Updated"
         self.stdout.write(
             f"  {verb} OWNER membership for {owner_email} on "

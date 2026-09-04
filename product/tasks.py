@@ -316,10 +316,8 @@ def check_low_stock_products() -> dict:
         msg.attach_alternative(html_content, "text/html")
         msg.send()
     except Exception as e:
-        logger.error(
-            "check_low_stock_products: failed to send alert email: %s",
-            e,
-            exc_info=True,
+        logger.exception(
+            "check_low_stock_products: failed to send alert email",
         )
         # Release the claim so the next run can retry the send.
         Product.objects.filter(id__in=product_ids).update(
@@ -400,12 +398,10 @@ def _send_product_alert_email(
         msg.attach_alternative(html_content, "text/html")
         msg.send()
         return True
-    except Exception as exc:
-        logger.error(
-            "Failed to send product alert email to %s: %s",
+    except Exception:
+        logger.exception(
+            "Failed to send product alert email to %s",
             recipient,
-            exc,
-            exc_info=True,
         )
         return False
 

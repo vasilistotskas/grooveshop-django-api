@@ -26,10 +26,13 @@ Design rules:
 
 from __future__ import annotations
 
+import logging
 from typing import TypedDict
 
 from django.conf import settings
 from django.db import connection
+
+logger = logging.getLogger(__name__)
 
 
 class VivaWalletCredentials(TypedDict):
@@ -127,8 +130,12 @@ def tenant_contact_email() -> str:
         setting_value = Setting.get("CONTACT_EMAIL", default="") or ""
         if setting_value:
             return setting_value
-    except Exception:  # pragma: no cover — extra_settings not installed
-        pass
+    except ImportError:  # extra_settings not installed
+        # Narrowed from `Exception`: the comment always said this guards
+        # a missing optional app, but as written it also hid a database
+        # failure — and this function's answer decides the From address on
+        # every outbound email.
+        logger.debug("extra_settings not installed — using INFO_EMAIL")
     return getattr(settings, "INFO_EMAIL", "") or ""
 
 

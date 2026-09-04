@@ -114,8 +114,8 @@ settings.CACHES = {
 # per-worker test databases) leak between workers and produce
 # order-dependent flakes. The teardown clear below deletes only this
 # worker's namespace so it never FLUSHDBs another worker's live keys.
-CACHE_WORKER_PREFIX = "test_%s" % os.environ.get(
-    "PYTEST_XDIST_WORKER", "master"
+CACHE_WORKER_PREFIX = "test_{}".format(
+    os.environ.get("PYTEST_XDIST_WORKER", "master")
 )
 caches["default"].key_prefix = CACHE_WORKER_PREFIX
 

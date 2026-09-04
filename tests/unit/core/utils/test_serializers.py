@@ -131,7 +131,7 @@ class TestCreateSchemaViewConfig(TestCase):
         assert "partial_update" in config
         assert "destroy" in config
 
-        for _operation_name, decorator in config.items():
+        for decorator in config.values():
             assert callable(decorator)
             assert hasattr(decorator, "__name__")
 

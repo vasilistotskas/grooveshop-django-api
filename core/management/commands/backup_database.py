@@ -155,8 +155,8 @@ class Command(BaseCommand):
             )
             pg_dump.stdout.close()
 
-            gzip_output, gzip_error = gzip_process.communicate()
-            pg_dump_output, pg_dump_error = pg_dump.communicate()
+            _gzip_output, gzip_error = gzip_process.communicate()
+            _pg_dump_output, pg_dump_error = pg_dump.communicate()
 
             if pg_dump.returncode != 0:
                 error_msg = pg_dump_error.decode("utf-8", errors="replace")

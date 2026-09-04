@@ -173,7 +173,7 @@ class EmailTemplateConfig:
         if template_name in cls.TEMPLATES:
             config = cls.TEMPLATES[template_name]
             # Find category by name
-            for category_key, category in cls.CATEGORIES.items():
+            for category in cls.CATEGORIES.values():
                 if category.name == config.category_name:
                     return category.path if category.path else None
 

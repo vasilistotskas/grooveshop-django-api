@@ -113,7 +113,7 @@ def postprocess_schema_parameters_to_accept_strings(
                     schema_dict["parameters"]
                 )
 
-            for key, value in schema_dict.items():
+            for value in schema_dict.values():
                 if isinstance(value, (dict, list)):
                     process_schema_recursive(value)
         elif isinstance(schema_dict, list):

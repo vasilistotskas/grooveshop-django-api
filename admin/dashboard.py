@@ -938,7 +938,7 @@ def _zone_c_queues(Order, ProductReview, Contact, ReviewStatus) -> dict:
                 "user_label": (
                     review.user.email if review.user else str(_("Anonymous"))
                 )[:25],
-                "rate": max(0, min(10, int(round(float(review.rate or 0))))),
+                "rate": max(0, min(10, round(float(review.rate or 0)))),
                 "created_at": review.created_at,
             }
         )

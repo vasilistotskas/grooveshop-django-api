@@ -3,6 +3,8 @@ import logging
 from django.apps import AppConfig
 from django.db import transaction
 
+from meili.exceptions import MeiliTaskFailed
+
 logger = logging.getLogger(__name__)
 
 
@@ -92,7 +94,9 @@ class MeiliConfig(AppConfig):
                                 f"Failed to index {model._meta.label} "
                                 f"pk={model.pk}: {finished.error}"
                             )
-                            raise Exception(finished.error)
+                            raise MeiliTaskFailed(
+                                finished.error, operation="index"
+                            )
                 except Exception as e:
                     logger.error(
                         f"Error indexing {model._meta.label} pk={model.pk}: {e}"
@@ -163,7 +167,9 @@ class MeiliConfig(AppConfig):
                                 f"Failed to delete {model._meta.label} "
                                 f"pk={model.pk}: {finished.error}"
                             )
-                            raise Exception(finished.error)
+                            raise MeiliTaskFailed(
+                                finished.error, operation="index"
+                            )
                 except Exception as e:
                     logger.error(
                         f"Error deleting {model._meta.label} pk={model.pk}: {e}"

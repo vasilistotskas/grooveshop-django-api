@@ -15,6 +15,7 @@ from meilisearch.models.task import Task, TaskInfo
 
 from meili._client import client as _client
 from meili.dataclasses import MeiliIndexSettings
+from meili.exceptions import MeiliSettingsError
 from meili.querysets import IndexQuerySet
 
 logger = logging.getLogger(__name__)
@@ -199,7 +200,7 @@ class IndexMixin(models.Model):
                 if task_uid:
                     finished = _client.wait_for_task(task_uid)
                     if finished.status == "failed":
-                        raise Exception(
+                        raise MeiliSettingsError(
                             f"Failed to update settings: {finished.error}"
                         )
             _client.flush_tasks()
@@ -260,7 +261,13 @@ class IndexMixin(models.Model):
                 objtype = type(obj)
             return IndexQuerySet(objtype)
 
-    meilisearch = _MeilisearchDescriptor()
+    # noqa: PIE794 is deliberate. The class also carries a bare
+    # `meilisearch: IndexQuerySet` annotation near the top so type
+    # checkers know what attribute access yields; that annotation binds
+    # no value at runtime. PIE794 reads the pair as a duplicate field
+    # and its fix deletes THIS line — the one that actually installs the
+    # descriptor — which silently removes `Model.meilisearch` entirely.
+    meilisearch = _MeilisearchDescriptor()  # noqa: PIE794
 
     @classmethod
     def get_meilisearch_queryset(cls):

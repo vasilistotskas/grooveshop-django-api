@@ -13,6 +13,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from cart.models import Cart
+from core.exceptions import HealthCheckFailed
 from core.tasks import (
     MonitoredTask,
     backup_database_task,
@@ -386,9 +387,7 @@ class TestClearLogFilesTask:
         }.get(key, default)
 
         def mock_exists_side_effect(path):
-            if path == "/.dockerenv" or path == self.logs_path:
-                return True
-            return False
+            return bool(path == "/.dockerenv" or path == self.logs_path)
 
         mock_exists.side_effect = mock_exists_side_effect
         mock_join.return_value = self.logs_path
@@ -500,9 +499,7 @@ class TestClearLogFilesTask:
         }.get(key, default)
 
         def mock_exists_side_effect(path):
-            if path == "/.dockerenv" or path == self.logs_path:
-                return True
-            return False
+            return bool(path == "/.dockerenv" or path == self.logs_path)
 
         mock_exists.side_effect = mock_exists_side_effect
         mock_join.return_value = self.logs_path
@@ -737,8 +734,11 @@ class TestMonitorSystemHealthTask:
         mock_cache.set.return_value = None
         mock_cache.get.return_value = "ok"
 
+        # Assert the TYPE, not a message substring: the point is that a
+        # failed dependency is distinguishable from a bug in the task,
+        # which `autoretry_for=(Exception,)` could not tell apart before.
         with pytest.raises(
-            Exception, match="Critical system health check failed"
+            HealthCheckFailed, match="a critical component reported unhealthy"
         ):
             monitor_system_health()
 

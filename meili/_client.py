@@ -7,6 +7,7 @@ from meilisearch.task import TaskInfo
 
 from meili._settings import _MeiliSettings
 from meili.dataclasses import MeiliIndexSettings
+from meili.exceptions import MeiliTaskFailed
 
 
 class Client:
@@ -257,7 +258,7 @@ class Client:
 
             task = self.client.wait_for_task(uid)
             if task.status == "failed":
-                raise Exception(task.error)
+                raise MeiliTaskFailed(task.error, operation="wait_for_task")
         return task
 
 

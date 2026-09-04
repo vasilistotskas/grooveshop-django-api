@@ -114,9 +114,7 @@ class BlogAuthorWriteSerializer(
         )
 
     def validate_website(self, value: str) -> str:
-        if value and not (
-            value.startswith("http://") or value.startswith("https://")
-        ):
+        if value and not (value.startswith(("http://", "https://"))):
             raise serializers.ValidationError(
                 _("Website must start with http:// or https://")
             )

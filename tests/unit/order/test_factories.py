@@ -206,7 +206,7 @@ class TestOrderFactories(TestCase):
             OrderFactory.create_refunded_order()
 
             mock_method.assert_called_once()
-            args, kwargs = mock_method.call_args
+            _args, kwargs = mock_method.call_args
             self.assertEqual(kwargs.get("status"), OrderStatus.REFUNDED)
             self.assertEqual(
                 kwargs.get("payment_status"), PaymentStatus.REFUNDED

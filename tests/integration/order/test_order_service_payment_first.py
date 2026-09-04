@@ -716,7 +716,7 @@ class TestCancelOrderWithStockManager:
         initial_stock = product.stock
 
         # Execute
-        canceled_order, refund_info = OrderService.cancel_order(
+        canceled_order, _refund_info = OrderService.cancel_order(
             order=order,
             reason="Customer request",
             refund_payment=False,  # Skip payment refund for this test

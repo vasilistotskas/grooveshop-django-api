@@ -132,7 +132,7 @@ class CartService:
         user = self.request.user
 
         if user.is_authenticated:
-            cart, created = Cart.objects.get_or_create(user=user)
+            cart, _created = Cart.objects.get_or_create(user=user)
 
             if self.cart_id:
                 guest_cart = (

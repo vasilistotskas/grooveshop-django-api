@@ -105,7 +105,7 @@ class TestNoLeakedTemplateComments:
                 for path in root.rglob(pattern):
                     text = path.read_text(encoding="utf-8")
                     for lineno, line in enumerate(text.splitlines(), 1):
-                        head, sep, tail = line.partition("{#")
+                        _head, sep, tail = line.partition("{#")
                         if sep and "#}" not in tail:
                             offenders.append(
                                 f"{path.relative_to(root)}:{lineno}"

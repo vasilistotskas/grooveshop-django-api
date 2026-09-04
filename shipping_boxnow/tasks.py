@@ -244,9 +244,8 @@ def process_boxnow_webhook_event(
 
         message_id = str(envelope.get("id", "<unknown>"))
         logger.exception(
-            "BoxNow webhook apply failed for message %s: %s",
+            "BoxNow webhook apply failed for message %s",
             message_id,
-            exc,
         )
         alert_admins_webhook_processing_failed(
             carrier="BoxNow", message_id=message_id, error=str(exc)

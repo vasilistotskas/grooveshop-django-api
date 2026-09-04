@@ -76,7 +76,7 @@ class Command(TenantCommandMixin, BaseCommand):
                     f"Unknown index: {index_name}\n\nAvailable indexes:\n"
                 )
             )
-            for idx_name in self.AVAILABLE_INDEXES.keys():
+            for idx_name in self.AVAILABLE_INDEXES:
                 self.stdout.write(f"  - {idx_name}")
             return
 
@@ -163,7 +163,7 @@ class Command(TenantCommandMixin, BaseCommand):
                     )
                     continue
 
-                field, direction = parts
+                _field, direction = parts
                 if direction not in ["asc", "desc"]:
                     errors.append(
                         f"Invalid sort direction in rule: {rule}. "

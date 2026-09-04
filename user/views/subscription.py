@@ -458,8 +458,8 @@ class UserSubscriptionViewSet(BaseModelViewSet):
                 subscription, context=self.get_serializer_context()
             )
             return Response(response_serializer.data)
-        except Exception as e:
-            logger.error("Error confirming subscription: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Error confirming subscription")
             return Response(
                 {
                     "detail": _(

@@ -78,7 +78,7 @@ class Command(TenantCommandMixin, BaseCommand):
                     f"Unknown index: {index_name}\n\nAvailable indexes:\n"
                 )
             )
-            for idx_name in self.AVAILABLE_INDEXES.keys():
+            for idx_name in self.AVAILABLE_INDEXES:
                 self.stdout.write(f"  - {idx_name}")
             return
 

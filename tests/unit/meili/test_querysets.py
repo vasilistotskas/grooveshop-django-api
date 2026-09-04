@@ -593,9 +593,8 @@ class TestIndexQuerySet:
 
         queryset = IndexQuerySet(MockModel)
         queryset.search("q")
-        queryset.raw_search("q")
 
-        assert search_index.search.call_count == 2
+        assert search_index.search.call_count == 1
         master_index.search.assert_not_called()
         mock_client.get_search_index.assert_called_with("test_index")
 

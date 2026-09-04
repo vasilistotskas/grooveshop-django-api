@@ -39,22 +39,6 @@ class CategoryImageQuerySet(TranslatableOptimizedQuerySet):
             active=True,
         ).first()
 
-    def get_banner_image(self, category):
-        """Get the banner image for a category."""
-        return self.filter(
-            category=category,
-            image_type=CategoryImageTypeEnum.BANNER,
-            active=True,
-        ).first()
-
-    def get_icon_image(self, category):
-        """Get the icon image for a category."""
-        return self.filter(
-            category=category,
-            image_type=CategoryImageTypeEnum.ICON,
-            active=True,
-        ).first()
-
     def get_image_by_type(self, category, image_type: CategoryImageTypeEnum):
         """Get an image by category and type."""
         return self.filter(

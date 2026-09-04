@@ -93,13 +93,5 @@ class ProductCategoryImage(
         return cls.objects.get_main_image(category)
 
     @classmethod
-    def get_banner_image(cls, category):
-        return cls.objects.get_banner_image(category)
-
-    @classmethod
-    def get_icon_image(cls, category):
-        return cls.objects.get_icon_image(category)
-
-    @classmethod
     def get_image_by_type(cls, category, image_type: CategoryImageTypeEnum):
         return cls.objects.get_image_by_type(category, image_type)

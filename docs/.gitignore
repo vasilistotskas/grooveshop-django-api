@@ -1,0 +1,5 @@
+# Vendor manuals, API dumps and screenshots stay local; only Markdown is versioned.
+*
+!*/
+!*.md
+!.gitignore

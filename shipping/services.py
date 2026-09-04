@@ -9,6 +9,7 @@ DB-backed ``ShippingProvider`` row + the in-memory carrier registry.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from django.conf import settings
@@ -196,7 +197,7 @@ class ShippingService:
         cls,
         order: Order,
         *,
-        context: dict | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> dict | None:
         """Return the adapter's detail-serializer dict for ``order``."""
         adapter = cls.adapter_for_order(order)

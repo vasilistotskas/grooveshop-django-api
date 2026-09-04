@@ -52,7 +52,7 @@ class CartService:
         # Guest carts are addressed by their unguessable UUID, never the
         # sequential PK — otherwise any anonymous caller can enumerate other
         # guests' carts by incrementing an integer header (IDOR). Reject
-        # anything that is not a valid UUID (M18 in MULTI_TENANT_AUDIT.md).
+        # anything that is not a valid UUID.
         self.cart_id: uuid.UUID | None = None
         if raw_cart_id:
             try:
@@ -229,8 +229,8 @@ class CartService:
 
         Authenticated users may only fetch their own cart. Anonymous
         callers may only fetch the guest cart bound to the X-Cart-Id
-        header captured during ``_extract_cart_info`` (see C11 + M18
-        in MULTI_TENANT_AUDIT.md). The lookup uses the public UUID
+        header captured during ``_extract_cart_info``. The lookup uses
+        the public UUID
         rather than the integer PK so the namespace is not enumerable.
         """
         try:

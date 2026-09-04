@@ -15,8 +15,8 @@ class TenantTask(Task):
     Schema resolution at enqueue time prefers an explicit
     ``_schema_name`` header from the caller (so cross-schema
     on_commit and fanout paths can pin the value) and falls back to
-    the thread-local ``connection.schema_name`` (H8 in
-    MULTI_TENANT_AUDIT.md). Without the explicit hand-off, dispatchers
+    the thread-local ``connection.schema_name``. Without the
+    explicit hand-off, dispatchers
     fired from worker callbacks or management commands stamp
     ``'public'`` and the worker runs against the wrong schema.
     """

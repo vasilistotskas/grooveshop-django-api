@@ -114,7 +114,7 @@ class NavigationMenuAdminViewSet(BaseModelViewSet):
 
 class PageLayoutAdminViewSet(BaseModelViewSet):
     queryset = PageLayout.objects.prefetch_related("sections")
-    # H22 (MULTI_TENANT_AUDIT.md): a platform-staff user must not be
+    # A platform-staff user must not be
     # able to mutate ANOTHER tenant's layout. The original fix paired
     # ``IsAdminUser`` with ``HasTenantAccess``, which was unsound on an
     # API request (the membership lookup compared primary keys ACROSS

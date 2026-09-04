@@ -46,7 +46,8 @@ atlassian-ide-plugin.xml
 *$py.class
 
 # Distribution / packaging
-.Python build/
+.Python
+build/
 develop-eggs/
 dist/
 downloads/
@@ -144,7 +145,6 @@ NOTES.MD
 .cursorrules
 .windsurfrules
 .kiro
-/docs/
 .claude/settings.local.json
 /mediafiles_private/
 

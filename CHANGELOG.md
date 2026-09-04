@@ -3,6 +3,137 @@
 
 
 
+## v3.28.2 (2026-09-04)
+
+### Bug fixes
+
+* fix(meili): meilisearch_inspect_index --help crashed on a lazy translation
+
+The command was the only one passing gettext_lazy proxies as argparse help/description; argparse's text filler calls re.sub on the description and raised TypeError. Use eager gettext like its siblings.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`6aa1c4b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/6aa1c4b46b542c69a07e47d6a8facfd99e9717cb))
+
+* fix(settings): silence the security.W003 false positive
+
+The check string-matches django.middleware.csrf.CsrfViewMiddleware and cannot see that tenant.middleware.TenantCsrfMiddleware subclasses it.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`5790d37`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5790d37cfb76bfa1917178d48bed0be8e30e7357))
+
+### Chores
+
+* chore(ci): run semantic-release from the locked environment
+
+uvx resolved python-semantic-release's transitive dependencies outside
+uv.lock at workflow time, which is the same exposure the inline step
+was introduced to remove (GitPython 3.1.60 broke PSR 10.x that way in
+2026-08). PSR is already a dev dependency, so run it with
+`uv run --locked --only-group dev`: every transitive pin comes from
+uv.lock, --locked refuses a stale lock, and --only-group dev keeps the
+runtime dependencies out of the release job. Verified locally with a
+--noop run from a fresh environment (74 packages, PSR starts).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`a7c3b5b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a7c3b5b3cb27f3fc9570b2385cab206171a29c22))
+
+* chore(deps): bump runtime and dev dependencies after changelog review
+
+Every bump was checked against its release notes before pinning: gunicorn 26.2.0 (HTTP/2 header-policy security fix, ASGI cancellation fix), daphne 4.2.2/4.2.3 (WebSocket message-size DoS and header-injection fixes), django-allauth 65.19.2 (TOTP enrolment rate limit, headless non-object JSON 500), psycopg 3.3.5, pytest 9.1.1, pytest-django 4.14.0, pytest-asyncio 1.4.0 (no event_loop_policy override in the suite), coverage 7.16.0, django-debug-toolbar 8.0.0 (shadow DOM; the configured panels still exist and manage.py check passes with the toolbar enabled), django-stubs 6.0.9 with djangorestframework-stubs 3.18.0 (3.18.1 requires django-stubs 6.1, which targets Django 6.1), and the transitive set within declared constraints including redis 6.4 (kombu allows <6.5; no charset/errors/ssl arguments are used) and stripe 15.6.1.
+
+The pyasn1 CVE override is dropped because nothing depends on pyasn1 any more. djangorestframework-stubs 3.18 types the serializer context as a read-only Mapping, so the shipping adapters' serialize_shipment accept Mapping and TranslationsModelViewSet builds a new context dict instead of mutating the parent's.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`c402d6e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c402d6e529f3682aeac155a4e48cc311fd5169d7))
+
+* chore(docs): retire the superseded multi-tenant audit document
+
+docs/MULTI_TENANT_AUDIT.md declared itself superseded and kept for history only, which the repo rules do not allow. The 34 code and test comments that cited its finding IDs now state the invariant they protect instead, and the five cart X-Cart-Id descriptions that leaked the citation into the public OpenAPI schema are regenerated.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`131c2e3`](https://github.com/vasilistotskas/grooveshop-django-api/commit/131c2e36add7da7fb84283542905a5ac0f3b556b))
+
+* chore(tooling): run ruff from the locked environment in pre-commit, align dev image pins
+
+The remote ruff hook was pinned four minor versions behind the project's ruff and the pre-push coverage hook ran 'coverage run' with no target. Both ruff hooks now run through uv so they can never drift from uv.lock; pre-commit-hooks moves to v6.0.0; the interpreter comes from .python-version. dev.Dockerfile catches up with Dockerfile and CI on the Python and uv pins. The two end-of-file newline fixes are from the first full pre-commit run.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`cc8246a`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cc8246a657af904b6175c560ac73a6d2082abac2))
+
+* chore(repo): remove one-off scripts and a stray msgfmt temp file
+
+scripts/ held a spent tenant-cutover SQL script (its documented create_tenant command no longer exists) and two one-off .po fillers with no caller anywhere in the repo. The .mo.k4lPnI file is an msgfmt temp artefact committed by accident.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`42e9f14`](https://github.com/vasilistotskas/grooveshop-django-api/commit/42e9f14bd07281cf2a65a6a63436d1f659a4fe87))
+
+* chore(deps): drop unused direct pins, the dist build and the GitPython workaround
+
+python-semantic-release 10.6.2 fixed the GitPython 3.1.60 crash (#1476), so the release job no longer pins gitpython alongside it and the dev group drops its own gitpython pin. The release also stops building and uploading sdist/wheel assets: nothing consumes them (the Docker workflow triggers on the release event), the project is a deployed application, and without a build there is no setup.py, setuptools package config or types-setuptools to keep. The two v7-era keys upload_to_pypi/upload_to_release were silently ignored by PSR 10 and are gone; changelog_file moves under default_templates as the deprecation warning asks.
+
+Direct pins of purely transitive packages are removed (asgiref, charset_normalizer, cryptography, importlib-resources, pyjwt, twisted): none is imported by this codebase, the twisted CVE floor already lives in [tool.uv] override-dependencies, and the lockfile keeps every resolved version unchanged.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`5d5b831`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5d5b83153001dfd0dbe94b1097bfd96edd43ed2c))
+
+* chore(deps): sync uv.lock to 3.28.1 [skip ci] ([`42eea09`](https://github.com/vasilistotskas/grooveshop-django-api/commit/42eea09e0d7b7a84dea8c057379130a8d91e2e89))
+
+### Documentation
+
+* docs(migrations): CREATE INDEX takes SHARE, build large indexes concurrently
+
+The note said a plain index build holds ACCESS EXCLUSIVE; PostgreSQL
+takes a SHARE lock (reads continue, writes block for the build). Same
+conclusion, correct reason, and the recommended tool is now
+AddIndexConcurrently / RemoveIndexConcurrently on a non-atomic
+migration, with the raw-SQL form carrying reverse_sql and
+state_operations when it is unavoidable.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`3dd9bb6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3dd9bb604c1a3290fdcbe6ec8aa9607e3e0d2f9d))
+
+* docs: correct stale README/CLAUDE.md claims and version the docs/ markdown
+
+README and CLAUDE.md described a WSGI deployment, three Meilisearch commands that do not exist, a Meilisearch image two majors behind CI, a 50% coverage floor (actual 70%), a 3-stage CI pipeline (actual seven jobs), the removed ?access_token WebSocket auth and an app list missing ten apps. The root .gitignore ignored all of docs/ while five docs were tracked, leaving docs/migrations.md and the README-linked command reference unversioned; a docs/.gitignore now keeps vendor manuals local and versions markdown only. The command reference is rewritten from the real commands' arguments.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`1b5592c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1b5592ce4a4dc78a2cd716f6b085dda7b57d6cc1))
+
+## v3.28.1 (2026-09-04)
+
+### Bug fixes
+
+* fix(giftcard): verify Viva reversal and failure events before voiding cards (#27)
+
+The Viva webhook is unauthenticated by design: there is no HMAC, and the
+source-IP check is deliberately non-blocking because Traefik SNATs the
+real address away. Retrieving the transaction from Viva IS the
+authentication, which is why the order path added
+_verify_viva_terminal_transaction for events 1797 and 1798.
+
+The gift-card branch of the same view never got that guard. Event 1796
+verified and checked the amount, but 1797 called
+GiftCardService.handle_purchase_reversal straight from the event body,
+and 1798 flipped the purchase to FAILED the same way. The branch
+docstring already claimed both were verified.
+
+A 1797 on a PAID purchase cancels it, writes a negative ADJUST zeroing
+every untouched card it issued, and disables those cards. The Viva order
+code that resolves the purchase is the ref the buyer sees in their own
+checkout URL, so anyone who has completed a purchase could post a
+reversal for it and destroy the stored value they paid for. The handler
+then returns 200 and writes the idempotency row, making it one-shot and
+final. A 1798 could flip a purchase to FAILED mid-checkout.
+
+Both branches now go through the same guard as the order path: skip when
+there is no TransactionId or the verified status is not the expected
+terminal one, and raise (500, Viva redelivers) when verification is
+unavailable, so an unverifiable event can never mutate state. The guard
+takes a subject label instead of an Order, since it is now shared by two
+paths with no common model.
+
+test_payment_failed_marks_failed encoded the unverified 1798 behaviour
+and now pins the verified one. Four new tests cover the reversal guard;
+all four fail on the previous code.
+
+Found during the 2026-09 audit review of order/views/viva_webhook.py.
+
+Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com> ([`e3973d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3973d22f7a4982e3f47ae07e11ae2d375e58bfc))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.28.0 [skip ci] ([`7af2312`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7af2312efee4786f830dd014f6e6533a32442a7d))
+
 ## v3.28.0 (2026-09-04)
 
 ### Bug fixes

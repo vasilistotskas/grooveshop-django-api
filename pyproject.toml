@@ -1,5 +1,5 @@
 [project]
-version = "3.28.0"
+version = "3.28.2"
 name = "grooveshop-django-api"
 authors = [
   { name = "Vasilis Totskas", email = "vassilistotskas@msn.com" }
@@ -13,14 +13,11 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-  "asgiref==3.12.1",
-  "charset_normalizer==3.5.1",
   "channels[daphne]==4.3.2",
   "channels-redis==4.3.0",
-  "cryptography==50.0.0",
   "django==6.0.8",
   "django-admin-thumbnails==1.0.0",
-  "django-allauth[idp-oidc]==65.19.1",
+  "django-allauth[idp-oidc]==65.19.2",
   "django-extra-settings==0.15.0",
   "django-celery-beat==2.9.0",
   "django-celery-results==2.6.0",
@@ -41,31 +38,28 @@ dependencies = [
   "drf-spectacular==0.30.0",
   "fido2==2.2.1",
   "flower==2.1.0",
-  "gunicorn==26.1.0",
-  "importlib-resources==6.5.2",
+  "gunicorn==26.2.0",
   "measurement==3.2.2",
   "meilisearch==0.43.0",
-  "phonenumbers==9.0.37",
+  "phonenumbers==9.0.38",
   "pillow==12.3.0",
-  "psycopg[binary,pool] == 3.3.4",
+  "psycopg[binary,pool]==3.3.5",
   "python-dotenv==1.2.3",
   "qrcode==8.2",
   "urllib3==2.7.0",
   "uvicorn==0.52.4",
   "celery[redis] >=5.6.3,<6.0.0",
-  "disposable-email-domains==0.0.241",
+  "disposable-email-domains==0.0.247",
   "django-stubs-ext==6.0.9",
-  "twisted[http2,tls]==26.4.0",
   "dj-stripe==2.11.0",
   "defusedxml>=0.7.1",
   "django-tenants>=3.14.0,<4.0.0",
   "nh3>=0.3.6",
-  "pyjwt==2.13.0",
   "weasyprint>=69.0",
   "requests==2.34.2",
   "xmlschema==4.3.2",
   "argon2-cffi>=25.1.0",
-  "facebook-business==26.0.0",
+  "facebook-business==26.0.1",
   "uvicorn-worker>=0.4.0",
   "websockets>=17.0.1",
 ]
@@ -78,35 +72,27 @@ repository = "https://github.com/vasilistotskas/grooveshop-django-api"
 # ─────────────────────────────────────────────────────────
 [dependency-groups]
 dev = [
-    "coverage[toml]==7.14.0",
-    "djangorestframework-stubs==3.16.9",
-    "django-debug-toolbar==6.3.0",
-    "django-stubs==6.0.4",
-    "Faker==40.15.0",
+    "coverage[toml]==7.16.0",
+    "djangorestframework-stubs==3.18.0",
+    "django-debug-toolbar==8.0.0",
+    "django-stubs==6.0.9",
+    "Faker==40.38.0",
     "factory-boy==3.3.3",
-    "gitpython==3.1.50",
-    "types-setuptools==82.0.0.20260508",
-    "pre-commit==4.6.0",
-    "pytest==9.0.3",
-    "pytest-asyncio==1.3.0",
-    "pytest-django==4.12.0",
+    "pre-commit==4.6.2",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "pytest-django==4.14.0",
     "pytest-xdist==3.8.0",
     "pytest-timeout==2.4.0",
     "pytest-cov==7.1.0",
-    "python-semantic-release==10.5.3",
+    "python-semantic-release==10.6.2",
     "ruff==0.15.12",
     "celery-stubs==0.1.3",
     "psutil==7.2.2",
-    "hypothesis==6.152.6",
+    "hypothesis==6.167.1",
     "ty==0.0.35",
     "pytest-split==0.11.0",
 ]
-
-# ─────────────────────────────────────────────────────────
-# Setuptools configuration
-# ─────────────────────────────────────────────────────────
-[tool.setuptools.packages]
-find = {}
 
 # ─────────────────────────────────────────────────────────
 # Coverage configuration
@@ -131,7 +117,6 @@ omit = [
     "*/factories/*",
     "*/manage.py",
     "*/factories.py",
-    "*/setup.py",
     "gunicorn_worker.py",
     "*/wsgi/*",
 ]
@@ -181,11 +166,10 @@ directory = "htmlcov"
 # ─────────────────────────────────────────────────────────
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
-version_variables = ["setup.py:__version__"]
 branch = "main"
-upload_to_pypi = false
-upload_to_release = true
-build_command = "pip install uv && uv build"
+# No build_command: this is a deployed application, not a library. The
+# Docker image workflow triggers on the published release and never
+# consumes sdist/wheel assets, so nothing is built or uploaded.
 commit_message = "chore(release): release version {version} [skip ci]"
 
 [tool.semantic_release.commit_parser_options]
@@ -210,10 +194,12 @@ prerelease_token = "rc"
 prerelease = false
 
 [tool.semantic_release.publish]
-dist_glob_patterns = ["dist/*"]
+upload_to_vcs_release = false
 
 [tool.semantic_release.changelog]
 template_dir = "templates"
+
+[tool.semantic_release.changelog.default_templates]
 changelog_file = "CHANGELOG.md"
 
 # ─────────────────────────────────────────────────────────
@@ -270,9 +256,6 @@ override-dependencies = [
     # CVE-2026-49855, CVE-2026-49853 (HIGH) — fixed in 6.5.6
     # CVE-2026-82397 (HIGH) — fixed in 6.5.8
     "tornado>=6.5.8",
-    # CVE-2026-30922, CVE-2026-23490 (HIGH) — fixed in 0.6.3 / 0.6.2
-    # CVE-2026-59885, CVE-2026-59886 (HIGH) — fixed in 0.6.4
-    "pyasn1>=0.6.4",
     # CVE-2026-42304 (HIGH) — DoS in twisted.names DNS compression
     # pointer chains; fixed in 26.4.0 (stable since 2026-08).
     # Extras kept inline so the resolver preserves pyopenssl/h2 etc.

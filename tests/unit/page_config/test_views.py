@@ -87,8 +87,8 @@ class TestPageLayoutAdminViewSet(TestCase):
         self.client.force_authenticate(user=self.admin)
 
         # Page-layout admin is ``IsPlatformSuperuser``. It previously
-        # paired ``IsAdminUser`` with ``HasTenantAccess`` (H22 in
-        # MULTI_TENANT_AUDIT.md), but that membership lookup compared
+        # paired ``IsAdminUser`` with ``HasTenantAccess``, but that
+        # membership lookup compared
         # primary keys ACROSS schemas on an API request — see
         # ``docs/api-staff-identity.md``. A store operator administering
         # their store through the API is deliberately NOT supported yet;

@@ -3,7 +3,7 @@
 Each test in this module targets one foundational guarantee the rest
 of the system depends on. The goal isn't end-to-end coverage — it's
 to catch a regression that silently bypasses tenant scoping (the
-class of bug MULTI_TENANT_AUDIT.md is built around).
+class of bug the multi-tenant hardening was built around).
 
 Tests in this file deliberately avoid real schema creation: we use the
 ``tenant_factory`` / ``bind_tenant`` fixtures from
@@ -42,7 +42,7 @@ class TestTenantTaskCallEntersSchema:
         src = inspect.getsource(TenantTask.__call__)
         assert "schema_context" in src, (
             "TenantTask.__call__ no longer mentions schema_context — "
-            "every task would run in public. See MULTI_TENANT_AUDIT.md."
+            "every task would run in public."
         )
         assert "super().__call__" in src, (
             "TenantTask.__call__ no longer delegates to the parent "
@@ -63,7 +63,7 @@ class TestTenantTaskCallEntersSchema:
 class TestTenantTaskApplyAsyncHeader:
     """``apply_async`` must stamp ``_schema_name`` from the explicit
     headers kwarg first, then ``connection.schema_name``. The fallback
-    is the bug class C1 / H8 in MULTI_TENANT_AUDIT.md.
+    alone stamps public for dispatchers fired outside the tenant context.
     """
 
     def test_explicit_schema_header_wins_over_connection(self) -> None:
@@ -116,8 +116,8 @@ class TestTenantTaskApplyAsyncHeader:
 
 class TestMeiliIndexNamePerTenant:
     """``IndexMixin.get_meili_index_name`` must emit a schema-prefixed
-    index name when the connection is in a non-public schema. C6 in
-    MULTI_TENANT_AUDIT.md removed the class-load auto-create; this
+    index name when the connection is in a non-public schema. The
+    class-load auto-create was removed for this reason; this
     test pins down the per-tenant naming contract so the regression
     can't sneak back via ``meilisearch_sync_all_indexes``.
     """
@@ -146,8 +146,7 @@ class TestEmailHelperCallSites:
     ``tenant_contact_email``) are actually used wherever the tenant
     fallback matters. A grep-based static check is cheap to maintain
     and catches the regression where a contributor reaches for
-    ``settings.DEFAULT_FROM_EMAIL`` directly (H23 / H1 in
-    MULTI_TENANT_AUDIT.md).
+    ``settings.DEFAULT_FROM_EMAIL`` directly.
     """
 
     REQUIRED_HELPERS = ("tenant_from_email", "tenant_contact_email")

@@ -31,6 +31,12 @@ class StockManager:
 
     RESERVATION_TTL_MINUTES_DEFAULT = 15
 
+    # How many expired reservations one cleanup transaction handles.
+    # Bounded so a backlog cannot exceed `statement_timeout` (30s) or
+    # `idle_in_transaction_session_timeout` (10s) and roll the whole
+    # sweep back, leaving the backlog to grow forever.
+    CLEANUP_BATCH_SIZE = 500
+
     @classmethod
     def get_reservation_ttl_minutes(cls) -> int:
         """
@@ -189,18 +195,44 @@ class StockManager:
             >>> StockManager.release_reservation(reservation_id=123)
             # Reservation marked as consumed, audit log created
         """
-        # Lock the reservation row so a concurrent release / convert-to-sale
-        # can't both pass the already-consumed check below and double-process
-        # it (G0289).
+        # PRODUCT FIRST, then the reservation — the same order
+        # ``reserve_stock``, ``decrement_stock(respect_reservations=True)``
+        # and ``convert_reservation_to_sale`` use.
         #
-        # ``of=("self",)`` so ONLY the reservation is locked. Django locks
-        # every row a select_for_update query selects, "including those
-        # from related objects" — so the plain select_related("product")
-        # here also took a FOR UPDATE on the product, which this method
-        # explicitly does not touch. That gave the codebase two lock
-        # orders for the same pair of rows (reserve_stock and
-        # decrement_stock take product first, then reservations) and a
-        # deadlock window on any contended product.
+        # ``of=("self",)`` alone was NOT enough, and the deadlock it was
+        # meant to close stayed open. It stops Django locking the product
+        # through ``select_related``, but the ``StockLog`` insert further
+        # down carries a real FK to ``product``, and PostgreSQL takes
+        # ``FOR KEY SHARE`` on the referenced row for every such insert.
+        # ``FOR KEY SHARE`` conflicts with ``FOR UPDATE``, so the product
+        # lock was taken anyway — just LAST, which is precisely the
+        # opposite order and precisely the cycle:
+        #
+        #   T1 reserve_stock:      FOR UPDATE product, then waits on the
+        #                          product's reservation rows
+        #   T2 release_reservation: FOR UPDATE reservation, then the log
+        #                          insert waits for KEY SHARE on product
+        #
+        # Reproduced against a real database with two connections;
+        # PostgreSQL detected it and aborted one side. On the cart path
+        # that abort is not caught, so the per-item loop dies half-done
+        # and the reservations it already made are never released — they
+        # hold stock for the full TTL, on the contended product.
+        #
+        # The product id is read without a lock purely to know WHICH row
+        # to lock; every check that matters happens after both locks are
+        # held, and a reservation is never reassigned to another product.
+        try:
+            product_id = StockReservation.objects.values_list(
+                "product_id", flat=True
+            ).get(id=reservation_id)
+        except StockReservation.DoesNotExist:
+            raise StockReservationError(
+                f"Reservation {reservation_id} not found"
+            )
+
+        Product.objects.select_for_update().get(id=product_id)
+
         try:
             reservation = (
                 StockReservation.objects.select_for_update(of=("self",))
@@ -758,49 +790,77 @@ class StockManager:
             ...     return count
         """
         now = timezone.now()
+        total = 0
 
-        # Fetch expired reservations (with related data) before marking them,
-        # so we can build the audit logs using the original field values.
-        expired_reservations = list(
-            StockReservation.objects.filter(
-                expires_at__lt=now, consumed=False
-            ).select_related("product", "reserved_by")
-        )
+        # BOUNDED batches, each its own transaction. This used to load
+        # every expired reservation in one go, put every id into a single
+        # `id__in=[...]`, then build every StockLog in Python with that
+        # transaction still open. After any outage the backlog is however
+        # many reservations expired meanwhile, and the connection carries
+        # `statement_timeout=30000` and
+        # `idle_in_transaction_session_timeout=10000` — so a large enough
+        # backlog either times out on the UPDATE or gets its backend
+        # terminated while the list comprehension runs. Either way it
+        # rolls back, `consumed` stays False, the next run faces the same
+        # (larger) batch, and the caller logs a clean success because it
+        # swallows the exception. The backlog never drains.
+        while True:
+            with transaction.atomic():
+                batch = list(
+                    StockReservation.objects.filter(
+                        expires_at__lt=now, consumed=False
+                    )
+                    .select_related("product", "reserved_by")
+                    .order_by("product_id", "id")[: cls.CLEANUP_BATCH_SIZE]
+                )
+                if not batch:
+                    break
 
-        count = len(expired_reservations)
-        if count == 0:
-            return 0
+                # Lock the products FIRST, in id order — the same order
+                # every other path here uses. The `bulk_create` below
+                # carries a real FK to `product`, and PostgreSQL takes
+                # `FOR KEY SHARE` on each referenced row for it; without
+                # this that lock lands AFTER the reservation rows are
+                # already locked, which is the opposite order to
+                # `reserve_stock` and deadlocks on a contended product.
+                product_ids = sorted({r.product_id for r in batch})
+                list(
+                    Product.objects.select_for_update()
+                    .filter(id__in=product_ids)
+                    .order_by("id")
+                )
 
-        # Bulk-mark all expired reservations as consumed in a single UPDATE.
-        reservation_ids = [r.id for r in expired_reservations]
-        # ``consumed=False`` in the filter as well as the SELECT above: a
-        # reservation converted to a sale in between must not be re-marked
-        # here. (A converted one can still get a RELEASE audit row from the
-        # loop below — a spurious log line in a narrow race, not a stock
-        # error, since neither operation moves physical stock.)
-        StockReservation.objects.filter(
-            id__in=reservation_ids, consumed=False
-        ).update(consumed=True, updated_at=now)
+                reservation_ids = [r.id for r in batch]
+                # ``consumed=False`` here as well as in the SELECT: a
+                # reservation converted to a sale in between must not be
+                # re-marked. (A converted one can still get a RELEASE
+                # audit row below — a spurious log line in a narrow race,
+                # not a stock error, since neither moves physical stock.)
+                StockReservation.objects.filter(
+                    id__in=reservation_ids, consumed=False
+                ).update(consumed=True, updated_at=now)
 
-        # Build StockLog entries for the audit trail.
-        # Releasing a reservation does not change physical stock — stock_before
-        # and stock_after are identical for each entry.
-        logs = [
-            StockLog(
-                product=reservation.product,
-                order=reservation.order,
-                operation_type=StockLog.OPERATION_RELEASE,
-                quantity_delta=reservation.quantity,
-                stock_before=reservation.product.stock,
-                stock_after=reservation.product.stock,
-                reason=(
-                    f"Expired reservation {reservation.id} auto-released"
-                    f" (expired at {reservation.expires_at})"
-                ),
-                performed_by=reservation.reserved_by,
-            )
-            for reservation in expired_reservations
-        ]
-        StockLog.objects.bulk_create(logs)
+                # Releasing a reservation does not change physical stock,
+                # so stock_before and stock_after are identical.
+                StockLog.objects.bulk_create(
+                    [
+                        StockLog(
+                            product=reservation.product,
+                            order=reservation.order,
+                            operation_type=StockLog.OPERATION_RELEASE,
+                            quantity_delta=reservation.quantity,
+                            stock_before=reservation.product.stock,
+                            stock_after=reservation.product.stock,
+                            reason=(
+                                f"Expired reservation {reservation.id} "
+                                f"auto-released (expired at "
+                                f"{reservation.expires_at})"
+                            ),
+                            performed_by=reservation.reserved_by,
+                        )
+                        for reservation in batch
+                    ]
+                )
+                total += len(batch)
 
-        return count
+        return total

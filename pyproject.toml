@@ -343,6 +343,24 @@ ignore = [
     # A rule that is 1-in-13 right and can break the build on the
     # remainder is not worth its suppressions.
     "ERA001",
+    # DJ001 (nullable CharField/TextField/URLField) is a REAL finding on
+    # all 13 sites and is deliberately deferred, not dismissed. Making a
+    # string column NOT NULL is a two-RELEASE change under the Argo CD
+    # PreSync hook, because migrations run before the new image: the
+    # ALTER lands while pods that still write NULL are serving, so the
+    # first release has to stop writing NULL and backfill, and only the
+    # second may add the constraint. That sequencing belongs in its own
+    # change with the migration-safety review, not folded into a lint
+    # pass. The 13:
+    #   order.Order.payment_id          — the worst: `null=True` AND
+    #                                     `default=""`, so "no payment
+    #                                     id" has two spellings
+    #   search.SearchQuery              — language_code, session_key,
+    #                                     user_agent
+    #   shipping_boxnow                 — BoxNowLocker.image_url,
+    #                                     BoxNowParcelEvent.data_fingerprint
+    #   user.UserAccount                — seven social profile URLs
+    "DJ001",
 ]
 
 [tool.ruff.lint.per-file-ignores]

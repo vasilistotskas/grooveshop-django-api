@@ -3,6 +3,51 @@
 
 
 
+## v3.28.1 (2026-09-04)
+
+### Bug fixes
+
+* fix(giftcard): verify Viva reversal and failure events before voiding cards (#27)
+
+The Viva webhook is unauthenticated by design: there is no HMAC, and the
+source-IP check is deliberately non-blocking because Traefik SNATs the
+real address away. Retrieving the transaction from Viva IS the
+authentication, which is why the order path added
+_verify_viva_terminal_transaction for events 1797 and 1798.
+
+The gift-card branch of the same view never got that guard. Event 1796
+verified and checked the amount, but 1797 called
+GiftCardService.handle_purchase_reversal straight from the event body,
+and 1798 flipped the purchase to FAILED the same way. The branch
+docstring already claimed both were verified.
+
+A 1797 on a PAID purchase cancels it, writes a negative ADJUST zeroing
+every untouched card it issued, and disables those cards. The Viva order
+code that resolves the purchase is the ref the buyer sees in their own
+checkout URL, so anyone who has completed a purchase could post a
+reversal for it and destroy the stored value they paid for. The handler
+then returns 200 and writes the idempotency row, making it one-shot and
+final. A 1798 could flip a purchase to FAILED mid-checkout.
+
+Both branches now go through the same guard as the order path: skip when
+there is no TransactionId or the verified status is not the expected
+terminal one, and raise (500, Viva redelivers) when verification is
+unavailable, so an unverifiable event can never mutate state. The guard
+takes a subject label instead of an Order, since it is now shared by two
+paths with no common model.
+
+test_payment_failed_marks_failed encoded the unverified 1798 behaviour
+and now pins the verified one. Four new tests cover the reversal guard;
+all four fail on the previous code.
+
+Found during the 2026-09 audit review of order/views/viva_webhook.py.
+
+Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com> ([`e3973d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3973d22f7a4982e3f47ae07e11ae2d375e58bfc))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.28.0 [skip ci] ([`7af2312`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7af2312efee4786f830dd014f6e6533a32442a7d))
+
 ## v3.28.0 (2026-09-04)
 
 ### Bug fixes

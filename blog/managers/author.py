@@ -31,10 +31,6 @@ class BlogAuthorQuerySet(TranslatableOptimizedQuerySet):
         """Select related user."""
         return self.select_related("user")
 
-    def with_posts_prefetch(self) -> Self:
-        """Prefetch blog posts."""
-        return self.prefetch_related("blog_posts")
-
     def with_posts_details(self) -> Self:
         """Prefetch blog posts with full details."""
         return self.prefetch_related(

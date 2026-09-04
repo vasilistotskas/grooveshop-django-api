@@ -130,10 +130,6 @@ class BlogPost(
         self.__dict__["comments_count"] = value
 
     @property
-    def all_comments_count(self) -> int:
-        return self.comments.count()
-
-    @property
     def tags_count(self) -> int:
         """Return tags count from annotation or query database."""
         # Check __dict__ first to avoid recursion with property

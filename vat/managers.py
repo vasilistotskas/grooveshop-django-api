@@ -32,18 +32,6 @@ class VatQuerySet(models.QuerySet):
         """
         return self.for_list()
 
-    def by_value(self, value) -> Self:
-        """Filter by exact VAT value."""
-        return self.filter(value=value)
-
-    def above_value(self, value) -> Self:
-        """Filter VAT rates above a certain value."""
-        return self.filter(value__gt=value)
-
-    def below_value(self, value) -> Self:
-        """Filter VAT rates below a certain value."""
-        return self.filter(value__lt=value)
-
 
 class VatManager(models.Manager):
     """

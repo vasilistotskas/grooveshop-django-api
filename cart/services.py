@@ -219,11 +219,6 @@ class CartService:
             lines_capped,
         )
 
-    def clean_cart(self):
-        if self.cart:
-            self.cart.items.all().delete()
-            self.cart_items = []
-
     def get_cart_by_id(self, cart_uuid: str | uuid.UUID):
         """Return the cart identified by ``cart_uuid`` if the caller owns it.
 

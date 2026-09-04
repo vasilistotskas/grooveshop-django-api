@@ -28,9 +28,6 @@ class RegionQuerySet(TranslatableOptimizedQuerySet):
     def by_country(self, country_code) -> Self:
         return self.filter(country__alpha_2=country_code.upper())
 
-    def by_country_name(self, country_name) -> Self:
-        return self.filter(country__translations__name__icontains=country_name)
-
     def for_list(self) -> Self:
         """
         Optimized queryset for list views.

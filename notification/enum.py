@@ -9,14 +9,6 @@ class NotificationKindEnum(models.TextChoices):
     WARNING = "WARNING", _("Warning")
     DANGER = "DANGER", _("Danger")
 
-    @classmethod
-    def get_alert_types(cls) -> list[str]:
-        return [cls.ERROR, cls.WARNING, cls.DANGER]
-
-    @classmethod
-    def get_positive_types(cls) -> list[str]:
-        return [cls.SUCCESS, cls.INFO]
-
 
 class NotificationCategoryEnum(models.TextChoices):
     ORDER = "ORDER", _("Order")

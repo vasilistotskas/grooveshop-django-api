@@ -90,10 +90,6 @@ class UserSubscriptionQuerySet(OptimizedQuerySet):
         """Filter subscriptions for a specific user."""
         return self.filter(user=user)
 
-    def for_topic(self, topic) -> Self:
-        """Filter subscriptions for a specific topic."""
-        return self.filter(topic=topic)
-
     def for_list(self) -> Self:
         """
         Optimized queryset for list views.

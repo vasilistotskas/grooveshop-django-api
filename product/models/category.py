@@ -9,7 +9,6 @@ from tinymce.models import HTMLField
 
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from core.utils.generators import SlugifyConfig, unique_slugify
-from product.enum.category import CategoryImageTypeEnum
 from product.managers.category import CategoryManager
 from product.models.product import Product
 from core.models import SeoModel
@@ -93,63 +92,6 @@ class ProductCategory(
         return ProductCategoryImage.get_main_image(self)
 
     @property
-    def banner_image(self):
-        from product.models.category_image import ProductCategoryImage  # noqa: PLC0415, I001
-
-        return ProductCategoryImage.get_banner_image(self)
-
-    @property
-    def icon_image(self):
-        from product.models.category_image import ProductCategoryImage  # noqa: PLC0415, I001
-
-        return ProductCategoryImage.get_icon_image(self)
-
-    @property
     def main_image_path(self) -> str:
         main_img = self.main_image
         return main_img.image_path if main_img else ""
-
-    @property
-    def banner_image_path(self) -> str:
-        banner_img = self.banner_image
-        return banner_img.image_path if banner_img else ""
-
-    @property
-    def icon_image_path(self) -> str:
-        icon_img = self.icon_image
-        return icon_img.image_path if icon_img else ""
-
-    @property
-    def main_image_url(self) -> str:
-        main_img = self.main_image
-        return main_img.image_url if main_img else ""
-
-    @property
-    def banner_image_url(self) -> str:
-        banner_img = self.banner_image
-        return banner_img.image_url if banner_img else ""
-
-    @property
-    def icon_image_url(self) -> str:
-        icon_img = self.icon_image
-        return icon_img.image_url if icon_img else ""
-
-    @property
-    def category_menu_image_one_path(self) -> str:
-        return self.main_image_path
-
-    @property
-    def category_menu_image_two_path(self) -> str:
-        return self.banner_image_path
-
-    @property
-    def category_menu_main_banner_path(self) -> str:
-        return self.banner_image_path
-
-    def get_image_by_type(self, image_type: CategoryImageTypeEnum):
-        from product.models.category_image import ProductCategoryImage  # noqa: PLC0415, I001
-
-        return ProductCategoryImage.get_image_by_type(self, image_type)
-
-    def get_all_images(self):
-        return self.images.active()

@@ -542,18 +542,30 @@ class CartViewSet(BaseModelViewSet):
         It releases the temporary stock reservations, making the stock
         available for other customers to purchase.
         """
-        # Get reservation_ids from request data
-        reservation_ids = request.data.get("reservation_ids", [])
+        # Validate through the serializer this action already DECLARES
+        # in `serializers_config` and never instantiated. The raw list
+        # went straight into `id__in`, so `{"reservationIds": ["abc"]}`
+        # from an anonymous caller raised `ValueError` deep inside
+        # queryset evaluation — an unhandled 500 with a traceback, on an
+        # endpoint any visitor can reach. It also bounded nothing, so one
+        # request could put an arbitrarily long `IN (...)` list on the
+        # database.
+        request_serializer = ReleaseReservationsRequestSerializer(
+            data=request.data
+        )
+        if not request_serializer.is_valid():
+            # `{"detail": ...}` rather than DRF's field-keyed default,
+            # because that is the shape every other error on this action
+            # already returns and the shape the storefront reads.
+            return Response(
+                {"detail": "reservation_ids must be a list of integers"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        reservation_ids = request_serializer.validated_data["reservation_ids"]
 
         if not reservation_ids:
             return Response(
                 {"detail": "reservation_ids is required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not isinstance(reservation_ids, list):
-            return Response(
-                {"detail": "reservation_ids must be a list"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

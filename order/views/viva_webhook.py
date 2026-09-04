@@ -1290,7 +1290,7 @@ def _handle_payment_created(order, event_data, transaction_id):
     # Wrapped in on_commit so the Celery worker always sees the committed
     # payment_status / order.status rather than an in-flight row.
     # ``_schema`` captured at lambda-build time; on_commit fires after the
-    # tenant ``schema_context`` exits (see C1/C2 in MULTI_TENANT_AUDIT.md).
+    # tenant ``schema_context`` exits, so it has to be pinned explicitly.
     _schema = connection.schema_name
     transaction.on_commit(
         lambda oid=order.id, s=_schema: (

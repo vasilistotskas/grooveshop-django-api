@@ -130,7 +130,13 @@ class TestOrderCreateSerializerValidation(APITestCase):
         receipts), so normalisation is only observable here.
         """
         data = self._base_data(
-            document_type="INVOICE", billing_vat_id="EL123456783"
+            document_type="INVOICE",
+            billing_vat_id="EL123456783",
+            # An INVOICE must name the counterparty; this test is
+            # about the tax-id prefix.
+            billing_company_name="Acme MON IKE",
+            billing_tax_office="Alpha Athinon",
+            billing_activity="Retail trade",
         )
         serializer = OrderCreateFromCartSerializer(data=data)
         serializer.is_valid()

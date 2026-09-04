@@ -5,7 +5,10 @@ from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 from djmoney.money import Money
 
-from order.enum.status import PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    PaymentStatus,
+)
 from order.models import Order
 from order.payment import get_payment_provider
 from order.signals import order_refunded
@@ -228,6 +231,20 @@ class PayWayService:
         status, status_data = provider.get_payment_status(order.payment_id)
 
         if status != order.payment_status:
+            if order.payment_status in SETTLED_PAYMENT_STATUSES:
+                # A settled order is final; the provider's view of the
+                # payment is not the order's view of the money (a refund
+                # lives on the charge, so the intent still reads
+                # succeeded). Same rule as OrderService and the webhooks.
+                logger.warning(
+                    "Ignoring polled payment status %s for order %s: "
+                    "payment_status already settled as %s",
+                    status,
+                    order.id,
+                    order.payment_status,
+                )
+                return order.payment_status, status_data
+
             order.payment_status = status
             order.save(update_fields=["payment_status"])
 

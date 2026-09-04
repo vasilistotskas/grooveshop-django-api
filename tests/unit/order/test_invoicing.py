@@ -211,6 +211,57 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
     @patch(
         "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
     )
+    def test_regen_after_mydata_mark_keeps_every_total_row(
+        self, _mock_render
+    ) -> None:
+        """The AADE-registered regen must still render shipping and the
+        payment fee.
+
+        The template puts those rows behind ``{% if totals.shipping %}``
+        and then prints ``totals.total`` unconditionally, and the frozen
+        total contains both. Dropping the keys produced a legally filed
+        document, emailed to the customer, whose lines do not add up to
+        its own total.
+        """
+        order = self._make_order()
+        order.shipping_price = Money(Decimal("3.50"), "EUR")
+        order.payment_method_fee = Money(Decimal("1.25"), "EUR")
+        order.save(update_fields=["shipping_price", "payment_method_fee"])
+
+        invoice = generate_invoice(order)
+        invoice.mydata_mark = 400001234567890
+        invoice.save(update_fields=["mydata_mark"])
+
+        # Go through the persistence step directly: it is what picks the
+        # frozen branch and hands the totals to the template.
+        from order.invoicing import _persist_invoice_row
+
+        _regenerated, _breakdown, totals = _persist_invoice_row(order, invoice)
+
+        for key in (
+            "subtotal",
+            "total_vat",
+            "shipping",
+            "payment_fee",
+            "discount",
+            "total",
+        ):
+            self.assertIn(key, totals, f"{key} missing from the frozen totals")
+
+        self.assertEqual(totals["shipping"].amount, Decimal("3.50"))
+        self.assertEqual(totals["payment_fee"].amount, Decimal("1.25"))
+        # The printed rows must reconcile with the printed total.
+        self.assertEqual(
+            totals["subtotal"].amount
+            + totals["total_vat"].amount
+            + totals["shipping"].amount
+            + totals["payment_fee"].amount,
+            totals["total"].amount,
+        )
+
+    @patch(
+        "order.invoicing._render_pdf_bytes", return_value=b"%PDF-1.4 ... %EOF"
+    )
     def test_force_refreshes_snapshots_without_new_row(
         self, _mock_render
     ) -> None:

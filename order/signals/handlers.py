@@ -13,7 +13,11 @@ from djstripe.models import Event
 from order.signals._tenant import with_tenant_schema_from_event
 
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -125,15 +129,12 @@ def handle_order_post_save(
     # tracking number. Without the equality check the signal would
     # fire a second time and the shopper would get a duplicate
     # "Tracking available" notification.
-    tracking_unchanged = (
-        (
-            instance.tracking_number == instance._original_tracking_number
-            and instance.shipping_carrier == instance._original_shipping_carrier
-        )
-        if hasattr(instance, "_original_tracking_number")
-        else False
-    )
-
+    # Fires only on the transition INTO having tracking: at least one
+    # field was empty before and both are set now. That already rules out
+    # a re-save with identical values — if the old value equalled the new
+    # non-empty one, the old one was non-empty too, which the "not both
+    # set before" term excludes. An extra equality check read as a second
+    # safeguard but could never change the outcome.
     tracking_dispatched = (
         hasattr(instance, "_original_tracking_number")
         and hasattr(instance, "_original_shipping_carrier")
@@ -143,7 +144,6 @@ def handle_order_post_save(
         )
         and bool(instance.tracking_number)
         and bool(instance.shipping_carrier)
-        and not tracking_unchanged
     )
     if tracking_dispatched:
 
@@ -175,11 +175,13 @@ def handle_order_post_save(
     if settings.AGENT_GATEWAY_INTERNAL_URL and (
         status_changed or payment_status_changed or tracking_dispatched
     ):
-        # ``_schema`` captured at lambda-build time — by the time
+        # ``_schema`` was captured at the top of this function and is
+        # bound into the lambda below as a default — by the time
         # on_commit fires the schema context has exited and TenantTask
         # would stamp the public schema (same contract as every other
-        # dispatch in this module).
-        _schema = connection.schema_name
+        # dispatch in this module). It is NOT re-read here: the three
+        # closures above reference ``_schema`` as a free variable, so
+        # rebinding the name would retroactively change what they see.
         transaction.on_commit(
             lambda oid=instance.id, s=_schema: (
                 push_order_event_to_gateway.apply_async(
@@ -189,41 +191,70 @@ def handle_order_post_save(
         )
 
 
-def _clear_cart_for_order(order: Order) -> None:
-    """Delete the cart the order was built from, if it still exists."""
+def _cart_for_order(order: Order):
+    """The cart this order was built from, or None."""
     from cart.models import Cart  # noqa: PLC0415
 
+    if order.user:
+        return Cart.objects.filter(user=order.user).first()
+
+    # For guest orders, read the cart UUID from the cart snapshot both
+    # creation paths write into order metadata
+    # (OrderService.create_order_from_cart[_offline]). The integer PK is
+    # internal only, so the lookup uses the UUID.
+    cart_uuid = (
+        order.metadata.get("cart_snapshot", {}).get("cart_uuid")
+        if order.metadata
+        else None
+    )
+    if not cart_uuid:
+        logger.debug("Guest order %s - no cart_uuid in metadata", order.id)
+        return None
+    return Cart.objects.filter(uuid=cart_uuid, user__isnull=True).first()
+
+
+def _clear_cart_for_order(order: Order) -> None:
+    """Take THIS ORDER's lines out of the cart, and drop the cart if that
+    empties it.
+
+    Not "delete the cart": an online order deliberately leaves the cart
+    standing until the payment lands (``handle_order_created`` skips the
+    clear while ``awaits_online_payment``, so a shopper who presses Back
+    still has a basket), and a hosted session can stay open for hours.
+    Anything the shopper puts in the cart during that window is theirs,
+    not part of the order being paid for, and deleting the row took it
+    with no trace. The cart is a per-user singleton, so matching it by
+    id would not have helped — only the LINES distinguish the two.
+
+    Lines the order has but the cart does not (promotion gifts injected
+    at creation) simply find nothing to remove.
+    """
     try:
-        if order.user:
-            cart = Cart.objects.filter(user=order.user).first()
-            if cart:
-                cart.delete()  # Delete entire cart, not just items
-                logger.debug(
-                    "Cleared cart for user %s after order %s",
-                    order.user.id,
-                    order.id,
-                )
+        cart = _cart_for_order(order)
+        if cart is None:
             return
 
-        # For guest orders, read the cart UUID from the cart snapshot
-        # both creation paths write into order metadata
-        # (OrderService.create_order_from_cart[_offline]). The integer
-        # PK is internal only (it is enumerable), so the
-        # lookup uses the UUID.
-        cart_uuid = (
-            order.metadata.get("cart_snapshot", {}).get("cart_uuid")
-            if order.metadata
-            else None
-        )
-        if not cart_uuid:
-            logger.debug("Guest order %s - no cart_uuid in metadata", order.id)
-            return
-        cart = Cart.objects.filter(uuid=cart_uuid, user__isnull=True).first()
-        if cart:
-            cart.delete()  # Delete entire cart
+        for item in order.items.all():
+            cart_item = cart.items.filter(product_id=item.product_id).first()
+            if cart_item is None:
+                continue
+            if cart_item.quantity > item.quantity:
+                cart_item.quantity -= item.quantity
+                cart_item.save(update_fields=["quantity"])
+            else:
+                cart_item.delete()
+
+        if cart.items.exists():
             logger.info(
-                "Cleared guest cart %s after order %s", cart_uuid, order.id
+                "Cart %s kept after order %s — it holds items the order "
+                "did not include",
+                cart.uuid,
+                order.id,
             )
+            return
+
+        cart.delete()
+        logger.debug("Cleared cart %s after order %s", cart.uuid, order.id)
     except Exception as e:
         logger.error(
             "Error clearing cart for order %s: %s", order.id, e, exc_info=True
@@ -502,6 +533,7 @@ def handle_order_item_post_save(
             delta=stock_difference,
             reason="admin order item edit",
             performed_by=None,
+            order_id=instance.order_id,
         )
 
         OrderItemHistory.log_quantity_change(
@@ -522,9 +554,12 @@ def handle_order_item_post_save(
                 exc_info=True,
             )
 
+    # ``is not None`` rather than truthiness: ``Money(0, "EUR")`` is
+    # falsy, so correcting a line priced at zero — a free-gift line, or a
+    # data-entry fix — produced no history entry at all.
     if (
         hasattr(instance, "_original_price")
-        and instance._original_price
+        and instance._original_price is not None
         and instance._original_price != instance.price
     ):
         OrderItemHistory.log_price_update(
@@ -1036,9 +1071,14 @@ def handle_stripe_payment_failed(sender, **kwargs):
                     )
                 )
 
-    except Exception as e:
+    except (KeyError, TypeError) as e:
+        # Malformed payload only — see charge.refunded above. A failure in
+        # the processing below must reach dj-stripe so the Event row rolls
+        # back and Stripe redelivers.
         logger.error(
-            "Error handling payment_intent.payment_failed: %s", e, exc_info=True
+            "Malformed payment_intent.payment_failed payload: %s",
+            e,
+            exc_info=True,
         )
 
 
@@ -1247,8 +1287,15 @@ def handle_stripe_charge_refunded(sender, **kwargs):
         if is_full_refund:
             order_refunded.send(sender=Order, order=order)
 
-    except Exception as e:
-        logger.error("Error handling charge.refunded: %s", e, exc_info=True)
+    except (KeyError, TypeError) as e:
+        # Malformed payload only. Everything else must PROPAGATE (G0231):
+        # this runs inside dj-stripe's webhook atomic, so swallowing
+        # commits the Event row and Stripe never redelivers. The history
+        # write and ``order_refunded`` above run AFTER the inner atomic
+        # has committed the refund, so losing them leaves an order that
+        # reads REFUNDED while the customer is never emailed about the
+        # money coming back.
+        logger.error("Malformed charge.refunded payload: %s", e, exc_info=True)
 
 
 @djstripe_receiver("charge.dispute.created")
@@ -1368,16 +1415,33 @@ def handle_stripe_dispute_created(sender, **kwargs):
             )
         )
 
-    except Exception as e:
+    except (KeyError, TypeError) as e:
+        # Malformed payload only — see charge.refunded above. A swallowed
+        # failure here flags the dispute in the DB and then loses the
+        # staff notification, so nobody works the chargeback before
+        # Stripe's evidence deadline.
         logger.error(
-            "Error handling charge.dispute.created: %s", e, exc_info=True
+            "Malformed charge.dispute.created payload: %s", e, exc_info=True
         )
 
 
 @djstripe_receiver("checkout.session.completed")
 @with_tenant_schema_from_event
 def handle_stripe_checkout_completed(sender, **kwargs):
-    """Handle Stripe checkout session completion webhook."""
+    """Handle Stripe checkout session completion webhook.
+
+    This receiver runs inside dj-stripe's webhook ``transaction.atomic``
+    block, so processing errors must PROPAGATE (G0231), exactly as in
+    ``handle_stripe_payment_succeeded``. Swallowing them let dj-stripe
+    commit the ``Event`` row for a session the customer had already paid
+    for: the mutations here roll back to their savepoint, Stripe's
+    redelivery early-returns on the existing event id, and the order sits
+    at PENDING until ``auto_cancel_stuck_pending_orders`` cancels it a day
+    later with no refund and no alert. The sibling
+    ``payment_intent.succeeded`` event is not a safety net — it resolves
+    the order by ``payment_id``, which only ``mark_as_paid`` writes, inside
+    the block that rolled back.
+    """
     logger.debug("Processing checkout.session.completed webhook")
 
     try:
@@ -1387,161 +1451,183 @@ def handle_stripe_checkout_completed(sender, **kwargs):
         payment_intent_id = session_data.get("payment_intent")
         payment_status = session_data.get("payment_status")
         event_id = event.id
+    except (KeyError, TypeError) as e:
+        # Malformed payload — a redelivery carries the same bad body, so
+        # propagating would only spin. Drop it, like the sibling handler.
+        logger.error(
+            "Malformed checkout.session.completed payload: %s",
+            e,
+            exc_info=True,
+        )
+        return
 
-        logger.info("Checkout session completed: %s", session_id)
+    logger.info("Checkout session completed: %s", session_id)
 
-        order_id = session_data.get("metadata", {}).get("order_id")
+    order_id = session_data.get("metadata", {}).get("order_id")
 
-        if not order_id:
-            logger.warning("No order_id in session metadata: %s", session_id)
+    if not order_id:
+        logger.warning("No order_id in session metadata: %s", session_id)
+        return
+
+    # Atomic idempotency check-and-mark with row lock, then perform all
+    # state mutations inside the same transaction to prevent double-save
+    # and parallel duplicate processing.
+    with transaction.atomic():
+        try:
+            order = Order.objects.select_for_update().get(id=order_id)
+        except Order.DoesNotExist:
+            logger.error(
+                "Order %s not found for session %s", order_id, session_id
+            )
             return
 
-        # Atomic idempotency check-and-mark with row lock, then perform all
-        # state mutations inside the same transaction to prevent double-save
-        # and parallel duplicate processing.
-        with transaction.atomic():
-            try:
-                order = Order.objects.select_for_update().get(id=order_id)
-            except Order.DoesNotExist:
-                logger.error(
-                    "Order %s not found for session %s", order_id, session_id
+        if order.metadata and order.metadata.get(
+            f"webhook_processed_{event_id}"
+        ):
+            logger.info(
+                "Webhook %s already processed for order %s, skipping",
+                event_id,
+                order.id,
+            )
+            return
+
+        if not order.metadata:
+            order.metadata = {}
+        order.metadata[f"webhook_processed_{event_id}"] = True
+
+        if payment_status == "paid" and payment_intent_id:
+            from order.payment_events import publish_payment_status
+            from shipping.services import ShippingService
+
+            # Settled-state guard: Stripe does not guarantee event
+            # delivery order, so a delayed checkout.session.completed
+            # must never un-refund / un-cancel an order that already
+            # reached a settled financial state. Mirrors
+            # OrderService.handle_payment_succeeded.
+            # COMPLETED is excluded on purpose: a "paid" event landing on
+            # an already-completed order is a redelivery, and processing
+            # it again is a harmless no-op rather than a regression.
+            if order.payment_status in (
+                SETTLED_PAYMENT_STATUSES - {PaymentStatus.COMPLETED}
+            ):
+                logger.warning(
+                    "Ignoring checkout.session.completed for order %s: "
+                    "payment_status already %s",
+                    order.id,
+                    order.payment_status,
                 )
+                # Persist the webhook_processed flag set above so a
+                # Stripe redelivery short-circuits on the idempotency
+                # check instead of re-running this guard (harmless, but
+                # avoids duplicate warning logs on every retry).
+                order.save(update_fields=["metadata"])
                 return
 
-            if order.metadata and order.metadata.get(
-                f"webhook_processed_{event_id}"
-            ):
-                logger.info(
-                    "Webhook %s already processed for order %s, skipping",
-                    event_id,
+            order.mark_as_paid(
+                payment_id=payment_intent_id, payment_method="stripe"
+            )
+
+            order.metadata["stripe_checkout_session_id"] = session_id
+            order.metadata["stripe_payment_intent_id"] = payment_intent_id
+            order.save(update_fields=["metadata"])
+
+            OrderHistory.log_payment_update(
+                order=order,
+                previous_value={"payment_status": "pending"},
+                new_value={
+                    "payment_status": "completed",
+                    "payment_id": payment_intent_id,
+                    "checkout_session_id": session_id,
+                },
+            )
+
+            if order.status == OrderStatus.CANCELED:
+                # Payment landed for an already-CANCELED order (the
+                # customer cancelled before the webhook, or the two
+                # raced). Record the receipt for reconciliation and
+                # page staff (ERROR is the monitored channel) for a
+                # manual refund — but do NOT advance status or mint a
+                # shipment for a cancelled order. Mirrors
+                # handle_payment_succeeded (G0281).
+                order.metadata["payment_after_cancel"] = {
+                    "payment_id": payment_intent_id,
+                    "recorded_at": timezone.now().isoformat(),
+                }
+                order.save(update_fields=["metadata"])
+                logger.error(
+                    "Payment %s received via checkout session for "
+                    "CANCELED order %s — manual refund required; NOT "
+                    "dispatching shipment creation",
+                    payment_intent_id,
                     order.id,
                 )
+                publish_payment_status(order)
                 return
 
-            if not order.metadata:
-                order.metadata = {}
-            order.metadata[f"webhook_processed_{event_id}"] = True
+            if order.status == OrderStatus.PENDING:
+                OrderService.update_order_status(order, OrderStatus.PROCESSING)
 
-            if payment_status == "paid" and payment_intent_id:
-                from order.payment_events import publish_payment_status
-                from shipping.services import ShippingService
+            # Stripe's guidance is to fulfil hosted Checkout Sessions on
+            # checkout.session.completed (not payment_intent.succeeded).
+            # Dispatch the courier task here so a Stripe-Checkout order
+            # isn't left paid-but-never-shipped when the PaymentIntent
+            # event's payment_id lookup races/misses. Idempotent on the
+            # shipment row; wrapped in on_commit by ShippingService.
+            ShippingService.dispatch_create_shipment_task(order)
 
-                # Settled-state guard: Stripe does not guarantee event
-                # delivery order, so a delayed checkout.session.completed
-                # must never un-refund / un-cancel an order that already
-                # reached a settled financial state. Mirrors
-                # OrderService.handle_payment_succeeded.
-                if order.payment_status in {
-                    PaymentStatus.REFUNDED,
-                    PaymentStatus.PARTIALLY_REFUNDED,
-                    PaymentStatus.CANCELED,
-                }:
-                    logger.warning(
-                        "Ignoring checkout.session.completed for order %s: "
-                        "payment_status already %s",
-                        order.id,
-                        order.payment_status,
-                    )
-                    # Persist the webhook_processed flag set above so a
-                    # Stripe redelivery short-circuits on the idempotency
-                    # check instead of re-running this guard (harmless, but
-                    # avoids duplicate warning logs on every retry).
-                    order.save(update_fields=["metadata"])
-                    return
+            publish_payment_status(order)
 
-                order.mark_as_paid(
-                    payment_id=payment_intent_id, payment_method="stripe"
-                )
+            logger.info(
+                "Order %s marked as paid via checkout session %s",
+                order_id,
+                session_id,
+            )
 
-                order.metadata["stripe_checkout_session_id"] = session_id
-                order.metadata["stripe_payment_intent_id"] = payment_intent_id
-                order.save(update_fields=["metadata"])
-
-                OrderHistory.log_payment_update(
-                    order=order,
-                    previous_value={"payment_status": "pending"},
-                    new_value={
-                        "payment_status": "completed",
-                        "payment_id": payment_intent_id,
-                        "checkout_session_id": session_id,
-                    },
-                )
-
-                if order.status == OrderStatus.CANCELED:
-                    # Payment landed for an already-CANCELED order (the
-                    # customer cancelled before the webhook, or the two
-                    # raced). Record the receipt for reconciliation and
-                    # page staff (ERROR is the monitored channel) for a
-                    # manual refund — but do NOT advance status or mint a
-                    # shipment for a cancelled order. Mirrors
-                    # handle_payment_succeeded (G0281).
-                    order.metadata["payment_after_cancel"] = {
-                        "payment_id": payment_intent_id,
-                        "recorded_at": timezone.now().isoformat(),
-                    }
-                    order.save(update_fields=["metadata"])
-                    logger.error(
-                        "Payment %s received via checkout session for "
-                        "CANCELED order %s — manual refund required; NOT "
-                        "dispatching shipment creation",
-                        payment_intent_id,
-                        order.id,
-                    )
-                    publish_payment_status(order)
-                    return
-
-                if order.status == OrderStatus.PENDING:
-                    OrderService.update_order_status(
-                        order, OrderStatus.PROCESSING
-                    )
-
-                # Stripe's guidance is to fulfil hosted Checkout Sessions on
-                # checkout.session.completed (not payment_intent.succeeded).
-                # Dispatch the courier task here so a Stripe-Checkout order
-                # isn't left paid-but-never-shipped when the PaymentIntent
-                # event's payment_id lookup races/misses. Idempotent on the
-                # shipment row; wrapped in on_commit by ShippingService.
-                ShippingService.dispatch_create_shipment_task(order)
-
-                publish_payment_status(order)
-
-                logger.info(
-                    "Order %s marked as paid via checkout session %s",
-                    order_id,
-                    session_id,
-                )
-
-                # Payment confirmed via Stripe Checkout — send the
-                # confirmation email now (idempotent).
-                # ``_schema`` captured at lambda-build time; on_commit
-                # fires after the schema_context has exited.
-                _schema = connection.schema_name
-                transaction.on_commit(
-                    lambda oid=order.id, s=_schema: (
-                        send_order_confirmation_email.apply_async(
-                            args=[oid], headers={"_schema_name": s}
-                        )
+            # Payment confirmed via Stripe Checkout — send the
+            # confirmation email now (idempotent).
+            # ``_schema`` captured at lambda-build time, or the
+            # worker would run against the wrong schema.
+            _schema = connection.schema_name
+            transaction.on_commit(
+                lambda oid=order.id, s=_schema: (
+                    send_order_confirmation_email.apply_async(
+                        args=[oid], headers={"_schema_name": s}
                     )
                 )
+            )
 
-            elif payment_status == "unpaid":
-                order.payment_status = PaymentStatus.PENDING
-                order.save(update_fields=["payment_status", "metadata"])
-
-                OrderHistory.log_note(
-                    order=order,
-                    note=f"Checkout session completed but payment is unpaid: {session_id}",
-                )
-
+        elif payment_status == "unpaid":
+            # The same settled-state guard the "paid" arm carries, and
+            # here it includes COMPLETED: writing PENDING over ANY
+            # settled state is a regression. Stripe retries a failed
+            # delivery 24 times — one attempt plus 23 hourly retries
+            # until a 2xx — which reaches as far as
+            # auto_cancel_stuck_pending_orders' own 24h default. A late
+            # retry would otherwise put a cancelled order back to
+            # "awaiting payment" and let the checkout endpoints open a
+            # fresh provider session for it.
+            if order.payment_status in SETTLED_PAYMENT_STATUSES:
                 logger.warning(
-                    "Checkout session completed but payment is unpaid: %s",
-                    session_id,
+                    "Ignoring unpaid checkout.session.completed for order "
+                    "%s: payment_status already %s",
+                    order.id,
+                    order.payment_status,
                 )
+                order.save(update_fields=["metadata"])
+                return
 
-    except Exception as e:
-        logger.error(
-            "Error handling checkout.session.completed: %s", e, exc_info=True
-        )
+            order.payment_status = PaymentStatus.PENDING
+            order.save(update_fields=["payment_status", "metadata"])
+
+            OrderHistory.log_note(
+                order=order,
+                note=f"Checkout session completed but payment is unpaid: {session_id}",
+            )
+
+            logger.warning(
+                "Checkout session completed but payment is unpaid: %s",
+                session_id,
+            )
 
 
 @djstripe_receiver("checkout.session.expired")

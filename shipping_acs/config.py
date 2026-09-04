@@ -2,9 +2,25 @@
 
 Single source of truth for "structural" per-provider config (locker
 kinds, nearest-search limit, weight bounds, default country, map
-chrome). Hardcoded defaults live alongside each accessor so the code
-path always works even when the metadata seed migration hasn't run
-yet (e.g. on a fresh `migrate --run-syncdb` in CI).
+chrome).
+
+The constants below are NOT dead seed duplicates — they are the
+per-key default for an operator-editable JSON blob, and they carry
+three loads the seed cannot:
+
+* ``metadata`` is edited in Django admin, so any single key can be
+  deleted or set to something unusable; each accessor falls back
+  per key rather than per blob.
+* They clamp invalid values (a ``print_type`` of 7, a weight that
+  will not parse as a Decimal) instead of dead-lettering the label
+  download or the picker.
+* ``print_type`` has no seeded value at all, so the constant is its
+  only source.
+
+Where a key IS seeded, the two must agree; that is asserted by
+``TestSeedAndFallbackAgree`` in
+``tests/unit/shipping_acs/test_metadata_driven_config.py`` rather
+than left to this comment.
 
 All accessors are cheap — a single ``.objects.only("metadata").first()``
 call per request. They cache the metadata dict on the resolver to
@@ -29,10 +45,9 @@ from django.conf import settings as django_settings
 
 logger = logging.getLogger(__name__)
 
-# Fallback constants — used only when the metadata seed migration
-# hasn't run yet OR when an operator deletes a key. Document any
-# change here in ``shipping/migrations/0004_seed_provider_metadata.py``
-# so the seed and the fallback agree.
+# Per-key defaults. Changing a value that the seed migration also
+# writes means changing both — see the module docstring, and the test
+# that enforces it.
 _DEFAULT_SHOP_KINDS_BY_COUNTRY: dict[str, list[int]] = {
     "GR": [7, 8],
     "CY": [7],

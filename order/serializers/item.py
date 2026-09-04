@@ -84,7 +84,7 @@ class OrderItemWriteSerializer(serializers.ModelSerializer[OrderItem]):
         product = attrs.get("product")
         quantity = attrs.get("quantity")
 
-        if product and hasattr(product, "stock") and product.stock < quantity:
+        if product and product.stock < quantity:
             raise serializers.ValidationError(
                 {
                     "quantity": _(
@@ -118,7 +118,7 @@ class OrderItemCreateSerializer(serializers.ModelSerializer[OrderItem]):
         product = attrs.get("product")
         quantity = attrs.get("quantity")
 
-        if product and hasattr(product, "stock") and product.stock < quantity:
+        if product and product.stock < quantity:
             raise serializers.ValidationError(
                 {
                     "quantity": _(

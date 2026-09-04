@@ -142,10 +142,6 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             return ""
 
     @property
-    def display_name(self) -> str:
-        return self.safe_translation_getter("name", any_language=True) or ""
-
-    @property
     def has_configuration(self) -> bool:
         return bool(self.configuration)
 
@@ -169,21 +165,6 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     @property
     def effective_cost(self) -> float:
         return float(self.cost.amount) if self.cost else 0.0
-
-    def is_free_for_amount(self, amount: float) -> bool:
-        if not self.free_threshold:
-            return False
-        return amount >= float(self.free_threshold.amount)
-
-    def get_configuration_value(self, key: str, default=None):
-        if not self.configuration:
-            return default
-        return self.configuration.get(key, default)
-
-    def set_configuration_value(self, key: str, value) -> None:
-        if not self.configuration:
-            self.configuration = {}
-        self.configuration[key] = value
 
     def clean(self) -> None:
         super().clean()

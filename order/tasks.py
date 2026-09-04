@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from django.db import connection, transaction
 from django.db.models import F
+from django.template import TemplateDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import strip_tags
@@ -28,6 +29,7 @@ from tenant.credentials import (
 )
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderHistory
+from order.models.order import AMOUNT_MISMATCH_FLAG
 from order.services import OrderService
 from user.utils.subscription import (
     build_list_unsubscribe_headers,
@@ -66,27 +68,14 @@ CONFIRMATION_EMAIL_LOCK_PREFIX = "order:confirm_email_lock:"
 # enough that a dead worker's lock expires quickly so a retry can proceed.
 CONFIRMATION_EMAIL_LOCK_TTL = 90  # seconds
 
-# Legacy flag name — kept so existing metadata rows are still readable
-# by _release_confirmation_email (used in existing tests).
-CONFIRMATION_EMAIL_SENT_FLAG = "confirmation_email_sent"
-
 
 def _confirmation_lock_key(order_id: int) -> str:
     return f"{CONFIRMATION_EMAIL_LOCK_PREFIX}{order_id}"
 
 
 def _confirmation_already_sent(metadata: dict | None) -> bool:
-    """Return True if the permanent DB timestamp shows the email was sent.
-
-    The boolean ``CONFIRMATION_EMAIL_SENT_FLAG`` is checked as a
-    fallback because pre-timestamp-key orders persisted in the DB
-    only have that key set. New writes use the timestamp only.
-    """
-    meta = metadata or {}
-    return bool(
-        meta.get(CONFIRMATION_EMAIL_SENT_AT_KEY)
-        or meta.get(CONFIRMATION_EMAIL_SENT_FLAG)
-    )
+    """Return True if the permanent DB timestamp shows the email was sent."""
+    return bool((metadata or {}).get(CONFIRMATION_EMAIL_SENT_AT_KEY))
 
 
 def _mark_confirmation_sent(order_id: int) -> None:
@@ -114,14 +103,7 @@ def _release_confirmation_email(order_id: int) -> None:
         order = Order.objects.select_for_update().filter(id=order_id).first()
         if order is None or not order.metadata:
             return
-        changed = False
-        for key in (
-            CONFIRMATION_EMAIL_SENT_AT_KEY,
-            CONFIRMATION_EMAIL_SENT_FLAG,
-        ):
-            if order.metadata.pop(key, None) is not None:
-                changed = True
-        if changed:
+        if order.metadata.pop(CONFIRMATION_EMAIL_SENT_AT_KEY, None) is not None:
             order.save(update_fields=["metadata"])
     cache.delete(_confirmation_lock_key(order_id))
 
@@ -399,8 +381,10 @@ def send_dispute_notification_email(
             html_content = render_to_string(
                 "emails/order/dispute_notification.html", context
             )
-        except Exception:
-            # Fallback plain-text if template not yet authored
+        except TemplateDoesNotExist:
+            # ONLY a missing template. Both dispute templates exist, so
+            # catching every exception here could only mask a real render
+            # bug behind an inline plain-text body nobody would notice.
             text_content = (
                 f"A Stripe dispute has been opened for Order #{order_id}.\n"
                 f"Dispute ID: {dispute_id}\n"
@@ -530,7 +514,7 @@ PAYMENT_FAILED_EMAIL_SENT_FLAG = "payment_failed_email_sent"
 def _reserve_payment_failed_email(order_id: int) -> bool:
     """Atomically claim the payment-failed-email slot for an order.
 
-    Mirrors `_reserve_confirmation_email` so concurrent webhook
+    Reserve-before-send, so concurrent webhook
     deliveries (Stripe + Viva, or retries) cannot both send the email.
     Returns True if this caller won the race and should proceed,
     False if another caller already claimed it. Raises
@@ -569,7 +553,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
     retry URL so the customer can attempt the payment again without
     starting a new order.
     """
-    reserved_this_call = False
+    email_sent = False
     try:
         if self.request.retries == 0:
             if not _reserve_payment_failed_email(order_id):
@@ -578,13 +562,10 @@ def send_payment_failed_email(self, order_id: int) -> bool:
                     order_id,
                 )
                 return True
-            reserved_this_call = True
 
-        order = (
-            Order.objects.select_related("user", "pay_way")
-            .prefetch_related("items__product__translations")
-            .get(id=order_id)
-        )
+        # No item prefetch: this email neither passes ``items`` into the
+        # context nor renders a line table.
+        order = Order.objects.select_related("user", "pay_way").get(id=order_id)
 
         retry_url = get_tenant_frontend_url(f"/account/orders/{order.id}")
 
@@ -614,6 +595,7 @@ def send_payment_failed_email(self, order_id: int) -> bool:
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()
+        email_sent = True
 
         OrderHistory.log_note(
             order=order,
@@ -639,10 +621,30 @@ def send_payment_failed_email(self, order_id: int) -> bool:
             f"Error sending payment-failed email for order #{order_id}: {e!s}",
             extra={"order_id": order_id, "error": str(e)},
         )
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second payment-failed email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "payment-failed email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
-        if reserved_this_call:
-            _release_payment_failed_email(order_id)
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_payment_failed_email(order_id)
         return False
 
 
@@ -704,7 +706,7 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
     ``order_status_generic.html``'s REFUNDED branch). Reuses the
     transactional ``List-Unsubscribe`` headers added in PR #4.
     """
-    reserved_this_call = False
+    email_sent = False
     try:
         if self.request.retries == 0:
             try:
@@ -715,7 +717,6 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
                         order_id,
                     )
                     return True
-                reserved_this_call = True
             except Order.DoesNotExist:
                 logger.error(
                     "Could not reserve refund confirmation email — Order #%s "
@@ -729,12 +730,24 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             "user", "country", "region", "pay_way"
         ).get(id=order_id)
 
+        # The label must resolve INSIDE the override below.
+        # get_FOO_display() calls force_str(..., strings_only=True) on the
+        # choice label, and a gettext_lazy proxy is not a protected type —
+        # so it resolved eagerly here, under whatever locale the worker
+        # last left active, and a German customer got a German email with
+        # a Greek status word. PaymentStatus labels are lazy, so passing
+        # the proxy through lets the render resolve it. Its sibling
+        # send_order_status_update_email already does exactly this with
+        # OrderStatus(status).label.
+        status_label = (
+            PaymentStatus(order.payment_status).label
+            if order.payment_status
+            else PaymentStatus.REFUNDED.label
+        )
         context = build_email_context(
             order=order,
             status="REFUNDED",
-            status_display=order.get_payment_status_display()
-            if order.payment_status
-            else "Refunded",
+            status_display=status_label,
             items=order.items.all(),
         )
 
@@ -761,6 +774,7 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()
+        email_sent = True
 
         OrderHistory.log_note(
             order=order,
@@ -789,10 +803,30 @@ def send_refund_confirmation_email(self, order_id: int) -> bool:
             e,
             extra={"order_id": order_id, "error": str(e)},
         )
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second refund confirmation email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "refund confirmation email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
-        if reserved_this_call:
-            _release_refund_confirmation_email(order_id)
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_refund_confirmation_email(order_id)
         return False
 
 
@@ -814,7 +848,7 @@ def send_order_status_update_email(
     On permanent failure the reservation is released so an admin can
     trigger a manual resend.
     """
-    reserved_this_call = False
+    email_sent = False
     try:
         # Only reserve on the first attempt to prevent the flag from
         # blocking legitimate retries after a transient failure.
@@ -827,7 +861,6 @@ def send_order_status_update_email(
                     status,
                 )
                 return True
-            reserved_this_call = True
 
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
@@ -875,7 +908,12 @@ def send_order_status_update_email(
                 html_content = render_to_string(
                     f"{template_base}.html", context
                 )
-            except Exception:
+            except TemplateDoesNotExist:
+                # ONLY a missing template. Catching everything meant a
+                # real render bug in a status template — a bad tag, a
+                # missing context key — silently downgraded the customer
+                # to the generic copy, and nothing ever surfaced that the
+                # specific template was broken.
                 logger.warning(
                     f"Template {template_base} not found, using generic template",
                     extra={"order_id": order_id, "status": status},
@@ -898,6 +936,7 @@ def send_order_status_update_email(
         msg.attach_alternative(html_content, "text/html")
 
         msg.send()
+        email_sent = True
 
         logger.info(
             f"Order status update email sent for order #{order.id} - Status: {status}",
@@ -928,6 +967,21 @@ def send_order_status_update_email(
             extra={"order_id": order_id, "status": status, "error": str(e)},
         )
 
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second order status update email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "order status update email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             logger.info(
                 f"Retrying send_order_status_update_email for order #{order_id} "
@@ -935,8 +989,13 @@ def send_order_status_update_email(
             )
             raise self.retry(exc=e) from e
 
-        if reserved_this_call:
-            _release_status_update_email(order_id, status)
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_status_update_email(order_id, status)
 
         return False
 
@@ -947,7 +1006,7 @@ SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG = "shipping_notification_email_sent"
 def _reserve_shipping_notification_email(order_id: int) -> bool:
     """Atomically claim the shipping-notification-email slot for an order.
 
-    Mirrors ``_reserve_confirmation_email`` so concurrent fires of the
+    Reserve-before-send, so concurrent fires of the
     ``order_shipment_dispatched`` signal (e.g. an admin manually
     re-saving tracking + a carrier event arriving in the same window)
     can't email the customer twice. Raises ``Order.DoesNotExist`` if
@@ -967,10 +1026,33 @@ def _reserve_shipping_notification_email(order_id: int) -> bool:
     return True
 
 
+def _release_shipping_notification_email(order_id: int) -> None:
+    """Clear the shipping-notification reservation on permanent failure.
+
+    Without this the flag outlives the send it was standing in for: the
+    four attempts span ~35 minutes, and if the relay is down for all of
+    them the order keeps ``shipping_notification_email_sent`` forever.
+    The customer is never told the parcel shipped and never gets the
+    tracking number, and re-saving the tracking in the admin is
+    short-circuited by the same flag. The deferral paths above already
+    take care NOT to reserve for exactly this reason.
+    """
+    with transaction.atomic():
+        order = Order.objects.select_for_update().filter(id=order_id).first()
+        if order is None or not order.metadata:
+            return
+        if (
+            order.metadata.pop(SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG, None)
+            is not None
+        ):
+            order.save(update_fields=["metadata"])
+
+
 @celery_app.task(
     base=MonitoredTask, bind=True, max_retries=3, default_retry_delay=300
 )
 def send_shipping_notification_email(self, order_id: int) -> bool:
+    email_sent = False
     try:
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
@@ -1050,6 +1132,7 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         msg.attach_alternative(html_content, "text/html")
 
         msg.send()
+        email_sent = True
 
         logger.info(
             f"Shipping confirmation email sent for order #{order.id}",
@@ -1081,9 +1164,31 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
             extra={"order_id": order_id, "error": str(e)},
         )
 
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second shipping notification email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "shipping notification email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
 
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_shipping_notification_email(order_id)
         return False
 
 
@@ -1155,7 +1260,7 @@ INVOICE_EMAIL_SENT_FLAG = "invoice_email_sent"
 
 
 def _reserve_invoice_email(order_id: int) -> bool:
-    """Mirror of ``_reserve_confirmation_email`` for the invoice email.
+    """Reserve-before-send for the invoice email.
 
     Returns ``True`` when this caller won the race. The flag lives
     under ``Order.metadata`` so it survives task retries and
@@ -1193,7 +1298,7 @@ def send_invoice_email(self, order_id: int) -> bool:
     a retry or a re-fired ``order_completed`` signal doesn't re-send.
     Released on permanent failure so an admin can resend manually.
     """
-    reserved_this_call = False
+    email_sent = False
     try:
         if self.request.retries == 0:
             if not _reserve_invoice_email(order_id):
@@ -1202,19 +1307,32 @@ def send_invoice_email(self, order_id: int) -> bool:
                     order_id,
                 )
                 return True
-            reserved_this_call = True
 
         order = Order.objects.select_related(
             "user", "country", "region", "pay_way"
         ).get(id=order_id)
         invoice = getattr(order, "invoice", None)
         if invoice is None or not invoice.has_document():
-            # No PDF to attach — release the flag so a later generation
-            # can trigger the email.
+            # An invoice row with no PDF is recoverable, so retry rather
+            # than give up on the first look. The myDATA path re-renders
+            # after the MARK lands, and that re-render DELETES the stored
+            # PDF before rendering the replacement — if the render then
+            # fails, the only copy is gone and this task used to release
+            # the flag and return, leaving the customer with no invoice
+            # and nothing recording that one was owed.
+            if invoice is not None and self.request.retries < self.max_retries:
+                logger.warning(
+                    "Invoice PDF for order #%s is not ready — retrying",
+                    order_id,
+                )
+                raise self.retry(countdown=self.default_retry_delay)
+
             _release_invoice_email(order_id)
-            logger.warning(
-                "Invoice email skipped for order #%s — PDF not ready",
+            logger.error(
+                "Invoice email abandoned for order #%s — no PDF after %s "
+                "attempt(s); the invoice needs regenerating by hand",
                 order_id,
+                self.request.retries + 1,
             )
             return False
 
@@ -1255,6 +1373,7 @@ def send_invoice_email(self, order_id: int) -> bool:
         )
 
         msg.send()
+        email_sent = True
 
         logger.info(
             "Invoice email sent for order #%s (%s)",
@@ -1282,10 +1401,30 @@ def send_invoice_email(self, order_id: int) -> bool:
             extra={"order_id": order_id, "error": str(e)},
             exc_info=True,
         )
+        if email_sent:
+            # The message is already with the relay. Whatever failed
+            # after it (the history note, the logging call) must not put
+            # the customer through a second invoice email — the
+            # reservation is only consulted on the first attempt, so a
+            # retry here would send again, up to max_retries times.
+            logger.error(
+                "invoice email for order #%s was sent but the bookkeeping "
+                "after it failed: %s",
+                order_id,
+                e,
+                extra={"order_id": order_id, "error": str(e)},
+            )
+            return True
+
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
-        if reserved_this_call:
-            _release_invoice_email(order_id)
+        # Unconditionally, NOT "if this attempt reserved": the slot is
+        # claimed on attempt 0, which always retries while attempts
+        # remain, so by the time control reaches here the claim was made
+        # by an earlier attempt of this same run and a per-attempt flag
+        # is always False. Guarding on one made the release dead code and
+        # left the flag standing for a send that never happened.
+        _release_invoice_email(order_id)
         return False
 
 
@@ -1524,11 +1663,21 @@ def check_pending_orders() -> int:
     # "complete your order" for those is wrong-audience (prod orders
     # 31/36/38/39 received exactly that in April 2026 while stuck on
     # a failed ACS mint).
-    pending_orders = Order.objects.filter(
-        status=OrderStatus.PENDING,
-        created_at__lt=one_day_ago,
-        reminder_count__lt=max_reminders,
-        pay_way__is_online_payment=True,
+    # Annotated and eager-loaded: the reminder template prints
+    # ``order.total_price``, and Order.total_price_items falls back to an
+    # aggregate query whenever the items_total annotation is absent —
+    # once per order, plus a user dereference for the language. On a
+    # daily sweep over a few hundred stale orders that is thousands of
+    # queries, each swallowed by the per-order try/except.
+    pending_orders = (
+        Order.objects.filter(
+            status=OrderStatus.PENDING,
+            created_at__lt=one_day_ago,
+            reminder_count__lt=max_reminders,
+            pay_way__is_online_payment=True,
+        )
+        .select_related("user", "pay_way")
+        .with_total_amounts()
     )
 
     count = 0
@@ -1690,6 +1839,26 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
         created_at__lt=pending_cutoff,
         pay_way__is_online_payment=True,
     )
+
+    # Never auto-cancel an order Viva confirmed a charge for. The webhook
+    # refuses to mark such an order paid when the amount does not match
+    # the total (usually a shopper paying on a stale checkout tab after
+    # the total moved) and stamps AMOUNT_MISMATCH_FLAG instead. Cancelling
+    # it here would close a CHARGED order with refund_payment=False and
+    # email the customer that it was cancelled. It needs a human.
+    charged = Order.objects.filter(
+        metadata__has_key=AMOUNT_MISMATCH_FLAG
+    ).values_list("id", flat=True)
+    charged_ids = list(charged)
+    if charged_ids:
+        logger.warning(
+            "Skipping auto-cancel for %s order(s) with a confirmed Viva "
+            "charge that did not match the order total: %s",
+            len(charged_ids),
+            charged_ids,
+        )
+        failed_qs = failed_qs.exclude(id__in=charged_ids)
+        pending_qs = pending_qs.exclude(id__in=charged_ids)
 
     canceled_failed = 0
     canceled_pending = 0

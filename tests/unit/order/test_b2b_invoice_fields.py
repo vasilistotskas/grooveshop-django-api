@@ -1,9 +1,8 @@
 """Company-requisite validation on INVOICE orders.
 
-Covers the checksum upgrade on ``billing_vat_id``, the
-``B2B_INVOICE_COMPANY_REQUIRED`` rollout shim (company trio optional
-until the merchant confirms the new storefront is live), and the
-same-as-shipping billing-address snapshot copy.
+Covers the checksum on ``billing_vat_id``, the company identity trio an
+INVOICE order must carry, and the same-as-shipping billing-address
+snapshot copy.
 """
 
 from unittest.mock import patch
@@ -56,26 +55,16 @@ class B2BInvoiceFieldsTestCase(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn("billing_vat_id", serializer.errors)
 
-    def test_company_fields_optional_while_shim_off(self):
-        self._stub_settings(
-            B2B_INVOICING_ENABLED=True, B2B_INVOICE_COMPANY_REQUIRED=False
-        )
-        serializer = OrderCreateFromCartSerializer(data=INVOICE_PAYLOAD)
-        self.assertTrue(serializer.is_valid(), serializer.errors)
-
-    def test_company_trio_required_once_shim_on(self):
-        self._stub_settings(
-            B2B_INVOICING_ENABLED=True, B2B_INVOICE_COMPANY_REQUIRED=True
-        )
+    def test_company_trio_is_required_on_an_invoice(self):
+        """A Greek invoice must name the counterparty."""
+        self._stub_settings(B2B_INVOICING_ENABLED=True)
         serializer = OrderCreateFromCartSerializer(data=INVOICE_PAYLOAD)
         self.assertFalse(serializer.is_valid())
         for field in COMPANY_FIELDS:
             self.assertIn(field, serializer.errors)
 
-    def test_company_trio_satisfies_shim(self):
-        self._stub_settings(
-            B2B_INVOICING_ENABLED=True, B2B_INVOICE_COMPANY_REQUIRED=True
-        )
+    def test_company_trio_satisfies_the_invoice_requirement(self):
+        self._stub_settings(B2B_INVOICING_ENABLED=True)
         serializer = OrderCreateFromCartSerializer(
             data={**INVOICE_PAYLOAD, **COMPANY_FIELDS}
         )
@@ -111,9 +100,7 @@ class B2BInvoiceFieldsTestCase(TestCase):
         self.assertEqual(serializer.validated_data["billing_city"], "Piraeus")
 
     def test_receipt_never_requires_company_fields(self):
-        self._stub_settings(
-            B2B_INVOICING_ENABLED=True, B2B_INVOICE_COMPANY_REQUIRED=True
-        )
+        self._stub_settings(B2B_INVOICING_ENABLED=True)
         serializer = OrderCreateFromCartSerializer(
             data={**BASE_PAYLOAD, "document_type": "RECEIPT"}
         )

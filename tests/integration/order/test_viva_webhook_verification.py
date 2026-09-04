@@ -25,11 +25,17 @@ from order.views.viva_webhook import (
 @pytest.mark.django_db
 class TestVivaReversalVerification:
     def _order(self):
+        # ``viva_order_codes`` carries the codes this order actually
+        # issued. Viva's guidance is to confirm a result with the
+        # COMBINATION of OrderCode and TransactionId, so a verified
+        # transaction that names a code the order never issued is exactly
+        # what the handler must refuse — the fixture has to name a real
+        # one for the happy path to be reachable.
         return OrderFactory(
             status=OrderStatus.PROCESSING,
             payment_status=PaymentStatus.COMPLETED,
             payment_id="viva_txn_1",
-            metadata={},
+            metadata={"viva_order_codes": ["OC1"]},
         )
 
     def test_reversal_flips_to_refunded_when_verified(self):
@@ -98,11 +104,13 @@ class TestVivaReversalVerification:
 @pytest.mark.django_db
 class TestVivaPaymentFailedVerification:
     def _order(self):
+        # See the note above: the order must have issued the code its
+        # verified transaction reports.
         return OrderFactory(
             status=OrderStatus.PENDING,
             payment_status=PaymentStatus.PENDING,
             payment_id="viva_txn_2",
-            metadata={},
+            metadata={"viva_order_codes": ["OC2"]},
         )
 
     def test_failed_flips_to_failed_when_verified(self):

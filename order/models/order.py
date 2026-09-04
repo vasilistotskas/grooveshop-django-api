@@ -27,6 +27,15 @@ from order.managers.order import OrderManager
 from shipping.enum import ShippingKind
 
 
+# Stamped on ``Order.metadata`` when a provider confirms a charge whose
+# amount does not match the order total. The money HAS left the customer,
+# so ``auto_cancel_stuck_pending_orders`` must leave the order for a human
+# rather than closing it with ``refund_payment=False``. Lives here rather
+# than beside either writer: the Viva webhook writes it and a Celery task
+# reads it, and a task must not import a view.
+AMOUNT_MISMATCH_FLAG = "viva_amount_mismatch"
+
+
 class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
     """
     Order model representing a customer purchase.
@@ -336,7 +345,23 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
         verbose_name_plural = _("Orders")
         ordering = ["-created_at"]
         indexes = [
+            # Declaring ``indexes`` REPLACES the abstract parents' list
+            # rather than extending it, so an index a mixin declares
+            # only reaches the tables that splat it back in.
             *TimeStampMixinModel.Meta.indexes,
+            # MetaDataModel's ``metadata`` half, named to match what it
+            # would have produced. It was missing entirely, which left
+            # the Viva webhook's ``metadata__contains`` lookup — run on
+            # every delivery, by a caller that retries hourly — as a
+            # sequential scan of the whole orders table.
+            #
+            # Its ``private_metadata`` half is deliberately NOT taken:
+            # no query in this codebase reads that column on an order
+            # (``MetaDataFilterMixin``, which exposes the only lookup,
+            # is not in OrderFilter's bases), and a GIN index still
+            # costs a pending-list write on every order INSERT and
+            # UPDATE. See tests/unit/core/test_abstract_model_indexes.py.
+            GinIndex(fields=["metadata"], name="order_meta_ix"),
             BTreeIndex(fields=["status"], name="order_status_ix"),
             BTreeIndex(fields=["document_type"], name="order_doc_type_ix"),
             BTreeIndex(
@@ -533,13 +558,26 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
 
     @property
     def is_paid(self) -> bool:
-        return bool(
-            (
-                self.payment_status
-                and self.payment_status == PaymentStatus.COMPLETED
-            )
-            and (self.paid_amount and self.paid_amount.amount > 0)
-        )
+        """True when the order owes nothing.
+
+        ``payment_status`` is the settlement authority — only
+        ``mark_as_paid`` and the provider webhooks set it COMPLETED.
+        Requiring ``paid_amount > 0`` on top of it broke the one case
+        where a settled order legitimately charges zero: deductions
+        (gift card, 100% promotion, full loyalty redemption) covering
+        the whole total. ``OrderService`` settles those without ever
+        involving a provider, and ``paid_amount`` is the REMAINDER the
+        customer owed, which is exactly 0.00 there — so the order
+        reported itself unpaid forever, ``awaits_online_payment`` stayed
+        True, and the checkout endpoints happily opened a zero-amount
+        provider session for it.
+
+        A COMPLETED order can only carry a zero ``paid_amount`` in that
+        case: ``mark_as_paid`` backfills the field from the order total
+        whenever it is unset or zero, so any order that owed money ends
+        up positive.
+        """
+        return self.payment_status == PaymentStatus.COMPLETED
 
     @property
     def awaits_online_payment(self) -> bool:

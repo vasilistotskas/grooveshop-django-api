@@ -60,14 +60,6 @@ def generate_stripe_config():
     }
 
 
-def generate_paypal_config():
-    return {
-        "client_id": fake.uuid4(),
-        "client_secret": fake.lexify(text="?" * 32),
-        "environment": random.choice(["sandbox", "production"]),
-    }
-
-
 def generate_bank_transfer_config():
     return {
         "account_number": fake.numerify(text="##########"),
@@ -78,28 +70,30 @@ def generate_bank_transfer_config():
 
 
 def generate_provider_data():
-    # "stripe" (and "viva_wallet") are deliberately EXCLUDED from this
-    # random pool: PayWayService.is_provider_configured() gates those
-    # two codes on tenant-only credentials with no platform fallback,
-    # so a randomly-drawn "stripe" row is invisible to anonymous
-    # list/retrieve queries unless a tenant Stripe key happens to be
-    # bound — a call site that just wants "some usable pay-way" must
-    # not flake depending on the random seed. Tests that specifically
-    # want Stripe (or Viva Wallet) pass ``provider_code="stripe"``
-    # explicitly and mock ``tenant.credentials.stripe_credentials``.
+    """Draw one coherent OFFLINE pay-way identity.
+
+    Only offline codes are drawn. The two providers this platform can
+    actually charge through — "stripe" and "viva_wallet" — are gated by
+    ``PayWayService.is_provider_configured()`` on tenant-only credentials
+    with no platform fallback, so a randomly-drawn one is invisible to
+    anonymous list/retrieve queries unless a tenant key happens to be
+    bound: a call site that just wants "some usable pay-way" must not
+    flake depending on the random seed. Tests that want an online
+    pay-way call ``create_online_payment`` and mock the credentials.
+    """
     providers = [
-        ("paypal", True, False, generate_paypal_config),
-        ("bank_transfer", False, True, generate_bank_transfer_config),
-        ("cash", False, False, lambda: None),
-        ("", False, False, lambda: None),
+        ("bank_transfer", True, generate_bank_transfer_config),
+        ("cash", False, lambda: None),
+        ("", False, lambda: None),
     ]
 
-    provider = random.choice(providers)
+    provider_code, requires_confirmation, build_config = random.choice(
+        providers
+    )
     return {
-        "provider_code": provider[0],
-        "is_online_payment": provider[1],
-        "requires_confirmation": provider[2],
-        "configuration": provider[3](),
+        "provider_code": provider_code,
+        "requires_confirmation": requires_confirmation,
+        "configuration": build_config(),
     }
 
 
@@ -117,22 +111,28 @@ class PayWayFactory(factory.django.DjangoModelFactory):
         width=256,
         height=256,
     )
-    provider_code = factory.LazyFunction(
-        lambda: generate_provider_data()["provider_code"]
+    # ONE draw feeds all three fields. They were three independent
+    # LazyFunction calls into generate_provider_data(), which handed out
+    # incoherent rows — a "cash" pay-way carrying a bank-transfer
+    # configuration, or an offline code marked is_online_payment=True
+    # (which then failed at checkout with "Unknown payment provider").
+    provider_data = factory.LazyFunction(generate_provider_data)
+    provider_code = factory.LazyAttribute(
+        lambda o: o.provider_data["provider_code"]
     )
-    is_online_payment = factory.LazyFunction(
-        lambda: generate_provider_data()["is_online_payment"]
+    is_online_payment = False
+    requires_confirmation = factory.LazyAttribute(
+        lambda o: o.provider_data["requires_confirmation"]
     )
-    requires_confirmation = factory.LazyFunction(
-        lambda: generate_provider_data()["requires_confirmation"]
-    )
-    configuration = factory.LazyFunction(
-        lambda: generate_provider_data()["configuration"]
+    configuration = factory.LazyAttribute(
+        lambda o: o.provider_data["configuration"]
     )
 
     class Meta:
         model = PayWay
         skip_postgeneration_save = True
+        # Helper value for the declarations above; never a model field.
+        exclude = ("provider_data",)
 
     @factory.post_generation
     def translations(self, create, extracted, **kwargs):
@@ -150,22 +150,18 @@ class PayWayFactory(factory.django.DjangoModelFactory):
 
     @classmethod
     def create_online_payment(cls, provider_code="stripe", **kwargs):
-        config = None
-        if provider_code == "stripe":
-            config = generate_stripe_config()
-        elif provider_code == "paypal":
-            config = generate_paypal_config()
-
-        # These helpers build a *usable* payment method for tests, so
-        # default to active=True (the base factory randomises ``active``).
-        # Order creation now rejects inactive pay-ways, so a randomly
-        # inactive method would flake the checkout tests that use it.
+        # "stripe" is the only online code whose credential shape this
+        # factory knows; any other gets no configuration unless the
+        # caller passes one.
+        kwargs.setdefault(
+            "configuration",
+            generate_stripe_config() if provider_code == "stripe" else None,
+        )
         kwargs.setdefault("active", True)
+        kwargs.setdefault("requires_confirmation", False)
         return cls.create(
             provider_code=provider_code,
             is_online_payment=True,
-            requires_confirmation=False,
-            configuration=config,
             **kwargs,
         )
 
@@ -173,16 +169,17 @@ class PayWayFactory(factory.django.DjangoModelFactory):
     def create_offline_payment(
         cls, provider_code="bank_transfer", requires_confirmation=True, **kwargs
     ):
-        config = None
-        if provider_code == "bank_transfer":
-            config = generate_bank_transfer_config()
-
+        kwargs.setdefault(
+            "configuration",
+            generate_bank_transfer_config()
+            if provider_code == "bank_transfer"
+            else None,
+        )
         kwargs.setdefault("active", True)
         return cls.create(
             provider_code=provider_code,
             is_online_payment=False,
             requires_confirmation=requires_confirmation,
-            configuration=config,
             **kwargs,
         )
 

@@ -36,6 +36,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from django.db import models
+from parler.managers import TranslatableManager, TranslatableQuerySet
 
 if TYPE_CHECKING:
     from typing import Self
@@ -123,65 +124,58 @@ class OptimizedManager(models.Manager):
 
 
 # Parler-compatible versions for translatable models
-try:
-    from parler.managers import TranslatableManager, TranslatableQuerySet
+class TranslatableOptimizedQuerySet(TranslatableQuerySet):
+    """
+    Base QuerySet for Parler translatable models with optimization patterns.
+    """
 
-    class TranslatableOptimizedQuerySet(TranslatableQuerySet):
+    def with_translations(self) -> Self:
+        """Prefetch translations for better performance."""
+        return self.prefetch_related("translations")
+
+    def for_list(self) -> Self:
+        """Return optimized queryset for list views."""
+        return self.with_translations()
+
+    def for_detail(self) -> Self:
+        """Return optimized queryset for detail views."""
+        return self.for_list()
+
+
+class TranslatableOptimizedManager(TranslatableManager):
+    """
+    Base Manager for Parler translatable models.
+
+    Set `queryset_class` to your custom QuerySet class.
+
+    Methods not explicitly defined on the Manager are automatically
+    delegated to the QuerySet via __getattr__.
+    """
+
+    queryset_class: type[TranslatableOptimizedQuerySet] = (
+        TranslatableOptimizedQuerySet
+    )
+
+    def get_queryset(self) -> TranslatableOptimizedQuerySet:
+        return self.queryset_class(self.model, using=self._db)
+
+    def __getattr__(self, name: str) -> Any:
         """
-        Base QuerySet for Parler translatable models with optimization patterns.
+        Delegate unknown attributes to the queryset.
+
+        Methods starting with underscore raise AttributeError to prevent
+        access to private/protected attributes.
         """
+        if name.startswith("_"):
+            raise AttributeError(
+                f"'{type(self).__name__}' object has no attribute '{name}'"
+            )
+        return getattr(self.get_queryset(), name)
 
-        def with_translations(self) -> Self:
-            """Prefetch translations for better performance."""
-            return self.prefetch_related("translations")
+    def for_list(self) -> TranslatableOptimizedQuerySet:
+        """Return optimized queryset for list views."""
+        return self.get_queryset().for_list()
 
-        def for_list(self) -> Self:
-            """Return optimized queryset for list views."""
-            return self.with_translations()
-
-        def for_detail(self) -> Self:
-            """Return optimized queryset for detail views."""
-            return self.for_list()
-
-    class TranslatableOptimizedManager(TranslatableManager):
-        """
-        Base Manager for Parler translatable models.
-
-        Set `queryset_class` to your custom QuerySet class.
-
-        Methods not explicitly defined on the Manager are automatically
-        delegated to the QuerySet via __getattr__.
-        """
-
-        queryset_class: type[TranslatableOptimizedQuerySet] = (
-            TranslatableOptimizedQuerySet
-        )
-
-        def get_queryset(self) -> TranslatableOptimizedQuerySet:
-            return self.queryset_class(self.model, using=self._db)
-
-        def __getattr__(self, name: str) -> Any:
-            """
-            Delegate unknown attributes to the queryset.
-
-            Methods starting with underscore raise AttributeError to prevent
-            access to private/protected attributes.
-            """
-            if name.startswith("_"):
-                raise AttributeError(
-                    f"'{type(self).__name__}' object has no attribute '{name}'"
-                )
-            return getattr(self.get_queryset(), name)
-
-        def for_list(self) -> TranslatableOptimizedQuerySet:
-            """Return optimized queryset for list views."""
-            return self.get_queryset().for_list()
-
-        def for_detail(self) -> TranslatableOptimizedQuerySet:
-            """Return optimized queryset for detail views."""
-            return self.get_queryset().for_detail()
-
-except ImportError:
-    # Parler not installed, provide stub classes
-    TranslatableOptimizedQuerySet = OptimizedQuerySet  # type: ignore[misc]  # ty: ignore[invalid-assignment]
-    TranslatableOptimizedManager = OptimizedManager  # type: ignore[misc]  # ty: ignore[invalid-assignment]
+    def for_detail(self) -> TranslatableOptimizedQuerySet:
+        """Return optimized queryset for detail views."""
+        return self.get_queryset().for_detail()

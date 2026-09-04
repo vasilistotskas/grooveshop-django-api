@@ -453,6 +453,11 @@ REST_FRAMEWORK = {
         "payment_anon": None if DEBUG else "5/minute",
         "cart_mutation": None if DEBUG else "60/minute",
         "cart_mutation_anon": None if DEBUG else "30/minute",
+        # Order creation moves stock, can mint a courier voucher and can
+        # open a provider payment session — and guest checkout means the
+        # anonymous budget is the one that matters.
+        "order_create": None if DEBUG else "20/minute",
+        "order_create_anon": None if DEBUG else "10/minute",
         # Coupon apply is a code-guessing oracle — keep the budget tight.
         "coupon_apply": None if DEBUG else "10/minute",
         # Gift-card balance check exposes a bearer secret's validity.
@@ -1542,14 +1547,6 @@ EXTRA_SETTINGS_DEFAULTS = [
     # wholesale. One switch, so the two halves can never disagree.
     {
         "name": "B2B_LOYALTY_ENABLED",
-        "type": "bool",
-        "value": False,
-    },
-    # Rollout shim: require company name/ΔΟΥ/activity on INVOICE
-    # orders. Stays False until the storefront release that sends
-    # those fields is live, else the deployed checkout breaks.
-    {
-        "name": "B2B_INVOICE_COMPANY_REQUIRED",
         "type": "bool",
         "value": False,
     },

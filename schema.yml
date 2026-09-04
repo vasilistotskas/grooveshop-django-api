@@ -14480,10 +14480,10 @@ paths:
   /api/v1/order/{id}/acs_label:
     get:
       operationId: getAcsLabelForOrder
-      description: Μεταδίδει το PDF ετικέτας ACS μέσω ταυτοποίησης Django. Προσβάσιμο
-        από τον ιδιοκτήτη της παραγγελίας, το προσωπικό, ή έναν επισκέπτη με το UUID
-        της παραγγελίας. Επιστρέφει 404 όταν δεν υπάρχει αποστολή ACS για την παραγγελία
-        ή δεν έχει εκδοθεί ακόμα το voucher.
+      description: Streams the ACS label PDF through Django auth. Accessible by the
+        order owner or store staff; guest orders cannot download labels. Returns 404
+        when no ACS shipment exists for the order or the voucher has not been minted
+        yet.
       summary: Λήψη του PDF ετικέτας voucher ACS για παραγγελία
       parameters:
       - in: path
@@ -14650,10 +14650,10 @@ paths:
   /api/v1/order/{id}/boxnow_label:
     get:
       operationId: getBoxNowLabelForOrder
-      description: Μεταδίδει το PDF ετικέτας BoxNow μέσω ταυτοποίησης Django. Προσβάσιμο
-        από τον ιδιοκτήτη της παραγγελίας, το προσωπικό, ή έναν επισκέπτη με το UUID
-        της παραγγελίας. Επιστρέφει 404 όταν δεν υπάρχει αποστολή BoxNow για την παραγγελία
-        ή δεν έχει ακόμα ανατεθεί ID δέματος.
+      description: Streams the BoxNow label PDF through Django auth. Accessible by
+        the order owner or store staff; guest orders cannot download labels. Returns
+        404 when no BoxNow shipment exists for the order or the parcel ID has not
+        yet been assigned.
       summary: Λήψη του PDF ετικέτας δέματος BoxNow για παραγγελία
       parameters:
       - in: path
@@ -15350,9 +15350,10 @@ paths:
           description: ''
         '200':
           content:
-            application/json:
+            application/pdf:
               schema:
-                $ref: '#/components/schemas/OrderDetail'
+                type: string
+                format: binary
           description: ''
   /api/v1/order/{id}/update_status:
     post:
@@ -35652,6 +35653,12 @@ components:
       - status
     CreatePaymentIntentRequestRequest:
       type: object
+      description: |-
+        Request body for ``create_payment_intent`` and ``retry_payment``.
+
+        The three named fields are declared because both views read them off
+        ``validated_data`` — undeclared, DRF dropped them and the branches
+        that copy them into ``payment_data`` could never fire.
       properties:
         paymentData:
           type: object
@@ -35660,6 +35667,22 @@ components:
             minLength: 1
             maxLength: 500
           description: Επιπλέον δεδομένα πληρωμής που απαιτούνται από τον πάροχο πληρωμών
+        paymentMethodId:
+          type: string
+          description: Provider payment-method id to charge
+          maxLength: 255
+        customerId:
+          type: string
+          description: Provider customer id to attach the payment to
+          maxLength: 255
+        returnUrl:
+          description: Where the provider should send the shopper back to
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 500
+          - type: string
+            maxLength: 0
     CreatePaymentIntentResponse:
       type: object
       properties:
@@ -38337,15 +38360,10 @@ components:
         customerNotes:
           type: string
           title: Σημειώσεις Πελάτη
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/OrderItemCreateRequest'
       required:
       - city
       - email
       - firstName
-      - items
       - lastName
       - phone
       - street
@@ -40300,10 +40318,6 @@ components:
         customerNotes:
           type: string
           title: Σημειώσεις Πελάτη
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/OrderItemCreateRequest'
     PatchedPageLayoutRequest:
       type: object
       properties:

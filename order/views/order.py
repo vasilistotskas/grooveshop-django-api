@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -9,7 +8,7 @@ from django.db import transaction
 from django.http import FileResponse
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from djmoney.money import Money
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
     extend_schema,
@@ -35,6 +34,8 @@ from core.api.permissions import (
 )
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import (
+    OrderCreateAnonThrottle,
+    OrderCreateThrottle,
     PaymentAttemptAnonThrottle,
     PaymentAttemptThrottle,
     VivaReturnThrottle,
@@ -76,8 +77,6 @@ from order.serializers.order import (
     OrderSerializer,
     OrderWriteSerializer,
     PaymentStatusResponseSerializer,
-    RefundOrderRequestSerializer,
-    RefundOrderResponseSerializer,
     ReorderResponseSerializer,
     UpdateStatusSerializer,
     VivaReturnLookupResponseSerializer,
@@ -176,17 +175,6 @@ serializers_config: SerializersConfig = {
         ),
         tags=["Orders"],
     ),
-    "refund_order": ActionConfig(
-        request=RefundOrderRequestSerializer,
-        response=RefundOrderResponseSerializer,
-        operation_id="refundOrder",
-        summary=_("Refund an order payment"),
-        description=_(
-            "Process a full or partial refund for an order's payment. "
-            "Only available for paid orders with valid payment providers."
-        ),
-        tags=["Orders"],
-    ),
     "payment_status": ActionConfig(
         response=PaymentStatusResponseSerializer,
         operation_id="getOrderPaymentStatus",
@@ -251,9 +239,10 @@ serializers_config: SerializersConfig = {
         summary=_("Download the BoxNow parcel label PDF for an order"),
         description=_(
             "Streams the BoxNow label PDF through Django auth. "
-            "Accessible by the order owner, staff, or a guest with the "
-            "order UUID. Returns 404 when no BoxNow shipment exists for "
-            "the order or the parcel ID has not yet been assigned."
+            "Accessible by the order owner or store staff; guest "
+            "orders cannot download labels. Returns 404 when no BoxNow "
+            "shipment exists for the order or the parcel ID has not yet "
+            "been assigned."
         ),
         tags=["Orders"],
     ),
@@ -271,14 +260,20 @@ serializers_config: SerializersConfig = {
         summary=_("Download the ACS voucher label PDF for an order"),
         description=_(
             "Streams the ACS label PDF through Django auth. "
-            "Accessible by the order owner, staff, or a guest with the "
-            "order UUID. Returns 404 when no ACS shipment exists for "
-            "the order or the voucher has not been minted yet."
+            "Accessible by the order owner or store staff; guest orders "
+            "cannot download labels. Returns 404 when no ACS shipment "
+            "exists for the order or the voucher has not been minted yet."
         ),
         tags=["Orders"],
     ),
     "shipment_label": ActionConfig(
-        response=OrderDetailSerializer,
+        # Streams application/pdf. Declaring OrderDetailSerializer here
+        # put a JSON 200 in schema.yml, so the generated storefront
+        # client expected a body it never receives. The (status,
+        # media_type) key is what makes the schema say application/pdf
+        # instead of inheriting the view's JSON renderer — verified
+        # against the generated output, not assumed.
+        responses={(200, "application/pdf"): OpenApiTypes.BINARY},
         operation_id="getShipmentLabelForOrder",
         summary=_("Download the carrier label PDF for an order"),
         description=_(
@@ -394,7 +389,6 @@ class OrderViewSet(BaseModelViewSet):
             "destroy",
             "add_tracking",
             "update_status",
-            "refund_order",
             "boxnow_cancel",
             "acs_cancel",
             "shipment_cancel",
@@ -425,8 +419,9 @@ class OrderViewSet(BaseModelViewSet):
         elif self.action in public_actions:
             self.permission_classes = []
         else:
-            # ``list`` (every order in the store) and any future
-            # unclassified action: staff surface, method-mapped.
+            # Any future unclassified action: staff surface,
+            # method-mapped. (``list`` does NOT reach here — it is in
+            # owner_or_admin_actions above.)
             self.permission_classes = [StoreStaffModelPermissions]
 
         return super().get_permissions()
@@ -477,22 +472,11 @@ class OrderViewSet(BaseModelViewSet):
     def get_object(self):
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
         order_id: str = self.kwargs[lookup_url_kwarg]
-        max_order_id_length = 8
 
         try:
-            if (
-                isinstance(order_id, str)
-                and len(order_id) > max_order_id_length
-                and "-" in order_id
-            ):
-                try:
-                    uuid.UUID(order_id)
-                    obj = OrderService.get_order_by_uuid(order_id)
-                    self.check_object_permissions(self.request, obj)
-                    return obj
-                except ValueError, TypeError:
-                    pass
-
+            # No UUID branch: every route in order/urls.py binds
+            # ``<int:pk>``, so a UUID string can never reach this lookup.
+            # Guest access by UUID is its own route (retrieve_by_uuid).
             obj = OrderService.get_order_by_id(int(order_id))
             self.check_object_permissions(self.request, obj)
             return obj
@@ -580,6 +564,19 @@ class OrderViewSet(BaseModelViewSet):
                     ]
                 }
             )
+
+    def get_throttles(self):
+        # Guest checkout is AllowAny, and creating an order moves stock,
+        # can mint a courier voucher and can open a provider payment
+        # session. The global anon/user budgets are day-scale ceilings
+        # and do not bound a burst, so this action carries its own.
+        if self.action == "create":
+            return [
+                OrderCreateThrottle(),
+                OrderCreateAnonThrottle(),
+                *super().get_throttles(),
+            ]
+        return super().get_throttles()
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -1281,11 +1278,8 @@ class OrderViewSet(BaseModelViewSet):
             # Reset per-flow idempotency flags so the confirmation
             # email can fire again on the (expected) new
             # payment_intent.succeeded, and the customer can be
-            # re-notified of any new failure. Both the boolean key
-            # (set on pre-timestamp orders) and the timestamp key
-            # (current) are popped so a retried payment always
-            # re-arms the email regardless of which key is set.
-            locked_order.metadata.pop("confirmation_email_sent", None)
+            # re-notified of any new failure, so the sent-at stamp is
+            # cleared and the confirmation re-arms.
             locked_order.metadata.pop("confirmation_email_sent_at", None)
             locked_order.metadata.pop("payment_failed_email_sent", None)
             locked_order.save(
@@ -1415,10 +1409,9 @@ class OrderViewSet(BaseModelViewSet):
         # concurrent checkout-session creation (double-click, retry)
         # can't lose-update the metadata JSON. For Viva every issued
         # orderCode must survive: the shopper may complete payment on any
-        # session, and the webhook + return endpoint resolve the order by
-        # whichever code was actually paid (see viva_order_code_q). The
-        # singular ``viva_order_code`` stays the latest for the return
-        # endpoint's documented ``s`` fallback.
+        # session, and both the webhook and the return endpoint resolve
+        # the order by whichever code was actually paid, from the one
+        # list (see viva_order_code_q).
         with transaction.atomic():
             locked = Order.objects.select_for_update().get(pk=order.pk)
             metadata = locked.metadata or {}
@@ -1428,7 +1421,6 @@ class OrderViewSet(BaseModelViewSet):
                 if new_code not in codes:
                     codes.append(new_code)
                 metadata["viva_order_codes"] = codes
-                metadata["viva_order_code"] = new_code
             else:
                 metadata["stripe_checkout_session_id"] = checkout_response[
                     "session_id"
@@ -1671,7 +1663,7 @@ class OrderViewSet(BaseModelViewSet):
             "the storefront can forward the customer to the canonical "
             "``/checkout/success/{uuid}`` route. ``t`` resolves via "
             "``payment_id`` (set by the webhook, may lag the redirect); "
-            "``s`` resolves via the ``viva_order_code`` stored at "
+            "``s`` resolves via the ``viva_order_codes`` recorded at "
             "session creation, so it works during the webhook race. "
             "Permission is open because both keys are unguessable "
             "Viva-generated identifiers and the response carries no PII "
@@ -1719,8 +1711,10 @@ class OrderViewSet(BaseModelViewSet):
 
         1. ``t`` → ``payment_id``: authoritative, but only populated
            once the webhook has fired (can lag by tens of seconds).
-        2. ``s`` → ``metadata.viva_order_code``: written at session
-           creation, so it resolves during the webhook race window.
+        2. ``s`` → ``metadata.viva_order_codes``: every code this
+           order has issued, recorded at session creation, so it
+           resolves during the webhook race window — and a shopper
+           who pays on an earlier session still resolves.
 
         ``eventId`` is deliberately NOT a lookup key — an earlier
         revision assumed it echoed ``merchantTrns`` (our order UUID),
@@ -2032,78 +2026,6 @@ class OrderViewSet(BaseModelViewSet):
             logger.error("Error updating order status: %s", e, exc_info=True)
             return Response(
                 {"detail": _("An unexpected error occurred")},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    @action(detail=True, methods=["POST"])
-    def refund_order(self, request, *args, **kwargs):
-        """Process full or partial refund for an order."""
-        order = self.get_object()
-
-        request_serializer_class = self.get_request_serializer()
-        request_serializer = request_serializer_class(data=request.data)
-        request_serializer.is_valid(raise_exception=True)
-
-        validated_data = request_serializer.validated_data
-
-        refund_amount = None
-        if validated_data.get("amount"):
-            currency = validated_data.get(
-                "currency", str(order.total_price.currency)
-            )
-            refund_amount = Money(validated_data["amount"], currency)
-
-        try:
-            success, response_data = OrderService.refund_order(
-                order=order,
-                amount=refund_amount,
-                reason=validated_data.get("reason", ""),
-                refunded_by=request.user.id
-                if request.user.is_authenticated
-                else None,
-            )
-
-            if not success:
-                return Response(
-                    {
-                        "detail": _("Failed to process refund."),
-                        "error": response_data.get("error"),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            response_data["success"] = True
-            response_data["message"] = _("Refund processed successfully.")
-
-            response_serializer_class = self.get_response_serializer()
-            response_serializer = response_serializer_class(data=response_data)
-            response_serializer.is_valid(raise_exception=True)
-
-            return Response(response_serializer.validated_data)
-
-        except ValueError as e:
-            logger.warning(
-                "Refund validation error for order %s: %s",
-                order.id,
-                e,
-            )
-            return Response(
-                {"detail": _("Unable to process refund for this order.")},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as e:
-            logger.error(
-                "Error processing refund for order %s: %s",
-                order.id,
-                e,
-                exc_info=True,
-            )
-            return Response(
-                {
-                    "detail": _(
-                        "An error occurred while processing the refund."
-                    ),
-                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

@@ -193,9 +193,18 @@ class StockManager:
         # Lock the reservation row so a concurrent release / convert-to-sale
         # can't both pass the already-consumed check below and double-process
         # it (G0289).
+        #
+        # ``of=("self",)`` so ONLY the reservation is locked. Django locks
+        # every row a select_for_update query selects, "including those
+        # from related objects" — so the plain select_related("product")
+        # here also took a FOR UPDATE on the product, which this method
+        # explicitly does not touch. That gave the codebase two lock
+        # orders for the same pair of rows (reserve_stock and
+        # decrement_stock take product first, then reservations) and a
+        # deadlock window on any contended product.
         try:
             reservation = (
-                StockReservation.objects.select_for_update()
+                StockReservation.objects.select_for_update(of=("self",))
                 .select_related("product")
                 .get(id=reservation_id)
             )
@@ -272,15 +281,33 @@ class StockManager:
             ... )
             # Reservation marked as consumed, stock decremented, audit log created
         """
-        # Lock the reservation row (then the product below) so a concurrent
-        # release / convert can't both pass the consumed/expired checks and
-        # double-decrement stock (G0289).
+        # PRODUCT FIRST, then the reservation — the same order
+        # ``reserve_stock`` and ``decrement_stock(respect_reservations=True)``
+        # use. Taking the reservation first (which the plain
+        # select_related also locked the product through, since Django
+        # locks related rows too) gave two opposite lock orders for one
+        # pair of rows: a checkout converting a reservation and a cart
+        # reserving the same hot product could each hold what the other
+        # was waiting for, and PostgreSQL aborted one of them.
+        #
+        # The product id is read without a lock purely to know WHICH
+        # product row to lock; every check that matters happens after
+        # both locks are held.
         try:
-            reservation = (
-                StockReservation.objects.select_for_update()
-                .select_related("product")
-                .get(id=reservation_id)
+            product_id = StockReservation.objects.values_list(
+                "product_id", flat=True
+            ).get(id=reservation_id)
+        except StockReservation.DoesNotExist:
+            raise StockReservationError(
+                f"Reservation {reservation_id} not found"
             )
+
+        product = Product.objects.select_for_update().get(id=product_id)
+
+        try:
+            reservation = StockReservation.objects.select_for_update(
+                of=("self",)
+            ).get(id=reservation_id)
         except StockReservation.DoesNotExist:
             raise StockReservationError(
                 f"Reservation {reservation_id} not found"
@@ -298,13 +325,6 @@ class StockManager:
             raise StockReservationError(
                 f"Reservation {reservation_id} has expired at {reservation.expires_at}"
             )
-
-        # Lock the product row using SELECT FOR UPDATE to prevent race conditions
-        # This ensures no other transaction can modify the product's stock
-        # until this transaction completes
-        product = Product.objects.select_for_update().get(
-            id=reservation.product_id
-        )
 
         # Validate sufficient stock
         # This should always pass if the reservation was valid, but we check
@@ -551,6 +571,7 @@ class StockManager:
         delta: int,
         reason: str = "admin order item edit",
         performed_by=None,
+        order_id: int | None = None,
     ) -> None:
         """
         Adjust a product's stock by a signed delta with a full audit log.
@@ -568,6 +589,11 @@ class StockManager:
                           consume.
             reason:       Human-readable reason written to StockLog.
             performed_by: Optional UserAccount instance (None for system ops).
+            order_id:     Order this movement belongs to, when there is one.
+                          ``cancel_order`` restores stock by summing the
+                          physical movements logged AGAINST THE ORDER, so an
+                          unattributed adjustment is stock the order can never
+                          give back.
         """
         if delta == 0:
             return
@@ -587,14 +613,27 @@ class StockManager:
         locked._change_reason = "StockManager: adjust_stock"
         locked.save(update_fields=["stock", "updated_at"])
 
+        # Log what MOVED, not what was asked for. The floor above can
+        # make those differ (2 on the shelf, delta -5, stock lands on 0
+        # having moved 2), and the log is read back as fact:
+        # ``cancel_order`` restores an order by summing its
+        # ``quantity_delta`` rows, so recording -5 there would put three
+        # units on the shelf that never left it. Keeping
+        # ``stock_before + quantity_delta == stock_after`` true is the
+        # whole point of an audit row.
+        applied = locked.stock - stock_before
         StockLog.objects.create(
             product=locked,
-            order=None,
+            order_id=order_id,
             operation_type=operation_type,
-            quantity_delta=delta,
+            quantity_delta=applied,
             stock_before=stock_before,
             stock_after=locked.stock,
-            reason=reason,
+            reason=(
+                reason
+                if applied == delta
+                else f"{reason} (requested {delta}, floored at 0)"
+            ),
             performed_by=performed_by,
         )
 
@@ -735,9 +774,14 @@ class StockManager:
 
         # Bulk-mark all expired reservations as consumed in a single UPDATE.
         reservation_ids = [r.id for r in expired_reservations]
-        StockReservation.objects.filter(id__in=reservation_ids).update(
-            consumed=True, updated_at=now
-        )
+        # ``consumed=False`` in the filter as well as the SELECT above: a
+        # reservation converted to a sale in between must not be re-marked
+        # here. (A converted one can still get a RELEASE audit row from the
+        # loop below — a spurious log line in a narrow race, not a stock
+        # error, since neither operation moves physical stock.)
+        StockReservation.objects.filter(
+            id__in=reservation_ids, consumed=False
+        ).update(consumed=True, updated_at=now)
 
         # Build StockLog entries for the audit trail.
         # Releasing a reservation does not change physical stock — stock_before

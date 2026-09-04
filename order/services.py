@@ -5,13 +5,17 @@ from typing import Any, ClassVar
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Sum
 from django.utils import timezone
 from django.utils.translation import get_language, gettext_lazy as _
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.exceptions import (
     InsufficientStockError,
     InvalidCouponError,
@@ -30,6 +34,7 @@ from order.exceptions import (
 from order.models.item import OrderItem
 from order.models.order import Order
 from promotion.services import CouponService, PromotionEngine
+from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
 from order.signals import order_refunded
 from order.stock import StockManager
@@ -41,12 +46,18 @@ logger = logging.getLogger(__name__)
 # Stripe/Viva do NOT guarantee delivery order, so e.g. a delayed
 # ``payment_failed`` event could arrive after a ``charge.refunded`` event
 # that already moved the order to REFUNDED — that must not regress it to FAILED.
-SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
+# Statuses for which a courier shipment is still meaningful. Anything
+# else has either not been paid for yet or is already done with its
+# voucher; see handle_payment_succeeded.
+# Online providers that settle by redirecting the shopper off-site: the
+# order is created BEFORE any money moves, so a partial deduction is not
+# the client error it is for the intent-first providers.
+_REDIRECT_PROVIDER_CODES: frozenset[str] = frozenset({"viva_wallet"})
+
+_SHIPMENT_DISPATCHABLE_STATUSES: frozenset[str] = frozenset(
     {
-        PaymentStatus.COMPLETED,
-        PaymentStatus.REFUNDED,
-        PaymentStatus.PARTIALLY_REFUNDED,
-        PaymentStatus.CANCELED,
+        OrderStatus.PENDING,
+        OrderStatus.PROCESSING,
     }
 )
 
@@ -248,6 +259,10 @@ class OrderService:
                     quantity=gift.quantity,
                     order_id=order.id,
                     reason="promotion_gift",
+                    # Same rule as the paid-line shortfall below (G0284):
+                    # a free gift must not be taken out of stock another
+                    # session is actively holding.
+                    respect_reservations=True,
                 )
             except Exception as exc:
                 logger.warning(
@@ -1406,8 +1421,18 @@ class OrderService:
                         e,
                         exc_info=True,
                     )
-                    # Don't fail the order creation, just log the error
-                    # The points won't be redeemed if this fails
+                    # Fail loud, like the payment-first path. The offline
+                    # providers (COD, Viva) have no amount guard, so
+                    # swallowing this charged the shopper the undiscounted
+                    # total while the checkout sidebar had shown the
+                    # discount and the points stayed unspent — the exact
+                    # outcome _evaluate_promotions' docstring says a
+                    # refused discount must never produce. Raising rolls
+                    # the whole creation back so the shopper retries and
+                    # sees a price that matches what they are charged.
+                    raise InvalidOrderDataError(
+                        str(_("Loyalty redemption failed."))
+                    ) from e
 
             # Step 6.6: Record promotion redemptions (rows + metadata)
             # for the evaluation done under lock at Step 2.5.
@@ -1473,9 +1498,10 @@ class OrderService:
                     payment_id=settle_id,
                     payment_method=settle_method,
                 )
-            elif pay_way.is_online_payment and pay_way.provider_code not in {
-                "viva_wallet"
-            }:
+            elif (
+                pay_way.is_online_payment
+                and pay_way.provider_code not in _REDIRECT_PROVIDER_CODES
+            ):
                 if gift_card_codes:
                     raise InvalidGiftCardError(
                         reason="gift_card_insufficient",
@@ -1782,90 +1808,83 @@ class OrderService:
         SHIPPED → RETURNED must not tell the customer "your order is on
         the way" moments before the return notification.
         """
-        try:
-            if not new_status:
-                raise ValueError("New status cannot be empty")
+        if not new_status:
+            raise ValueError("New status cannot be empty")
 
-            # Lock + re-read the CURRENT status so concurrent transitions
-            # serialize and validate against the committed row, not the
-            # caller's stale snapshot (G0285). Sync the caller's object to
-            # the committed status so callers that read ``order`` after this
-            # (rather than the returned instance) stay consistent.
-            current_status = (
-                Order.objects.select_for_update()
-                .values_list("status", flat=True)
-                .get(pk=order.pk)
-            )
-            order.status = current_status
+        # Lock + re-read the CURRENT status so concurrent transitions
+        # serialize and validate against the committed row, not the
+        # caller's stale snapshot (G0285). Sync the caller's object to
+        # the committed status so callers that read ``order`` after this
+        # (rather than the returned instance) stay consistent.
+        current_status = (
+            Order.objects.select_for_update()
+            .values_list("status", flat=True)
+            .get(pk=order.pk)
+        )
+        order.status = current_status
 
-            if order.status == new_status:
-                logger.info(
-                    "Order %s status is already %s", order.id, new_status
-                )
-                return order
-
-            allowed_transitions = {
-                OrderStatus.PENDING: [
-                    OrderStatus.PROCESSING,
-                    OrderStatus.CANCELED,
-                ],
-                OrderStatus.PROCESSING: [
-                    OrderStatus.SHIPPED,
-                    OrderStatus.CANCELED,
-                ],
-                OrderStatus.SHIPPED: [
-                    OrderStatus.DELIVERED,
-                    OrderStatus.RETURNED,
-                ],
-                OrderStatus.DELIVERED: [
-                    OrderStatus.COMPLETED,
-                    OrderStatus.RETURNED,
-                ],
-                OrderStatus.CANCELED: [],
-                OrderStatus.COMPLETED: [],
-                OrderStatus.RETURNED: [OrderStatus.REFUNDED],
-                OrderStatus.REFUNDED: [],
-            }
-
-            if new_status not in allowed_transitions.get(order.status, []):
-                logger.warning(
-                    "Invalid status transition for order %s: from %s to %s",
-                    order.id,
-                    order.status,
-                    new_status,
-                )
-                raise InvalidStatusTransitionError(
-                    current_status=order.status,
-                    new_status=new_status,
-                    allowed=[
-                        str(s)
-                        for s in allowed_transitions.get(order.status, [])
-                    ],
-                )
-
-            old_status = order.status
-
-            if silent_for_customer:
-                cls._suppress_customer_status_notifications(order, new_status)
-
-            order.status = new_status
-            order.status_updated_at = timezone.now()
-            order.save(update_fields=["status", "status_updated_at"])
-
-            # Note: order_status_changed signal is sent automatically by
-            # handle_order_post_save when the status changes.
-
-            logger.info(
-                "Order %s status updated from %s to %s",
-                order.id,
-                old_status,
-                new_status,
-            )
-
+        if order.status == new_status:
+            logger.info("Order %s status is already %s", order.id, new_status)
             return order
 
-        except InvalidStatusTransitionError:
-            raise
+        allowed_transitions = {
+            OrderStatus.PENDING: [
+                OrderStatus.PROCESSING,
+                OrderStatus.CANCELED,
+            ],
+            OrderStatus.PROCESSING: [
+                OrderStatus.SHIPPED,
+                OrderStatus.CANCELED,
+            ],
+            OrderStatus.SHIPPED: [
+                OrderStatus.DELIVERED,
+                OrderStatus.RETURNED,
+            ],
+            OrderStatus.DELIVERED: [
+                OrderStatus.COMPLETED,
+                OrderStatus.RETURNED,
+            ],
+            OrderStatus.CANCELED: [],
+            OrderStatus.COMPLETED: [],
+            OrderStatus.RETURNED: [OrderStatus.REFUNDED],
+            OrderStatus.REFUNDED: [],
+        }
+
+        if new_status not in allowed_transitions.get(order.status, []):
+            logger.warning(
+                "Invalid status transition for order %s: from %s to %s",
+                order.id,
+                order.status,
+                new_status,
+            )
+            raise InvalidStatusTransitionError(
+                current_status=order.status,
+                new_status=new_status,
+                allowed=[
+                    str(s) for s in allowed_transitions.get(order.status, [])
+                ],
+            )
+
+        old_status = order.status
+
+        if silent_for_customer:
+            cls._suppress_customer_status_notifications(order, new_status)
+
+        order.status = new_status
+        order.status_updated_at = timezone.now()
+        order.save(update_fields=["status", "status_updated_at"])
+
+        # Note: order_status_changed signal is sent automatically by
+        # handle_order_post_save when the status changes.
+
+        logger.info(
+            "Order %s status updated from %s to %s",
+            order.id,
+            old_status,
+            new_status,
+        )
+
+        return order
 
     @classmethod
     def _suppress_customer_status_notifications(
@@ -2111,31 +2130,62 @@ class OrderService:
                     )
                     # Continue with other reservations even if one fails
 
-            # Restore stock for order items using StockManager
-            for item in order.items.select_related("product").all():
-                product = item.product
-                if hasattr(product, "stock"):
-                    try:
-                        StockManager.increment_stock(
-                            product_id=product.id,
-                            quantity=item.quantity,
-                            order_id=order.id,
-                            reason=f"Order {order.id} canceled: {reason}",
-                        )
-                        logger.info(
-                            "Restored stock for product %s: +%s (order %s canceled)",
-                            product.id,
-                            item.quantity,
-                            order.id,
-                        )
-                    except Exception as e:
-                        logger.error(
-                            "Failed to restore stock for product %s: %s",
-                            product.id,
-                            e,
-                            exc_info=True,
-                        )
-                        # Continue with other items even if one fails
+            # Restore the stock this order is actually HOLDING, which is
+            # not the same as the quantities it lists. Only two operations
+            # move physical stock — decrement_stock and
+            # convert_reservation_to_sale, both logged as DECREMENT against
+            # the order — while an OrderItem created any other way (the
+            # standalone OrderItem admin, a repair script) never decremented
+            # anything: handle_order_item_post_save deliberately skips it to
+            # avoid double-counting the checkout path. Restoring per listed
+            # item therefore invented stock that never left the shelf.
+            #
+            # Summing the order's own physical movements gets every case
+            # right: nothing taken restores nothing, a partially restored
+            # order restores only the remainder, and cancelling twice is a
+            # no-op because the first restore's INCREMENT rows net it out.
+            # RESERVE/RELEASE rows are excluded — a reservation is a logical
+            # hold and leaves physical stock untouched (stock_before ==
+            # stock_after).
+            outstanding = (
+                StockLog.objects.filter(
+                    order_id=order.id,
+                    operation_type__in=(
+                        StockLog.OPERATION_DECREMENT,
+                        StockLog.OPERATION_INCREMENT,
+                    ),
+                )
+                .values("product_id")
+                .annotate(net=Sum("quantity_delta"))
+            )
+            for row in outstanding:
+                # ``net`` is a Sum over a non-null column, and every row
+                # here IS a group, so it is always an int.
+                quantity = -row["net"]
+                if quantity <= 0:
+                    continue
+                product_id = row["product_id"]
+                try:
+                    StockManager.increment_stock(
+                        product_id=product_id,
+                        quantity=quantity,
+                        order_id=order.id,
+                        reason=f"Order {order.id} canceled: {reason}",
+                    )
+                    logger.info(
+                        "Restored stock for product %s: +%s (order %s canceled)",
+                        product_id,
+                        quantity,
+                        order.id,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "Failed to restore stock for product %s: %s",
+                        product_id,
+                        e,
+                        exc_info=True,
+                    )
+                    # Continue with other products even if one fails
 
             old_status = order.status
             order.status = OrderStatus.CANCELED
@@ -2336,6 +2386,48 @@ class OrderService:
         return True, refund_response
 
     @classmethod
+    def _apply_polled_payment_status(
+        cls, order: Order, payment_status_enum: PaymentStatus
+    ) -> None:
+        """Write a POLLED provider status, unless the order is settled.
+
+        Polling reports the provider's view of the payment, which is not
+        the order's view of the money. A Stripe PaymentIntent stays
+        ``succeeded`` after the charge is refunded, so a settled order
+        polled by anyone — including a customer opening the order page,
+        which reaches this through the read-only ``payment_status``
+        action — would be written back to COMPLETED and lose the refund.
+
+        Same rule the webhook handlers already follow: a settled state is
+        final, and the row is re-read under lock so a concurrent webhook
+        either lands first or is seen.
+        """
+        with transaction.atomic():
+            locked = Order.objects.select_for_update().get(pk=order.pk)
+            if locked.payment_status in SETTLED_PAYMENT_STATUSES:
+                logger.warning(
+                    "Ignoring polled payment status %s for order %s: "
+                    "payment_status already settled as %s",
+                    payment_status_enum,
+                    order.id,
+                    locked.payment_status,
+                )
+                order.payment_status = locked.payment_status
+                return
+            if payment_status_enum == locked.payment_status:
+                order.payment_status = locked.payment_status
+                return
+            logger.info(
+                "Updating order %s payment status from %s to %s",
+                order.id,
+                locked.payment_status,
+                payment_status_enum,
+            )
+            locked.payment_status = payment_status_enum
+            locked.save(update_fields=["payment_status"])
+            order.payment_status = payment_status_enum
+
+    @classmethod
     def get_payment_status(
         cls,
         order: Order,
@@ -2357,14 +2449,7 @@ class OrderService:
         )
 
         if update_order and payment_status_enum != order.payment_status:
-            logger.info(
-                "Updating order %s payment status from %s to %s",
-                order.id,
-                order.payment_status,
-                payment_status_enum,
-            )
-            order.payment_status = payment_status_enum
-            order.save(update_fields=["payment_status"])
+            cls._apply_polled_payment_status(order, payment_status_enum)
 
         return payment_status_enum, status_data
 
@@ -2382,15 +2467,19 @@ class OrderService:
         if not auto_update_status:
             return order
 
-        final_statuses = {
+        # Not "final" — SHIPPED is mid-flight, and the documented
+        # terminal set is COMPLETED/CANCELED/REFUNDED. These are the
+        # statuses that need no advance when tracking lands: already at
+        # or past SHIPPED, or ended somewhere this must not walk out of.
+        no_advance_needed = {
+            OrderStatus.SHIPPED,
             OrderStatus.DELIVERED,
             OrderStatus.COMPLETED,
             OrderStatus.RETURNED,
             OrderStatus.REFUNDED,
-            OrderStatus.SHIPPED,
         }
 
-        if order.status in final_statuses:
+        if order.status in no_advance_needed:
             pass
         elif order.status == OrderStatus.PROCESSING:
             cls.update_order_status(order, OrderStatus.SHIPPED)
@@ -2486,30 +2575,6 @@ class OrderService:
             .first()
         )
         return picked.code if picked is not None else None
-
-    @classmethod
-    def _extract_shipment_payload(
-        cls, order_data: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Pop carrier-specific keys off ``order_data`` and return them.
-
-        Mutates ``order_data`` in place — the popped keys would otherwise
-        cause ``Order.objects.create(**order_data)`` to crash with an
-        unexpected-kwarg ``TypeError``.  The returned dict is handed to
-        the carrier registry so each adapter reads what it needs.
-
-        The key list is the union of every registered carrier's
-        ``payload_keys`` ClassVar, so adding a new carrier (ELTA,
-        Speedex …) means writing one new adapter file with its
-        ``payload_keys`` declared — no edit to ``order/services.py``.
-        """
-        from shipping.interfaces import all_payload_keys
-
-        return {
-            key: order_data.pop(key)
-            for key in all_payload_keys()
-            if key in order_data
-        }
 
     @staticmethod
     def _seed_language_code(order_data: dict[str, Any]) -> None:
@@ -2813,7 +2878,24 @@ class OrderService:
         # ShippingService.dispatch_create_shipment_task wraps the
         # delay() in transaction.on_commit so the worker only sees the
         # committed row.
-        cls._dispatch_shipment_creation_task(order)
+        #
+        # Only for an order that still has a delivery ahead of it. The
+        # CANCELED early-return above exists because minting a courier
+        # shipment for a dead order is wrong (G0281), and an order that
+        # already SHIPPED, was DELIVERED, RETURNED or REFUNDED is just as
+        # done with its voucher. A duplicate provider success event — a
+        # different event id for the same intent is not caught by the
+        # webhook_processed_{event_id} flag — would otherwise re-enqueue
+        # carrier work against a finished order.
+        if order.status in _SHIPMENT_DISPATCHABLE_STATUSES:
+            cls._dispatch_shipment_creation_task(order)
+        else:
+            logger.info(
+                "Not dispatching shipment creation for order %s: status is "
+                "%s, which has no delivery ahead of it",
+                order.id,
+                order.status,
+            )
 
         publish_payment_status(order)
         logger.info("Order %s marked as paid successfully", order.id)
@@ -2962,5 +3044,17 @@ class OrderService:
             if order_value.amount >= pay_way.free_threshold.amount:
                 return Money(0, order_value.currency)
 
-        # Return payment method cost in order currency
+        # Same currency only. Re-labelling would turn a fee configured
+        # in one currency into the same NUMBER in another — charging a
+        # different sum rather than converting it.
+        if pay_way.cost.currency != order_value.currency:
+            logger.error(
+                "Pay-way %s fee is in %s but the order is in %s — charging "
+                "no fee rather than re-labelling the amount",
+                pay_way.pk,
+                pay_way.cost.currency,
+                order_value.currency,
+            )
+            return Money(0, order_value.currency)
+
         return Money(pay_way.cost.amount, order_value.currency)

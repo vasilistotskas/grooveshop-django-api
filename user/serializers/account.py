@@ -26,17 +26,14 @@ class UserSerializer(serializers.ModelSerializer[User]):
         return username
 
     class Meta:
-        extra_fields = []
-        if hasattr(User, "USERNAME_FIELD"):
-            extra_fields.append(User.USERNAME_FIELD)
-        if hasattr(User, "EMAIL_FIELD"):
-            extra_fields.append(User.EMAIL_FIELD)
-        if hasattr(User, "first_name"):
-            extra_fields.append("first_name")
-        if hasattr(User, "last_name"):
-            extra_fields.append("last_name")
+        # Named outright. AUTH_USER_MODEL is fixed to user.UserAccount,
+        # whose USERNAME_FIELD is "email", so the hasattr probes that
+        # used to build this list resolved to exactly these every time —
+        # except the EMAIL_FIELD probe, which silently never matched
+        # (UserAccount extends AbstractBaseUser, which does not define
+        # it). A shim for a pluggable user model that cannot be plugged.
         model = User
-        fields = ("pk", *extra_fields)
+        fields = ("pk", "email", "first_name", "last_name")
         read_only_fields = ("email",)
 
 
@@ -44,13 +41,13 @@ class UserWriteSerializer(UserSerializer):
     phone = PhoneNumberField(required=False, allow_blank=True, allow_null=True)
 
     class Meta(UserSerializer.Meta):
+        # The base fields are spread in, so they are not repeated here —
+        # the dynamic list they used to be built from made "email",
+        # "first_name" and "last_name" appear twice in this tuple.
         fields = (
             *UserSerializer.Meta.fields,
-            "email",
             "username",
             "image",
-            "first_name",
-            "last_name",
             "phone",
             "city",
             "zipcode",

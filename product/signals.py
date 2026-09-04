@@ -142,18 +142,14 @@ def reindex_product_translations(sender, instance, **kwargs):
     if update_fields and set(update_fields) <= {"view_count"}:
         return
 
-    # Check if async indexing is enabled
-    try:
-        from meili.tasks import index_document_task
+    # No import guard: celery is a hard runtime dependency and ``meili``
+    # is an installed app, so this import cannot fail. Guarding it meant
+    # a genuine breakage would have degraded silently to synchronous
+    # indexing instead of surfacing.
+    from meili.tasks import index_document_task  # noqa: PLC0415
 
-        celery_available = True
-    except ImportError:
-        celery_available = False
-
-    use_async = (
-        not settings.DEBUG
-        and celery_available
-        and settings.MEILISEARCH.get("ASYNC_INDEXING", True)
+    use_async = not settings.DEBUG and settings.MEILISEARCH.get(
+        "ASYNC_INDEXING", True
     )
 
     if use_async:
@@ -301,18 +297,14 @@ def update_product_search_index_on_attribute_change(sender, instance, **kwargs):
     if settings.MEILISEARCH.get("OFFLINE", False):
         return
 
-    # Check if async indexing is enabled
-    try:
-        from meili.tasks import index_document_task
+    # No import guard: celery is a hard runtime dependency and ``meili``
+    # is an installed app, so this import cannot fail. Guarding it meant
+    # a genuine breakage would have degraded silently to synchronous
+    # indexing instead of surfacing.
+    from meili.tasks import index_document_task  # noqa: PLC0415
 
-        celery_available = True
-    except ImportError:
-        celery_available = False
-
-    use_async = (
-        not settings.DEBUG
-        and celery_available
-        and settings.MEILISEARCH.get("ASYNC_INDEXING", True)
+    use_async = not settings.DEBUG and settings.MEILISEARCH.get(
+        "ASYNC_INDEXING", True
     )
 
     if use_async:

@@ -9,7 +9,7 @@ The lookup races the Viva webhook: ``payment_id`` (which equals
 ``t``) is only set when the webhook arrives, but the customer's
 browser redirect can hit this endpoint tens of seconds earlier. The
 fallback via ``s`` (the Viva order code, stored in
-``metadata.viva_order_code`` at session-creation time) closes that
+``metadata.viva_order_codes`` at session-creation time) closes that
 gap.
 """
 
@@ -33,7 +33,7 @@ class VivaReturnEndpointTestCase(APITestCase):
             payment_status=PaymentStatus.COMPLETED,
             payment_method="viva_wallet",
             payment_id="txn-xyz-123",
-            metadata={"viva_order_code": "9999"},
+            metadata={"viva_order_codes": ["9999"]},
         )
 
         response = self.client.get(self.url, {"t": "txn-xyz-123"})
@@ -52,7 +52,7 @@ class VivaReturnEndpointTestCase(APITestCase):
             payment_status=PaymentStatus.PENDING,
             payment_method="",
             payment_id="",
-            metadata={"viva_order_code": "6836925145972608"},
+            metadata={"viva_order_codes": ["6836925145972608"]},
         )
 
         response = self.client.get(
@@ -74,7 +74,7 @@ class VivaReturnEndpointTestCase(APITestCase):
             payment_status=PaymentStatus.PENDING,
             payment_method="",
             payment_id="",
-            metadata={"viva_order_code": "7680701046572600"},
+            metadata={"viva_order_codes": ["7680701046572600"]},
         )
 
         response = self.client.get(self.url, {"s": "7680701046572600"})
@@ -92,7 +92,7 @@ class VivaReturnEndpointTestCase(APITestCase):
             payment_status=PaymentStatus.COMPLETED,
             payment_method="viva_wallet",
             payment_id="txn-priority",
-            metadata={"viva_order_code": "1111"},
+            metadata={"viva_order_codes": ["1111"]},
         )
         OrderFactory(
             num_order_items=0,
@@ -100,7 +100,7 @@ class VivaReturnEndpointTestCase(APITestCase):
             payment_status=PaymentStatus.PENDING,
             payment_method="",
             payment_id="",
-            metadata={"viva_order_code": "2222"},
+            metadata={"viva_order_codes": ["2222"]},
         )
 
         response = self.client.get(self.url, {"t": "txn-priority", "s": "2222"})

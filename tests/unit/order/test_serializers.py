@@ -188,14 +188,24 @@ class OrderCreateUpdateSerializerTestCase(TestCase):
             ],
         }
 
-    def test_items_validation(self):
-        invalid_data = self.valid_data.copy()
-        invalid_data["items"] = []
+    def test_items_are_read_only(self):
+        """``items`` is not writable on this serializer.
 
-        serializer = OrderWriteSerializer(data=invalid_data)
-        self.assertFalse(serializer.is_valid())
+        It is wired to update/partial_update only, and ``update()``
+        discards items because a line carries a committed stock movement
+        and a price snapshot. It used to be a required, stock-validated
+        field, so a PUT — the shape the detail serializer hands back —
+        demanded a payload it would throw away and gated on live stock
+        for products it would never touch. This replaces a test that
+        pinned that dead validation.
+        """
+        data = self.valid_data.copy()
+        data["items"] = []
 
-        self.assertFalse(serializer.is_valid())
+        serializer = OrderWriteSerializer(data=data)
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertNotIn("items", serializer.validated_data)
 
     def test_paid_amount_is_read_only(self):
         data_with_paid = self.valid_data.copy()

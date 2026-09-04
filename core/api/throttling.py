@@ -37,6 +37,22 @@ class PaymentAttemptAnonThrottle(AnonRateThrottle):
     scope = "payment_anon"
 
 
+class OrderCreateThrottle(UserRateThrottle):
+    scope = "order_create"
+
+
+class OrderCreateAnonThrottle(AnonRateThrottle):
+    """Anonymous checkout is a stock- and money-moving endpoint.
+
+    Creating an order reserves or decrements stock, can mint a courier
+    voucher and can open a provider payment session, all before anyone
+    has authenticated. The global anon budget is a day-scale ceiling and
+    does not bound a burst.
+    """
+
+    scope = "order_create_anon"
+
+
 class CartMutationThrottle(UserRateThrottle):
     scope = "cart_mutation"
 

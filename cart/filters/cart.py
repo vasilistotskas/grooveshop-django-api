@@ -249,9 +249,27 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_has_discounts(self, queryset, name, value):
-        """Filter carts with discounted items."""
-        if value is True:
-            return queryset.filter(items__discount_value__gt=0).distinct()
-        elif value is False:
-            return queryset.exclude(items__discount_value__gt=0).distinct()
-        return queryset
+        """Filter carts holding at least one discounted item.
+
+        ``CartItem.discount_value`` is a PROPERTY, not a column, so it
+        cannot appear in a lookup — `?hasDiscounts=` raised
+        ``FieldError`` and returned 500. Its retail branch is
+        ``product.discount_value``, which is
+        ``price * discount_percent / 100``, so it is positive exactly
+        when both of those columns are, and both ARE columns.
+
+        The B2B branch resolves against a customer group's price list
+        and has no SQL equivalent, so a wholesale cart whose only saving
+        comes from group pricing does not match here. Filtering is a
+        catalogue-level question; the per-line value stays on the
+        serialized item.
+        """
+        if value is None:
+            return queryset
+        discounted = {
+            "items__product__discount_percent__gt": 0,
+            "items__product__price__gt": 0,
+        }
+        if value:
+            return queryset.filter(**discounted).distinct()
+        return queryset.exclude(**discounted).distinct()

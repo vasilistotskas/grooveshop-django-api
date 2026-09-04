@@ -13,6 +13,20 @@ if TYPE_CHECKING:
     from typing import Self
 
 
+def abandoned_cutoff():
+    """The single line between an active cart and an abandoned one.
+
+    `CART_ABANDONED_HOURS` is the operator-facing knob, and it also
+    drives the cleanup task — so the API filters have to agree with it.
+    They used to hardcode their own thresholds instead: 30 days on the
+    cart filters, and on the item filters 24 hours for "active" against
+    30 days for "abandoned", which left a cart idle for five days
+    matching NEITHER.
+    """
+    hours = Setting.get("CART_ABANDONED_HOURS", default=24)
+    return timezone.now() - timedelta(hours=hours)
+
+
 class CartQuerySet(OptimizedQuerySet):
     """
     Optimized QuerySet for Cart model.
@@ -22,16 +36,12 @@ class CartQuerySet(OptimizedQuerySet):
     """
 
     def active(self) -> Self:
-        abandoned_threshold = Setting.get("CART_ABANDONED_HOURS", default=24)
-        cutoff_time = timezone.now() - timedelta(hours=abandoned_threshold)
-        return self.filter(last_activity__gte=cutoff_time).exclude(
+        return self.filter(last_activity__gte=abandoned_cutoff()).exclude(
             items__isnull=True
         )
 
     def abandoned(self) -> Self:
-        abandoned_threshold = Setting.get("CART_ABANDONED_HOURS", default=24)
-        cutoff_time = timezone.now() - timedelta(hours=abandoned_threshold)
-        return self.filter(last_activity__lt=cutoff_time)
+        return self.filter(last_activity__lt=abandoned_cutoff())
 
     def empty(self) -> Self:
         return self.filter(items__isnull=True)

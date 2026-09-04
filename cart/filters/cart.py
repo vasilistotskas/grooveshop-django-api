@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
+from cart.managers.cart import abandoned_cutoff
 from cart.models import Cart
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import UUIDFilterMixin
@@ -150,8 +151,8 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_is_active(self, queryset, name, value):
-        """Filter active carts (activity within 30 days)."""
-        cutoff = timezone.now() - timedelta(days=30)
+        """Filter carts active within ``CART_ABANDONED_HOURS``."""
+        cutoff = abandoned_cutoff()
         if value is True:
             return queryset.filter(last_activity__gte=cutoff)
         elif value is False:
@@ -159,8 +160,8 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         return queryset
 
     def filter_is_abandoned(self, queryset, name, value):
-        """Filter abandoned carts (inactive 30+ days)."""
-        cutoff = timezone.now() - timedelta(days=30)
+        """Filter carts idle beyond ``CART_ABANDONED_HOURS``."""
+        cutoff = abandoned_cutoff()
         if value is True:
             return queryset.filter(last_activity__lt=cutoff)
         elif value is False:

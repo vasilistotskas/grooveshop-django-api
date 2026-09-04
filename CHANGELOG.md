@@ -3,6 +3,12 @@
 
 
 
+## v3.28.4 (2026-09-04)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.28.3 [skip ci] ([`300313d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/300313d1c01f62497f7300bb6318317abc3cbe3b))
+
 ## v3.28.3 (2026-09-04)
 
 ### Chores
@@ -270,9 +276,1088 @@ Found during the 2026-09 audit review of order/views/viva_webhook.py.
 
 Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com> ([`e3973d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3973d22f7a4982e3f47ae07e11ae2d375e58bfc))
 
+* fix(order): make the metadata index buildable by every caller that migrates
+
+Amends the previous commit's migration, which the safety review blocked
+and I then reproduced: on a fresh database the ENTIRE MT lane fails with
+`NotSupportedError`, and creating a store through the platform admin
+would 500 and roll the tenant back.
+
+`AddIndexConcurrently` refuses to run when `connection.in_atomic_block`
+is true, and that flag is not controlled by the migration's own `atomic`
+attribute — it reports the transaction of whoever called us. Two callers
+have one open, because `Tenant.save()` with `auto_create_schema = True`
+replays the full migration history INLINE: the admin's add form (which
+Django wraps in `transaction.atomic()`) and `tests_mt/conftest.py`'s
+`get_or_create`. The local MT lane hid this behind `--reuse-db`, which
+takes the `get()` branch; `--create-db` reproduces CI exactly.
+
+The build now adapts to its caller, which is what each caller wants
+anyway. Inside a transaction it is tenant provisioning, where the schema
+is new and `order_order` is empty, so a plain `CREATE INDEX` is instant
+and uncontended. Outside one it is the PreSync `migrate_schemas` job
+against tenants holding real orders while the old pods still serve, and
+`CONCURRENTLY` earns its two table scans. `SeparateDatabaseAndState`
+keeps Django's model state in step, so `makemigrations --check` stays
+clean.
+
+Two further review findings, both confirmed:
+
+- `statement_timeout = 30000` is set on every connection (settings.py).
+  A concurrent build is one statement that also waits out every open
+  snapshot on the table, so a single overlapping pg_dump could cancel it
+  — and cancellation is precisely what leaves an INVALID index behind.
+  Lifted for the build and restored after.
+- The migration was not resumable: bare `CREATE INDEX` meant a retry
+  died on `DuplicateTable`, and with `HookFailed` deleting the Job the
+  error would be gone before anyone read it. Now `IF NOT EXISTS`, and
+  since that happily skips an index that exists but is INVALID, any such
+  leftover is dropped first.
+
+`private_metadata` is no longer indexed. Nothing reads that column on an
+order — `MetaDataFilterMixin`, which exposes the only lookup, is not
+among `OrderFilter`'s bases — while a GIN index costs a pending-list
+write on every order INSERT and UPDATE regardless. The invariant test
+grew a `_DELIBERATE` list, kept separate from `_KNOWN_DRIFT` so a
+decision is not filed as an oversight, plus a test that Order keeps the
+`metadata` index the exemption would otherwise hide the loss of.
+
+Verified against real schemas, not just reviewed: MT lane 11 passed on
+`--create-db`; reverse unapplies cleanly; re-running the build is a
+no-op; a deliberately invalidated index is dropped and rebuilt valid; and
+the planner picks `order_meta_ix` for both the webhook's `@>` and the
+admin filter's `?` — which is why Django's default `jsonb_ops` is right
+here and `jsonb_path_ops` would not be.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`cd77b53`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd77b53cde1f7d0df1633059053af62c6c4defa3))
+
+* fix(order): confirm a Viva transaction belongs to the order before trusting it
+
+Viva's own instruction for a payment notification is to confirm the
+result with the COMBINATION of OrderCode and TransactionId, then check
+StatusId and Amount before updating anything
+(developer.viva.com/webhooks-for-payments/transaction-payment-created).
+
+We checked StatusId and Amount, and only logged the orderCode from the
+Retrieve Transaction response. The webhook body is unauthenticated by
+design — Viva sends no signature on payment events, the source-IP check
+is advisory, and retrieving the transaction IS the authentication — so
+anyone could post their OWN real TransactionId against SOMEONE ELSE'S
+OrderCode. We resolved the victim's order, verified the attacker's
+genuinely completed transaction, and settled the victim's order as soon
+as the two amounts happened to agree, which costs an attacker nothing to
+arrange. The amount guard's own comment describes replaying a low-value
+transaction against a high-value order; equal amounts walk straight past
+it.
+
+Both the payment path and the reversal/failure path now confirm the
+verified transaction reports an orderCode this order actually issued.
+Any issued code counts, not just the latest, because a shopper can pay on
+a stale tab — the same rule viva_order_code_q already uses for lookup,
+so resolution and verification agree on what belongs to an order.
+
+A response with no orderCode raises rather than skips: Viva documents the
+field, so its absence is an abnormal answer, and a 500 has Viva redeliver
+where an ack would strand a real payment.
+
+Three existing fixtures returned an orderCode the order had never issued
+— a state the system cannot produce — so they were made faithful rather
+than the check loosened.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`cad3920`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cad3920fd5ded5d6268dd0db755b4ef726f2922c))
+
+* fix(order): compare the currency Viva actually reports, not two vocabularies
+
+Validated against docs/viva-payment-api.yaml and the Viva developer
+portal rather than assumed.
+
+Retrieve Transaction returns ISO 4217 in its NUMERIC form as a string —
+currencyCode: "978" for the euro — while everything on our side stores
+the alphabetic code. The provider passed that value through raw and fell
+back to a literal "EUR" when it was missing, so the field held two
+different vocabularies depending on the call and nothing downstream could
+compare it. It is now normalised to the alphabetic form using the money
+library's own ISO table rather than a hand-written map, and an unknown
+code returns None instead of quietly claiming to be the shop's currency.
+
+That makes the missing currency check possible. The amount guard compared
+numbers alone, so a charge for the right number in the wrong currency
+settled the order. Currency is now checked first, because an amount only
+means something once you know what it is denominated in.
+
+Also corrects a comment I wrote earlier: Viva does not retry a failed
+delivery "for up to three days". The documented policy is 24 attempts —
+one plus 23 hourly retries until a 2xx — which still reaches as far as
+auto_cancel_stuck_pending_orders' own 24h default, so the race the guard
+protects against is real, but the stated reason was wrong.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`1c5c58d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1c5c58d0885926e8c5986dbff6756fa23958256b))
+
+* fix(order): a fee in another currency is not the same number in ours
+
+Six cleanups in order/services.py from the audit's low-severity set. Two
+change behaviour.
+
+calculate_payment_method_fee returned the pay-way cost's amount wearing
+the order's currency label. That is not a conversion — a 3.50 USD fee
+became 3.50 EUR. It now refuses to charge a fee it cannot express in the
+order's currency, and logs loudly.
+
+A promotion gift decremented stock without respect_reservations, so a
+free gift could be taken out of inventory another session was actively
+holding. The paid-line shortfall twenty lines below already passes it
+with an explicit rationale (G0284); the gift now does too.
+
+The rest are cosmetic. _extract_shipment_payload was dead — its only
+other mention is a comment pointing at it. update_order_status wrapped
+its whole body in a try whose sole handler re-raised, so the body is now
+unwrapped. add_tracking_info's "final_statuses" is not the documented
+terminal set and included SHIPPED, which is mid-flight; renamed to say
+what the branch actually means, which is "needs no advance". The bare
+"viva_wallet" literal in the settlement branch is now a named constant
+explaining why redirect providers are the exception.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`4576232`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4576232f2c1ecd618753d7ae77aa7b431a5d38e9))
+
+* fix(order): recover a lost invoice PDF, and stop three quiet degradations
+
+Four defects in the task layer.
+
+A missing invoice PDF now retries instead of giving up on the first look.
+The myDATA path re-renders after the AADE MARK lands, and that re-render
+deletes the stored PDF before rendering its replacement. If the render
+then fails — the failure is swallowed by design so it cannot block the
+email — the only copy is gone, and the email task found no document,
+released its reservation and returned. The customer got no invoice at all
+and nothing recorded that one was owed. It now retries, and on the last
+attempt logs an error saying the invoice needs regenerating by hand.
+
+The refund email resolved its status label outside the language override.
+get_FOO_display() calls force_str with strings_only, and a lazy
+translation proxy is not a protected type, so the label resolved eagerly
+under whatever locale the worker last left active: a German customer got
+a German email with a Greek status word. Passing the lazy proxy through
+lets the render resolve it, which is what the sibling status-update task
+already does. The English literal fallback that bypassed gettext is gone
+with it.
+
+The pending-reminder sweep was N+1. The template prints the order total,
+and total_price_items falls back to an aggregate whenever the annotation
+is absent — once per order, plus a user dereference for the language,
+every one swallowed by the per-order try/except.
+
+Two template fallbacks caught every exception. Only a missing template
+should fall back: catching everything meant a real render bug in a status
+template silently downgraded the customer to the generic copy, and the
+dispute template — which exists — could fail into an inline plain-text
+body nobody would notice. Both now catch TemplateDoesNotExist. The test
+that simulated a missing template with a bare Exception now raises what a
+missing template actually raises.
+
+Found during the 2026-09 audit review of order/tasks.py.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`2376e50`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2376e50719c6b57f762af8d27faa197d73ff411d))
+
+* fix(order): one stock lock order, and stop update-only validation blocking edits
+
+Four defects in the stock and serializer layer.
+
+The reservation paths and the product paths locked the same two rows in
+opposite orders. Django locks every row a select_for_update query
+selects, "including those from related objects" (verified against the
+Django 6.0 queryset docs), so convert_reservation_to_sale and
+release_reservation were taking a lock on the product through
+select_related while reserve_stock and decrement_stock lock the product
+first and the reservations second. On a contended product a checkout and
+a cart reservation could each hold what the other waited for and
+PostgreSQL aborted one. Both paths now lock product first, then the
+reservation with of=("self",) so the join stops locking anything extra.
+release_reservation no longer locks the product at all, which matches its
+docstring: it does not touch physical stock.
+
+Refunding without naming a quantity refunded the originally ordered
+quantity rather than what was left. On an item with 5 ordered and 2
+already refunded, the documented empty-body call asked for 5 more, tripped
+the over-refund guard and came back as a generic 400. The last three units
+could only be refunded by naming the exact remainder.
+
+for_detail() did not carry the totals annotation its own docstring
+implied. Order.total_price_items is annotation-backed only when the
+annotation is present, and otherwise costs an aggregate plus a currency
+lookup that bypasses the prefetch cache — three or four times per detail
+response.
+
+OrderWriteSerializer is wired to update and partial_update only, and
+update() deliberately discards items because a line carries a committed
+stock movement and a price snapshot. The field was still required and
+stock-validated, so a full PUT — the shape the detail serializer hands
+back — demanded a payload it would throw away and gated on live stock for
+products it would never touch. An owner could not fix their delivery
+address once any line had sold out. items is read-only now and the dead
+item validation is gone; the unit test that pinned it is replaced by one
+pinning the real contract.
+
+Found during the 2026-09 audit review of order/stock.py and
+order/serializers/.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`efdbade`](https://github.com/vasilistotskas/grooveshop-django-api/commit/efdbade4a00a63e24e944cb6f709fe21e02eb0d3))
+
+* fix(order): stop a request body 500ing checkout, and bound anonymous order creation
+
+payment_data is splatted into PayWayService.process_payment as keyword
+arguments, and nothing filtered its keys. A body of {"paymentData":
+{"order": "1"}} therefore raised "got multiple values for keyword
+argument", which DRF surfaced as a 500 on a payment endpoint, reachable
+by the order's owner or a guest with the uuid. Reserved keys are now
+rejected by name with a 400.
+
+The same two views read payment_method_id, customer_id and return_url
+off validated_data, but the serializer never declared them, so DRF
+dropped them and those branches could never fire. Declared, so the fields
+the views were written to use actually arrive.
+
+shipment_label declared an OrderDetail JSON 200 while streaming
+application/pdf, which put a body in schema.yml that the generated
+storefront client would wait for. It now declares a binary response, like
+its two carrier-specific siblings. ActionConfig.responses was widened to
+allow that, which is what drf-spectacular expects for a file stream.
+
+The BoxNow and ACS label descriptions promised access to "a guest with
+the order UUID"; neither action is in guest_allowed_actions, so guests
+are refused. Corrected rather than left to mislead an integrator.
+
+Order creation now carries its own throttle. It is AllowAny for guest
+checkout and it moves stock, can mint a courier voucher and can open a
+provider payment session; the global anonymous budget is a day-scale
+ceiling that does not bound a burst.
+
+Found during the 2026-09 audit review of order/views/order.py.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`ff7adde`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ff7adde78c6774bc836f547cd2d99a3ef43dcd4e))
+
+* fix(order): gate shipment dispatch on status, and fail loud on a dropped discount
+
+handle_payment_succeeded returns early for a CANCELED order because
+minting a courier shipment for a dead order is wrong, and its comment
+claimed the dispatch below was likewise status-gated. It was not — only
+the PENDING to PROCESSING transition was, so SHIPPED, DELIVERED, RETURNED
+and REFUNDED all fell through and re-enqueued carrier work for an order
+already done with its voucher. A duplicate provider event reaches this:
+the idempotency flag is keyed on the event id, so a second event for the
+same payment intent is not caught by it. Dispatch now happens only for an
+order that still has a delivery ahead of it.
+
+The offline creation path swallowed a failed loyalty redemption and
+carried on. COD and Viva have no amount guard, so that charged the
+shopper the undiscounted total while the checkout sidebar had shown the
+discount and the points stayed unspent. The payment-first path already
+raises here and explains why, and _evaluate_promotions' docstring states
+the same rule for the offline path specifically. It now raises too, so
+the creation rolls back and the shopper sees a price that matches what
+they will be charged.
+
+Found during the 2026-09 audit review of order/services.py.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`7b4f669`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7b4f669092586e60722fff1001577947e9ec5959))
+
+* fix(order): stop the Viva webhook acking work it refused to do
+
+Three holes in the 1796/1798 paths, one theme: the webhook answered Viva
+200 for work it had declined.
+
+Verify before the settled guard. The multi-tenant candidate loop rests on
+one invariant — a tenant that does not own the transaction cannot answer
+anything but 500, because Retrieve-Transaction fails against its
+credentials. _handle_payment_failed returned early whenever its own order
+was already settled, before verifying. A merchant can plant another
+tenant's order code in their own order's metadata, which is precisely why
+candidates are a list, so a settled order on the wrong tenant
+short-circuited, wrote the audit row into that tenant's schema and handed
+Viva a 200. The real owner never saw the event, and Viva does not
+redeliver after a 200.
+
+Skips are reported as skips. Every skip path returned None and the caller
+stamped the VivaWebhookEvent row processed, so the audit table claimed
+work that never happened while the row permanently deduped the
+transaction.
+
+A charged order is no longer auto-cancelled. The amount guard refuses to
+mark an order paid when Viva's verified amount does not match the total,
+which is right, but the money has still left the customer. The usual
+cause is a shopper paying on a stale checkout tab after the total moved.
+Nothing recorded that, so the order sat pending and
+auto_cancel_stuck_pending_orders closed it a day later with
+refund_payment=False and emailed the customer that it was cancelled. The
+mismatch is now stamped on the order and auto-cancel skips those orders,
+logging them for a human.
+
+Also: decimal.InvalidOperation is an ArithmeticError, not a ValueError,
+so the amount parser's documented fallback never ran and a malformed
+amount escaped the view as a 500 that Viva would retry on a payload that
+can never parse.
+
+Found during the 2026-09 audit review of order/views/viva_webhook.py.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`77ba11e`](https://github.com/vasilistotskas/grooveshop-django-api/commit/77ba11e43b58682d3e1db12a17d58ae96d6bd7ec))
+
+* fix(order): guard the unpaid checkout arm and stop three more webhooks swallowing
+
+Two more instances of rules this file already follows elsewhere.
+
+The unpaid arm of checkout.session.completed wrote PENDING with no
+settled-state guard, while the paid arm ninety lines above carries one.
+Stripe retries a failed delivery for up to three days, which is long
+enough for auto_cancel_stuck_pending_orders to cancel the order first.
+The late retry then found no idempotency flag, took the unpaid arm, and
+put a cancelled order back to awaiting payment, where the checkout
+endpoints would happily open a fresh provider session for it. The guard
+here includes COMPLETED, because writing PENDING over any settled state
+is a regression. The paid arm's narrower set is now expressed from the
+same constant, with a note on why it excludes COMPLETED.
+
+charge.refunded, payment_intent.payment_failed and charge.dispute.created
+each swallowed every exception. They run inside dj-stripe's webhook
+transaction, so returning normally commits the Event row and the
+redelivery early-returns: nothing retries, ever. What is lost sits after
+the inner atomic has already committed, which is the worst shape. A
+refund records payment_status REFUNDED and then loses order_refunded, so
+the confirmation email is never dispatched and the customer is refunded
+without being told. A dispute is flagged in the database and then loses
+the staff notification, so nobody works the chargeback before Stripe's
+evidence deadline. All three now propagate, keeping only a malformed
+payload guard, matching payment_intent.succeeded.
+
+test_handles_service_exception_gracefully asserted the swallow it was
+named after. Inverted: it now pins propagation and says why.
+
+Found during the 2026-09 audit review of order/signals/handlers.py.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`0ee28c4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/0ee28c4ff171690262e8a0553ea5effb6a608896))
+
+* fix(order): paying clears the order's lines, not the shopper's whole cart
+
+An online order deliberately leaves the cart standing until the payment
+lands: handle_order_created skips the clear while awaits_online_payment,
+so a shopper who presses Back still has a basket. A hosted payment page
+can stay open for hours, and anything added during that window belongs
+to the shopper, not to the order being paid for.
+
+_clear_cart_for_order deleted the whole cart row. The guest branch at
+least resolved the exact cart from the snapshot uuid; the authenticated
+branch just took the user's cart. Scoping would not have saved it
+either, because Cart is a per-user singleton, so the order's cart and
+the shopper's current cart are the same row. Only the lines tell them
+apart.
+
+So: place an online order, go back to the store, add an item, then
+finish paying on the still-open page, and the new item is destroyed with
+no trace.
+
+It now subtracts the order's own lines, reducing a quantity rather than
+removing the line when the cart holds more than was ordered, and drops
+the cart only when that leaves it empty. Lines the cart never had
+(promotion gifts injected at creation) find nothing to remove.
+
+Found during the 2026-09 audit review of order/signals/handlers.py.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`2a60272`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2a6027293eec00f3cd7e5d1ca40dd3bcab9cd554))
+
+* fix(order): log the stock that moved, and stop losing paid checkout sessions
+
+Two defects found reviewing order/stock.py and order/signals/handlers.py.
+
+adjust_stock logged the requested delta, not the movement. It floors the
+result at zero, so two on the shelf with a delta of -5 lands on zero
+having moved two, while the audit row claimed -5. That row is read back
+as fact: cancel_order restores an order by summing its quantity_delta
+rows, so cancelling afterwards put three units on the shelf that never
+left it. The row now records what moved, keeping stock_before plus
+quantity_delta equal to stock_after, and says so in the reason when the
+floor clamped.
+
+checkout.session.completed swallowed every error. The handler runs
+inside dj-stripe's webhook transaction, and the project already has a
+rule for this, honoured by payment_intent.succeeded: processing errors
+must propagate so the Event row rolls back and Stripe redelivers.
+Swallowing meant a customer paid, a later step failed, the mutations
+rolled back to their savepoint, dj-stripe committed the Event row
+anyway, and the redelivery early-returned on the existing event id. The
+order stayed pending until it was auto-cancelled a day later with no
+refund and no alert.
+
+The sibling payment_intent.succeeded event is not a safety net here: it
+finds the order by payment_id, which only mark_as_paid writes, inside
+the block that rolled back. The handler's own comment already records
+that this lookup can miss.
+
+Only a malformed payload is still dropped, because a redelivery carries
+the same bad body. That mirrors the sibling handler exactly.
+
+Found during the 2026-09 audit review of order/stock.py and
+order/signals/handlers.py.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`39618a5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/39618a5a3a2900abbc56e9c70e63ab45702c22ac))
+
+* fix(order): stop transactional emails re-sending, and make the release reachable
+
+Five email tasks reserve an idempotency flag on Order.metadata before
+sending and consult it only on the first attempt, because re-reading it
+on a retry would block a legitimate retry after a transient relay
+failure. That left two holes.
+
+A failure after msg.send() re-sends. The retry restarts from the top
+with no reservation check, so a Postgres blip during the history note
+that follows the send puts a second copy in the customer's inbox, and up
+to three if it persists. Each task now records that the message reached
+the relay and treats a later failure as success: the customer has the
+email, only the bookkeeping after it failed.
+
+The release on permanent failure never ran. Four tasks paired their
+reserve with a release guarded by a per-attempt "did this call reserve"
+flag. That flag is set only when retries == 0, and attempt 0 always
+retries while attempts remain, so by the time the terminal branch is
+reached it is always False. Verified by driving the task at
+retries == max_retries with the flag pre-set: the flag survived. The
+release is now unconditional, which is correct because reaching the
+terminal branch means an earlier attempt of this same run took the slot.
+
+send_shipping_notification_email had no release helper at all, so a
+relay outage across all four attempts (about 35 minutes) left
+shipping_notification_email_sent set forever. The customer is never told
+the parcel shipped, never gets the tracking number, and re-saving the
+tracking in the admin is short-circuited by the same flag. Its deferral
+paths already avoid reserving for exactly this reason.
+
+Found during the 2026-09 audit review of order/tasks.py. The dead
+release was not in the report; the regression test surfaced it.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`01f0eff`](https://github.com/vasilistotskas/grooveshop-django-api/commit/01f0eff8ebbb4023063c53ec83d7df4c8af040c9))
+
+* fix(order): a registered invoice must still print its shipping and fee
+
+Once an invoice has an AADE MARK its financial values are legally
+frozen, so a corrective re-render reuses the persisted figures rather
+than recomputing from a possibly changed order. That frozen branch built
+a totals dict with three keys where _order_totals produces six.
+
+invoices/invoice.html renders the discount, shipping and payment-fee
+rows behind {% if %} and then prints totals.total unconditionally, and
+the frozen total contains the shipping and the fee. So the rows vanished
+while the total kept their value: items 12.40, shipping 3.50, fee 1.25
+printed as subtotal 10.00, VAT 2.40, TOTAL 17.15 — a legally registered
+tax document whose own lines are 4.75 short of its total.
+
+That is the only PDF the customer ever sees on the happy path. The
+post-MARK regen runs seconds after submission to stamp the AADE QR code,
+and it deletes the correct pre-MARK PDF first so the regenerated file
+lands on the same storage key.
+
+The Invoice row now persists shipping, payment_fee and discount
+alongside the figures it already kept, and the frozen branch reads all
+six.
+
+Migration notes, after a safety review of the first draft:
+
+- All six new columns (three amounts plus django-money's companion
+  currency columns) carry a database default. Django drops the column
+  default straight after ADD COLUMN unless the field declares
+  db_default, and migrations run before the new image rolls, so old pods
+  inserting an invoice would have hit a not-null violation. django-money
+  has no db_default support for the currency column it generates, hence
+  the RunSQL that puts those three back.
+- The backfill is a separate, non-atomic migration. ADD COLUMN takes
+  ACCESS EXCLUSIVE, and sharing a transaction with the backfill would
+  hold it for the whole scan; order_invoice is on the customer order
+  path and every connection has a 30s statement timeout, so blocked
+  reads would not queue, they would fail.
+- It pages by primary key rather than iterating: a server-side cursor
+  does not survive the per-batch commit.
+- It derives the split from the invoice, not from the order's current
+  values, which could contradict a total frozen at issue time. The
+  residual after subtotal and VAT is exactly the two components, so the
+  fee is taken from the order only as far as that allows and shipping
+  absorbs the rest. The printed lines always sum to the printed total.
+
+Found during the 2026-09 audit review of order/tasks.py and
+order/invoicing.py.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`1ebf014`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1ebf0143b003e376e5d84c24cc7bfba1a2f7fadc))
+
+* fix(order): a polled provider status may not undo a settled payment
+
+Providers report the state of the payment, which is not the state of the
+money. A Stripe PaymentIntent stays succeeded forever once the charge is
+refunded, because the refund lives on the charge; Viva's lookup behaves
+the same way.
+
+Both polling paths wrote the provider's answer back unconditionally:
+OrderService.get_payment_status and PayWayService.check_payment_status,
+the latter also calling mark_as_paid. The webhook handlers already
+refused to regress a settled state, so the rule existed and the polling
+paths simply did not follow it.
+
+The customer-facing reach is the bad part. GET
+/api/v1/order/{id}/payment_status is a read-only action reachable by the
+order's owner, or by a guest with the order uuid. Refund an order from
+the Stripe dashboard, then have the customer open their order page, and
+the refund is overwritten: the order is COMPLETED again, and is_paid,
+the refund gates and the invoicing all follow it back.
+
+Both paths now refuse to move an order out of COMPLETED, REFUNDED,
+PARTIALLY_REFUNDED or CANCELED, and still report the provider's answer to
+the caller. OrderService re-reads the row under lock, so a concurrent
+webhook either lands first or is seen.
+
+SETTLED_PAYMENT_STATUSES moved to order/enum/status.py beside the enum it
+is built from. It was defined twice — order/services.py and a private
+copy in order/views/viva_webhook.py — and now has three enforcement
+points, so one definition matters.
+
+Found during the 2026-09 audit review of order/views/order.py.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`40c4ea5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/40c4ea5f9e792160aae13a22e7888ec9ba2fa55e))
+
+* fix(order): an order settled entirely by deductions is paid
+
+is_paid required payment_status COMPLETED and a positive paid_amount.
+paid_amount is the remainder the customer owed, so when deductions (a
+gift card, a 100% promotion, a full loyalty redemption) covered the
+whole total it is legitimately 0.00 — OrderService settles those itself,
+no provider is ever involved. Such an order reported itself unpaid
+forever:
+
+- awaits_online_payment is `not is_paid` behind an online pay way, so
+  the account and order pages showed a settled order as awaiting
+  payment;
+- create_checkout_session, create_payment_intent and retry_payment all
+  passed their `if order.is_paid` guard and built a provider session for
+  a zero amount, so the shopper got an opaque provider error instead of
+  "already paid";
+- refund_order refused with "this order has not been paid yet".
+
+payment_status is the settlement authority and is enough on its own. A
+COMPLETED order can only carry a zero paid_amount in this case anyway,
+because mark_as_paid backfills the field from the order total whenever
+it is unset or zero.
+
+Note this also removes a divergence with the is_paid FILTER
+(order/filters.py), which already treats COMPLETED as sufficient — a
+fully covered order was matched by ?is_paid=true while its own
+serialized is_paid said false.
+
+Found during the 2026-09 audit review of order/services.py.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`206ef90`](https://github.com/vasilistotskas/grooveshop-django-api/commit/206ef90e2f3e055fa61533fda5b86e1d41306af6))
+
+* fix(order): cancel restores the stock the order took, not what it lists
+
+cancel_order incremented stock once per OrderItem, but only two
+operations ever remove physical stock — decrement_stock and
+convert_reservation_to_sale — and both are reached solely from the
+checkout path. handle_order_item_post_save deliberately skips the
+decrement when an item is created, so the checkout path is not counted
+twice, and the standalone OrderItem admin exposes order, product,
+quantity and price as editable with no add restriction.
+
+So an item added through the admin took nothing off the shelf, and
+cancelling the order put it back anyway. Stock 10, admin adds a line for
+3, customer cancels, stock is 13. The store then oversells three units
+that never existed. Cancelling twice doubled the restore for the same
+reason.
+
+The restore is now derived from the order's own physical movements:
+sum quantity_delta over the order's DECREMENT and INCREMENT StockLog
+rows per product and give back what is still outstanding. Every case
+falls out of that. Nothing taken restores nothing, a partly restored
+order restores the remainder, and a second cancel is a no-op because the
+first restore's INCREMENT rows net it out. RESERVE and RELEASE rows are
+excluded: a reservation is a logical hold and leaves physical stock
+untouched, which the log records as stock_before == stock_after.
+
+adjust_stock gained an order_id so the admin quantity-edit path is
+attributed to its order. Without it that movement logged against no
+order and became stock the order could never give back.
+
+Two existing fixtures simulated the order taking stock with a raw
+product.stock write. product/signals.py classifies exactly that as a
+manual admin adjustment and logs it against no order, which is not the
+order's stock to return, so both now consume through StockManager. Their
+assertions are unchanged. Three regressions added; all three fail on the
+previous code.
+
+Found during the 2026-09 audit review of order/services.py.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`41e6ccb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/41e6ccb8c4d239ce4ead76807fabe220152b159c))
+
 ### Chores
 
 * chore(deps): sync uv.lock to 3.28.0 [skip ci] ([`7af2312`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7af2312efee4786f830dd014f6e6533a32442a7d))
+
+### Documentation
+
+* docs(order): state the invariant instead of citing a deleted audit finding
+
+Four comments in the two order files this branch rewrites still pointed
+at `MULTI_TENANT_AUDIT.md` finding IDs (`C1`, `C1/C2`). PR #25 deletes
+that document — it was self-labelled superseded — and rewrites all 20
+citing files the same way.
+
+Left alone, these four lines are the ONLY place the two branches collide
+in `order/signals/handlers.py`, and the collision is a trap: resolving it
+with `git checkout --theirs <file>` takes the whole file from this
+branch, silently reverting #25's rewrites at three other sites in it and
+leaving live comments that reference a file no longer in the tree. I hit
+exactly that while rehearsing the merge.
+
+Saying what the capture is for ("the worker would run against the wrong
+schema") is what the reader needed anyway; the finding ID only ever
+pointed at a document that is going away.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`c6939db`](https://github.com/vasilistotskas/grooveshop-django-api/commit/c6939db352cb01fc533f9776e69229ce95fb1b9d))
+
+### Performance improvements
+
+* perf(order): index order metadata, which the model declared but the table never had
+
+`MetaDataModel` declares a GIN index on each of its two jsonb columns.
+`Order.Meta` defines its own `indexes`, and defining it REPLACES the
+abstract parents' list rather than extending it — Django does not merge
+them. `Order` splatted `TimeStampMixinModel.Meta.indexes` back in and not
+`MetaDataModel`'s, so the pair was silently absent. `Product`, which
+splats both, has had them all along.
+
+The bill landed on the Viva webhook. Every delivery resolves the order
+through `metadata__contains={"viva_order_codes": [code]}` (jsonb `@>`),
+1796/1797/1798 all take that path, and Viva retries an unacknowledged
+event hourly up to 23 times — so a mispriced lookup repeats. Without the
+index each is a sequential scan of the whole orders table. The B2B admin
+filter and the amount-mismatch sweep in `order/tasks.py` scan the same
+way through `metadata__has_key`.
+
+Built CONCURRENTLY (hence `atomic = False`): a plain build takes a SHARE
+lock on `order_order`, blocking every INSERT and UPDATE for its duration,
+and under the Argo CD PreSync hook migrations run BEFORE the new image
+rolls out — the store is live and taking checkouts throughout.
+
+Executed, not just reviewed: applied to the three real tenant schemas
+locally, all six indexes report indisvalid, and the planner picks
+`order_meta_ix` for the webhook's exact predicate (Bitmap Index Scan).
+
+The invariant is now a test over every concrete model, walking the MRO so
+a new mixin or subclass is covered the day it is written. Two notes on
+it. It must read `base._meta.abstract`, never `base.Meta.abstract` —
+`ModelBase` resets the latter to False once the class is built, and the
+first version of this test filtered on it, matched nothing, and passed
+whether or not the bug was present. And it found eight more models with
+the same drift, all dropping the created_at/updated_at pair, five of them
+ordering their list queries by exactly that unindexed column. They are
+recorded in `_KNOWN_DRIFT` rather than fixed here: they belong to five
+other apps, each needs its own migration, and a second test fails if any
+of them is fixed without being taken off the list.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`a1b4b58`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a1b4b58b532d519cc502333479bbc672b773143b))
+
+### Refactoring
+
+* refactor(order): take the shared shape for the Viva terminal-event guard
+
+`_verify_viva_terminal_transaction` now takes a human `subject` label
+plus a keyword-only `order`, matching the signature PR #27 gives it.
+
+Both PRs changed this function and git merges them CLEANLY into code
+that raises `NameError` on every Viva 1797/1798 event. #27 generalised
+the first parameter from `order` to a `subject` string so the gift-card
+branch could share the guard, which has no order model. This branch,
+independently, added the OrderCode-ownership check INSIDE the same
+function, referencing `order`. The signature line and the new body are
+far enough apart that git flags nothing — the merged function simply
+uses a name its parameter list no longer has, and since the guard runs
+before any state change, every reversal and failure event would 500 and
+be retried by Viva 23 times while the financial state never moved.
+
+Found by rehearsing the merge locally: `ruff` and `ty` both report
+`F821 Undefined name 'order'` on the combined tree, and neither branch
+shows it alone.
+
+Adopting #27's parameter order here means the signature merges
+identically instead of conflicting. The ownership check becomes
+conditional on `order` being passed, so the gift-card call sites — which
+pass four positional arguments and no order — keep #27's behaviour
+exactly, while the order path keeps the check this branch added.
+
+Follow-up worth having, deliberately not folded in: a gift-card purchase
+issues its own Viva order code, so the same OrderCode/TransactionId
+pairing that protects orders should protect purchases too. Wiring it
+means touching #27's call sites, which belongs in its own change.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`62830ed`](https://github.com/vasilistotskas/grooveshop-django-api/commit/62830ed6cd18b6bb04634501261d1a10bb94d25f))
+
+* refactor(shipping_boxnow): the "Wave 3 task" it guards against has shipped
+
+`apply_webhook_event` wrapped its import of
+`boxnow_send_arrival_notification` in an `except ImportError` that logged
+"task not yet available (Wave 3 task); skipping notification". The task
+has been in `shipping_boxnow/tasks.py:275` for some time, so the arm was
+unreachable — and had it ever been reached, a parcel arriving at its
+final destination would have notified nobody, with only a warning to show
+for it.
+
+The guard also spanned the `transaction.on_commit` registration, not just
+the import, which is a scope no comment justified.
+
+The remaining `except ImportError` in the codebase (`core/urls.py:206`,
+debug_toolbar) is real: it is a dev-group dependency and the production
+image installs with `--no-dev`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`48518aa`](https://github.com/vasilistotskas/grooveshop-django-api/commit/48518aaba354d9d4891bd917f0eae8911c349e59))
+
+* refactor(core): drop the import guards for dependencies that cannot be absent
+
+Six `try/except ImportError` blocks around imports that can never fail.
+
+`core/managers/base.py` and `core/managers/tree.py` each wrapped their
+whole body in a guard and, on the impossible branch, aliased the
+translatable and tree managers to their non-translatable parents.
+django-parler and django-mptt are hard runtime pins, and the stubs would
+have been worse than an ImportError anyway: silently returning a manager
+with no `with_translations()` to models that are declared translatable.
+Unwrapping also let both imports move to the top of the file, where the
+linter can see them.
+
+The four in the carriers guarded `from shipping_acs...` inside
+`shipping_acs/carrier.py`, and `from shipping_boxnow...` inside
+`shipping_boxnow/carrier.py` — a module cannot fail to import its own
+app. `shipping_acs/carrier.py` made the point itself: three unguarded
+imports from the same package sat directly above the guarded one.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`801ccb6`](https://github.com/vasilistotskas/grooveshop-django-api/commit/801ccb65952bd116679c7579184ac9cff751ae76))
+
+* refactor(pay_way): delete the helpers nothing calls
+
+Six members with no caller, no test and no template reference:
+
+- `PayWayEnum.get_online_payments` / `get_offline_payments` /
+  `get_digital_wallet_payments` hard-coded which display labels count as
+  online. The `is_online_payment` column already answers that per row, and
+  the two disagreed — the enum called CREDIT_CARD online, while a
+  cash-on-delivery row can legitimately carry that label.
+- `PayWayQuerySet.online_payments` / `offline_payments` restated the same
+  column as a filter. `active()`/`inactive()` stay: they are the queryset
+  idiom every other model here exposes.
+- `PayWay.display_name` was a byte-identical copy of `__str__`.
+- `PayWay.is_free_for_amount`, `get_configuration_value` and
+  `set_configuration_value` were speculative accessors over two plain
+  fields.
+
+The enum MEMBERS stay. An earlier reference count called
+PAY_PAL/APPLE_PAY/GOOGLE_PAY/PAY_ON_DELIVERY/VIVA_WALLET dead, but they
+are data, not symbols: `pay_way/migrations/0019_seed_default_pay_ways`
+writes the literal "PAY_ON_DELIVERY" onto the one active pay-way every
+new tenant gets, and the storefront renders all nine as
+`payment_methods.<KEY>` from its own locale file. Removing any would cost
+a migration on a translated field and desynchronise the two repos.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`ad710fb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ad710fb8e469ed83c88f1ad066f69ba97189f85a))
+
+* refactor(order): remove the PayPal stub, and stop the pay-way factory inventing it
+
+`PayPalPaymentProvider` had four methods, each raising
+NotImplementedError, and read `PAYPAL_CLIENT_ID`/`PAYPAL_CLIENT_SECRET`
+through `getattr(settings, ..., "")` — neither setting exists anywhere,
+so both were always "". It was deliberately left out of
+`get_payment_provider`'s registry, which means nothing could reach it: the
+only references were three tests, one of them skipped with the reason
+"PayPal provider is mock implementation". The test that matters — an
+unregistered code raising rather than half-charging — stays.
+
+`pay_way/factories.py` was seeding it into every fourth random pay-way,
+as an *online* provider that checkout then rejects with "Unknown payment
+provider". Removing it exposed the bigger problem: `provider_code`,
+`is_online_payment`, `requires_confirmation` and `configuration` were
+four separate `LazyFunction` calls into `generate_provider_data()`, so
+each field came from its own independent draw. A factory-built pay-way
+could be "cash" carrying a bank-transfer configuration, or an offline
+code flagged as online. One draw now feeds all of them (via `Meta.exclude`,
+factory_boy's idiom for a helper declaration), and the random pool holds
+only offline codes — the two chargeable providers were already excluded
+from it, so the online path belongs to `create_online_payment`.
+
+Also drops the `dj_paypal:` cache-purge exemption. dj-paypal is not a
+dependency, so nothing writes that prefix.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`96fcadb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/96fcadb2f5f8d581868881a5308cec28ce905cc3))
+
+* refactor(order): drop guards for attributes that always exist
+
+`user/serializers/account.py` branched on `hasattr(User, "EMAIL_FIELD")`
+and three siblings, as if `AUTH_USER_MODEL` were swappable. It is not,
+and `EMAIL_FIELD` was never on `UserAccount` at all — it extends
+`AbstractBaseUser`, which does not define one — so the shim quietly
+dropped `email` from the read serializer's field list. Both serializers
+now name their fields outright; the write one had `email`, `first_name`
+and `last_name` twice over.
+
+The same shape in `order/managers/item.py` (`hasattr(first_item,
+"price")` on an OrderItem row) and `order/serializers/item.py`
+(`hasattr(product, "stock")`, twice) tested for model fields that are
+declared on the models being read. The manager wanted an emptiness
+check, so it now asks that question directly.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`e9e3203`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e9e3203a349f8003a55bfd9902fcf25bfb2f5d6c))
+
+* refactor: remove import guards for dependencies that cannot be missing
+
+Four guards caught ImportError on modules this project cannot run
+without, and each one turned a real breakage into a silent downgrade.
+
+celery is a hard runtime dependency and meili is an installed app, so
+`from meili.tasks import index_document_task` cannot fail. Three sites
+guarded it anyway: two in product/signals.py and one in meili/apps.py
+fell back to synchronous indexing, and blog/signals.py returned outright,
+skipping indexing altogether and leaving stale documents searchable. None
+of them logged anything, so the only symptom would have been search
+results quietly going out of date.
+
+django-unfold is the admin theme this project runs on, so there is no
+"without unfold" mode. That guard would have rendered plain Django
+widgets and left the admin looking subtly wrong with nothing to explain
+why.
+
+The imports are now unconditional: if one ever does fail, it fails with a
+traceback naming the module instead of degrading in silence.
+
+The pair of tests covering both sides of the unfold flag went with the
+flag, replaced by one asserting the widgets it actually builds.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`5ed7034`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5ed703427175909fd8948aa5bad32f858506f2a1))
+
+* refactor(order): one list of Viva order codes, not a list plus a duplicate
+
+Each hosted-checkout session mints a fresh 16-digit orderCode. The writer
+appended it to metadata.viva_order_codes and also mirrored the newest
+into a singular metadata.viva_order_code, so the webhook lookup, the
+return endpoint and every reader of an order's codes had to match either
+spelling.
+
+The list is the thing that matters: a shopper can pay on an earlier
+session — stale tab, back button, retry — and matching only the newest
+code silently strands that payment, because Viva treats our 200 as
+handled and never retries. The singular was only ever the newest entry
+repeated.
+
+Migration 0052 folds any singular into the list where it is missing, then
+drops the key, as one set-based statement for the reasons written up in
+0051. Ordering is safe: old pods write both keys, so a code minted during
+the rollout still lands in the list the new reader consults.
+
+The first draft's SQL missed the case it most needed to handle — rows
+carrying only the singular, where the list key is absent entirely.
+jsonb_typeof of a missing key is NULL, which no comparison matches, so
+those rows fell through to a NULL result. Caught by the test that asserts
+such an order is still reachable through the lookup afterwards.
+
+Irreversible by design: nothing is lost, and restoring the singular would
+have to guess which entry was newest at the time.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`266a36f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/266a36f1fa7f01533db823db8dc765918fd0b214))
+
+* refactor(order): one spelling of "confirmation email sent"
+
+The send used to be recorded as a bare boolean and later as a timestamp,
+and the reader accepted either, so every future reader had to know both
+shapes. Migration 0051 converts the rows and the fallback is removed here.
+
+Ordering is the safe direction and must stay that way. Migrations run
+before the new image, and the OLD reader is "timestamp OR boolean", which
+reads post-migration rows exactly as the new one does. Shipping the code
+first would be the unsafe order: the new reader would see every
+legacy-only row as unsent and re-send a confirmation to all of them.
+
+Written as one set-based UPDATE rather than a read-modify-write loop,
+after a migration-safety review caught the race. metadata is a single
+jsonb blob, so reading it in Python and writing it back loses any
+concurrent update to another key on the same row — and every other writer
+takes a row lock a migration would not be holding. Losing that update
+would strip the very timestamp being written and re-send the customer's
+confirmation after rollout. An UPDATE holds its own row locks for the
+whole statement and touches the table once, which matters because the
+abstract GinIndex on metadata is not inherited into Order.Meta.indexes,
+so each pass would otherwise be a full scan.
+
+The first draft also wrote a "backfilled" marker so the reverse could
+undo itself. That marker would have started lying immediately: three
+paths strip or overwrite the timestamp without clearing it, and a
+rollback would then have destroyed a genuine send time. The marker is
+gone and the migration is irreversible by design — the old reader accepts
+the timestamp, so a rollback needs no data restored.
+
+Also removes the last tails: a pop of the legacy key in retry_payment
+that nothing writes any more, and three docstrings naming
+_reserve_confirmation_email, deleted in 938bf61a.
+
+Backfilled rows take updated_at, the closest the row can honestly offer,
+and only where no real timestamp exists.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`5f65588`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5f6558840925ff9853812cb4782d8c270d5a2cf4))
+
+* refactor(order): retire the B2B invoice rollout shim
+
+B2B_INVOICE_COMPANY_REQUIRED existed to keep an older checkout working:
+company name, tax office and activity were only enforced on INVOICE
+orders once a merchant flipped the flag, because the deployed storefront
+sent the tax id alone.
+
+Validated before removing rather than taken from the plan: the infra
+image pin is storefront v3.166.1, and useCheckoutSubmit.ts sends
+billingCompanyName, billingTaxOffice and billingActivity. The shim has
+nothing left to protect.
+
+A Greek invoice must name its counterparty, so the trio is now simply
+required on INVOICE orders — no flag, no default, no branch. The setting
+is gone from EXTRA_SETTINGS_DEFAULTS and from the demo seed.
+
+Three tests carried invoice payloads without the trio. The two whose
+subject is something else (the invoicing gate, the tax-id prefix) had
+their payloads completed; the pair that pinned the flag's two positions
+is replaced by one that states the rule.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`ab5af64`](https://github.com/vasilistotskas/grooveshop-django-api/commit/ab5af6440dd865e03eda58b6b2f98aa6086220fa))
+
+* refactor(order): correct my own layering, schema and defensive-code slips
+
+A self-audit of this branch against the project's own rules found four
+things worth fixing.
+
+A Celery task imported a constant from a view module, which is backwards:
+views dispatch tasks, not the reverse. The constant is order state — a
+key on Order.metadata written by the Viva webhook and read by the
+auto-cancel sweep — so it now lives on the model both already import.
+
+The label download declared application/json for a PDF stream. Fixing
+the body type to binary left the media type wrong, which still misleads a
+generated client. drf-spectacular keys a response on (status, media_type)
+for exactly this, and the generated schema now says application/pdf.
+Verified by regenerating and reading the output rather than assuming, and
+done this way deliberately: the documented alternative is a custom
+renderer, which would change content negotiation and 406 any client
+sending Accept: application/json.
+
+Three defensive expressions guarded against shapes that cannot occur:
+unwrapping a MoneyField value that is always Money, defaulting a Sum that
+is always an int because every row is a group over a non-null column, and
+a getattr for a primary key that a model instance always has. Each was
+insurance against nothing, and insurance against nothing hides the case
+where the assumption really does break.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`3551e3f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/3551e3f810f628ea231ecac9e60db739fabfa7ed))
+
+* refactor(order): drop dead work and stop re-marking a converted reservation
+
+Three low-severity items.
+
+_persist_invoice_row took a force flag it never read; the caller's own
+force handling happens above it. Removed, along with the argument at its
+one test call site.
+
+The payment-failed email prefetched items and their product translations,
+but it neither passes items into the context nor renders a line table, so
+every send paid for joins it threw away.
+
+cleanup_expired_reservations selected on consumed=False and then updated
+by id alone, so a reservation converted to a sale in between was
+re-marked by the sweep. The filter now carries consumed=False too. The
+audit row is still built from the pre-update snapshot, which in that
+narrow race can log a release for a converted reservation — noted in
+place, and harmless because neither operation moves physical stock.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`dc15016`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dc15016eeb339490739e8254a505c2c5650ea055))
+
+* refactor(order): remove an unreachable guard and log a price fixed from zero
+
+Four low-severity items from the audit review of order/signals/handlers.py.
+
+The shipment-dispatch condition carried an equality check that could
+never change its outcome: the branch fires only on the transition into
+having tracking, so at least one field was empty before and both are set
+now — an old value equal to the new non-empty one implies the old one was
+non-empty, which the preceding term already excludes. Removed, with the
+reasoning written down in its place.
+
+Its regression test patched .delay while the handler calls .apply_async,
+so the assertion held no matter what the handler did. Pointed at the real
+method; it still passes, which is the point — the behaviour is guaranteed
+structurally.
+
+A line-item price correction FROM zero was never recorded in history,
+because Money(0) is falsy and the guard tested truthiness. Free-gift
+lines and data-entry fixes start at zero, which is exactly when an audit
+trail matters.
+
+_schema was re-read halfway through handle_order_post_save, rebinding a
+name that three already-registered commit hooks read as a free variable.
+Both reads yield the same value today, so nothing was broken, but the
+hooks would silently follow any future change to the second read. There
+is now one binding, taken once, and the comment says why it must stay
+that way.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`78ed862`](https://github.com/vasilistotskas/grooveshop-django-api/commit/78ed862288226bcb1d5410d44fd4357159a5a479))
+
+* refactor(order): drop unreachable view code and fix a note written too early
+
+Six low-severity items from the audit review of the order views.
+
+OrderViewSet.refund_order was never routed — order/urls.py binds every
+action explicitly and this one is absent, so the only refund endpoint is
+the order-item one. It has been removed along with its schema entry,
+which had been advertising a URL that returns 404. The refund SERVICE it
+called is used elsewhere and is untouched.
+
+get_object carried a UUID branch that cannot run: every order route binds
+<int:pk>, so a UUID string never reaches it. Guest access by UUID has its
+own route.
+
+Two dead branches in the item view. get_object caught
+OrderItem.DoesNotExist, but DRF's generic get_object goes through
+get_object_or_404 and raises Http404. perform_create branched on a price
+in validated_data, but price is not a writable field on the write
+serializer, so the line price always comes from the product — which is
+the property worth stating, since it means a client cannot name its own
+price.
+
+The item refund wrote "Refund reason: ..." to the item's notes BEFORE
+calling refund(), so a refund that then failed validation left a note
+claiming a refund that never happened. Reason is recorded after the
+refund succeeds.
+
+And a comment in get_permissions named ``list`` as reaching the fallback
+branch; it is classified above and never does.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`f92362f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f92362ffcffb851edb48065f1899c99bd4580d40))
 
 ### Testing
 
@@ -296,6 +1381,38 @@ through the django-tenants API so the schema name and the tenant object
 always move together, and say so on the root bind_tenant fixture.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`d1c4438`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1c4438c098c28e346843921d230db01ed9c4c52))
+
+* test(shipping_acs): enforce that the metadata seed and its defaults agree
+
+The audit flagged `shipping_acs/config.py`'s constants as dead
+duplicates of `shipping/migrations/0004_seed_provider_metadata`, to be
+deleted in favour of failing loudly. They are not duplicates, and
+deleting them would have broken two things:
+
+- `metadata` is an operator-editable JSON blob in Django admin, so any
+  one key can go missing or arrive unusable. Each accessor defaults and
+  clamps per key — `TestPrintType::test_invalid_value_falls_back_to_default`
+  and the weight-clamp tests already pin that as intended behaviour.
+- `print_type` is not seeded at all. The constant is its only source, so
+  "fail loudly if metadata is missing" would have dead-lettered every
+  label download.
+
+What was genuinely missing is the other half. `config.py` asked, in a
+comment, that a change here be mirrored in the seed — nothing enforced
+it, and a drift is invisible: tenants seeded before the change keep the
+old value while a deleted key yields the new constant, and the two
+disagree about weight bounds or nearest-search size with no error
+anywhere. That is now a test over the two literals, no database needed.
+It also pins `print_type`'s absence from the seed, with the reason
+(the seed only fills missing keys, so adding it would reach fresh
+tenants and never existing ones).
+
+The module docstring said the constants exist for the case where the
+seed "hasn't run yet", which is what made them look removable; it now
+states what they actually do.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`328d3f9`](https://github.com/vasilistotskas/grooveshop-django-api/commit/328d3f9323330d23610388dd7d6092d12384fedc))
 
 ## v3.28.0 (2026-09-04)
 

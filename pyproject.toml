@@ -299,7 +299,13 @@ extend-select = [
     "F405", # name may be undefined, or defined from star imports
     "A",    # builtin shadowing
     "DJ",   # Django-specific correctness
-    "PLR0913", # too many arguments — makes `max-args` below real
+    # PLR0917, not PLR0913. PLR0913 counts EVERY parameter, so it fires
+    # just as loudly on a function whose arguments are all keyword-only —
+    # which is the shape its own remedy recommends and which cannot be
+    # mixed up at a call site. Ten of the fourteen it flagged here were
+    # already keyword-only. PLR0917 counts POSITIONAL parameters, which
+    # is the thing that actually goes wrong silently.
+    "PLR0917", # too many POSITIONAL arguments
     "T20",  # print / pprint left in the tree
     "TID",  # banned and relative imports
 ]
@@ -353,8 +359,12 @@ ignore = [
 #   and at 80 columns the collapsed form needs a parenthesised context
 #   group — churning test structure for no behavioural gain. The rule
 #   stays enforced in production code, where it is already clean.
-"tests/**" = ["S101", "TRY002", "DJ008", "S110", "SIM117"]
-"tests_mt/**" = ["S101", "TRY002", "DJ008", "S110", "SIM117"]
+# PLR0917: pytest injects fixtures POSITIONALLY, and `@mock.patch`
+#   passes each mock as a positional argument in bottom-up order. A test
+#   with several of either cannot be given keyword-only parameters — the
+#   rule is unsatisfiable there by construction, not by choice.
+"tests/**" = ["S101", "TRY002", "DJ008", "S110", "SIM117", "PLR0917"]
+"tests_mt/**" = ["S101", "TRY002", "DJ008", "S110", "SIM117", "PLR0917"]
 # Seeding helpers print deliberate, `verbose`-gated progress for an
 # operator watching `seed_all` run. They are shared by the management
 # command and the test factories, so they have no `self.stdout` to write
@@ -364,7 +374,7 @@ ignore = [
 "devtools/management/commands/seed_all.py" = ["T201"]
 
 [tool.ruff.lint.pylint]
-max-args = 6
+max-positional-args = 6
 
 # ─────────────────────────────────────────────────────────
 # ty type checker configuration

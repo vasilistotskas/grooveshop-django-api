@@ -213,7 +213,12 @@ GitHub Actions (`.github/workflows/ci.yml`) jobs:
 - **Type checker**: `ty` (config under `[tool.ty]`). Not in pre-commit — run
   `uv run ty check` yourself before committing; the `.claude` PostToolUse hook
   reports per-file findings as you edit but never blocks.
-- **Max function args**: 6 (pylint rule via ruff)
+- **Max POSITIONAL args**: 6 (`PLR0917` via ruff). Deliberately not
+  `PLR0913`, which counts every parameter and so penalises
+  keyword-only arguments — the very shape that removes the hazard,
+  since a keyword argument cannot be mixed up at a call site.
+  Exempt in `tests/`: pytest injects fixtures positionally and
+  `@mock.patch` passes each mock as a positional argument.
 - Migrations are excluded from linting (`**/migrations/**`)
 - Semantic release: `feat` → minor, `fix`/`perf` → patch
 

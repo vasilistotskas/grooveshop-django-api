@@ -22,6 +22,7 @@ CLICK_SCORE_MAX_ITEMS = 50
     retry_backoff=True,
 )
 def save_search_query(
+    *,
     query: str,
     language_code: str | None,
     content_type: str,

@@ -351,6 +351,7 @@ class OrderService:
     @transaction.atomic
     def create_order_from_cart(
         cls,
+        *,
         cart,
         shipping_address: dict[str, Any],
         payment_intent_id: str,
@@ -1030,6 +1031,7 @@ class OrderService:
     @transaction.atomic
     def create_order_from_cart_offline(
         cls,
+        *,
         cart,
         shipping_address: dict[str, Any],
         pay_way,

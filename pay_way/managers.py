@@ -26,19 +26,13 @@ class PayWayQuerySet(TranslatableOptimizedQuerySet):
     def inactive(self) -> Self:
         return self.filter(active=False)
 
-    def online_payments(self) -> Self:
-        return self.filter(is_online_payment=True)
-
-    def offline_payments(self) -> Self:
-        return self.filter(is_online_payment=False)
-
 
 class PayWayManager(TranslatableOptimizedManager):
     """
     Manager for the PayWay model.
 
     ``for_list()`` / ``for_detail()`` and delegation of queryset methods
-    (``active()``, ``online_payments()``, …) are provided by
+    (``active()``, ``inactive()``) are provided by
     ``TranslatableOptimizedManager``.
 
     Usage in ViewSet:

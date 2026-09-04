@@ -7,6 +7,7 @@ from typing import Any, NotRequired, TypedDict
 from django.db import models
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from parler_rest.fields import TranslatedFieldsField
 from rest_framework import serializers
@@ -71,9 +72,18 @@ class ActionConfig:
 
     request: type[serializers.Serializer] | None = None
     response: type[serializers.Serializer] | None = None
-    responses: dict[int, type[serializers.Serializer] | dict | None] | None = (
-        None
-    )
+    # Keys are a status code, or a ``(status, media_type)`` pair when the
+    # action does not answer in JSON — that pair is what makes the schema
+    # say ``application/pdf`` for a label download instead of inheriting
+    # the view's JSON renderer. Values allow ``OpenApiTypes`` so a file
+    # stream can be declared as binary rather than as a serializer.
+    responses: (
+        dict[
+            int | tuple[int, str],
+            type[serializers.Serializer] | dict | OpenApiTypes | None,
+        ]
+        | None
+    ) = None
     operation_id: str | None = None
     summary: str | Promise | None = None
     description: str | Promise | None = None

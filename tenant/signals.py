@@ -1,14 +1,42 @@
 from __future__ import annotations
 
+from corsheaders.signals import check_request_enabled
 from django.core.cache import cache
+from django.db import connection, transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from tenant.cache import tenant_resolve_key
+from tenant.middleware import origin_belongs_to_tenant
 from tenant.models import Tenant, TenantDomain
 
 
-@receiver([post_save, post_delete], sender=TenantDomain)
+@receiver(check_request_enabled, dispatch_uid="tenant.allow_tenant_origin")
+def allow_tenant_origin(sender, request, **kwargs) -> bool:
+    """CORS allow for the CURRENT tenant's own domains.
+
+    ``CORS_ALLOWED_ORIGINS`` holds the platform origins; every tenant
+    storefront is a distinct origin that only its ``TenantDomain`` rows
+    know, so the static list cannot cover them and an allow-all would
+    hand credentialed CORS to the whole internet. django-cors-headers
+    echoes the Origin (with credentials) when a receiver returns True.
+    ``CorsMiddleware`` sits after ``TenantMainMiddleware``, so the tenant
+    is bound; ``connection.tenant`` rather than ``get_current_tenant``
+    so the platform console's own domain rows count on the public
+    schema too. Server-to-server callers (Nuxt SSR, the agent gateway,
+    media-stream) send no Origin and never reach this.
+    """
+    origin = request.headers.get("Origin", "")
+    if not origin:
+        return False
+    return origin_belongs_to_tenant(getattr(connection, "tenant", None), origin)
+
+
+@receiver(
+    [post_save, post_delete],
+    sender=TenantDomain,
+    dispatch_uid="tenant.invalidate_domain_caches",
+)
 def invalidate_domain_caches(sender, instance, **kwargs):
     """Clear tenant resolve + CSRF domain caches when a domain changes.
 
@@ -34,12 +62,25 @@ def invalidate_domain_caches(sender, instance, **kwargs):
         cache.delete(f"global:tenant_domains:{instance.tenant.schema_name}")
 
 
-@receiver(post_save, sender=Tenant)
+@receiver(
+    post_save, sender=Tenant, dispatch_uid="tenant.invalidate_tenant_caches"
+)
 def invalidate_tenant_caches(sender, instance, **kwargs):
     """Clear caches for all domains of a tenant when tenant config changes."""
     for domain in instance.domains.values_list("domain", flat=True):
         cache.delete(tenant_resolve_key(domain))
     cache.delete(f"global:tenant_domains:{instance.schema_name}")
+
+
+def _purge_resolve_for_schema(schema: str) -> None:
+    from django_tenants.utils import schema_context  # noqa: PLC0415
+
+    with schema_context("public"):
+        tenant = Tenant.objects.filter(schema_name=schema).first()
+        if tenant is None:
+            return
+        for domain in tenant.domains.values_list("domain", flat=True):
+            cache.delete(tenant_resolve_key(domain))
 
 
 def _purge_resolve_for_current_schema():
@@ -49,22 +90,27 @@ def _purge_resolve_for_current_schema():
     ``TenantConfigSerializer`` payload. The connection's current schema
     identifies whose domains to purge; the keys themselves are
     schema-independent "global:" keys (see ``invalidate_domain_caches``).
+
+    The purge runs on commit: a ``post_save`` fires inside the caller's
+    transaction, so purging there would clear the cache before the row
+    is visible (a concurrent resolve would re-cache the stale payload)
+    and pay the public-schema round-trip once per seeded row instead of
+    once per transaction. The schema is captured NOW because the commit
+    hook may run after a ``schema_context`` has unwound.
     """
     from django.db import connection  # noqa: PLC0415
-    from django_tenants.utils import schema_context  # noqa: PLC0415
 
     schema = connection.schema_name
     if schema == "public":
         return
-    with schema_context("public"):
-        tenant = Tenant.objects.filter(schema_name=schema).first()
-        if tenant is None:
-            return
-        for domain in tenant.domains.values_list("domain", flat=True):
-            cache.delete(tenant_resolve_key(domain))
+    transaction.on_commit(lambda: _purge_resolve_for_schema(schema))
 
 
-@receiver(post_save, sender="extra_settings.Setting")
+@receiver(
+    post_save,
+    sender="extra_settings.Setting",
+    dispatch_uid="tenant.invalidate_resolve_on_agent_setting_change",
+)
 def invalidate_resolve_on_agent_setting_change(sender, instance, **kwargs):
     """Purge the tenant-resolve cache when a merchant edits a setting
     that is FOLDED into the cached TenantConfig payload.
@@ -84,7 +130,11 @@ def invalidate_resolve_on_agent_setting_change(sender, instance, **kwargs):
     _purge_resolve_for_current_schema()
 
 
-@receiver([post_save, post_delete], sender="pay_way.PayWay")
+@receiver(
+    [post_save, post_delete],
+    sender="pay_way.PayWay",
+    dispatch_uid="tenant.invalidate_resolve_on_pay_way_change",
+)
 def invalidate_resolve_on_pay_way_change(sender, instance, **kwargs):
     """Purge the tenant-resolve cache when a pay-way changes.
 
@@ -97,7 +147,7 @@ def invalidate_resolve_on_pay_way_change(sender, instance, **kwargs):
     _purge_resolve_for_current_schema()
 
 
-@receiver(post_save, sender=Tenant)
+@receiver(post_save, sender=Tenant, dispatch_uid="tenant.reactivate_on_renewal")
 def reactivate_on_renewal(sender, instance, **kwargs):
     """Recording a payment lifts a BILLING suspension immediately.
 

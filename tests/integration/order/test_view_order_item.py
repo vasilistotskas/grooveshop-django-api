@@ -5,6 +5,12 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from tests.utils import TestURLFixerMixin
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_staff,
+    store_tenant,
+    unbind_store_tenant,
+)
 from order.enum.status import OrderStatus
 from order.factories.order import OrderFactory
 from order.models.item import OrderItem
@@ -399,7 +405,11 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
 
     def setUp(self):
         self.user = UserAccountFactory()
-        self.staff = UserAccountFactory(is_staff=True)
+        # Refunds are a STORE STAFF operation: a stamped platform identity
+        # with a staff role in the tenant bound to this connection.
+        self.tenant = store_tenant("refund_tenant")
+        self.staff = store_staff(self.tenant)
+        self.addCleanup(unbind_store_tenant, bind_store_tenant(self.tenant))
         self.pay_way = PayWayFactory()
         self.product = ProductFactory(
             active=True, num_images=0, num_reviews=0, stock=20
@@ -425,6 +435,24 @@ class RefundActionTests(TestURLFixerMixin, APITestCase):
         response = self.client.post(
             self.get_refund_url(self.order_item.id),
             {"quantity": 1, "reason": "self refund"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.order_item.refresh_from_db()
+        self.assertFalse(self.order_item.is_refunded)
+
+    def test_refund_action_refused_for_is_staff_residue(self):
+        """``is_staff`` on a tenant-schema customer row is not a grant."""
+        residue = UserAccountFactory(is_staff=True)
+        self.client.force_authenticate(user=residue)
+
+        self.order.status = OrderStatus.DELIVERED.value
+        self.order.save()
+
+        response = self.client.post(
+            self.get_refund_url(self.order_item.id),
+            {"quantity": 1, "reason": "Product defective"},
             format="json",
         )
 

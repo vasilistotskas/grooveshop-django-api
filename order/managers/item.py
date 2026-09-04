@@ -41,10 +41,12 @@ class OrderItemQuerySet(OptimizedQuerySet):
         items = self.annotate_total_price()
         total = items.aggregate(total=Sum("calculated_total"))["total"] or 0
 
+        # ``price`` is a non-null MoneyField on every OrderItem, so the
+        # only question is whether the queryset had a row at all.
         first_item = self.first()
-        if first_item and hasattr(first_item, "price"):
-            return Money(amount=total, currency=first_item.price.currency)
-        return Money(amount=0, currency=settings.DEFAULT_CURRENCY)
+        if first_item is None:
+            return Money(amount=0, currency=settings.DEFAULT_CURRENCY)
+        return Money(amount=total, currency=first_item.price.currency)
 
     def for_user(self, user) -> Self:
         return self.filter(order__user=user)

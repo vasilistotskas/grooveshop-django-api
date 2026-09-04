@@ -144,6 +144,37 @@ class OrderModelTestCase(TestCase):
 
         self.assertFalse(result)
 
+    def test_is_paid_when_deductions_covered_the_whole_total(self):
+        """A gift card (or a 100% promotion, or a full loyalty
+        redemption) settles the order without a provider, so the
+        REMAINDER the customer owed is 0.00. Requiring a positive
+        paid_amount made such an order report itself unpaid forever."""
+        self.order.payment_status = PaymentStatus.COMPLETED
+        self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
+        self.order.payment_id = "GIFTCARD_abc"
+
+        self.assertTrue(Order.is_paid.__get__(self.order))
+
+    def test_fully_covered_order_no_longer_awaits_online_payment(self):
+        """awaits_online_payment is `not is_paid` behind an online pay
+        way, so the same gap kept a settled order in the "pay now" state
+        and let the checkout endpoints open a zero-amount session."""
+        self.order.payment_status = PaymentStatus.COMPLETED
+        self.order.paid_amount = Money("0.00", settings.DEFAULT_CURRENCY)
+        self.order.pay_way = Mock(is_online_payment=True)
+        # ``self.order`` is a Mock(spec=Order), which would hand back a
+        # truthy stub for ``is_paid`` and make this assertion vacuous.
+        # Feed it what the real property answers.
+        self.order.is_paid = Order.is_paid.__get__(self.order)
+
+        self.assertFalse(Order.awaits_online_payment.__get__(self.order))
+
+    def test_is_paid_false_while_payment_is_pending(self):
+        self.order.payment_status = PaymentStatus.PENDING
+        self.order.paid_amount = Money("100.00", settings.DEFAULT_CURRENCY)
+
+        self.assertFalse(Order.is_paid.__get__(self.order))
+
     def test_can_be_canceled_property_true(self):
         self.order.status = OrderStatus.PENDING
 

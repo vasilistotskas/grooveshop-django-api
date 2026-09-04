@@ -8,15 +8,14 @@ from measurement.base import BidimensionalMeasure, MeasureBase
 
 from core.utils.measurement import get_measurement
 
-try:
-    from unfold.widgets import (
-        UnfoldAdminSelectWidget,
-        UnfoldAdminTextInputWidget,
-    )
-
-    UNFOLD_AVAILABLE = True
-except ImportError:
-    UNFOLD_AVAILABLE = False
+# django-unfold is a hard dependency and the admin theme this project
+# runs on, so there is no "without unfold" mode to fall back to. The
+# guard only meant a real breakage would have rendered the plain Django
+# widgets and left the admin looking subtly wrong with nothing logged.
+from unfold.widgets import (
+    UnfoldAdminSelectWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 
 class MeasurementWidget(forms.MultiWidget):
@@ -32,20 +31,12 @@ class MeasurementWidget(forms.MultiWidget):
         self.unit_choices = unit_choices
 
         if not float_widget:
-            if UNFOLD_AVAILABLE:
-                float_widget = UnfoldAdminTextInputWidget(attrs=attrs)
-            else:
-                float_widget = forms.TextInput(attrs=attrs)
+            float_widget = UnfoldAdminTextInputWidget(attrs=attrs)
 
         if not unit_choices_widget:
-            if UNFOLD_AVAILABLE:
-                unit_choices_widget = UnfoldAdminSelectWidget(
-                    attrs=attrs, choices=unit_choices
-                )
-            else:
-                unit_choices_widget = forms.Select(
-                    attrs=attrs, choices=unit_choices
-                )
+            unit_choices_widget = UnfoldAdminSelectWidget(
+                attrs=attrs, choices=unit_choices
+            )
 
         widgets = (float_widget, unit_choices_widget)
         super().__init__(widgets, attrs)

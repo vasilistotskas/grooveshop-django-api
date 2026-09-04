@@ -1,26 +1,37 @@
 from unittest.mock import patch
 
 import pytest
-from django.db import connection
 
 from b2b.vies import ViesResult
-from tenant.models import Tenant
+from tests.utils.staff import (
+    bind_store_tenant,
+    store_tenant,
+    unbind_store_tenant,
+)
 
 
 @pytest.fixture
-def b2b_tenant(db, monkeypatch):
-    """A tenant row with the B2B plan flag on, active for the request."""
-    tenant = Tenant(
-        schema_name="b2b_gate_tenant",
+def b2b_tenant(db):
+    """A tenant row with the B2B plan flag on, bound for the request.
+
+    Bound through ``connection.set_tenant`` rather than by assigning
+    ``connection.tenant``: submitting a profile runs the merchant
+    notification task eagerly, which enters ``schema_context("public")``
+    and on exit restores the connection with ``set_tenant(previous)``.
+    With a bare attribute assignment that exit rewrote
+    ``connection.schema_name`` to this tenant while the attribute
+    restore left it there, and the next ``Tenant.save()`` in the worker
+    refused to run "outside the public schema".
+    """
+    tenant = store_tenant(
+        "b2b_gate_tenant",
         name="b2b-gate-tenant",
-        slug="b2b-gate-tenant",
         owner_email="owner-b2b@example.com",
         b2b_enabled=True,
     )
-    tenant.auto_create_schema = False
-    tenant.save()
-    monkeypatch.setattr(connection, "tenant", tenant, raising=False)
-    return tenant
+    previous = bind_store_tenant(tenant)
+    yield tenant
+    unbind_store_tenant(previous)
 
 
 @pytest.fixture

@@ -27,6 +27,7 @@ class NotificationUserFilterTest(APITestCase):
             last_name="User",
             is_active=True,
             is_staff=True,
+            is_superuser=True,
         )
         self.client.force_authenticate(user=self.auth_user)
 

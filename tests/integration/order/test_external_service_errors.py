@@ -8,18 +8,15 @@ from stripe._error import (
     APIError,
 )
 
-from order.payment import (
-    StripePaymentProvider,
-    PayPalPaymentProvider,
-)
+from order.payment import StripePaymentProvider
 
 
 @pytest.mark.django_db
 class TestExternalServiceErrorsAreLogged:
     """
-    This test suite validates that all external payment service failures
-    (Stripe, PayPal) are properly logged with exc_info=True and return
-    structured error responses. Carrier-specific error tests live alongside
+    This test suite validates that external payment service failures are
+    properly logged with exc_info=True and return structured error
+    responses. Carrier-specific error tests live alongside
     each carrier in ``tests/{unit,integration}/shipping_*/``.
     """
 
@@ -225,73 +222,6 @@ class TestExternalServiceErrorsAreLogged:
                 f"logs but none had exc_info set."
             )
 
-    @pytest.mark.skip(
-        reason="PayPal provider is mock implementation without error logging. "
-        "Needs real implementation with exc_info=True logging."
-    )
-    @pytest.mark.parametrize(
-        "method_name,method_args",
-        [
-            (
-                "process_payment",
-                {
-                    "amount": Money("100.00", "USD"),
-                    "order_id": "order_paypal_1",
-                },
-            ),
-            (
-                "refund_payment",
-                {
-                    "payment_id": "PAYID-TEST123",
-                    "amount": Money("25.00", "USD"),
-                },
-            ),
-            ("get_payment_status", {"payment_id": "PAYID-TEST456"}),
-        ],
-    )
-    def test_paypal_errors_are_logged_with_exc_info(
-        self,
-        method_name,
-        method_args,
-        caplog,
-    ):
-        """
-        Test that PayPal service failures are logged with exc_info=True.
-
-        **EXPECTED TO FAIL**: PayPal provider is currently a mock implementation
-        that doesn't log errors. This test documents the expected behavior.
-        """
-        provider = PayPalPaymentProvider()
-        caplog.set_level(logging.ERROR)
-
-        # Force an exception in the PayPal provider
-        with patch.object(
-            PayPalPaymentProvider,
-            method_name,
-            side_effect=Exception("PayPal error"),
-        ):
-            try:
-                method = getattr(provider, method_name)
-                result = method(**method_args)
-
-                # If it returns a tuple, verify failure
-                if isinstance(result, tuple):
-                    success, error_data = result
-                    assert success is False
-            except Exception:
-                pass  # Exception is acceptable if logged
-
-            # Verify: Error was logged with exc_info
-            error_logs = [r for r in caplog.records if r.levelname == "ERROR"]
-            assert len(error_logs) > 0, "PayPal errors should be logged"
-
-            logs_with_exc_info = [
-                r for r in error_logs if r.exc_info is not None
-            ]
-            assert len(logs_with_exc_info) > 0, (
-                "PayPal error logs should include exc_info=True"
-            )
-
     def test_stripe_errors_return_structured_response(self, caplog):
         """
         Test that Stripe errors return structured error responses.
@@ -328,7 +258,8 @@ class TestExternalServiceErrorsAreLogged:
         This test verifies that the logging pattern is consistent across
         different external service integrations.
 
-        **NOTE**: Only tests Stripe currently since PayPal/FedEx/UPS are mocks.
+        **NOTE**: Stripe is the only provider exercised here; each carrier's
+        error logging is covered alongside it in ``tests/*/shipping_*/``.
         """
         caplog.set_level(logging.ERROR)
 

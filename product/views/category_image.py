@@ -7,9 +7,11 @@ from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 
 from rest_framework.response import Response
 
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
 from core.utils.serializers import (
@@ -88,6 +90,19 @@ class ProductCategoryImageViewSet(BaseModelViewSet):
     ordering_fields = ["created_at", "image_type", "sort_order"]
     ordering = ["sort_order", "-created_at"]
     search_fields = ["translations__title", "translations__alt_text"]
+
+    def get_permissions(self):
+        # ``bulk_update`` is a PATCH, which DjangoModelPermissions maps to
+        # ``change`` — the right codename for flipping active/sort_order.
+        if self.action in (
+            "create",
+            "update",
+            "partial_update",
+            "destroy",
+            "bulk_update",
+        ):
+            return [StoreStaffModelPermissions()]
+        return [AllowAny()]
 
     def get_queryset(self) -> QuerySet[ProductCategoryImage]:
         queryset = super().get_queryset()

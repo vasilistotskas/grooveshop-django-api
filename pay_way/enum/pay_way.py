@@ -12,31 +12,3 @@ class PayWayEnum(models.TextChoices):
     APPLE_PAY = "APPLE_PAY", _("Apple Pay")
     GOOGLE_PAY = "GOOGLE_PAY", _("Google Pay")
     VIVA_WALLET = "VIVA_WALLET", _("Viva Wallet")
-
-    @classmethod
-    def get_online_payments(cls) -> list[str]:
-        return [
-            cls.CREDIT_CARD,
-            cls.PAY_PAL,
-            cls.STRIPE,
-            cls.APPLE_PAY,
-            cls.GOOGLE_PAY,
-            cls.VIVA_WALLET,
-        ]
-
-    @classmethod
-    def get_offline_payments(cls) -> list[str]:
-        return [
-            cls.PAY_ON_DELIVERY,
-            cls.PAY_ON_STORE,
-            cls.BANK_TRANSFER,
-        ]
-
-    @classmethod
-    def get_digital_wallet_payments(cls) -> list[str]:
-        return [
-            cls.APPLE_PAY,
-            cls.GOOGLE_PAY,
-            cls.PAY_PAL,
-            cls.VIVA_WALLET,
-        ]

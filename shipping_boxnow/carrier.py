@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.enum import ShippingKind
@@ -66,7 +67,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
         return getattr(order, "boxnow_shipment", None)
 
     def serialize_shipment(
-        self, shipment: Any, *, context: dict
+        self, shipment: Any, *, context: Mapping[str, Any]
     ) -> dict | None:
         from shipping_boxnow.serializers.shipment import (
             BoxNowShipmentDetailSerializer,
@@ -155,15 +156,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
         """
         from shipping.utils import compute_total_weight_grams
 
-        try:
-            from shipping_boxnow.models import BoxNowLocker, BoxNowShipment
-        except ImportError:
-            logger.warning(
-                "shipping_boxnow app not available — skipping BoxNow "
-                "shipment creation for order %s",
-                order.id,
-            )
-            return
+        from shipping_boxnow.models import BoxNowLocker, BoxNowShipment
 
         if kind != ShippingKind.PICKUP_POINT:
             return
@@ -217,17 +210,7 @@ class BoxNowCarrier(ShippingCarrierInterface):
         self, order: Order, *, schema_name: str | None = None
     ) -> None:
         """Enqueue the BoxNow create-shipment Celery task for ``order``."""
-        try:
-            from shipping_boxnow.tasks import (
-                create_boxnow_shipment_for_order,
-            )
-        except ImportError:
-            logger.warning(
-                "shipping_boxnow app not available — skipping BoxNow "
-                "task dispatch for order %s",
-                order.id,
-            )
-            return
+        from shipping_boxnow.tasks import create_boxnow_shipment_for_order
 
         logger.info(
             "BoxNow dispatch: queued create-shipment for order=%s",

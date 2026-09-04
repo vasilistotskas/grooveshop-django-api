@@ -236,3 +236,67 @@ class TestPrintType:
             instance.print_voucher.assert_called_once_with(
                 "TEST_9999999999", print_type=2
             )
+
+
+class TestSeedAndFallbackAgree:
+    """The seed migration and ``config.py``'s constants must not drift.
+
+    ``config.py`` documents the rule in a comment ("Document any change
+    here in ``shipping/migrations/0004_seed_provider_metadata.py`` so
+    the seed and the fallback agree"), which nothing enforced. A drift
+    is invisible: every tenant provisioned before the change keeps the
+    seeded value, every fresh caller with a deleted key gets the
+    constant, and the two silently disagree about weight bounds or how
+    many lockers a nearest-search returns.
+
+    No database needed — this compares two literals.
+    """
+
+    @staticmethod
+    def _seeded() -> dict:
+        import importlib
+
+        migration = importlib.import_module(
+            "shipping.migrations.0004_seed_provider_metadata"
+        )
+        return migration._ACS_DEFAULT_METADATA
+
+    def test_shop_kinds_match(self):
+        assert (
+            self._seeded()["shop_kinds_by_country"]
+            == acs_config._DEFAULT_SHOP_KINDS_BY_COUNTRY
+        )
+
+    def test_nearest_limit_matches(self):
+        assert (
+            self._seeded()["nearest_limit"] == acs_config._DEFAULT_NEAREST_LIMIT
+        )
+
+    def test_weight_bounds_match(self):
+        seeded = self._seeded()
+        assert (
+            Decimal(seeded["min_weight_kg"])
+            == acs_config._DEFAULT_MIN_WEIGHT_KG
+        )
+        assert (
+            Decimal(seeded["max_weight_kg"])
+            == acs_config._DEFAULT_MAX_WEIGHT_KG
+        )
+
+    def test_voucher_language_matches(self):
+        assert (
+            self._seeded()["default_voucher_language"]
+            == acs_config._DEFAULT_VOUCHER_LANGUAGE
+        )
+
+    def test_print_type_is_fallback_only(self):
+        """``print_type`` is deliberately NOT seeded.
+
+        It postdates the migration, and the seed only fills missing keys
+        on re-run, so adding it there would reach fresh tenants but never
+        existing ones — two populations with different printer defaults.
+        The constant reaches both. Pinned so a future "make the seed
+        complete" change has to read this first.
+        """
+        assert "print_type" not in self._seeded()
+        assert acs_config._DEFAULT_PRINT_TYPE == 1

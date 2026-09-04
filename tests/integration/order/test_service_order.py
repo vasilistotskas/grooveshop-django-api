@@ -16,6 +16,7 @@ from order.exceptions import (
 from order.factories.order import OrderFactory
 from order.models.order import Order
 from order.services import OrderService
+from order.stock import StockManager
 from product.factories.product import ProductFactory
 
 User = get_user_model()
@@ -131,14 +132,21 @@ class OrderServiceTestCase(TestCase):
         product = ProductFactory(stock=10)
         test_currency = order.shipping_price.currency
 
-        # Manually decrement stock first (simulating order creation)
-        product.stock = 7
-        product.save()
-
         order.items.create(
             product=product,
             price=Money(amount=Decimal("50.00"), currency=test_currency),
             quantity=3,
+        )
+
+        # Take the stock the way checkout does. A raw ``product.stock = 7``
+        # is indistinguishable from an admin editing the product: it logs
+        # against no order (product/signals.py), and cancelling an order
+        # must not hand back stock some other actor removed.
+        StockManager.decrement_stock(
+            product_id=product.id,
+            quantity=3,
+            order_id=order.id,
+            reason="test: order created",
         )
 
         product.refresh_from_db()

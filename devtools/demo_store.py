@@ -85,7 +85,6 @@ DEMO_SETTINGS: dict[str, Any] = {
     # when B2B_ALLOW_PROMOTIONS is false).
     "B2B_ALLOW_PROMOTIONS": True,
     "B2B_LOYALTY_ENABLED": True,
-    "B2B_INVOICE_COMPANY_REQUIRED": True,
     # Footer + contact page fall back to INFO_EMAIL, which is
     # info@example.invalid on staging.
     "CONTACT_EMAIL": "support@staging.webside.gr",

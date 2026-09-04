@@ -19,6 +19,7 @@ from pay_way.serializers import (
     PayWaySerializer,
     PayWayWriteSerializer,
 )
+from tenant.membership import is_store_staff
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -84,9 +85,7 @@ class PayWayViewSet(BaseModelViewSet):
         # Staff still see everything so admins can audit/re-enable rows
         # via the DRF API as well as Django admin.
         user = getattr(self.request, "user", None)
-        if self.action in {"list", "retrieve"} and not (
-            user and user.is_authenticated and user.is_staff
-        ):
+        if self.action in {"list", "retrieve"} and not is_store_staff(user):
             qs = qs.active()
             # Also hide providers this tenant holds no credentials for —
             # a seeded-but-keyless Stripe/Viva row would dead-end the

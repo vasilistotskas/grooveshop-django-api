@@ -122,7 +122,7 @@ class OrderSignalsTestCase(TestCase):
         )
 
         # Dispatched via apply_async with the schema captured at
-        # lambda-build time (C1 in MULTI_TENANT_AUDIT.md).
+        # lambda-build time.
         mock_email_task.assert_called_once()
         assert mock_email_task.call_args.kwargs["args"] == [
             self.order.id,
@@ -502,10 +502,17 @@ class OrderSignalsTestCase(TestCase):
         assert mock_email_task.call_args.kwargs["args"] == [self.order.id]
         assert "_schema_name" in mock_email_task.call_args.kwargs["headers"]
 
-    @patch("order.signals.handlers.send_shipping_notification_email.delay")
+    @patch(
+        "order.signals.handlers.send_shipping_notification_email.apply_async"
+    )
     def test_tracking_info_unchanged_does_not_redispatch(self, mock_email_task):
         """Re-saving the same tracking value (e.g. admin re-edits the
-        field with no change) must NOT re-fire the email."""
+        field with no change) must NOT re-fire the email.
+
+        Patches ``apply_async`` — what the handler actually calls. It used
+        to patch ``delay``, so the assertion held no matter what the
+        handler did.
+        """
         self.order.tracking_number = "TRACK-9876"
         self.order.shipping_carrier = "acs"
         self.order.save()

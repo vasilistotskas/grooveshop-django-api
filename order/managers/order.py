@@ -111,6 +111,13 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
         an eager-load of the linked shipping_provider row + provider
         shipment objects so the Order detail serializer never N+1s on
         ``boxnow_shipment`` / ``acs_shipment``.
+
+        ``with_total_amounts()`` matters as much here as on the list.
+        ``Order.total_price_items`` is annotation-backed only when the
+        annotation is present; without it every read falls back to an
+        aggregate plus a currency lookup — two round trips that
+        ``aggregate()`` takes outside the prefetch cache — and the detail
+        serializer reads it three or four times per response.
         """
         from order.models.history import OrderHistory
 
@@ -120,6 +127,7 @@ class OrderQuerySet(SoftDeleteQuerySetMixin, OptimizedQuerySet):
             .with_payment_info()
             .with_items()
             .with_counts()
+            .with_total_amounts()
             .select_related("shipping_provider")
             .prefetch_related(
                 Prefetch(

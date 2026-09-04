@@ -5,7 +5,6 @@ from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
 from django.urls import path
 
-from asgi.cors_handler import cors_handler
 from asgi.health_check import health_check
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
@@ -25,7 +24,7 @@ websocket_urlpatterns = [
 
 application = ProtocolTypeRouter(
     {
-        "http": cors_handler(django_asgi_app),
+        "http": django_asgi_app,
         "websocket": AllowedHostsOriginValidator(
             TenantWebsocketMiddleware(
                 TokenAuthMiddlewareStack(URLRouter(websocket_urlpatterns))
@@ -34,4 +33,4 @@ application = ProtocolTypeRouter(
     }
 )
 
-__all__ = ["application", "cors_handler"]
+__all__ = ["application"]

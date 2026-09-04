@@ -186,7 +186,7 @@ def run_billing_cycle() -> dict[str, int]:
     from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
 
     from tenant.lifecycle import (  # noqa: PLC0415
-        PROTECTED_SCHEMAS,
+        is_protected_tenant,
         suspend_tenant,
     )
     from tenant.models import SuspendedReason, Tenant  # noqa: PLC0415
@@ -229,7 +229,7 @@ def run_billing_cycle() -> dict[str, int]:
                 target = min(target, 2)
             if target <= stage:
                 continue
-            if target == 3 and tenant.schema_name in PROTECTED_SCHEMAS:
+            if target == 3 and is_protected_tenant(tenant):
                 # suspend_tenant would refuse anyway; skipping before
                 # the email keeps a protected store from receiving a
                 # suspension notice that cannot come true.

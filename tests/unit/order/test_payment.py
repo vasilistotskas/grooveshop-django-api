@@ -7,7 +7,6 @@ from djstripe.models import PaymentIntent
 
 from order.enum.status import PaymentStatus
 from order.payment import (
-    PayPalPaymentProvider,
     StripePaymentProvider,
     VivaWalletPaymentProvider,
     get_payment_provider,
@@ -72,16 +71,6 @@ class PaymentModuleTestCase(TestCase):
         with self.assertRaises(ImproperlyConfigured):
             StripePaymentProvider()
 
-    @mock.patch("order.payment.settings")
-    def test_paypal_payment_provider_init(self, mock_settings):
-        mock_settings.PAYPAL_CLIENT_ID = "test_client_id"
-        mock_settings.PAYPAL_CLIENT_SECRET = "test_client_secret"
-
-        provider = PayPalPaymentProvider()
-
-        self.assertEqual(provider.client_id, "test_client_id")
-        self.assertEqual(provider.client_secret, "test_client_secret")
-
     @mock.patch("order.payment.stripe.PaymentIntent.create")
     @mock.patch("order.payment.logger")
     def test_stripe_process_payment(self, mock_logger, mock_stripe_create):
@@ -106,23 +95,6 @@ class PaymentModuleTestCase(TestCase):
                 payment_data["payment_id"], "pi_test_order_id_mock"
             )
             self.assertEqual(payment_data["status"], PaymentStatus.COMPLETED)
-
-    @mock.patch("order.payment.logger")
-    def test_paypal_process_payment_raises_not_implemented(self, mock_logger):
-        """PayPal provider is intentionally a hard-stop: the previous mock
-        ``COMPLETED`` return was an audit finding (any active PayPal pay-way
-        would have auto-confirmed orders without a real payment).  Until a
-        real PayPal integration ships, ``process_payment`` raises
-        ``NotImplementedError`` so the failure surfaces immediately.
-        """
-        provider = PayPalPaymentProvider()
-        amount = Money(
-            amount=Decimal("100.00"), currency=settings.DEFAULT_CURRENCY
-        )
-        order_id = "test_order_id"
-
-        with self.assertRaises(NotImplementedError):
-            provider.process_payment(amount, order_id)
 
     @mock.patch("order.payment.stripe.Refund.create")
     @mock.patch("order.payment.logger")
@@ -197,9 +169,9 @@ class PaymentModuleTestCase(TestCase):
         provider = get_payment_provider("viva_wallet")
         self.assertIsInstance(provider, VivaWalletPaymentProvider)
 
-        # PayPal is an unimplemented stub and deliberately unregistered —
-        # resolving it must fail fast instead of exposing a provider whose
-        # every method raises NotImplementedError mid-checkout.
+        # A PayWay row can carry any provider_code an admin typed. One
+        # this system cannot charge through must fail fast at resolution
+        # rather than part-way through a checkout.
         with self.assertRaises(ValueError):
             get_payment_provider("paypal")
 

@@ -16,7 +16,7 @@ from pay_way.enum.pay_way import PayWayEnum
 from pay_way.managers import PayWayManager
 from shipping.enum import ShippingKind
 
-# Per M15 in MULTI_TENANT_AUDIT.md, secrets MUST live on the Tenant
+# Secrets MUST live on the Tenant
 # model (stripe_secret_key, viva_wallet_*, acs_*, box_now_*,
 # meta_capi_*, etc.) rather than in the unencrypted
 # PayWay.configuration JSONField.
@@ -142,10 +142,6 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
             return ""
 
     @property
-    def display_name(self) -> str:
-        return self.safe_translation_getter("name", any_language=True) or ""
-
-    @property
     def has_configuration(self) -> bool:
         return bool(self.configuration)
 
@@ -169,21 +165,6 @@ class PayWay(TranslatableModel, TimeStampMixinModel, SortableModel, UUIDModel):
     @property
     def effective_cost(self) -> float:
         return float(self.cost.amount) if self.cost else 0.0
-
-    def is_free_for_amount(self, amount: float) -> bool:
-        if not self.free_threshold:
-            return False
-        return amount >= float(self.free_threshold.amount)
-
-    def get_configuration_value(self, key: str, default=None):
-        if not self.configuration:
-            return default
-        return self.configuration.get(key, default)
-
-    def set_configuration_value(self, key: str, value) -> None:
-        if not self.configuration:
-            self.configuration = {}
-        self.configuration[key] = value
 
     def clean(self) -> None:
         super().clean()

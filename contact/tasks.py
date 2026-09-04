@@ -57,7 +57,7 @@ def send_contact_notification_email_task(contact_id: int) -> bool:
         return False
 
     # Route to the tenant's public contact inbox, not the platform
-    # ADMINS list (H23 in MULTI_TENANT_AUDIT.md). On a single-tenant
+    # ADMINS list. On a single-tenant
     # deployment this resolves to the same address operators use
     # already; on multi-tenant it puts each tenant's submissions in
     # their own inbox.

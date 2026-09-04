@@ -33,128 +33,115 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from mptt.managers import TreeManager
+from mptt.querysets import TreeQuerySet
+from parler.managers import TranslatableManager, TranslatableQuerySet
+
 if TYPE_CHECKING:
     from typing import Self
 
-try:
-    from mptt.managers import TreeManager
-    from mptt.querysets import TreeQuerySet
-    from parler.managers import TranslatableManager, TranslatableQuerySet
 
-    class TreeTranslatableQuerySet(TranslatableQuerySet, TreeQuerySet):
+class TreeTranslatableQuerySet(TranslatableQuerySet, TreeQuerySet):
+    """
+    QuerySet combining MPTT tree operations with Parler translations.
+
+    Used for hierarchical models like ProductCategory and BlogCategory
+    that need both tree structure and multi-language support.
+
+    Provides:
+    - All MPTT tree methods (get_descendants, get_ancestors, etc.)
+    - All Parler translation methods (translated, language, etc.)
+    - Optimized prefetch methods for common patterns
+    """
+
+    @classmethod
+    def as_manager(cls):
         """
-        QuerySet combining MPTT tree operations with Parler translations.
+        Return a Manager instance created from this QuerySet.
 
-        Used for hierarchical models like ProductCategory and BlogCategory
-        that need both tree structure and multi-language support.
-
-        Provides:
-        - All MPTT tree methods (get_descendants, get_ancestors, etc.)
-        - All Parler translation methods (translated, language, etc.)
-        - Optimized prefetch methods for common patterns
+        This is required for proper integration with MPTT's TreeManager.
         """
+        manager = TreeTranslatableManager.from_queryset(cls)()
+        manager._built_with_as_manager = True
+        return manager
 
-        @classmethod
-        def as_manager(cls):
-            """
-            Return a Manager instance created from this QuerySet.
+    as_manager.queryset_only = True
 
-            This is required for proper integration with MPTT's TreeManager.
-            """
-            manager = TreeTranslatableManager.from_queryset(cls)()
-            manager._built_with_as_manager = True
-            return manager
+    def with_translations(self) -> Self:
+        """Prefetch translations for better performance."""
+        return self.prefetch_related("translations")
 
-        as_manager.queryset_only = True
+    def with_parent(self) -> Self:
+        """Select related parent for tree navigation."""
+        return self.select_related("parent")
 
-        def with_translations(self) -> Self:
-            """Prefetch translations for better performance."""
-            return self.prefetch_related("translations")
-
-        def with_parent(self) -> Self:
-            """Select related parent for tree navigation."""
-            return self.select_related("parent")
-
-        def for_list(self) -> Self:
-            """
-            Return optimized queryset for list views.
-
-            Override in subclass to add additional optimizations.
-            Default includes translations and parent relationship.
-            """
-            return self.with_translations().with_parent()
-
-        def for_detail(self) -> Self:
-            """
-            Return optimized queryset for detail views.
-
-            Override in subclass to add additional prefetches beyond for_list().
-            """
-            return self.for_list()
-
-    class TreeTranslatableManager(TreeManager, TranslatableManager):
+    def for_list(self) -> Self:
         """
-        Manager combining MPTT tree operations with Parler translations.
+        Return optimized queryset for list views.
 
-        Set `queryset_class` to your custom QuerySet class.
-
-        Methods not explicitly defined on the Manager are automatically
-        delegated to the QuerySet via __getattr__.
-
-        Provides:
-        - All MPTT tree manager methods (root_nodes, etc.)
-        - All Parler translation manager methods
-        - Automatic delegation to custom QuerySet methods
-
-        Example:
-            class CategoryManager(TreeTranslatableManager):
-                queryset_class = CategoryQuerySet
+        Override in subclass to add additional optimizations.
+        Default includes translations and parent relationship.
         """
+        return self.with_translations().with_parent()
 
-        queryset_class: type[TreeTranslatableQuerySet] = (
-            TreeTranslatableQuerySet
-        )
-        _queryset_class: type[TreeTranslatableQuerySet] = (
-            TreeTranslatableQuerySet
-        )
+    def for_detail(self) -> Self:
+        """
+        Return optimized queryset for detail views.
 
-        def __init_subclass__(cls, **kwargs):
-            """Sync queryset_class with _queryset_class when subclass is created."""
-            super().__init_subclass__(**kwargs)
-            if hasattr(cls, "queryset_class"):
-                cls._queryset_class = cls.queryset_class
+        Override in subclass to add additional prefetches beyond for_list().
+        """
+        return self.for_list()
 
-        def get_queryset(self) -> TreeTranslatableQuerySet:
-            """Return the base queryset."""
-            return self.queryset_class(self.model, using=self._db)
 
-        def __getattr__(self, name: str) -> Any:
-            """
-            Delegate unknown attributes to the queryset.
+class TreeTranslatableManager(TreeManager, TranslatableManager):
+    """
+    Manager combining MPTT tree operations with Parler translations.
 
-            Methods starting with underscore raise AttributeError to prevent
-            access to private/protected attributes.
-            """
-            if name.startswith("_"):
-                raise AttributeError(
-                    f"'{type(self).__name__}' object has no attribute '{name}'"
-                )
-            return getattr(self.get_queryset(), name)
+    Set `queryset_class` to your custom QuerySet class.
 
-        def for_list(self) -> TreeTranslatableQuerySet:
-            """Return optimized queryset for list views."""
-            return self.get_queryset().for_list()
+    Methods not explicitly defined on the Manager are automatically
+    delegated to the QuerySet via __getattr__.
 
-        def for_detail(self) -> TreeTranslatableQuerySet:
-            """Return optimized queryset for detail views."""
-            return self.get_queryset().for_detail()
+    Provides:
+    - All MPTT tree manager methods (root_nodes, etc.)
+    - All Parler translation manager methods
+    - Automatic delegation to custom QuerySet methods
 
-except ImportError:
-    # MPTT or Parler not installed, provide stub classes
-    from core.managers.base import (
-        TranslatableOptimizedManager,
-        TranslatableOptimizedQuerySet,
-    )
+    Example:
+        class CategoryManager(TreeTranslatableManager):
+            queryset_class = CategoryQuerySet
+    """
 
-    TreeTranslatableQuerySet = TranslatableOptimizedQuerySet  # type: ignore[misc]  # ty: ignore[invalid-assignment]
-    TreeTranslatableManager = TranslatableOptimizedManager  # type: ignore[misc]  # ty: ignore[invalid-assignment]
+    queryset_class: type[TreeTranslatableQuerySet] = TreeTranslatableQuerySet
+    _queryset_class: type[TreeTranslatableQuerySet] = TreeTranslatableQuerySet
+
+    def __init_subclass__(cls, **kwargs):
+        """Sync queryset_class with _queryset_class when subclass is created."""
+        super().__init_subclass__(**kwargs)
+        if hasattr(cls, "queryset_class"):
+            cls._queryset_class = cls.queryset_class
+
+    def get_queryset(self) -> TreeTranslatableQuerySet:
+        """Return the base queryset."""
+        return self.queryset_class(self.model, using=self._db)
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Delegate unknown attributes to the queryset.
+
+        Methods starting with underscore raise AttributeError to prevent
+        access to private/protected attributes.
+        """
+        if name.startswith("_"):
+            raise AttributeError(
+                f"'{type(self).__name__}' object has no attribute '{name}'"
+            )
+        return getattr(self.get_queryset(), name)
+
+    def for_list(self) -> TreeTranslatableQuerySet:
+        """Return optimized queryset for list views."""
+        return self.get_queryset().for_list()
+
+    def for_detail(self) -> TreeTranslatableQuerySet:
+        """Return optimized queryset for detail views."""
+        return self.get_queryset().for_detail()

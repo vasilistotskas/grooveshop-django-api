@@ -52,6 +52,7 @@ from order.exceptions import InsufficientStockError, StockReservationError
 from order.models import StockReservation
 from order.services import OrderService
 from order.stock import StockManager
+from tenant.membership import is_store_staff
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ GUEST_CART_HEADERS = [
             "Cart UUID for guest users. Used to identify and maintain "
             "guest cart sessions. Sequential integer IDs were enumerable "
             "metadata, so the public identifier is the UUID inherited "
-            "from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md)."
+            "from ``UUIDModel``."
         ),
         required=False,
     ),
@@ -281,7 +282,7 @@ class CartViewSet(BaseModelViewSet):
         """
         user = self.request.user
 
-        if user.is_staff:
+        if is_store_staff(user):
             return Cart.objects.for_list()
         elif user.is_authenticated:
             return Cart.objects.for_detail().filter(user=user)
@@ -559,7 +560,7 @@ class CartViewSet(BaseModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Ownership gate (C11 in MULTI_TENANT_AUDIT.md): a reservation
+        # Ownership gate: a reservation
         # belongs to the requester if it was made by their user account
         # OR its session_id matches the current cart's UUID. The ids come
         # straight from the request body, so without this any caller could

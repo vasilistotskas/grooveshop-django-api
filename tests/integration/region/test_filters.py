@@ -22,35 +22,39 @@ class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
     def setUpTestData(cls):
         cls.test_id = uuid.uuid4().hex[:4].upper()
 
-        # Codes come from the ISO 3166-1 USER-ASSIGNED ranges: alpha-2
-        # XA-XZ and alpha-3 XAA-XZZ are permanently reserved and will
-        # never name a real country, so these cannot collide with
-        # reference data any seed migration inserts.
+        # EVERY unique column here is drawn from an ISO 3166-1
+        # USER-ASSIGNED range, which is permanently reserved and can
+        # never name a real country — so no seed migration can collide
+        # with these rows. alpha-2 XA-XZ, alpha-3 XAA-XZZ, numeric
+        # 900-999. (`phone_code` is deliberately NOT unique on the model
+        # — calling codes are shared, +1 US/CA — so it needs nothing.)
         #
-        # They used to be built as f"GR{hex_char}", which produces the
-        # literal "GRC" whenever that character is a C — one run in
-        # sixteen — and country/migrations/0010_seed_default_country
-        # seeds Greece as ("GR", "GRC"). That is the
-        # `duplicate key ... country_country_alpha_3_key` failure that
-        # took out this whole class on CI at random.
+        # All three columns previously derived from a uuid4 hex slice
+        # and collided with `country/migrations/0010_seed_default_country`,
+        # which seeds Greece as ("GR", "GRC", 297):
+        #   f"GR{hex}"      -> "GRC" once in 16 runs
+        #   276 + hex % 100 -> 297 about once in 80
+        # Each took out all 23 tests in this class as setup errors, at
+        # random, on whichever shard happened to run them.
         gr, us, de = random.sample(string.ascii_uppercase, 3)
+        iso_gr, iso_us, iso_de = random.sample(range(900, 1000), 3)
 
         cls.country_gr = CountryFactory(
             alpha_2=f"X{gr}",
             alpha_3=f"X{gr}A",
-            iso_cc=300 + int(cls.test_id[:2], 16) % 100,
+            iso_cc=iso_gr,
             phone_code=30,
         )
         cls.country_us = CountryFactory(
             alpha_2=f"X{us}",
             alpha_3=f"X{us}B",
-            iso_cc=840 + int(cls.test_id[:2], 16) % 100,
+            iso_cc=iso_us,
             phone_code=1,
         )
         cls.country_de = CountryFactory(
             alpha_2=f"X{de}",
             alpha_3=f"X{de}C",
-            iso_cc=276 + int(cls.test_id[:2], 16) % 100,
+            iso_cc=iso_de,
             phone_code=49,
         )
 

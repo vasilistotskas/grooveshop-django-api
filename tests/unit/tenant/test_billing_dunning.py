@@ -165,14 +165,10 @@ class TestLifecycle:
         assert t.suspended_at is None
         assert t.suspended_reason == ""
 
-    def test_protected_schemas_are_refused(self):
-        t = _make_tenant()
-        with patch(
-            "tenant.lifecycle.PROTECTED_SCHEMAS",
-            frozenset({t.schema_name}),
-        ):
-            assert suspend_tenant(t, reason=SuspendedReason.MANUAL) is False
-            assert activate_tenant(t) is False
+    def test_protected_tenants_are_refused(self):
+        t = _make_tenant(is_protected=True)
+        assert suspend_tenant(t, reason=SuspendedReason.MANUAL) is False
+        assert activate_tenant(t) is False
         t.refresh_from_db()
         assert t.is_active is True
 
@@ -278,12 +274,10 @@ class TestRunBillingCycle:
 
     def test_a_protected_store_is_never_suspended_or_emailed(self):
         """A suspension notice that cannot come true must not be sent."""
-        t = _make_tenant(paid_until=self._today() - timedelta(days=30))
-        with patch(
-            "tenant.lifecycle.PROTECTED_SCHEMAS",
-            frozenset({t.schema_name}),
-        ):
-            summary = run_billing_cycle()
+        t = _make_tenant(
+            paid_until=self._today() - timedelta(days=30), is_protected=True
+        )
+        summary = run_billing_cycle()
         assert summary["suspended"] == 0
         assert len(self.outbox) == 0
         t.refresh_from_db()

@@ -38,3 +38,23 @@ class PaymentStatus(models.TextChoices):
     REFUNDED = "REFUNDED", _("Refunded")
     PARTIALLY_REFUNDED = "PARTIALLY_REFUNDED", _("Partially Refunded")
     CANCELED = "CANCELED", _("Canceled")
+
+
+SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
+    {
+        PaymentStatus.COMPLETED,
+        PaymentStatus.REFUNDED,
+        PaymentStatus.PARTIALLY_REFUNDED,
+        PaymentStatus.CANCELED,
+    }
+)
+"""The payment states that are financially final.
+
+Nothing may move an order OUT of one of these on the strength of a
+provider report. Providers do not guarantee delivery order, and a
+refund lives on the charge rather than the intent — so a refunded
+Stripe order still reports its intent as ``succeeded`` forever.
+
+Defined here, beside the enum, because all three enforcement points
+need it: the Viva webhook, ``OrderService`` and ``PayWayService``.
+"""

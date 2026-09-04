@@ -10,7 +10,7 @@ Multi-tenant: the webhook hits the platform's public schema (BoxNow
 doesn't know about our tenant boundary). We resolve the owning tenant
 by looking up ``data.parcelId`` across all active tenant schemas, then
 verify the signature with that tenant's secret and dispatch the task
-with the matching schema header. See C5 in MULTI_TENANT_AUDIT.md.
+with the matching schema header.
 Tenant resolution reads the reparse of the SIGNED ``data`` bytes, never
 the raw-body parse (duplicate-key forgery).
 """

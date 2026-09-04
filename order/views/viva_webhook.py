@@ -1,5 +1,6 @@
 import hashlib
 import ipaddress
+from decimal import InvalidOperation
 import json
 import logging
 from base64 import b64encode
@@ -21,9 +22,13 @@ from django_tenants.utils import (
     tenant_context,
 )
 
-from order.enum.status import OrderStatus, PaymentStatus
+from order.enum.status import (
+    SETTLED_PAYMENT_STATUSES,
+    OrderStatus,
+    PaymentStatus,
+)
 from order.models.history import OrderHistory
-from order.models.order import Order
+from order.models.order import AMOUNT_MISMATCH_FLAG, Order
 from order.tasks import (
     send_order_confirmation_email,
     send_payment_failed_email,
@@ -37,7 +42,7 @@ def _resolve_tenant_candidates(order_code: str) -> list:
     the HTTP layer for machine-to-machine callers), so ownership is
     found by iterating tenants and looking the order up via
     ``viva_order_code_q`` — matching both the latest
-    ``metadata.viva_order_code`` AND the ``viva_order_codes`` history
+    the ``viva_order_codes`` history
     array, because every ``create_checkout_session`` mints a fresh code
     and a shopper on a stale tab may pay an earlier one.
 
@@ -144,9 +149,7 @@ def viva_order_code_q(order_code: object) -> Q:
     """Match an Order by ANY Viva orderCode ever issued for it.
 
     Each ``create_checkout_session`` mints a fresh Viva orderCode and
-    appends it to ``metadata['viva_order_codes']`` (the most recent is
-    also mirrored in the legacy singular ``metadata['viva_order_code']``
-    for the return endpoint's documented ``s`` fallback). A shopper can
+    appends it to ``metadata['viva_order_codes']``. A shopper can
     complete payment on an earlier session (stale tab, back button,
     retry) whose orderCode is not the latest, so both the webhook and
     the browser-return lookup MUST resolve any issued code. Matching
@@ -158,22 +161,11 @@ def viva_order_code_q(order_code: object) -> Q:
     lookup (well-supported on PostgreSQL) rather than a key-transform
     ``__contains``.
     """
-    code = str(order_code)
-    return Q(metadata__viva_order_code=code) | Q(
-        metadata__contains={"viva_order_codes": [code]}
-    )
+    return Q(metadata__contains={"viva_order_codes": [str(order_code)]})
 
 
 # Payment statuses representing a financially settled (terminal) state.
 # A stale or out-of-order Viva webhook event MUST NOT overwrite any of these.
-_SETTLED_PAYMENT_STATUSES: frozenset[str] = frozenset(
-    {
-        PaymentStatus.COMPLETED,
-        PaymentStatus.REFUNDED,
-        PaymentStatus.PARTIALLY_REFUNDED,
-        PaymentStatus.CANCELED,
-    }
-)
 
 # Viva Wallet production webhook source IPs (from official docs).
 # https://developer.viva.com/webhooks-for-payments/
@@ -402,7 +394,7 @@ def _verify_transaction(transaction_id):
 
 
 def _verify_viva_terminal_transaction(
-    subject, transaction_id, expected_statuses, event_label
+    subject, transaction_id, expected_statuses, event_label, *, order=None
 ):
     """Verify a reversal (1797) / failed (1798) Viva event against the
     Retrieve Transaction API before mutating financial state (G0275).
@@ -419,6 +411,16 @@ def _verify_viva_terminal_transaction(
     "gift-card purchase <uuid>") and is only used in the log lines: this
     guard is shared by the order and gift-card branches, which have no
     common model.
+
+    *subject* is a human label for the thing being mutated ("order 42",
+    "gift-card purchase <uuid>") and is used only in the log lines, so this
+    guard can be shared by callers that have no order model.
+
+    *order*, when given, additionally requires the verified transaction to
+    carry one of THAT order's own Viva order codes. Viva's instruction is
+    to confirm a result by the COMBINATION of OrderCode and TransactionId;
+    a caller with no order passes nothing and gets the status/amount half
+    only.
 
     Returns ``True`` to proceed. Returns ``False`` (skip, no mutation) when
     the event carries no ``TransactionId`` or the verified status is not one
@@ -449,6 +451,26 @@ def _verify_viva_terminal_transaction(
         raise RuntimeError(
             f"Viva transaction verification unavailable for {transaction_id}"
         )
+
+    # Viva's own instruction is to confirm the result with the
+    # COMBINATION of OrderCode and TransactionId
+    # (developer.viva.com/webhooks-for-payments/transaction-payment-created),
+    # then check StatusId and Amount. Without the first half, anyone can
+    # post their own real TransactionId against someone else's OrderCode.
+    if order is not None and not _transaction_belongs_to_order(
+        order, verified_data
+    ):
+        logger.error(
+            "Viva %s event: transaction %s reports order_code %r, which is "
+            "not one of %s's issued codes — refusing to mutate state",
+            event_label,
+            transaction_id,
+            verified_data.get("order_code")
+            if isinstance(verified_data, dict)
+            else None,
+            subject,
+        )
+        return False
 
     if verified_status not in expected_statuses:
         logger.warning(
@@ -554,7 +576,7 @@ def _handle_webhook_event(request):
             )
         logger.error(
             "Order not found for Viva Wallet order code: %s | "
-            "(no tenant matched metadata.viva_order_code + "
+            "(no tenant matched metadata.viva_order_codes + "
             "viva_order_codes[])",
             order_code,
         )
@@ -677,7 +699,7 @@ def _process_event_in_tenant(
     if not order:
         logger.error(
             "Viva webhook: tenant schema=%s resolved but Order vanished "
-            "(order_code=%s, searched metadata.viva_order_code + "
+            "(order_code=%s, searched metadata.viva_order_codes + "
             "viva_order_codes[])",
             connection.schema_name,
             order_code,
@@ -747,7 +769,12 @@ def _process_event_in_tenant(
             )
             outcome = VivaWebhookEvent.OUTCOME_PROCESSED
             if event_type_id == 1796:
-                _handle_payment_created(order, event_data, transaction_id)
+                # The handler reports a skip so the audit row does not
+                # claim work that never happened.
+                outcome = (
+                    _handle_payment_created(order, event_data, transaction_id)
+                    or VivaWebhookEvent.OUTCOME_PROCESSED
+                )
             elif event_type_id == 1797:
                 _handle_reversal_created(order, event_data, transaction_id)
             elif event_type_id == 1798:
@@ -960,7 +987,84 @@ def _process_gift_card_purchase_event(
     return JsonResponse({"status": "ok"})
 
 
+def order_viva_codes(order) -> set[str]:
+    """Every Viva orderCode ever issued for this order.
+
+    The mirror of :func:`viva_order_code_q`, evaluated in Python: each
+    ``create_checkout_session`` mints a fresh code and appends it to
+    ``metadata['viva_order_codes']``, with the most recent also mirrored
+    in the singular key.
+    """
+    metadata = order.metadata or {}
+    codes = {
+        str(code) for code in (metadata.get("viva_order_codes") or []) if code
+    }
+    # ``_resolve_tenant_candidates`` also resolves an order by
+    # ``payment_id``, so a code stored there counts as issued too — the
+    # two must agree on what "belongs to this order" means.
+    if order.payment_id:
+        codes.add(str(order.payment_id))
+    return codes
+
+
+def _transaction_belongs_to_order(order, verified_data) -> bool:
+    """Does the VERIFIED transaction actually belong to this order?
+
+    Viva's own guidance is to retrieve the transaction and validate the
+    orderCode, statusId AND amount from that response
+    (developer.viva.com/webhooks-for-payments/setting-up-webhooks). We
+    checked statusId and amount but only logged the orderCode, which
+    leaves the substitution the amount guard cannot see: the webhook body
+    is unauthenticated, so anyone may post their OWN real TransactionId
+    against SOMEONE ELSE'S OrderCode. We would resolve the victim's
+    order, verify the attacker's transaction — genuinely COMPLETED — and
+    settle the victim's order as soon as the two amounts happen to
+    match, which costs the attacker nothing to arrange.
+
+    An absent orderCode in the response is NOT treated as a match: the
+    whole point is to confirm the link, and a confirmation we did not
+    receive is not one we can assume.
+    """
+    reported = (
+        verified_data.get("order_code")
+        if isinstance(verified_data, dict)
+        else None
+    )
+    if not reported:
+        # Viva documents orderCode as part of the Retrieve Transaction
+        # response, so its absence is an abnormal answer rather than a
+        # mismatch. Raise instead of refusing: a 500 has Viva redeliver,
+        # where a skip would ack the event and strand a real payment.
+        raise RuntimeError(
+            f"Viva transaction {verified_data.get('payment_id')!r} was "
+            "verified without an orderCode — cannot confirm it belongs to "
+            f"order {order.id}"
+        )
+    return str(reported) in order_viva_codes(order)
+
+
+def _flag_amount_mismatch(
+    order, transaction_id, verified_amount, expected_amount
+) -> None:
+    """Record a verified charge whose amount does not match the order."""
+    from django.utils import timezone  # noqa: PLC0415
+
+    if not order.metadata:
+        order.metadata = {}
+    order.metadata[AMOUNT_MISMATCH_FLAG] = {
+        "transaction_id": str(transaction_id),
+        "verified_amount": str(verified_amount),
+        "expected_amount": str(expected_amount),
+        "observed_at": timezone.now().isoformat(),
+    }
+    order.save(update_fields=["metadata"])
+
+
 def _handle_payment_created(order, event_data, transaction_id):
+    from order.models.viva_webhook_event import (  # noqa: PLC0415
+        VivaWebhookEvent,
+    )
+
     from django.utils import timezone
 
     logger.info(
@@ -1061,12 +1165,50 @@ def _handle_payment_created(order, event_data, transaction_id):
     verified_amount_raw = (
         verified_data.get("amount") if isinstance(verified_data, dict) else None
     )
+    # The transaction must be THIS order's before its amount or status
+    # mean anything (Viva's documented three-way check).
+    if not _transaction_belongs_to_order(order, verified_data):
+        logger.error(
+            "Viva transaction %s reports order_code %r, which is not one of "
+            "order %s's issued codes — refusing to mark as paid",
+            transaction_id,
+            verified_data.get("order_code")
+            if isinstance(verified_data, dict)
+            else None,
+            order.id,
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+
+    # Currency first: an amount only means something once we know it is
+    # denominated in the order's currency. Viva reports ISO 4217 in its
+    # NUMERIC form ("978"); the provider normalises that to the
+    # alphabetic code, so this compares like with like.
+    order_total = order.calculate_order_total_amount()
+    verified_currency = (
+        verified_data.get("currency")
+        if isinstance(verified_data, dict)
+        else None
+    )
+    if verified_currency and verified_currency != order_total.currency.code:
+        logger.error(
+            "Viva transaction %s is in %s but order %s is in %s — refusing "
+            "to mark as paid",
+            transaction_id,
+            verified_currency,
+            order.id,
+            order_total.currency.code,
+        )
+        _flag_amount_mismatch(
+            order, transaction_id, verified_currency, order_total.currency.code
+        )
+        return VivaWebhookEvent.OUTCOME_SKIPPED
+
     if verified_amount_raw is not None:
         try:
             from decimal import Decimal  # noqa: PLC0415
 
             verified_amount = Decimal(str(verified_amount_raw))
-            expected_amount = order.calculate_order_total_amount().amount
+            expected_amount = order_total.amount
             # Allow a 1-cent tolerance for any provider-side rounding.
             if abs(verified_amount - expected_amount) > Decimal("0.01"):
                 logger.error(
@@ -1077,8 +1219,19 @@ def _handle_payment_created(order, event_data, transaction_id):
                     expected_amount,
                     order.id,
                 )
-                return
-        except TypeError, ValueError, AttributeError:
+                # Marking it paid would under-charge, so we do not — but
+                # the money HAS left the customer (Viva verified a real
+                # transaction), and the usual cause is a shopper paying
+                # on a stale checkout tab after the total moved. Record
+                # it on the order: without this the order just sat
+                # PENDING and auto_cancel_stuck_pending_orders closed it
+                # a day later with refund_payment=False, leaving a
+                # charged customer, a cancelled order and no alert.
+                _flag_amount_mismatch(
+                    order, transaction_id, verified_amount, expected_amount
+                )
+                return VivaWebhookEvent.OUTCOME_SKIPPED
+        except TypeError, ValueError, AttributeError, InvalidOperation:
             logger.warning(
                 "Could not parse Viva verified amount %r for order %s — "
                 "proceeding with status-only verification.",
@@ -1092,7 +1245,7 @@ def _handle_payment_created(order, event_data, transaction_id):
             transaction_id,
             verified_status,
         )
-        return
+        return VivaWebhookEvent.OUTCOME_SKIPPED
 
     logger.info(
         "Viva transaction %s VERIFIED COMPLETED — updating order %s",
@@ -1177,7 +1330,7 @@ def _handle_payment_created(order, event_data, transaction_id):
     # Wrapped in on_commit so the Celery worker always sees the committed
     # payment_status / order.status rather than an in-flight row.
     # ``_schema`` captured at lambda-build time; on_commit fires after the
-    # tenant ``schema_context`` exits (see C1/C2 in MULTI_TENANT_AUDIT.md).
+    # tenant ``schema_context`` exits, so it has to be pinned explicitly.
     _schema = connection.schema_name
     transaction.on_commit(
         lambda oid=order.id, s=_schema: (
@@ -1204,26 +1357,35 @@ def _handle_payment_failed(order, event_data, transaction_id):
         order.id,
     )
 
+    # Verify FIRST, settled-guard second. The multi-tenant candidate loop
+    # rests on one invariant: a tenant that does not own the transaction
+    # cannot answer anything but 500, because Retrieve-Transaction fails
+    # against its credentials. Returning early — for any reason — before
+    # verification breaks that. A merchant can plant another tenant's
+    # orderCode in their own order's metadata (which is why candidates are
+    # a LIST), so an already-settled order on the wrong tenant would
+    # short-circuit here, write the audit row into that tenant's schema,
+    # and hand Viva a 200. The real owner never sees the event and Viva
+    # does not redeliver after a 200.
+    if not _verify_viva_terminal_transaction(
+        f"order {order.id}",
+        transaction_id,
+        {PaymentStatus.FAILED, PaymentStatus.CANCELED},
+        "payment_failed",
+        order=order,
+    ):
+        return
+
     # Guard: a stale or out-of-order "payment failed" Viva event must not
     # overwrite a financially settled state.  Viva does NOT guarantee
     # delivery order.
-    if order.payment_status in _SETTLED_PAYMENT_STATUSES:
+    if order.payment_status in SETTLED_PAYMENT_STATUSES:
         logger.warning(
             "Ignoring stale payment_failed (Viva) for order %s: "
             "payment_status already %s",
             order.id,
             order.payment_status,
         )
-        return
-
-    # Never trust the unauthenticated event body: confirm with Viva that the
-    # transaction actually failed before flipping state (G0275).
-    if not _verify_viva_terminal_transaction(
-        f"order {order.id}",
-        transaction_id,
-        {PaymentStatus.FAILED, PaymentStatus.CANCELED},
-        "payment_failed",
-    ):
         return
 
     previous_payment_status = order.payment_status
@@ -1278,6 +1440,7 @@ def _handle_reversal_created(order, event_data, transaction_id):
         transaction_id,
         {PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED},
         "reversal",
+        order=order,
     ):
         return
 

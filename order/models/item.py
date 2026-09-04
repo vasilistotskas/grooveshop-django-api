@@ -130,7 +130,15 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
             # the over-refund guard, and stock is restocked twice.
             item = type(self).objects.select_for_update().get(pk=self.pk)
 
-            refund_qty = quantity if quantity is not None else item.quantity
+            # No quantity means "refund what is still refundable", which is
+            # the remainder — not the originally ordered quantity. Using
+            # the latter made the documented empty-body call fail on any
+            # partially refunded item (5 ordered, 2 already refunded: the
+            # default asked for 5 more and tripped the over-refund guard),
+            # so the last units could only be refunded by naming the exact
+            # remainder.
+            remaining = item.quantity - item.refunded_quantity
+            refund_qty = quantity if quantity is not None else remaining
 
             if refund_qty <= 0:
                 raise ValidationError(

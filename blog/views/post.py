@@ -43,6 +43,7 @@ from core.utils.serializers import (
     crud_config,
 )
 from core.utils.views import cache_methods
+from tenant.membership import is_store_staff
 
 if TYPE_CHECKING:
     from blog.strategies.related_posts_strategy import RelatedPostsStrategy
@@ -335,7 +336,7 @@ class BlogPostViewSet(BaseModelViewSet):
         ).prefetch_related("translations", "likes")
 
         # Filter out unapproved comments for non-staff users
-        if not request.user.is_staff:
+        if not is_store_staff(request.user):
             queryset = queryset.filter(approved=True)
 
         comment_filterset = BlogCommentFilter(

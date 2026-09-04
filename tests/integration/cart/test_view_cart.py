@@ -405,15 +405,15 @@ class CartViewSetTest(TestURLFixerMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["user"], self.user.pk)
 
-    def test_staff_user_can_see_all_carts(self):
-        staff_user = UserAccountFactory(is_staff=True, num_addresses=0)
-        self.client.force_authenticate(user=staff_user)
+    def test_is_staff_residue_only_sees_its_own_cart(self):
+        """``is_staff`` on a tenant-schema customer row is not a grant."""
+        residue = UserAccountFactory(is_staff=True, num_addresses=0)
+        self.client.force_authenticate(user=residue)
 
         response = self.client.get(self.detail_url)
-        self.assertIn(
-            response.status_code,
-            [status.HTTP_200_OK, status.HTTP_404_NOT_FOUND],
-        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["user"], residue.pk)
+        self.assertNotEqual(response.data["id"], self.cart.pk)
 
     def test_cart_service_integration(self):
         response = self.client.get(self.detail_url)

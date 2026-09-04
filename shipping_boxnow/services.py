@@ -967,29 +967,20 @@ class BoxNowService:
             # class of bug as ACS order 47 — see project memory
             # ``project_shipping_dispatch_on_commit``).
             if mapped_state == BoxNowParcelState.FINAL_DESTINATION:
-                try:
-                    from shipping_boxnow.tasks import (  # noqa: PLC0415
-                        boxnow_send_arrival_notification,
-                    )
+                from shipping_boxnow.tasks import (  # noqa: PLC0415
+                    boxnow_send_arrival_notification,
+                )
 
-                    # Defer to on_commit — we're inside ``transaction.atomic``
-                    # and Celery dispatched mid-transaction can deliver to a
-                    # worker that races the COMMIT, causing
-                    # ``BoxNowParcelEvent.DoesNotExist``. Mirrors the
-                    # ShippingService.dispatch_create_shipment_task pattern.
-                    transaction.on_commit(
-                        lambda eid=event.id: (
-                            boxnow_send_arrival_notification.delay(eid)
-                        )
+                # Defer to on_commit — we're inside ``transaction.atomic``
+                # and Celery dispatched mid-transaction can deliver to a
+                # worker that races the COMMIT, causing
+                # ``BoxNowParcelEvent.DoesNotExist``. Mirrors the
+                # ShippingService.dispatch_create_shipment_task pattern.
+                transaction.on_commit(
+                    lambda eid=event.id: boxnow_send_arrival_notification.delay(
+                        eid
                     )
-                except ImportError:
-                    logger.warning(
-                        "apply_webhook_event: "
-                        "boxnow_send_arrival_notification task not yet "
-                        "available (Wave 3 task); skipping notification "
-                        "for event.id=%s",
-                        event.id,
-                    )
+                )
 
             # --- Inline WebSocket notification on parcel delivery ---------
             # No email here — the customer already gets order-status emails

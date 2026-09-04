@@ -672,6 +672,14 @@ def bind_tenant(monkeypatch):
     test modules also declare their own local copy of this fixture
     (same shape) — either is fine, the local one simply shadows this
     one for that module.
+
+    Only for stand-ins and for code that never switches schema. A real
+    ``Tenant`` whose code path enters ``schema_context`` (every eager
+    ``TenantTask`` does) must be bound with
+    ``tests.utils.staff.bind_store_tenant``: the context exit restores
+    the connection via ``set_tenant(previous)``, which rewrites
+    ``connection.schema_name`` to the bound tenant, and unwinding the
+    attribute alone leaves the worker outside the public schema.
     """
 
     def _bind(t):

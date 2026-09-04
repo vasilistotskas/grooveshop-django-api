@@ -75,10 +75,27 @@ class PlatformStaffBackend(ModelBackend):
         return user
 
     def get_user(self, user_id):
+        """Restore a platform-staff session, re-checking the flag.
+
+        ``authenticate_staff`` requires ``is_staff`` to MINT the identity
+        and ``PlatformStaffTokenAuthentication.validate_user`` requires it
+        to keep a token working — "an outstanding token must stop working
+        the moment it does", as that code says. Session restore did
+        neither: ``ModelBackend.get_user`` checks only ``is_active``.
+
+        The stamp below is the sole thing ``is_store_staff`` and
+        ``TenantRolePermissionBackend`` consult, so without this check
+        the documented revocation — untick ``is_staff`` — closed the
+        admin UI (which reads the flag directly) while leaving the API
+        wide open to the existing session cookie for its remaining life.
+        Only sessions this backend authenticated reach this method, so
+        refusing a non-staff user here cannot affect a customer login.
+        """
         with schema_context(get_public_schema_name()):
             user = super().get_user(user_id)
-        if user is not None:
-            setattr(user, PLATFORM_IDENTITY_ATTR, True)
+        if user is None or not user.is_staff:
+            return None
+        setattr(user, PLATFORM_IDENTITY_ATTR, True)
         return user
 
 

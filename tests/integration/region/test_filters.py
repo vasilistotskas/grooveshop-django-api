@@ -1,3 +1,5 @@
+import random
+import string
 import uuid
 
 from django.conf import settings
@@ -18,24 +20,36 @@ default_language = settings.PARLER_DEFAULT_LANGUAGE_CODE
 class RegionFilterTestCase(TestURLFixerMixin, APITestCase):
     @classmethod
     def setUpTestData(cls):
-        # Use unique alpha codes to avoid conflicts with parallel tests
         cls.test_id = uuid.uuid4().hex[:4].upper()
 
+        # Codes come from the ISO 3166-1 USER-ASSIGNED ranges: alpha-2
+        # XA-XZ and alpha-3 XAA-XZZ are permanently reserved and will
+        # never name a real country, so these cannot collide with
+        # reference data any seed migration inserts.
+        #
+        # They used to be built as f"GR{hex_char}", which produces the
+        # literal "GRC" whenever that character is a C — one run in
+        # sixteen — and country/migrations/0010_seed_default_country
+        # seeds Greece as ("GR", "GRC"). That is the
+        # `duplicate key ... country_country_alpha_3_key` failure that
+        # took out this whole class on CI at random.
+        gr, us, de = random.sample(string.ascii_uppercase, 3)
+
         cls.country_gr = CountryFactory(
-            alpha_2=f"G{cls.test_id[:1]}",
-            alpha_3=f"GR{cls.test_id[:1]}",
+            alpha_2=f"X{gr}",
+            alpha_3=f"X{gr}A",
             iso_cc=300 + int(cls.test_id[:2], 16) % 100,
             phone_code=30,
         )
         cls.country_us = CountryFactory(
-            alpha_2=f"U{cls.test_id[1:2]}",
-            alpha_3=f"US{cls.test_id[1:2]}",
+            alpha_2=f"X{us}",
+            alpha_3=f"X{us}B",
             iso_cc=840 + int(cls.test_id[:2], 16) % 100,
             phone_code=1,
         )
         cls.country_de = CountryFactory(
-            alpha_2=f"D{cls.test_id[2:3]}",
-            alpha_3=f"DE{cls.test_id[2:3]}",
+            alpha_2=f"X{de}",
+            alpha_3=f"X{de}C",
             iso_cc=276 + int(cls.test_id[:2], 16) % 100,
             phone_code=49,
         )

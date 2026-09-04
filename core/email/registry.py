@@ -2,8 +2,7 @@
 
 import os
 from dataclasses import dataclass
-from datetime import datetime
-from datetime import timezone as dt_timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from django.conf import settings
@@ -204,7 +203,7 @@ class EmailTemplateRegistry:
                 # Get last modified time
                 try:
                     last_modified = datetime.fromtimestamp(
-                        html_file.stat().st_mtime, tz=dt_timezone.utc
+                        html_file.stat().st_mtime, tz=UTC
                     )
                 except (OSError, PermissionError) as e:
                     logger.warning(

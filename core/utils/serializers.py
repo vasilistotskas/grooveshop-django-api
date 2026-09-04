@@ -126,7 +126,12 @@ type SerializersConfig = dict[str, ActionConfig]
 
 def crud_config(
     *,
-    list: type[serializers.Serializer],
+    # `list` shadows the builtin, and that is the point: these three
+    # keyword names ARE the DRF action names the config maps to, so the
+    # call sites read `crud_config(list=..., detail=..., write=...)`.
+    # Renaming one of the three would break that symmetry at 28 call
+    # sites, and this function never calls the builtin.
+    list: type[serializers.Serializer],  # noqa: A002
     detail: type[serializers.Serializer],
     write: type[serializers.Serializer] | None = None,
 ) -> SerializersConfig:

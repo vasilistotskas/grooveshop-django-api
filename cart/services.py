@@ -38,10 +38,7 @@ class CartService:
 
         self._extract_cart_info()
 
-        try:
-            self._initialize_cart()
-        except CartServiceInitException:
-            raise
+        self._initialize_cart()
 
     def _extract_cart_info(self):
         if hasattr(self.request, "META"):

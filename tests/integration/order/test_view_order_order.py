@@ -339,16 +339,14 @@ class OrderViewSetTestCase(TestURLFixerMixin, APITestCase):
 
             response = self.client.post(self.list_url, payload, format="json")
 
-        # Debug: check response if it fails
-        if response.status_code != status.HTTP_201_CREATED:
-            import json
-
-            print(f"Response status: {response.status_code}")
-            print(
-                f"Response data: {json.dumps(dict(response.data), indent=2, ensure_ascii=True)}"
-            )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        # The response body is in the assertion message rather than a
+        # print: a print only reaches stdout, which pytest swallows on a
+        # passing run and buries on a failing one.
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+            f"order creation failed: {response.data}",
+        )
         self.assertEqual(Order.objects.count(), initial_count + 1)
 
         created_order = Order.objects.get(email=unique_email)

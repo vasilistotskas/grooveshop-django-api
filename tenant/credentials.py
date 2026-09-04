@@ -126,16 +126,25 @@ def tenant_contact_email() -> str:
         return tenant_email
     try:
         from extra_settings.models import Setting
-
-        setting_value = Setting.get("CONTACT_EMAIL", default="") or ""
-        if setting_value:
-            return setting_value
     except ImportError:  # extra_settings not installed
-        # Narrowed from `Exception`: the comment always said this guards
-        # a missing optional app, but as written it also hid a database
-        # failure — and this function's answer decides the From address on
-        # every outbound email.
         logger.debug("extra_settings not installed — using INFO_EMAIL")
+    else:
+        try:
+            setting_value = Setting.get("CONTACT_EMAIL", default="") or ""
+        except Exception:
+            # This is a fallback CHAIN — tenant field, then the setting,
+            # then INFO_EMAIL — so a database blip should drop through to
+            # the next link rather than break every outbound email. What
+            # it must not do is drop through SILENTLY, which is what the
+            # bare `except Exception: pass` here used to do.
+            logger.warning(
+                "Could not read the CONTACT_EMAIL setting; falling back "
+                "to INFO_EMAIL",
+                exc_info=True,
+            )
+        else:
+            if setting_value:
+                return setting_value
     return getattr(settings, "INFO_EMAIL", "") or ""
 
 

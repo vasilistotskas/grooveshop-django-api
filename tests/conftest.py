@@ -684,6 +684,19 @@ def bind_tenant(monkeypatch):
 
     def _bind(t):
         monkeypatch.setattr(connection, "tenant", t, raising=False)
+        # Also pin `schema_name` to whatever it is right now. This is a
+        # no-op during the test, but it makes monkeypatch RESTORE it at
+        # teardown — which matters because any code path that enters
+        # `schema_context` (every eager `TenantTask`) rewrites
+        # `connection.schema_name` on exit via `set_tenant(previous)`.
+        # Unwinding only the `tenant` attribute left the worker sitting
+        # outside the public schema, and the next test on that worker to
+        # create a real Tenant died with "Can't create tenant outside the
+        # public schema" — a failure with no visible connection to
+        # whichever test actually leaked.
+        monkeypatch.setattr(
+            connection, "schema_name", connection.schema_name, raising=False
+        )
 
     return _bind
 

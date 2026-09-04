@@ -634,12 +634,13 @@ def get_setting_by_key(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if key not in PUBLIC_SETTING_KEYS:
-            if not is_store_staff(request.user):
-                return Response(
-                    {"detail": _("Setting not found or access denied.")},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+        if (key not in PUBLIC_SETTING_KEYS) and (
+            not is_store_staff(request.user)
+        ):
+            return Response(
+                {"detail": _("Setting not found or access denied.")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         try:
             setting_value = Setting.get(key)

@@ -374,7 +374,7 @@ class EmailTemplatePreviewService:
 
     def _get_sample_user_context(self) -> dict:
         """Generate sample user data for user-related templates."""
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         return {
             "user": {
@@ -407,7 +407,6 @@ class EmailTemplatePreviewService:
 
     def _get_sample_subscription_context(self) -> dict:
         """Generate sample subscription data for subscription templates."""
-        from datetime import datetime
 
         return {
             "user": {

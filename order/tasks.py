@@ -553,13 +553,14 @@ def send_payment_failed_email(self, order_id: int) -> bool:
     """
     email_sent = False
     try:
-        if self.request.retries == 0:
-            if not _reserve_payment_failed_email(order_id):
-                logger.info(
-                    "Payment failed email already sent for order #%s, skipping",
-                    order_id,
-                )
-                return True
+        if (self.request.retries == 0) and (
+            not _reserve_payment_failed_email(order_id)
+        ):
+            logger.info(
+                "Payment failed email already sent for order #%s, skipping",
+                order_id,
+            )
+            return True
 
         # No item prefetch: this email neither passes ``items`` into the
         # context nor renders a line table.
@@ -850,15 +851,16 @@ def send_order_status_update_email(
     try:
         # Only reserve on the first attempt to prevent the flag from
         # blocking legitimate retries after a transient failure.
-        if self.request.retries == 0:
-            if not _reserve_status_update_email(order_id, status):
-                logger.info(
-                    "Status update email already sent (or reserved) "
-                    "for order #%s status=%s, skipping",
-                    order_id,
-                    status,
-                )
-                return True
+        if (self.request.retries == 0) and (
+            not _reserve_status_update_email(order_id, status)
+        ):
+            logger.info(
+                "Status update email already sent (or reserved) "
+                "for order #%s status=%s, skipping",
+                order_id,
+                status,
+            )
+            return True
 
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
@@ -1091,14 +1093,15 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         # re-send because the flag is held by this worker; releasing
         # on every retry would defeat idempotency, and re-checking
         # would block a legitimate retry after a transient failure.
-        if self.request.retries == 0:
-            if not _reserve_shipping_notification_email(order_id):
-                logger.info(
-                    "Shipping notification email already sent (or reserved) "
-                    "for order #%s, skipping",
-                    order_id,
-                )
-                return True
+        if (self.request.retries == 0) and (
+            not _reserve_shipping_notification_email(order_id)
+        ):
+            logger.info(
+                "Shipping notification email already sent (or reserved) "
+                "for order #%s, skipping",
+                order_id,
+            )
+            return True
 
         context = build_email_context(
             order=order,
@@ -1296,13 +1299,14 @@ def send_invoice_email(self, order_id: int) -> bool:
     """
     email_sent = False
     try:
-        if self.request.retries == 0:
-            if not _reserve_invoice_email(order_id):
-                logger.info(
-                    "Invoice email already sent for order #%s, skipping",
-                    order_id,
-                )
-                return True
+        if (self.request.retries == 0) and (
+            not _reserve_invoice_email(order_id)
+        ):
+            logger.info(
+                "Invoice email already sent for order #%s, skipping",
+                order_id,
+            )
+            return True
 
         order = Order.objects.select_related(
             "user", "country", "region", "pay_way"

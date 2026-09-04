@@ -299,7 +299,6 @@ extend-select = [
     "F405", # name may be undefined, or defined from star imports
     "A",    # builtin shadowing
     "DJ",   # Django-specific correctness
-    "ERA",  # commented-out code
     "PLR0913", # too many arguments — makes `max-args` below real
     "T20",  # print / pprint left in the tree
     "TID",  # banned and relative imports
@@ -327,6 +326,17 @@ ignore = [
     # about what it is really catching, which is the Phase 4 triage —
     # not something to settle with a blanket autofix here.
     "BLE001",
+    # ERA001 was enabled and then withdrawn after reading all 13
+    # production hits: 12 are prose, not code. This codebase documents
+    # with comments that contain `=`, dotted paths and parenthesised
+    # tuples — "# (slug, name, price)" heading a data table,
+    # "#   SOCIALACCOUNT_EMAIL_AUTHENTICATION = True" recording a
+    # setting. One hit is worse than noise: `# xgettext:no-python-format`
+    # in order/admin.py is a FUNCTIONAL directive, and ERA001's fix
+    # deletes it, which hard-fails msgfmt on the Greek catalogue.
+    # A rule that is 1-in-13 right and can break the build on the
+    # remainder is not worth its suppressions.
+    "ERA001",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -339,8 +349,19 @@ ignore = [
 #   `on_commit(..., robust=True)` and closes connections best-effort;
 #   each site already carries a `# pragma: no cover` saying so.
 # All four are 100% test-only — measured, not assumed.
-"tests/**" = ["S101", "TRY002", "DJ008", "S110"]
-"tests_mt/**" = ["S101", "TRY002", "DJ008", "S110"]
+# SIM117: stacked `with mock.patch(...)` blocks. All 19 are in tests,
+#   and at 80 columns the collapsed form needs a parenthesised context
+#   group — churning test structure for no behavioural gain. The rule
+#   stays enforced in production code, where it is already clean.
+"tests/**" = ["S101", "TRY002", "DJ008", "S110", "SIM117"]
+"tests_mt/**" = ["S101", "TRY002", "DJ008", "S110", "SIM117"]
+# Seeding helpers print deliberate, `verbose`-gated progress for an
+# operator watching `seed_all` run. They are shared by the management
+# command and the test factories, so they have no `self.stdout` to write
+# to, and routing operator-facing progress into the log would hide it.
+"country/factories.py" = ["T201"]
+"region/factories.py" = ["T201"]
+"devtools/management/commands/seed_all.py" = ["T201"]
 
 [tool.ruff.lint.pylint]
 max-args = 6

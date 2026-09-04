@@ -170,7 +170,7 @@ class TestOrderFactories(TestCase):
             OrderFactory.create_shipped_order(test_param=123)
 
             mock_method.assert_called_once()
-            args, kwargs = mock_method.call_args
+            _args, kwargs = mock_method.call_args
             self.assertEqual(kwargs.get("status"), OrderStatus.SHIPPED)
             self.assertEqual(kwargs.get("test_param"), 123)
 
@@ -180,7 +180,7 @@ class TestOrderFactories(TestCase):
             OrderFactory.create_pending_order(test_param=456)
 
             mock_method.assert_called_once()
-            args, kwargs = mock_method.call_args
+            _args, kwargs = mock_method.call_args
             self.assertEqual(kwargs.get("status"), OrderStatus.PENDING)
             self.assertEqual(
                 kwargs.get("payment_status"), PaymentStatus.PENDING
@@ -193,7 +193,7 @@ class TestOrderFactories(TestCase):
             OrderFactory.create_completed_order()
 
             mock_method.assert_called_once()
-            args, kwargs = mock_method.call_args
+            _args, kwargs = mock_method.call_args
             self.assertEqual(kwargs.get("status"), OrderStatus.COMPLETED)
 
         with mock.patch(

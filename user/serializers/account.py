@@ -93,11 +93,12 @@ class UserWriteSerializer(UserSerializer):
 
     def validate_username(self, username):
         username = super().validate_username(username)
-        if self.instance and self.instance.username != username:
-            if User.objects.filter(username=username).exists():
-                raise serializers.ValidationError(
-                    _("A user with this username already exists.")
-                )
+        if (self.instance and self.instance.username != username) and (
+            User.objects.filter(username=username).exists()
+        ):
+            raise serializers.ValidationError(
+                _("A user with this username already exists.")
+            )
         return username
 
 

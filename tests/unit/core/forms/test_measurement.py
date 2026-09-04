@@ -137,7 +137,7 @@ class TestMeasurementWidget(SimpleTestCase):
 
 class TestMeasurementFormField(SimpleTestCase):
     def test_init_with_invalid_measurement_type(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TypeError) as cm:
             MeasurementFormField(measurement=str)
 
         self.assertIn("must be a subclass of MeasureBase", str(cm.exception))
@@ -303,7 +303,7 @@ class TestMeasurementFormField(SimpleTestCase):
         self.assertEqual(result, mock_speed)
 
     def test_error_message_with_invalid_measurement_subclass(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TypeError) as cm:
             MeasurementFormField(measurement=dict)
 
         expected_msg = f"{dict} must be a subclass of MeasureBase"

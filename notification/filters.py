@@ -213,7 +213,7 @@ class NotificationUserFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         if value:
             try:
                 user_ids = [
-                    int(id.strip()) for id in value.split(",") if id.strip()
+                    int(raw.strip()) for raw in value.split(",") if raw.strip()
                 ]
                 return queryset.filter(user__id__in=user_ids)
             except ValueError:
@@ -225,7 +225,7 @@ class NotificationUserFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         if value:
             try:
                 notification_ids = [
-                    int(id.strip()) for id in value.split(",") if id.strip()
+                    int(raw.strip()) for raw in value.split(",") if raw.strip()
                 ]
                 return queryset.filter(notification__id__in=notification_ids)
             except ValueError:

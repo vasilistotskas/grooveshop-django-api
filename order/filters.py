@@ -392,7 +392,7 @@ class OrderFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         if value:
             try:
                 user_ids = [
-                    int(id.strip()) for id in value.split(",") if id.strip()
+                    int(raw.strip()) for raw in value.split(",") if raw.strip()
                 ]
                 return queryset.filter(user__id__in=user_ids)
             except ValueError:
@@ -674,7 +674,7 @@ class OrderItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         if value:
             try:
                 order_ids = [
-                    int(id.strip()) for id in value.split(",") if id.strip()
+                    int(raw.strip()) for raw in value.split(",") if raw.strip()
                 ]
                 return queryset.filter(order__id__in=order_ids)
             except ValueError:
@@ -685,7 +685,7 @@ class OrderItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         if value:
             try:
                 product_ids = [
-                    int(id.strip()) for id in value.split(",") if id.strip()
+                    int(raw.strip()) for raw in value.split(",") if raw.strip()
                 ]
                 return queryset.filter(product__id__in=product_ids)
             except ValueError:

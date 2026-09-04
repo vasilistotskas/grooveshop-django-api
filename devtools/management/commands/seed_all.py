@@ -449,7 +449,6 @@ class FactoryExecutor:
     ) -> None:
         """Apply locale-specific context to factory"""
         market = context.get("market", "global")
-        # locales = context.get("locales", [])
 
         # This could be enhanced to actually configure the factory
         # based on market/locale settings

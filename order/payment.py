@@ -358,7 +358,7 @@ class StripePaymentProvider(PaymentProvider):
                 # Convert list to comma-separated string for Stripe metadata
                 if isinstance(cart_item_ids, list):
                     metadata["cart_item_ids"] = ",".join(
-                        str(id) for id in cart_item_ids
+                        str(item_id) for item_id in cart_item_ids
                     )
                 else:
                     metadata["cart_item_ids"] = str(cart_item_ids)

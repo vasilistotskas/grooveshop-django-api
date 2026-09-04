@@ -136,8 +136,19 @@ def _order_exists_on_unavailable_tenant(order_code: object) -> bool:
                 ):
                     return True
         except Exception:
-            # A destroyed tenant's schema may be gone already; that is
-            # not a "retry later" case.
+            # A destroyed tenant's schema may be gone already; that is not
+            # a "retry later" case, so the loop moves on. It does not move
+            # on QUIETLY though: this loop is how an unauthenticated
+            # webhook finds its tenant, and a tenant skipped because of an
+            # unexpected error is otherwise indistinguishable from one
+            # that simply did not hold the order code.
+            logger.warning(
+                "Viva webhook: skipped tenant %s while resolving order "
+                "code %s — its schema may already be gone",
+                getattr(tenant, "schema_name", tenant),
+                order_code,
+                exc_info=True,
+            )
             continue
     return False
 

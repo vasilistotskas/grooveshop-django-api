@@ -67,10 +67,10 @@ def discounted_line_gross(order, items=None) -> dict[int, Decimal]:
     # nearly equals the items total, push one line past its own gross.
     # Repair by moving the overflow to the largest remaining line so
     # no line goes negative and the total allocation stays exact.
-    for pk in gross:
-        overflow = shares[pk] - gross[pk]
+    for pk, gross_share in gross.items():
+        overflow = shares[pk] - gross_share
         if overflow > 0:
-            shares[pk] = gross[pk]
+            shares[pk] = gross_share
             for other_pk, _line in sorted(
                 gross.items(), key=lambda kv: -(kv[1] - shares[kv[0]])
             ):

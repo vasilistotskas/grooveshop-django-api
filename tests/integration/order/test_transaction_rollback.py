@@ -456,10 +456,13 @@ class TestTransactionFailuresRollbackCompletely:
             original_save = Order.save
 
             def failing_save(self, *args, **kwargs):
-                if hasattr(self, "_state") and self._state.adding is False:
-                    # This is an update, not a create
-                    if self.status == OrderStatus.PROCESSING:
-                        raise Exception("Order status update failed")
+                # An update, not a create, moving into PROCESSING
+                if (
+                    hasattr(self, "_state")
+                    and self._state.adding is False
+                    and self.status == OrderStatus.PROCESSING
+                ):
+                    raise Exception("Order status update failed")
                 return original_save(self, *args, **kwargs)
 
             with patch.object(Order, "save", failing_save):

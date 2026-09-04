@@ -7,6 +7,7 @@ from django.contrib.auth.models import (
 )
 from django.contrib.postgres.indexes import BTreeIndex, GinIndex
 from django.db import models
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from django_stubs_ext.db.models import TypedModelMeta
 from phonenumber_field.modelfields import PhoneNumberField
@@ -30,9 +31,20 @@ class UserAccount(
         unique=True,
         blank=True,
         null=True,
-        help_text=_(
-            f"Required. {settings.ACCOUNT_USERNAME_MAX_LENGTH} characters or fewer."
-            "Letters, digits and @/./+/-/_ only."
+        # `format_lazy`, not an f-string and not `%`. An f-string is
+        # resolved before `_()` sees it, so the msgid carried the actual
+        # number and never matched the catalogue. `lazy % dict` is no
+        # better here: it returns a plain str, which would resolve the
+        # translation at import time and freeze one language into a model
+        # field. `format_lazy` stays lazy until the text is read.
+        # The missing space after "fewer." went with the f-string — the
+        # two literals concatenated to "fewer.Letters".
+        help_text=format_lazy(
+            _(
+                "Required. {max} characters or fewer. "
+                "Letters, digits and @/./+/-/_ only."
+            ),
+            max=settings.ACCOUNT_USERNAME_MAX_LENGTH,
         ),
         validators=[username_validator],
         error_messages={

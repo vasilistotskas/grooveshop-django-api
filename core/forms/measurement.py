@@ -78,7 +78,7 @@ class MeasurementFormField(forms.MultiValueField):
         **kwargs,
     ):
         if not issubclass(measurement, MeasureBase | BidimensionalMeasure):
-            raise ValueError(f"{measurement} must be a subclass of MeasureBase")
+            raise TypeError(f"{measurement} must be a subclass of MeasureBase")
 
         self.measurement = measurement
         if not unit_choices:

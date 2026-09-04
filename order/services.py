@@ -3030,9 +3030,10 @@ class OrderService:
             return Money(0, order_value.currency)
 
         # Check if order value meets free threshold
-        if pay_way.free_threshold and pay_way.free_threshold.amount > 0:
-            if order_value.amount >= pay_way.free_threshold.amount:
-                return Money(0, order_value.currency)
+        if (pay_way.free_threshold and pay_way.free_threshold.amount > 0) and (
+            order_value.amount >= pay_way.free_threshold.amount
+        ):
+            return Money(0, order_value.currency)
 
         # Same currency only. Re-labelling would turn a fee configured
         # in one currency into the same NUMBER in another — charging a

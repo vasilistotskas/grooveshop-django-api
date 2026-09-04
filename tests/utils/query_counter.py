@@ -84,10 +84,11 @@ class QueryCountAssertion:
             self.queries = list(self._context.captured_queries)
             self.count = len(self.queries)
 
-        if exc_type is None and self.max_queries is not None:
-            if self.count > self.max_queries:
-                message = self._build_error_message()
-                raise AssertionError(message)
+        if (exc_type is None and self.max_queries is not None) and (
+            self.count > self.max_queries
+        ):
+            message = self._build_error_message()
+            raise AssertionError(message)
 
         return False
 
@@ -158,7 +159,9 @@ def count_queries(verbose: bool = False):
         yield counter
 
     if verbose:
-        print(f"Query count: {counter.count}")
+        # Deliberate: this helper's whole purpose is to report a count to
+        # whoever asked for `verbose`, and pytest shows stdout on failure.
+        print(f"Query count: {counter.count}")  # noqa: T201
 
 
 def assert_max_queries(

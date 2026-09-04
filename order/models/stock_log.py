@@ -165,37 +165,39 @@ class StockLog(TimeStampMixinModel):
 
         # For operations that change physical stock (DECREMENT, INCREMENT)
         # Validate: stock_after == stock_before + quantity_delta
-        if self.operation_type in [
-            self.OPERATION_DECREMENT,
-            self.OPERATION_INCREMENT,
-        ]:
-            if self.stock_after != self.stock_before + self.quantity_delta:
-                raise ValidationError(
-                    _(
-                        "Stock calculation error: For {operation}, stock_after must equal "
-                        "stock_before + quantity_delta. Got: {after} != {before} + {delta}"
-                    ).format(
-                        operation=self.get_operation_type_display(),
-                        after=self.stock_after,
-                        before=self.stock_before,
-                        delta=self.quantity_delta,
-                    )
+        if (
+            self.operation_type
+            in [self.OPERATION_DECREMENT, self.OPERATION_INCREMENT]
+            and self.stock_after != self.stock_before + self.quantity_delta
+        ):
+            raise ValidationError(
+                _(
+                    "Stock calculation error: For {operation}, stock_after must equal "
+                    "stock_before + quantity_delta. Got: {after} != {before} + {delta}"
+                ).format(
+                    operation=self.get_operation_type_display(),
+                    after=self.stock_after,
+                    before=self.stock_before,
+                    delta=self.quantity_delta,
                 )
+            )
 
         # For operations that don't change physical stock (RESERVE, RELEASE)
         # Validate: stock_after == stock_before (no physical change)
-        elif self.operation_type in [
-            self.OPERATION_RESERVE,
-            self.OPERATION_RELEASE,
-        ]:
-            if self.stock_after != self.stock_before:
-                raise ValidationError(
-                    _(
-                        "Stock calculation error: For {operation}, stock_after must equal "
-                        "stock_before (no physical stock change). Got: {after} != {before}"
-                    ).format(
-                        operation=self.get_operation_type_display(),
-                        after=self.stock_after,
-                        before=self.stock_before,
-                    )
+        if (
+            self.operation_type
+            in [
+                self.OPERATION_RESERVE,
+                self.OPERATION_RELEASE,
+            ]
+        ) and (self.stock_after != self.stock_before):
+            raise ValidationError(
+                _(
+                    "Stock calculation error: For {operation}, stock_after must equal "
+                    "stock_before (no physical stock change). Got: {after} != {before}"
+                ).format(
+                    operation=self.get_operation_type_display(),
+                    after=self.stock_after,
+                    before=self.stock_before,
                 )
+            )

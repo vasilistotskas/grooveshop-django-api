@@ -3,6 +3,12 @@
 
 
 
+## v3.28.5 (2026-09-04)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.28.4 [skip ci] ([`32eba47`](https://github.com/vasilistotskas/grooveshop-django-api/commit/32eba47754953225cddebe0e8354247dc59ac3dd))
+
 ## v3.28.4 (2026-09-04)
 
 ### Chores
@@ -238,43 +244,6 @@ The WebSocket consumer's staff branch joined a store-wide admins group on the sa
 Tests: tests/utils/staff.py builds a stamped staff identity and binds the tenant through the django-tenants API (assigning connection.tenant directly leaks connection.schema_name once a signal re-enters schema_context); new predicate, permission-class, category-image and residue regression tests; existing tests that relied on the bypass now use a superuser or a real staff identity.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`678f40d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/678f40d1c18251c965fa298f0a539ffae68d1646))
-
-* fix(giftcard): verify Viva reversal and failure events before voiding cards (#27)
-
-The Viva webhook is unauthenticated by design: there is no HMAC, and the
-source-IP check is deliberately non-blocking because Traefik SNATs the
-real address away. Retrieving the transaction from Viva IS the
-authentication, which is why the order path added
-_verify_viva_terminal_transaction for events 1797 and 1798.
-
-The gift-card branch of the same view never got that guard. Event 1796
-verified and checked the amount, but 1797 called
-GiftCardService.handle_purchase_reversal straight from the event body,
-and 1798 flipped the purchase to FAILED the same way. The branch
-docstring already claimed both were verified.
-
-A 1797 on a PAID purchase cancels it, writes a negative ADJUST zeroing
-every untouched card it issued, and disables those cards. The Viva order
-code that resolves the purchase is the ref the buyer sees in their own
-checkout URL, so anyone who has completed a purchase could post a
-reversal for it and destroy the stored value they paid for. The handler
-then returns 200 and writes the idempotency row, making it one-shot and
-final. A 1798 could flip a purchase to FAILED mid-checkout.
-
-Both branches now go through the same guard as the order path: skip when
-there is no TransactionId or the verified status is not the expected
-terminal one, and raise (500, Viva redelivers) when verification is
-unavailable, so an unverifiable event can never mutate state. The guard
-takes a subject label instead of an Order, since it is now shared by two
-paths with no common model.
-
-test_payment_failed_marks_failed encoded the unverified 1798 behaviour
-and now pins the verified one. Four new tests cover the reversal guard;
-all four fail on the previous code.
-
-Found during the 2026-09 audit review of order/views/viva_webhook.py.
-
-Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com> ([`e3973d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3973d22f7a4982e3f47ae07e11ae2d375e58bfc))
 
 * fix(order): make the metadata index buildable by every caller that migrates
 
@@ -898,6 +867,84 @@ Found during the 2026-09 audit review of order/services.py.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`41e6ccb`](https://github.com/vasilistotskas/grooveshop-django-api/commit/41e6ccb8c4d239ce4ead76807fabe220152b159c))
 
+* fix(core): merge metadata server-side so a concurrent writer's keys survive
+
+`store_value_in_metadata` read `metadata` off the instance, mutated it in
+Python and saved the column back. `metadata` is ONE jsonb document, so
+that write replaces it wholesale — every key another transaction
+committed since the instance was loaded is silently gone.
+
+Reachable through `POST /api/v1/loyalty/redeem`
+(`loyalty/views/loyalty.py`), which loads the order with a bare
+`Order.objects.get()` — no `select_for_update`, no surrounding
+`transaction.atomic` — then runs serializer validation, a status check
+and a duplicate-redemption query before writing. Everything committed
+against that order in the window is lost.
+
+The key most likely to be in that window is the worst one to lose.
+A hosted-checkout session mints a Viva order code and appends it to
+`viva_order_codes`, which is how both the webhook and the browser-return
+endpoint find the order (`viva_order_code_q`). Drop it and a PAID order
+is unmatched, so the auto-cancel sweep cancels it a day later — the
+failure mode PR #28 spent several commits closing off elsewhere.
+
+The other two callers are safe and stay that way: both create the order
+inside the same transaction moments earlier, so no other writer can have
+touched the row yet.
+
+Now one `UPDATE order_order SET metadata = metadata || %s`, merged by
+Postgres against whatever the row holds at UPDATE time — the same
+set-based approach migrations 0051 and 0052 use, and for the same
+reason. Verified the generated SQL is the operator and not an accident.
+No lock needed, so this is also correct for callers outside a
+transaction, which the redeem endpoint is.
+
+`test_a_key_written_after_load_is_not_clobbered` fails on the previous
+implementation and passes on this one; the other four pin the merge
+semantics (own keys still merge and overwrite, the in-memory instance
+stays usable for callers that keep setting keys on it, empty is a
+no-op).
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`cd9ba3b`](https://github.com/vasilistotskas/grooveshop-django-api/commit/cd9ba3ba3a1eee6e03acb5e8907d9340af56d1bb))
+
+* fix(giftcard): verify Viva reversal and failure events before voiding cards (#27)
+
+The Viva webhook is unauthenticated by design: there is no HMAC, and the
+source-IP check is deliberately non-blocking because Traefik SNATs the
+real address away. Retrieving the transaction from Viva IS the
+authentication, which is why the order path added
+_verify_viva_terminal_transaction for events 1797 and 1798.
+
+The gift-card branch of the same view never got that guard. Event 1796
+verified and checked the amount, but 1797 called
+GiftCardService.handle_purchase_reversal straight from the event body,
+and 1798 flipped the purchase to FAILED the same way. The branch
+docstring already claimed both were verified.
+
+A 1797 on a PAID purchase cancels it, writes a negative ADJUST zeroing
+every untouched card it issued, and disables those cards. The Viva order
+code that resolves the purchase is the ref the buyer sees in their own
+checkout URL, so anyone who has completed a purchase could post a
+reversal for it and destroy the stored value they paid for. The handler
+then returns 200 and writes the idempotency row, making it one-shot and
+final. A 1798 could flip a purchase to FAILED mid-checkout.
+
+Both branches now go through the same guard as the order path: skip when
+there is no TransactionId or the verified status is not the expected
+terminal one, and raise (500, Viva redelivers) when verification is
+unavailable, so an unverifiable event can never mutate state. The guard
+takes a subject label instead of an Order, since it is now shared by two
+paths with no common model.
+
+test_payment_failed_marks_failed encoded the unverified 1798 behaviour
+and now pins the verified one. Four new tests cover the reversal guard;
+all four fail on the previous code.
+
+Found during the 2026-09 audit review of order/views/viva_webhook.py.
+
+Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com> ([`e3973d2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/e3973d22f7a4982e3f47ae07e11ae2d375e58bfc))
+
 ### Chores
 
 * chore(deps): sync uv.lock to 3.28.0 [skip ci] ([`7af2312`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7af2312efee4786f830dd014f6e6533a32442a7d))
@@ -1358,6 +1405,115 @@ branch; it is classified above and never does.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`f92362f`](https://github.com/vasilistotskas/grooveshop-django-api/commit/f92362ffcffb851edb48065f1899c99bd4580d40))
+
+* refactor: remove the API whose only callers were its own tests
+
+Each of these is either duplicated by live code or pure speculation.
+Judged one at a time rather than deleted as a class.
+
+`BlogAuthorQuerySet` — all five filters go, and the whole
+`tests/unit/blog/managers/test_author.py` with them, since every one of
+its 18 tests existed to exercise them. `with_website`, `with_posts` and
+`without_posts` are not merely unused: `BlogAuthorFilter` already
+implements exactly those three predicates inline (`filter_has_website`,
+`filter_has_posts`) and does NOT call the queryset — so the logic lived
+twice and only the filterset copy ever ran. `with_bio` and `active`
+(authors who posted within 180 days) have no equivalent anywhere and
+encode a business rule nothing asked for.
+
+`IndexQuerySet.highlight` / `.crop` — zero references anywhere, not even
+a test. The `QueryState` fields they set stay: `_build_search_params`
+sends all of them to Meilisearch on every search, so the defaults keep
+flowing exactly as before.
+
+`IndexQuerySet.raw_search` — a hand-rolled copy of
+`_build_search_params` that had already drifted from it, omitting
+`attributesToSearchOn`, `attributesToHighlight` and the crop parameters.
+A second params builder that silently disagrees with the real one is
+worse than no second builder.
+
+`ProductCategoryImage.get_banner_image` / `get_icon_image` (classmethod
+and manager both) — subsumed by `get_image_by_type`, which covers all
+ten image types instead of three. `get_main_image` stays: it has a live
+caller in `ProductCategory.main_image`. The one test retargets to the
+generic accessor.
+
+KEPT, against the same rule: `IndexQuerySet.matching_strategy` and
+`attributes_to_search_on`. Also tests-only, but they set parameters that
+go to Meilisearch on every search, and matching-strategy semantics are
+load-bearing enough in this codebase to be documented in CLAUDE.md — the
+`last` strategy's word-dropping behaviour is why the search views carry
+`_relaxed_query`. Removing the only handle on that in the middle of the
+search work would cost more than it saves.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`391c790`](https://github.com/vasilistotskas/grooveshop-django-api/commit/391c79023ecdb4ee8d2496618186cfa2f65bb305))
+
+* refactor: delete the queryset filters, enum helpers and image properties nothing calls
+
+Second batch of the dead-code sweep, across the domain apps. Every symbol
+was re-counted against the whole repo immediately before deletion.
+
+Managers — filters with no caller anywhere, including their own module:
+`blog` `with_posts_prefetch`; `country` `active_countries`,
+`with_phone_code`, `search_by_name`, `search_by_code`, `by_continent`;
+`region` `by_country_name`; `vat` `by_value`, `above_value`,
+`below_value`; `loyalty` `has_earn_transactions`; `user` `for_topic`;
+`product` `for_attribute`, `by_attribute`, and the four
+`main_images`/`banner_images`/`icon_images`/`gallery_images` filters,
+which `by_type` already expresses parametrically.
+
+`country`'s `by_continent(self, continent)` was worse than unused: its
+body was `return self`, so it ignored the argument and returned every
+country. Any future caller would have got silently unfiltered results.
+
+Enums — `CategoryImageTypeEnum.get_priority_ordered` and the
+`get_display_types` table it was the only reader of;
+`NotificationKindEnum.get_alert_types` / `get_positive_types`.
+
+`ProductCategory` — eleven image accessors forming a closed dead
+subtree: the `banner_image`/`icon_image` lookups, the `*_path` and
+`*_url` wrappers over them, the three `category_menu_*` aliases that
+just re-exported `banner_image_path`, plus `get_image_by_type` and
+`get_all_images`. `main_image` and `main_image_path` stay — the latter
+has 71 call sites and is what the serializers publish.
+
+Also `CartService.clean_cart` and `BlogPost.all_comments_count`.
+
+`schema.yml` regenerates byte-identical, so no published field moved.
+
+Method: a reference count that excludes the defining file is wrong here
+— `with_posts_details`, `with_regions` and `with_country` all looked
+dead by that measure and are each called by their own `for_detail`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`a69822c`](https://github.com/vasilistotskas/grooveshop-django-api/commit/a69822c22c0ea74568afda575b494048b91d6436))
+
+* refactor(core): delete the shared helpers nothing imports
+
+Re-measured each symbol against the whole tree (not just Python — also
+templates and settings) immediately before deleting it.
+
+- `core/units.py` kept four unit vocabularies and a `MeasurementUnits`
+  type built by folding all four together. `Product.weight` is the only
+  measurement this platform stores, so only `WeightUnits` was ever
+  imported; distance, area, volume and the fold are gone. No migration
+  references them.
+- `core/models.py`: `get_duration_since_created` / `_updated`, and seven
+  of `MetaDataModel`'s eight metadata accessors. `store_value_in_metadata`
+  stays — `loyalty/services.py:456` calls it, which is exactly why a
+  reference count has to include the whole repo before anything goes.
+- `core/caches.py`: `ONE_HOUR` / `ONE_DAY`, neither of which any cache
+  timeout used.
+- `core/cache/service.py`: `list_surfaces`, a one-line passthrough to
+  `iter_surfaces`. The clear_cache command has a `_list_surfaces` of its
+  own that calls `iter_surfaces` directly — the near-identical name is
+  what made this look used.
+- `core/email/config.py`: `get_all_categories` and
+  `get_templates_by_category`.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`d8ca6bf`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d8ca6bfa62808cdaa5841be349ccdbc41498d88d))
 
 ### Testing
 

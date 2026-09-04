@@ -164,7 +164,13 @@ def verify_signature(
         raw_data_bytes,
         hashlib.sha256,
     ).hexdigest()
-    return hmac.compare_digest(expected, datasignature_hex)
+    # Bytes, not str: a signature header carrying a non-ASCII
+    # character would raise TypeError out of `compare_digest` rather
+    # than simply failing verification.
+    return hmac.compare_digest(
+        expected.encode("ascii"),
+        datasignature_hex.encode("utf-8", "surrogateescape"),
+    )
 
 
 # ---------------------------------------------------------------------------

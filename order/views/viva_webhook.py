@@ -3,7 +3,7 @@ import ipaddress
 import json
 import logging
 from base64 import b64encode
-from decimal import InvalidOperation
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -415,11 +415,6 @@ def _verify_viva_terminal_transaction(
     genuinely reached the expected terminal state.
 
     *subject* is a human label for the thing being mutated ("order 42",
-    "gift-card purchase <uuid>") and is only used in the log lines: this
-    guard is shared by the order and gift-card branches, which have no
-    common model.
-
-    *subject* is a human label for the thing being mutated ("order 42",
     "gift-card purchase <uuid>") and is used only in the log lines, so this
     guard can be shared by callers that have no order model.
 
@@ -429,10 +424,14 @@ def _verify_viva_terminal_transaction(
     a caller with no order passes nothing and gets the status/amount half
     only.
 
-    Returns ``True`` to proceed. Returns ``False`` (skip, no mutation) when
-    the event carries no ``TransactionId`` or the verified status is not one
-    we expect. Raises ``RuntimeError`` (→ 500, Viva retries) when
-    verification is UNAVAILABLE — including any Retrieve-Transaction error
+    Returns the VERIFIED status to proceed with — truthy, so existing
+    ``if not verify(...)`` callers are unaffected, and it lets a caller
+    that expects several statuses tell which one it actually got. A
+    reversal, for instance, has to know whether Viva confirmed a full
+    REFUNDED or a PARTIALLY_REFUNDED, because the two settle differently.
+    Returns ``None`` (skip, no mutation) when the event carries no
+    ``TransactionId`` or the verified status is not one we expect. Raises
+    ``RuntimeError`` (→ 500, Viva retries) when verification is UNAVAILABLE — including any Retrieve-Transaction error
     such as a 404 for a forged id or a transient network fault — so an
     unverifiable event can never mutate state on a trusted-by-default basis.
     """
@@ -443,7 +442,7 @@ def _verify_viva_terminal_transaction(
             event_label,
             subject,
         )
-        return False
+        return None
 
     verified_status, verified_data = _verify_transaction(transaction_id)
     verify_errored = isinstance(verified_data, dict) and (
@@ -477,7 +476,7 @@ def _verify_viva_terminal_transaction(
             else None,
             subject,
         )
-        return False
+        return None
 
     if verified_status not in expected_statuses:
         logger.warning(
@@ -489,9 +488,9 @@ def _verify_viva_terminal_transaction(
             verified_status,
             sorted(expected_statuses),
         )
-        return False
+        return None
 
-    return True
+    return verified_status
 
 
 def _handle_webhook_event(request):
@@ -1441,14 +1440,17 @@ def _handle_reversal_created(order, event_data, transaction_id):
     # Never trust the unauthenticated event body: confirm with Viva that the
     # transaction was actually reversed/refunded before marking the order
     # REFUNDED and firing the refund email + toast + Meta CAPI Refund (G0275).
-    if not _verify_viva_terminal_transaction(
+    verified_status = _verify_viva_terminal_transaction(
         f"order {order.id}",
         transaction_id,
         {PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED},
         "reversal",
         order=order,
-    ):
+    )
+    if not verified_status:
         return
+
+    is_partial = verified_status == PaymentStatus.PARTIALLY_REFUNDED
 
     previous_payment_status = order.payment_status
 
@@ -1459,6 +1461,7 @@ def _handle_reversal_created(order, event_data, transaction_id):
         {
             "reversal_transaction_id": transaction_id,
             "provider": "viva_wallet",
+            "verified_status": str(verified_status),
         }
     )
     order.metadata["refunds"] = refunds
@@ -1478,4 +1481,23 @@ def _handle_reversal_created(order, event_data, transaction_id):
         },
     )
 
-    order_refunded.send(sender=Order, order=order)
+    if is_partial and order.gift_card_amount and order.gift_card_amount.amount:
+        # Viva's reversal event does not tell us HOW MUCH came back, and
+        # the Retrieve-Transaction response's sign for a reversal is not
+        # confirmed against the vendor docs — so this path cannot compute
+        # the refunded amount. Crediting the full redemption instead is
+        # what created money: a EUR 5 goodwill refund put the whole
+        # EUR 60 gift card back, spendable, while the shopper kept the
+        # goods. Crediting ZERO under-pays visibly and an operator can
+        # correct it; over-crediting is silent and cannot be undone.
+        logger.error(
+            "Viva PARTIAL reversal on order %s, which was settled with "
+            "%s of gift-card value: the event carries no refund amount, "
+            "so NO gift-card credit was issued. Credit the card(s) by "
+            "hand from the admin once the reversed amount is known.",
+            order.id,
+            order.gift_card_amount,
+        )
+        order_refunded.send(sender=Order, order=order, amount=Decimal(0))
+    else:
+        order_refunded.send(sender=Order, order=order)

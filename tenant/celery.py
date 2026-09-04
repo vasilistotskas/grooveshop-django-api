@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from celery import Task
-from django.db import connection
+from django.db import connection, transaction
 
 logger = logging.getLogger(__name__)
 
@@ -106,3 +107,48 @@ def run_for_all_tenants(task_name: str, **kwargs: Any) -> list[dict[str, str]]:
             {"schema_name": tenant.schema_name, "task_id": str(result.id)}
         )
     return results
+
+
+def dispatch_on_commit(
+    task: Task,
+    args: Sequence[Any] | None = None,
+    kwargs: Mapping[str, Any] | None = None,
+    *,
+    schema_name: str | None = None,
+    **options: Any,
+) -> None:
+    """Queue ``task`` for after the current transaction, schema pinned NOW.
+
+    ``TenantTask.apply_async`` falls back to ``connection.schema_name``,
+    but a commit hook runs after the request's schema context can
+    unwind — a Stripe replay, a management command, a webhook loop over
+    tenants — and by then the connection has usually snapped back to
+    ``public``. The task then runs against the wrong schema and fails on
+    ``DoesNotExist``, or worse, does not.
+
+    The fix cannot live inside ``TenantTask``: by the time the hook runs
+    the caller's frame is gone, and wrapping ``on_commit`` globally would
+    break ``captureOnCommitCallbacks`` and every hook that is not a task.
+    An explicit hand-off is the one supported idiom, and this is it —
+    ``connection.schema_name`` is read HERE, at registration, and carried
+    in the header ``TenantTask.apply_async`` already honours.
+
+    ``args`` and ``kwargs`` are omitted from the call when not given,
+    rather than passed as empty, so the resulting ``apply_async``
+    signature is the one the call sites already produce.
+
+    ``transaction.on_commit`` is reached through the module, not bound at
+    import: the test suite monkeypatches it.
+    """
+    schema = schema_name or getattr(connection, "schema_name", "public")
+    headers = {**(options.pop("headers", None) or {}), "_schema_name": schema}
+
+    call: dict[str, Any] = {}
+    if args is not None:
+        call["args"] = list(args)
+    if kwargs is not None:
+        call["kwargs"] = dict(kwargs)
+
+    transaction.on_commit(
+        lambda: task.apply_async(**call, headers=headers, **options)
+    )

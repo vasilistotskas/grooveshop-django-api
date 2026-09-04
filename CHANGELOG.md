@@ -3,6 +3,44 @@
 
 
 
+## v3.28.3 (2026-09-04)
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.28.2 [skip ci] ([`5acc7ba`](https://github.com/vasilistotskas/grooveshop-django-api/commit/5acc7bacacb802e4c8c1e2fe0688a8f011d38bdc))
+
+### Testing
+
+* test(region): draw every unique country column from a reserved range
+
+My previous fix to this class was incomplete. It moved `alpha_2` and
+`alpha_3` into the ISO 3166-1 user-assigned ranges but left `iso_cc`
+derived from the same uuid4 hex slice — so it closed one collision with
+`country/migrations/0010_seed_default_country` and left another.
+
+Greece is seeded as ("GR", "GRC", 297). The German fixture computed
+`276 + hex % 100`, which spans 276-375 and therefore hits 297: measured
+at 1.16% of 200k draws. That is the
+`duplicate key ... country_country_iso_cc_key` failure that took all 23
+tests in the class down as setup errors on PR #26's Testing (2) shard —
+a shard whose diff has nothing to do with countries.
+
+`iso_cc` is now sampled from 900-999, the ISO 3166-1 user-assigned
+NUMERIC range, alongside the alpha ranges already in use. Verified
+exhaustively: 0 collisions with the seeded row and 0 self-collisions in
+200k draws, where the old expression produced 2312.
+
+`phone_code` needs no such treatment — the model comment records that it
+is deliberately not unique, because calling codes are shared (+1 US/CA).
+
+The lesson worth keeping: when a fixture collides with seeded reference
+data, fix EVERY unique column at once. Fixing only the one that happened
+to fail leaves the same bug wearing a different constraint name, and it
+resurfaces on someone else's unrelated PR.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`d202923`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d20292345db3bfb3f16246579d48a1c0583075b4))
+
 ## v3.28.2 (2026-09-04)
 
 ### Bug fixes
@@ -93,6 +131,108 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`1b5592c`](https://gi
 
 ### Bug fixes
 
+* fix(tenant): credentialed tenant origins must be https outside DEBUG
+
+origin_belongs_to_tenant admitted http:// and https:// alike, and that
+one predicate grants both CSRF trust and credentialed CORS. Production
+storefronts are https-only (SSL redirect, HSTS, Secure session cookie),
+so a plain-http origin can never carry a legitimate session there —
+trusting it only helps someone able to answer for the tenant hostname
+over http. https only, with http kept for local development under
+DEBUG.
+
+Reported by CodeRabbit on PR #26.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`1a698d5`](https://github.com/vasilistotskas/grooveshop-django-api/commit/1a698d5cac5d56ae3b789b070625753c7622fc9a))
+
+* fix(tenant): judge the destroy gates on the locked row, not the caller's copy
+
+destroy_refusal read the instance the caller happened to be holding. An
+operator loads the changelist, someone else re-activates or protects the
+store, the first operator confirms — and the gate passed on the stale
+snapshot, dropping a schema the newer state forbids destroying.
+
+The gate now runs inside the destroy transaction against a
+select_for_update re-read, and the lock is held through
+delete(force_drop=True), so a concurrent activate either lands before
+the gate sees it or waits until the row is gone.
+
+The offboarding tests moved from MagicMock stand-ins to saved rows,
+since only what is in the database counts now; Tenant.delete stays
+patched so no schema DDL is issued.
+
+Reported by CodeRabbit on PR #26.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`2a48634`](https://github.com/vasilistotskas/grooveshop-django-api/commit/2a48634ab0274345f95e9886e287c563e822cbac))
+
+* fix(tenant): apply the provider whitelist before the per-tenant OAuth app
+
+list_apps filtered the whitelist, and allauth's own get_app selects from
+list_apps, so the filter looked complete. But this adapter overrides
+get_app and returns a tenant-specific SocialApp before that fallback is
+ever reached: a provider the merchant switched off was hidden from the
+login buttons yet still started OAuth when its redirect URL was hit
+directly, for any tenant that had its own SocialApp row.
+
+get_app now consults the same whitelist first and raises
+SocialApp.DoesNotExist for a provider outside it, which is the outcome
+allauth's own implementation produces for an unknown app.
+
+Reported by CodeRabbit on PR #26; verified against the installed
+allauth adapter source before fixing.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`dbdbd82`](https://github.com/vasilistotskas/grooveshop-django-api/commit/dbdbd8287b97ac68eea19261b1b34058b6c93c14))
+
+* fix(cors): one CORS policy — platform origins plus the current tenant's own domains
+
+Two CORS policies coexisted. settings.py set CORS_ALLOW_ALL_ORIGINS with credentials on, which makes django-cors-headers echo any Origin with Access-Control-Allow-Credentials — credentialed cross-origin access for the whole internet wherever the Django middleware was the authority (runserver, WSGI). In production the ASGI entrypoint wrapped HTTP in asgi/cors_handler.py, a hand-written policy that matched Origin against the static platform list only, answered preflights itself and rewrote every response's headers — neutralising the allow-all but also denying every tenant storefront the CORS it needs to dial its own API host, and carrying a header list that had already drifted from CORS_ALLOW_HEADERS.
+
+django-cors-headers is now the single authority. The origin rule TenantCsrfMiddleware already applied (scheme + a registered TenantDomain, cached under the schema-independent global:tenant_domains key the signals invalidate) is extracted to tenant.middleware.origin_belongs_to_tenant and connected to corsheaders' check_request_enabled, so CSRF and CORS cannot drift. CORS_ALLOW_ALL_ORIGINS is gone, Idempotency-Key joins the allowed headers and the preflight max-age the wrapper advertised is kept; the wrapper and its tests are deleted. Covered in the main lane and, for the middleware ordering that binds the tenant before CorsMiddleware runs, in the multi-tenant lane.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`4be8cab`](https://github.com/vasilistotskas/grooveshop-django-api/commit/4be8cabbe8fa8bd28faa6a861d51e637e4a12e59))
+
+* fix(tenant): keep a database default on is_protected for the PreSync window
+
+Django drops the column default right after ADD COLUMN unless db_default is declared, and the Argo PreSync hook migrates before the new image rolls: old pods still inserting Tenant history rows without the column would have failed for the length of the rollout, and after any image rollback. Found by the migration-safety review; the regenerated migration keeps DEFAULT false in place.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`121e404`](https://github.com/vasilistotskas/grooveshop-django-api/commit/121e4049bc0faacd8049802fa0a31377f1504225))
+
+* fix(tenant,devtools): close four fail-open paths in the control plane
+
+seed_demo_store classified a tenant with zero TenantDomain rows as safe (an empty list has no live host) and matched its non-production markers as substrings, so a live stagingear.gr-style name passed. Hostnames are now classified by whole labels and reserved suffixes, and a domainless tenant is refused unless it is flagged is_demo.
+
+tenant/resolve returns chat_api_key and acp_bearer_token when X-Internal-Token is present but sent no Vary or Cache-Control, so any intermediary caching by URL could serve the secret-bearing body to anonymous callers. Both variants now vary on the header and the secret variant is private, no-store.
+
+The per-tenant social-login whitelist returned None (no restriction) whenever the setting lookup raised, re-enabling every configured provider on a DB blip or a half-provisioned schema. It now fails closed.
+
+tenant/signals.py was the only signal module without dispatch_uid (autoreload or a second import doubled every receiver, including the self-re-entering reactivate_on_renewal), and the pay-way/setting purge ran a public-schema round-trip synchronously inside the caller's transaction, once per seeded row. It now runs on commit with the schema captured eagerly.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`b622ff4`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b622ff4d87e632c26b14982a42d0bc9c3bc245ac))
+
+* fix(tenant): enforce the destroy gates in the lifecycle and make protection a row flag
+
+DELETE /api/v1/tenant/admin/<pk>/ called destroy_tenant with none of the gates the admin action enforces (suspended first, 24 h cooldown), so one platform-API call could drop a live store's schema. The gates are now tenant.lifecycle.destroy_refusal, evaluated inside destroy_tenant itself so no caller can skip them; the admin action reuses it only to bucket its operator messages, and the API returns 400 with the reason.
+
+Protection was two byte-identical frozensets of schema names (tenant/lifecycle.py and tenant/models.py) that named a customer's store in code and left every newly onboarded tenant unprotected. It is now the Tenant.is_protected row flag, editable by platform superusers in the admin; the public schema stays protected by construction. A data migration carries the two previously hard-coded stores over.
+
+POST on the tenant-admin list route is removed: schema_name was read-only on the serializer and the model validators never ran, so the route could only produce a broken row. Tenants are created through provisioning (tenant_create, the admin's New Store flow), which no consumer of the API ever bypassed.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`eaeddb2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/eaeddb26ded9b3b8e38a7654a130e694d3c72f1b))
+
+* fix(api): derive store-staff authorization from membership, never from is_staff
+
+On an API request, request.user is a row from the tenant schema, where is_staff is customer residue from the id-preserving cutover — IsPlatformSuperuser's own docstring records that the flag handed such accounts administrative rights. IsOwnerOrAdmin, IsOwnerOrAdminOrGuest and 30-odd view, serializer, filter and manager branches still bypassed ownership on it, which let a residue customer list every order, cart, notification, alert and favourite in the store, read unpublished content, moderate comments, refund order items and read any extra_settings key.
+
+tenant.membership.is_store_staff is now the single predicate: a platform superuser, or a provenance-stamped platform identity (PlatformStaffBackend / PlatformStaffTokenAuthentication) holding an active staff-capable membership in the tenant bound to the connection — the API twin of MyAdminSite.has_permission, cached per tenant pk like TenantRolePermissionBackend. Every is_staff branch outside the public-schema authentication layer is replaced, and an AST-based test keeps it that way.
+
+ProductCategoryImageViewSet was the one view module with no permission gating at all: the default IsAuthenticatedOrReadOnly let any shopper create, edit, delete and bulk-update category images. Writes now require StoreStaffModelPermissions like the sibling image viewset.
+
+The WebSocket consumer's staff branch joined a store-wide admins group on the same flag; socket identities are resolved from the tenant user table and can never carry the provenance stamp, and nothing publishes to that group, so the group and its helper are removed.
+
+Tests: tests/utils/staff.py builds a stamped staff identity and binds the tenant through the django-tenants API (assigning connection.tenant directly leaks connection.schema_name once a signal re-enters schema_context); new predicate, permission-class, category-image and residue regression tests; existing tests that relied on the bypass now use a superuser or a real staff identity.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`678f40d`](https://github.com/vasilistotskas/grooveshop-django-api/commit/678f40d1c18251c965fa298f0a539ffae68d1646))
+
 * fix(giftcard): verify Viva reversal and failure events before voiding cards (#27)
 
 The Viva webhook is unauthenticated by design: there is no HMAC, and the
@@ -133,6 +273,29 @@ Co-authored-by: Claude Fable 5.1 <noreply@anthropic.com> ([`e3973d2`](https://gi
 ### Chores
 
 * chore(deps): sync uv.lock to 3.28.0 [skip ci] ([`7af2312`](https://github.com/vasilistotskas/grooveshop-django-api/commit/7af2312efee4786f830dd014f6e6533a32442a7d))
+
+### Testing
+
+* test(b2b): bind the gate tenant through set_tenant, not by attribute
+
+The B2B conftest attached its tenant with monkeypatch.setattr(connection,
+"tenant", ...). Submitting a profile runs the merchant notification task
+eagerly; TenantTask enters schema_context("public") and on exit restores
+the connection with set_tenant(previous), which rewrites
+connection.schema_name to the bound tenant. Unwinding the attribute
+alone left the worker in "b2b_gate_tenant", and the next Tenant.save()
+in the file refused to run outside the public schema.
+
+This leaked on main as well, but by accident it never showed: the
+per-test extra_settings reseed saved an agent setting, whose post_save
+receiver ran a synchronous schema_context("public") round trip that
+reset the connection to public before the next fixture. Moving that
+purge onto the commit hook removed the accidental repair and exposed
+the binding. Bind via tests.utils.staff.bind_store_tenant, which goes
+through the django-tenants API so the schema name and the tenant object
+always move together, and say so on the root bind_tenant fixture.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`d1c4438`](https://github.com/vasilistotskas/grooveshop-django-api/commit/d1c4438c098c28e346843921d230db01ed9c4c52))
 
 ## v3.28.0 (2026-09-04)
 

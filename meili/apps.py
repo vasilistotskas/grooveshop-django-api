@@ -4,6 +4,7 @@ from django.apps import AppConfig
 from django.db import transaction
 
 from meili.exceptions import MeiliTaskFailed
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -49,18 +50,17 @@ class MeiliConfig(AppConfig):
                 not settings.DEBUG and settings.MEILISEARCH["ASYNC_INDEXING"]
             )
             if use_async:
-
-                def _dispatch_index():
-                    logger.debug("Indexing/removing document async")
-                    # index_document_task indexes qualifying instances and
-                    # deletes ones that no longer match meili_filter().
-                    index_document_task.delay(
-                        app_label=model._meta.app_label,
-                        model_name=model._meta.model_name,
-                        pk=model.pk,
-                    )
-
-                transaction.on_commit(_dispatch_index)
+                logger.debug("Indexing/removing document async")
+                # index_document_task indexes qualifying instances and
+                # deletes ones that no longer match meili_filter().
+                dispatch_on_commit(
+                    index_document_task,
+                    kwargs={
+                        "app_label": model._meta.app_label,
+                        "model_name": model._meta.model_name,
+                        "pk": model.pk,
+                    },
+                )
                 return
 
             # Synchronous indexing for DEBUG mode or when Celery unavailable
@@ -140,15 +140,14 @@ class MeiliConfig(AppConfig):
                 not settings.DEBUG and settings.MEILISEARCH["ASYNC_INDEXING"]
             )
             if use_async:
-
-                def _dispatch_delete():
-                    logger.debug("Deleting Document Async")
-                    delete_document_task.delay(
-                        index_name=type(model).get_meili_index_name(),
-                        document_pk=_get_document_pk(model),
-                    )
-
-                transaction.on_commit(_dispatch_delete)
+                logger.debug("Deleting Document Async")
+                dispatch_on_commit(
+                    delete_document_task,
+                    kwargs={
+                        "index_name": type(model).get_meili_index_name(),
+                        "document_pk": _get_document_pk(model),
+                    },
+                )
                 return
 
             # Synchronous deletion for DEBUG mode or when Celery unavailable

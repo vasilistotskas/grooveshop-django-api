@@ -1,13 +1,13 @@
 import logging
 
 from django.conf import settings
-from django.db import transaction
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
 
 from blog.models import BlogComment
 from blog.models.post import BlogPost
 from core.utils.tenant_urls import get_tenant_frontend_url
+from tenant.celery import dispatch_on_commit
 
 logger = logging.getLogger(__name__)
 
@@ -45,15 +45,15 @@ def reindex_blog_post_translations(sender, instance, **kwargs):
     if not translation_pks:
         return
 
-    def _dispatch_reindex(pks=translation_pks):
-        for pk in pks:
-            index_document_task.delay(
-                app_label="blog",
-                model_name="blogposttranslation",
-                pk=pk,
-            )
-
-    transaction.on_commit(_dispatch_reindex)
+    for pk in translation_pks:
+        dispatch_on_commit(
+            index_document_task,
+            kwargs={
+                "app_label": "blog",
+                "model_name": "blogposttranslation",
+                "pk": pk,
+            },
+        )
 
 
 @receiver(

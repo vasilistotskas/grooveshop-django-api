@@ -110,7 +110,11 @@ def run_for_all_tenants(task_name: str, **kwargs: Any) -> list[dict[str, str]]:
 
 
 def dispatch_on_commit(
-    task: Task,
+    # Annotated `Any`, not `Task`: Celery's `@shared_task` returns a Task
+    # at RUNTIME, but a type checker sees the undecorated function, so a
+    # `Task` annotation is an error at every call site rather than a
+    # guarantee. What this needs of the argument is `.apply_async`.
+    task: Any,
     args: Sequence[Any] | None = None,
     kwargs: Mapping[str, Any] | None = None,
     *,

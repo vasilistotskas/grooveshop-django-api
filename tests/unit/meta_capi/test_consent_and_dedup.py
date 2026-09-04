@@ -11,6 +11,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
+from django.db import connection
 from django.test import RequestFactory
 
 from meta_capi.services import build_purchase_event
@@ -83,12 +84,18 @@ class TestCompleteRegistrationConsent:
     def test_dispatches_when_consent_granted(self):
         user = UserAccountFactory()
         with patch(
-            "meta_capi.signals.dispatch_complete_registration_event.delay"
-        ) as mock_delay:
+            "meta_capi.signals.dispatch_complete_registration_event.apply_async"
+        ) as mock_dispatch:
             _on_user_signed_up(
                 sender=None, request=self._request("granted"), user=user
             )
-        mock_delay.assert_called_once()
+        # `apply_async` carrying the schema header, not a bare `delay`:
+        # allauth's signup runs inside an atomic block, so the hook fires
+        # after that block's schema context can unwind.
+        mock_dispatch.assert_called_once()
+        assert mock_dispatch.call_args.kwargs["headers"] == {
+            "_schema_name": connection.schema_name
+        }
 
     def test_no_dispatch_when_consent_denied_or_absent(self):
         user = UserAccountFactory()

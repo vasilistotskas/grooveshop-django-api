@@ -28,14 +28,20 @@ def test_async_reindex_collects_pks_without_aggregate_join():
         override_settings(
             MEILISEARCH={"OFFLINE": False, "ASYNC_INDEXING": True}
         ),
-        patch("meili.tasks.index_document_task.delay") as mock_dispatch,
+        patch("meili.tasks.index_document_task.apply_async") as mock_dispatch,
         CaptureQueriesContext(connection) as ctx,
     ):
         reindex_product_translations(sender=Product, instance=product)
 
     # The dispatch fired for the product's translations (proves we didn't
-    # early-return and actually walked the PK path).
+    # early-return and actually walked the PK path). `apply_async`, not
+    # `delay`: reindex goes through `dispatch_on_commit`, which stamps the
+    # tenant schema at registration rather than when the hook fires.
     assert mock_dispatch.called
+    assert all(
+        call.kwargs["headers"] == {"_schema_name": connection.schema_name}
+        for call in mock_dispatch.call_args_list
+    )
 
     # No captured query may carry the review-average aggregate — that marker
     # is unique to get_meilisearch_queryset() and must not appear on the

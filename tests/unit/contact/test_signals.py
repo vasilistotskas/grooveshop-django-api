@@ -2,6 +2,7 @@ import contextlib
 from unittest.mock import patch
 
 from django.core import mail
+from django.db import connection
 from django.test import TestCase, override_settings
 
 from contact.models import Contact
@@ -190,8 +191,8 @@ class TestContactSignals(TestCase):
         # send_mail directly — patch the task's .delay to assert dispatch.
         with (
             patch(
-                "contact.tasks.send_contact_notification_email_task.delay"
-            ) as mock_delay,
+                "contact.tasks.send_contact_notification_email_task.apply_async"
+            ) as mock_dispatch,
             override_settings(
                 INFO_EMAIL=_INFO_EMAIL,
                 DEFAULT_FROM_EMAIL="noreply@example.com",
@@ -201,7 +202,13 @@ class TestContactSignals(TestCase):
                 sender=Contact, instance=contact, created=True
             )
 
-            mock_delay.assert_called_once_with(contact.id)
+            # `apply_async`, not `delay`: the tenant schema has to be
+            # stamped at registration, because the commit hook fires
+            # after the request's schema context can unwind.
+            mock_dispatch.assert_called_once_with(
+                args=[contact.id],
+                headers={"_schema_name": connection.schema_name},
+            )
 
     def test_signal_handler_not_created(self):
         contact = Contact.objects.create(**self.contact_data)

@@ -45,7 +45,7 @@ def test_anonymize_old_search_queries_strips_pii_after_window():
     # Old row: identifiers nulled, query text kept for aggregate value.
     assert old.ip_address is None
     assert old.user_agent == ""
-    assert old.session_key is None
+    assert old.session_key == ""
     assert old.query == "old"
 
     # Recent row: untouched.

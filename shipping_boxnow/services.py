@@ -787,8 +787,10 @@ class BoxNowService:
         data: dict = envelope["data"]
         message_id: str = envelope["id"]
         # SHA-256 of the HMAC-signed ``data`` bytes, stamped by the webhook
-        # view. Absent only for events queued before this field shipped.
-        data_fingerprint: str | None = envelope.get("_data_fingerprint")
+        # view. Absent only for events queued before this field shipped;
+        # "" rather than None so the stored column has one spelling for
+        # "no fingerprint" — every use below already tests it for truth.
+        data_fingerprint: str = envelope.get("_data_fingerprint") or ""
 
         # --- Idempotency check (outside transaction) ----------------------
         # Dedup on the message id (BoxNow retries reuse it) AND on the
@@ -1655,7 +1657,7 @@ class BoxNowService:
         # postal-code filtering and the admin display.
         return {
             "type": locker_type,
-            "image_url": dest.get("imageUrl") or None,
+            "image_url": dest.get("imageUrl") or "",
             "lat": dest.get("lat", 0),
             "lng": dest.get("lng", 0),
             "title": dest.get("title", ""),

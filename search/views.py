@@ -993,7 +993,8 @@ def search_analytics(request):
 
     # Calculate search volume by language
     volume_by_language = dict(
-        queries_qs.filter(language_code__isnull=False)
+        queries_qs.exclude(language_code__isnull=True)
+        .exclude(language_code="")
         .values("language_code")
         .annotate(count=Count("id"))
         .values_list("language_code", "count")

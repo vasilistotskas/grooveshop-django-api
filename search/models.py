@@ -54,6 +54,7 @@ class SearchQuery(models.Model):
         db_index=True,
         null=True,
         blank=True,
+        default="",
         help_text="Language code for the search (e.g., 'en', 'el', 'de')",
     )
     content_type = models.CharField(
@@ -87,6 +88,7 @@ class SearchQuery(models.Model):
         max_length=40,
         null=True,
         blank=True,
+        default="",
         help_text="Session key for anonymous users",
     )
     ip_address = models.GenericIPAddressField(
@@ -95,6 +97,7 @@ class SearchQuery(models.Model):
     user_agent = models.TextField(
         null=True,
         blank=True,
+        default="",
         help_text="User agent string from the request",
         validators=[MaxLengthValidator(512)],
     )

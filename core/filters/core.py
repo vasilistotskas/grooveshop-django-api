@@ -1,5 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
+from tenant.membership import is_store_staff
 
 
 class TimeStampFilterMixin:
@@ -99,13 +100,13 @@ class SoftDeleteFilterMixin:
 
     def filter_is_deleted(self, queryset, name, value):
         request = getattr(self, "request", None)
-        if request and getattr(request.user, "is_staff", False):
+        if request and is_store_staff(getattr(request, "user", None)):
             return queryset.filter(is_deleted=value)
         return queryset
 
     def filter_include_deleted(self, queryset, name, value):
         request = getattr(self, "request", None)
-        if value and request and getattr(request.user, "is_staff", False):
+        if value and request and is_store_staff(getattr(request, "user", None)):
             return queryset.model.objects.all_with_deleted()
         return queryset
 
@@ -147,7 +148,7 @@ class MetaDataFilterMixin:
 
     def filter_private_metadata_has_key(self, queryset, name, value):
         request = getattr(self, "request", None)
-        if value and request and getattr(request.user, "is_staff", False):
+        if value and request and is_store_staff(getattr(request, "user", None)):
             return queryset.filter(private_metadata__has_key=value)
         return queryset
 

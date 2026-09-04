@@ -7835,7 +7835,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - Cart
       security:
@@ -7885,7 +7885,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - Cart
       security:
@@ -7941,7 +7941,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - Cart
       security:
@@ -7997,7 +7997,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - Cart
       security:
@@ -8037,7 +8037,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - Cart
       requestBody:
@@ -8103,7 +8103,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - Cart
       security:
@@ -8162,7 +8162,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - Cart
       requestBody:
@@ -8962,7 +8962,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       - in: query
         name: cartType
         schema:
@@ -9371,7 +9371,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - Cart
       requestBody:
@@ -9441,7 +9441,7 @@ paths:
           format: uuid
         description: Cart UUID for guest users. Used to identify and maintain guest
           cart sessions. Sequential integer IDs were enumerable metadata, so the public
-          identifier is the UUID inherited from ``UUIDModel`` (M18 in MULTI_TENANT_AUDIT.md).
+          identifier is the UUID inherited from ``UUIDModel``.
       tags:
       - Cart
       security:

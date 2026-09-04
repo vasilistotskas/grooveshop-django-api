@@ -7,7 +7,7 @@ from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.models import AnonymousUser
 from django.core.serializers.json import DjangoJSONEncoder
 
-from notification.groups import admins_group, user_group
+from notification.groups import user_group
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,6 @@ User = get_user_model()
 class NotificationConsumer(AsyncWebsocketConsumer):
     user: AbstractBaseUser | AnonymousUser | None = None
     group_name: str | None = None
-    admin_group_name: str | None = None
 
     def _get_schema_name(self) -> str:
         tenant = self.scope.get("tenant")
@@ -56,13 +55,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                     self.group_name, self.channel_name
                 )
 
-                if self.user.is_staff:
-                    self.admin_group_name = admins_group(schema_name)
-                    logger.debug("User is staff, adding to admins group")
-                    await self.channel_layer.group_add(
-                        self.admin_group_name, self.channel_name
-                    )
-
                 logger.debug("Accepting connection")
                 await self.accept()
                 logger.debug("Connection accepted")
@@ -95,17 +87,6 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 logger.exception(
                     f"group_discard failed for group {self.group_name}"
                 )
-
-            if self.user.is_staff and self.admin_group_name:
-                logger.debug("User is staff, removing from admins group")
-                try:
-                    await self.channel_layer.group_discard(
-                        self.admin_group_name, self.channel_name
-                    )
-                except Exception:
-                    logger.exception(
-                        f"group_discard failed for group {self.admin_group_name}"
-                    )
 
     async def send_notification(self, event):
         logger.debug(f"Sending notification: {event}")

@@ -122,7 +122,7 @@ class OrderSignalsTestCase(TestCase):
         )
 
         # Dispatched via apply_async with the schema captured at
-        # lambda-build time (C1 in MULTI_TENANT_AUDIT.md).
+        # lambda-build time.
         mock_email_task.assert_called_once()
         assert mock_email_task.call_args.kwargs["args"] == [
             self.order.id,

@@ -373,6 +373,26 @@ class TestTenantResolveChatApiKey:
         assert "acp_bearer_token" not in cached
 
     @pytest.mark.django_db
+    def test_secret_variant_is_never_cacheable(
+        self, resolve_client, tenant_factory, settings
+    ):
+        """The body varies on X-Internal-Token; a shared cache must key
+        on it and never store the secret-bearing response."""
+        settings.AGENT_GATEWAY_INTERNAL_SECRET = "gw-secret"
+        self._tenant_with_key(
+            tenant_factory, "chat-key-vary", "chat-key-vary.example"
+        )
+        url = "/api/v1/tenant/resolve?domain=chat-key-vary.example"
+
+        public = resolve_client.get(url)
+        assert "X-Internal-Token" in public["Vary"]
+        assert "no-store" not in public.get("Cache-Control", "")
+
+        gateway = resolve_client.get(url, HTTP_X_INTERNAL_TOKEN="gw-secret")
+        assert "X-Internal-Token" in gateway["Vary"]
+        assert gateway["Cache-Control"] == "private, no-store"
+
+    @pytest.mark.django_db
     def test_chat_api_key_withheld_when_no_internal_secret_configured(
         self, resolve_client, tenant_factory, settings
     ):

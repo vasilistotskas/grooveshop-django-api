@@ -30,6 +30,7 @@ from order.serializers.item import (
     OrderItemWriteSerializer,
     OrderItemRefundResponseSerializer,
 )
+from tenant.membership import is_store_staff
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -86,7 +87,7 @@ class OrderItemViewSet(BaseModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.is_staff or user.is_superuser:
+        if is_store_staff(user):
             return (
                 OrderItem.objects.all()
                 .select_related("order", "product")
@@ -109,7 +110,7 @@ class OrderItemViewSet(BaseModelViewSet):
     def check_order_permission(self, order):
         user = self.request.user
 
-        if user.is_staff or user.is_superuser:
+        if is_store_staff(user):
             return
 
         if not order.user or order.user.id != user.id:
@@ -144,7 +145,7 @@ class OrderItemViewSet(BaseModelViewSet):
         # staff/merchant operation, never customer self-service (which would
         # otherwise let an order owner restock stock and mark items refunded
         # with no payment refund).
-        if not (request.user.is_staff or request.user.is_superuser):
+        if not is_store_staff(request.user):
             raise PermissionDenied(_("Only staff can process refunds."))
 
         order_item = self.get_object()

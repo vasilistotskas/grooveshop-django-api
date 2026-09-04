@@ -70,7 +70,9 @@ class TestNotificationConsumer(TransactionTestCase):
         user.save()
         return user
 
-    async def test_staff_user_groups(self):
+    async def test_is_staff_flag_joins_only_the_user_group(self):
+        """WebSocket identities are tenant-schema customers; ``is_staff``
+        on that row is residue and must not open any store-wide group."""
         staff_user = await self.create_staff_user()
 
         consumer = NotificationConsumer()
@@ -84,20 +86,14 @@ class TestNotificationConsumer(TransactionTestCase):
 
         await consumer.connect()
 
-        consumer.channel_layer.group_add.assert_any_call(
+        consumer.channel_layer.group_add.assert_called_once_with(
             f"tenant_public_user_{staff_user.id}", consumer.channel_name
-        )
-        consumer.channel_layer.group_add.assert_any_call(
-            "tenant_public_admins", consumer.channel_name
         )
 
         await consumer.disconnect(1000)
 
-        consumer.channel_layer.group_discard.assert_any_call(
+        consumer.channel_layer.group_discard.assert_called_once_with(
             f"tenant_public_user_{staff_user.id}", consumer.channel_name
-        )
-        consumer.channel_layer.group_discard.assert_any_call(
-            "tenant_public_admins", consumer.channel_name
         )
 
     async def test_send_notification(self):
@@ -179,30 +175,6 @@ class TestNotificationConsumer(TransactionTestCase):
         consumer.close.assert_called_with(code=4003)
 
     @patch("notification.consumers.logger")
-    async def test_connect_with_logging_staff_user(self, mock_logger):
-        staff_user = await self.create_staff_user()
-
-        consumer = NotificationConsumer()
-        consumer.scope = {"user": staff_user}
-        consumer.channel_layer = MagicMock()
-        consumer.channel_layer.group_add = AsyncMock()
-        consumer.channel_name = "test_channel"
-        consumer.accept = AsyncMock()
-
-        await consumer.connect()
-
-        mock_logger.debug.assert_any_call(
-            "User is staff, adding to admins group"
-        )
-
-        consumer.channel_layer.group_add.assert_any_call(
-            f"tenant_public_user_{staff_user.id}", "test_channel"
-        )
-        consumer.channel_layer.group_add.assert_any_call(
-            "tenant_public_admins", "test_channel"
-        )
-
-    @patch("notification.consumers.logger")
     async def test_connect_keyerror_handling(self, mock_logger):
         consumer = NotificationConsumer()
         consumer.scope = {}
@@ -260,31 +232,6 @@ class TestNotificationConsumer(TransactionTestCase):
 
         consumer.channel_layer.group_discard.assert_called_with(
             f"tenant_public_user_{user.id}", "test_channel"
-        )
-
-    @patch("notification.consumers.logger")
-    async def test_disconnect_with_logging_staff_user(self, mock_logger):
-        staff_user = await self.create_staff_user()
-
-        consumer = NotificationConsumer()
-        consumer.user = staff_user
-        consumer.group_name = f"tenant_public_user_{staff_user.id}"
-        consumer.admin_group_name = "tenant_public_admins"
-        consumer.channel_layer = MagicMock()
-        consumer.channel_layer.group_discard = AsyncMock()
-        consumer.channel_name = "test_channel"
-
-        await consumer.disconnect(1000)
-
-        mock_logger.debug.assert_any_call(
-            "User is staff, removing from admins group"
-        )
-
-        consumer.channel_layer.group_discard.assert_any_call(
-            f"tenant_public_user_{staff_user.id}", "test_channel"
-        )
-        consumer.channel_layer.group_discard.assert_any_call(
-            "tenant_public_admins", "test_channel"
         )
 
     @patch("notification.consumers.logger")

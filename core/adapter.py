@@ -13,7 +13,7 @@ def _webauthn_rp_id() -> str:
     passkey registered on ``store-a.com`` will not assert on
     ``store-b.com``. Returning ``settings.APP_MAIN_HOST_NAME`` for every
     tenant would silently break passkey enrolment on every tenant
-    except the platform domain (H2 in MULTI_TENANT_AUDIT.md).
+    except the platform domain.
 
     Resolution order:
       1. ``connection.tenant.primary_domain`` — the public hostname the

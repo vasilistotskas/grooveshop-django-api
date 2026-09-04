@@ -442,9 +442,9 @@ class TestProductionGuard(TestCase):
     ``devtools`` is an installed app, so the command is present on every
     pod including production. The only thing standing between a typo'd
     ``--schema`` and a live store's catalogue being overwritten is
-    ``_guard``, and its whole verdict comes from substring-matching the
-    tenant's domains. Nothing else re-checks it, so the marker list is
-    load-bearing and gets tested like it.
+    ``_guard``, whose verdict comes from classifying the tenant's
+    hostnames. Nothing else re-checks it, so the classifier is
+    load-bearing and gets tested like it — against real hostnames.
     """
 
     # Real hostnames, not invented ones: the bug this class exists for
@@ -458,6 +458,10 @@ class TestProductionGuard(TestCase):
         "fyteia.grooveshop.space",
         "api.fyteia.grooveshop.space",
         "www.fyteia.grooveshop.space",
+        # Substrings of a marker inside a live name must not count.
+        "stagingear.gr",
+        "mylocalhosting.gr",
+        "localhost.example.gr",
     )
 
     NON_PRODUCTION_HOSTS = (
@@ -466,14 +470,15 @@ class TestProductionGuard(TestCase):
         "tenant2-staging.webside.gr",
         "platform-staging.grooveshop.space",
         "localhost",
+        "shop.localhost",
+        "shop.local",
+        "shop.invalid",
+        "STAGING.Webside.GR",
     )
 
     @staticmethod
     def _looks_non_production(domain: str) -> bool:
-        return any(
-            marker in domain
-            for marker in seed_demo_store.NON_PRODUCTION_MARKERS
-        )
+        return seed_demo_store.is_non_production_domain(domain)
 
     def test_no_marker_matches_a_live_hostname(self):
         for host in self.LIVE_HOSTS:
@@ -505,6 +510,13 @@ class TestProductionGuard(TestCase):
     def test_guard_allows_a_fully_marked_tenant(self):
         self._run_guard(["staging.webside.gr", "api-staging.webside.gr"])
 
+    def test_guard_refuses_a_tenant_without_domains(self):
+        # No hostname means no evidence either way; unknown is not safe.
+        with self.assertRaises(CommandError) as caught:
+            self._run_guard([])
+
+        self.assertIn("no TenantDomain rows", str(caught.exception))
+
     def test_guard_refuses_on_live_payments_even_with_safe_domains(self):
         # Defence in depth: a tenant taking real card payments is live
         # whatever its hostnames say.
@@ -527,24 +539,10 @@ class TestProductionGuard(TestCase):
             SimpleNamespace(
                 schema_name="demo", viva_wallet_live_mode=viva_live
             ),
-            _StubDomainModel(domains),
+            list(domains),
             force=force,
         )
         return command
-
-
-class _StubDomainModel:
-    """Stands in for ``TenantDomain`` so the guard needs no database."""
-
-    def __init__(self, domains):
-        self.objects = self
-        self._domains = domains
-
-    def filter(self, **_kwargs):
-        return self
-
-    def values_list(self, _field, flat=False):  # noqa: FBT002
-        return self._domains
 
 
 class TestDemoOptIn(TestCase):
@@ -566,7 +564,21 @@ class TestDemoOptIn(TestCase):
             SimpleNamespace(
                 schema_name="demo", viva_wallet_live_mode=False, is_demo=True
             ),
-            _StubDomainModel(["demo.grooveshop.space"]),
+            ["demo.grooveshop.space"],
+            force=False,
+        )
+
+        self.assertIn("is_demo", command.stdout.getvalue())
+
+    def test_demo_flag_lets_a_domainless_tenant_through(self):
+        command = seed_demo_store.Command()
+        command.stdout = StringIO()
+
+        command._guard(
+            SimpleNamespace(
+                schema_name="demo", viva_wallet_live_mode=False, is_demo=True
+            ),
+            [],
             force=False,
         )
 
@@ -582,7 +594,7 @@ class TestDemoOptIn(TestCase):
                 SimpleNamespace(
                     schema_name="webside", viva_wallet_live_mode=False
                 ),
-                _StubDomainModel(["webside.gr"]),
+                ["webside.gr"],
                 force=False,
             )
 
@@ -596,7 +608,7 @@ class TestDemoOptIn(TestCase):
                 SimpleNamespace(
                     schema_name="demo", viva_wallet_live_mode=True, is_demo=True
                 ),
-                _StubDomainModel(["demo.grooveshop.space"]),
+                ["demo.grooveshop.space"],
                 force=False,
             )
 

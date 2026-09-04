@@ -303,6 +303,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "core.urls"
 
+# security.W003 string-matches ``django.middleware.csrf.CsrfViewMiddleware``
+# and cannot see that ``tenant.middleware.TenantCsrfMiddleware`` subclasses
+# it, so the check is a false positive here.
+SILENCED_SYSTEM_CHECKS = ["security.W003"]
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -1197,10 +1202,13 @@ CORS_ALLOWED_ORIGINS = [
     MEDIA_STREAM_BASE_URL,
     STATIC_BASE_URL,
 ]
-# All origins allowed — django-tenants validates domains at middleware level.
-# Each tenant domain is a distinct origin; static CORS list can't cover them.
-CORS_ALLOW_ALL_ORIGINS = True
+# The static list above is the PLATFORM's origins only. Every tenant
+# storefront is a distinct origin that only its TenantDomain rows know;
+# tenant.signals.allow_tenant_origin admits exactly those per request
+# (same rule as TenantCsrfMiddleware). Never allow-all here: with
+# credentials on, django-cors-headers echoes ANY Origin back.
 CORS_ALLOW_CREDENTIALS = True
+CORS_PREFLIGHT_MAX_AGE = 600
 CORS_ALLOW_METHODS = [
     "DELETE",
     "GET",
@@ -1213,6 +1221,7 @@ CORS_ALLOW_HEADERS = (
     *default_headers,
     "x-session-token",
     "x-cart-id",
+    "idempotency-key",
     "location",
 )
 

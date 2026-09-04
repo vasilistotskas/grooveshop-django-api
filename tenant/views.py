@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import connection
 from django.db.models import Prefetch
+from django.utils.cache import patch_vary_headers
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import status, viewsets
 from rest_framework.decorators import (
@@ -96,8 +97,12 @@ def tenant_resolve(request: Request) -> Response:
         cache.set(cache_key, data, TENANT_RESOLVE_CACHE_TTL)
 
     # Secrets ride only on internally-authenticated responses and are
-    # never cached — the cache holds exactly the public payload.
-    if _is_gateway(request):
+    # never cached — the cache holds exactly the public payload. The
+    # HTTP layer has to know that too: the body varies on the token
+    # header, so a shared cache must key on it and never store the
+    # secret-bearing variant.
+    is_gateway = _is_gateway(request)
+    if is_gateway:
         secrets = (
             TenantDomain.objects.filter(domain=domain, tenant__is_active=True)
             .values_list("tenant__chat_api_key", "tenant__acp_bearer_token")
@@ -109,7 +114,11 @@ def tenant_resolve(request: Request) -> Response:
             "chat_api_key": chat_api_key or "",
             "acp_bearer_token": acp_bearer_token or "",
         }
-    return Response(data)
+    response = Response(data)
+    patch_vary_headers(response, ("X-Internal-Token",))
+    if is_gateway:
+        response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @extend_schema(exclude=True)
@@ -255,8 +264,8 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
     def _require_public_schema(self):
         if connection.schema_name != "public":
             # Returning 404 instead of 403 hides the endpoint's existence
-            # from tenants that have no business knowing it's there
-            # (H6 in MULTI_TENANT_AUDIT.md). A 403 leaks the URL surface
+            # from tenants that have no business knowing it's there.
+            # A 403 leaks the URL surface
             # to anyone hitting the API on a tenant domain.
             from django.http import Http404
 
@@ -266,10 +275,6 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
         if connection.schema_name != "public":
             return Tenant.objects.none()
         return super().get_queryset()
-
-    def create(self, request, *args, **kwargs):
-        self._require_public_schema()
-        return super().create(request, *args, **kwargs)
 
     def update(self, request, *args, **kwargs):
         self._require_public_schema()
@@ -296,8 +301,8 @@ class TenantAdminViewSet(viewsets.ModelViewSet):
                 tenant, actor=getattr(request.user, "email", "") or ""
             )
         except ValueError as exc:
-            # Protected schema — lifecycle refuses as a last line of
-            # defence even if a caller skipped the earlier gates.
+            # Protected, still live, or inside the suspension cooldown —
+            # the gates are the lifecycle function's, not this view's.
             raise ValidationError({"detail": str(exc)}) from exc
         return Response(
             {

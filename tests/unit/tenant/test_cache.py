@@ -356,3 +356,19 @@ class TestResolveKeyIsShapeVersioned:
         key = tenant_resolve_key("shop.example")
         assert key.startswith(f"{GLOBAL_CACHE_PREFIX}tenant_resolve:")
         assert key.endswith(":shop.example")
+
+
+class TestReceiverRegistration:
+    def test_reimporting_the_signals_module_does_not_double_register(self):
+        """Every receiver carries a dispatch_uid, so autoreload or a
+        second import cannot make the purge run twice per save."""
+        import importlib
+
+        from django.db.models.signals import post_save
+
+        from tenant import signals
+        from tenant.models import Tenant
+
+        before = len(post_save._live_receivers(Tenant))
+        importlib.reload(signals)
+        assert len(post_save._live_receivers(Tenant)) == before

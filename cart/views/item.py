@@ -35,6 +35,7 @@ from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,
 )
+from tenant.membership import is_store_staff
 
 GUEST_CART_HEADERS = [
     OpenApiParameter(
@@ -183,7 +184,7 @@ class CartItemViewSet(BaseModelViewSet):
             else CartItem.objects.for_detail()
         )
 
-        if user.is_staff:
+        if is_store_staff(user):
             return base
 
         if not self.cart_service.cart:

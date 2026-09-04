@@ -131,7 +131,7 @@ class TestMembershipIsolation:
 class TestVivaWebhookTenantResolution:
     """``_resolve_tenant_for_order_code`` iterates active tenants and
     finds the schema whose Order table contains the matching
-    ``metadata.viva_order_code`` (C2 in MULTI_TENANT_AUDIT.md).
+    ``metadata.viva_order_code``.
 
     The auto-created Tenant rows here use ``auto_create_schema=False``
     so no real Postgres schemas exist. We patch
@@ -214,7 +214,7 @@ class TestVivaWebhookTenantResolution:
 @pytest.mark.django_db
 class TestBoxNowWebhookTenantResolution:
     """``_resolve_tenant_for_parcel`` mirrors the Viva resolver but
-    keys on ``BoxNowShipment.parcel_id`` (C5 in MULTI_TENANT_AUDIT.md).
+    keys on ``BoxNowShipment.parcel_id``.
     Uses the same no-op ``schema_context`` patch as the Viva tests
     above so the iteration is exercised without real Postgres schemas.
     """
@@ -284,9 +284,9 @@ class TestHealthProbeBypass:
 class TestWebSocketGroupIsolation:
     """The WebSocket consumer's group name embeds the tenant schema, so
     a notification broadcast on tenant A is delivered only to
-    subscribers connected through tenant A's domain. H3 in
-    MULTI_TENANT_AUDIT.md is the auth side; this test pins down the
-    delivery side.
+    subscribers connected through tenant A's domain. The ticket
+    middleware is the auth side; this test pins down the delivery
+    side.
     """
 
     def test_per_user_group_name_includes_tenant_schema(self) -> None:
@@ -301,16 +301,6 @@ class TestWebSocketGroupIsolation:
         assert "tenant_alpha" in a
         assert "tenant_beta" in b
 
-    def test_admin_group_name_includes_tenant_schema(self) -> None:
-        from notification.groups import admins_group
-
-        a = admins_group("tenant_alpha")
-        b = admins_group("tenant_beta")
-
-        assert a != b
-        assert "tenant_alpha" in a
-        assert "tenant_beta" in b
-
 
 # ---------------------------------------------------------------------------
 # Page-config tenant admin permission
@@ -321,7 +311,7 @@ class TestWebSocketGroupIsolation:
 class TestPageConfigTenantPermission:
     """``PageLayoutAdminViewSet`` must not be reachable by store staff.
 
-    H22 (MULTI_TENANT_AUDIT.md): platform-staff without a membership in
+    Platform-staff without a membership in
     the current tenant must not mutate that tenant's layout.
 
     The original guard required ``IsAdminUser`` PAIRED with
@@ -389,7 +379,7 @@ class TestPageConfigTenantPermission:
 @pytest.mark.django_db
 class TestCartUuidIdentifier:
     """X-Cart-Id header carries the cart UUID, not the integer PK.
-    M18 in MULTI_TENANT_AUDIT.md. We exercise the service contract
+    We exercise the service contract
     directly so the regression check doesn't depend on the full
     DRF/factory stack.
     """

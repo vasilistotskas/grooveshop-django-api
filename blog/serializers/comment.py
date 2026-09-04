@@ -15,6 +15,7 @@ from blog.models.comment import BlogComment
 from blog.models.post import BlogPost
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
+from tenant.membership import is_store_staff
 
 User = get_user_model()
 
@@ -172,7 +173,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
             obj.get_children().select_related("user").order_by("created_at")
         )
 
-        if not (request and request.user.is_staff):
+        if not (request and is_store_staff(request.user)):
             children = children.filter(approved=True)
 
         if children.exists():
@@ -199,7 +200,7 @@ class BlogCommentDetailSerializer(BlogCommentSerializer):
         request = self.context.get("request")
         ancestors = obj.get_ancestors().select_related("user")
 
-        if not (request and request.user.is_staff):
+        if not (request and is_store_staff(request.user)):
             ancestors = ancestors.filter(approved=True)
 
         return [

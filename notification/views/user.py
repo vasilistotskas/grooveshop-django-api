@@ -27,6 +27,7 @@ from notification.serializers.user import (
     NotificationUserSerializer,
     NotificationUserWriteSerializer,
 )
+from tenant.membership import is_store_staff
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -102,7 +103,7 @@ class NotificationUserViewSet(BaseModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        if self.request.user.is_staff:
+        if is_store_staff(self.request.user):
             return super().get_queryset()
         return super().get_queryset().filter(user=self.request.user)
 

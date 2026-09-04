@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.enum import ShippingKind
@@ -60,7 +61,7 @@ class AcsCarrier(ShippingCarrierInterface):
         return getattr(order, "acs_shipment", None)
 
     def serialize_shipment(
-        self, shipment: Any, *, context: dict
+        self, shipment: Any, *, context: Mapping[str, Any]
     ) -> dict | None:
         from shipping_acs.serializers.shipment import (
             AcsShipmentDetailSerializer,

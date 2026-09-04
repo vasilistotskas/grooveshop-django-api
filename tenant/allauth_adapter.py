@@ -31,7 +31,7 @@ def _resolve_tenant_from_request(request):
     Under Daphne/Channels ``database_sync_to_async`` reuses threads
     across requests, so a pooled worker can hold a stale
     ``connection.tenant`` from an earlier request and hand back another
-    tenant's OAuth app config (H7 in MULTI_TENANT_AUDIT.md). Reading the
+    tenant's OAuth app config. Reading the
     host bypasses the thread-local entirely.
     """
     if request is None:
@@ -165,13 +165,16 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
             with schema_context(tenant.schema_name):
                 value = Setting.get("SOCIAL_LOGIN_PROVIDERS", default=None)
         except Exception:
-            logger.warning(
+            # Fail CLOSED: the whitelist is a security control. A DB blip
+            # or a half-provisioned schema disables social login for this
+            # request; it must never silently re-enable every configured
+            # provider the merchant switched off.
+            logger.exception(
                 "SOCIAL_LOGIN_PROVIDERS lookup failed for tenant %r — "
-                "not restricting",
+                "social login disabled for this request",
                 getattr(tenant, "schema_name", "?"),
-                exc_info=True,
             )
-            return None
+            return set()
         if not isinstance(value, list) or "*" in value:
             return None
         return {str(item) for item in value}
@@ -179,12 +182,11 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
     def list_apps(self, request, provider=None, client_id=None):
         """Filter the (db ⊕ settings) app list by the tenant whitelist.
 
-        ``list_apps`` is the single funnel every consumer goes through:
-        the headless config's provider list (the login/signup buttons)
-        derives from it via ``list_providers``, and ``get_app`` — the
-        redirect/token auth flows — selects from it. Filtering here
-        therefore both hides disabled providers from the UI and rejects
-        direct flow attempts against them.
+        The headless config's provider list (the login/signup buttons)
+        derives from it via ``list_providers``, and allauth's own
+        ``get_app`` selects from it when no per-tenant ``SocialApp``
+        exists. The per-tenant branch of ``get_app`` returns before that
+        fallback, so it applies the same whitelist itself.
         """
         apps = super().list_apps(
             request, provider=provider, client_id=client_id
@@ -211,7 +213,7 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
         ``connection.tenant``. Under Daphne/Channels with
         ``database_sync_to_async`` thread pooling, ``connection.tenant``
         can be stale and would return a different tenant's OAuth app
-        config (H7 in MULTI_TENANT_AUDIT.md — same fix pattern as
+        config (same fix pattern as
         ``pre_login``).
         """
         tenant = _resolve_tenant_from_request(request)
@@ -219,10 +221,17 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
             tenant is not None
             and getattr(tenant, "schema_name", "public") != "public"
         ):
+            from allauth.socialaccount.models import SocialApp  # noqa: PLC0415
+
+            allowed = self._allowed_providers(request)
+            if allowed is not None and provider not in allowed:
+                # Enforced here as well as in ``list_apps``: the per-tenant
+                # lookup below returns before allauth's own ``get_app``
+                # ever consults ``list_apps``, so a provider the merchant
+                # switched off was hidden from the login buttons yet still
+                # started OAuth when its redirect URL was hit directly.
+                raise SocialApp.DoesNotExist()
             try:
-                from allauth.socialaccount.models import (  # noqa: PLC0415
-                    SocialApp,
-                )
                 from django.contrib.sites.models import Site  # noqa: PLC0415
 
                 # Find the Site row whose domain matches this tenant's

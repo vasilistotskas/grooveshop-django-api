@@ -16,7 +16,7 @@ from pay_way.enum.pay_way import PayWayEnum
 from pay_way.managers import PayWayManager
 from shipping.enum import ShippingKind
 
-# Per M15 in MULTI_TENANT_AUDIT.md, secrets MUST live on the Tenant
+# Secrets MUST live on the Tenant
 # model (stripe_secret_key, viva_wallet_*, acs_*, box_now_*,
 # meta_capi_*, etc.) rather than in the unencrypted
 # PayWay.configuration JSONField.

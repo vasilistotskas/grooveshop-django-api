@@ -424,3 +424,88 @@ class TestSocialLoginProviderFilter:
 
     def test_public_schema_never_restricts(self):
         assert self._allowed(["google"], schema_name="public") is None
+
+    def _get_app(self, allowed, provider="google"):
+        """Run ``get_app`` for a non-public tenant with the whitelist
+        pinned to *allowed*; returns (outcome, sentinel, tenant, fallback).
+        The tenant's own lookup finds no app, so an admitted provider
+        falls through to allauth's ``get_app`` (patched to a sentinel)."""
+        from unittest.mock import Mock, patch
+
+        from tenant.allauth_adapter import TenantSocialAccountAdapter
+
+        tenant = Mock(schema_name="shop")
+        tenant.domains.filter.return_value.first.return_value = None
+        sentinel = object()
+        with (
+            patch(
+                "tenant.allauth_adapter._resolve_tenant_from_request",
+                return_value=tenant,
+            ),
+            patch.object(
+                TenantSocialAccountAdapter,
+                "_allowed_providers",
+                return_value=allowed,
+            ),
+            patch(
+                "user.adapter.SocialAccountAdapter.get_app",
+                return_value=sentinel,
+            ) as fallback,
+        ):
+            try:
+                outcome = TenantSocialAccountAdapter().get_app(
+                    object(), provider
+                )
+            except Exception as exc:  # the outcome under test
+                outcome = exc
+        return outcome, sentinel, tenant, fallback
+
+    def test_get_app_refuses_a_disabled_provider_before_the_tenant_lookup(
+        self,
+    ):
+        """A tenant-specific ``SocialApp`` used to win before the
+        whitelist was consulted, so a merchant-disabled provider still
+        started OAuth when its URL was hit directly."""
+        from allauth.socialaccount.models import SocialApp
+
+        outcome, _sentinel, tenant, fallback = self._get_app({"facebook"})
+        assert isinstance(outcome, SocialApp.DoesNotExist)
+        tenant.domains.filter.assert_not_called()
+        fallback.assert_not_called()
+
+    def test_get_app_admits_a_whitelisted_provider(self):
+        outcome, sentinel, tenant, _fallback = self._get_app({"google"})
+        assert outcome is sentinel
+        tenant.domains.filter.assert_called_once_with(is_primary=True)
+
+    def test_get_app_without_restriction_looks_up_the_tenant_app(self):
+        outcome, sentinel, tenant, _fallback = self._get_app(None)
+        assert outcome is sentinel
+        tenant.domains.filter.assert_called_once_with(is_primary=True)
+
+    def test_lookup_failure_fails_closed(self):
+        """The whitelist is a security control: an exception must not
+        re-enable every configured provider."""
+        from contextlib import nullcontext
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from tenant.allauth_adapter import TenantSocialAccountAdapter
+
+        with (
+            patch(
+                "tenant.allauth_adapter._resolve_tenant_from_request",
+                return_value=SimpleNamespace(schema_name="shop"),
+            ),
+            patch(
+                "django_tenants.utils.schema_context",
+                return_value=nullcontext(),
+            ),
+            patch(
+                "extra_settings.models.Setting.get",
+                side_effect=RuntimeError("db down"),
+            ),
+        ):
+            assert (
+                TenantSocialAccountAdapter._allowed_providers(object()) == set()
+            )

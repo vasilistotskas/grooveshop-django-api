@@ -8,6 +8,7 @@ from core.managers import (
     TranslatableOptimizedManager,
     TranslatableOptimizedQuerySet,
 )
+from tenant.membership import is_store_staff
 
 if TYPE_CHECKING:
     from typing import Self
@@ -81,7 +82,7 @@ class BlogPostQuerySet(TranslatableOptimizedQuerySet):
         callers and rendered category cards linking to a detail route
         that then 404'd.
         """
-        if user is not None and user.is_authenticated and user.is_staff:
+        if is_store_staff(user):
             return self
         return self.published()
 

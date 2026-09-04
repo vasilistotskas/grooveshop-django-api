@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GrooveShop Django API — a headless e-commerce API built with Django 6 and Django REST Framework. Supports both WSGI (Gunicorn) and ASGI (Daphne/Uvicorn) with WebSocket notifications via Django Channels. Uses PostgreSQL 18, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14, managed with uv.
+GrooveShop Django API — a headless, multi-tenant e-commerce API built with Django 6 and Django REST Framework. Served as ASGI only (Gunicorn managing Uvicorn workers; Daphne only backs `runserver`) with WebSocket notifications via Django Channels. Each store is a django-tenants schema resolved from the request host. Uses PostgreSQL 18, Redis, Celery (RabbitMQ broker), and Meilisearch. Python 3.14, managed with uv.
 
 ## Common Commands
 
@@ -45,7 +45,7 @@ uv run python manage.py spectacular --color --file schema.yml
 
 # Meilisearch index management
 uv run python manage.py meilisearch_sync_all_indexes
-uv run python manage.py meilisearch_sync_index --model ProductTranslation
+uv run python manage.py meilisearch_sync_index product.ProductTranslation
 
 # Docker (full stack)
 docker compose up -d --build
@@ -62,7 +62,13 @@ Single `settings.py` at the project root (not inside any app). Uses `SYSTEM_ENV`
 All apps live at the project root (flat structure, no `src/` directory):
 
 - **core/** — Shared infrastructure: base views, serializers, permissions, middleware, filters, caching, Celery config, URL routing. The `core/urls.py` is the root URL conf that mounts all other apps under `api/v1/`.
+- **tenant/** — Multi-tenancy control plane: `Tenant`/`TenantDomain`, provisioning, billing, lifecycle, staff identity and roles, per-tenant credentials (`tenant/credentials.py` — no platform-wide fallback for money/secrets)
 - **product/**, **order/**, **cart/**, **blog/**, **user/** — Main domain apps
+- **promotion/**, **giftcard/**, **b2b/** — Rule-based promotions and coupons; stored-value gift cards with a ledger; wholesale program (business profiles, VIES, group pricing)
+- **shipping/**, **shipping_acs/**, **shipping_boxnow/** — Carrier abstraction (`shipping/interfaces.py`) and the two carrier integrations
+- **page_config/** — Merchant-editable storefront layouts, navigation and content pages
+- **meta_capi/** — Meta Conversions API event dispatch
+- **agent/** — OAuth-scoped `/api/v1/agent/*` surface consumed through the agent gateway
 - **search/** — Meilisearch integration with federated search, Greeklish transliteration, and analytics
 - **meili/** — Meilisearch model definitions and indexing via `IndexMixin` with `MeiliMeta` config
 - **notification/** — Real-time notifications via WebSocket (Django Channels consumer)
@@ -113,7 +119,7 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 
 **Custom fields**: `ImageAndSvgField` (images + SVG), `MeasurementField` (physical measurements with unit conversion)
 
-**Permissions** (`core/api/permissions.py`): `IsOwnerOrAdmin`, `IsOwnerOrAdminOrGuest` — checks `user`, `owner`, or `created_by` fields. `IsOwnerOrAdminOrGuest` additionally handles guest orders: when `obj.user is None`, it verifies `request.query_params.get("uuid") == str(obj.uuid)`.
+**Permissions** (`core/api/permissions.py`): `IsOwnerOrAdmin`, `IsOwnerOrAdminOrGuest` — checks `user`, `owner`, or `created_by` fields; the staff bypass is `tenant.membership.is_store_staff` (a provenance-stamped platform identity with a staff role in the current tenant, or a superuser). `request.user.is_staff` is never an authorization signal on an API request — on a tenant-schema row it is customer residue (see `IsPlatformSuperuser`). Store-scoped write routes use `StoreStaffModelPermissions`. `IsOwnerOrAdminOrGuest` additionally handles guest orders: when `obj.user is None`, it verifies `request.query_params.get("uuid") == str(obj.uuid)`.
 
 ### API Conventions
 
@@ -143,17 +149,17 @@ Domain models compose multiple mixins, e.g. `Product(SoftDeleteModel, Translatab
 ### WebSocket / Real-time
 
 ASGI routing in `asgi/__init__.py` with Channels `ProtocolTypeRouter`:
-- HTTP: Django ASGI with CORS handler
+- HTTP: Django ASGI. CORS is django-cors-headers only: the static `CORS_ALLOWED_ORIGINS` holds the platform origins and `tenant.signals.allow_tenant_origin` admits the current tenant's own domains (the same rule as `TenantCsrfMiddleware`); never set `CORS_ALLOW_ALL_ORIGINS`
 - WebSocket: `ws/notifications/` → `NotificationConsumer`
-- Auth via `TokenAuthMiddleware` — only `?access_token=<knox>` in query params; `session_token` is not accepted
-- Groups: `user_{id}` per-user, `admins` for staff
+- Auth via `TokenAuthMiddleware` — a single-use `?ticket=<token>` minted by the API and consumed atomically from Redis (`core/middleware/channels.py`); Knox tokens and session cookies are not accepted on the socket
+- Groups: `tenant_{schema}_user_{id}` per user (`notification/groups.py`); WebSocket identities are tenant-schema customers, so there is no staff group on the socket
 
 ### Celery
 
 App configured in `core/celery.py`. Base task class: `MonitoredTask` (logs success/failure). All tasks use `autoretry_for`, `retry_backoff`, and `retry_jitter` with exponential backoff (max 5 retries).
 
 Tasks are split by domain:
-- `core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, loyalty points expiration, inactive user notifications
+- `core/tasks.py` — system health monitoring, DB backup, cache clearing, session cleanup, Meilisearch sync, abandoned cart cleanup, inactive user notifications
 - `product/tasks.py` — price drop notifications
 - `search/tasks.py` — search analytics
 - `blog/tasks.py` — comment liked notifications
@@ -176,8 +182,8 @@ Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key
 - `CELERY_TASK_ALWAYS_EAGER = True` (synchronous execution)
 - Auto-fixtures: cache clearing, DB query reset, site cache clear, connection cleanup for xdist
 - `requires_meilisearch` skip marker for tests needing live Meilisearch
-- `count_queries` fixture and `QueryCountAssertionMixin` for N+1 detection
-- Coverage minimum: 50% (`fail_under = 50`), timeout: 600s
+- `count_queries` fixture for N+1 detection
+- Coverage minimum: 70% (`fail_under = 70`, enforced on the combined CI shards), per-test timeout: 600s
 
 **MT (multi-tenant) lane** — `tests_mt/` is a SIBLING of `tests/`, not a subdirectory: `tests/conftest.py` strips multi-tenancy (`DATABASE_ROUTERS = []`, no `TenantMainMiddleware`) to keep the main suite fast, which makes schema-binding bugs (cross-schema FKs, cache-key leaks, seed migrations that stop reaching new tenants) invisible to it. `tests_mt/conftest.py` keeps the real `TenantSyncRouter` and `TenantMainMiddleware`, provisions one tenant schema per session, and runs a handful of high-leverage smoke tests on top. Not collected by a bare `uv run pytest` (`testpaths = ["tests"]` excludes it) — run it explicitly with `uv run pytest tests_mt -n 0` (serial; schema switching is process-global via `connection`).
 
@@ -191,10 +197,14 @@ Tests in `tests/` with `unit/`, `integration/`, and `utils/` subdirectories. Key
 
 ### CI/CD
 
-GitHub Actions (`.github/workflows/ci.yml`): 3-stage pipeline:
-1. **Quality** — Ruff format check
-2. **Testing** — PostgreSQL 18 + Redis + Meilisearch services, migrations, pytest with coverage (15 min timeout)
-3. **Release** — python-semantic-release cuts the version, changelog, and GitHub release with dist assets (main branch only); the Docker image workflow triggers on the published release. Not published to PyPI — this is a deployed application, not a library (dropped 2026-08 after the PyPI project hit its 10 GB size cap).
+GitHub Actions (`.github/workflows/ci.yml`) jobs:
+1. **Security Scan** — Trivy filesystem scan (HIGH/CRITICAL fail the job).
+2. **Code Quality** — Ruff format + lint, `ty check`, OpenAPI schema validation.
+3. **Migration Check** — `makemigrations --check` plus both django-tenants migration paths on a clean DB.
+4. **Testing** — 4 duration-balanced pytest shards (pytest-split, `.test_durations`) against PostgreSQL 18 + Redis + Meilisearch, each uploading raw coverage data.
+5. **Testing (multi-tenant lane)** — `tests_mt` serially with the real tenant router and middleware.
+6. **Coverage Gate** — combines the shard data and enforces `fail_under`.
+7. **Release** — python-semantic-release (pinned via `uvx`) cuts the version, changelog and GitHub release on `main`; the Docker image workflow triggers on the published release. Nothing is built or published to PyPI — this is a deployed application, not a library.
 
 ## Code Style
 

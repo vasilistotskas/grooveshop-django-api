@@ -84,6 +84,7 @@ from order.serializers.order import (
 from order.services import OrderService
 from pay_way.models import PayWay
 from pay_way.services import PayWayService
+from tenant.membership import is_store_staff
 
 logger = logging.getLogger(__name__)
 
@@ -354,7 +355,7 @@ class OrderViewSet(BaseModelViewSet):
         """
         if self.action == "list":
             qs = Order.objects.for_list()
-            if not self.request.user.is_staff:
+            if not is_store_staff(self.request.user):
                 qs = qs.filter(user=self.request.user)
             return qs
         elif self.action == "my_orders":
@@ -426,11 +427,7 @@ class OrderViewSet(BaseModelViewSet):
         return super().get_permissions()
 
     def check_object_permissions(self, request, obj):
-        if (
-            request.user
-            and request.user.is_authenticated
-            and request.user.is_staff
-        ):
+        if is_store_staff(request.user):
             super().check_object_permissions(request, obj)
             return
 
@@ -1588,7 +1585,7 @@ class OrderViewSet(BaseModelViewSet):
 
         user = request.user
 
-        is_admin = user and user.is_authenticated and user.is_staff
+        is_admin = is_store_staff(user)
         is_owner = (
             user
             and user.is_authenticated
@@ -1930,7 +1927,7 @@ class OrderViewSet(BaseModelViewSet):
             raise NotAuthenticated(
                 _("Authentication is required to reorder a past order.")
             )
-        if order.user_id != user.id and not user.is_staff:
+        if order.user_id != user.id and not is_store_staff(user):
             raise PermissionDenied(
                 _("You can only reorder your own past orders.")
             )
@@ -1946,7 +1943,7 @@ class OrderViewSet(BaseModelViewSet):
         """Add tracking information to an order."""
         order = self.get_object()
 
-        if not request.user.is_staff:
+        if not is_store_staff(request.user):
             raise PermissionDenied(_("Only staff can add tracking information"))
 
         request_serializer_class = self.get_request_serializer()
@@ -1985,7 +1982,7 @@ class OrderViewSet(BaseModelViewSet):
         """Update the status of an order."""
         order = self.get_object()
 
-        if not request.user.is_staff:
+        if not is_store_staff(request.user):
             raise PermissionDenied(_("Only staff can update order status"))
 
         request_serializer_class = self.get_request_serializer()

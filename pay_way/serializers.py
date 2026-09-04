@@ -8,6 +8,7 @@ from rest_framework import serializers
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
 from pay_way.models import PayWay
+from tenant.membership import is_store_staff
 
 
 @extend_schema_field(generate_schema_multi_lang(PayWay))
@@ -58,7 +59,7 @@ class PayWayDetailSerializer(PayWaySerializer):
     def to_representation(self, instance):
         ret = super().to_representation(instance)
         request = self.context.get("request")
-        if not request or not getattr(request.user, "is_staff", False):
+        if not request or not is_store_staff(request.user):
             ret.pop("configuration", None)
         return ret
 

@@ -128,6 +128,11 @@ def fanout_issue_daily_acs_pickup_list():
 
 
 @celery_app.task(base=TenantTask)
+def fanout_warn_unprinted_acs_vouchers():
+    return run_for_all_tenants("shipping_acs.tasks.warn_unprinted_acs_vouchers")
+
+
+@celery_app.task(base=TenantTask)
 def fanout_anonymize_old_search_queries():
     return run_for_all_tenants(
         "search.tasks.anonymize_old_search_queries", days=90

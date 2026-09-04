@@ -1,0 +1,13 @@
+{% load i18n %}{% if blocked %}{% trans "ACS PICKUP LIST NOT ISSUED" %}{% else %}{% trans "ACS VOUCHERS AWAITING A PRINTED LABEL" %}{% endif %}
+
+{% if blocked %}{% blocktrans count counter=vouchers|length %}Today's pickup list was rejected by ACS. {{ counter }} voucher has no printed label:{% plural %}Today's pickup list was rejected by ACS. {{ counter }} vouchers have no printed label:{% endblocktrans %}{% else %}{% blocktrans count counter=vouchers|length %}{{ counter }} voucher still has no printed label before today's pickup list:{% plural %}{{ counter }} vouchers still have no printed label before today's pickup list:{% endblocktrans %}{% endif %}
+
+{% for v in vouchers %}- {% trans "Voucher" %} {{ v.voucher_no }} — {% trans "order" %} #{{ v.order_id }}
+{% endfor %}
+{% if acs_message %}{% trans "ACS replied" %}: {{ acs_message }}
+
+{% endif %}{% trans "ACS refuses the whole pickup list when any voucher on it is unprinted, and its API cannot issue a partial one — so these also hold back every other parcel waiting today. Open each order in the admin and download its ACS label; that is what marks the voucher printed. Then use “Issue ACS pickup list now” on the ACS shipments page instead of waiting for tomorrow's run." %}
+
+{{ SITE_NAME }}
+{{ INFO_EMAIL }}
+{{ SITE_URL }}

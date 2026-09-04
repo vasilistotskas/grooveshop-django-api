@@ -1,0 +1,30 @@
+{% extends "emails/base/email_base.html" %}
+{% load i18n %}
+
+{% block email_title %}{% if blocked %}{% trans "ACS Pickup List Not Issued" %}{% else %}{% trans "ACS Vouchers Awaiting a Printed Label" %}{% endif %} - {{ SITE_NAME }}{% endblock %}
+
+{% block email_content %}
+<h1>{% if blocked %}{% trans "ACS Pickup List Not Issued" %}{% else %}{% trans "ACS Vouchers Awaiting a Printed Label" %}{% endif %}</h1>
+<p>{% if blocked %}{% blocktrans count counter=vouchers|length %}Today's pickup list was rejected by ACS. {{ counter }} voucher has no printed label:{% plural %}Today's pickup list was rejected by ACS. {{ counter }} vouchers have no printed label:{% endblocktrans %}{% else %}{% blocktrans count counter=vouchers|length %}{{ counter }} voucher still has no printed label before today's pickup list:{% plural %}{{ counter }} vouchers still have no printed label before today's pickup list:{% endblocktrans %}{% endif %}</p>
+
+<table class="email-table">
+    <thead>
+        <tr>
+            <th>{% trans "Voucher" %}</th>
+            <th>{% trans "Order" %}</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for v in vouchers %}
+        <tr>
+            <td>{{ v.voucher_no }}</td>
+            <td>#{{ v.order_id }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if acs_message %}<p class="mt-3"><strong>{% trans "ACS replied" %}:</strong> {{ acs_message }}</p>{% endif %}
+
+<p class="mt-3">{% trans "ACS refuses the whole pickup list when any voucher on it is unprinted, and its API cannot issue a partial one — so these also hold back every other parcel waiting today. Open each order in the admin and download its ACS label; that is what marks the voucher printed. Then use “Issue ACS pickup list now” on the ACS shipments page instead of waiting for tomorrow's run." %}</p>
+{% endblock %}

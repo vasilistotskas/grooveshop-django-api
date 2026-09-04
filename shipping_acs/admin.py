@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from django.contrib import admin, messages
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -34,6 +35,26 @@ from shipping_acs.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _back_to_changelist(model_admin):
+    """Return the response every URL-backed unfold action owes Django.
+
+    ``actions_row``, ``actions_list`` and ``actions_detail`` are
+    registered as real URLs (``unfold`` ModelAdmin.get_urls), and
+    ``@action`` hands the decorated method's return value straight to
+    Django. An action that falls off the end therefore returns ``None``
+    and Django raises "didn't return an HttpResponse" — the button does
+    its work and *then* 500s, so the operator sees a server error and no
+    confirmation of an action that actually ran.
+
+    ``actions_submit_line`` is exempt: it is invoked from
+    ``save_model``, not routed as a URL.
+    """
+    opts = model_admin.model._meta
+    return redirect(
+        reverse(f"admin:{opts.app_label}_{opts.model_name}_changelist")
+    )
 
 
 # ── Inlines ────────────────────────────────────────────────────────────────
@@ -182,6 +203,11 @@ class AcsShipmentAdmin(BaseModelAdmin):
         "updated_at",
     )
     inlines = [AcsTrackingEventInline]
+    # Changelist-level, and deliberately on the SHIPMENT admin rather
+    # than AcsPickupListAdmin: that one is IsSuperuserOnlyModelAdmin, so
+    # the merchant who prints the labels cannot open it. This is the
+    # page they already work on, next to the "not printed" filter.
+    actions_list = ["issue_pickup_list_now"]
     actions_row = ["repoll_tracking", "issue_voucher_now"]
     actions = ["bulk_repoll_tracking", "retire_shipments"]
     list_select_related = ("order", "pickup_list")
@@ -264,6 +290,58 @@ class AcsShipmentAdmin(BaseModelAdmin):
         )
 
     @action(
+        description=str(_("Issue ACS pickup list now")),
+        variant=ActionVariant.PRIMARY,
+    )
+    def issue_pickup_list_now(self, request):
+        """Re-run the daily manifest without waiting for 16:30.
+
+        ACS rejects the whole pickup list when any voucher on it is
+        unprinted, and its API has no voucher-list parameter, so a
+        single late order blocks every other parcel that day. Printing
+        the missing label clears it in seconds — this is the button that
+        turns that into a same-day fix instead of a wait until tomorrow.
+        """
+        from shipping_acs.exceptions import AcsError
+        from shipping_acs.services import AcsService
+
+        changelist = _back_to_changelist(self)
+        try:
+            pickup_list = AcsService.issue_daily_pickup_list(
+                issued_by_id=request.user.id
+                if request.user.is_authenticated
+                else None
+            )
+        except AcsError as exc:
+            # Surface ACS's own words: they name what has to be printed.
+            self.message_user(
+                request,
+                _("ACS did not issue the pickup list: %(err)s")
+                % {"err": str(exc)},
+                messages.ERROR,
+            )
+            return changelist
+
+        if pickup_list is None:
+            self.message_user(
+                request,
+                _("No vouchers are waiting for a pickup list."),
+                messages.INFO,
+            )
+            return changelist
+
+        self.message_user(
+            request,
+            _("Pickup list %(no)s issued for %(n)s voucher(s).")
+            % {
+                "no": pickup_list.pickup_list_no,
+                "n": pickup_list.voucher_count,
+            },
+            messages.SUCCESS,
+        )
+        return changelist
+
+    @action(
         description=str(_("Re-poll ACS tracking")),
         variant=ActionVariant.INFO,
     )
@@ -272,6 +350,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
         poll_acs_tracking_one.delay(int(object_id))
         messages.info(request, _("Tracking poll dispatched."))
+        return _back_to_changelist(self)
 
     @action(
         description=str(_("Issue ACS voucher now")),
@@ -286,7 +365,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
             shipment = _Shipment.objects.get(pk=object_id)
         except _Shipment.DoesNotExist:
             messages.error(request, _("Shipment not found."))
-            return
+            return _back_to_changelist(self)
 
         # A CANCELED shipment keeps its (now-deleted) voucher_no, which
         # makes the mint task short-circuit and return the dead voucher.
@@ -301,7 +380,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
                     _("Cannot reset shipment for re-mint: %(err)s")
                     % {"err": str(exc)},
                 )
-                return
+                return _back_to_changelist(self)
             messages.info(
                 request,
                 _("Cancelled shipment reset — minting a fresh voucher."),
@@ -309,6 +388,7 @@ class AcsShipmentAdmin(BaseModelAdmin):
 
         create_acs_voucher_for_order.delay(shipment.order_id)
         messages.info(request, _("Voucher creation task dispatched."))
+        return _back_to_changelist(self)
 
 
 @admin.register(AcsStation)
@@ -405,6 +485,7 @@ class AcsCodPayoutAdmin(IsSuperuserOnlyModelAdmin, BaseModelAdmin):
 
         reconcile_acs_cod_payouts.delay()
         messages.info(request, _("COD reconciliation task dispatched."))
+        return _back_to_changelist(self)
 
 
 @admin.register(AcsTrackingEvent)

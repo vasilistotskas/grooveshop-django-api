@@ -3,6 +3,139 @@
 
 
 
+## v3.28.0 (2026-09-04)
+
+### Bug fixes
+
+* fix(shipping_acs): return a response from every URL-backed admin action
+
+Unfold registers actions_row/actions_list/actions_detail as real URLs
+and its @action decorator hands the decorated method's return value
+straight to Django, so an action that falls off the end returns None and
+Django raises "didn't return an HttpResponse object". The button does
+its work — dispatching the Celery task — and *then* 500s, so the
+operator sees a server error, no confirmation, and retries something
+that already ran.
+
+An AST sweep of every admin.py in the project found three:
+repoll_tracking, issue_voucher_now (including its two early-exit
+branches) and run_reconciliation. All three are in shipping_acs.
+
+_back_to_changelist derives the target from the admin's own model, so
+run_reconciliation returns to the COD payout list rather than the
+shipment one, and issue_pickup_list_now now shares it.
+
+actions_submit_line is deliberately exempt: it is invoked from
+save_model, not routed as a URL, so returning None there is correct.
+
+Guarded two ways — a behavioural test per action, and an AST invariant
+over every admin.py, because a behavioural test only covers the actions
+that exist today and the failure mode is a missing return.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H6QHvSZHY35xi5VEvr5Au5
+
+---------
+
+Co-authored-by: Claude Opus 5 <noreply@anthropic.com> ([`42f49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/42f49b21a58bf07a1fba1717d4388ee8310877b9))
+
+### Chores
+
+* chore(deps): sync uv.lock to 3.27.5 [skip ci] ([`13ec057`](https://github.com/vasilistotskas/grooveshop-django-api/commit/13ec05733047c9f630e29907c82c706bc57720d8))
+
+### Features
+
+* feat(shipping_acs): make a blocked pickup list visible and recoverable (#29) ([`42f49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/42f49b21a58bf07a1fba1717d4388ee8310877b9))
+
+* feat(shipping_acs): make a blocked pickup list visible and recoverable
+
+v3.27.5 made the manifest failure loud. It did not make it recoverable,
+and on 2026-09-03 that showed: one order placed at 15:00 whose label was
+not printed blocked six ready parcels, the only signal was a log line,
+and the merchant had no way to re-run once the label was printed.
+
+ACS imposes the all-or-nothing part — ACS_Issue_Pickup_List takes a
+pickup date and no voucher list, so a partial manifest is impossible.
+What was ours to fix is that nobody was told and nothing could be done
+about it until the next day.
+
+- "Issue ACS pickup list now" on the ACS shipments changelist, so
+  clearing the blocker and re-running is one click. It sits on the
+  shipment admin, not AcsPickupListAdmin, because that one is
+  IsSuperuserOnlyModelAdmin and the person who prints the labels cannot
+  open it. It surfaces ACS's own refusal text, since that names the
+  vouchers, and returns a redirect.
+- An alert email when ACS refuses, listing voucher and order numbers.
+  It never swallows the failure: the task still raises, and a mail
+  error cannot mask the refusal. ACS's Unprinted_Vouchers wins over the
+  local label_printed_at mirror when present, because a label printed
+  from ACS's own portal never reaches that column.
+- warn_unprinted_acs_vouchers at 15:45 Mon-Fri, 45 minutes ahead of the
+  manifest, so an unprinted label is still fixable while it matters.
+
+Every new behaviour is mutation-tested: dropping the alert, swallowing
+the refusal, skipping the pre-warning, returning None from the admin
+action, or preferring the local flag over ACS's list each fails a test.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01H6QHvSZHY35xi5VEvr5Au5 ([`42f49b2`](https://github.com/vasilistotskas/grooveshop-django-api/commit/42f49b21a58bf07a1fba1717d4388ee8310877b9))
+
+### Testing
+
+* test(region): stop the filter fixtures minting a real country code
+
+`RegionFilterTestCase.setUpTestData` built its countries as
+f"GR{hex_char}", f"US{hex_char}", f"DE{hex_char}", where the character
+came from a uuid4 hex digit. One value in sixteen is a C, which makes the
+first code the literal "GRC" — and
+`country/migrations/0010_seed_default_country` seeds Greece as
+("GR", "GRC"). The insert then dies on
+`country_country_alpha_3_key`, taking all 23 tests in the class down as
+setup errors.
+
+Measured: the old expression produced "GRC" in 6.17% of 100k draws, which
+matches how this behaved on CI — green on most runs, all 23 red on some.
+It failed the Testing (2) shard on PR #28, whose diff does not touch
+country or region at all.
+
+Codes now come from the ISO 3166-1 user-assigned ranges (alpha-2 XA-XZ,
+alpha-3 XAA-XZZ), which are permanently reserved and can never name a
+real country, so no seed migration can ever collide with them. The three
+letters are drawn without replacement, so the fixtures cannot collide
+with each other either. Everything downstream already read
+`country_*.alpha_2` off the instances, so nothing else changed.
+
+The sibling `tests/integration/country/` suites use hard-coded real codes
+safely — their conftest deletes the seeded GR row first. This class had
+no such guard.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017eMDKoMZDowhm1LLyi4yHg ([`1218701`](https://github.com/vasilistotskas/grooveshop-django-api/commit/12187012683282a4b6c953f75cb3b53ec7d41587))
+
+* test(tenant): make the legal-identity helper prove its own write
+
+These three tests failed once in a local full parallel run, with the
+endpoint publishing the seeded blank instead of the value the test had
+just written. They pass in isolation, as a directory, on a full re-run of
+the same commit, and on CI.
+
+The cause was not established, and each candidate was ruled out rather
+than assumed: the extra_settings cache is inert under the test cache
+config (a write through set_cached_setting is not observable, checked
+directly), each xdist worker has its own database so cross-worker
+contamination is impossible, and nothing re-seeds settings during a
+request. A deliberate cache-poisoning reproduction did not reproduce it.
+An earlier speculative cache-invalidation fix was reverted because it
+would have been a no-op dressed up as a cure.
+
+So this does not claim to fix it. _set now reads the value back through
+the same accessor the endpoint uses and asserts it landed, which turns a
+recurrence into "the row did not land" at the point of writing rather
+than an opaque empty string at an assertion twenty lines later. If it
+recurs, that message says whether the writer or the reader is at fault.
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com> ([`b4a5b52`](https://github.com/vasilistotskas/grooveshop-django-api/commit/b4a5b52e2c8f264a793277a244852b957d2d1004))
+
 ## v3.27.5 (2026-09-03)
 
 ### Bug fixes

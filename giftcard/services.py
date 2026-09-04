@@ -203,6 +203,26 @@ class GiftCardService:
                     )
                     % {"code": card.code},
                 )
+            # A card's balance is denominated in its OWN currency, and
+            # the plan below compares raw Decimals. Without this, a $100
+            # card settled a EUR 100 order one-for-one and extinguished
+            # EUR 100 of liability against roughly EUR 92 of instrument.
+            # There is no FX rate anywhere in this codebase to convert
+            # with, and inventing 1:1 silently is the worst of the
+            # options — so refuse, and say which card.
+            if card.balance.currency != currency:
+                raise GiftCardError(
+                    "gift_card_currency_mismatch",
+                    _(
+                        "Gift card %(code)s is in %(card_currency)s and "
+                        "cannot pay for a %(order_currency)s order."
+                    )
+                    % {
+                        "code": card.code,
+                        "card_currency": card.balance.currency,
+                        "order_currency": currency,
+                    },
+                )
 
         due = Decimal(amount_due.amount)
         if due <= 0:
@@ -453,11 +473,45 @@ class GiftCardService:
                         order=order,
                         description=f"Refund of order #{order.id}",
                     )
+                    cls._keep_refund_spendable(redeem.gift_card)
             except IntegrityError:
                 # A concurrent refund task credited this card first.
                 continue
             credited += share
         return credited
+
+    @classmethod
+    def _keep_refund_spendable(cls, card) -> None:
+        """Give a lapsed card a fresh window when money returns to it.
+
+        A card can expire while its value is sitting on an order that is
+        refunded later. The credit then landed on a card that
+        `plan_redemption` refuses (`is_redeemable` is False) and that
+        `expire_cards` reclaims on its next run — matching ACTIVE,
+        past-`expires_at`, balance now positive. The customer's refund
+        was destroyed within a day, and the only trace was
+        "Expired N gift cards" while the refund task had reported
+        success.
+
+        Refunding money and then confiscating it is not a defensible
+        outcome under any expiry policy, so the card gets the same
+        window a newly issued one gets, counted from now.
+        """
+        if card.expires_at is None or card.expires_at > timezone.now():
+            return
+        fresh = cls.default_expiry()
+        if fresh is None:
+            return
+        previous = card.expires_at
+        card.expires_at = fresh
+        card.save(update_fields=["expires_at"])
+        logger.info(
+            "Gift card %s had expired at %s; extended to %s so the "
+            "refund credited to it stays spendable",
+            card.code,
+            previous,
+            fresh,
+        )
 
     @staticmethod
     def _split_refund(contributions, amount: Decimal) -> dict:

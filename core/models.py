@@ -168,12 +168,6 @@ class TimeStampMixinModel(models.Model):
             BTreeIndex(fields=["updated_at"], name="%(class)s_updated_at_ix"),
         ]
 
-    def get_duration_since_created(self):
-        return timezone.now() - self.created_at
-
-    def get_duration_since_updated(self):
-        return timezone.now() - self.updated_at
-
 
 class UUIDModel(models.Model):
     """
@@ -255,37 +249,12 @@ class MetaDataModel(models.Model):
             self.metadata = {}
         super().save(*args, **kwargs)
 
-    def get_value_from_private_metadata(self, key: str, default: Any = None):
-        return self.private_metadata.get(key, default)
-
-    def store_value_in_private_metadata(self, items: dict):
-        if items:
-            for key, value in items.items():
-                self.private_metadata[key] = value
-            self.save(update_fields=["private_metadata"])
-
-    def clear_private_metadata(self):
-        self.private_metadata = {}
-
-    def delete_value_from_private_metadata(self, key: str):
-        if key in self.private_metadata:
-            del self.private_metadata[key]
-
-    def get_value_from_metadata(self, key: str, default: Any = None):
-        return self.metadata.get(key, default)
-
     def store_value_in_metadata(self, items: dict):
+        """Merge ``items`` into ``metadata`` and persist just that column."""
         if items:
             for key, value in items.items():
                 self.metadata[key] = value
             self.save(update_fields=["metadata"])
-
-    def clear_metadata(self):
-        self.metadata = {}
-
-    def delete_value_from_metadata(self, key: str):
-        if key in self.metadata:
-            del self.metadata[key]
 
 
 class SoftDeleteMixin(models.Model):

@@ -82,10 +82,6 @@ class CacheService:
     """
 
     @staticmethod
-    def list_surfaces() -> list[CacheSurface]:
-        return iter_surfaces()
-
-    @staticmethod
     def count(codes: Iterable[str]) -> dict[str, int]:
         result: dict[str, int] = {}
         for code in codes:

@@ -394,10 +394,10 @@ def _verify_transaction(transaction_id):
 
 
 def _verify_viva_terminal_transaction(
-    order, transaction_id, expected_statuses, event_label
+    subject, transaction_id, expected_statuses, event_label, *, order=None
 ):
     """Verify a reversal (1797) / failed (1798) Viva event against the
-    Retrieve Transaction API before mutating ``payment_status`` (G0275).
+    Retrieve Transaction API before mutating financial state (G0275).
 
     The webhook endpoint is unauthenticated — there is no HMAC and the
     source-IP check is non-blocking — so the event body must not be trusted
@@ -406,6 +406,16 @@ def _verify_viva_terminal_transaction(
     a spoofed 1798 could mark it FAILED. Mirroring the 1796 path, we confirm
     with Viva that the transaction genuinely reached the expected terminal
     state.
+
+    *subject* is a human label for the thing being mutated ("order 42",
+    "gift-card purchase <uuid>") and is used only in the log lines, so this
+    guard can be shared by callers that have no order model.
+
+    *order*, when given, additionally requires the verified transaction to
+    carry one of THAT order's own Viva order codes. Viva's instruction is
+    to confirm a result by the COMBINATION of OrderCode and TransactionId;
+    a caller with no order passes nothing and gets the status/amount half
+    only.
 
     Returns ``True`` to proceed. Returns ``False`` (skip, no mutation) when
     the event carries no ``TransactionId`` or the verified status is not one
@@ -416,10 +426,10 @@ def _verify_viva_terminal_transaction(
     """
     if not transaction_id:
         logger.error(
-            "Viva %s event for order %s carries no TransactionId — refusing "
+            "Viva %s event for %s carries no TransactionId — refusing "
             "to mutate payment state without verification",
             event_label,
-            order.id,
+            subject,
         )
         return False
 
@@ -442,25 +452,27 @@ def _verify_viva_terminal_transaction(
     # (developer.viva.com/webhooks-for-payments/transaction-payment-created),
     # then check StatusId and Amount. Without the first half, anyone can
     # post their own real TransactionId against someone else's OrderCode.
-    if not _transaction_belongs_to_order(order, verified_data):
+    if order is not None and not _transaction_belongs_to_order(
+        order, verified_data
+    ):
         logger.error(
             "Viva %s event: transaction %s reports order_code %r, which is "
-            "not one of order %s's issued codes — refusing to mutate state",
+            "not one of %s's issued codes — refusing to mutate state",
             event_label,
             transaction_id,
             verified_data.get("order_code")
             if isinstance(verified_data, dict)
             else None,
-            order.id,
+            subject,
         )
         return False
 
     if verified_status not in expected_statuses:
         logger.warning(
-            "Viva %s event for order %s: transaction %s verified status is "
+            "Viva %s event for %s: transaction %s verified status is "
             "%s, not in %s — skipping (event unverified or premature)",
             event_label,
-            order.id,
+            subject,
             transaction_id,
             verified_status,
             sorted(expected_statuses),
@@ -1328,10 +1340,11 @@ def _handle_payment_failed(order, event_data, transaction_id):
     # and hand Viva a 200. The real owner never sees the event and Viva
     # does not redeliver after a 200.
     if not _verify_viva_terminal_transaction(
-        order,
+        f"order {order.id}",
         transaction_id,
         {PaymentStatus.FAILED, PaymentStatus.CANCELED},
         "payment_failed",
+        order=order,
     ):
         return
 
@@ -1395,10 +1408,11 @@ def _handle_reversal_created(order, event_data, transaction_id):
     # transaction was actually reversed/refunded before marking the order
     # REFUNDED and firing the refund email + toast + Meta CAPI Refund (G0275).
     if not _verify_viva_terminal_transaction(
-        order,
+        f"order {order.id}",
         transaction_id,
         {PaymentStatus.REFUNDED, PaymentStatus.PARTIALLY_REFUNDED},
         "reversal",
+        order=order,
     ):
         return
 

@@ -536,6 +536,16 @@ def list_settings(request):
         )
 
 
+# Every key this API will resolve at all — the names the platform
+# declares as store settings. `Setting.get` falls through to
+# `django.conf.settings` for anything else (django-extra-settings'
+# `EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS`, on by default), so an
+# unbounded key is a read of the Django settings module.
+STORE_SETTING_KEYS = frozenset(
+    entry["name"] for entry in settings.EXTRA_SETTINGS_DEFAULTS
+)
+
+
 PUBLIC_SETTING_KEYS = frozenset(
     {
         "CHECKOUT_SHIPPING_PRICE",
@@ -643,6 +653,32 @@ def get_setting_by_key(request):
             return Response(
                 error_data,
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # This endpoint serves STORE settings. `Setting.get` is not a
+        # store-settings lookup: django-extra-settings defaults
+        # `EXTRA_SETTINGS_FALLBACK_TO_CONF_SETTINGS` to True, so on a
+        # miss it degenerates to `getattr(django.conf.settings, key)` —
+        # and `key` comes straight off the query string. Any staff token
+        # could read `SECRET_KEY`, `EMAIL_HOST_PASSWORD`, `DATABASES`
+        # (which carries the DB password) or the gateway's internal
+        # secret. `SECRET_KEY` alone lets the holder forge sessions and
+        # any `django.core.signing` value for every user on every
+        # tenant, so one store's operator became platform root.
+        #
+        # A key is servable when the platform DECLARES it or the tenant
+        # actually HAS it as a row; either way the value comes from the
+        # settings table, never from the fallback. A name with neither is
+        # now indistinguishable from one that does not exist. (A row
+        # named after a Django setting is no loophole: once the row
+        # exists, `Setting.get` returns the ROW.)
+        if (
+            key not in STORE_SETTING_KEYS
+            and not Setting.objects.filter(name=key).exists()
+        ):
+            return Response(
+                {"detail": _("Setting not found or access denied.")},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         if (key not in PUBLIC_SETTING_KEYS) and (

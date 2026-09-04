@@ -39,19 +39,13 @@ class LimitOffsetPaginator(pagination.LimitOffsetPagination):
                             "type": "string",
                             "nullable": True,
                             "format": "uri",
-                            "example": "http://api.example.org/accounts/?{limit_query_param}=2&{offset_query_param}=4".format(
-                                limit_query_param=self.limit_query_param,
-                                offset_query_param=self.offset_query_param,
-                            ),
+                            "example": f"http://api.example.org/accounts/?{self.limit_query_param}=2&{self.offset_query_param}=4",
                         },
                         "previous": {
                             "type": "string",
                             "nullable": True,
                             "format": "uri",
-                            "example": "http://api.example.org/accounts/?{limit_query_param}=2&{offset_query_param}=0".format(
-                                limit_query_param=self.limit_query_param,
-                                offset_query_param=self.offset_query_param,
-                            ),
+                            "example": f"http://api.example.org/accounts/?{self.limit_query_param}=2&{self.offset_query_param}=0",
                         },
                     },
                 },

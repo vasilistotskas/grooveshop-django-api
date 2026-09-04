@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from django.db.models import Case, When, IntegerField, Q
+from django.db.models import Case, IntegerField, Q, When
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
-    extend_schema_view,
     OpenApiParameter,
+    extend_schema_view,
 )
 from rest_framework import status
 from rest_framework.decorators import action

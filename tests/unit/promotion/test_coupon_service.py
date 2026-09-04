@@ -22,7 +22,7 @@ class TestApply:
     ):
         cart, _ = make_cart([(100, 1)])
         code = PromotionCodeFactory(
-            promotion=PromotionFactory(benefit_value=Decimal("10"))
+            promotion=PromotionFactory(benefit_value=Decimal(10))
         )
 
         result = CouponService.apply(cart, code.code.lower())
@@ -75,7 +75,7 @@ class TestApply:
     ):
         cart, _ = make_cart([(30, 1)])
         code = PromotionCodeFactory(
-            promotion=PromotionFactory(min_subtotal=Money(Decimal("50"), "EUR"))
+            promotion=PromotionFactory(min_subtotal=Money(Decimal(50), "EUR"))
         )
 
         with pytest.raises(CouponError) as excinfo:

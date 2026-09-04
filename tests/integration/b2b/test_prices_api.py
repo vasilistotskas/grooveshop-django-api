@@ -26,7 +26,7 @@ pytestmark = pytest.mark.django_db
 def _product(price="100.00"):
     return ProductFactory(
         price=Money(Decimal(price), "EUR"),
-        discount_percent=Decimal("0"),
+        discount_percent=Decimal(0),
         vat=None,
         stock=10,
         active=True,
@@ -43,7 +43,7 @@ class TestPricesEndpoint:
     def test_approved_buyer_gets_group_prices(
         self, b2b_tenant, enable_wholesale
     ):
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         profile = BusinessProfileFactory(approved=True, customer_group=group)
         percent_product = _product("100.00")
         override_product = _product("100.00")
@@ -90,11 +90,11 @@ class TestPricesEndpoint:
         assert response.data == []
 
     def test_inactive_product_excluded(self, b2b_tenant, enable_wholesale):
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         profile = BusinessProfileFactory(approved=True, customer_group=group)
         inactive = ProductFactory(
             price=Money(Decimal("100.00"), "EUR"),
-            discount_percent=Decimal("0"),
+            discount_percent=Decimal(0),
             vat=None,
             stock=10,
             active=False,

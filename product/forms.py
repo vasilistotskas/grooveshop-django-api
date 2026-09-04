@@ -8,8 +8,8 @@ class ApplyDiscountForm(forms.Form):
     discount_percent = forms.DecimalField(
         label=_("Discount Percentage"),
         required=True,
-        min_value=Decimal("0"),
-        max_value=Decimal("100"),
+        min_value=Decimal(0),
+        max_value=Decimal(100),
         decimal_places=2,
         max_digits=5,
         widget=forms.NumberInput(

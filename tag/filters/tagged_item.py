@@ -1,9 +1,9 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
-from tag.models.tagged_item import TaggedItem
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import UUIDFilterMixin
+from tag.models.tagged_item import TaggedItem
 
 
 class TaggedItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):

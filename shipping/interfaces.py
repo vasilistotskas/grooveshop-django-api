@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from decimal import Decimal
 
     from order.models.order import Order
-
     from shipping.enum import ShippingKind
 
 
@@ -185,7 +184,7 @@ class ShippingCarrierInterface(ABC):
         have to override.  BoxNow + ACS implement this to drop their
         per-Order child rows during checkout.
         """
-        return None
+        return
 
     def dispatch_create_shipment_task(
         self, order: Order, *, schema_name: str | None = None
@@ -203,7 +202,7 @@ class ShippingCarrierInterface(ABC):
         the worker binds the right tenant even when on_commit fires
         after the request's schema context has unwound.
         """
-        return None
+        return
 
     def filter_pay_ways(self, queryset, *, kind: ShippingKind):
         """Return a PayWay queryset filtered by this carrier's rules.

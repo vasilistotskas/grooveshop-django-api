@@ -18,7 +18,7 @@ class OrderCreateDocumentTypeEnum(models.TextChoices):
 
     @classmethod
     def get_document_types_for_status(cls, status: str) -> list[str]:
-        from order.enum.status import OrderStatus  # noqa: PLC0415
+        from order.enum.status import OrderStatus
 
         if status in [OrderStatus.PENDING, OrderStatus.PROCESSING]:
             return [cls.RECEIPT, cls.INVOICE, cls.PROFORMA]

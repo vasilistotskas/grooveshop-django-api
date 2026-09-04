@@ -66,7 +66,7 @@ class TestLoyaltyDiscountReachesTheCharge:
             update_fields=["loyalty_discount", "loyalty_discount_currency"]
         )
 
-        assert order.calculate_order_total_amount().amount == Decimal("0")
+        assert order.calculate_order_total_amount().amount == Decimal(0)
 
     def test_paid_amount_matches_the_amount_due(self):
         """``mark_as_paid`` must not restore the undiscounted total."""

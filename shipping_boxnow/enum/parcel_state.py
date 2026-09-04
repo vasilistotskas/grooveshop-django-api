@@ -18,10 +18,10 @@ class BoxNowParcelState(models.TextChoices):
 
     # Map from BoxNow webhook ``event`` strings (hyphenated) to
     # our enum values.  BoxNow uses hyphens; we use underscores.
-    _WEBHOOK_MAP: dict[str, "BoxNowParcelState"]
+    _WEBHOOK_MAP: dict[str, BoxNowParcelState]
 
     @classmethod
-    def from_webhook_event(cls, value: str) -> "BoxNowParcelState":
+    def from_webhook_event(cls, value: str) -> BoxNowParcelState:
         """
         Convert a BoxNow ``event`` (or ``parcelState`` / ``state``) string
         to the corresponding enum member.

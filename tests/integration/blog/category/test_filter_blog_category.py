@@ -1,8 +1,9 @@
 import uuid
 from datetime import timedelta
-from django.utils import timezone
-from django.urls import reverse
+
 from django.test import TransactionTestCase
+from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from blog.factories.category import BlogCategoryFactory

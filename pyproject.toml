@@ -86,11 +86,11 @@ dev = [
     "pytest-timeout==2.4.0",
     "pytest-cov==7.1.0",
     "python-semantic-release==10.6.2",
-    "ruff==0.15.12",
+    "ruff==0.16.6",
     "celery-stubs==0.1.3",
     "psutil==7.2.2",
     "hypothesis==6.167.1",
-    "ty==0.0.35",
+    "ty==0.0.78",
     "pytest-split==0.11.0",
 ]
 
@@ -281,8 +281,118 @@ target-version = "py314"
 line-length = 80
 exclude = ["**/migrations/**"]
 
+[tool.ruff.lint]
+# Ruff 0.16 turned on a much broader default set, which is what every
+# contributor's editor shows out of the box — so that is the baseline
+# here rather than a hand-picked `select`. Before this, the section did
+# not exist at all: only the 59 legacy defaults ran, which is why 364
+# `# noqa` comments in the tree suppressed rules that were never on.
+extend-select = [
+    # Dropped from 0.16's defaults, re-added: each is a real bug shape,
+    # and all six are already at zero findings here, so enforcing them
+    # costs nothing and stops a regression.
+    "E402", # module import not at top of file
+    "E722", # bare except
+    "E731", # lambda assigned to a name
+    "E741", # ambiguous variable name (l, I, O)
+    "F403", # `from x import *`
+    "F405", # name may be undefined, or defined from star imports
+    "A",    # builtin shadowing
+    "DJ",   # Django-specific correctness
+    # PLR0917, not PLR0913. PLR0913 counts EVERY parameter, so it fires
+    # just as loudly on a function whose arguments are all keyword-only —
+    # which is the shape its own remedy recommends and which cannot be
+    # mixed up at a call site. Ten of the fourteen it flagged here were
+    # already keyword-only. PLR0917 counts POSITIONAL parameters, which
+    # is the thing that actually goes wrong silently.
+    "PLR0917", # too many POSITIONAL arguments
+    "T20",  # print / pprint left in the tree
+    "TID",  # banned and relative imports
+]
+ignore = [
+    # Lazy imports are the house pattern: modules import inside
+    # functions to stay importable before the app registry is ready and
+    # to break circular imports between apps. 1744 of them.
+    "PLC0415",
+    # Django and DRF declare mutable class attributes by design —
+    # `Meta.indexes`, `serializers_config`, `fields`. 661 of them.
+    "RUF012",
+    # Greek copy is the product's default locale, so "ambiguous"
+    # Cyrillic/Greek lookalikes are simply the correct characters.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    # Signal receivers, DRF hooks and Celery task bodies take arguments
+    # the framework passes and the body does not read.
+    "ARG",
+    # Magic values are overwhelmingly test fixtures and HTTP status
+    # codes; the signal-to-noise does not justify 819 suppressions.
+    "PLR2004",
+    # 120 blind `except Exception` handlers. Each needs a judgement
+    # about what it is really catching, which is the Phase 4 triage —
+    # not something to settle with a blanket autofix here.
+    "BLE001",
+    # ERA001 was enabled and then withdrawn after reading all 13
+    # production hits: 12 are prose, not code. This codebase documents
+    # with comments that contain `=`, dotted paths and parenthesised
+    # tuples — "# (slug, name, price)" heading a data table,
+    # "#   SOCIALACCOUNT_EMAIL_AUTHENTICATION = True" recording a
+    # setting. One hit is worse than noise: `# xgettext:no-python-format`
+    # in order/admin.py is a FUNCTIONAL directive, and ERA001's fix
+    # deletes it, which hard-fails msgfmt on the Greek catalogue.
+    # A rule that is 1-in-13 right and can break the build on the
+    # remainder is not worth its suppressions.
+    "ERA001",
+    # DJ001 (nullable CharField/TextField/URLField) is a REAL finding on
+    # all 13 sites and is deliberately deferred, not dismissed. Making a
+    # string column NOT NULL is a two-RELEASE change under the Argo CD
+    # PreSync hook, because migrations run before the new image: the
+    # ALTER lands while pods that still write NULL are serving, so the
+    # first release has to stop writing NULL and backfill, and only the
+    # second may add the constraint. That sequencing belongs in its own
+    # change with the migration-safety review, not folded into a lint
+    # pass. The 13:
+    #   order.Order.payment_id          — the worst: `null=True` AND
+    #                                     `default=""`, so "no payment
+    #                                     id" has two spellings
+    #   search.SearchQuery              — language_code, session_key,
+    #                                     user_agent
+    #   shipping_boxnow                 — BoxNowLocker.image_url,
+    #                                     BoxNowParcelEvent.data_fingerprint
+    #   user.UserAccount                — seven social profile URLs
+    "DJ001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, and pytest rewrites those asserts — 6527 of them.
+# TRY002: a test that simulates "something arbitrary went wrong" raises
+#   `Exception` on purpose; a bespoke class would assert less, not more.
+# DJ008: `__str__` on the throwaway models declared inside
+#   test_manager_delegation.py to exercise manager delegation.
+# S110: the conftest deliberately swallows — it emulates
+#   `on_commit(..., robust=True)` and closes connections best-effort;
+#   each site already carries a `# pragma: no cover` saying so.
+# All four are 100% test-only — measured, not assumed.
+# SIM117: stacked `with mock.patch(...)` blocks. All 19 are in tests,
+#   and at 80 columns the collapsed form needs a parenthesised context
+#   group — churning test structure for no behavioural gain. The rule
+#   stays enforced in production code, where it is already clean.
+# PLR0917: pytest injects fixtures POSITIONALLY, and `@mock.patch`
+#   passes each mock as a positional argument in bottom-up order. A test
+#   with several of either cannot be given keyword-only parameters — the
+#   rule is unsatisfiable there by construction, not by choice.
+"tests/**" = ["S101", "TRY002", "DJ008", "S110", "SIM117", "PLR0917"]
+"tests_mt/**" = ["S101", "TRY002", "DJ008", "S110", "SIM117", "PLR0917"]
+# Seeding helpers print deliberate, `verbose`-gated progress for an
+# operator watching `seed_all` run. They are shared by the management
+# command and the test factories, so they have no `self.stdout` to write
+# to, and routing operator-facing progress into the log would hide it.
+"country/factories.py" = ["T201"]
+"region/factories.py" = ["T201"]
+"devtools/management/commands/seed_all.py" = ["T201"]
+
 [tool.ruff.lint.pylint]
-max-args = 6
+max-positional-args = 6
 
 # ─────────────────────────────────────────────────────────
 # ty type checker configuration

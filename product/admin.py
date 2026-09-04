@@ -3,9 +3,9 @@ from decimal import Decimal
 
 import admin_thumbnails
 from django.contrib import admin, messages
-from django.db.models import F, Q, Sum, Count, Prefetch
+from django.db.models import Count, F, Prefetch, Q, Sum
 from django.db.models.functions import TruncDay
-from django.http import HttpResponseRedirect, Http404
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import path, reverse, reverse_lazy
 from django.utils import timezone
@@ -16,8 +16,6 @@ from django.utils.translation import ngettext
 from parler.admin import TranslatableAdmin
 from simple_history.admin import SimpleHistoryAdmin
 from unfold.admin import TabularInline
-
-from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateTimeFilter,
@@ -29,6 +27,7 @@ from unfold.contrib.filters.admin import (
 from unfold.decorators import action, display
 from unfold.enums import ActionVariant
 
+from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from admin.displays import (
     REVIEW_STATUS_VARIANT,
     choice_label,
@@ -1017,12 +1016,12 @@ class ProductAdmin(
 
         # Check if we need likes_count or review_average based on filters/ordering
         needs_likes = (
-            any("likes_count" in str(param) for param in request.GET.keys())
+            any("likes_count" in str(param) for param in request.GET)
             or request.GET.get("o", "").find("likes") != -1
         )
 
         needs_reviews = (
-            any("review_average" in str(param) for param in request.GET.keys())
+            any("review_average" in str(param) for param in request.GET)
             or request.GET.get("o", "").find("review") != -1
         )
 
@@ -1172,8 +1171,8 @@ class ProductAdmin(
     def stock_reservation_summary(self, obj):
         """Active reservations + last-7-days stock ops, with a link to
         the full stock-history chart (``stock_history_view``)."""
-        from order.models.stock_reservation import StockReservation
         from order.models.stock_log import StockLog
+        from order.models.stock_reservation import StockReservation
 
         now = timezone.now()
 

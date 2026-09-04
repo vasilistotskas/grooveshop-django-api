@@ -1,15 +1,15 @@
-from .tag import TagSerializer, TagDetailSerializer, TagWriteSerializer
+from .tag import TagDetailSerializer, TagSerializer, TagWriteSerializer
 from .tagged_item import (
-    TaggedItemSerializer,
     TaggedItemDetailSerializer,
+    TaggedItemSerializer,
     TaggedItemWriteSerializer,
 )
 
 __all__ = [
-    "TagSerializer",
     "TagDetailSerializer",
+    "TagSerializer",
     "TagWriteSerializer",
-    "TaggedItemSerializer",
     "TaggedItemDetailSerializer",
+    "TaggedItemSerializer",
     "TaggedItemWriteSerializer",
 ]

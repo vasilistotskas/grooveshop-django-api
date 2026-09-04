@@ -1,12 +1,12 @@
 from __future__ import annotations
-from rest_framework import serializers
+
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
+    OpenApiParameter,
     extend_schema,
     inline_serializer,
-    OpenApiParameter,
 )
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -16,7 +16,18 @@ from notification.models.user import NotificationUser
 from notification.serializers.notification import NotificationSerializer
 
 
-@extend_schema(
+# `@extend_schema` over `@api_view` is drf-spectacular's own documented
+# pattern (see its FAQ). The suppressions on the decorators below are a ty
+# limitation, not a defect here: `djangorestframework-stubs` declares
+# `AsView` as `Protocol[_View]` with `__call__: _View` — an attribute
+# annotated with the class's own TypeVar — and ty will not resolve that
+# into callability when checking `TypeVar F, bound=Callable[..., Any]`.
+# Reduced to 25 lines with no Django involved: the same Protocol with a
+# concrete `__call__: Callable[..., Any]` passes, the generic form fails.
+# Upstream master still declares it the same way, so a stubs bump does
+# not help. Suppressed per line rather than per file so real
+# argument-type errors in these modules are still reported.
+@extend_schema(  # ty: ignore[invalid-argument-type]
     operation_id="getNotificationsByIds",
     summary=_("Returns the notifications for a list of ids."),
     description=_("Returns the notifications for a list of ids."),

@@ -11,12 +11,11 @@ from __future__ import annotations
 import secrets
 from datetime import timedelta
 
+from allauth.idp.oidc.models import Client, Token
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
-
-from allauth.idp.oidc.models import Client, Token
 
 from order.factories.order import OrderFactory
 from product.factories.favourite import ProductFavouriteFactory

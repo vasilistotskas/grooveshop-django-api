@@ -1045,9 +1045,7 @@ class TestOpenAPISchemaGeneration:
 
         # Check for federated search endpoint (various possible path formats)
         federated_paths = [
-            path
-            for path in schema["paths"].keys()
-            if "federated" in path.lower()
+            path for path in schema["paths"] if "federated" in path.lower()
         ]
 
         assert len(federated_paths) > 0, (
@@ -1104,9 +1102,7 @@ class TestOpenAPISchemaGeneration:
 
         # Check for analytics endpoint
         analytics_paths = [
-            path
-            for path in schema["paths"].keys()
-            if "analytics" in path.lower()
+            path for path in schema["paths"] if "analytics" in path.lower()
         ]
 
         assert len(analytics_paths) > 0, (
@@ -1169,7 +1165,7 @@ class TestOpenAPISchemaGeneration:
         # Look for federated search response schema
         federated_schemas = [
             name
-            for name in schemas.keys()
+            for name in schemas
             if "federated" in name.lower() and "response" in name.lower()
         ]
 
@@ -1188,7 +1184,7 @@ class TestOpenAPISchemaGeneration:
         # Look for analytics response schema
         analytics_schemas = [
             name
-            for name in schemas.keys()
+            for name in schemas
             if "analytics" in name.lower() and "response" in name.lower()
         ]
 
@@ -1235,6 +1231,7 @@ class TestManagementCommandsExecution:
         would wipe filterable/sortable/searchable/synonyms (G0172).
         """
         from io import StringIO
+
         from django.core.management import call_command
 
         with patch("meili._client.client.client.index") as mock_index:
@@ -1266,6 +1263,7 @@ class TestManagementCommandsExecution:
         """The command must update ONLY the ranking rules via the dedicated
         endpoint â€” never the full-payload update_settings (G0172)."""
         from io import StringIO
+
         from django.core.management import call_command
 
         with patch("meili._client.client.client.index") as mock_index:

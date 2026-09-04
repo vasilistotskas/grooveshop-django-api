@@ -52,7 +52,7 @@ class DependencyNode:
         return self.model_class.__name__
 
     def add_dependency(
-        self, dependency_node: "DependencyNode", dependency_type: str = "FK"
+        self, dependency_node: DependencyNode, dependency_type: str = "FK"
     ):
         """Add a dependency (this factory depends on dependency_node)"""
         self.dependencies.add(dependency_node)

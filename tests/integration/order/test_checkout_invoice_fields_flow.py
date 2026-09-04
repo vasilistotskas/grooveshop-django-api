@@ -42,16 +42,16 @@ def checkout():
     cart.items.all().delete()
     product = ProductFactory(
         stock=10,
-        price=Money(Decimal("100"), "EUR"),
-        discount_percent=Decimal("0"),
+        price=Money(Decimal(100), "EUR"),
+        discount_percent=Decimal(0),
         vat=None,
         active=True,
     )
     CartItemFactory(cart=cart, product=product, quantity=1)
     pay_way = PayWayFactory(
         is_online_payment=False,
-        cost=Money(Decimal("0"), "EUR"),
-        free_threshold=Money(Decimal("0"), "EUR"),
+        cost=Money(Decimal(0), "EUR"),
+        free_threshold=Money(Decimal(0), "EUR"),
     )
     shipping_address = {
         "first_name": "Maria",

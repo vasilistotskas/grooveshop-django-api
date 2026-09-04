@@ -1,17 +1,18 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from datetime import timedelta
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from notification.enum import (
+    NotificationCategoryEnum,
+    NotificationKindEnum,
+    NotificationPriorityEnum,
+)
 from notification.factories.notification import NotificationFactory
 from notification.factories.user import NotificationUserFactory
 from notification.models.user import NotificationUser
-from notification.enum import (
-    NotificationKindEnum,
-    NotificationCategoryEnum,
-    NotificationPriorityEnum,
-)
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()

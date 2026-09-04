@@ -1,7 +1,6 @@
 import os
 import re
 
-from core.fields.image import ImageAndSvgField
 from django.contrib.postgres.indexes import BTreeIndex
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -11,6 +10,7 @@ from djmoney.models.fields import MoneyField
 from parler.models import TranslatableModel, TranslatedFields
 from tinymce.models import HTMLField
 
+from core.fields.image import ImageAndSvgField
 from core.models import SortableModel, TimeStampMixinModel, UUIDModel
 from pay_way.enum.pay_way import PayWayEnum
 from pay_way.managers import PayWayManager

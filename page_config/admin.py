@@ -3,7 +3,6 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
-
 from page_config.models import (
     ContentPage,
     ContentPageTranslation,
@@ -86,7 +85,7 @@ class NavigationMenuAdmin(BaseModelAdmin):
 
     def save_model(self, request, obj, form, change):
         # Field-level JSON validation mirrors the storefront contract.
-        from page_config.schemas import (  # noqa: PLC0415
+        from page_config.schemas import (
             validate_navigation_items,
         )
 

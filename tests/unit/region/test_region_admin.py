@@ -386,9 +386,9 @@ class TestRegionAdmin(TestCase):
 
         queryset = Region.objects.filter(country=self.country)
 
-        setattr(self.request, "session", {})
+        self.request.session = {}
         messages = FallbackStorage(self.request)
-        setattr(self.request, "_messages", messages)
+        self.request._messages = messages
 
         self.admin.update_sort_order(self.request, queryset)
 
@@ -526,9 +526,9 @@ class TestRegionAdminEdgeCases(TestCase):
     def test_sort_order_action_empty_queryset(self):
         empty_queryset = Region.objects.none()
 
-        setattr(self.request, "session", {})
+        self.request.session = {}
         messages = FallbackStorage(self.request)
-        setattr(self.request, "_messages", messages)
+        self.request._messages = messages
 
         try:
             self.admin.update_sort_order(self.request, empty_queryset)

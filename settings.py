@@ -947,9 +947,14 @@ def get_celery_beat_schedule():
         },
         "clear-all-cache": {
             "task": "core.tasks.clear_all_cache_task",
-            "schedule": SCHEDULE_PRESETS["monthly_first_4am"]
-            if not DEBUG
-            else SCHEDULE_PRESETS["monthly_first_4am"],
+            # NOTE: the only beat entry with no DEBUG override. Every
+            # sibling reads `... if not DEBUG else "every_hour"`; this one
+            # had "monthly_first_4am" on BOTH branches, so the conditional
+            # never did anything. Collapsed rather than "fixed" to
+            # every_hour, because that would start clearing the whole
+            # cache hourly in development — a behaviour change to decide
+            # deliberately, not to infer from the neighbours.
+            "schedule": SCHEDULE_PRESETS["monthly_first_4am"],
         },
         "cleanup-abandoned-carts": {
             "task": "tenant.tasks.fanout_cleanup_abandoned_carts",

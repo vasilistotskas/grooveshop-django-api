@@ -63,11 +63,13 @@ class TestMeiliIndexesGetTheirSettings:
         from tenant import provisioning
 
         model = MagicMock()
-        with override_settings(MEILISEARCH={"OFFLINE": True}):
-            with patch(
+        with (
+            override_settings(MEILISEARCH={"OFFLINE": True}),
+            patch(
                 "meili.models.IndexMixin.__subclasses__", return_value=[model]
-            ):
-                provisioning._create_meili_indexes(MagicMock())
+            ),
+        ):
+            provisioning._create_meili_indexes(MagicMock())
 
         model.update_meili_settings.assert_not_called()
 

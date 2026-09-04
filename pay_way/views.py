@@ -90,7 +90,7 @@ class PayWayViewSet(BaseModelViewSet):
             # Also hide providers this tenant holds no credentials for —
             # a seeded-but-keyless Stripe/Viva row would dead-end the
             # shopper at checkout-session creation.
-            from pay_way.services import PayWayService  # noqa: PLC0415
+            from pay_way.services import PayWayService
 
             codes = set(
                 qs.exclude(provider_code="").values_list(

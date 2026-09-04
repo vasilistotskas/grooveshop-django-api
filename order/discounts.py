@@ -20,7 +20,7 @@ CENT = Decimal("0.01")
 
 
 def order_discount_total(order) -> Decimal:
-    total = Decimal("0")
+    total = Decimal(0)
     for money in (order.discount_amount, order.loyalty_discount):
         if money and money.amount > 0:
             total += Decimal(money.amount)
@@ -40,7 +40,7 @@ def discounted_line_gross(order, items=None) -> dict[int, Decimal]:
         item.pk: Decimal(item.price.amount) * Decimal(item.quantity)
         for item in items
     }
-    items_total = sum(gross.values(), Decimal("0"))
+    items_total = sum(gross.values(), Decimal(0))
     discount = order_discount_total(order)
     if discount <= 0 or items_total <= 0:
         return gross
@@ -49,7 +49,7 @@ def discounted_line_gross(order, items=None) -> dict[int, Decimal]:
 
     shares: dict[int, Decimal] = {}
     remainders: dict[int, Decimal] = {}
-    allocated = Decimal("0")
+    allocated = Decimal(0)
     for pk, line in gross.items():
         raw = discount * line / items_total
         floored = raw.quantize(CENT, rounding=ROUND_FLOOR)
@@ -67,10 +67,10 @@ def discounted_line_gross(order, items=None) -> dict[int, Decimal]:
     # nearly equals the items total, push one line past its own gross.
     # Repair by moving the overflow to the largest remaining line so
     # no line goes negative and the total allocation stays exact.
-    for pk in gross:
-        overflow = shares[pk] - gross[pk]
+    for pk, gross_share in gross.items():
+        overflow = shares[pk] - gross_share
         if overflow > 0:
-            shares[pk] = gross[pk]
+            shares[pk] = gross_share
             for other_pk, _line in sorted(
                 gross.items(), key=lambda kv: -(kv[1] - shares[kv[0]])
             ):

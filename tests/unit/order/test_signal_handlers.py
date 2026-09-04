@@ -1,5 +1,6 @@
-from django.test import TestCase
 from unittest.mock import MagicMock, Mock, patch
+
+from django.test import TestCase
 
 from order.enum.status import OrderStatus
 from order.signals.handlers import handle_order_post_save

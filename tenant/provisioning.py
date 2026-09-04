@@ -61,7 +61,7 @@ def ensure_api_domain(tenant: Tenant) -> str | None:
     ``messages.warning`` for the admin), so this function does not
     raise — it just cannot do anything.
     """
-    from tenant.models import TenantDomain  # noqa: PLC0415
+    from tenant.models import TenantDomain
 
     primary = tenant.domains.filter(is_primary=True).first()
     if primary is None:
@@ -104,8 +104,8 @@ def ensure_site(tenant: Tenant) -> str | None:
     deliberately. Returns the domain, or ``None`` when the tenant has no
     primary domain yet — matching ``ensure_api_domain``'s contract.
     """
-    from django.contrib.sites.models import Site  # noqa: PLC0415
-    from django_tenants.utils import (  # noqa: PLC0415
+    from django.contrib.sites.models import Site
+    from django_tenants.utils import (
         get_public_schema_name,
         schema_context,
     )
@@ -157,13 +157,13 @@ def provision_stripe(
     callers render it (stdout for the command, ``message_user`` for the
     admin) rather than this function printing.
     """
-    from urllib.parse import urljoin  # noqa: PLC0415
+    from urllib.parse import urljoin
 
-    from django.urls import reverse  # noqa: PLC0415
-    from django_tenants.utils import tenant_context  # noqa: PLC0415
+    from django.urls import reverse
+    from django_tenants.utils import tenant_context
 
     with tenant_context(tenant):
-        from tenant.credentials import stripe_credentials  # noqa: PLC0415
+        from tenant.credentials import stripe_credentials
 
         secret_key = stripe_credentials()["secret_key"]
         if not secret_key:
@@ -196,7 +196,7 @@ def provision_stripe(
                 ),
             }
 
-        from djstripe.models import APIKey, WebhookEndpoint  # noqa: PLC0415
+        from djstripe.models import APIKey, WebhookEndpoint
 
         api_key, created = APIKey.objects.get_or_create_by_api_key(secret_key)
         if api_key.djstripe_owner_account_id is None:
@@ -260,13 +260,13 @@ def provision_owner_membership(
     backfill) once they do. Callers decide how to surface that (the
     CLI writes a stdout warning; the admin a ``messages.warning``).
     """
-    from django.contrib.auth import get_user_model  # noqa: PLC0415
-    from django_tenants.utils import (  # noqa: PLC0415
+    from django.contrib.auth import get_user_model
+    from django_tenants.utils import (
         get_public_schema_name,
         schema_context,
     )
 
-    from tenant.models import (  # noqa: PLC0415
+    from tenant.models import (
         TenantMembershipRole,
         UserTenantMembership,
     )
@@ -300,7 +300,7 @@ def provision_owner_membership(
 
 def _seed_extra_settings(tenant: Tenant) -> None:
     try:
-        from extra_settings.models import Setting  # noqa: PLC0415
+        from extra_settings.models import Setting
 
         # The canonical seeding path (also wired to post_migrate by
         # django-extra-settings itself, and used by the
@@ -317,7 +317,7 @@ def _seed_extra_settings(tenant: Tenant) -> None:
 
 def _seed_page_layouts(tenant: Tenant) -> None:
     try:
-        from page_config.defaults import seed_page_layouts  # noqa: PLC0415
+        from page_config.defaults import seed_page_layouts
 
         seed_page_layouts()
         logger.info("Seeded page layouts for %s", tenant.schema_name)
@@ -327,7 +327,7 @@ def _seed_page_layouts(tenant: Tenant) -> None:
 
 def _seed_content_pages(tenant: Tenant) -> None:
     try:
-        from page_config.defaults import seed_content_pages  # noqa: PLC0415
+        from page_config.defaults import seed_content_pages
 
         seed_content_pages()
         logger.info("Seeded content pages for %s", tenant.schema_name)
@@ -336,13 +336,13 @@ def _seed_content_pages(tenant: Tenant) -> None:
 
 
 def _create_meili_indexes(tenant: Tenant) -> None:
-    from django.conf import settings as django_settings  # noqa: PLC0415
+    from django.conf import settings as django_settings
 
     if django_settings.MEILISEARCH.get("OFFLINE"):
         return
 
     # Discover all IndexMixin subclasses
-    from meili.models import IndexMixin  # noqa: PLC0415
+    from meili.models import IndexMixin
 
     for model in IndexMixin.__subclasses__():
         index_name = model.get_meili_index_name()
@@ -380,7 +380,7 @@ def seed_tenant_defaults(tenant: Tenant) -> None:
     swallowed): a Meilisearch or page_config hiccup must never block
     tenant creation.
     """
-    from django_tenants.utils import schema_context  # noqa: PLC0415
+    from django_tenants.utils import schema_context
 
     with schema_context(tenant.schema_name):
         _seed_extra_settings(tenant)

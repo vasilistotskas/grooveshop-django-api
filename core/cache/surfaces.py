@@ -63,8 +63,7 @@ def _nuxt_routes(*paths: str) -> tuple[str, ...]:
     """
 
     return tuple(
-        "cache:nitro:routes:_:*{}*".format(_escaped_pathname(path))
-        for path in paths
+        f"cache:nitro:routes:_:*{_escaped_pathname(path)}*" for path in paths
     )
 
 

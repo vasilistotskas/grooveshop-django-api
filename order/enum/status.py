@@ -13,15 +13,15 @@ class OrderStatus(models.TextChoices):
     REFUNDED = "REFUNDED", _("Refunded")
 
     @classmethod
-    def get_active_statuses(cls) -> list["OrderStatus"]:
+    def get_active_statuses(cls) -> list[OrderStatus]:
         return [cls.PENDING, cls.PROCESSING, cls.SHIPPED, cls.DELIVERED]
 
     @classmethod
-    def get_final_statuses(cls) -> list["OrderStatus"]:
+    def get_final_statuses(cls) -> list[OrderStatus]:
         return [cls.COMPLETED, cls.CANCELED, cls.REFUNDED]
 
     @classmethod
-    def get_status_groups(cls) -> dict[str, list["OrderStatus"]]:
+    def get_status_groups(cls) -> dict[str, list[OrderStatus]]:
         return {
             "active": cls.get_active_statuses(),
             "final": cls.get_final_statuses(),

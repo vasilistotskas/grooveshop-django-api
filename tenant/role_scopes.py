@@ -28,7 +28,6 @@ Two rules shape everything here:
 
 from __future__ import annotations
 
-
 # Apps that belong to the PLATFORM, never to a store.
 #
 # Enumerated deliberately (see module docstring). Notes on the
@@ -93,7 +92,7 @@ def store_app_labels() -> frozenset[str]:
     automatically, plus the shared-but-per-schema apps above, minus
     anything claimed by the platform.
     """
-    from tenant.app_labels import tenant_only_app_labels  # noqa: PLC0415
+    from tenant.app_labels import tenant_only_app_labels
 
     labels = set(tenant_only_app_labels()) | set(STORE_SHARED_APP_LABELS)
     return frozenset(labels - PLATFORM_ONLY_APP_LABELS)

@@ -812,10 +812,8 @@ class OrderViewSet(BaseModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        except Exception as e:
-            logger.error(
-                "Unexpected error creating order: %s", e, exc_info=True
-            )
+        except Exception:
+            logger.exception("Unexpected error creating order")
             return Response(
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1343,7 +1341,7 @@ class OrderViewSet(BaseModelViewSet):
         # hides unconfigured providers, but a stale client (or a key
         # removed mid-session) could still submit one — refuse before
         # the provider constructor raises ImproperlyConfigured.
-        from pay_way.services import PayWayService  # noqa: PLC0415
+        from pay_way.services import PayWayService
 
         if not PayWayService.is_provider_configured(
             order.pay_way.provider_code
@@ -1454,12 +1452,12 @@ class OrderViewSet(BaseModelViewSet):
         Gated by ``AGENT_STRIPE_DELEGATED_ENABLED`` (off until Stripe
         Agentic Commerce enrollment completes).
         """
-        from order.enum.status import PaymentStatus
-
         # Per-store commercial capability: the Tenant flag enables the
         # SPT flow for THIS store; the platform env stays as a legacy
         # enable-all switch for the pre-multi-tenant deployment.
         from django.db import connection as _connection
+
+        from order.enum.status import PaymentStatus
 
         tenant_enabled = getattr(
             getattr(_connection, "tenant", None),
@@ -1479,7 +1477,7 @@ class OrderViewSet(BaseModelViewSet):
 
         # The SPT is granted against a specific merchant account, so it
         # must be confirmed with THIS tenant's own Stripe identity.
-        from pay_way.services import PayWayService  # noqa: PLC0415
+        from pay_way.services import PayWayService
 
         if not PayWayService.is_provider_configured("stripe"):
             return Response(
@@ -1641,8 +1639,8 @@ class OrderViewSet(BaseModelViewSet):
             raise ValidationError(
                 {"detail": _("Unable to cancel this order.")}
             ) from e
-        except Exception as e:
-            logger.error("Error canceling order: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Error canceling order")
             return Response(
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1779,7 +1777,7 @@ class OrderViewSet(BaseModelViewSet):
             # the storefront can route the buyer to the gift-card
             # confirmation instead of a dead order lookup.
             if order_code:
-                from giftcard.models import (  # noqa: PLC0415
+                from giftcard.models import (
                     GiftCardPurchase,
                 )
 
@@ -1968,10 +1966,8 @@ class OrderViewSet(BaseModelViewSet):
             )
             return Response(response_serializer.data)
 
-        except Exception as e:
-            logger.error(
-                "Error adding tracking information: %s", e, exc_info=True
-            )
+        except Exception:
+            logger.exception("Error adding tracking information")
             return Response(
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -2022,8 +2018,8 @@ class OrderViewSet(BaseModelViewSet):
                     )
                 }
             ) from e
-        except Exception as e:
-            logger.error("Error updating order status: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Error updating order status")
             return Response(
                 {"detail": _("An unexpected error occurred")},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -2057,12 +2053,10 @@ class OrderViewSet(BaseModelViewSet):
                 {"detail": _("Unable to retrieve payment status.")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        except Exception as e:
-            logger.error(
-                "Error getting payment status for order %s: %s",
+        except Exception:
+            logger.exception(
+                "Error getting payment status for order %s",
                 order.id,
-                e,
-                exc_info=True,
             )
             return Response(
                 {

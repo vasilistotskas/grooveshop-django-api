@@ -21,7 +21,6 @@ from rest_framework.test import APIClient
 
 from user.factories.account import UserAccountFactory
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

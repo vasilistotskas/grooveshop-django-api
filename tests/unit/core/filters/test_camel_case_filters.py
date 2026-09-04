@@ -1,12 +1,13 @@
-from django.test import TestCase
-from django.http import QueryDict
 from django.db import models
+from django.http import QueryDict
+from django.test import TestCase
+from django_filters import rest_framework as filters
+
 from core.filters.camel_case_filters import (
     CamelCaseFilterMixin,
     CamelCaseTimeStampFilterSet,
     snake_to_camel,
 )
-from django_filters import rest_framework as filters
 
 
 class MockModel(models.Model):

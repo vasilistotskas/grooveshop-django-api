@@ -67,7 +67,7 @@ def _action_source_website():
     return ActionSource.WEBSITE
 
 
-def _decimal_to_float(value: Decimal | float | int | None) -> float | None:
+def _decimal_to_float(value: Decimal | float | None) -> float | None:
     if value is None:
         return None
     return float(value)
@@ -134,9 +134,11 @@ def is_capi_enabled() -> bool:
         return False
     # Tenant-only credentials, no platform fallback — an unconfigured
     # tenant is simply "disabled", not an error.
-    if not (tenant_meta_pixel_id() and tenant_meta_capi_access_token()):
-        return False
-    return True
+    # `bool(...)`, not the bare `and`: `and` yields its last truthy
+    # operand, so this function annotated `-> bool` was returning the CAPI
+    # access token itself. Any caller comparing `is True` saw False, and
+    # the secret travelled somewhere only a flag was expected.
+    return bool(tenant_meta_pixel_id() and tenant_meta_capi_access_token())
 
 
 def _build_user_data(order: Order) -> Any:

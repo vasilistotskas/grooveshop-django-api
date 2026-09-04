@@ -4,7 +4,7 @@ from django_filters import rest_framework as filters
 
 from blog.models.tag import BlogTag
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
-from core.filters.core import UUIDFilterMixin, SortableFilterMixin
+from core.filters.core import SortableFilterMixin, UUIDFilterMixin
 
 
 class BlogTagFilter(

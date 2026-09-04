@@ -7,7 +7,7 @@ to help diagnose signature verification failures.
 
 import hashlib
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from django.http import HttpRequest, HttpResponse
 

@@ -10,7 +10,6 @@ from django.utils import timezone
 from order.enum.status import OrderStatus, PaymentStatus
 from order.factories.order import OrderFactory
 from order.models.order import Order
-from pay_way.factories import PayWayFactory
 from order.tasks import (
     CONFIRMATION_EMAIL_SENT_AT_KEY,
     _confirmation_already_sent,
@@ -23,6 +22,7 @@ from order.tasks import (
     send_order_status_update_email,
     send_shipping_notification_email,
 )
+from pay_way.factories import PayWayFactory
 
 
 @pytest.mark.django_db

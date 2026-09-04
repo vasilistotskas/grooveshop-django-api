@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import functools
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from django.db import connection
 from django_tenants.utils import get_public_schema_name, schema_context
@@ -156,7 +156,7 @@ def with_tenant_schema_from_event(func: Callable) -> Callable:
         # a 500 and cause Stripe to redeliver indefinitely.
         if schema_name != get_public_schema_name():
             try:
-                from tenant.models import Tenant  # noqa: PLC0415
+                from tenant.models import Tenant
 
                 # Mirror the Viva/BoxNow resolvers: a suspended tenant's
                 # Stripe events must not mutate its frozen data. Stripe
@@ -188,7 +188,7 @@ def with_tenant_schema_from_event(func: Callable) -> Callable:
             # would raise ImproperlyConfigured. The Viva and Celery
             # resolvers already do this deliberately; this path was the
             # odd one out.
-            from django_tenants.utils import tenant_context  # noqa: PLC0415
+            from django_tenants.utils import tenant_context
 
             with tenant_context(tenant):
                 return func(sender, **kwargs)

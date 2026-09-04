@@ -8,7 +8,6 @@ from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
-
 from rest_framework.response import Response
 
 from core.api.permissions import StoreStaffModelPermissions

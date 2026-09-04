@@ -50,7 +50,7 @@ class TestPromotionDiscountReachesTheCharge:
         )
 
         assert order.calculate_order_total_amount().amount == max(
-            total.amount - Decimal("10.00"), Decimal("0")
+            total.amount - Decimal("10.00"), Decimal(0)
         )
 
     def test_deductions_never_produce_a_negative_charge(self):
@@ -58,13 +58,13 @@ class TestPromotionDiscountReachesTheCharge:
         total = order.total_price
 
         order.discount_amount = Money(
-            total.amount + Decimal("50"), total.currency
+            total.amount + Decimal(50), total.currency
         )
         order.save(
             update_fields=["discount_amount", "discount_amount_currency"]
         )
 
-        assert order.calculate_order_total_amount().amount == Decimal("0")
+        assert order.calculate_order_total_amount().amount == Decimal(0)
 
     def test_pricing_breakdown_reports_deductions(self):
         from order.serializers.order import OrderDetailSerializer

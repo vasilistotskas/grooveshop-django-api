@@ -1,17 +1,16 @@
 import json
 import logging
-from django.core.exceptions import ImproperlyConfigured
+
 from celery.exceptions import CeleryError
-from core.api.permissions import IsPlatformSuperuser
-from core.celery import celery_app
 from django.conf import settings
-from django.db import DatabaseError, connection
+from django.core.exceptions import ImproperlyConfigured
+from django.db import DatabaseError, connection, transaction
 from django.middleware.csrf import get_token
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import (
+    OpenApiParameter,
     extend_schema,
     extend_schema_view,
-    OpenApiParameter,
 )
 from redis import Redis, RedisError
 from rest_framework import status
@@ -22,17 +21,19 @@ from rest_framework.decorators import (
     permission_classes,
     throttle_classes,
 )
-from rest_framework.permissions import AllowAny
 from rest_framework.metadata import SimpleMetadata
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-from django.db import transaction
+
+from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import (
     ErrorResponseSerializer,
     HealthCheckResponseSerializer,
     SettingDetailSerializer,
     SettingSerializer,
 )
+from core.celery import celery_app
 from core.pagination.cursor import CursorPaginator
 from core.pagination.limit_offset import LimitOffsetPaginator
 from core.pagination.page_number import PageNumberPaginator
@@ -135,11 +136,9 @@ class RequestResponseSerializerMixin:
             return self.serializer_class
 
         raise ImproperlyConfigured(
-            "No serializer found for action '{action}' and no default serializer defined. "
-            "Define {cls}.serializers_config['{action}'] or set {cls}.serializer_class, "
-            "or override {cls}.get_serializer_class().".format(
-                action=current_action, cls=self.__class__.__name__
-            )
+            f"No serializer found for action '{current_action}' and no default serializer defined. "
+            f"Define {self.__class__.__name__}.serializers_config['{current_action}'] or set {self.__class__.__name__}.serializer_class, "
+            f"or override {self.__class__.__name__}.get_serializer_class()."
         )
 
     def get_request_serializer(self, *args, **kwargs):
@@ -415,7 +414,18 @@ class BaseModelViewSet(
         return Response(data)
 
 
-@extend_schema(
+# `@extend_schema` over `@api_view` is drf-spectacular's own documented
+# pattern (see its FAQ). The suppressions on the decorators below are a ty
+# limitation, not a defect here: `djangorestframework-stubs` declares
+# `AsView` as `Protocol[_View]` with `__call__: _View` — an attribute
+# annotated with the class's own TypeVar — and ty will not resolve that
+# into callability when checking `TypeVar F, bound=Callable[..., Any]`.
+# Reduced to 25 lines with no Django involved: the same Protocol with a
+# concrete `__call__: Callable[..., Any]` passes, the generic form fails.
+# Upstream master still declares it the same way, so a stubs bump does
+# not help. Suppressed per line rather than per file so real
+# argument-type errors in these modules are still reported.
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Check the health status of database, Redis, and Celery"),
     description=_("Check the health status of database, Redis, and Celery"),
     tags=["Health"],
@@ -463,7 +473,7 @@ def health_check(request):
     return response
 
 
-@extend_schema(exclude=True)
+@extend_schema(exclude=True)  # ty: ignore[invalid-argument-type]
 @api_view(["GET"])
 @authentication_classes([])
 @permission_classes([AllowAny])
@@ -484,7 +494,7 @@ def health_live(request):
     return Response({"status": "ok"})
 
 
-@extend_schema(
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("List all available settings"),
     description=_("Retrieve all settings with their names, values, and types"),
     tags=["Settings"],
@@ -517,8 +527,8 @@ def list_settings(request):
         serializer = SettingSerializer(settings_list, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    except Exception as e:
-        logger.error(f"Error listing settings: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error listing settings")
 
         return Response(
             {"detail": _("Failed to retrieve settings")},
@@ -594,7 +604,7 @@ PUBLIC_SETTING_KEYS = frozenset(
 )
 
 
-@extend_schema(
+@extend_schema(  # ty: ignore[invalid-argument-type]
     summary=_("Get setting by key"),
     description=_("Retrieve a specific setting value by its key name"),
     tags=["Settings"],
@@ -635,12 +645,13 @@ def get_setting_by_key(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if key not in PUBLIC_SETTING_KEYS:
-            if not is_store_staff(request.user):
-                return Response(
-                    {"detail": _("Setting not found or access denied.")},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+        if (key not in PUBLIC_SETTING_KEYS) and (
+            not is_store_staff(request.user)
+        ):
+            return Response(
+                {"detail": _("Setting not found or access denied.")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         try:
             setting_value = Setting.get(key)
@@ -671,8 +682,8 @@ def get_setting_by_key(request):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-    except Exception as e:
-        logger.error(f"Error retrieving setting: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error retrieving setting")
 
         return Response(
             {"detail": _("Failed to retrieve setting")},

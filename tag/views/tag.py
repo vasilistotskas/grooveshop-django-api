@@ -5,6 +5,14 @@ from drf_spectacular.utils import extend_schema_view
 from rest_framework.permissions import AllowAny
 
 from core.api.permissions import StoreStaffModelPermissions
+from core.api.serializers import ErrorResponseSerializer
+from core.api.views import BaseModelViewSet
+from core.utils.serializers import (
+    SerializersConfig,
+    create_schema_view_config,
+    crud_config,
+)
+from core.utils.views import cache_methods
 from tag.filters.tag import TagFilter
 from tag.models.tag import Tag
 from tag.serializers.tag import (
@@ -12,15 +20,6 @@ from tag.serializers.tag import (
     TagSerializer,
     TagWriteSerializer,
 )
-from core.api.serializers import ErrorResponseSerializer
-from core.api.views import BaseModelViewSet
-
-from core.utils.serializers import (
-    SerializersConfig,
-    create_schema_view_config,
-    crud_config,
-)
-from core.utils.views import cache_methods
 
 serializers_config: SerializersConfig = {
     **crud_config(

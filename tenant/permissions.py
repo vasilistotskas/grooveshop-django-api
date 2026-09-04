@@ -59,7 +59,7 @@ class IsTenantFeatureEnabled(BasePermission):
         # loyalty_enabled=False by default, so every loyalty endpoint
         # 404'd on the control-plane host. The helper returns None for
         # the public schema, which is what "no tenant to gate on" means.
-        from tenant.membership import get_current_tenant  # noqa: PLC0415
+        from tenant.membership import get_current_tenant
 
         tenant = get_current_tenant()
         if tenant is None:
@@ -135,7 +135,7 @@ class IsSettingEnabled(BasePermission):
         # (the schema tests deliberately run without DB access).
         if getattr(view, "swagger_fake_view", False):
             return True
-        from extra_settings.models import Setting  # noqa: PLC0415
+        from extra_settings.models import Setting
 
         if not bool(Setting.get(self.setting_key, default=self.default)):
             raise NotFound()

@@ -5,8 +5,9 @@ Tests the calculate_payment_method_fee method in OrderService to ensure
 it correctly calculates fees based on PayWay configuration and free thresholds.
 """
 
-import pytest
 from decimal import Decimal
+
+import pytest
 from django.conf import settings
 from djmoney.money import Money
 

@@ -227,6 +227,7 @@ class TestBeatScheduleTenantCoverage:
 
     def test_every_fanout_beat_target_exists(self):
         from django.conf import settings
+
         from tenant import tasks as tenant_tasks
 
         missing = [

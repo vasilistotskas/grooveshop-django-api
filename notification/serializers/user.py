@@ -2,9 +2,9 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.relations import PrimaryKeyRelatedField
 
-from user.serializers.account import UserDetailsSerializer
 from notification.models.user import NotificationUser
 from notification.serializers.notification import NotificationSerializer
+from user.serializers.account import UserDetailsSerializer
 
 
 class NotificationUserSerializer(serializers.ModelSerializer[NotificationUser]):

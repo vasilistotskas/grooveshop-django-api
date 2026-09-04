@@ -3,7 +3,8 @@ import logging
 import time
 import traceback
 from collections import defaultdict, deque
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -58,7 +59,7 @@ class SeedingOptions:
     debug: bool = False
 
     @classmethod
-    def from_dict(cls, options: dict[str, Any]) -> "SeedingOptions":
+    def from_dict(cls, options: dict[str, Any]) -> SeedingOptions:
         """Create SeedingOptions from command options dict"""
         return cls(**{k: v for k, v in options.items() if hasattr(cls, k)})
 
@@ -448,7 +449,6 @@ class FactoryExecutor:
     ) -> None:
         """Apply locale-specific context to factory"""
         market = context.get("market", "global")
-        # locales = context.get("locales", [])
 
         # This could be enhanced to actually configure the factory
         # based on market/locale settings
@@ -902,16 +902,15 @@ class Command(BaseCommand):
             return True
 
         if hasattr(factory_class, "custom_seed") and callable(
-            getattr(factory_class, "custom_seed")
+            factory_class.custom_seed
         ):
             return True
 
         from devtools.factories import SeedingStrategyRegistry
 
-        if SeedingStrategyRegistry.has_strategy(factory_class.__name__):
-            return True
-
-        return False
+        return bool(
+            SeedingStrategyRegistry.has_strategy(factory_class.__name__)
+        )
 
     def _execute_custom_seeding(
         self,
@@ -974,7 +973,7 @@ class Command(BaseCommand):
 
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR(f"  [ERROR] Custom seeding failed: {str(e)}")
+                self.style.ERROR(f"  [ERROR] Custom seeding failed: {e!s}")
             )
             raise
 
@@ -1086,7 +1085,10 @@ class Command(BaseCommand):
 
         logger.error(
             "Fatal seeding error",
-            exc_info=True,
+            # The exception is passed in, so name it rather than relying
+            # on sys.exc_info(): this helper is called from the handler,
+            # but nothing in its signature says it has to be.
+            exc_info=error,
             extra={
                 "session_duration": time.time() - self.session_start_time
                 if self.session_start_time

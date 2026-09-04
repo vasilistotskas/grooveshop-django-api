@@ -20,19 +20,19 @@ from shipping_boxnow.serializers.webhook import (
 )
 
 __all__ = [
+    "BoxNowCustomerSerializer",
+    # webhook
+    "BoxNowEventLocationSerializer",
+    "BoxNowLockerDetailSerializer",
     # locker
     "BoxNowLockerSerializer",
-    "BoxNowLockerDetailSerializer",
     "BoxNowNearestLockerRequestSerializer",
     "BoxNowNearestLockerResponseSerializer",
     # parcel event
     "BoxNowParcelEventSerializer",
+    "BoxNowShipmentDetailSerializer",
     # shipment
     "BoxNowShipmentSerializer",
-    "BoxNowShipmentDetailSerializer",
-    # webhook
-    "BoxNowEventLocationSerializer",
-    "BoxNowCustomerSerializer",
     "BoxNowWebhookDataSerializer",
     "BoxNowWebhookEnvelopeSerializer",
     "BoxNowWebhookResponseSerializer",

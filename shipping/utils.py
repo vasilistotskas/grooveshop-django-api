@@ -30,4 +30,4 @@ def compute_total_weight_grams(items) -> int:
             continue
         grams_per_unit = float(getattr(weight, "g", 0) or 0)
         total_grams += grams_per_unit * float(quantity)
-    return max(0, int(round(total_grams)))
+    return max(0, round(total_grams))

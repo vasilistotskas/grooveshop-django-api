@@ -15,7 +15,6 @@ from core.cache import CacheService
 from core.cache.nuxt import is_configured as nuxt_purge_configured
 from core.cache.registry import iter_surfaces
 
-
 # Platform console identity. Deliberately NOT the UNFOLD_SITE_HEADER
 # defaults: those are tenant #1's ("Webside"), and the control plane must
 # not wear a merchant's name.
@@ -58,7 +57,7 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         if not super().has_permission(request):
             return False
 
-        from tenant.auth_backends import (  # noqa: PLC0415
+        from tenant.auth_backends import (
             is_platform_staff_session,
         )
 
@@ -69,7 +68,7 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         if user.is_superuser:
             return True
 
-        from tenant.membership import (  # noqa: PLC0415
+        from tenant.membership import (
             get_current_tenant,
             get_membership,
         )
@@ -91,12 +90,12 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         row does not exist. ``PasswordChangeForm.save()`` would try to
         UPDATE the wrong (or a missing) row.
         """
-        from tenant.auth_backends import (  # noqa: PLC0415
+        from tenant.auth_backends import (
             is_platform_staff_session,
         )
 
         if is_platform_staff_session(request):
-            from django_tenants.utils import (  # noqa: PLC0415
+            from django_tenants.utils import (
                 get_public_schema_name,
                 schema_context,
             )
@@ -134,12 +133,12 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         belong to that host.
         """
         app_list = super().get_app_list(request, app_label)
-        from tenant.membership import get_current_tenant  # noqa: PLC0415
+        from tenant.membership import get_current_tenant
 
         if get_current_tenant() is not None:
             return app_list
 
-        from tenant.app_labels import tenant_only_app_labels  # noqa: PLC0415
+        from tenant.app_labels import tenant_only_app_labels
 
         hidden = set(tenant_only_app_labels())
         return [app for app in app_list if app.get("app_label") not in hidden]
@@ -163,8 +162,8 @@ class MyAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
           ``BaseModelAdmin._withheld_on_public``.
         """
         context = super().each_context(request)
-        from tenant.console import is_platform_console  # noqa: PLC0415
-        from tenant.membership import get_current_tenant  # noqa: PLC0415
+        from tenant.console import is_platform_console
+        from tenant.membership import get_current_tenant
 
         if is_platform_console(request):
             context["site_header"] = PLATFORM_SITE_HEADER

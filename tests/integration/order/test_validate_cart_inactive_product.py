@@ -10,7 +10,6 @@ from cart.factories.item import CartItemFactory
 from order.services import OrderService
 from product.factories.product import ProductFactory
 
-
 pytestmark = pytest.mark.assert_english
 
 

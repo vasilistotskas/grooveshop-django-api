@@ -138,7 +138,7 @@ def is_store_staff(user: Any) -> bool:
     if getattr(user, "is_superuser", False):
         return True
 
-    from tenant.auth_backends import PLATFORM_IDENTITY_ATTR  # noqa: PLC0415
+    from tenant.auth_backends import PLATFORM_IDENTITY_ATTR
 
     if not getattr(user, PLATFORM_IDENTITY_ATTR, False):
         return False

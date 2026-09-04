@@ -3,13 +3,13 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from tests.utils import TestURLFixerMixin
 from country.factories import CountryFactory
 from country.models import Country
 from country.serializers import (
     CountryDetailSerializer,
     CountrySerializer,
 )
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 languages = [

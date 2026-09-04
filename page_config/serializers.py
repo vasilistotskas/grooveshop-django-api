@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
-from django.utils.translation import gettext_lazy as _
 
 from core.api.schema import generate_schema_multi_lang
 from core.api.serializers import RequiredDefaultTranslationMixin
@@ -68,11 +68,11 @@ class PageSectionWriteSerializer(serializers.ModelSerializer):
         # (shared/pageSections.ts): typos and out-of-range values fail
         # HERE with a readable error instead of silently rendering
         # component defaults.
-        from django.core.exceptions import (  # noqa: PLC0415
+        from django.core.exceptions import (
             ValidationError as DjangoValidationError,
         )
 
-        from page_config.schemas import validate_section_props  # noqa: PLC0415
+        from page_config.schemas import validate_section_props
 
         try:
             validate_section_props(
@@ -128,11 +128,11 @@ class NavigationMenuSerializer(serializers.ModelSerializer):
         fields = ("slot", "items")
 
     def validate(self, attrs):
-        from django.core.exceptions import (  # noqa: PLC0415
+        from django.core.exceptions import (
             ValidationError as DjangoValidationError,
         )
 
-        from page_config.schemas import (  # noqa: PLC0415
+        from page_config.schemas import (
             validate_navigation_items,
         )
 

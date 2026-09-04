@@ -121,7 +121,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
         _("Get Discount Percent"),
         max_digits=5,
         decimal_places=2,
-        default=Decimal("100"),
+        default=Decimal(100),
         help_text=_(
             "BXGY: discount applied to the 'get' units — 100 means "
             "free, 50 means half price"
@@ -217,7 +217,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
     def clean(self):
         super().clean()
         if self.benefit_type == BenefitType.PERCENTAGE and not (
-            Decimal("0") < self.benefit_value <= Decimal("100")
+            Decimal(0) < self.benefit_value <= Decimal(100)
         ):
             raise ValidationError(
                 {
@@ -249,7 +249,7 @@ class Promotion(TranslatableModel, TimeStampMixinModel, UUIDModel):
                         )
                     }
                 )
-            if not (Decimal("0") < self.get_discount_percent <= Decimal("100")):
+            if not (Decimal(0) < self.get_discount_percent <= Decimal(100)):
                 raise ValidationError(
                     {
                         "get_discount_percent": _(

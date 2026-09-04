@@ -1053,7 +1053,7 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
                     "(optionally prefixed with EL or GR)."
                 )
             )
-        from b2b.validators import is_valid_greek_vat  # noqa: PLC0415
+        from b2b.validators import is_valid_greek_vat
 
         if not is_valid_greek_vat(cleaned):
             raise serializers.ValidationError(
@@ -1199,15 +1199,16 @@ class OrderCreateFromCartSerializer(serializers.Serializer):
         # BoxNow-specific carrier field. The service-layer
         # ``validate_order_payload`` also enforces this, but failing here
         # gives the shopper a field-scoped 400 before order creation.
-        if provider_code == "boxnow" and shipping_kind == "pickup_point":
-            if not attrs.get("boxnow_locker_id"):
-                raise serializers.ValidationError(
-                    {
-                        "boxnow_locker_id": _(
-                            "Locker ID required when shipping method is BoxNow"
-                        )
-                    }
-                )
+        if (provider_code == "boxnow" and shipping_kind == "pickup_point") and (
+            not attrs.get("boxnow_locker_id")
+        ):
+            raise serializers.ValidationError(
+                {
+                    "boxnow_locker_id": _(
+                        "Locker ID required when shipping method is BoxNow"
+                    )
+                }
+            )
 
         # NOTE: pay-way active + carrier-compatibility is enforced in the
         # view (``_validate_pay_way_for_order``) where the PayWay row is

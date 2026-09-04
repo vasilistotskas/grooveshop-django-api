@@ -129,8 +129,8 @@ class TestPlatformSiteRegistry(TestCase):
 
     def test_reuses_the_shared_model_admin_classes(self):
         """Copied from the default registry so the two cannot drift."""
-        from django.contrib import admin as django_admin
         from django.apps import apps
+        from django.contrib import admin as django_admin
 
         Tenant = apps.get_model("tenant", "Tenant")
         shared = type(django_admin.site._registry[Tenant])

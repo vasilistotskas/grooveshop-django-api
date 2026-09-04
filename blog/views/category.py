@@ -10,7 +10,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
-from core.api.permissions import StoreStaffModelPermissions
 from blog.filters.category import BlogCategoryFilter
 from blog.filters.post import BlogPostFilter
 from blog.models.category import BlogCategory
@@ -23,10 +22,9 @@ from blog.serializers.category import (
     BlogCategoryWriteSerializer,
 )
 from blog.serializers.post import BlogPostSerializer
+from core.api.permissions import StoreStaffModelPermissions
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-from tenant.permissions import IsBlogEnabled
-
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -34,7 +32,7 @@ from core.utils.serializers import (
     crud_config,
 )
 from core.utils.views import cache_methods
-
+from tenant.permissions import IsBlogEnabled
 
 serializers_config: SerializersConfig = {
     **crud_config(

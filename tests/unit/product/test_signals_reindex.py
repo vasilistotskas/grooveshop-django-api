@@ -15,8 +15,8 @@ from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 
 from product.factories.product import ProductFactory
-from product.signals import reindex_product_translations
 from product.models.product import Product
+from product.signals import reindex_product_translations
 
 
 @pytest.mark.django_db

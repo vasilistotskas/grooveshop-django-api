@@ -18,7 +18,6 @@ from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
 
-
 # ---------------------------------------------------------------------------
 # Hypothesis strategies
 # ---------------------------------------------------------------------------
@@ -117,17 +116,19 @@ class TestOverRedemptionRejected:
             # Attempt to redeem more than the balance
             points_to_redeem = balance + excess
 
-            with patch(
-                "loyalty.services.Setting.get",
-                side_effect=_loyalty_settings(enabled=True),
+            with (
+                patch(
+                    "loyalty.services.Setting.get",
+                    side_effect=_loyalty_settings(enabled=True),
+                ),
+                pytest.raises(ValidationError),
             ):
-                with pytest.raises(ValidationError):
-                    LoyaltyService.redeem_points(
-                        user,
-                        points_to_redeem,
-                        "EUR",
-                        max_discount=Decimal("99999"),
-                    )
+                LoyaltyService.redeem_points(
+                    user,
+                    points_to_redeem,
+                    "EUR",
+                    max_discount=Decimal(99999),
+                )
 
             # Verify no REDEEM transaction was created
             redeem_count = PointsTransaction.objects.filter(
@@ -191,7 +192,7 @@ class TestRedeemTransactionHasNegativePoints:
                 side_effect=_loyalty_settings(enabled=True),
             ):
                 LoyaltyService.redeem_points(
-                    user, points_to_redeem, "EUR", max_discount=Decimal("99999")
+                    user, points_to_redeem, "EUR", max_discount=Decimal(99999)
                 )
 
             # Verify the REDEEM transaction

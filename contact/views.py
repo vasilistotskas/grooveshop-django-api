@@ -8,9 +8,9 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from contact.models import Contact, Feedback
 from contact.serializers import ContactWriteSerializer, FeedbackWriteSerializer
-from tenant.permissions import IsFeedbackEnabled
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import ContactCreateThrottle, FeedbackCreateThrottle
+from tenant.permissions import IsFeedbackEnabled
 
 logger = logging.getLogger(__name__)
 

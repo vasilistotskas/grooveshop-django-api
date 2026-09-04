@@ -31,7 +31,7 @@ def _completed_order(user, *, metadata=None):
     order = OrderFactory(user=user, metadata=metadata or {})
     product = ProductFactory(
         price=Money(Decimal("100.00"), "EUR"),
-        discount_percent=Decimal("0"),
+        discount_percent=Decimal(0),
         vat=None,
         stock=10,
         active=True,

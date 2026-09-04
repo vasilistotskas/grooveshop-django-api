@@ -178,7 +178,7 @@ def fanout_clear_expired_sessions():
     retry_jitter=True,
 )
 def process_tenant_billing():
-    from tenant.billing import run_billing_cycle  # noqa: PLC0415
+    from tenant.billing import run_billing_cycle
 
     return run_billing_cycle()
 
@@ -195,7 +195,7 @@ def process_tenant_billing():
     retry_jitter=True,
 )
 def flush_tenant_media_task(schema_name: str):
-    from tenant.media_flush import flush_tenant_media  # noqa: PLC0415
+    from tenant.media_flush import flush_tenant_media
 
     return {"flushed": flush_tenant_media(schema_name)}
 

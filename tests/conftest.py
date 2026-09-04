@@ -1,13 +1,13 @@
 import os
 
 import pytest
-from redis.exceptions import ConnectionError as RedisConnectionError
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.cache import caches
 from django.db import connection, connections, reset_queries
 from hypothesis import HealthCheck
 from hypothesis import settings as hypothesis_settings
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 # Hypothesis profiles for different environments
 hypothesis_settings.register_profile(
@@ -114,8 +114,8 @@ settings.CACHES = {
 # per-worker test databases) leak between workers and produce
 # order-dependent flakes. The teardown clear below deletes only this
 # worker's namespace so it never FLUSHDBs another worker's live keys.
-CACHE_WORKER_PREFIX = "test_%s" % os.environ.get(
-    "PYTEST_XDIST_WORKER", "master"
+CACHE_WORKER_PREFIX = "test_{}".format(
+    os.environ.get("PYTEST_XDIST_WORKER", "master")
 )
 caches["default"].key_prefix = CACHE_WORKER_PREFIX
 
@@ -684,6 +684,19 @@ def bind_tenant(monkeypatch):
 
     def _bind(t):
         monkeypatch.setattr(connection, "tenant", t, raising=False)
+        # Also pin `schema_name` to whatever it is right now. This is a
+        # no-op during the test, but it makes monkeypatch RESTORE it at
+        # teardown — which matters because any code path that enters
+        # `schema_context` (every eager `TenantTask`) rewrites
+        # `connection.schema_name` on exit via `set_tenant(previous)`.
+        # Unwinding only the `tenant` attribute left the worker sitting
+        # outside the public schema, and the next test on that worker to
+        # create a real Tenant died with "Can't create tenant outside the
+        # public schema" — a failure with no visible connection to
+        # whichever test actually leaked.
+        monkeypatch.setattr(
+            connection, "schema_name", connection.schema_name, raising=False
+        )
 
     return _bind
 

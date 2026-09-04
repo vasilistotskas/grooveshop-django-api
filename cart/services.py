@@ -38,10 +38,7 @@ class CartService:
 
         self._extract_cart_info()
 
-        try:
-            self._initialize_cart()
-        except CartServiceInitException:
-            raise
+        self._initialize_cart()
 
     def _extract_cart_info(self):
         if hasattr(self.request, "META"):
@@ -100,7 +97,7 @@ class CartService:
         non-approved users and disabled tenants.
         """
         if cart is not None:
-            from b2b.services import B2BPricingService  # noqa: PLC0415
+            from b2b.services import B2BPricingService
 
             B2BPricingService.bind_cart(cart, self.request.user)
         return cart
@@ -132,7 +129,7 @@ class CartService:
         user = self.request.user
 
         if user.is_authenticated:
-            cart, created = Cart.objects.get_or_create(user=user)
+            cart, _created = Cart.objects.get_or_create(user=user)
 
             if self.cart_id:
                 guest_cart = (

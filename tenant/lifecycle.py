@@ -19,7 +19,6 @@ payload on any save.
 from __future__ import annotations
 
 import logging
-
 from datetime import timedelta
 
 from django.utils import timezone
@@ -99,10 +98,10 @@ def suspend_tenant(tenant, *, reason: str) -> bool:
 
 def _dispatch_media_flush(schema_name: str) -> None:
     try:
-        from tenant.tasks import flush_tenant_media_task  # noqa: PLC0415
+        from tenant.tasks import flush_tenant_media_task
 
         flush_tenant_media_task.delay(schema_name)
-    except Exception:  # noqa: BLE001 — never fail a suspend on dispatch
+    except Exception:
         logging.getLogger(__name__).warning(
             "could not dispatch media flush for %s", schema_name
         )
@@ -138,13 +137,13 @@ def export_tenant_data(tenant, *, actor: str = "") -> str:
     which is the only volume both the backend and the celery worker
     mount. Returns the path.
     """
-    import os  # noqa: PLC0415
+    import os
 
-    from django.core.management import call_command  # noqa: PLC0415
-    from django.utils import timezone  # noqa: PLC0415
-    from django_tenants.utils import schema_context  # noqa: PLC0415
+    from django.core.management import call_command
+    from django.utils import timezone
+    from django_tenants.utils import schema_context
 
-    from tenant.offboarding import private_media_root  # noqa: PLC0415
+    from tenant.offboarding import private_media_root
 
     stamp = timezone.now().strftime("%Y%m%dT%H%M%SZ")
     export_dir = os.path.join(
@@ -182,9 +181,9 @@ def export_tenant_data(tenant, *, actor: str = "") -> str:
 
 def has_tenant_export(tenant) -> bool:
     """Whether a data export already exists for this store."""
-    import os  # noqa: PLC0415
+    import os
 
-    from tenant.offboarding import private_media_root  # noqa: PLC0415
+    from tenant.offboarding import private_media_root
 
     export_dir = os.path.join(
         private_media_root(), "_tenant_exports", tenant.schema_name
@@ -219,11 +218,11 @@ def destroy_tenant(tenant, *, actor: str = "") -> dict:
     platform API or a future script — can skip the suspended-first and
     cooldown rules the way the API once did.
     """
-    from django.db import transaction  # noqa: PLC0415
-    from django.utils import timezone  # noqa: PLC0415
+    from django.db import transaction
+    from django.utils import timezone
 
-    from tenant import offboarding  # noqa: PLC0415
-    from tenant.models import Tenant, TenantArchive  # noqa: PLC0415
+    from tenant import offboarding
+    from tenant.models import Tenant, TenantArchive
 
     with transaction.atomic():
         # Judge the row as it is NOW, under lock — not the caller's

@@ -34,7 +34,7 @@ class LoyaltyService:
         create, which runs with no permission classes. See
         tenant.membership.tenant_plan_allows.
         """
-        from tenant.membership import tenant_plan_allows  # noqa: PLC0415
+        from tenant.membership import tenant_plan_allows
 
         if not tenant_plan_allows("loyalty_enabled"):
             return False
@@ -127,7 +127,7 @@ class LoyaltyService:
         # group pricing applied. Redemption is gated on the same switch
         # (see ``B2BService.loyalty_allowed``) so a wholesale cart is
         # never half in the program.
-        from b2b.services import B2BService  # noqa: PLC0415
+        from b2b.services import B2BService
 
         if (order.metadata or {}).get(
             "b2b_pricing"
@@ -346,7 +346,7 @@ class LoyaltyService:
             )
 
         if lock:
-            from django.contrib.auth import get_user_model  # noqa: PLC0415
+            from django.contrib.auth import get_user_model
 
             User = get_user_model()
             User.objects.select_for_update().get(pk=user.pk)

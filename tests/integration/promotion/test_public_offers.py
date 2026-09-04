@@ -14,9 +14,9 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
-from djmoney.money import Money
 from django.urls import reverse
 from django.utils import timezone
+from djmoney.money import Money
 from extra_settings.models import Setting
 from rest_framework import status
 from rest_framework.test import APIClient

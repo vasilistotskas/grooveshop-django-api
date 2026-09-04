@@ -5,11 +5,11 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from tests.utils import TestURLFixerMixin
 from order.enum.status import OrderStatus
-from order.factories.order import OrderFactory
 from order.factories.item import OrderItemFactory
+from order.factories.order import OrderFactory
 from product.factories.product import ProductFactory
+from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
 
 User = get_user_model()

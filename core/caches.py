@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Awaitable, cast
+from collections.abc import Awaitable
+from typing import Any, cast
 
 from django.conf import settings
 from django.core.cache.backends.redis import RedisCache, RedisCacheClient

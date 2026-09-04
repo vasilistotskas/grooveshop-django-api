@@ -3,12 +3,12 @@ from django.apps import apps
 from django.conf import settings
 from faker import Faker
 
+from country.models import Country
 from devtools.factories import (
     CustomDjangoModelFactory,
-    custom_seeding,
     SeedingResult,
+    custom_seeding,
 )
-from country.models import Country
 
 fake = Faker()
 
@@ -104,7 +104,7 @@ class CountryFactory(CustomDjangoModelFactory):
                         print(f"Created country: {country_data['alpha_2']}")
 
                 except Exception as e:
-                    error_msg = f"Failed to create country {country_data['alpha_2']}: {str(e)}"
+                    error_msg = f"Failed to create country {country_data['alpha_2']}: {e!s}"
                     result.errors.append(error_msg)
                     if verbose:
                         print(f"Error: {error_msg}")

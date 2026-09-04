@@ -75,7 +75,7 @@ class InvoiceCounterAtomicTestCase(TransactionTestCase):
 
             try:
                 results.append(InvoiceCounter.allocate(2026))
-            except BaseException as exc:  # noqa: BLE001
+            except BaseException as exc:
                 errors.append(exc)
             finally:
                 connection.close()
@@ -122,7 +122,7 @@ class VatBreakdownTestCase(TestCase):
         breakdown = _compute_vat_breakdown(order)
         self.assertEqual(len(breakdown), 1)
         row = breakdown[0]
-        self.assertEqual(Decimal(row["rate"]), Decimal("24"))
+        self.assertEqual(Decimal(row["rate"]), Decimal(24))
         # 12.40 gross × 2 includes 24% VAT → subtotal = 24.80 / 1.24 = 20.00
         self.assertEqual(row["subtotal"], "20.00")
         self.assertEqual(row["vat"], "4.80")
@@ -140,7 +140,7 @@ class VatBreakdownTestCase(TestCase):
         breakdown = _compute_vat_breakdown(order)
         rates = [Decimal(row["rate"]) for row in breakdown]
         # Sorted descending by rate (Greek convention).
-        self.assertEqual(rates, [Decimal("24"), Decimal("6")])
+        self.assertEqual(rates, [Decimal(24), Decimal(6)])
         self.assertEqual(breakdown[0]["vat"], "2.40")
         self.assertEqual(breakdown[1]["vat"], "0.60")
 
@@ -151,7 +151,7 @@ class VatBreakdownTestCase(TestCase):
 
         breakdown = _compute_vat_breakdown(order)
         self.assertEqual(len(breakdown), 1)
-        self.assertEqual(Decimal(breakdown[0]["rate"]), Decimal("0"))
+        self.assertEqual(Decimal(breakdown[0]["rate"]), Decimal(0))
         self.assertEqual(breakdown[0]["vat"], "0.00")
         self.assertEqual(breakdown[0]["subtotal"], "5.00")
 
@@ -301,9 +301,7 @@ class GenerateInvoiceIdempotencyTestCase(TestCase):
         invoice = generate_invoice(order)
         self.assertTrue(invoice.invoice_number.startswith("INV-"))
         self.assertEqual(len(invoice.vat_breakdown), 1)
-        self.assertEqual(
-            Decimal(invoice.vat_breakdown[0]["rate"]), Decimal("24")
-        )
+        self.assertEqual(Decimal(invoice.vat_breakdown[0]["rate"]), Decimal(24))
         self.assertIn("name", invoice.seller_snapshot)
         self.assertIn("email", invoice.buyer_snapshot)
         self.assertEqual(invoice.currency, "EUR")
@@ -413,7 +411,7 @@ class RenderItemsTestCase(TestCase):
         self.assertEqual(row["sku"], product.sku)
         self.assertEqual(row["quantity"], 2)
         self.assertEqual(row["unit_gross"], Decimal("12.40"))
-        self.assertEqual(row["vat_rate"], Decimal("24"))
+        self.assertEqual(row["vat_rate"], Decimal(24))
         # 12.40 × 2 = 24.80
         self.assertEqual(row["line_total"], Decimal("24.80"))
 

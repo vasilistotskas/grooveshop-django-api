@@ -30,7 +30,6 @@ from rest_framework.test import APIClient
 from shipping_boxnow.factories import BoxNowShipmentFactory
 from tenant.models import Tenant
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -226,7 +225,6 @@ class TestWebhookEndpoint:
 
         def _capture(parcel_id):
             captured["parcel_id"] = parcel_id
-            return None  # unresolved → orphan ack (200)
 
         with patch(
             "shipping_boxnow.views.webhook._resolve_tenant_for_parcel",

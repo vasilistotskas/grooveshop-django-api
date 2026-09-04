@@ -114,7 +114,7 @@ class BlogPostDetailSerializer(BlogPostSerializer):
         lazy_serializer("blog.serializers.author.BlogAuthorDetailSerializer")()
     )
     def get_author(self, obj: BlogPost):
-        from blog.serializers.author import BlogAuthorDetailSerializer  # noqa: PLC0415, I001
+        from blog.serializers.author import BlogAuthorDetailSerializer  # noqa: I001
 
         return BlogAuthorDetailSerializer(obj.author, context=self.context).data
 
@@ -124,7 +124,7 @@ class BlogPostDetailSerializer(BlogPostSerializer):
         )()
     )
     def get_category(self, obj: BlogPost):
-        from blog.serializers.category import BlogCategoryDetailSerializer  # noqa: PLC0415, I001
+        from blog.serializers.category import BlogCategoryDetailSerializer  # noqa: I001
 
         return BlogCategoryDetailSerializer(
             obj.category, context=self.context
@@ -136,7 +136,7 @@ class BlogPostDetailSerializer(BlogPostSerializer):
         )
     )
     def get_tags(self, obj: BlogPost):
-        from blog.serializers.tag import BlogTagDetailSerializer  # noqa: PLC0415, I001
+        from blog.serializers.tag import BlogTagDetailSerializer
 
         return BlogTagDetailSerializer(
             obj.tags.all(), many=True, context=self.context

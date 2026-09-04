@@ -25,7 +25,7 @@ class TranslatedFieldExtended(TranslatedFieldsField):
         """Convert null values to empty strings in translations."""
         result = super().to_representation(value)
         if isinstance(result, dict):
-            for lang_code, fields in result.items():
+            for fields in result.values():
                 if isinstance(fields, dict):
                     for field_name, field_value in fields.items():
                         if field_value is None:
@@ -126,7 +126,12 @@ type SerializersConfig = dict[str, ActionConfig]
 
 def crud_config(
     *,
-    list: type[serializers.Serializer],
+    # `list` shadows the builtin, and that is the point: these three
+    # keyword names ARE the DRF action names the config maps to, so the
+    # call sites read `crud_config(list=..., detail=..., write=...)`.
+    # Renaming one of the three would break that symmetry at 28 call
+    # sites, and this function never calls the builtin.
+    list: type[serializers.Serializer],  # noqa: A002
     detail: type[serializers.Serializer],
     write: type[serializers.Serializer] | None = None,
 ) -> SerializersConfig:

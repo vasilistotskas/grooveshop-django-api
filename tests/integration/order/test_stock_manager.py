@@ -1,6 +1,7 @@
-import pytest
 from datetime import timedelta
 from unittest.mock import patch
+
+import pytest
 from django.utils import timezone
 
 from order.exceptions import (
@@ -1407,8 +1408,9 @@ class TestStockManagerDecrementStock:
 
     def test_decrement_stock_atomicity_with_transaction_rollback(self):
         """Test that stock decrement is atomic and rolls back on error."""
-        from order.factories import OrderFactory
         from django.db import transaction
+
+        from order.factories import OrderFactory
 
         product = ProductFactory(stock=100)
         order = OrderFactory(num_order_items=0)
@@ -1644,8 +1646,9 @@ class TestStockManagerDecrementStock:
 
     def test_decrement_stock_updates_product_timestamp(self):
         """Test that decrementing stock updates the product's updated_at timestamp."""
-        from order.factories import OrderFactory
         import time
+
+        from order.factories import OrderFactory
 
         product = ProductFactory(stock=100)
         original_updated_at = product.updated_at

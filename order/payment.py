@@ -2,10 +2,10 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any
 
+import moneyed
 import stripe
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
-import moneyed
 from djmoney.money import Money
 from djstripe.models import PaymentIntent, Refund
 
@@ -53,7 +53,7 @@ class StripePaymentProvider(PaymentProvider):
     """
 
     def __init__(self):
-        from tenant.credentials import stripe_credentials  # noqa: PLC0415
+        from tenant.credentials import stripe_credentials
 
         creds = stripe_credentials()
         self.api_key: str = creds["secret_key"]
@@ -105,12 +105,12 @@ class StripePaymentProvider(PaymentProvider):
                 and shipping_price.amount > 0
                 and amount.amount > shipping_price.amount
             ):
-                line_item_amount = int(
-                    round((amount.amount - shipping_price.amount) * 100)
+                line_item_amount = round(
+                    (amount.amount - shipping_price.amount) * 100
                 )
             else:
                 shipping_price = None
-                line_item_amount = int(round(amount.amount * 100))
+                line_item_amount = round(amount.amount * 100)
 
             success_url = kwargs.get("success_url")
             cancel_url = kwargs.get("cancel_url")
@@ -164,9 +164,7 @@ class StripePaymentProvider(PaymentProvider):
                         "shipping_rate_data": {
                             "type": "fixed_amount",
                             "fixed_amount": {
-                                "amount": int(
-                                    round(shipping_price.amount * 100)
-                                ),
+                                "amount": round(shipping_price.amount * 100),
                                 "currency": currency_code,
                             },
                             "display_name": "Standard shipping",
@@ -227,17 +225,15 @@ class StripePaymentProvider(PaymentProvider):
             }
 
         except stripe.StripeError as e:
-            logger.error(
-                f"Stripe Checkout Session creation failed: {e}",
+            logger.exception(
+                "Stripe Checkout Session creation failed",
                 extra={"order_id": order_id, "error": str(e)},
-                exc_info=True,
             )
             return False, {"error": str(e), "stripe_error": True}
         except Exception as e:
-            logger.error(
-                f"Checkout Session creation failed: {e}",
+            logger.exception(
+                "Checkout Session creation failed",
                 extra={"order_id": order_id, "error": str(e)},
-                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -264,7 +260,7 @@ class StripePaymentProvider(PaymentProvider):
 
         try:
             stripe_pi = stripe.PaymentIntent.create(
-                amount=int(round(amount.amount * 100)),
+                amount=round(amount.amount * 100),
                 currency=str(amount.currency).lower(),
                 confirm=True,
                 payment_method_data=payment_method_data,
@@ -309,10 +305,9 @@ class StripePaymentProvider(PaymentProvider):
                 "provider": "stripe",
             }
         except stripe.StripeError as e:
-            logger.error(
-                f"Stripe SPT payment failed: {e}",
+            logger.exception(
+                "Stripe SPT payment failed",
                 extra={"order_id": order_id, "error": str(e)},
-                exc_info=True,
             )
             return False, {"error": str(e), "stripe_error": True}
 
@@ -329,7 +324,7 @@ class StripePaymentProvider(PaymentProvider):
                 },
             )
 
-            stripe_amount = int(round(amount.amount * 100))
+            stripe_amount = round(amount.amount * 100)
             currency_code = str(amount.currency).lower()
 
             # Build comprehensive metadata for tracking. `tenant_schema`
@@ -363,7 +358,7 @@ class StripePaymentProvider(PaymentProvider):
                 # Convert list to comma-separated string for Stripe metadata
                 if isinstance(cart_item_ids, list):
                     metadata["cart_item_ids"] = ",".join(
-                        str(id) for id in cart_item_ids
+                        str(item_id) for item_id in cart_item_ids
                     )
                 else:
                     metadata["cart_item_ids"] = str(cart_item_ids)
@@ -447,17 +442,15 @@ class StripePaymentProvider(PaymentProvider):
             return True, payment_data
 
         except stripe.StripeError as e:
-            logger.error(
-                f"Stripe payment processing failed: {e}",
+            logger.exception(
+                "Stripe payment processing failed",
                 extra={"order_id": order_id, "error": str(e)},
-                exc_info=True,
             )
             return False, {"error": str(e), "stripe_error": True}
         except Exception as e:
-            logger.error(
-                f"Payment processing failed: {e}",
+            logger.exception(
+                "Payment processing failed",
                 extra={"order_id": order_id, "error": str(e)},
-                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -482,7 +475,7 @@ class StripePaymentProvider(PaymentProvider):
                 "metadata": {"tenant_schema": tenant_schema},
             }
             if amount:
-                refund_params["amount"] = int(round(amount.amount * 100))
+                refund_params["amount"] = round(amount.amount * 100)
             stripe_refund = stripe.Refund.create(
                 **refund_params, api_key=self.api_key
             )
@@ -510,17 +503,15 @@ class StripePaymentProvider(PaymentProvider):
             return True, refund_data
 
         except stripe.StripeError as e:
-            logger.error(
-                f"Stripe refund failed: {e}",
+            logger.exception(
+                "Stripe refund failed",
                 extra={"payment_id": payment_id, "error": str(e)},
-                exc_info=True,
             )
             return False, {"error": str(e), "stripe_error": True}
         except Exception as e:
-            logger.error(
-                f"Refund failed: {e}",
+            logger.exception(
+                "Refund failed",
                 extra={"payment_id": payment_id, "error": str(e)},
-                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -554,17 +545,15 @@ class StripePaymentProvider(PaymentProvider):
             return status, status_data
 
         except stripe.StripeError as e:
-            logger.error(
-                f"Failed to get Stripe payment status: {e}",
+            logger.exception(
+                "Failed to get Stripe payment status",
                 extra={"payment_id": payment_id, "error": str(e)},
-                exc_info=True,
             )
             return PaymentStatus.FAILED, {"error": str(e), "stripe_error": True}
         except Exception as e:
-            logger.error(
-                f"Failed to get payment status: {e}",
+            logger.exception(
+                "Failed to get payment status",
                 extra={"payment_id": payment_id, "error": str(e)},
-                exc_info=True,
             )
             return PaymentStatus.FAILED, {"error": str(e)}
 
@@ -610,7 +599,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
     LIVE_TRANSACTIONS_URL = "https://www.vivapayments.com"
 
     def __init__(self):
-        from tenant.credentials import viva_wallet_credentials  # noqa: PLC0415
+        from tenant.credentials import viva_wallet_credentials
 
         creds = viva_wallet_credentials()
         self.merchant_id = creds["merchant_id"]
@@ -732,7 +721,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
             )
 
             access_token = self._get_access_token()
-            viva_amount = int(round(amount.amount * 100))
+            viva_amount = round(amount.amount * 100)
 
             # ``merchantTrns`` is echoed back as ``eventId`` in the
             # hosted-checkout return URL, and the ``/order/viva_return``
@@ -800,12 +789,13 @@ class VivaWalletPaymentProvider(PaymentProvider):
                     error_body = e.response.json()
                 except Exception:
                     error_body = e.response.text
-            logger.error(
-                "Viva Wallet payment order creation failed: %s %s",
-                e,
+            logger.exception(
+                # `e` is not repeated: the traceback carries it. The Viva
+                # error BODY is not in the traceback and is the half that
+                # says which of their validations failed.
+                "Viva Wallet payment order creation failed: %s",
                 error_body,
                 extra={"order_id": order_id},
-                exc_info=True,
             )
             return False, {
                 "error": str(e),
@@ -813,11 +803,9 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "details": error_body,
             }
         except Exception as e:
-            logger.error(
-                "Viva Wallet payment order creation failed: %s",
-                e,
+            logger.exception(
+                "Viva Wallet payment order creation failed",
                 extra={"order_id": order_id},
-                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -842,7 +830,7 @@ class VivaWalletPaymentProvider(PaymentProvider):
 
             params = {}
             if amount:
-                params["amount"] = int(round(amount.amount * 100))
+                params["amount"] = round(amount.amount * 100)
 
             response = requests.delete(
                 f"{self.transactions_url}/api/transactions/{payment_id}",
@@ -872,12 +860,13 @@ class VivaWalletPaymentProvider(PaymentProvider):
                     error_body = e.response.json()
                 except Exception:
                     error_body = e.response.text
-            logger.error(
-                "Viva Wallet refund failed: %s %s",
-                e,
+            logger.exception(
+                # `e` is not repeated: the traceback carries it. The Viva
+                # error BODY is not in the traceback and is the half that
+                # says which of their validations failed.
+                "Viva Wallet refund failed: %s",
                 error_body,
                 extra={"payment_id": payment_id},
-                exc_info=True,
             )
             return False, {
                 "error": str(e),
@@ -885,11 +874,9 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "details": error_body,
             }
         except Exception as e:
-            logger.error(
-                "Viva Wallet refund failed: %s",
-                e,
+            logger.exception(
+                "Viva Wallet refund failed",
                 extra={"payment_id": payment_id},
-                exc_info=True,
             )
             return False, {"error": str(e)}
 
@@ -942,12 +929,13 @@ class VivaWalletPaymentProvider(PaymentProvider):
                     error_body = e.response.json()
                 except Exception:
                     error_body = e.response.text
-            logger.error(
-                "Failed to get Viva Wallet payment status: %s %s",
-                e,
+            logger.exception(
+                # `e` is not repeated: the traceback carries it. The Viva
+                # error BODY is not in the traceback and is the half that
+                # says which of their validations failed.
+                "Failed to get Viva Wallet payment status: %s",
                 error_body,
                 extra={"payment_id": payment_id},
-                exc_info=True,
             )
             return PaymentStatus.FAILED, {
                 "error": str(e),
@@ -955,11 +943,9 @@ class VivaWalletPaymentProvider(PaymentProvider):
                 "details": error_body,
             }
         except Exception as e:
-            logger.error(
-                "Failed to get Viva Wallet payment status: %s",
-                e,
+            logger.exception(
+                "Failed to get Viva Wallet payment status",
                 extra={"payment_id": payment_id},
-                exc_info=True,
             )
             return PaymentStatus.FAILED, {"error": str(e)}
 

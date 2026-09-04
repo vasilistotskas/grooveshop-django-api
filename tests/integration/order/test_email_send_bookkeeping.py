@@ -94,14 +94,16 @@ class TestReservationSurvivesOnlyASuccessfulSend:
             metadata={SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG: True}
         )
 
-        with patch(
-            "order.tasks.EmailMultiAlternatives.send",
-            side_effect=OSError("relay down"),
+        with (
+            patch(
+                "order.tasks.EmailMultiAlternatives.send",
+                side_effect=OSError("relay down"),
+            ),
+            pytest.raises(Retry),
         ):
-            with pytest.raises(Retry):
-                send_shipping_notification_email.apply(
-                    args=[order.id], retries=1, throw=True
-                ).get()
+            send_shipping_notification_email.apply(
+                args=[order.id], retries=1, throw=True
+            ).get()
 
         order.refresh_from_db()
         assert order.metadata.get(SHIPPING_NOTIFICATION_EMAIL_SENT_FLAG)
@@ -123,14 +125,16 @@ class TestFailureAfterTheMessageIsSent:
         consulted on the first attempt."""
         order = _shipped_order()
 
-        with patch(
-            "order.tasks.OrderHistory.log_note",
-            side_effect=RuntimeError("db blip"),
+        with (
+            patch(
+                "order.tasks.OrderHistory.log_note",
+                side_effect=RuntimeError("db blip"),
+            ),
+            patch("order.tasks.EmailMultiAlternatives.send") as send,
         ):
-            with patch("order.tasks.EmailMultiAlternatives.send") as send:
-                result = send_shipping_notification_email.apply(
-                    args=[order.id]
-                ).get()
+            result = send_shipping_notification_email.apply(
+                args=[order.id]
+            ).get()
 
         assert result is True
         assert send.call_count == 1, (

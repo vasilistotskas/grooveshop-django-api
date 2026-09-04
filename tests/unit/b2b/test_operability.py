@@ -17,12 +17,12 @@ pytestmark = pytest.mark.django_db
 
 
 def _bound_cart(price="100.00", quantity=1, **group_kwargs):
-    group = CustomerGroupFactory(discount_percent=Decimal("10"), **group_kwargs)
+    group = CustomerGroupFactory(discount_percent=Decimal(10), **group_kwargs)
     cart = CartFactory(is_guest=True)
     cart.items.all().delete()
     product = ProductFactory(
         price=Money(Decimal(price), "EUR"),
-        discount_percent=Decimal("0"),
+        discount_percent=Decimal(0),
         vat=None,
         stock=100,
         active=True,
@@ -37,7 +37,7 @@ def _bound_cart(price="100.00", quantity=1, **group_kwargs):
 
 class TestMinOrderValue:
     def test_unmet_below_minimum(self):
-        cart, group = _bound_cart(
+        cart, _group = _bound_cart(
             "100.00", min_order_value=Money("500.00", "EUR")
         )
 
@@ -78,16 +78,7 @@ class TestImportPriceLines:
 
         summary = B2BService.import_price_lines(
             group,
-            "\n".join(
-                [
-                    "SKU-EXISTING;12.50",
-                    "SKU-NEW,7,90",  # comma separator + decimal comma
-                    "",  # blank lines skipped
-                    "SKU-MISSING;5.00",
-                    "SKU-NEW;not-a-price",
-                    "garbage-line",
-                ]
-            ),
+            "SKU-EXISTING;12.50\nSKU-NEW,7,90\n\nSKU-MISSING;5.00\nSKU-NEW;not-a-price\ngarbage-line",
         )
 
         assert summary["created"] == 1

@@ -37,7 +37,7 @@ def _cart_with_line(user, price="100.00", quantity=1):
     cart.items.all().delete()
     product = ProductFactory(
         price=Money(Decimal(price), "EUR"),
-        discount_percent=Decimal("0"),
+        discount_percent=Decimal(0),
         vat=None,
         stock=10,
         active=True,
@@ -76,7 +76,7 @@ class TestCartReadBinding:
         self, b2b_tenant, enable_wholesale
     ):
         profile = BusinessProfileFactory(
-            customer_group=CustomerGroupFactory(discount_percent=Decimal("10"))
+            customer_group=CustomerGroupFactory(discount_percent=Decimal(10))
         )  # PENDING
         _cart_with_line(profile.user, "100.00")
 
@@ -129,7 +129,7 @@ class TestCouponGateOnWire:
         b2b_tenant.promotions_enabled = True
         b2b_tenant.save(update_fields=["promotions_enabled"])
         code = PromotionCodeFactory(
-            promotion=PromotionFactory(benefit_value=Decimal("10"))
+            promotion=PromotionFactory(benefit_value=Decimal(10))
         )
 
         def _get(key, default=None):
@@ -171,8 +171,8 @@ class TestPaymentIntentBinding:
         pay_way = PayWayFactory(
             is_online_payment=True,
             provider_code="stripe",
-            cost=Money(Decimal("0"), "EUR"),
-            free_threshold=Money(Decimal("0"), "EUR"),
+            cost=Money(Decimal(0), "EUR"),
+            free_threshold=Money(Decimal(0), "EUR"),
         )
 
         provider = MagicMock()
@@ -223,8 +223,8 @@ class TestPaymentIntentBinding:
         pay_way = PayWayFactory(
             is_online_payment=True,
             provider_code="stripe",
-            cost=Money(Decimal("0"), "EUR"),
-            free_threshold=Money(Decimal("0"), "EUR"),
+            cost=Money(Decimal(0), "EUR"),
+            free_threshold=Money(Decimal(0), "EUR"),
         )
 
         response = _client(user).post(

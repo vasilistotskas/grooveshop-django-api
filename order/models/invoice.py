@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import os
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from django.conf import settings
 from django.contrib.postgres.indexes import BTreeIndex
@@ -35,10 +35,6 @@ from django_stubs_ext.db.models import TypedModelMeta
 from djmoney.models.fields import MoneyField
 
 from core.models import TimeStampMixinModel, UUIDModel
-
-if TYPE_CHECKING:
-    pass
-
 
 INVOICE_NUMBER_FORMAT = "INV-{year}-{number:06d}"
 
@@ -240,21 +236,21 @@ class Invoice(TimeStampMixinModel, UUIDModel):
         max_digits=11,
         decimal_places=2,
         default=0,
-        db_default=Decimal("0"),
+        db_default=Decimal(0),
     )
     payment_fee = MoneyField(
         _("Payment Method Fee"),
         max_digits=11,
         decimal_places=2,
         default=0,
-        db_default=Decimal("0"),
+        db_default=Decimal(0),
     )
     discount = MoneyField(
         _("Discount"),
         max_digits=11,
         decimal_places=2,
         default=0,
-        db_default=Decimal("0"),
+        db_default=Decimal(0),
         help_text=_(
             "Informational only — the line values are already net of the "
             "allocation, so this never enters the total arithmetic."

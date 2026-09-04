@@ -1,9 +1,9 @@
-import pytest
 import logging
 from unittest.mock import patch
 
-from djmoney.money import Money
+import pytest
 import stripe
+from djmoney.money import Money
 from stripe._error import (
     APIError,
 )

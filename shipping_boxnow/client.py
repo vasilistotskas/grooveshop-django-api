@@ -57,7 +57,7 @@ class BoxNowClient:
         timeout: int | None = None,
         session: requests.Session | None = None,
     ) -> None:
-        from tenant.credentials import box_now_credentials  # noqa: PLC0415
+        from tenant.credentials import box_now_credentials
 
         creds = box_now_credentials()
         self.client_id = client_id or creds["client_id"]
@@ -562,19 +562,19 @@ class BoxNowClient:
         self,
         parcel_id: str,
         *,
-        type: str = "pdf",
+        label_type: str = "pdf",
         dpi: int | None = None,
     ) -> bytes:
         """
         Fetch the shipping label for a single parcel.
 
-        Calls ``GET /api/v1/parcels/{parcel_id}/label.{type}``.
+        Calls ``GET /api/v1/parcels/{parcel_id}/label.{label_type}``.
 
         Args:
             parcel_id: BoxNow 10-digit parcel ID.
-            type:      Label format: ``"pdf"`` (default) or ``"zpl"``.
+            label_type: Label format: ``"pdf"`` (default) or ``"zpl"``.
             dpi:       ZPL printer resolution — ``200`` or ``300``
-                       (only relevant for ``type="zpl"``).
+                       (only relevant for ``label_type="zpl"``).
 
         Returns:
             Raw label bytes (PDF binary or ZPL text).
@@ -585,7 +585,7 @@ class BoxNowClient:
 
         response = self._request(
             "GET",
-            f"/api/v1/parcels/{parcel_id}/label.{type}",
+            f"/api/v1/parcels/{parcel_id}/label.{label_type}",
             params=params or None,
         )
         return response.content
@@ -594,19 +594,19 @@ class BoxNowClient:
         self,
         order_number: str,
         *,
-        type: str = "pdf",
+        label_type: str = "pdf",
         dpi: int | None = None,
     ) -> bytes:
         """
         Fetch shipping labels for all parcels in a delivery request (order).
 
         Calls
-        ``GET /api/v1/delivery-requests/{order_number}/label.{type}``.
+        ``GET /api/v1/delivery-requests/{order_number}/label.{label_type}``.
 
         Args:
             order_number: The order number used when creating the delivery
                           request (``orderNumber`` field).
-            type:         ``"pdf"`` (default) or ``"zpl"``.
+            label_type:   ``"pdf"`` (default) or ``"zpl"``.
             dpi:          ZPL DPI (200 or 300).
 
         Returns:
@@ -618,7 +618,7 @@ class BoxNowClient:
 
         response = self._request(
             "GET",
-            f"/api/v1/delivery-requests/{order_number}/label.{type}",
+            f"/api/v1/delivery-requests/{order_number}/label.{label_type}",
             params=params or None,
         )
         return response.content

@@ -42,7 +42,7 @@ class PayWayService:
         behavior (listed, then rejected by the ``supported_providers``
         check at checkout-session creation).
         """
-        from tenant.credentials import (  # noqa: PLC0415
+        from tenant.credentials import (
             stripe_credentials,
             viva_wallet_credentials,
         )

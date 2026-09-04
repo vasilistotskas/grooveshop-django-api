@@ -40,15 +40,14 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import override as translation_override
-
-from core.utils.tenant_urls import get_tenant_frontend_url
-from tenant.credentials import tenant_contact_email, tenant_site_name
 from extra_settings.models import Setting
 
 from core.utils.i18n import get_order_language
+from core.utils.tenant_urls import get_tenant_frontend_url
 from order.discounts import discounted_line_gross, order_discount_total
 from order.models.invoice import Invoice, InvoiceCounter
 from order.models.order import Order
+from tenant.credentials import tenant_contact_email, tenant_site_name
 
 logger = logging.getLogger(__name__)
 
@@ -136,9 +135,9 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     """
     buckets: dict[Decimal, dict[str, Decimal]] = defaultdict(
         lambda: {
-            "subtotal": Decimal("0"),
-            "vat": Decimal("0"),
-            "gross": Decimal("0"),
+            "subtotal": Decimal(0),
+            "vat": Decimal(0),
+            "gross": Decimal(0),
         }
     )
 
@@ -148,13 +147,13 @@ def _compute_vat_breakdown(order: Order) -> list[dict[str, Any]]:
     for item in items:
         line_gross = line_gross_by_pk[item.pk]
 
-        rate = Decimal("0")
+        rate = Decimal(0)
         if item.product and item.product.vat_id:
             rate = Decimal(item.product.vat.value)
 
         # Item prices are VAT-inclusive (final prices), so back out the
         # VAT component: subtotal = gross / (1 + rate/100).
-        divisor = Decimal("1") + rate / Decimal("100")
+        divisor = Decimal(1) + rate / Decimal(100)
         line_subtotal = (line_gross / divisor) if divisor else line_gross
         line_vat = line_gross - line_subtotal
 
@@ -181,20 +180,18 @@ def _order_totals(
     """Derive invoice totals from the VAT breakdown so rounding adds up."""
     subtotal = sum(
         Decimal(row["subtotal"]) for row in vat_breakdown
-    ) or Decimal("0")
-    total_vat = sum(Decimal(row["vat"]) for row in vat_breakdown) or Decimal(
-        "0"
-    )
+    ) or Decimal(0)
+    total_vat = sum(Decimal(row["vat"]) for row in vat_breakdown) or Decimal(0)
     gross = subtotal + total_vat
     shipping = (
         Decimal(order.shipping_price.amount)
         if order.shipping_price
-        else Decimal("0")
+        else Decimal(0)
     )
     payment_fee = (
         Decimal(order.payment_method_fee.amount)
         if order.payment_method_fee
-        else Decimal("0")
+        else Decimal(0)
     )
     total = gross + shipping + payment_fee
     return {

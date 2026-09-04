@@ -23,10 +23,10 @@ class CustomerGroup(TimeStampMixinModel, UUIDModel):
         _("Discount percent"),
         max_digits=5,
         decimal_places=2,
-        default=Decimal("0"),
+        default=Decimal(0),
         validators=[
-            MinValueValidator(Decimal("0")),
-            MaxValueValidator(Decimal("100")),
+            MinValueValidator(Decimal(0)),
+            MaxValueValidator(Decimal(100)),
         ],
         help_text=_(
             "Percent off the retail NET (VAT-exclusive) price. A fixed "
@@ -38,7 +38,7 @@ class CustomerGroup(TimeStampMixinModel, UUIDModel):
         _("Minimum order value"),
         max_digits=11,
         decimal_places=2,
-        default=Decimal("0"),
+        default=Decimal(0),
         default_currency=settings.DEFAULT_CURRENCY,
         help_text=_(
             "Minimum cart items total (VAT-inclusive) required to place "

@@ -112,9 +112,9 @@ class PlatformAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         The view import is local so this module keeps importing before
         the app registry is ready (it is pulled in from AppConfig).
         """
-        from django.urls import path  # noqa: PLC0415
+        from django.urls import path
 
-        from admin.platform_billing import PlanBillingView  # noqa: PLC0415
+        from admin.platform_billing import PlanBillingView
 
         return [
             path(
@@ -137,7 +137,7 @@ class PlatformAdminSite(AdminSiteLoginNextMixin, UnfoldAdminSite):
         if not super().has_permission(request):
             return False
 
-        from tenant.auth_backends import (  # noqa: PLC0415
+        from tenant.auth_backends import (
             is_platform_staff_session,
         )
 
@@ -178,7 +178,7 @@ def register_platform_models() -> None:
     because ``AppConfig.ready()`` can run more than once under the
     autoreloader.
     """
-    from django.contrib import admin as django_admin  # noqa: PLC0415
+    from django.contrib import admin as django_admin
 
     for model, model_admin in list(django_admin.site._registry.items()):
         if model._meta.app_label not in PLATFORM_APP_LABELS:

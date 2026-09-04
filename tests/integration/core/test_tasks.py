@@ -13,6 +13,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from cart.models import Cart
+from core.exceptions import HealthCheckFailed
 from core.tasks import (
     MonitoredTask,
     backup_database_task,
@@ -20,10 +21,10 @@ from core.tasks import (
     cleanup_old_backups,
     cleanup_old_guest_carts,
     clear_all_cache_task,
+    clear_development_log_files_task,
     clear_duplicate_history_task,
     clear_expired_notifications_task,
     clear_expired_sessions_task,
-    clear_development_log_files_task,
     clear_old_history_task,
     monitor_system_health,
     scheduled_database_backup,
@@ -386,11 +387,7 @@ class TestClearLogFilesTask:
         }.get(key, default)
 
         def mock_exists_side_effect(path):
-            if path == "/.dockerenv":
-                return True
-            elif path == self.logs_path:
-                return True
-            return False
+            return bool(path == "/.dockerenv" or path == self.logs_path)
 
         mock_exists.side_effect = mock_exists_side_effect
         mock_join.return_value = self.logs_path
@@ -502,11 +499,7 @@ class TestClearLogFilesTask:
         }.get(key, default)
 
         def mock_exists_side_effect(path):
-            if path == "/.dockerenv":
-                return True
-            elif path == self.logs_path:
-                return True
-            return False
+            return bool(path == "/.dockerenv" or path == self.logs_path)
 
         mock_exists.side_effect = mock_exists_side_effect
         mock_join.return_value = self.logs_path
@@ -741,8 +734,11 @@ class TestMonitorSystemHealthTask:
         mock_cache.set.return_value = None
         mock_cache.get.return_value = "ok"
 
+        # Assert the TYPE, not a message substring: the point is that a
+        # failed dependency is distinguishable from a bug in the task,
+        # which `autoretry_for=(Exception,)` could not tell apart before.
         with pytest.raises(
-            Exception, match="Critical system health check failed"
+            HealthCheckFailed, match="a critical component reported unhealthy"
         ):
             monitor_system_health()
 

@@ -55,7 +55,7 @@ def _cart_for(user, price="100.00", vat_rate=None, quantity=1):
     product = ProductFactory(
         stock=10,
         price=Money(Decimal(price), "EUR"),
-        discount_percent=Decimal("0"),
+        discount_percent=Decimal(0),
         vat=VatFactory(value=Decimal(str(vat_rate))) if vat_rate else None,
         active=True,
     )
@@ -66,8 +66,8 @@ def _cart_for(user, price="100.00", vat_rate=None, quantity=1):
 def _pay_way(**kwargs):
     defaults = {
         "is_online_payment": False,
-        "cost": Money(Decimal("0"), "EUR"),
-        "free_threshold": Money(Decimal("0"), "EUR"),
+        "cost": Money(Decimal(0), "EUR"),
+        "free_threshold": Money(Decimal(0), "EUR"),
     }
     defaults.update(kwargs)
     return PayWayFactory(**defaults)
@@ -75,7 +75,7 @@ def _pay_way(**kwargs):
 
 class TestGroupPricingCheckout:
     def test_order_item_snapshots_wholesale_price(self, enable_wholesale):
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         profile = BusinessProfileFactory(approved=True, customer_group=group)
         cart, product = _cart_for(profile.user, "100.00", vat_rate="24")
         country = CountryFactory()
@@ -94,7 +94,7 @@ class TestGroupPricingCheckout:
         assert order.metadata["b2b_pricing"]["discount_percent"] == "10.00"
 
     def test_fixed_override_reaches_order_item(self, enable_wholesale):
-        group = CustomerGroupFactory(discount_percent=Decimal("0"))
+        group = CustomerGroupFactory(discount_percent=Decimal(0))
         profile = BusinessProfileFactory(approved=True, customer_group=group)
         cart, product = _cart_for(profile.user, "100.00")
         PriceListItemFactory(
@@ -114,7 +114,7 @@ class TestGroupPricingCheckout:
     def test_payment_fee_threshold_uses_wholesale_total(self, enable_wholesale):
         # Fee 5 EUR waived from 95 EUR: retail total (100) clears the
         # threshold but the wholesale total (90) must NOT.
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         profile = BusinessProfileFactory(approved=True, customer_group=group)
         cart, _product = _cart_for(profile.user, "100.00")
         country = CountryFactory()
@@ -148,7 +148,7 @@ class TestGroupPricingCheckout:
 
     def test_pending_profile_stays_retail(self, enable_wholesale):
         profile = BusinessProfileFactory(
-            customer_group=CustomerGroupFactory(discount_percent=Decimal("10"))
+            customer_group=CustomerGroupFactory(discount_percent=Decimal(10))
         )  # PENDING
         cart, product = _cart_for(profile.user, "100.00")
         country = CountryFactory()
@@ -169,7 +169,7 @@ class TestGroupPricingCheckout:
         from order.exceptions import InvalidOrderDataError
 
         group = CustomerGroupFactory(
-            discount_percent=Decimal("10"),
+            discount_percent=Decimal(10),
             min_order_value=M("500.00", "EUR"),
         )
         profile = BusinessProfileFactory(approved=True, customer_group=group)
@@ -187,7 +187,7 @@ class TestGroupPricingCheckout:
             )
 
     def test_feature_off_stays_retail(self):
-        group = CustomerGroupFactory(discount_percent=Decimal("10"))
+        group = CustomerGroupFactory(discount_percent=Decimal(10))
         profile = BusinessProfileFactory(approved=True, customer_group=group)
         cart, product = _cart_for(profile.user, "100.00")
         country = CountryFactory()

@@ -17,7 +17,6 @@ from order.stock import StockManager
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
 
-
 pytestmark = pytest.mark.assert_english
 
 

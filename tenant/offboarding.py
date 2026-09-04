@@ -42,6 +42,7 @@ import shutil
 from datetime import date
 
 from django.conf import settings
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,7 @@ def purge_search_indexes(schema_name: str) -> list[str]:
     prefix = f"{schema_name}__"
     deleted: list[str] = []
     try:
-        from meili._client import client as meili_client  # noqa: PLC0415
+        from meili._client import client as meili_client
 
         for index in meili_client.get_indexes():
             if index.uid.startswith(prefix):
@@ -203,11 +204,11 @@ def latest_invoice_year(schema_name: str) -> int | None:
     guessing "no invoices" would delete records that may exist, and of
     the two possible mistakes only over-retention is recoverable.
     """
-    from django_tenants.utils import schema_context  # noqa: PLC0415
+    from django_tenants.utils import schema_context
 
     try:
         with schema_context(schema_name):
-            from order.models.invoice import Invoice  # noqa: PLC0415
+            from order.models.invoice import Invoice
 
             latest = (
                 Invoice.objects.exclude(document_file="")
@@ -221,7 +222,7 @@ def latest_invoice_year(schema_name: str) -> int | None:
             "records exist and retaining them",
             schema_name,
         )
-        return date.today().year
+        return timezone.localdate().year
     if latest is None:
         return None
     return latest.year

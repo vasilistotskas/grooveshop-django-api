@@ -180,8 +180,9 @@ class TestActorBinding:
         This is the misattribution guard: resolving locally is what
         would credit a shopper who happens to share the actor's pk.
         """
-        import admin.log_actors as log_actors
         from django_tenants.utils import get_public_schema_name
+
+        from admin import log_actors
 
         entered: list[str] = []
         original = log_actors.schema_context

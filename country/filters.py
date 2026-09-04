@@ -2,9 +2,9 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
-from country.models import Country
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
-from core.filters.core import UUIDFilterMixin, SortableFilterMixin
+from core.filters.core import SortableFilterMixin, UUIDFilterMixin
+from country.models import Country
 
 
 class CountryFilter(

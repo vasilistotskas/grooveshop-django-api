@@ -1,41 +1,41 @@
-import pytest
 from datetime import timedelta
 from unittest.mock import Mock, patch
 
+import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import RequestFactory
 from django.utils import timezone
 
+from country.factories import CountryFactory
+from region.factories import RegionFactory
 from user.admin import (
-    GroupAdmin,
-    UserAdmin,
-    UserAddressAdmin,
-    SubscriptionTopicAdmin,
-    UserSubscriptionAdmin,
-    SubscriptionCountFilter,
     AddressCountFilter,
-    UserStatusFilter,
+    GroupAdmin,
     SocialMediaFilter,
+    SubscriptionCountFilter,
+    SubscriptionTopicAdmin,
     TopicCategoryFilter,
+    UserAddressAdmin,
     UserAddressInline,
+    UserAdmin,
+    UserStatusFilter,
+    UserSubscriptionAdmin,
     UserSubscriptionInline,
 )
 from user.factories import (
+    SubscriptionTopicFactory,
     UserAccountFactory,
     UserAddressFactory,
-    SubscriptionTopicFactory,
     UserSubscriptionFactory,
 )
 from user.models import (
+    SubscriptionTopic,
     UserAccount,
     UserAddress,
-    SubscriptionTopic,
     UserSubscription,
 )
-from country.factories import CountryFactory
-from region.factories import RegionFactory
 
 User = get_user_model()
 

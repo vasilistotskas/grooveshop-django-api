@@ -32,7 +32,7 @@ from product.models.product import _quantize_cents
 
 logger = logging.getLogger(__name__)
 
-ONE_HUNDRED = Decimal("100")
+ONE_HUNDRED = Decimal(100)
 
 
 @dataclass(frozen=True)
@@ -76,7 +76,7 @@ class B2BService:
         would bypass an endpoint-only gate entirely. See
         tenant.membership.tenant_plan_allows.
         """
-        from tenant.membership import tenant_plan_allows  # noqa: PLC0415
+        from tenant.membership import tenant_plan_allows
 
         if not tenant_plan_allows("b2b_enabled"):
             return False
@@ -331,7 +331,7 @@ class B2BService:
 
     @classmethod
     def _queue_status_email(cls, profile: BusinessProfile) -> None:
-        from b2b.tasks import (  # noqa: PLC0415
+        from b2b.tasks import (
             send_business_profile_status_email,
         )
 
@@ -354,7 +354,7 @@ class B2BService:
         accepted (Greek convention). Returns a summary dict:
         ``{"created": n, "updated": n, "errors": [str, …]}``.
         """
-        from product.models.product import Product  # noqa: PLC0415
+        from product.models.product import Product
 
         created = 0
         updated = 0
@@ -398,7 +398,7 @@ class B2BService:
 
     @classmethod
     def _queue_admin_application_email(cls, profile: BusinessProfile) -> None:
-        from b2b.tasks import (  # noqa: PLC0415
+        from b2b.tasks import (
             send_admin_new_business_profile_email,
         )
 
@@ -440,7 +440,7 @@ class B2BPricingService:
                 * (ONE_HUNDRED - group.discount_percent)
                 / ONE_HUNDRED
             )
-        rate = product.vat_percent or Decimal("0")
+        rate = product.vat_percent or Decimal(0)
         vat_factor = (ONE_HUNDRED + rate) / ONE_HUNDRED
         final_amount = _quantize_cents(net_amount * vat_factor)
 

@@ -22,7 +22,6 @@ from shipping_boxnow.factories import (
 from shipping_boxnow.models import BoxNowParcelEvent
 from shipping_boxnow.services import BoxNowService
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

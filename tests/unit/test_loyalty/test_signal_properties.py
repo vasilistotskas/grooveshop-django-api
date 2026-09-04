@@ -14,13 +14,12 @@ from unittest.mock import patch
 import pytest
 from django.utils import timezone
 from djmoney.money import Money
-from hypothesis import given, settings, HealthCheck
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
-
 
 # ---------------------------------------------------------------------------
 # Hypothesis strategies
@@ -109,8 +108,8 @@ def _create_product(
     bonus_points: int = 0,
 ):
     """Create a real Product with a Vat record in the database."""
-    from vat.models import Vat
     from product.models.product import Product
+    from vat.models import Vat
 
     vat = None
     if vat_percent > 0:

@@ -5,7 +5,6 @@ from order.models import StockLog
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
 
-
 pytestmark = pytest.mark.assert_english
 
 

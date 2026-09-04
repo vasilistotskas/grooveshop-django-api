@@ -119,8 +119,7 @@ def _kg_from_grams(weight_grams: int | None) -> str:
         kg = min_kg
     else:
         kg = (Decimal(grams) / Decimal(1000)).quantize(Decimal("0.001"))
-        if kg < min_kg:
-            kg = min_kg
+        kg = max(kg, min_kg)
         if kg > max_kg:
             logger.warning(
                 "Clamping ACS voucher weight from %s kg to %s kg — "
@@ -644,7 +643,7 @@ class AcsService:
             cod_decimal = (
                 shipment.cod_amount.amount
                 if shipment.cod_amount
-                else Decimal("0")
+                else Decimal(0)
             ).quantize(Decimal("0.01"))
             params["Cod_Ammount"] = format(cod_decimal, "f").replace(".", ",")
             # Per ACS PDF p.6: ``Cod_Payment_Way`` should be ``null``
@@ -1123,7 +1122,7 @@ class AcsService:
         unique ``pickup_list_no`` so adopting a manifest we already know
         about is idempotent.
         """
-        from tenant.credentials import acs_credentials  # noqa: PLC0415
+        from tenant.credentials import acs_credentials
 
         billing = billing_code or acs_credentials()["billing_code"]
         with transaction.atomic():
@@ -1755,7 +1754,7 @@ class AcsService:
         failure must not fail the reconcile itself (the payout rows
         that did match are already persisted).
         """
-        from shipping.alerts import send_ops_alert  # noqa: PLC0415
+        from shipping.alerts import send_ops_alert
 
         try:
             sent = send_ops_alert(

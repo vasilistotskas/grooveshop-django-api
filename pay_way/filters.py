@@ -4,9 +4,9 @@ from django_filters import rest_framework as filters
 
 from core.filters.camel_case_filters import CamelCaseFilterMixin
 from core.filters.core import (
+    SortableFilterMixin,
     TimeStampFilterMixin,
     UUIDFilterMixin,
-    SortableFilterMixin,
 )
 from pay_way.models import PayWay
 

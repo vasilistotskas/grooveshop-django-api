@@ -1,6 +1,6 @@
-from djangorestframework_camel_case.util import camel_to_underscore
-from django_filters import rest_framework as filters
 from django.utils.translation import gettext_lazy as _
+from django_filters import rest_framework as filters
+from djangorestframework_camel_case.util import camel_to_underscore
 from drf_spectacular.extensions import OpenApiFilterExtension
 from drf_spectacular.plumbing import build_parameter_type
 from drf_spectacular.types import OpenApiTypes
@@ -127,8 +127,8 @@ class CamelCasePublishableTimeStampFilterSet(
     def filter_currently_published(self, queryset, name, value):
         """Filter items that are currently published."""
         if value:
-            from django.utils import timezone
             from django.db.models import Q
+            from django.utils import timezone
 
             today = timezone.now()
             return queryset.filter(

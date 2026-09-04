@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
-from datetime import timedelta
-
+from django.contrib.auth import get_user_model
+from django.core import signing
+from django.core.mail import EmailMultiAlternatives
+from django.db import connection
+from django.template.loader import render_to_string
+from django.utils import translation
+from django.utils.translation import gettext as _
 from extra_settings.models import Setting
 
 from core.utils.email_context import build_email_context
+from core.utils.i18n import get_user_language
 from core.utils.tenant_urls import (
     get_tenant_api_base_url,
     get_tenant_base_url,
@@ -17,16 +24,6 @@ from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
 )
-from django.contrib.auth import get_user_model
-from django.core import signing
-from django.db import connection
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-from django.utils import translation
-from django.utils.translation import gettext as _
-
-from core.utils.i18n import get_user_language
-
 from user.models.subscription import SubscriptionTopic, UserSubscription
 
 logger = logging.getLogger(__name__)
@@ -139,7 +136,7 @@ def send_subscription_confirmation(
         return False
 
 
-def check_subscription_before_send(user: "User", topic_slug: str) -> bool:
+def check_subscription_before_send(user: User, topic_slug: str) -> bool:
     return UserSubscription.objects.filter(
         user=user,
         topic__slug=topic_slug,
@@ -147,7 +144,7 @@ def check_subscription_before_send(user: "User", topic_slug: str) -> bool:
     ).exists()
 
 
-def _make_unsubscribe_token(user: "AbstractBaseUser") -> str:
+def _make_unsubscribe_token(user: AbstractBaseUser) -> str:
     """Sign the user's pk + owning schema into a tamper-proof token.
 
     The schema is baked in because ``SECRET_KEY`` is global and the
@@ -162,7 +159,7 @@ def _make_unsubscribe_token(user: "AbstractBaseUser") -> str:
     )
 
 
-def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
+def generate_unsubscribe_link(user: User, topic: SubscriptionTopic) -> str:
     # The unsubscribe URL targets a Django API endpoint that has no
     # Nuxt proxy, so the tenant's API origin is the correct base. The
     # token bakes in ``connection.schema_name`` (see
@@ -175,7 +172,7 @@ def generate_unsubscribe_link(user: "User", topic: SubscriptionTopic) -> str:
 
 
 def generate_blanket_unsubscribe_link(
-    user: "AbstractBaseUser",
+    user: AbstractBaseUser,
 ) -> str:
     """Build the blanket (no-topic) unsubscribe URL for ``user``.
 
@@ -256,7 +253,7 @@ def build_transactional_list_headers(*, list_id: str) -> dict[str, str]:
     }
 
 
-def get_user_subscription_summary(user: "User") -> dict[str, Any]:
+def get_user_subscription_summary(user: User) -> dict[str, Any]:
     subscriptions = UserSubscription.objects.filter(user=user).select_related(
         "topic"
     )

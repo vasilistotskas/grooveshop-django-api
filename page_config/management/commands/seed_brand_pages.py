@@ -43,7 +43,7 @@ class Command(BaseCommand):
         if not Tenant.objects.filter(schema_name=schema_name).exists():
             raise CommandError(f"No tenant with schema {schema_name!r}.")
 
-        from page_config.defaults import seed_brand_pages  # noqa: PLC0415
+        from page_config.defaults import seed_brand_pages
 
         with schema_context(schema_name):
             created_map = seed_brand_pages()

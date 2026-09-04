@@ -47,16 +47,16 @@ def checkout():
     cart.items.all().delete()
     product = ProductFactory(
         stock=10,
-        price=Money(Decimal("100"), "EUR"),
-        discount_percent=Decimal("0"),
+        price=Money(Decimal(100), "EUR"),
+        discount_percent=Decimal(0),
         vat=None,
         active=True,
     )
     CartItemFactory(cart=cart, product=product, quantity=1)
     pay_way = PayWayFactory(
         is_online_payment=False,
-        cost=Money(Decimal("0"), "EUR"),
-        free_threshold=Money(Decimal("0"), "EUR"),
+        cost=Money(Decimal(0), "EUR"),
+        free_threshold=Money(Decimal(0), "EUR"),
     )
     shipping_address = {
         "first_name": "Maria",
@@ -92,7 +92,7 @@ class TestOfflineCheckoutWithCoupon:
         self, enable_promotions, checkout
     ):
         code = PromotionCodeFactory(
-            promotion=PromotionFactory(benefit_value=Decimal("10"))
+            promotion=PromotionFactory(benefit_value=Decimal(10))
         )
         CartPromotionCode.objects.create(cart=checkout["cart"], code=code)
 
@@ -120,7 +120,7 @@ class TestOfflineCheckoutWithCoupon:
         PromotionRedemption.objects.create(
             promotion=promotion,
             code=code,
-            amount=Money(Decimal("5"), "EUR"),
+            amount=Money(Decimal(5), "EUR"),
         )
         CartPromotionCode.objects.create(cart=checkout["cart"], code=code)
 
@@ -140,7 +140,7 @@ class TestOfflineCheckoutWithCoupon:
 
         order = _create_offline_order(checkout)
 
-        assert order.shipping_price.amount == Decimal("0")
+        assert order.shipping_price.amount == Decimal(0)
         assert order.metadata.get("promotion_free_shipping") is True
 
     def test_automatic_promotion_applies_without_code(
@@ -149,7 +149,7 @@ class TestOfflineCheckoutWithCoupon:
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             benefit_type=BenefitType.FIXED_AMOUNT,
-            benefit_value=Decimal("15"),
+            benefit_value=Decimal(15),
         )
 
         order = _create_offline_order(checkout)
@@ -160,12 +160,12 @@ class TestOfflineCheckoutWithCoupon:
     def test_disabled_feature_means_no_discount(self, checkout):
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("50"),
+            benefit_value=Decimal(50),
         )
 
         order = _create_offline_order(checkout)
 
-        assert order.discount_amount.amount == Decimal("0")
+        assert order.discount_amount.amount == Decimal(0)
 
     def test_usage_limits_hold_for_consecutive_orders(
         self, enable_promotions, checkout
@@ -173,7 +173,7 @@ class TestOfflineCheckoutWithCoupon:
         promotion = PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             usage_limit_total=1,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
         )
 
         first = _create_offline_order(checkout)
@@ -195,7 +195,7 @@ class TestOfflineCheckoutWithCoupon:
             user=second_user,
         )
 
-        assert second.discount_amount.amount == Decimal("0")
+        assert second.discount_amount.amount == Decimal(0)
         assert (
             PromotionRedemption.objects.filter(promotion=promotion).count() == 1
         )

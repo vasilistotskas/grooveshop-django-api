@@ -22,9 +22,10 @@ Usage:
     print(f"Query count: {counter.count}")
 """
 
+from collections.abc import Callable
 from contextlib import contextmanager
 from functools import wraps
-from typing import Callable, Optional
+from typing import Self
 
 from django.db import connection, reset_queries
 from django.test.utils import CaptureQueriesContext
@@ -51,9 +52,9 @@ class QueryCountAssertion:
 
     def __init__(
         self,
-        max_queries: Optional[int] = None,
+        max_queries: int | None = None,
         verbose: bool = False,
-        fail_message: Optional[str] = None,
+        fail_message: str | None = None,
     ):
         """
         Initialize the query counter.
@@ -69,9 +70,9 @@ class QueryCountAssertion:
         self.fail_message = fail_message
         self.count = 0
         self.queries: list = []
-        self._context: Optional[CaptureQueriesContext] = None
+        self._context: CaptureQueriesContext | None = None
 
-    def __enter__(self) -> "QueryCountAssertion":
+    def __enter__(self) -> Self:
         reset_queries()
         self._context = CaptureQueriesContext(connection)
         self._context.__enter__()
@@ -83,18 +84,21 @@ class QueryCountAssertion:
             self.queries = list(self._context.captured_queries)
             self.count = len(self.queries)
 
-        if exc_type is None and self.max_queries is not None:
-            if self.count > self.max_queries:
-                message = self._build_error_message()
-                raise AssertionError(message)
+        if (exc_type is None and self.max_queries is not None) and (
+            self.count > self.max_queries
+        ):
+            message = self._build_error_message()
+            raise AssertionError(message)
 
         return False
 
     def _build_error_message(self) -> str:
         """Build a detailed error message for assertion failures."""
         parts = [
-            f"Expected at most {self.max_queries} queries, "
-            f"but {self.count} were executed."
+            (
+                f"Expected at most {self.max_queries} queries, "
+                f"but {self.count} were executed."
+            )
         ]
 
         if self.fail_message:
@@ -155,13 +159,15 @@ def count_queries(verbose: bool = False):
         yield counter
 
     if verbose:
-        print(f"Query count: {counter.count}")
+        # Deliberate: this helper's whole purpose is to report a count to
+        # whoever asked for `verbose`, and pytest shows stdout on failure.
+        print(f"Query count: {counter.count}")  # noqa: T201
 
 
 def assert_max_queries(
     max_queries: int,
     verbose: bool = False,
-    fail_message: Optional[str] = None,
+    fail_message: str | None = None,
 ) -> Callable:
     """
     Decorator to assert maximum query count for a test function.

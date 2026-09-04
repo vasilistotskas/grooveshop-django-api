@@ -14,9 +14,10 @@ is not available.
 """
 
 import pytest
-from django.test import Client
 from django.contrib.auth import get_user_model
-from search.models import SearchQuery, SearchClick
+from django.test import Client
+
+from search.models import SearchClick, SearchQuery
 from tests.conftest import requires_meilisearch
 
 User = get_user_model()
@@ -438,6 +439,7 @@ class TestSearchAnalyticsIntegration:
         """
         # Create test search queries with different dates
         from datetime import timedelta
+
         from django.utils import timezone
 
         old_date = timezone.now() - timedelta(days=365)

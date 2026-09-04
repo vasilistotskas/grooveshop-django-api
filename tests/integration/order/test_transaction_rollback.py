@@ -6,6 +6,7 @@ from django.utils import timezone
 from djmoney.money import Money
 
 from cart.models import Cart, CartItem
+from country.factories import CountryFactory
 from order.enum.status import OrderStatus, PaymentStatus
 from order.models import Order, OrderItem
 from order.models.stock_log import StockLog
@@ -14,7 +15,6 @@ from order.stock import StockManager
 from pay_way.factories import PayWayFactory
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
-from country.factories import CountryFactory
 
 
 @pytest.mark.django_db
@@ -124,54 +124,56 @@ class TestTransactionFailuresRollbackCompletely:
         # Simulate failure at specified point
         if failure_point == "order_save":
             # Patch Order.save to raise exception
-            with patch(
-                "order.models.order.Order.save",
-                side_effect=Exception("Order save failed"),
+            with (
+                patch(
+                    "order.models.order.Order.save",
+                    side_effect=Exception("Order save failed"),
+                ),
+                pytest.raises(expected_exception, match="Order save failed"),
             ):
-                with pytest.raises(
-                    expected_exception, match="Order save failed"
-                ):
-                    OrderService.create_order_from_cart(
-                        cart=cart,
-                        shipping_address=self.shipping_address,
-                        payment_intent_id=payment_intent_id,
-                        pay_way=self.pay_way,
-                        user=self.user,
-                    )
+                OrderService.create_order_from_cart(
+                    cart=cart,
+                    shipping_address=self.shipping_address,
+                    payment_intent_id=payment_intent_id,
+                    pay_way=self.pay_way,
+                    user=self.user,
+                )
 
         elif failure_point == "order_item_save":
             # Patch OrderItem.save to raise exception
-            with patch(
-                "order.models.OrderItem.save",
-                side_effect=Exception("OrderItem save failed"),
-            ):
-                with pytest.raises(
+            with (
+                patch(
+                    "order.models.OrderItem.save",
+                    side_effect=Exception("OrderItem save failed"),
+                ),
+                pytest.raises(
                     expected_exception, match="OrderItem save failed"
-                ):
-                    OrderService.create_order_from_cart(
-                        cart=cart,
-                        shipping_address=self.shipping_address,
-                        payment_intent_id=payment_intent_id,
-                        pay_way=self.pay_way,
-                        user=self.user,
-                    )
+                ),
+            ):
+                OrderService.create_order_from_cart(
+                    cart=cart,
+                    shipping_address=self.shipping_address,
+                    payment_intent_id=payment_intent_id,
+                    pay_way=self.pay_way,
+                    user=self.user,
+                )
 
         elif failure_point == "stock_log_save":
             # Patch StockLog.save to raise exception
-            with patch(
-                "order.models.stock_log.StockLog.save",
-                side_effect=Exception("StockLog save failed"),
+            with (
+                patch(
+                    "order.models.stock_log.StockLog.save",
+                    side_effect=Exception("StockLog save failed"),
+                ),
+                pytest.raises(expected_exception, match="StockLog save failed"),
             ):
-                with pytest.raises(
-                    expected_exception, match="StockLog save failed"
-                ):
-                    OrderService.create_order_from_cart(
-                        cart=cart,
-                        shipping_address=self.shipping_address,
-                        payment_intent_id=payment_intent_id,
-                        pay_way=self.pay_way,
-                        user=self.user,
-                    )
+                OrderService.create_order_from_cart(
+                    cart=cart,
+                    shipping_address=self.shipping_address,
+                    payment_intent_id=payment_intent_id,
+                    pay_way=self.pay_way,
+                    user=self.user,
+                )
 
         # Verify complete rollback - no partial changes persisted
 
@@ -355,7 +357,7 @@ class TestTransactionFailuresRollbackCompletely:
             side_effect=Exception("Stock increment failed"),
         ):
             # Service should NOT raise - it logs the error and continues
-            canceled_order, refund_info = OrderService.cancel_order(
+            _canceled_order, _refund_info = OrderService.cancel_order(
                 order, reason="Test cancellation", refund_payment=False
             )
 
@@ -454,10 +456,13 @@ class TestTransactionFailuresRollbackCompletely:
             original_save = Order.save
 
             def failing_save(self, *args, **kwargs):
-                if hasattr(self, "_state") and self._state.adding is False:
-                    # This is an update, not a create
-                    if self.status == OrderStatus.PROCESSING:
-                        raise Exception("Order status update failed")
+                # An update, not a create, moving into PROCESSING
+                if (
+                    hasattr(self, "_state")
+                    and self._state.adding is False
+                    and self.status == OrderStatus.PROCESSING
+                ):
+                    raise Exception("Order status update failed")
                 return original_save(self, *args, **kwargs)
 
             with patch.object(Order, "save", failing_save):

@@ -20,9 +20,8 @@ backfills, where the delivery happened weeks ago and a sudden
 state (order_paid signal, status transition, history) still flows.
 """
 
-from datetime import timedelta
-
 from contextlib import nullcontext as _nullcontext
+from datetime import timedelta
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone

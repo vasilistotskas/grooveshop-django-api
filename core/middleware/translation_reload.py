@@ -66,16 +66,16 @@ class TranslationReloadMiddleware(MiddlewareMixin):
 
         with _check_lock:
             if now - _last_check_monotonic < _CHECK_INTERVAL_SECONDS:
-                return None
+                return
             _last_check_monotonic = now
 
         try:
             remote_version = cache.get(TRANSLATION_VERSION_CACHE_KEY)
         except Exception:
-            return None
+            return
 
         if remote_version is None:
-            return None
+            return
 
         if _local_translation_version != remote_version:
             try:
@@ -88,10 +88,10 @@ class TranslationReloadMiddleware(MiddlewareMixin):
                     "Failed to refresh translations after version tick %s",
                     remote_version,
                 )
-                return None
+                return
             _local_translation_version = remote_version
             logger.info(
                 "Refreshed translations from DB (version %s)", remote_version
             )
 
-        return None
+        return

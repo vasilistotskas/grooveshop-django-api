@@ -1,7 +1,7 @@
-import pytest
 from datetime import timedelta
 from unittest.mock import Mock, patch
 
+import pytest
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory
@@ -9,12 +9,12 @@ from django.utils import timezone
 from djmoney.money import Money
 
 from cart.admin import (
+    ActivityStatusFilter,
     CartAdmin,
     CartItemAdmin,
     CartItemInline,
     CartTypeFilter,
     TotalItemsFilter,
-    ActivityStatusFilter,
 )
 from cart.factories import CartFactory, CartItemFactory
 from cart.models import Cart, CartItem

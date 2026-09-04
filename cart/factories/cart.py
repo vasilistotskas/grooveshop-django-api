@@ -49,6 +49,6 @@ class CartFactory(factory.django.DjangoModelFactory):
             return
 
         if extracted:
-            from cart.factories.item import CartItemFactory  # noqa: PLC0415
+            from cart.factories.item import CartItemFactory
 
             CartItemFactory.create_batch(extracted, cart=self)

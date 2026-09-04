@@ -331,7 +331,7 @@ class TestResponseValidationWithZod:
 
         # Verify key fields exist (flexible about exact names due to camelCase conversion)
         properties = response_schema["properties"]
-        property_names_lower = [k.lower() for k in properties.keys()]
+        property_names_lower = [k.lower() for k in properties]
 
         # Check for essential fields (case-insensitive)
         assert any("limit" in name for name in property_names_lower), (
@@ -377,7 +377,7 @@ class TestResponseValidationWithZod:
 
         # Verify analytics fields exist (flexible about exact names)
         properties = response_schema["properties"]
-        property_names_lower = [k.lower() for k in properties.keys()]
+        property_names_lower = [k.lower() for k in properties]
 
         # Check for essential analytics fields (case-insensitive)
         assert any(

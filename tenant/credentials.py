@@ -26,10 +26,13 @@ Design rules:
 
 from __future__ import annotations
 
+import logging
 from typing import TypedDict
 
 from django.conf import settings
 from django.db import connection
+
+logger = logging.getLogger(__name__)
 
 
 class VivaWalletCredentials(TypedDict):
@@ -122,13 +125,26 @@ def tenant_contact_email() -> str:
     if tenant_email:
         return tenant_email
     try:
-        from extra_settings.models import Setting  # noqa: PLC0415
-
-        setting_value = Setting.get("CONTACT_EMAIL", default="") or ""
-        if setting_value:
-            return setting_value
-    except Exception:  # pragma: no cover — extra_settings not installed
-        pass
+        from extra_settings.models import Setting
+    except ImportError:  # extra_settings not installed
+        logger.debug("extra_settings not installed — using INFO_EMAIL")
+    else:
+        try:
+            setting_value = Setting.get("CONTACT_EMAIL", default="") or ""
+        except Exception:
+            # This is a fallback CHAIN — tenant field, then the setting,
+            # then INFO_EMAIL — so a database blip should drop through to
+            # the next link rather than break every outbound email. What
+            # it must not do is drop through SILENTLY, which is what the
+            # bare `except Exception: pass` here used to do.
+            logger.warning(
+                "Could not read the CONTACT_EMAIL setting; falling back "
+                "to INFO_EMAIL",
+                exc_info=True,
+            )
+        else:
+            if setting_value:
+                return setting_value
     return getattr(settings, "INFO_EMAIL", "") or ""
 
 
@@ -214,7 +230,7 @@ def _customised(field: str) -> str:
     tenant that customised nothing emits nothing. Case-insensitive for
     the same reason it is there — the hex fields are free text.
     """
-    from tenant.models import Tenant  # noqa: PLC0415
+    from tenant.models import Tenant
 
     value = (_get_tenant_field(field) or "").strip()
     if not value:

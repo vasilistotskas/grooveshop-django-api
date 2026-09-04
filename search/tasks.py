@@ -22,6 +22,7 @@ CLICK_SCORE_MAX_ITEMS = 50
     retry_backoff=True,
 )
 def save_search_query(
+    *,
     query: str,
     language_code: str | None,
     content_type: str,
@@ -242,8 +243,9 @@ def anonymize_old_search_queries(days: int = 90) -> int:
     keeping the aggregate analytics value (query text, counts, timing).
     Registered as a periodic beat task.
     """
-    from django.utils import timezone
     from datetime import timedelta
+
+    from django.utils import timezone
 
     from search.models import SearchQuery
 

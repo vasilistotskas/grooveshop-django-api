@@ -9,15 +9,6 @@ from django.utils import timezone
 from django.utils.html import format_html_join
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import TabularInline
-
-from admin.base import BaseModelAdmin, BaseTranslatableAdmin
-from admin.displays import (
-    choice_label,
-    format_dt,
-    header_two_line,
-    relative_time,
-)
-from admin.export import ExportActionMixin
 from unfold.contrib.filters.admin import (
     DropdownFilter,
     RangeDateFilter,
@@ -33,6 +24,14 @@ from unfold.forms import (
     UserCreationForm,
 )
 
+from admin.base import BaseModelAdmin, BaseTranslatableAdmin
+from admin.displays import (
+    choice_label,
+    format_dt,
+    header_two_line,
+    relative_time,
+)
+from admin.export import ExportActionMixin
 from admin.mixins import IsSuperuserOnlyModelAdmin
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
@@ -217,7 +216,11 @@ class UserSubscriptionInline(TabularInline):
 
 
 @admin.register(Group)
-class GroupAdmin(BaseGroupAdmin, BaseModelAdmin):
+# Suppression is a stubs artefact, not a real override conflict: the two
+# bases declare the method with signatures that django-stubs types
+# differently, and ty reports the pair rather than a mismatch in the code
+# written here.
+class GroupAdmin(BaseGroupAdmin, BaseModelAdmin):  # ty: ignore[invalid-method-override]
     pass
 
 

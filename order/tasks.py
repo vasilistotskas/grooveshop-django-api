@@ -10,11 +10,9 @@ from django.db import connection, transaction
 from django.db.models import F
 from django.template import TemplateDoesNotExist
 from django.template.loader import render_to_string
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.html import strip_tags
 from django.utils.translation import gettext as _
-from django.utils import translation
-
 from extra_settings.models import Setting
 
 from core import celery_app
@@ -22,15 +20,15 @@ from core.tasks import MonitoredTask
 from core.utils.email_context import build_email_context
 from core.utils.i18n import get_order_language, get_user_language
 from core.utils.tenant_urls import get_tenant_frontend_url
+from order.enum.status import OrderStatus, PaymentStatus
+from order.models import Order, OrderHistory
+from order.models.order import AMOUNT_MISMATCH_FLAG
+from order.services import OrderService
 from tenant.credentials import (
     tenant_contact_email,
     tenant_from_email,
     tenant_site_name,
 )
-from order.enum.status import OrderStatus, PaymentStatus
-from order.models import Order, OrderHistory
-from order.models.order import AMOUNT_MISMATCH_FLAG
-from order.services import OrderService
 from user.utils.subscription import (
     build_list_unsubscribe_headers,
     build_transactional_list_headers,
@@ -555,13 +553,14 @@ def send_payment_failed_email(self, order_id: int) -> bool:
     """
     email_sent = False
     try:
-        if self.request.retries == 0:
-            if not _reserve_payment_failed_email(order_id):
-                logger.info(
-                    "Payment failed email already sent for order #%s, skipping",
-                    order_id,
-                )
-                return True
+        if (self.request.retries == 0) and (
+            not _reserve_payment_failed_email(order_id)
+        ):
+            logger.info(
+                "Payment failed email already sent for order #%s, skipping",
+                order_id,
+            )
+            return True
 
         # No item prefetch: this email neither passes ``items`` into the
         # context nor renders a line table.
@@ -852,15 +851,16 @@ def send_order_status_update_email(
     try:
         # Only reserve on the first attempt to prevent the flag from
         # blocking legitimate retries after a transient failure.
-        if self.request.retries == 0:
-            if not _reserve_status_update_email(order_id, status):
-                logger.info(
-                    "Status update email already sent (or reserved) "
-                    "for order #%s status=%s, skipping",
-                    order_id,
-                    status,
-                )
-                return True
+        if (self.request.retries == 0) and (
+            not _reserve_status_update_email(order_id, status)
+        ):
+            logger.info(
+                "Status update email already sent (or reserved) "
+                "for order #%s status=%s, skipping",
+                order_id,
+                status,
+            )
+            return True
 
         order = (
             Order.objects.select_related("user", "country", "region", "pay_way")
@@ -1093,14 +1093,15 @@ def send_shipping_notification_email(self, order_id: int) -> bool:
         # re-send because the flag is held by this worker; releasing
         # on every retry would defeat idempotency, and re-checking
         # would block a legitimate retry after a transient failure.
-        if self.request.retries == 0:
-            if not _reserve_shipping_notification_email(order_id):
-                logger.info(
-                    "Shipping notification email already sent (or reserved) "
-                    "for order #%s, skipping",
-                    order_id,
-                )
-                return True
+        if (self.request.retries == 0) and (
+            not _reserve_shipping_notification_email(order_id)
+        ):
+            logger.info(
+                "Shipping notification email already sent (or reserved) "
+                "for order #%s, skipping",
+                order_id,
+            )
+            return True
 
         context = build_email_context(
             order=order,
@@ -1222,12 +1223,10 @@ def generate_order_invoice(self, order_id: int) -> bool:
     try:
         invoice = generate_invoice(order)
     except Exception as e:
-        logger.error(
-            "Error generating invoice for order #%s: %s",
+        logger.exception(
+            "Error generating invoice for order #%s",
             order_id,
-            e,
             extra={"order_id": order_id, "error": str(e)},
-            exc_info=True,
         )
         if self.request.retries < self.max_retries:
             raise self.retry(exc=e) from e
@@ -1300,13 +1299,14 @@ def send_invoice_email(self, order_id: int) -> bool:
     """
     email_sent = False
     try:
-        if self.request.retries == 0:
-            if not _reserve_invoice_email(order_id):
-                logger.info(
-                    "Invoice email already sent for order #%s, skipping",
-                    order_id,
-                )
-                return True
+        if (self.request.retries == 0) and (
+            not _reserve_invoice_email(order_id)
+        ):
+            logger.info(
+                "Invoice email already sent for order #%s, skipping",
+                order_id,
+            )
+            return True
 
         order = Order.objects.select_related(
             "user", "country", "region", "pay_way"
@@ -1394,12 +1394,10 @@ def send_invoice_email(self, order_id: int) -> bool:
         return False
 
     except Exception as e:
-        logger.error(
-            "Error sending invoice email for order #%s: %s",
+        logger.exception(
+            "Error sending invoice email for order #%s",
             order_id,
-            e,
             extra={"order_id": order_id, "error": str(e)},
-            exc_info=True,
         )
         if email_sent:
             # The message is already with the relay. Whatever failed
@@ -1556,12 +1554,10 @@ def send_invoice_to_mydata(self, order_id: int) -> bool:
     # preserves ``invoice_number`` + ``issue_date`` (no counter gap).
     try:
         generate_invoice(order, force=True)
-    except Exception as exc:  # noqa: BLE001 — never block the email
-        logger.error(
-            "Failed to re-render PDF with MARK for order #%s: %s",
+    except Exception:
+        logger.exception(
+            "Failed to re-render PDF with MARK for order #%s",
             order_id,
-            exc,
-            exc_info=True,
         )
 
     OrderHistory.log_note(
@@ -1587,6 +1583,8 @@ def cancel_mydata_invoice(self, order_id: int) -> bool:
     from order.mydata import (
         MyDataError,
         MyDataTransportError,
+    )
+    from order.mydata import (
         cancel_invoice as _cancel,
     )
 
@@ -1739,10 +1737,9 @@ def check_pending_orders() -> int:
 
             count += 1
         except Exception:
-            logger.error(
+            logger.exception(
                 "Pending-order reminder failed for order %s",
                 order.id,
-                exc_info=True,
             )
 
     return count
@@ -1784,10 +1781,9 @@ def cleanup_expired_stock_reservations() -> int:
         return count
 
     except Exception as e:
-        logger.error(
-            f"Error cleaning up expired stock reservations: {e!s}",
+        logger.exception(
+            "Error cleaning up expired stock reservations",
             extra={"error": str(e)},
-            exc_info=True,
         )
         return 0
 
@@ -1890,13 +1886,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
                 "Auto-canceled: payment failed and not retried",
             ):
                 canceled_failed += 1
-        except Exception as e:
+        except Exception:
             errors += 1
-            logger.error(
-                "Auto-cancel (failed-payment) error for order %s: %s",
+            logger.exception(
+                "Auto-cancel (failed-payment) error for order %s",
                 order.id,
-                e,
-                exc_info=True,
             )
 
     for order in pending_qs.iterator():
@@ -1906,13 +1900,11 @@ def auto_cancel_stuck_pending_orders() -> dict[str, int]:
                 "Auto-canceled: payment never completed",
             ):
                 canceled_pending += 1
-        except Exception as e:
+        except Exception:
             errors += 1
-            logger.error(
-                "Auto-cancel (stale-pending) error for order %s: %s",
+            logger.exception(
+                "Auto-cancel (stale-pending) error for order %s",
                 order.id,
-                e,
-                exc_info=True,
             )
 
     total = canceled_failed + canceled_pending
@@ -2048,12 +2040,10 @@ def send_checkout_abandonment_emails() -> int:
                 abandonment_notified=True
             )
             sent += 1
-        except Exception as e:
-            logger.error(
-                "Error sending checkout-abandonment email for cart %s: %s",
+        except Exception:
+            logger.exception(
+                "Error sending checkout-abandonment email for cart %s",
                 cart.id,
-                e,
-                exc_info=True,
             )
 
     if sent:

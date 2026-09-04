@@ -1,10 +1,10 @@
-from django.db.models import Count, Q, F
+from django.db.models import Count, F, Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from blog.models.category import BlogCategory
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
-from core.filters.core import UUIDFilterMixin, SortableFilterMixin
+from core.filters.core import SortableFilterMixin, UUIDFilterMixin
 
 
 class BlogCategoryFilter(
@@ -172,9 +172,12 @@ class BlogCategoryFilter(
                 "total_posts"
             ]
 
-            if value is True and post_count > 0:
-                result_ids.append(category.id)
-            elif value is False and post_count == 0:
+            if (
+                value is True
+                and post_count > 0
+                or value is False
+                and post_count == 0
+            ):
                 result_ids.append(category.id)
 
         return queryset.filter(id__in=result_ids)

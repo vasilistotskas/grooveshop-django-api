@@ -168,8 +168,8 @@ class TestOriginRule:
         assert origin_belongs_to_tenant(tenant, origin) is True
 
     def test_fake_tenant_owns_no_origins(self):
-        from django_tenants.utils import get_public_schema_name
         from django_tenants.postgresql_backend.base import FakeTenant
+        from django_tenants.utils import get_public_schema_name
 
         fake = FakeTenant(schema_name=get_public_schema_name())
         assert origin_belongs_to_tenant(fake, TENANT_ORIGIN) is False

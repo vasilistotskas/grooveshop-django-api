@@ -32,7 +32,7 @@ class TestPurchaseReversal:
         assert purchase.status == GiftCardPurchaseStatus.CANCELED
 
     def test_untouched_card_is_voided(self, enable_gift_cards):
-        purchase = GiftCardPurchaseFactory(amount=Money(Decimal("50"), "EUR"))
+        purchase = GiftCardPurchaseFactory(amount=Money(Decimal(50), "EUR"))
         card = GiftCardService.complete_purchase(purchase, "txn_1")
 
         outcome = GiftCardService.handle_purchase_reversal(purchase)
@@ -42,15 +42,15 @@ class TestPurchaseReversal:
         assert outcome == "processed"
         assert purchase.status == GiftCardPurchaseStatus.CANCELED
         assert card.status == GiftCardStatus.DISABLED
-        assert card.balance.amount == Decimal("0")
+        assert card.balance.amount == Decimal(0)
 
     def test_spent_card_is_left_for_ops(self, enable_gift_cards):
-        purchase = GiftCardPurchaseFactory(amount=Money(Decimal("50"), "EUR"))
+        purchase = GiftCardPurchaseFactory(amount=Money(Decimal(50), "EUR"))
         card = GiftCardService.complete_purchase(purchase, "txn_2")
         GiftCardTransaction.objects.create(
             gift_card=card,
             kind=GiftCardTransactionKind.REDEEM,
-            amount=Decimal("-10"),
+            amount=Decimal(-10),
         )
 
         GiftCardService.handle_purchase_reversal(purchase)
@@ -58,7 +58,7 @@ class TestPurchaseReversal:
         card.refresh_from_db()
         # Partially spent — never auto-voided.
         assert card.status == GiftCardStatus.ACTIVE
-        assert card.balance.amount == Decimal("40")
+        assert card.balance.amount == Decimal(40)
 
 
 class TestExpiryReminders:
@@ -66,12 +66,12 @@ class TestExpiryReminders:
         from giftcard.tasks import send_gift_card_expiry_reminders
 
         card = GiftCardFactory(
-            initial_value=Money(Decimal("30"), "EUR"),
+            initial_value=Money(Decimal(30), "EUR"),
             recipient_email="soon@example.com",
             expires_at=timezone.now() + timezone.timedelta(days=10),
         )
         far_card = GiftCardFactory(
-            initial_value=Money(Decimal("30"), "EUR"),
+            initial_value=Money(Decimal(30), "EUR"),
             recipient_email="later@example.com",
             expires_at=timezone.now() + timezone.timedelta(days=300),
         )
@@ -126,7 +126,7 @@ class TestVivaPurchaseWebhookBranch:
         from order.enum.status import PaymentStatus
 
         purchase = GiftCardPurchaseFactory(
-            amount=Money(Decimal("40"), "EUR"),
+            amount=Money(Decimal(40), "EUR"),
             provider_code="viva_wallet",
         )
         purchase.payment_id = "1234567890123456"
@@ -150,7 +150,7 @@ class TestVivaPurchaseWebhookBranch:
         from order.enum.status import PaymentStatus
 
         purchase = GiftCardPurchaseFactory(
-            amount=Money(Decimal("40"), "EUR"),
+            amount=Money(Decimal(40), "EUR"),
             provider_code="viva_wallet",
         )
         purchase.payment_id = "2234567890123456"
@@ -174,7 +174,7 @@ class TestVivaPurchaseWebhookBranch:
         self, enable_gift_cards
     ):
         purchase = GiftCardPurchaseFactory(
-            amount=Money(Decimal("40"), "EUR"),
+            amount=Money(Decimal(40), "EUR"),
             provider_code="viva_wallet",
         )
         purchase.payment_id = "3234567890123456"
@@ -193,7 +193,7 @@ class TestVivaPurchaseWebhookBranch:
     def _paid_purchase(self, payment_id):
         """A PAID purchase with one issued, untouched card."""
         purchase = GiftCardPurchaseFactory(
-            amount=Money(Decimal("40"), "EUR"), provider_code="viva_wallet"
+            amount=Money(Decimal(40), "EUR"), provider_code="viva_wallet"
         )
         purchase.payment_id = payment_id
         purchase.save(update_fields=["payment_id"])
@@ -221,7 +221,7 @@ class TestVivaPurchaseWebhookBranch:
         assert response.status_code == 200
         assert purchase.status == GiftCardPurchaseStatus.PAID
         assert card.status == GiftCardStatus.ACTIVE
-        assert card.balance.amount == Decimal("40")
+        assert card.balance.amount == Decimal(40)
 
     def test_reversal_without_a_transaction_id_voids_nothing(
         self, enable_gift_cards
@@ -265,7 +265,7 @@ class TestVivaPurchaseWebhookBranch:
         assert response.status_code == 200
         assert purchase.status == GiftCardPurchaseStatus.CANCELED
         assert card.status == GiftCardStatus.DISABLED
-        assert card.balance.amount == Decimal("0")
+        assert card.balance.amount == Decimal(0)
 
     def test_unverifiable_reversal_returns_500_and_voids_nothing(
         self, enable_gift_cards

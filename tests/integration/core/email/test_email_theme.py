@@ -105,7 +105,7 @@ class TestNoLeakedTemplateComments:
                 for path in root.rglob(pattern):
                     text = path.read_text(encoding="utf-8")
                     for lineno, line in enumerate(text.splitlines(), 1):
-                        head, sep, tail = line.partition("{#")
+                        _head, sep, tail = line.partition("{#")
                         if sep and "#}" not in tail:
                             offenders.append(
                                 f"{path.relative_to(root)}:{lineno}"
@@ -160,7 +160,7 @@ class TestThemeResolution:
             assert value.startswith("#"), f"{key} is not hex: {value!r}"
 
     def test_accent_hex_drives_the_palette(self, monkeypatch):
-        import tenant.credentials as credentials
+        from tenant import credentials
 
         values = {"accent_hex": "#AA00BB", "success_hex": "#00CC44"}
         monkeypatch.setattr(
@@ -176,7 +176,7 @@ class TestThemeResolution:
         assert theme["secondary"] == "#00CC44"
 
     def test_theme_metadata_scale_wins_over_accent(self, monkeypatch):
-        import tenant.credentials as credentials
+        from tenant import credentials
 
         values = {
             "accent_hex": "#AA00BB",
@@ -197,7 +197,7 @@ class TestThemeResolution:
 
     def test_malformed_theme_metadata_falls_back_cleanly(self, monkeypatch):
         """Merchant-editable JSON must never break outbound mail."""
-        import tenant.credentials as credentials
+        from tenant import credentials
 
         for junk in ("not-a-dict", {"colors": "nope"}, {"colors": {}}, None):
             monkeypatch.setattr(
@@ -241,7 +241,7 @@ class TestUncustomisedTenantRendersExactlyAsBefore:
     def test_tenant_carrying_model_defaults_gets_the_original_palette(
         self, monkeypatch
     ):
-        import tenant.credentials as credentials
+        from tenant import credentials
         from tenant.models import Tenant
 
         defaults = {
@@ -259,7 +259,7 @@ class TestUncustomisedTenantRendersExactlyAsBefore:
 
     def test_customisation_is_still_honoured(self, monkeypatch):
         """The feature must still work for a store that DID choose."""
-        import tenant.credentials as credentials
+        from tenant import credentials
 
         values = {"accent_hex": "#AA00BB", "theme_metadata": {}}
         monkeypatch.setattr(
@@ -274,7 +274,7 @@ class TestUncustomisedTenantRendersExactlyAsBefore:
 
     def test_default_comparison_is_case_insensitive(self, monkeypatch):
         """The hex fields are free text; #003dff is not a customisation."""
-        import tenant.credentials as credentials
+        from tenant import credentials
         from tenant.models import Tenant
 
         default = str(Tenant._meta.get_field("accent_hex").default)

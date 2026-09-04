@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -13,21 +13,19 @@ from django.core.mail import EmailMultiAlternatives, mail_admins
 from django.db import connections, transaction
 from django.db.models import F
 from django.template.loader import render_to_string
-from django.utils import timezone
 
 # See order/tasks.py for rationale — eager gettext over lazy for email subjects.
-from django.utils import translation
+from django.utils import timezone, translation
 from django.utils.translation import gettext as _
-
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_user_language
-from tenant.credentials import tenant_contact_email, tenant_from_email
-
 from extra_settings.models import Setting
 
 from cart.models import Cart
 from core import celery_app
+from core.exceptions import HealthCheckFailed, ManagementCommandFailed
+from core.utils.email_context import build_email_context
+from core.utils.i18n import get_user_language
 from tenant.celery import TenantTask
+from tenant.credentials import tenant_contact_email, tenant_from_email
 
 User = get_user_model()
 
@@ -79,6 +77,14 @@ class MonitoredTask(TenantTask):
                 self.name,
                 einfo.traceback,
             )
+
+
+class _DeletedLogFile(TypedDict):
+    """One pruned development log file, as reported in the task's `extra`."""
+
+    filename: str
+    size: int
+    modified: str
 
 
 @celery_app.task(
@@ -390,7 +396,10 @@ def clear_development_log_files_task(days=7):
             "path": logs_path,
         }
 
-    deleted_files = []
+    # Typed record, not a bare dict literal: `{"filename": str, "size":
+    # int, ...}` infers a value type of `str | int`, so `sum(f["size"]
+    # for f in deleted_files)` cannot be shown to be summing numbers.
+    deleted_files: list[_DeletedLogFile] = []
     errors = []
     cutoff_date = timezone.now() - timedelta(days=days)
 
@@ -402,11 +411,9 @@ def clear_development_log_files_task(days=7):
                 continue
 
             should_cleanup = (
-                filename.endswith(".log")
+                filename.endswith((".log", ".bak", ".old"))
                 or ".log." in filename
                 or "backup" in filename.lower()
-                or filename.endswith(".bak")
-                or filename.endswith(".old")
             )
 
             if not should_cleanup:
@@ -422,19 +429,19 @@ def clear_development_log_files_task(days=7):
                     file_size = os.path.getsize(file_path)
                     os.remove(file_path)
                     deleted_files.append(
-                        {
-                            "filename": filename,
-                            "size": file_size,
-                            "modified": file_date.isoformat(),
-                        }
+                        _DeletedLogFile(
+                            filename=filename,
+                            size=file_size,
+                            modified=file_date.isoformat(),
+                        )
                     )
 
             except OSError as e:
                 logger.error(f"Error processing file {filename}: {e}")
                 errors.append({"file": filename, "error": str(e)})
 
-    except OSError as e:
-        logger.exception(f"Error accessing logs directory: {e}")
+    except OSError:
+        logger.exception("Error accessing logs directory")
         raise
 
     message = f"Deleted {len(deleted_files)} development log files older than {days} days"
@@ -621,7 +628,7 @@ def monitor_system_health():
             health_checks["cache"] = True
             logger.debug("Cache health check passed")
         else:
-            raise Exception("Cache read/write test failed")
+            raise HealthCheckFailed("cache", "read/write test failed")
 
     except Exception as e:
         error_msg = f"Cache health check failed: {e}"
@@ -684,7 +691,9 @@ def monitor_system_health():
     logger.info("System health check completed", extra=result)
 
     if not critical_passed:
-        raise Exception("Critical system health check failed")
+        raise HealthCheckFailed(
+            "system", "a critical component reported unhealthy"
+        )
 
     return result
 
@@ -973,8 +982,7 @@ def sync_meilisearch_indexes():
             "timestamp": timezone.now().isoformat(),
         }
     except SystemExit as e:
-        logger.error(f"Meilisearch sync command exited with code: {e.code}")
-        raise Exception(f"Command exited with code {e.code}")
+        raise ManagementCommandFailed("meilisearch sync", e.code) from e
     except management.CommandError as e:
         logger.error(f"Django command error in sync_meilisearch_indexes: {e}")
         raise

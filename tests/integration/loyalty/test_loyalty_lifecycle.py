@@ -15,8 +15,8 @@ from django.conf import settings
 from djmoney.money import Money
 
 from loyalty.enum import TransactionType
-from loyalty.models.transaction import PointsTransaction
 from loyalty.models.tier import LoyaltyTier
+from loyalty.models.transaction import PointsTransaction
 from loyalty.services import LoyaltyService
 from order.models.item import OrderItem
 from order.models.order import Order
@@ -384,12 +384,12 @@ class TestOrderCompleteAndRedeemFlow:
                 user,
                 points_amount=100,
                 currency="EUR",
-                max_discount=Decimal("99999"),
+                max_discount=Decimal(99999),
                 order=redeem_order,
             )
 
         # 100 / 100.0 = 1.00 EUR discount
-        assert discount == Decimal("1")
+        assert discount == Decimal(1)
 
         # Verify REDEEM transaction
         redeem_txs = PointsTransaction.objects.filter(
@@ -432,12 +432,12 @@ class TestOrderCompleteAndRedeemFlow:
                 user,
                 points_amount=200,
                 currency="EUR",
-                max_discount=Decimal("99999"),
+                max_discount=Decimal(99999),
                 order=redeem_order,
             )
 
         # 200 / 50.0 = 4.00 EUR
-        assert discount == Decimal("4")
+        assert discount == Decimal(4)
 
         # Verify order metadata
         redeem_order.refresh_from_db()
@@ -470,7 +470,7 @@ class TestOrderCompleteAndRedeemFlow:
                     user,
                     points_amount=100,
                     currency="EUR",
-                    max_discount=Decimal("99999"),
+                    max_discount=Decimal(99999),
                 )
 
         # Verify no REDEEM transaction was created
@@ -705,7 +705,7 @@ class TestRedeemPointsCappedByProductsTotal:
                 max_discount=Decimal("150.00"),
             )
 
-        assert discount == Decimal("150")
+        assert discount == Decimal(150)
 
         # Verify REDEEM transaction was created
         assert (
@@ -741,7 +741,7 @@ class TestRedeemPointsCappedByProductsTotal:
                 max_discount=Decimal("150.00"),
             )
 
-        assert discount == Decimal("50")
+        assert discount == Decimal(50)
 
 
 # ---------------------------------------------------------------------------

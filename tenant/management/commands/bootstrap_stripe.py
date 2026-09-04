@@ -28,7 +28,6 @@ Usage:
 
 from __future__ import annotations
 
-
 from django.core.management.base import BaseCommand, CommandError
 
 from tenant.models import Tenant
@@ -92,7 +91,7 @@ class Command(BaseCommand):
         The logic itself lives in ``tenant/provisioning.py`` so the admin
         action and this command cannot drift.
         """
-        from tenant.provisioning import provision_stripe  # noqa: PLC0415
+        from tenant.provisioning import provision_stripe
 
         result = provision_stripe(
             tenant,

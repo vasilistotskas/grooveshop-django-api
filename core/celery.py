@@ -22,7 +22,7 @@ _worker_translation_version: float | None = None
 
 @setup_logging.connect
 def config_loggers(*args, **kwargs):
-    from django.conf import settings  # noqa: F401, PLC0415
+    from django.conf import settings  # noqa: F401
 
 
 def create_celery_app():

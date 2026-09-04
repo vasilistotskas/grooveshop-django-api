@@ -48,7 +48,7 @@ def _resolve_tenant_from_request(request):
     host = host.split(":", 1)[0].rstrip(".")
     if not host:
         return None
-    from tenant.models import TenantDomain  # noqa: PLC0415
+    from tenant.models import TenantDomain
 
     domain = (
         TenantDomain.objects.select_related("tenant")
@@ -159,8 +159,8 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
         ):
             return None
         try:
-            from django_tenants.utils import schema_context  # noqa: PLC0415
-            from extra_settings.models import Setting  # noqa: PLC0415
+            from django_tenants.utils import schema_context
+            from extra_settings.models import Setting
 
             with schema_context(tenant.schema_name):
                 value = Setting.get("SOCIAL_LOGIN_PROVIDERS", default=None)
@@ -221,7 +221,7 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
             tenant is not None
             and getattr(tenant, "schema_name", "public") != "public"
         ):
-            from allauth.socialaccount.models import SocialApp  # noqa: PLC0415
+            from allauth.socialaccount.models import SocialApp
 
             allowed = self._allowed_providers(request)
             if allowed is not None and provider not in allowed:
@@ -232,7 +232,7 @@ class TenantSocialAccountAdapter(SocialAccountAdapter):
                 # started OAuth when its redirect URL was hit directly.
                 raise SocialApp.DoesNotExist()
             try:
-                from django.contrib.sites.models import Site  # noqa: PLC0415
+                from django.contrib.sites.models import Site
 
                 # Find the Site row whose domain matches this tenant's
                 # primary domain.  Uses select_related to avoid N+1.

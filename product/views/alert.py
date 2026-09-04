@@ -58,7 +58,7 @@ class ProductAlertViewSet(BaseModelViewSet):
     ordering = ["-created_at"]
 
     def get_permissions(self):
-        from tenant.permissions import (  # noqa: PLC0415
+        from tenant.permissions import (
             IsProductAlertsEnabled,
         )
 

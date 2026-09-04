@@ -15,7 +15,6 @@ from djmoney.money import Money
 from loyalty.enum import TransactionType
 from loyalty.models.transaction import PointsTransaction
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

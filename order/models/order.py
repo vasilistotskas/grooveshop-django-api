@@ -16,16 +16,15 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from core.enum import FloorChoicesEnum, LocationChoicesEnum
 from core.models import (
+    MetaDataModel,
     SoftDeleteModel,
     TimeStampMixinModel,
     UUIDModel,
-    MetaDataModel,
 )
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import OrderStatus, PaymentStatus
 from order.managers.order import OrderManager
 from shipping.enum import ShippingKind
-
 
 # Stamped on ``Order.metadata`` when a provider confirms a charge whose
 # amount does not match the order total. The money HAS left the customer,
@@ -661,7 +660,7 @@ class Order(SoftDeleteModel, TimeStampMixinModel, UUIDModel, MetaDataModel):
                 )
                 if deduction and deduction.amount > 0
             ),
-            Decimal("0"),
+            Decimal(0),
         )
         if deductions <= 0:
             return total

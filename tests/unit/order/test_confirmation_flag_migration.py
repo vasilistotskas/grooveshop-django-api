@@ -13,6 +13,7 @@ every other writer takes a row lock the migration would not be holding.
 from __future__ import annotations
 
 import importlib
+from datetime import UTC
 
 import pytest
 from django.db import connection
@@ -61,7 +62,6 @@ def test_the_backfilled_timestamp_is_the_rows_own_updated_at():
     while denoting the same moment.
     """
     from datetime import datetime
-    from datetime import timezone as dt_timezone
 
     order = _order({LEGACY: True})
 
@@ -70,9 +70,7 @@ def test_the_backfilled_timestamp_is_the_rows_own_updated_at():
     order.refresh_from_db()
     stamped = datetime.fromisoformat(order.metadata[TIMESTAMP])
     assert stamped.tzinfo is not None, "the timestamp must be offset-aware"
-    assert stamped.astimezone(dt_timezone.utc) == order.updated_at.astimezone(
-        dt_timezone.utc
-    )
+    assert stamped.astimezone(UTC) == order.updated_at.astimezone(UTC)
 
 
 def test_a_row_that_already_has_the_timestamp_keeps_it():

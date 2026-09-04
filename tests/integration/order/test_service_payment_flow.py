@@ -760,6 +760,7 @@ class TestOrderServiceHandlePaymentSucceeded:
         """
         from django.conf import settings
         from djmoney.money import Money
+
         from order.models.order import Order
 
         payment_id = f"pi_settled_{settled_payment_status.value}"

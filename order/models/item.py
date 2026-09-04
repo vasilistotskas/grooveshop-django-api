@@ -148,13 +148,22 @@ class OrderItem(TimeStampMixinModel, SortableModel, UUIDModel):
                 )
 
             if item.refunded_quantity + refund_qty > item.quantity:
+                # %-format, not an f-string: an f-string is resolved
+                # BEFORE `_()` sees it, so the msgid carries the actual
+                # numbers and can never match a catalogue entry — this
+                # message reached Greek users untranslated.
                 raise ValidationError(
                     _(
                         "Cannot refund more than the ordered quantity. "
-                        f"Ordered quantity: {item.quantity}, "
-                        f"Refunded quantity: {item.refunded_quantity}, "
-                        f"Refund quantity: {refund_qty}"
+                        "Ordered quantity: %(ordered)s, "
+                        "Refunded quantity: %(refunded)s, "
+                        "Refund quantity: %(requested)s"
                     )
+                    % {
+                        "ordered": item.quantity,
+                        "refunded": item.refunded_quantity,
+                        "requested": refund_qty,
+                    }
                 )
 
             if hasattr(item.product, "stock"):

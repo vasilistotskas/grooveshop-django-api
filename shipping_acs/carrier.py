@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from shipping.enum import ShippingKind
@@ -12,7 +12,6 @@ from shipping.interfaces import ShippingCarrierInterface, register_provider
 
 if TYPE_CHECKING:
     from order.models.order import Order
-
     from shipping_acs.models import AcsShipment
 
 logger = logging.getLogger(__name__)
@@ -159,7 +158,6 @@ class AcsCarrier(ShippingCarrierInterface):
         from shipping.utils import compute_total_weight_grams
         from shipping_acs.enum.charge_type import AcsChargeType
         from shipping_acs.enum.cod_payment_way import AcsCodPaymentWay
-
         from shipping_acs.models import AcsShipment, AcsStation
 
         if AcsShipment.objects.filter(order=order).exists():
@@ -212,8 +210,7 @@ class AcsCarrier(ShippingCarrierInterface):
             item_quantity = int(raw_qty) if raw_qty is not None else 1
         except TypeError, ValueError:
             item_quantity = 1
-        if item_quantity < 1:
-            item_quantity = 1
+        item_quantity = max(item_quantity, 1)
 
         station = None
         if external_id:
@@ -258,7 +255,7 @@ class AcsCarrier(ShippingCarrierInterface):
         # Stamp the caller-captured tenant schema so the worker binds
         # the right store even when this dispatch is deferred past the
         # request's schema context (see the base method's contract).
-        from django.db import connection  # noqa: PLC0415
+        from django.db import connection
 
         create_acs_voucher_for_order.apply_async(
             args=[order.id],

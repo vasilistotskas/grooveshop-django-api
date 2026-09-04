@@ -5,7 +5,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models import Count
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _, ngettext
+from django.utils.translation import gettext_lazy as _
+from django.utils.translation import ngettext
 from unfold.admin import GenericTabularInline
 from unfold.contrib.filters.admin import (
     DropdownFilter,
@@ -17,7 +18,6 @@ from unfold.enums import ActionVariant
 
 from admin.base import BaseModelAdmin, BaseTranslatableAdmin
 from admin.displays import format_dt
-
 from tag.models.tag import Tag
 from tag.models.tagged_item import TaggedItem
 

@@ -33,13 +33,9 @@ class SeedingResult:
 class TranslationError(Exception):
     """Raised when translation operations fail"""
 
-    pass
-
 
 class UniqueFieldError(ValidationError):
     """Raised when unique field generation fails"""
-
-    pass
 
 
 class TranslationUtilities:
@@ -474,7 +470,6 @@ class CustomDjangoModelFactory(
         cls, kwargs: dict[str, Any], market: str
     ) -> None:
         """Apply locale-aware field generation"""
-        pass
 
     @classmethod
     def _get_translation_data(

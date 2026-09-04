@@ -6,8 +6,9 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 
-from meili._client import client as _client
 from core.management.tenant_mixin import TenantCommandMixin
+from meili._client import client as _client
+from meili.exceptions import MeiliTaskFailed
 from meili.models import IndexMixin
 
 DEFAULT_BATCH_SIZE = settings.MEILISEARCH.get("DEFAULT_BATCH_SIZE", 1000)
@@ -214,7 +215,9 @@ class Command(TenantCommandMixin, BaseCommand):
         self.stdout.write(self.style.MIGRATE_HEADING("=" * 70))
 
         if failed_models:
-            raise Exception(f"Failed to sync {len(failed_models)} model(s)")
+            raise MeiliTaskFailed(
+                f"{len(failed_models)} model(s)", operation="sync"
+            )
 
     def _format_duration(self, seconds):
         """Format duration in a human-readable way."""
@@ -383,7 +386,7 @@ class Command(TenantCommandMixin, BaseCommand):
                 try:
                     finished = _client.wait_for_task(task.task_uid)
                     if finished.status == "failed":
-                        raise Exception(finished.error)
+                        raise MeiliTaskFailed(finished.error, operation="sync")
 
                     # Progress for task waiting - show more frequently for large task counts
                     current_time = time.perf_counter()
@@ -456,7 +459,7 @@ class Command(TenantCommandMixin, BaseCommand):
             return total_count
         except Exception as e:
             close_old_connections()
-            raise Exception(f"Failed to sync model: {e}")
+            raise MeiliTaskFailed(e, operation="sync model") from e
 
     def _prune_stale_documents(self, Model, synced_pks: set[str]) -> None:
         """Delete index documents whose primary key was not synced this run.

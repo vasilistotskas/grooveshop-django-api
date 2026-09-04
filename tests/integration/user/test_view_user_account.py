@@ -5,9 +5,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from user.serializers.account import UserDetailsSerializer
 from tests.utils import TestURLFixerMixin
 from user.factories.account import UserAccountFactory
+from user.serializers.account import UserDetailsSerializer
 
 User = get_user_model()
 

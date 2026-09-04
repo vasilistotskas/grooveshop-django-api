@@ -75,7 +75,7 @@ class PlatformStaffTokenAuthentication(BoundedTokenAuthentication):
 
     @property
     def token_model(self):
-        from django.apps import apps  # noqa: PLC0415
+        from django.apps import apps
 
         return apps.get_model(self.token_model_name)
 

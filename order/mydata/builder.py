@@ -37,6 +37,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+from order.discounts import discounted_line_gross
 from order.mydata.types import (
     CLASSIFICATION_CATEGORY_B2B_MERCHANDISE,
     CLASSIFICATION_CATEGORY_GOODS_SALES,
@@ -57,7 +58,6 @@ from order.mydata.types import (
     VAT_CATEGORY_24,
     VAT_EXEMPTION_NO_VAT_ARTICLES,
 )
-from order.discounts import discounted_line_gross
 from order.mydata.uid import build_uid
 from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 
@@ -67,14 +67,14 @@ from vat.constants import MYDATA_SUPPORTED_VAT_RATES
 # (missing vatExemptionCategory) downstream, which is a confusing
 # way to learn you have bad VAT rows.
 _VAT_CATEGORY_BY_RATE: dict[Decimal, int] = {
-    Decimal("24"): VAT_CATEGORY_24,
-    Decimal("17"): VAT_CATEGORY_17,
-    Decimal("13"): VAT_CATEGORY_13,
-    Decimal("9"): VAT_CATEGORY_9,
-    Decimal("6"): VAT_CATEGORY_6,
-    Decimal("4"): VAT_CATEGORY_4,  # Island discount 4% (classic)
-    Decimal("3"): VAT_CATEGORY_3,  # Law 5057/2023
-    Decimal("0"): VAT_CATEGORY_0,
+    Decimal(24): VAT_CATEGORY_24,
+    Decimal(17): VAT_CATEGORY_17,
+    Decimal(13): VAT_CATEGORY_13,
+    Decimal(9): VAT_CATEGORY_9,
+    Decimal(6): VAT_CATEGORY_6,
+    Decimal(4): VAT_CATEGORY_4,  # Island discount 4% (classic)
+    Decimal(3): VAT_CATEGORY_3,  # Law 5057/2023
+    Decimal(0): VAT_CATEGORY_0,
 }
 # ``vat.constants.MYDATA_SUPPORTED_VAT_RATES`` mirrors these keys so the
 # ``Vat`` model can reject an unmapped rate at save time (``order``
@@ -88,7 +88,7 @@ assert set(_VAT_CATEGORY_BY_RATE) == MYDATA_SUPPORTED_VAT_RATES, (
 )
 # Rates that are NOT taxed — these land in vatCategory=7 and need
 # ``vatExemptionCategory`` per AADE error 217.
-_ZERO_RATED = Decimal("0")
+_ZERO_RATED = Decimal(0)
 
 
 def _vat_category(rate: Decimal) -> int:
@@ -118,7 +118,7 @@ def _split_gross(line_gross: Decimal, rate: Decimal) -> tuple[Decimal, Decimal]:
     Returning the ROUNDED values is essential — the per-line and
     summary columns must agree after AADE's server-side re-rounding
     (errors 203 / 207–210 otherwise)."""
-    divisor = Decimal("1") + rate / Decimal("100")
+    divisor = Decimal(1) + rate / Decimal(100)
     line_net = line_gross / divisor if divisor else line_gross
     line_vat = line_gross - line_net
     return (
@@ -326,7 +326,7 @@ def _gift_card_payment_type() -> int:
     Μετρητά; 5 = Επί πιστώσει is the usual alternative). Invalid
     values fall back to Cash rather than producing a schema error.
     """
-    from extra_settings.models import Setting  # noqa: PLC0415
+    from extra_settings.models import Setting
 
     try:
         value = int(Setting.get("MYDATA_GIFT_CARD_PAYMENT_TYPE", default=3))
@@ -352,7 +352,7 @@ def _payment_rows(invoice: Any) -> list[tuple[int, Decimal]]:
     gift_amount = (
         min(Decimal(gift_card.amount), total)
         if gift_card and gift_card.amount > 0
-        else Decimal("0")
+        else Decimal(0)
     )
     rows: list[tuple[int, Decimal]] = []
     if gift_amount > 0:
@@ -476,11 +476,11 @@ def build_invoice_xml(
     # the server sees (avoids errors 203 / 207–210). Shipping and
     # payment-method fees are emitted as extra lines so
     # ``paymentMethods.amount`` still equals the invoice gross.
-    summed_net = Decimal("0")
-    summed_vat = Decimal("0")
-    summed_gross = Decimal("0")
+    summed_net = Decimal(0)
+    summed_vat = Decimal(0)
+    summed_gross = Decimal(0)
     classification_totals: dict[tuple[str, str], Decimal] = defaultdict(
-        lambda: Decimal("0")
+        lambda: Decimal(0)
     )
     cls_type, cls_category = _classification_pair_for(invoice_type)
 
@@ -496,7 +496,7 @@ def build_invoice_xml(
         rate = (
             Decimal(item.product.vat.value)
             if item.product and item.product.vat_id
-            else Decimal("0")
+            else Decimal(0)
         )
         line_gross = line_gross_by_pk[item.pk]
         if line_gross <= 0:
@@ -524,14 +524,14 @@ def build_invoice_xml(
     # domestic rate). Tier C will thread through per-order overrides
     # for exports / island rates.
     for gross_decimal in _ancillary_charges(invoice.order):
-        line_net, line_vat = _split_gross(gross_decimal, Decimal("24"))
+        line_net, line_vat = _split_gross(gross_decimal, Decimal(24))
         line_number += 1
         _emit_detail(
             invoice_el,
             line_number=line_number,
             line_net=line_net,
             line_vat=line_vat,
-            rate=Decimal("24"),
+            rate=Decimal(24),
             classification_type=cls_type,
             classification_category=cls_category,
         )

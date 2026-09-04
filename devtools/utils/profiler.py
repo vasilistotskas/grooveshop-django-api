@@ -31,7 +31,7 @@ class ProfileLevel(Enum):
 class MetricsExporter(Protocol):
     """Protocol for metrics exporters"""
 
-    def export(self, metrics: "SessionMetrics", path: Path) -> None:
+    def export(self, metrics: SessionMetrics, path: Path) -> None:
         """Export metrics to a file"""
         ...
 
@@ -274,7 +274,10 @@ class MemoryProfiler:
                     self.initial_memory = process.memory_info().rss
                     self.current_memory = self.initial_memory
                     self.peak_memory = self.initial_memory
-                except Exception:
+                except Exception:  # noqa: S110
+                    # Profiling is best-effort dev tooling: psutil may be
+                    # absent or refused by the OS, and a profiler that
+                    # raises would break the thing it is measuring.
                     pass
 
             if not tracemalloc.is_tracing():
@@ -314,7 +317,10 @@ class MemoryProfiler:
                     self.peak_process_memory = max(
                         self.peak_process_memory, process_memory
                     )
-                except Exception:
+                except Exception:  # noqa: S110
+                    # Profiling is best-effort dev tooling: psutil may be
+                    # absent or refused by the OS, and a profiler that
+                    # raises would break the thing it is measuring.
                     pass
 
             return self.current_memory
@@ -342,7 +348,10 @@ class MemoryProfiler:
                     self.peak_process_memory = max(
                         self.peak_process_memory, process_memory
                     )
-                except Exception:
+                except Exception:  # noqa: S110
+                    # Profiling is best-effort dev tooling: psutil may be
+                    # absent or refused by the OS, and a profiler that
+                    # raises would break the thing it is measuring.
                     pass
 
             memory_delta_process = abs(

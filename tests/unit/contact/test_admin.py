@@ -1,5 +1,6 @@
 import datetime
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import pytest
 from django.contrib.admin.sites import AdminSite
@@ -8,7 +9,6 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django.utils.translation import gettext
 from unfold.contrib.filters.admin import RangeDateTimeFilter
-from zoneinfo import ZoneInfo
 
 from contact.admin import ContactAdmin, MessageLengthFilter, RecentContactFilter
 from contact.models import Contact

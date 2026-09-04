@@ -11,12 +11,11 @@ from django_tenants.models import DomainMixin, TenantMixin, _check_schema_name
 from knox.models import AbstractAuthToken
 from simple_history.models import HistoricalRecords
 
+from core.models import TimeStampMixinModel, UUIDModel
 from tenant.validators import (
     validate_reserved_schema_name,
     validate_theme_metadata,
 )
-
-from core.models import TimeStampMixinModel, UUIDModel
 
 
 class TenantPlan(models.TextChoices):
@@ -888,7 +887,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
             the row is removed. Defaults to False so that accidental
             row deletion does not silently destroy tenant data.
         """
-        from tenant.lifecycle import is_protected_tenant  # noqa: PLC0415
+        from tenant.lifecycle import is_protected_tenant
 
         if is_protected_tenant(self):
             raise ValidationError(
@@ -935,7 +934,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         key = self.stripe_publishable_key
         if not key:
             return
-        if not (key.startswith("pk_test_") or key.startswith("pk_live_")):
+        if not (key.startswith(("pk_test_", "pk_live_"))):
             raise ValidationError(
                 {
                     "stripe_publishable_key": _(
@@ -1058,7 +1057,7 @@ class Tenant(TenantMixin, TimeStampMixinModel, UUIDModel):
         value = self.ga_tracking_id
         if not value:
             return
-        if not (value.startswith("G-") or value.startswith("UA-")):
+        if not (value.startswith(("G-", "UA-"))):
             raise ValidationError(
                 {
                     "ga_tracking_id": _(

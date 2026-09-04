@@ -6,13 +6,13 @@ from typing import Any
 from celery import shared_task
 from django.utils import translation
 
+from core.utils.email_context import build_email_context
+from core.utils.i18n import get_order_language
 from shipping_boxnow.exceptions import (
     BoxNowAPIError,
     BoxNowConfigError,
     BoxNowRetryableError,
 )
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_order_language
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -244,9 +244,8 @@ def process_boxnow_webhook_event(
 
         message_id = str(envelope.get("id", "<unknown>"))
         logger.exception(
-            "BoxNow webhook apply failed for message %s: %s",
+            "BoxNow webhook apply failed for message %s",
             message_id,
-            exc,
         )
         alert_admins_webhook_processing_failed(
             carrier="BoxNow", message_id=message_id, error=str(exc)

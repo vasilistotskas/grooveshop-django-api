@@ -56,7 +56,7 @@ def get_tenant_base_url() -> str:
     if domains_manager is not None:
         try:
             domain_obj = domains_manager.filter(is_primary=True).first()
-        except Exception:  # noqa: BLE001 — any failure falls through to fallback
+        except Exception:
             domain_obj = None
         if domain_obj and getattr(domain_obj, "domain", ""):
             return f"https://{domain_obj.domain}"
@@ -153,7 +153,7 @@ def _resolve_prefixed_service_domain(
                 "-is_primary"
             )
         )
-    except Exception:  # noqa: BLE001 — any failure falls through
+    except Exception:
         candidates = []
 
     # Require a SEPARATOR after the prefix. ``istartswith`` alone matched
@@ -179,7 +179,7 @@ def _resolve_prefixed_service_domain(
 
     try:
         primary_domain_obj = domains_manager.filter(is_primary=True).first()
-    except Exception:  # noqa: BLE001 — any failure falls through
+    except Exception:
         primary_domain_obj = None
     if primary_domain_obj and getattr(primary_domain_obj, "domain", ""):
         return f"{prefix}.{primary_domain_obj.domain}"

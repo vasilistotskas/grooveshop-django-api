@@ -24,7 +24,7 @@ pytestmark = pytest.mark.django_db
 def _bind(cart):
     from b2b.services import B2BPricingContext
 
-    group = CustomerGroupFactory(discount_percent=Decimal("10"))
+    group = CustomerGroupFactory(discount_percent=Decimal(10))
     cart._b2b_pricing = B2BPricingContext(
         group=group,
         prices=B2BPricingService.resolve_map(
@@ -40,7 +40,7 @@ class TestB2BPromotionGate:
         cart, _ = make_cart([(100, 1)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
         )
         _bind(cart)
 
@@ -55,7 +55,7 @@ class TestB2BPromotionGate:
         cart, _ = make_cart([(100, 1)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
         )
         _bind(cart)
 
@@ -80,7 +80,7 @@ class TestB2BPromotionGate:
         cart, _ = make_cart([(100, 1)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
         )
 
         result = PromotionEngine.evaluate(cart)
@@ -97,12 +97,14 @@ class TestB2BPromotionGate:
         from promotion.enum import CouponRejectionReason
         from promotion.factories import (
             PromotionCodeFactory,
+        )
+        from promotion.factories import (
             PromotionFactory as PF,
         )
         from promotion.models import CartPromotionCode
 
         cart, _ = make_cart([(100, 1)])
-        code = PromotionCodeFactory(promotion=PF(benefit_value=Decimal("10")))
+        code = PromotionCodeFactory(promotion=PF(benefit_value=Decimal(10)))
         CartPromotionCode.objects.create(cart=cart, code=code)
         _bind(cart)
 
@@ -129,7 +131,7 @@ class TestB2BPromotionGate:
             benefit_type=BenefitType.BXGY,
             buy_quantity=2,
             get_quantity=1,
-            get_discount_percent=Decimal("100"),
+            get_discount_percent=Decimal(100),
         )
         _bind(cart)  # 10% group → unit 90.00
 

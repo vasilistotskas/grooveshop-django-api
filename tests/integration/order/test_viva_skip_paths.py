@@ -65,7 +65,7 @@ class TestSkipsAreReportedAsSkips:
         order = _order()
         expected = order.calculate_order_total_amount().amount
 
-        with _verified(PaymentStatus.COMPLETED, str(expected - Decimal("2"))):
+        with _verified(PaymentStatus.COMPLETED, str(expected - Decimal(2))):
             outcome = _handle_payment_created(
                 order, {"StatusId": "F"}, "txn-mismatch"
             )
@@ -107,14 +107,14 @@ class TestChargedOrderIsNotAutoCancelled:
         order = _order()
         expected = order.calculate_order_total_amount().amount
 
-        with _verified(PaymentStatus.COMPLETED, str(expected - Decimal("2"))):
+        with _verified(PaymentStatus.COMPLETED, str(expected - Decimal(2))):
             _handle_payment_created(order, {"StatusId": "F"}, "txn-1")
 
         order.refresh_from_db()
         flag = order.metadata[AMOUNT_MISMATCH_FLAG]
         assert flag["transaction_id"] == "txn-1"
         assert Decimal(flag["expected_amount"]) == expected
-        assert Decimal(flag["verified_amount"]) == expected - Decimal("2")
+        assert Decimal(flag["verified_amount"]) == expected - Decimal(2)
 
     def test_auto_cancel_leaves_a_charged_order_alone(self):
         from datetime import timedelta

@@ -14,18 +14,18 @@ from .stock import (
 )
 
 __all__ = [
-    # Order
-    "OrderManager",
-    "OrderQuerySet",
-    # Order Item
-    "OrderItemManager",
-    "OrderItemQuerySet",
     # Order History
     "OrderHistoryManager",
     "OrderHistoryQuerySet",
     # Order Item History
     "OrderItemHistoryManager",
     "OrderItemHistoryQuerySet",
+    # Order Item
+    "OrderItemManager",
+    "OrderItemQuerySet",
+    # Order
+    "OrderManager",
+    "OrderQuerySet",
     # Stock Log
     "StockLogManager",
     "StockLogQuerySet",

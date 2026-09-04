@@ -9,7 +9,7 @@ class BoxNowLockerType(models.TextChoices):
     DEPOT = "depot", _("Depot")
 
     @classmethod
-    def from_api(cls, value: str) -> "BoxNowLockerType":
+    def from_api(cls, value: str) -> BoxNowLockerType:
         """
         Convert a BoxNow API location type string to the
         corresponding enum member.

@@ -97,7 +97,7 @@ class Command(TenantCommandMixin, BaseCommand):
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(
-                    f"✗ Failed to update ProductTranslation settings: {str(e)}"
+                    f"✗ Failed to update ProductTranslation settings: {e!s}"
                 )
             )
 
@@ -124,6 +124,6 @@ class Command(TenantCommandMixin, BaseCommand):
         except Exception as e:
             self.stdout.write(
                 self.style.ERROR(
-                    f"✗ Failed to update BlogPostTranslation settings: {str(e)}"
+                    f"✗ Failed to update BlogPostTranslation settings: {e!s}"
                 )
             )

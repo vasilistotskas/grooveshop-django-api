@@ -191,7 +191,6 @@ class TestUpdateClickScores:
 
     def test_top_list_is_capped(self, monkeypatch):
         import search.tasks as tasks_module
-
         from product.factories.product import ProductFactory
 
         monkeypatch.setattr(tasks_module, "CLICK_SCORE_MAX_ITEMS", 2)

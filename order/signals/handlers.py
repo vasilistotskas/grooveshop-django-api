@@ -10,8 +10,6 @@ from django_tenants.utils import schema_context
 from djstripe.event_handlers import djstripe_receiver
 from djstripe.models import Event
 
-from order.signals._tenant import with_tenant_schema_from_event
-
 from order.enum.document_type import OrderDocumentTypeEnum
 from order.enum.status import (
     SETTLED_PAYMENT_STATUSES,
@@ -21,6 +19,13 @@ from order.enum.status import (
 from order.models.history import OrderHistory, OrderItemHistory
 from order.models.item import OrderItem
 from order.models.order import Order
+from order.notifications import (
+    notify_order_created_live,
+    notify_order_refunded_live,
+    notify_order_status_changed_live,
+    notify_payment_confirmed_live,
+    notify_payment_failed_live,
+)
 from order.services import OrderService
 from order.signals import (
     order_canceled,
@@ -34,13 +39,7 @@ from order.signals import (
     order_shipped,
     order_status_changed,
 )
-from order.notifications import (
-    notify_order_created_live,
-    notify_order_refunded_live,
-    notify_order_status_changed_live,
-    notify_payment_confirmed_live,
-    notify_payment_failed_live,
-)
+from order.signals._tenant import with_tenant_schema_from_event
 from order.tasks import (
     generate_order_invoice,
     push_order_event_to_gateway,
@@ -193,7 +192,7 @@ def handle_order_post_save(
 
 def _cart_for_order(order: Order):
     """The cart this order was built from, or None."""
-    from cart.models import Cart  # noqa: PLC0415
+    from cart.models import Cart
 
     if order.user:
         return Cart.objects.filter(user=order.user).first()
@@ -255,10 +254,8 @@ def _clear_cart_for_order(order: Order) -> None:
 
         cart.delete()
         logger.debug("Cleared cart %s after order %s", cart.uuid, order.id)
-    except Exception as e:
-        logger.error(
-            "Error clearing cart for order %s: %s", order.id, e, exc_info=True
-        )
+    except Exception:
+        logger.exception("Error clearing cart for order %s", order.id)
 
 
 @receiver(order_paid, dispatch_uid="order.clear_cart_on_paid")
@@ -482,10 +479,8 @@ def handle_order_item_pre_save(
         except sender.DoesNotExist:
             instance._original_quantity = 0
             instance._original_price = None
-        except Exception as e:
-            logger.error(
-                "Error in handle_order_item_pre_save: %s", e, exc_info=True
-            )
+        except Exception:
+            logger.exception("Error in handle_order_item_pre_save")
     else:
         instance._original_quantity = 0
         instance._original_price = None
@@ -516,15 +511,13 @@ def handle_order_item_post_save(
             logger.debug(
                 "Order item %s created for order %s", instance.id, order.id
             )
-        except Exception as e:
-            logger.error(
-                "Error handling order item creation: %s", e, exc_info=True
-            )
+        except Exception:
+            logger.exception("Error handling order item creation")
     elif (
         hasattr(instance, "_original_quantity")
         and instance._original_quantity != instance.quantity
     ):
-        from order.stock import StockManager  # noqa: PLC0415
+        from order.stock import StockManager
 
         product = instance.product
         stock_difference = instance._original_quantity - instance.quantity
@@ -547,11 +540,9 @@ def handle_order_item_post_save(
                 order=instance.order,
                 note=f"Item {instance.product.safe_translation_getter('name', any_language=True) if instance.product else 'Unknown'} quantity updated from {instance._original_quantity} to {instance.quantity}",
             )
-        except Exception as e:
-            logger.error(
-                "Error logging order history for quantity change: %s",
-                e,
-                exc_info=True,
+        except Exception:
+            logger.exception(
+                "Error logging order history for quantity change",
             )
 
     # ``is not None`` rather than truthiness: ``Money(0, "EUR")`` is
@@ -580,11 +571,9 @@ def handle_order_item_post_save(
                     f"marked as {'refunded' if instance.is_refunded else 'not refunded'}"
                 ),
             )
-        except Exception as e:
-            logger.error(
-                "Error logging order history for refund change: %s",
-                e,
-                exc_info=True,
+        except Exception:
+            logger.exception(
+                "Error logging order history for refund change",
             )
 
 
@@ -718,10 +707,8 @@ def handle_order_canceled(
             previous_status,
         )
 
-    except Exception as e:
-        logger.error(
-            "Error handling order_canceled signal: %s", e, exc_info=True
-        )
+    except Exception:
+        logger.exception("Error handling order_canceled signal")
 
 
 @receiver(order_completed, dispatch_uid="order.handle_order_completed")
@@ -748,10 +735,8 @@ def handle_order_completed(
 
         logger.info("Order %s marked as completed", order.id)
 
-    except Exception as e:
-        logger.error(
-            "Error handling order_completed signal: %s", e, exc_info=True
-        )
+    except Exception:
+        logger.exception("Error handling order_completed signal")
 
 
 @receiver(order_refunded, dispatch_uid="order.handle_order_refunded")
@@ -813,10 +798,8 @@ def handle_order_refunded(
 
         logger.info("Order %s refunded", order.id)
 
-    except Exception as e:
-        logger.error(
-            "Error handling order_refunded signal: %s", e, exc_info=True
-        )
+    except Exception:
+        logger.exception("Error handling order_refunded signal")
 
 
 @receiver(order_returned, dispatch_uid="order.handle_order_returned")
@@ -846,10 +829,8 @@ def handle_order_returned(
 
         logger.info("Order %s returned", order.id)
 
-    except Exception as e:
-        logger.error(
-            "Error handling order_returned signal: %s", e, exc_info=True
-        )
+    except Exception:
+        logger.exception("Error handling order_returned signal")
 
 
 @djstripe_receiver("payment_intent.succeeded")
@@ -873,13 +854,11 @@ def handle_stripe_payment_succeeded(sender, **kwargs):
         event: Event = kwargs["event"]
         payment_intent_id = event.data["object"]["id"]
         event_id = event.id
-    except (KeyError, TypeError) as e:
+    except KeyError, TypeError:
         # Malformed event payload — a redelivery carries the same bad body,
         # so log and drop rather than 500-looping Stripe. Nothing has been
         # committed at this point.
-        logger.error(
-            "Malformed payment_intent.succeeded event: %s", e, exc_info=True
-        )
+        logger.exception("Malformed payment_intent.succeeded event")
         return
 
     logger.info("Stripe payment succeeded: %s", payment_intent_id)
@@ -1071,14 +1050,12 @@ def handle_stripe_payment_failed(sender, **kwargs):
                     )
                 )
 
-    except (KeyError, TypeError) as e:
+    except KeyError, TypeError:
         # Malformed payload only — see charge.refunded above. A failure in
         # the processing below must reach dj-stripe so the Event row rolls
         # back and Stripe redelivers.
-        logger.error(
-            "Malformed payment_intent.payment_failed payload: %s",
-            e,
-            exc_info=True,
+        logger.exception(
+            "Malformed payment_intent.payment_failed payload",
         )
 
 
@@ -1169,11 +1146,9 @@ def handle_stripe_payment_requires_action(sender, **kwargs):
             },
         )
 
-    except Exception as e:
-        logger.error(
-            "Error handling payment_intent.requires_action: %s",
-            e,
-            exc_info=True,
+    except Exception:
+        logger.exception(
+            "Error handling payment_intent.requires_action",
         )
 
 
@@ -1287,7 +1262,7 @@ def handle_stripe_charge_refunded(sender, **kwargs):
         if is_full_refund:
             order_refunded.send(sender=Order, order=order)
 
-    except (KeyError, TypeError) as e:
+    except KeyError, TypeError:
         # Malformed payload only. Everything else must PROPAGATE (G0231):
         # this runs inside dj-stripe's webhook atomic, so swallowing
         # commits the Event row and Stripe never redelivers. The history
@@ -1295,7 +1270,7 @@ def handle_stripe_charge_refunded(sender, **kwargs):
         # has committed the refund, so losing them leaves an order that
         # reads REFUNDED while the customer is never emailed about the
         # money coming back.
-        logger.error("Malformed charge.refunded payload: %s", e, exc_info=True)
+        logger.exception("Malformed charge.refunded payload")
 
 
 @djstripe_receiver("charge.dispute.created")
@@ -1415,14 +1390,12 @@ def handle_stripe_dispute_created(sender, **kwargs):
             )
         )
 
-    except (KeyError, TypeError) as e:
+    except KeyError, TypeError:
         # Malformed payload only — see charge.refunded above. A swallowed
         # failure here flags the dispute in the DB and then loses the
         # staff notification, so nobody works the chargeback before
         # Stripe's evidence deadline.
-        logger.error(
-            "Malformed charge.dispute.created payload: %s", e, exc_info=True
-        )
+        logger.exception("Malformed charge.dispute.created payload")
 
 
 @djstripe_receiver("checkout.session.completed")
@@ -1451,13 +1424,11 @@ def handle_stripe_checkout_completed(sender, **kwargs):
         payment_intent_id = session_data.get("payment_intent")
         payment_status = session_data.get("payment_status")
         event_id = event.id
-    except (KeyError, TypeError) as e:
+    except KeyError, TypeError:
         # Malformed payload — a redelivery carries the same bad body, so
         # propagating would only spin. Drop it, like the sibling handler.
-        logger.error(
-            "Malformed checkout.session.completed payload: %s",
-            e,
-            exc_info=True,
+        logger.exception(
+            "Malformed checkout.session.completed payload",
         )
         return
 
@@ -1700,7 +1671,5 @@ def handle_stripe_checkout_expired(sender, **kwargs):
             },
         )
 
-    except Exception as e:
-        logger.error(
-            "Error handling checkout.session.expired: %s", e, exc_info=True
-        )
+    except Exception:
+        logger.exception("Error handling checkout.session.expired")

@@ -73,7 +73,7 @@ def invalidate_tenant_caches(sender, instance, **kwargs):
 
 
 def _purge_resolve_for_schema(schema: str) -> None:
-    from django_tenants.utils import schema_context  # noqa: PLC0415
+    from django_tenants.utils import schema_context
 
     with schema_context("public"):
         tenant = Tenant.objects.filter(schema_name=schema).first()
@@ -98,7 +98,7 @@ def _purge_resolve_for_current_schema():
     once per transaction. The schema is captured NOW because the commit
     hook may run after a ``schema_context`` has unwound.
     """
-    from django.db import connection  # noqa: PLC0415
+    from django.db import connection
 
     schema = connection.schema_name
     if schema == "public":
@@ -161,10 +161,10 @@ def reactivate_on_renewal(sender, instance, **kwargs):
     The dunning task's own suspension save also lands here, but at that
     moment ``paid_until`` is necessarily in the past, so nothing fires.
     """
-    from django.utils import timezone  # noqa: PLC0415
+    from django.utils import timezone
 
-    from tenant.lifecycle import activate_tenant  # noqa: PLC0415
-    from tenant.models import SuspendedReason  # noqa: PLC0415
+    from tenant.lifecycle import activate_tenant
+    from tenant.models import SuspendedReason
 
     if instance.is_active:
         return

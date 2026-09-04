@@ -1,16 +1,17 @@
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 from djstripe.models import Event
 
 from order.enum.status import OrderStatus, PaymentStatus
+from order.factories import OrderFactory
 from order.models import OrderHistory
 from order.signals.handlers import (
-    handle_stripe_payment_succeeded,
-    handle_stripe_payment_failed,
-    handle_stripe_dispute_created,
     handle_stripe_checkout_completed,
+    handle_stripe_dispute_created,
+    handle_stripe_payment_failed,
+    handle_stripe_payment_succeeded,
 )
-from order.factories import OrderFactory
 
 
 @pytest.fixture
@@ -455,8 +456,11 @@ class TestWebhookHandlerErrorHandling:
         with patch("order.signals.handlers.logger") as mock_logger:
             handle_stripe_payment_succeeded(sender=None, event=event)
 
-            # Verify error was logged
-            assert mock_logger.error.called
+            # The handler logs via `logger.exception`, which on a real
+            # Logger delegates to `.error(..., exc_info=True)` but on a
+            # Mock does not — so assert the call that is actually made,
+            # and that it carries the traceback.
+            assert mock_logger.exception.called
 
     def test_handles_malformed_payment_intent_id(self, mock_djstripe_event):
         """

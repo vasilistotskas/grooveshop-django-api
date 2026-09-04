@@ -3,7 +3,7 @@ from rest_framework import serializers
 
 from core.api.serializers import ContentObjectRelatedField
 from tag.models import TaggedItem
-from tag.serializers.tag import TagSerializer, TagDetailSerializer
+from tag.serializers.tag import TagDetailSerializer, TagSerializer
 
 
 class TaggedItemSerializer(serializers.ModelSerializer[TaggedItem]):

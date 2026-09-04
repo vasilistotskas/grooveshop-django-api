@@ -14,7 +14,7 @@ class Command(BaseCommand):
         # so an unknown plan would be stored silently — reject it at the
         # parser instead (argparse choices; call_command surfaces the
         # violation as CommandError).
-        from tenant.models import TenantPlan  # noqa: PLC0415
+        from tenant.models import TenantPlan
 
         parser.add_argument("--name", required=True)
         parser.add_argument("--slug", required=True)
@@ -108,7 +108,7 @@ class Command(BaseCommand):
         # recorded by platform staff when the first payment lands.
         paid_until = None
         if options["plan"] == TenantPlan.TRIAL and options["trial_days"] > 0:
-            from django.utils import timezone  # noqa: PLC0415
+            from django.utils import timezone
 
             paid_until = timezone.localdate() + timedelta(
                 days=options["trial_days"]
@@ -136,7 +136,7 @@ class Command(BaseCommand):
         # row (see tenant/provisioning.py for why it is not optional).
         # Explicit --extra-domains still win: get_or_create below is a
         # no-op if the operator already listed it.
-        from tenant.provisioning import (  # noqa: PLC0415
+        from tenant.provisioning import (
             ensure_api_domain,
             ensure_site,
         )
@@ -165,7 +165,7 @@ class Command(BaseCommand):
 
         # Seed default data in tenant schema. ``seed_tenant_defaults``
         # opens its own ``schema_context`` internally.
-        from tenant.provisioning import seed_tenant_defaults  # noqa: PLC0415
+        from tenant.provisioning import seed_tenant_defaults
 
         seed_tenant_defaults(tenant)
 
@@ -176,7 +176,7 @@ class Command(BaseCommand):
         )
 
     def _provision_owner_membership(self, tenant, owner_email: str):
-        from tenant.provisioning import (  # noqa: PLC0415
+        from tenant.provisioning import (
             provision_owner_membership,
         )
 
@@ -194,7 +194,7 @@ class Command(BaseCommand):
             )
             return
 
-        membership, created = result
+        _membership, created = result
         verb = "Created" if created else "Updated"
         self.stdout.write(
             f"  {verb} OWNER membership for {owner_email} on "

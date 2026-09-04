@@ -9,9 +9,9 @@ These tests cover:
 - ``TokenAuthMiddlewareStack``.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -114,34 +114,40 @@ class TestAuthenticateTicket(TransactionTestCase):
     # -- GETDEL returns None (ticket not in cache or already consumed) -------
 
     async def test_missing_cache_entry_returns_anonymous(self):
-        with patch(
-            "core.middleware.channels.cache.make_and_validate_key",
-            return_value="ws:ticket:abc",
+        with (
+            patch(
+                "core.middleware.channels.cache.make_and_validate_key",
+                return_value="ws:ticket:abc",
+            ),
+            _make_getdel_patcher(None),
         ):
-            with _make_getdel_patcher(None):
-                result = await authenticate_ticket("abc")
+            result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
     # -- GETDEL returns garbled value ----------------------------------------
 
     async def test_invalid_cache_value_returns_anonymous(self):
-        with patch(
-            "core.middleware.channels.cache.make_and_validate_key",
-            return_value="ws:ticket:abc",
+        with (
+            patch(
+                "core.middleware.channels.cache.make_and_validate_key",
+                return_value="ws:ticket:abc",
+            ),
+            _make_getdel_patcher(b"not-an-int"),
         ):
-            with _make_getdel_patcher(b"not-an-int"):
-                result = await authenticate_ticket("abc")
+            result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
     # -- user does not exist -------------------------------------------------
 
     async def test_nonexistent_user_returns_anonymous(self):
-        with patch(
-            "core.middleware.channels.cache.make_and_validate_key",
-            return_value="ws:ticket:abc",
+        with (
+            patch(
+                "core.middleware.channels.cache.make_and_validate_key",
+                return_value="ws:ticket:abc",
+            ),
+            _make_getdel_patcher(b"99999999"),
         ):
-            with _make_getdel_patcher(b"99999999"):
-                result = await authenticate_ticket("abc")
+            result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
     # -- inactive user -------------------------------------------------------
@@ -150,12 +156,14 @@ class TestAuthenticateTicket(TransactionTestCase):
         user = await self._create_user(active=False)
         await self._create_token(user)
 
-        with patch(
-            "core.middleware.channels.cache.make_and_validate_key",
-            return_value="ws:ticket:abc",
+        with (
+            patch(
+                "core.middleware.channels.cache.make_and_validate_key",
+                return_value="ws:ticket:abc",
+            ),
+            _make_getdel_patcher(str(user.pk).encode()),
         ):
-            with _make_getdel_patcher(str(user.pk).encode()):
-                result = await authenticate_ticket("abc")
+            result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
     # -- no live Knox tokens -------------------------------------------------
@@ -163,12 +171,14 @@ class TestAuthenticateTicket(TransactionTestCase):
     async def test_no_knox_token_returns_anonymous(self):
         user = await self._create_user()
         # Deliberately do NOT create a Knox token.
-        with patch(
-            "core.middleware.channels.cache.make_and_validate_key",
-            return_value="ws:ticket:abc",
+        with (
+            patch(
+                "core.middleware.channels.cache.make_and_validate_key",
+                return_value="ws:ticket:abc",
+            ),
+            _make_getdel_patcher(str(user.pk).encode()),
         ):
-            with _make_getdel_patcher(str(user.pk).encode()):
-                result = await authenticate_ticket("abc")
+            result = await authenticate_ticket("abc")
         self.assertIsInstance(result, AnonymousUser)
 
     # -- happy path ----------------------------------------------------------
@@ -177,12 +187,14 @@ class TestAuthenticateTicket(TransactionTestCase):
         user = await self._create_user()
         await self._create_token(user)
 
-        with patch(
-            "core.middleware.channels.cache.make_and_validate_key",
-            return_value="ws:ticket:abc",
+        with (
+            patch(
+                "core.middleware.channels.cache.make_and_validate_key",
+                return_value="ws:ticket:abc",
+            ),
+            _make_getdel_patcher(str(user.pk).encode()),
         ):
-            with _make_getdel_patcher(str(user.pk).encode()):
-                result = await authenticate_ticket("abc")
+            result = await authenticate_ticket("abc")
 
         self.assertEqual(result.pk, user.pk)
 
@@ -196,19 +208,21 @@ class TestAuthenticateTicket(TransactionTestCase):
         mock_redis = MagicMock()
         mock_redis.getdel.return_value = str(user.pk).encode()
 
-        with patch(
-            "core.middleware.channels.cache.make_and_validate_key",
-            return_value=prefixed,
-        ):
-            with patch(
+        with (
+            patch(
+                "core.middleware.channels.cache.make_and_validate_key",
+                return_value=prefixed,
+            ),
+            patch(
                 "core.middleware.channels.cache._cache.get_client",
                 return_value=mock_redis,
                 # See _make_getdel_patcher: the attribute exists only on
                 # the Redis-backed CustomCache, and the resolved backend
                 # here may be LocMem.
                 create=True,
-            ):
-                await authenticate_ticket("myticket")
+            ),
+        ):
+            await authenticate_ticket("myticket")
 
         mock_redis.getdel.assert_called_once_with(prefixed)
 

@@ -13,10 +13,9 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from djmoney.money import Money
 from rest_framework import status
 from rest_framework.test import APIClient
-
-from djmoney.money import Money
 
 from loyalty.enum import TransactionType
 from loyalty.models.tier import LoyaltyTier, LoyaltyTierTranslation
@@ -26,7 +25,6 @@ from order.factories.item import OrderItemFactory
 from order.factories.order import OrderFactory
 from product.factories.product import ProductFactory
 from user.factories.account import UserAccountFactory
-
 
 # ---------------------------------------------------------------------------
 # Helpers

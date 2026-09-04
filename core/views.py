@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views import View
+
 from core.utils.files import sanitize_filename
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ def _may_upload_editor_image(user) -> bool:
     if user.is_superuser:
         return True
 
-    from tenant.membership import (  # noqa: PLC0415
+    from tenant.membership import (
         get_current_tenant,
         get_membership,
     )

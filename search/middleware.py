@@ -10,7 +10,8 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 
 from django.http import HttpRequest, HttpResponseBase
 from django.utils.deprecation import MiddlewareMixin
@@ -119,7 +120,7 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                         "queryId"
                     ) or response_data.get("query_id")
             except (json.JSONDecodeError, AttributeError, KeyError) as e:
-                logger.debug(f"Could not parse response data: {str(e)}")
+                logger.debug(f"Could not parse response data: {e!s}")
 
             # Extract user information
             user = request.user if request.user.is_authenticated else None
@@ -157,11 +158,10 @@ class SearchAnalyticsMiddleware(MiddlewareMixin):
                 results_count,
             )
 
-        except Exception as e:
+        except Exception:
             # Log error but don't break the request
-            logger.error(
-                f"Failed to track search analytics: {str(e)}",
-                exc_info=True,
+            logger.exception(
+                "Failed to track search analytics",
                 extra={
                     "path": request.path,
                     "query": request.GET.get("query", ""),

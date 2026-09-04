@@ -22,7 +22,7 @@ from typing import Any
 
 def is_platform_console(request: Any) -> bool:
     """True when *request* is being served from the PUBLIC schema."""
-    from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+    from django_tenants.utils import get_public_schema_name
 
     tenant = getattr(request, "tenant", None)
     if tenant is None:
@@ -37,7 +37,7 @@ def is_tenant_console(request: Any) -> bool:
     schema is unknown, so a caller can distinguish "definitely a tenant"
     from "no idea".
     """
-    from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+    from django_tenants.utils import get_public_schema_name
 
     tenant = getattr(request, "tenant", None)
     if tenant is None:

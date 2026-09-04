@@ -1,9 +1,10 @@
-import pytest
 from datetime import timedelta
+
+import pytest
 from django.utils import timezone
 
+from order.models import StockLog, StockReservation
 from order.stock import StockManager
-from order.models import StockReservation, StockLog
 from product.factories import ProductFactory
 
 

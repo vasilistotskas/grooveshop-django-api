@@ -64,7 +64,7 @@ class InvoiceDownloadResponseSerializer(serializers.ModelSerializer):
         amount = getattr(money_field, "amount", money_field)
         try:
             return str(amount)
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
 
     def get_total(self, obj: Invoice) -> str | None:

@@ -117,14 +117,15 @@ class TestNoUrlBackedActionCanReturnNone:
                     return stmt.value is not None
                 if isinstance(stmt, ast.Raise):
                     return True
-                if isinstance(stmt, ast.If) and stmt.orelse:
-                    if returns(stmt.body) and returns(stmt.orelse):
-                        return True
-                if isinstance(stmt, ast.Try):
-                    if returns(stmt.body) and all(
-                        returns(h.body) for h in stmt.handlers
-                    ):
-                        return True
+                if (isinstance(stmt, ast.If) and stmt.orelse) and (
+                    returns(stmt.body) and returns(stmt.orelse)
+                ):
+                    return True
+                if (isinstance(stmt, ast.Try)) and (
+                    returns(stmt.body)
+                    and all(returns(h.body) for h in stmt.handlers)
+                ):
+                    return True
             return False
 
         bare = any(

@@ -1,7 +1,6 @@
+from allauth.mfa.adapter import DefaultMFAAdapter
 from django.conf import settings
 from django.db import connection
-
-from allauth.mfa.adapter import DefaultMFAAdapter
 
 from tenant.credentials import tenant_totp_issuer
 

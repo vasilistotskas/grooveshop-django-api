@@ -129,8 +129,8 @@ def test_an_invoice_with_no_extras_stays_at_zero():
     _run()
 
     invoice.refresh_from_db()
-    assert invoice.shipping.amount == Decimal("0")
-    assert invoice.payment_fee.amount == Decimal("0")
+    assert invoice.shipping.amount == Decimal(0)
+    assert invoice.payment_fee.amount == Decimal(0)
     assert _reconciles(invoice)
 
 

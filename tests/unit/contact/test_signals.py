@@ -7,7 +7,6 @@ from django.test import TestCase, override_settings
 from contact.models import Contact
 from contact.signals import send_email_notification
 
-
 # The contact notification task now routes to the tenant's contact
 # email. In unit tests there is no
 # active tenant, so the helper falls back through extra_settings to

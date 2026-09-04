@@ -5,13 +5,13 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.utils import timezone
+from faker import Faker
 
 from cart.factories import CartFactory, CartItemFactory
 from cart.models import Cart
 from country.factories import CountryFactory
 from product.factories import ProductFactory
 from user.factories import UserAccountFactory
-from faker import Faker
 
 User = get_user_model()
 

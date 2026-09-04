@@ -12,7 +12,6 @@ from django.test import SimpleTestCase
 
 from order.mydata.parser import parse_response_doc
 
-
 _SUCCESS_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <ResponseDoc>
     <response>

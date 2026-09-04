@@ -36,17 +36,13 @@ class PageNumberPaginator(pagination.PageNumberPagination):
                             "type": "string",
                             "nullable": True,
                             "format": "uri",
-                            "example": "http://api.example.org/accounts/?{page_query_param}=4".format(
-                                page_query_param=self.page_query_param
-                            ),
+                            "example": f"http://api.example.org/accounts/?{self.page_query_param}=4",
                         },
                         "previous": {
                             "type": "string",
                             "nullable": True,
                             "format": "uri",
-                            "example": "http://api.example.org/accounts/?{page_query_param}=2".format(
-                                page_query_param=self.page_query_param
-                            ),
+                            "example": f"http://api.example.org/accounts/?{self.page_query_param}=2",
                         },
                     },
                 },

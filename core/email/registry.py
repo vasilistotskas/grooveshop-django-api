@@ -2,11 +2,11 @@
 
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 from django.conf import settings
+from django.utils import timezone
 
 from core.email.config import EmailTemplateConfig
 from order.enum.status import OrderStatus
@@ -154,11 +154,10 @@ class EmailTemplateRegistry:
                     f for f in template_dir.glob("*.html") if f.is_file()
                 ]
 
-        except Exception as e:
-            logger.error(
-                f"Failed to list template files in {template_dir}: {e!s}",
+        except Exception:
+            logger.exception(
+                f"Failed to list template files in {template_dir}",
                 extra={"template_dir": str(template_dir)},
-                exc_info=True,
             )
             return
 
@@ -204,14 +203,14 @@ class EmailTemplateRegistry:
                 # Get last modified time
                 try:
                     last_modified = datetime.fromtimestamp(
-                        html_file.stat().st_mtime
+                        html_file.stat().st_mtime, tz=UTC
                     )
                 except (OSError, PermissionError) as e:
                     logger.warning(
                         f"Could not get modification time for {html_file}: {e!s}",
                         extra={"file": str(html_file)},
                     )
-                    last_modified = datetime.now()
+                    last_modified = timezone.now()
 
                 # Build template path
                 if category_path:
@@ -235,18 +234,17 @@ class EmailTemplateRegistry:
 
                 self._templates[template_name] = template_info
 
-            except Exception as e:
-                logger.error(
-                    f"Error processing template file {html_file}: {e!s}",
+            except Exception:
+                logger.exception(
+                    f"Error processing template file {html_file}",
                     extra={"file": str(html_file)},
-                    exc_info=True,
                 )
 
     def get_all_templates(self) -> list[EmailTemplateInfo]:
         """Get all registered templates."""
         return list(self._templates.values())
 
-    def get_template(self, name: str) -> Optional[EmailTemplateInfo]:
+    def get_template(self, name: str) -> EmailTemplateInfo | None:
         """Get specific template by name."""
         return self._templates.get(name)
 

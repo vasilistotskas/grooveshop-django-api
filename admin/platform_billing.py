@@ -44,8 +44,8 @@ from tenant.billing import billing_config, billing_state
 
 def _billing_rows(today: date) -> list[dict[str, Any]]:
     """One row per store (the public schema is the platform, not a store)."""
-    from django.apps import apps  # noqa: PLC0415
-    from django_tenants.utils import get_public_schema_name  # noqa: PLC0415
+    from django.apps import apps
+    from django_tenants.utils import get_public_schema_name
 
     Tenant = apps.get_model("tenant", "Tenant")
     rows: list[dict[str, Any]] = []
@@ -76,12 +76,12 @@ def _billing_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
     are safe; tenant-supplied names/domains stay plain strings so the
     component escapes them — same contract as the dashboard table.
     """
-    from django.utils.formats import date_format  # noqa: PLC0415
-    from django.utils.safestring import mark_safe  # noqa: PLC0415
+    from django.utils.formats import date_format
+    from django.utils.safestring import mark_safe
 
     # Same badge maps + renderer the Tenants changelist uses, so the two
     # surfaces cannot drift as tiers/states change.
-    from tenant.admin import (  # noqa: PLC0415
+    from tenant.admin import (
         _PLAN_BADGES,
         _STATE_BADGES,
         _unfold_label,
@@ -95,11 +95,11 @@ def _billing_table(rows: list[dict[str, Any]]) -> dict[str, Any]:
             [
                 row["name"],
                 row["domain"] or "—",
-                mark_safe(  # noqa: S308 - fixed strings, no user input
+                mark_safe(
                     _unfold_label(row["plan_display"], plan_tone, plan_icon)
                 ),
                 date_format(row["paid_until"]) if row["paid_until"] else "—",
-                mark_safe(  # noqa: S308 - fixed strings, no user input
+                mark_safe(
                     _unfold_label(str(state_label), state_tone, state_icon)
                 ),
             ]
@@ -132,7 +132,7 @@ class PlanBillingView(UnfoldSiteViewMixin, TemplateView):
     template_name = "admin/platform_billing.html"
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
-        from django.utils import timezone  # noqa: PLC0415
+        from django.utils import timezone
 
         context = super().get_context_data(**kwargs)
 

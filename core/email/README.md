@@ -103,12 +103,12 @@ That's it! The template is now:
 
 ```python
 TemplateConfig(
-    name="template_name",           # File name without extension
+    name="template_name",  # File name without extension
     category_name="Category Name",  # Display category
-    description="What this does",   # Description
-    subject_template="Subject {var}", # Subject with variables
-    order_statuses=[],              # Related order statuses
-    is_used=True,                   # Is actively used?
+    description="What this does",  # Description
+    subject_template="Subject {var}",  # Subject with variables
+    order_statuses=[],  # Related order statuses
+    is_used=True,  # Is actively used?
     context_keys=["key1", "key2"],  # Required context variables
 )
 ```
@@ -117,10 +117,10 @@ TemplateConfig(
 
 ```python
 TemplateCategory(
-    name="Category Name",           # Display name
-    path="subdirectory",            # Path (empty for root)
-    context_generator="method_name", # Context generator method
-    templates={},                   # Auto-populated
+    name="Category Name",  # Display name
+    path="subdirectory",  # Path (empty for root)
+    context_generator="method_name",  # Context generator method
+    templates={},  # Auto-populated
 )
 ```
 
@@ -151,7 +151,7 @@ generator_map = {
     # ... existing generators
     "generate_custom_context": lambda: (
         self._get_sample_custom_context(),
-        True
+        True,
     ),
 }
 ```
@@ -246,14 +246,16 @@ core/templates/emails/
 ### 2. Context Keys
 Always document required context keys:
 ```python
-context_keys=["user", "order", "items"]
+context_keys = ["user", "order", "items"]
 ```
 
 ### 3. Subject Templates
 Keep subjects concise and use clear variable names:
 ```python
-subject_template="Order #{order[id]} Update"  # ✅ Good
-subject_template="Your order {order[id]} has been {order[status]}"  # ❌ Too long
+subject_template = "Order #{order[id]} Update"  # ✅ Good
+subject_template = (
+    "Your order {order[id]} has been {order[status]}"  # ❌ Too long
+)
 ```
 
 ### 4. Categories

@@ -108,7 +108,7 @@ class ProductReviewViewSet(BaseModelViewSet):
             return queryset.filter(status=ReviewStatus.TRUE)
 
     def get_permissions(self):
-        from tenant.permissions import (  # noqa: PLC0415
+        from tenant.permissions import (
             IsProductReviewsEnabled,
         )
 

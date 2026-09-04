@@ -54,8 +54,8 @@ def test_webhook_retryable_error_is_not_swallowed():
         patch(
             "shipping.alerts.alert_admins_webhook_processing_failed"
         ) as mock_alert,
+        pytest.raises(Retry),
     ):
-        with pytest.raises(Retry):
-            process_boxnow_webhook_event.apply(args=[envelope]).get()
+        process_boxnow_webhook_event.apply(args=[envelope]).get()
 
     mock_alert.assert_not_called()

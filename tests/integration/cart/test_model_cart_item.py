@@ -78,7 +78,7 @@ class CartItemModelTestCase(TestCase):
         # stored snapshot differed from the live value, firing phantom
         # "Cart price drift at checkout" warnings (16.12 × 24% VAT
         # = 3.8688 → final 19.9888 vs stored 19.99).
-        vat_24, _ = Vat.objects.get_or_create(value=Decimal("24"))
+        vat_24, _ = Vat.objects.get_or_create(value=Decimal(24))
         product = ProductFactory(
             num_images=0,
             num_reviews=0,

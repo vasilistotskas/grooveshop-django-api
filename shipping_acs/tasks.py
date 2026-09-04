@@ -28,13 +28,13 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from core.utils.email_context import build_email_context
+from core.utils.i18n import get_order_language
 from shipping_acs.exceptions import (
     AcsAPIError,
     AcsConfigError,
     AcsRetryableError,
 )
-from core.utils.email_context import build_email_context
-from core.utils.i18n import get_order_language
 from tenant.celery import TenantTask
 from tenant.credentials import tenant_contact_email, tenant_from_email
 
@@ -290,10 +290,8 @@ def _alert_unprinted_vouchers(
         # Never let a mail failure mask the underlying problem: the
         # caller still raises, and the ERROR log already carries the
         # vouchers.
-        logger.error(
-            "ACS unprinted-voucher alert: failed to send email: %s",
-            exc,
-            exc_info=True,
+        logger.exception(
+            "ACS unprinted-voucher alert: failed to send email",
         )
         return {"alerted": 0, "error": str(exc)}
 
@@ -590,7 +588,7 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             stale_alert_sent=True
         )
 
-    from tenant.credentials import (  # noqa: PLC0415
+    from tenant.credentials import (
         tenant_admin_recipients,
         tenant_from_email,
         tenant_site_name,
@@ -645,10 +643,8 @@ def check_stale_acs_shipments(self) -> dict[str, Any]:
             html_message=html_content,
         )
     except Exception as exc:
-        logger.error(
-            "check_stale_acs_shipments: failed to send alert email: %s",
-            exc,
-            exc_info=True,
+        logger.exception(
+            "check_stale_acs_shipments: failed to send alert email",
         )
         AcsShipment.objects.filter(id__in=shipment_ids).update(
             stale_alert_sent=False

@@ -99,10 +99,10 @@ def notify_back_in_stock_favourites_live(product_id: int) -> dict:
                     ),
                 },
                 "el": {
-                    "title": "Ξανά διαθέσιμο",  # noqa: RUF001
+                    "title": "Ξανά διαθέσιμο",
                     "message": (
-                        f"Το {product_name} είναι ξανά διαθέσιμο. "  # noqa: RUF001
-                        f"Πρόλαβέ το πριν εξαντληθεί."  # noqa: RUF001
+                        f"Το {product_name} είναι ξανά διαθέσιμο. "
+                        f"Πρόλαβέ το πριν εξαντληθεί."
                     ),
                 },
             },
@@ -195,11 +195,11 @@ def send_price_drop_notifications(
                     ),
                 },
                 "el": {
-                    "title": "Μείωση Τιμής!",  # noqa: RUF001
+                    "title": "Μείωση Τιμής!",
                     "message": (
-                        f"Η τιμή του {instance_name} μειώθηκε από "  # noqa: RUF001
+                        f"Η τιμή του {instance_name} μειώθηκε από "
                         f"{old_price} σε {new_price}. "
-                        f"Δείτε το τώρα!"  # noqa: RUF001
+                        f"Δείτε το τώρα!"
                     ),
                 },
             },
@@ -238,6 +238,7 @@ def check_low_stock_products() -> dict:
     - Respects `low_stock_threshold=0` as "disabled for this product".
     """
     from django.db import transaction
+
     from product.models.product import Product
 
     # Auto-clear the flag on products whose stock has recovered above
@@ -315,10 +316,8 @@ def check_low_stock_products() -> dict:
         msg.attach_alternative(html_content, "text/html")
         msg.send()
     except Exception as e:
-        logger.error(
-            "check_low_stock_products: failed to send alert email: %s",
-            e,
-            exc_info=True,
+        logger.exception(
+            "check_low_stock_products: failed to send alert email",
         )
         # Release the claim so the next run can retry the send.
         Product.objects.filter(id__in=product_ids).update(
@@ -368,7 +367,7 @@ def _send_product_alert_email(
         html_content = render_to_string(
             f"emails/product/{template_basename}.html", context
         )
-    except Exception:  # noqa: BLE001 — template may not exist yet
+    except Exception:
         # Minimal plain-text fallback keeps the feature working even if
         # the dedicated template has not been authored yet.
         # Strip CR/LF from subject so it cannot be used for header
@@ -399,12 +398,10 @@ def _send_product_alert_email(
         msg.attach_alternative(html_content, "text/html")
         msg.send()
         return True
-    except Exception as exc:  # noqa: BLE001
-        logger.error(
-            "Failed to send product alert email to %s: %s",
+    except Exception:
+        logger.exception(
+            "Failed to send product alert email to %s",
             recipient,
-            exc,
-            exc_info=True,
         )
         return False
 

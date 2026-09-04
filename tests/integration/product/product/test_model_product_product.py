@@ -118,7 +118,7 @@ class ProductModelTestCase(TestCase):
         # drift at checkout" warnings for identical displayed prices).
         from vat.models import Vat
 
-        vat_24, _ = Vat.objects.get_or_create(value=Decimal("24"))
+        vat_24, _ = Vat.objects.get_or_create(value=Decimal(24))
         product = ProductFactory(
             category=self.category,
             vat=vat_24,
@@ -322,7 +322,7 @@ class ProductQuerySetTestCase(TestCase):
         self.assertEqual(
             product1.price_save_percent_annotation, expected_price_save_percent1
         )
-        self.assertEqual(product2.price_save_percent_annotation, Decimal("0"))
+        self.assertEqual(product2.price_save_percent_annotation, Decimal(0))
 
     def test_queryset_with_likes_count_annotation(self):
         queryset = Product.objects.with_likes_count()

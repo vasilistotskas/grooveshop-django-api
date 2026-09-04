@@ -3,7 +3,6 @@ from unittest.mock import patch
 from django import forms
 from django.test import SimpleTestCase
 from measurement.measures import Distance, Speed, Weight
-
 from unfold.widgets import (
     UnfoldAdminSelectWidget,
     UnfoldAdminTextInputWidget,
@@ -23,8 +22,8 @@ class MockMeasureBase:
     def __init__(self, **kwargs):
         for unit, value in kwargs.items():
             setattr(self, unit, value)
-        self.unit = list(kwargs.keys())[0]
-        self.value = list(kwargs.values())[0]
+        self.unit = next(iter(kwargs.keys()))
+        self.value = next(iter(kwargs.values()))
 
 
 class MockBidimensionalMeasure:
@@ -51,8 +50,8 @@ class MockBidimensionalMeasure:
     def __init__(self, **kwargs):
         for unit, value in kwargs.items():
             setattr(self, unit, value)
-        self.unit = list(kwargs.keys())[0]
-        self.value = list(kwargs.values())[0]
+        self.unit = next(iter(kwargs.keys()))
+        self.value = next(iter(kwargs.values()))
 
 
 class TestMeasurementWidget(SimpleTestCase):
@@ -138,7 +137,7 @@ class TestMeasurementWidget(SimpleTestCase):
 
 class TestMeasurementFormField(SimpleTestCase):
     def test_init_with_invalid_measurement_type(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TypeError) as cm:
             MeasurementFormField(measurement=str)
 
         self.assertIn("must be a subclass of MeasureBase", str(cm.exception))
@@ -304,10 +303,10 @@ class TestMeasurementFormField(SimpleTestCase):
         self.assertEqual(result, mock_speed)
 
     def test_error_message_with_invalid_measurement_subclass(self):
-        with self.assertRaises(ValueError) as cm:
+        with self.assertRaises(TypeError) as cm:
             MeasurementFormField(measurement=dict)
 
-        expected_msg = "{} must be a subclass of MeasureBase".format(dict)
+        expected_msg = f"{dict} must be a subclass of MeasureBase"
         self.assertEqual(str(cm.exception), expected_msg)
 
 

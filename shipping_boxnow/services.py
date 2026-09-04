@@ -136,7 +136,7 @@ def is_configured() -> bool:
     (skip an unconfigured tenant cleanly instead of raising
     ``BoxNowConfigError``).
     """
-    from tenant.credentials import box_now_credentials  # noqa: PLC0415
+    from tenant.credentials import box_now_credentials
 
     creds = box_now_credentials()
     return bool(
@@ -317,7 +317,7 @@ class BoxNowService:
             shipment.save(update_fields=update_fields)
 
         # ---- Phase 2: API call (no transaction, no lock) -----------------
-        from tenant.credentials import (  # noqa: PLC0415
+        from tenant.credentials import (
             box_now_credentials,
             tenant_site_name,
         )
@@ -332,7 +332,7 @@ class BoxNowService:
         # BoxNow API §3.4 — BoxNow sends us the success-notification +
         # PDF label here. The customer gets BoxNow's own customer-facing
         # notifications via ``destination.contactEmail`` / ``contactNumber``.
-        from tenant.credentials import (  # noqa: PLC0415
+        from tenant.credentials import (
             tenant_contact_email,
             tenant_from_email,
         )
@@ -967,7 +967,7 @@ class BoxNowService:
             # class of bug as ACS order 47 — see project memory
             # ``project_shipping_dispatch_on_commit``).
             if mapped_state == BoxNowParcelState.FINAL_DESTINATION:
-                from shipping_boxnow.tasks import (  # noqa: PLC0415
+                from shipping_boxnow.tasks import (
                     boxnow_send_arrival_notification,
                 )
 
@@ -1011,13 +1011,13 @@ class BoxNowService:
             return
 
         try:
-            from notification.enum import (  # noqa: PLC0415
+            from notification.enum import (
                 NotificationCategoryEnum,
                 NotificationKindEnum,
                 NotificationPriorityEnum,
                 NotificationTypeEnum,
             )
-            from notification.services import (  # noqa: PLC0415
+            from notification.services import (
                 create_user_notification,
             )
 
@@ -1269,7 +1269,7 @@ class BoxNowService:
             cls._apply_order_status_transition(locked, mapped_state)
 
             if mapped_state == BoxNowParcelState.FINAL_DESTINATION:
-                from shipping_boxnow.tasks import (  # noqa: PLC0415
+                from shipping_boxnow.tasks import (
                     boxnow_send_arrival_notification,
                 )
 
@@ -1333,9 +1333,11 @@ class BoxNowService:
 
                     seen_external_ids.add(external_id)
 
-                    locker, was_created = BoxNowLocker.objects.update_or_create(
-                        external_id=external_id,
-                        defaults=cls._locker_defaults_from_dest(dest),
+                    _locker, was_created = (
+                        BoxNowLocker.objects.update_or_create(
+                            external_id=external_id,
+                            defaults=cls._locker_defaults_from_dest(dest),
+                        )
                     )
                     if was_created:
                         created_count += 1
@@ -1636,7 +1638,7 @@ class BoxNowService:
         BoxNow field names use camelCase; we map them to our snake_case
         columns here so ``sync_lockers`` stays readable.
         """
-        from shipping_boxnow.enum import BoxNowLockerType  # noqa: PLC0415
+        from shipping_boxnow.enum import BoxNowLockerType
 
         raw_type = dest.get("locationType", "apm")
         try:

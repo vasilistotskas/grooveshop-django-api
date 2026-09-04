@@ -81,7 +81,7 @@ class ProductFavouriteViewSet(BaseModelViewSet):
     filterset_class = ProductFavouriteFilter
 
     def get_permissions(self):
-        from tenant.permissions import IsFavouritesEnabled  # noqa: PLC0415
+        from tenant.permissions import IsFavouritesEnabled
 
         # Merchant feature gate always fires first (404 when disabled).
         return [IsFavouritesEnabled(), IsAuthenticated()]

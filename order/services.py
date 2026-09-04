@@ -7,7 +7,9 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import QuerySet, Sum
 from django.utils import timezone
-from django.utils.translation import get_language, gettext_lazy as _
+from django.utils.translation import get_language
+from django.utils.translation import gettext_lazy as _
+from django_stubs_ext import StrOrPromise
 from djmoney.money import Money
 
 from order.enum.document_type import OrderDocumentTypeEnum
@@ -33,11 +35,11 @@ from order.exceptions import (
 )
 from order.models.item import OrderItem
 from order.models.order import Order
-from promotion.services import CouponService, PromotionEngine
 from order.models.stock_log import StockLog
 from order.models.stock_reservation import StockReservation
 from order.signals import order_refunded
 from order.stock import StockManager
+from promotion.services import CouponService, PromotionEngine
 
 logger = logging.getLogger(__name__)
 
@@ -225,7 +227,7 @@ class OrderService:
         due after promotions and loyalty. Returns the settled amount."""
         if not gift_card_codes:
             return Money(0, settings.DEFAULT_CURRENCY)
-        from giftcard.services import (  # noqa: PLC0415
+        from giftcard.services import (
             GiftCardError,
             GiftCardService,
         )
@@ -249,7 +251,7 @@ class OrderService:
         """
         if not promo_result.gift_items:
             return
-        from order.stock import StockManager  # noqa: PLC0415
+        from order.stock import StockManager
 
         skipped = []
         for gift in promo_result.gift_items:
@@ -304,9 +306,9 @@ class OrderService:
             or user is None
             or not getattr(user, "is_authenticated", False)
         ):
-            return Decimal("0")
+            return Decimal(0)
 
-        from loyalty.services import LoyaltyService  # noqa: PLC0415
+        from loyalty.services import LoyaltyService
 
         try:
             return LoyaltyService.preview_redemption(
@@ -331,7 +333,7 @@ class OrderService:
         """Payment-first path: lock the cards and compute the plan the
         PaymentIntent verification AND the later recording both use —
         one plan, no drift between the verified and redeemed amounts."""
-        from giftcard.services import (  # noqa: PLC0415
+        from giftcard.services import (
             GiftCardError,
             GiftCardService,
         )
@@ -349,6 +351,7 @@ class OrderService:
     @transaction.atomic
     def create_order_from_cart(
         cls,
+        *,
         cart,
         shipping_address: dict[str, Any],
         payment_intent_id: str,
@@ -408,7 +411,7 @@ class OrderService:
             ... )
         """
         try:
-            from cart.models import Cart  # noqa: PLC0415
+            from cart.models import Cart
 
             # Lock the Cart row immediately so concurrent checkouts on the
             # same cart are serialised.  Must happen before any reads so
@@ -433,7 +436,10 @@ class OrderService:
             # payment fee, item price snapshots, PaymentIntent amount
             # verification) must see the same prices the cart preview
             # showed. Kept in lockstep with the offline path.
-            from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
+            from b2b.services import (
+                B2BPricingService,
+                B2BService,
+            )
 
             B2BPricingService.bind_cart(cart, user)
 
@@ -556,9 +562,7 @@ class OrderService:
                 _cart_total.currency,
                 max_discount=_cart_total.amount,
             )
-            _expected_total = max(
-                _expected_total - loyalty_preview, Decimal("0")
-            )
+            _expected_total = max(_expected_total - loyalty_preview, Decimal(0))
             # Gift cards settle part of the total LAST (payment, not
             # discount) — the plan locks the card rows until commit so
             # the amount verified here is exactly what gets redeemed
@@ -568,7 +572,7 @@ class OrderService:
                 Money(_expected_total, _cart_total.currency),
             )
             _expected_total -= gift_plan.amount.amount
-            calculated_total_cents = int(round(_expected_total * 100))
+            calculated_total_cents = round(_expected_total * 100)
             # The Stripe provider returns amount already divided by 100
             # (see payment.py StripePaymentProvider.get_payment_status) and
             # also returns a currency code. Some providers/tests return a
@@ -577,7 +581,7 @@ class OrderService:
             expected_currency = settings.DEFAULT_CURRENCY.lower()
 
             if "amount" in payment_data and payment_data["amount"] is not None:
-                provider_amount_cents = int(round(payment_data["amount"] * 100))
+                provider_amount_cents = round(payment_data["amount"] * 100)
                 if provider_amount_cents != calculated_total_cents:
                     # Log the full input set that produced the mismatch so
                     # root-causing doesn't require re-running the checkout
@@ -921,11 +925,9 @@ class OrderService:
                 except ValidationError:
                     raise
                 except Exception as e:
-                    logger.error(
-                        "Failed to apply loyalty discount to order %s: %s",
+                    logger.exception(
+                        "Failed to apply loyalty discount to order %s",
                         order.id,
-                        e,
-                        exc_info=True,
                     )
                     # The PaymentIntent was verified WITH the loyalty
                     # discount (Step 2.6) — silently dropping it here
@@ -1018,10 +1020,8 @@ class OrderService:
         ):
             raise
         except Exception as e:
-            logger.error(
-                "Unexpected error creating order from cart: %s",
-                e,
-                exc_info=True,
+            logger.exception(
+                "Unexpected error creating order from cart",
             )
             raise InvalidOrderDataError(
                 _("Failed to create order: {error}").format(error=str(e))
@@ -1031,6 +1031,7 @@ class OrderService:
     @transaction.atomic
     def create_order_from_cart_offline(
         cls,
+        *,
         cart,
         shipping_address: dict[str, Any],
         pay_way,
@@ -1090,7 +1091,7 @@ class OrderService:
             ... )
         """
         try:
-            from cart.models import Cart  # noqa: PLC0415
+            from cart.models import Cart
 
             # Lock the Cart row immediately so concurrent checkouts on the
             # same cart are serialised.  Must happen before any reads so
@@ -1111,7 +1112,10 @@ class OrderService:
 
             # Step 2.4: Re-bind wholesale pricing on the LOCKED cart
             # (see the payment-first path for the rationale).
-            from b2b.services import B2BPricingService, B2BService  # noqa: PLC0415
+            from b2b.services import (
+                B2BPricingService,
+                B2BService,
+            )
 
             B2BPricingService.bind_cart(cart, user)
 
@@ -1415,11 +1419,9 @@ class OrderService:
                 except ValidationError:
                     raise
                 except Exception as e:
-                    logger.error(
-                        "Failed to apply loyalty discount to order %s: %s",
+                    logger.exception(
+                        "Failed to apply loyalty discount to order %s",
                         order.id,
-                        e,
-                        exc_info=True,
                     )
                     # Fail loud, like the payment-first path. The offline
                     # providers (COD, Viva) have no amount guard, so
@@ -1563,10 +1565,8 @@ class OrderService:
         ):
             raise
         except Exception as e:
-            logger.error(
-                "Unexpected error creating order from cart (order-first): %s",
-                e,
-                exc_info=True,
+            logger.exception(
+                "Unexpected error creating order from cart (order-first)",
             )
             raise InvalidOrderDataError(
                 _("Failed to create order: {error}").format(error=str(e))
@@ -1704,7 +1704,10 @@ class OrderService:
         """
         from django.core.validators import validate_email
 
-        errors = {}
+        # Values are a mix: `_( ... )` lazy translations from this
+        # method and plain `str` from the shipping provider's validator.
+        # `StrOrPromise` is django-stubs-ext's public spelling for that.
+        errors: dict[str, list[StrOrPromise]] = {}
 
         # Required fields
         required_fields = [
@@ -2178,12 +2181,10 @@ class OrderService:
                         quantity,
                         order.id,
                     )
-                except Exception as e:
-                    logger.error(
-                        "Failed to restore stock for product %s: %s",
+                except Exception:
+                    logger.exception(
+                        "Failed to restore stock for product %s",
                         product_id,
-                        e,
-                        exc_info=True,
                     )
                     # Continue with other products even if one fails
 
@@ -2264,12 +2265,10 @@ class OrderService:
                             ),
                             "message": "Order canceled but refund failed",
                         }
-                except Exception as refund_error:
-                    logger.error(
-                        "Error processing refund for canceled order %s: %s",
+                except Exception:
+                    logger.exception(
+                        "Error processing refund for canceled order %s",
                         order.id,
-                        refund_error,
-                        exc_info=True,
                     )
                     refund_info = {
                         "refunded": False,
@@ -2280,9 +2279,7 @@ class OrderService:
             return order, refund_info
 
         except Exception as e:
-            logger.error(
-                "Error canceling order %s: %s", order.id, e, exc_info=True
-            )
+            logger.exception("Error canceling order %s", order.id)
             raise OrderCancellationError(
                 order_id=order.id,
                 reason=_("Failed to cancel order: {error}").format(
@@ -2761,8 +2758,6 @@ class OrderService:
     @classmethod
     @transaction.atomic
     def handle_payment_succeeded(cls, payment_intent_id: str) -> Order | None:
-        from order.payment_events import publish_payment_status
-
         # Acquire a row lock and hydrate related objects in one query.
         # ``for_detail()`` adds COUNT/SUM annotations which Postgres
         # rejects under FOR UPDATE (aggregate in locked query). We
@@ -2771,6 +2766,7 @@ class OrderService:
         from django.db.models import Prefetch
 
         from order.models.history import OrderHistory
+        from order.payment_events import publish_payment_status
 
         # ``of=("self",)`` restricts the row lock to the Order table.
         # Without it Postgres rejects the query with ``FOR UPDATE cannot
@@ -3040,9 +3036,10 @@ class OrderService:
             return Money(0, order_value.currency)
 
         # Check if order value meets free threshold
-        if pay_way.free_threshold and pay_way.free_threshold.amount > 0:
-            if order_value.amount >= pay_way.free_threshold.amount:
-                return Money(0, order_value.currency)
+        if (pay_way.free_threshold and pay_way.free_threshold.amount > 0) and (
+            order_value.amount >= pay_way.free_threshold.amount
+        ):
+            return Money(0, order_value.currency)
 
         # Same currency only. Re-labelling would turn a fee configured
         # in one currency into the same NUMBER in another — charging a

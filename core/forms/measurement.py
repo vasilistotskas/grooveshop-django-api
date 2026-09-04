@@ -6,8 +6,6 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from measurement.base import BidimensionalMeasure, MeasureBase
 
-from core.utils.measurement import get_measurement
-
 # django-unfold is a hard dependency and the admin theme this project
 # runs on, so there is no "without unfold" mode to fall back to. The
 # guard only meant a real breakage would have rendered the plain Django
@@ -16,6 +14,8 @@ from unfold.widgets import (
     UnfoldAdminSelectWidget,
     UnfoldAdminTextInputWidget,
 )
+
+from core.utils.measurement import get_measurement
 
 
 class MeasurementWidget(forms.MultiWidget):
@@ -54,7 +54,7 @@ class MeasurementWidget(forms.MultiWidget):
                     ]
                 return [float(magnitude), unit]
             elif isinstance(value, MeasureBase):
-                choice_units = set([u for u, n in self.unit_choices])
+                choice_units = {u for u, n in self.unit_choices}
                 unit = value.STANDARD_UNIT
                 if unit not in choice_units:
                     unit = choice_units.pop()
@@ -78,24 +78,19 @@ class MeasurementFormField(forms.MultiValueField):
         **kwargs,
     ):
         if not issubclass(measurement, MeasureBase | BidimensionalMeasure):
-            raise ValueError(
-                "{} must be a subclass of MeasureBase".format(measurement)
-            )
+            raise TypeError(f"{measurement} must be a subclass of MeasureBase")
 
         self.measurement = measurement
         if not unit_choices:
             if issubclass(measurement, BidimensionalMeasure):
                 assert isinstance(bidimensional_separator, str), (
-                    "Supplied bidimensional_separator for {} must be of string/unicode type;"
-                    " Instead got type {}".format(
-                        measurement,
-                        str(type(bidimensional_separator)),
-                    )
+                    f"Supplied bidimensional_separator for {measurement} must be of string/unicode type;"
+                    f" Instead got type {type(bidimensional_separator)!s}"
                 )
                 unit_choices = tuple(
                     (
                         (
-                            "{}__{}".format(primary, reference),
+                            f"{primary}__{reference}",
                             "{}{}{}".format(
                                 getattr(
                                     measurement.PRIMARY_DIMENSION, "LABELS", {}
@@ -125,17 +120,13 @@ class MeasurementFormField(forms.MultiValueField):
 
         if min_value is not None:
             if not isinstance(min_value, MeasureBase):
-                msg = '"min_value" must be a measure, got {}'.format(
-                    type(min_value)
-                )
+                msg = f'"min_value" must be a measure, got {type(min_value)}'
                 raise ValueError(msg)
             validators += [MinValueValidator(min_value)]
 
         if max_value is not None:
             if not isinstance(max_value, MeasureBase):
-                msg = '"max_value" must be a measure, got {}'.format(
-                    type(max_value)
-                )
+                msg = f'"max_value" must be a measure, got {type(max_value)}'
                 raise ValueError(msg)
             validators += [MaxValueValidator(max_value)]
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from django.db import IntegrityError
 
 from order.factories.order import OrderFactory
 from shipping_acs.enum.shipment_state import AcsShipmentState
@@ -48,7 +49,10 @@ def test_voucher_no_unique_rejects_duplicate_assigned_numbers():
     order_b = OrderFactory(
         status=OrderStatus.PENDING, payment_status=PaymentStatus.PENDING
     )
-    with pytest.raises(Exception):
+    # IntegrityError specifically: the point is the UNIQUE constraint on
+    # voucher_no, and a bare Exception would also pass if the factory
+    # merely blew up for an unrelated reason.
+    with pytest.raises(IntegrityError):
         AcsShipmentFactory(order=order_b, voucher_no="7227891234")
 
 
@@ -69,7 +73,7 @@ def test_is_active_false_for_terminal_state():
 
 def test_tracking_event_fingerprint_unique():
     event_a = AcsTrackingEventFactory(event_fingerprint="abc123")
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         AcsTrackingEventFactory(
             shipment=event_a.shipment, event_fingerprint="abc123"
         )

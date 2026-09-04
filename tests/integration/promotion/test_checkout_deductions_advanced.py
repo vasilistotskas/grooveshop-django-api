@@ -51,16 +51,16 @@ def checkout():
     cart.items.all().delete()
     product = ProductFactory(
         stock=10,
-        price=Money(Decimal("100"), "EUR"),
-        discount_percent=Decimal("0"),
+        price=Money(Decimal(100), "EUR"),
+        discount_percent=Decimal(0),
         vat=None,
         active=True,
     )
     CartItemFactory(cart=cart, product=product, quantity=1)
     pay_way = PayWayFactory(
         is_online_payment=False,
-        cost=Money(Decimal("0"), "EUR"),
-        free_threshold=Money(Decimal("0"), "EUR"),
+        cost=Money(Decimal(0), "EUR"),
+        free_threshold=Money(Decimal(0), "EUR"),
     )
     shipping_address = {
         "first_name": "Eleni",
@@ -89,7 +89,7 @@ class TestZeroTotalSettlement:
         # 100% off everything + free shipping = zero total.
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("100"),
+            benefit_value=Decimal(100),
         )
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
@@ -104,7 +104,7 @@ class TestZeroTotalSettlement:
         )
 
         order.refresh_from_db()
-        assert order.paid_amount.amount == Decimal("0")
+        assert order.paid_amount.amount == Decimal(0)
         assert order.payment_status == PaymentStatus.COMPLETED
         assert order.payment_id == f"DISCOUNT_{order.uuid}"
         assert order.payment_method == "discount"
@@ -124,8 +124,8 @@ class TestGiftInjection:
         self, enable_promotions, checkout
     ):
         gift_product = ProductFactory(
-            price=Money(Decimal("15"), "EUR"),
-            discount_percent=Decimal("0"),
+            price=Money(Decimal(15), "EUR"),
+            discount_percent=Decimal(0),
             vat=None,
             stock=5,
             active=True,
@@ -140,12 +140,12 @@ class TestGiftInjection:
         )
 
         gift_line = order.items.get(product=gift_product)
-        assert gift_line.price.amount == Decimal("0")
+        assert gift_line.price.amount == Decimal(0)
         assert gift_line.quantity == 1
         gift_product.refresh_from_db()
         assert gift_product.stock == 4
         # The paid line is untouched and the total charges only it.
-        assert order.total_price_items.amount == Decimal("100")
+        assert order.total_price_items.amount == Decimal(100)
         assert order.metadata["promotion_gifts"][0]["product_id"] == (
             gift_product.id
         )
@@ -154,8 +154,8 @@ class TestGiftInjection:
         self, enable_promotions, checkout
     ):
         gift_product = ProductFactory(
-            price=Money(Decimal("15"), "EUR"),
-            discount_percent=Decimal("0"),
+            price=Money(Decimal(15), "EUR"),
+            discount_percent=Decimal(0),
             vat=None,
             stock=0,
             active=True,
@@ -196,14 +196,14 @@ class TestLoyaltyPaymentIntentParity:
         pay_way = PayWayFactory(
             provider_code="stripe",
             is_online_payment=True,
-            cost=Money(Decimal("0"), "EUR"),
-            free_threshold=Money(Decimal("0"), "EUR"),
+            cost=Money(Decimal(0), "EUR"),
+            free_threshold=Money(Decimal(0), "EUR"),
         )
 
         # Expected charge: 100 items − 5.00 loyalty (500 pts @ 100/EUR)
         # + generic shipping (free ≥ threshold at 100 EUR carts).
         expected_total = OrderService.calculate_shipping_cost(
-            order_value=Money(Decimal("100"), "EUR"),
+            order_value=Money(Decimal(100), "EUR"),
             country_id=checkout["shipping_address"]["country_id"],
             region_id=None,
             shipping_provider_code=None,
@@ -256,11 +256,11 @@ class TestLoyaltyPaymentIntentParity:
         pay_way = PayWayFactory(
             provider_code="stripe",
             is_online_payment=True,
-            cost=Money(Decimal("0"), "EUR"),
-            free_threshold=Money(Decimal("0"), "EUR"),
+            cost=Money(Decimal(0), "EUR"),
+            free_threshold=Money(Decimal(0), "EUR"),
         )
         undiscounted = OrderService.calculate_shipping_cost(
-            order_value=Money(Decimal("100"), "EUR"),
+            order_value=Money(Decimal(100), "EUR"),
             country_id=checkout["shipping_address"]["country_id"],
             region_id=None,
             shipping_provider_code=None,

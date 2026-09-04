@@ -1,5 +1,6 @@
 from datetime import timedelta
-from django.db.models import Q, F
+
+from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters

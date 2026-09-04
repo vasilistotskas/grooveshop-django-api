@@ -3,9 +3,9 @@ from drf_spectacular.utils import extend_schema_field
 from parler_rest.serializers import TranslatableModelSerializer
 from rest_framework import serializers
 
-from tag.models import Tag
 from core.api.schema import generate_schema_multi_lang
 from core.utils.serializers import TranslatedFieldExtended
+from tag.models import Tag
 
 
 @extend_schema_field(generate_schema_multi_lang(Tag))

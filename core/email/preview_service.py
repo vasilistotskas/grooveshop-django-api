@@ -2,16 +2,16 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from django.conf import settings
 from django.template.loader import render_to_string
+from django.utils import timezone
 
 from core.email.config import EmailTemplateConfig
-from core.utils.email_context import build_email_context
-from tenant.credentials import tenant_site_name
 from core.email.sample_data import SampleOrderDataGenerator
+from core.utils.email_context import build_email_context
 from order.models import Order
+from tenant.credentials import tenant_site_name
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +25,9 @@ class EmailPreview:
     html_content: str
     text_content: str
     context_data: dict
-    order_id: Optional[int]
+    order_id: int | None
     is_sample_data: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class EmailTemplatePreviewService:
@@ -41,7 +41,7 @@ class EmailTemplatePreviewService:
     def generate_preview(
         self,
         template_name: str,
-        order_id: Optional[int] = None,
+        order_id: int | None = None,
         language: str = "el",
     ) -> EmailPreview:
         """Generate preview for a template."""
@@ -108,7 +108,7 @@ class EmailTemplatePreviewService:
             translation.activate(current_language)
 
     def _get_context_data_for_category(
-        self, template_name: str, order_id: Optional[int] = None
+        self, template_name: str, order_id: int | None = None
     ) -> tuple[dict, bool]:
         """Get context data for template rendering based on configuration."""
         # Resolve the generator from the template's REAL directory, not
@@ -162,7 +162,7 @@ class EmailTemplatePreviewService:
         return self._get_context_data(order_id, template_name)
 
     def _get_context_data(
-        self, order_id: Optional[int], template_name: str = ""
+        self, order_id: int | None, template_name: str = ""
     ) -> tuple[dict, bool]:
         """Get context data for order templates."""
         if order_id:
@@ -304,29 +304,27 @@ class EmailTemplatePreviewService:
             return f"Template not found: {template_path}. Please check that the template file exists."
         except TemplateSyntaxError as e:
             # Template has syntax errors
-            logger.error(
-                f"Template syntax error in {template_path}: {e!s}",
+            logger.exception(
+                f"Template syntax error in {template_path}",
                 extra={
                     "template_path": template_path,
                     "error": str(e),
                     "line_number": getattr(e, "lineno", None),
                 },
-                exc_info=True,
             )
             return f"Template syntax error: {e!s}"
         except Exception as e:
             # Other rendering errors
-            logger.error(
-                f"Error rendering template {template_path}: {e!s}",
+            logger.exception(
+                f"Error rendering template {template_path}",
                 extra={
                     "template_path": template_path,
                     "context_keys": list(context.keys()),
                 },
-                exc_info=True,
             )
             return f"Error rendering template: {e!s}"
 
-    def _extract_category(self, template_name: str) -> Optional[str]:
+    def _extract_category(self, template_name: str) -> str | None:
         """Resolve a template's directory from the REGISTRY, not its name.
 
         This used to call ``EmailTemplateConfig.get_category_for_template``,
@@ -342,7 +340,7 @@ class EmailTemplatePreviewService:
         registry found on disk, so reading it back cannot disagree with
         reality and cannot regress when a directory is added.
         """
-        from core.email.registry import EmailTemplateRegistry  # noqa: PLC0415
+        from core.email.registry import EmailTemplateRegistry
 
         info = EmailTemplateRegistry().get_template(template_name)
         if info is not None:
@@ -356,6 +354,7 @@ class EmailTemplatePreviewService:
     def _get_available_template_list(self) -> list[str]:
         """Get list of available email templates for error messages."""
         import os
+
         from django.conf import settings
 
         templates = []
@@ -375,7 +374,7 @@ class EmailTemplatePreviewService:
 
     def _get_sample_user_context(self) -> dict:
         """Generate sample user data for user-related templates."""
-        from datetime import datetime, timedelta
+        from datetime import timedelta
 
         return {
             "user": {
@@ -384,12 +383,12 @@ class EmailTemplatePreviewService:
                 "first_name": "John",
                 "last_name": "Doe",
                 "email": "john.doe@example.com",
-                "date_joined": datetime.now() - timedelta(days=180),
-                "last_login": datetime.now() - timedelta(days=45),
+                "date_joined": timezone.now() - timedelta(days=180),
+                "last_login": timezone.now() - timedelta(days=45),
             },
             "app_base_url": settings.NUXT_BASE_URL,
-            "week_start": datetime.now() - timedelta(days=7),
-            "week_end": datetime.now(),
+            "week_start": timezone.now() - timedelta(days=7),
+            "week_end": timezone.now(),
             "featured_articles": [
                 {
                     "title": "New Product Launch",
@@ -408,7 +407,6 @@ class EmailTemplatePreviewService:
 
     def _get_sample_subscription_context(self) -> dict:
         """Generate sample subscription data for subscription templates."""
-        from datetime import datetime
 
         return {
             "user": {
@@ -422,7 +420,7 @@ class EmailTemplatePreviewService:
                 "id": 67890,
                 "plan": "Premium",
                 "status": "active",
-                "start_date": datetime.now(),
+                "start_date": timezone.now(),
                 "billing_cycle": "monthly",
                 "amount": "€9.99",
             },

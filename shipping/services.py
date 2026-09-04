@@ -120,7 +120,7 @@ class ShippingService:
         """
         adapter = cls.adapter_for_order(order)
         if adapter is None:
-            return None
+            return
         kind = ShippingKind(order.shipping_kind)
         adapter.create_shipment_row(
             order, kind=kind, payload=payload or {}, items=items

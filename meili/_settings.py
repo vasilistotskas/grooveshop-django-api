@@ -26,8 +26,8 @@ class _MeiliSettings:
     sync: bool
 
     @classmethod
-    def from_settings(cls) -> "_MeiliSettings":
-        from django.conf import settings  # noqa: PLC0415
+    def from_settings(cls) -> _MeiliSettings:
+        from django.conf import settings
 
         meili_settings = cast("MeiliSettings", settings.MEILISEARCH)
 

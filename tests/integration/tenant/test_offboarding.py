@@ -192,7 +192,10 @@ class TestRetentionWindow:
             "django_tenants.utils.schema_context",
             side_effect=RuntimeError("schema gone"),
         ):
-            assert offboarding.latest_invoice_year("acme") == date.today().year
+            assert (
+                offboarding.latest_invoice_year("acme")
+                == timezone.localdate().year
+            )
 
 
 @pytest.mark.django_db

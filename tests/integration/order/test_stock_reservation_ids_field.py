@@ -5,7 +5,6 @@ from django.test.utils import CaptureQueriesContext
 from order.factories import OrderFactory
 from order.models.order import Order
 
-
 pytestmark = pytest.mark.assert_english
 
 

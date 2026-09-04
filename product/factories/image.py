@@ -7,7 +7,6 @@ from django.conf import settings
 
 from product.models.product import ProductImage
 
-
 available_languages = [
     lang["code"] for lang in settings.PARLER_LANGUAGES[settings.SITE_ID]
 ]

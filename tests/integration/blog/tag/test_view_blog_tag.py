@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+
 from blog.factories.tag import BlogTagFactory
 from blog.models.tag import BlogTag
 from tests.utils import TestURLFixerMixin

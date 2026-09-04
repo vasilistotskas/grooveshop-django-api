@@ -30,10 +30,10 @@ from core.managers.tree import (
 )
 
 __all__ = [
-    "OptimizedQuerySet",
     "OptimizedManager",
-    "TranslatableOptimizedQuerySet",
+    "OptimizedQuerySet",
     "TranslatableOptimizedManager",
-    "TreeTranslatableQuerySet",
+    "TranslatableOptimizedQuerySet",
     "TreeTranslatableManager",
+    "TreeTranslatableQuerySet",
 ]

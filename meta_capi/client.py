@@ -62,8 +62,8 @@ def _get_api(access_token: str, api_version: str) -> Any:
         cached = _api_cache.get(cache_key)
         if cached is not None:
             return cached
-        from facebook_business.api import FacebookAdsApi  # noqa: PLC0415
-        from facebook_business.session import (  # noqa: PLC0415
+        from facebook_business.api import FacebookAdsApi
+        from facebook_business.session import (
             FacebookSession,
         )
 
@@ -136,7 +136,7 @@ class MetaCapiClient:
 
         # Lazy imports — keep module import cheap (no SDK side effects
         # at Django boot) and the SDK out of the unit-test fast path.
-        from facebook_business.adobjects.adspixel import (  # noqa: PLC0415
+        from facebook_business.adobjects.adspixel import (
             AdsPixel,
         )
         from facebook_business.adobjects.serverside.event_request import (

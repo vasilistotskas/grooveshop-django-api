@@ -1,11 +1,9 @@
-from .tag import TagTranslationFactory
-from .tag import TagFactory
-from .tagged_item import TaggedItemFactory
-from .tagged_item import TaggedProductFactory
+from .tag import TagFactory, TagTranslationFactory
+from .tagged_item import TaggedItemFactory, TaggedProductFactory
 
 __all__ = [
-    "TagTranslationFactory",
     "TagFactory",
+    "TagTranslationFactory",
     "TaggedItemFactory",
     "TaggedProductFactory",
 ]

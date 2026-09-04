@@ -95,7 +95,7 @@ def merchant_legal_identity() -> dict[str, object]:
     fall back to the site name for its own rendering; that is an invoice
     concern and does not belong in the published identity.
     """
-    from extra_settings.models import Setting  # noqa: PLC0415
+    from extra_settings.models import Setting
 
     identity: dict[str, object] = {
         field: str(Setting.get(key, default="") or "").strip()

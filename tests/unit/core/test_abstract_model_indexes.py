@@ -27,7 +27,6 @@ import pytest
 from django.apps import apps
 from django.db import models
 
-
 # Indexes a model drops ON PURPOSE, with the reason. Distinct from
 # _KNOWN_DRIFT below: nothing here is waiting to be fixed.
 _DELIBERATE: dict[str, str] = {

@@ -3,6 +3,8 @@ import logging
 from django.apps import AppConfig
 from django.db import transaction
 
+from meili.exceptions import MeiliTaskFailed
+
 logger = logging.getLogger(__name__)
 
 
@@ -11,17 +13,20 @@ class MeiliConfig(AppConfig):
     name = "meili"
 
     def ready(self):
-        from django.apps import apps  # noqa: PLC0415
-        from django.conf import settings  # noqa: PLC0415
-        from django.db.models.signals import post_delete, post_save  # noqa: PLC0415
+        from django.apps import apps
+        from django.conf import settings
+        from django.db.models.signals import (
+            post_delete,
+            post_save,
+        )
 
-        from ._client import client as _client  # noqa: PLC0415
-        from .models import IndexMixin  # noqa: PLC0415
+        from ._client import client as _client
+        from .models import IndexMixin
 
         # No import guard: celery is a hard runtime dependency, so this
         # cannot fail. Guarding it left the app silently indexing
         # synchronously with no way to tell why.
-        from .tasks import (  # noqa: PLC0415
+        from .tasks import (
             delete_document_task,
             index_document_task,
         )
@@ -89,7 +94,9 @@ class MeiliConfig(AppConfig):
                                 f"Failed to index {model._meta.label} "
                                 f"pk={model.pk}: {finished.error}"
                             )
-                            raise Exception(finished.error)
+                            raise MeiliTaskFailed(
+                                finished.error, operation="index"
+                            )
                 except Exception as e:
                     logger.error(
                         f"Error indexing {model._meta.label} pk={model.pk}: {e}"
@@ -160,7 +167,9 @@ class MeiliConfig(AppConfig):
                                 f"Failed to delete {model._meta.label} "
                                 f"pk={model.pk}: {finished.error}"
                             )
-                            raise Exception(finished.error)
+                            raise MeiliTaskFailed(
+                                finished.error, operation="index"
+                            )
                 except Exception as e:
                     logger.error(
                         f"Error deleting {model._meta.label} pk={model.pk}: {e}"
@@ -207,7 +216,7 @@ class MeiliConfig(AppConfig):
 
         def _initialize_meilisearch_config(model):
             """Initialize _meilisearch configuration for a model."""
-            from .models import _Meili  # noqa: PLC0415
+            from .models import _Meili
 
             meta = model.MeiliMeta
             index_name = getattr(meta, "index_name", None) or model.__name__

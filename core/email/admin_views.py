@@ -11,6 +11,7 @@ from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 
 from order.models import Order
+
 from .preview_service import EmailTemplatePreviewService
 
 logger = logging.getLogger(__name__)
@@ -143,8 +144,8 @@ def preview_template_ajax(request: HttpRequest) -> JsonResponse:
 
     except json.JSONDecodeError:
         return JsonResponse({"success": False, "error": "Invalid JSON data"})
-    except Exception as e:
-        logger.error("Error previewing template: %s", e, exc_info=True)
+    except Exception:
+        logger.exception("Error previewing template")
         return JsonResponse(
             {"success": False, "error": "An unexpected error occurred"}
         )
@@ -195,13 +196,8 @@ def get_template_info(request: HttpRequest, template_name: str) -> JsonResponse:
             }
         )
 
-    except Exception as e:
-        logger.error(
-            "Error getting template info for %s: %s",
-            template_name,
-            e,
-            exc_info=True,
-        )
+    except Exception:
+        logger.exception("Error getting template info for %s", template_name)
         return JsonResponse(
             {"success": False, "error": "An unexpected error occurred"}
         )
@@ -243,13 +239,8 @@ def get_order_data(request: HttpRequest, order_id: int) -> JsonResponse:
         return JsonResponse(
             {"success": False, "error": f"Order {order_id} not found"}
         )
-    except Exception as e:
-        logger.error(
-            "Error getting order data for %s: %s",
-            order_id,
-            e,
-            exc_info=True,
-        )
+    except Exception:
+        logger.exception("Error getting order data for %s", order_id)
         return JsonResponse(
             {"success": False, "error": "An unexpected error occurred"}
         )

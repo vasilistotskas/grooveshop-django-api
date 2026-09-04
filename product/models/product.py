@@ -27,6 +27,7 @@ from tinymce.models import HTMLField
 from core.fields.measurement import MeasurementField
 from core.models import (
     MetaDataModel,
+    SeoModel,
     SoftDeleteModel,
     TimeStampMixinModel,
     UUIDModel,
@@ -37,7 +38,6 @@ from core.weight import zero_weight
 from meili.models import IndexMixin
 from product.managers.product import ProductManager
 from product.models.image import ProductImage
-from core.models import SeoModel
 from search.transliteration import (
     greeklish_shadow,
     greeklish_shadow_alt,
@@ -433,15 +433,19 @@ class Product(
     def colored_stock(self) -> SafeString:
         if self.stock > 0:
             return mark_safe(
-                '<span style="color: #1bff00;">{}</span>'.format(self.stock)
+                f'<span style="color: #1bff00;">{self.stock}</span>'
             )
         else:
             return mark_safe(
-                '<span style="color: #ff0000;">{}</span>'.format(self.stock)
+                f'<span style="color: #ff0000;">{self.stock}</span>'
             )
 
 
-class ProductTranslation(TranslatedFieldsModel, IndexMixin):
+# Suppression is a stubs artefact, not a real override conflict: the two
+# bases declare the method with signatures that django-stubs types
+# differently, and ty reports the pair rather than a mismatch in the code
+# written here.
+class ProductTranslation(TranslatedFieldsModel, IndexMixin):  # ty: ignore[invalid-method-override]
     master = TranslationsForeignKey(
         "product.Product",
         on_delete=models.CASCADE,

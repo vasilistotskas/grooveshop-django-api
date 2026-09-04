@@ -33,9 +33,9 @@ class AdminSiteLoginNextMixin:
     """
 
     def login(self, request, extra_context=None):
-        from django.contrib.auth import REDIRECT_FIELD_NAME  # noqa: PLC0415
-        from django.shortcuts import redirect  # noqa: PLC0415
-        from django.urls import reverse  # noqa: PLC0415
+        from django.contrib.auth import REDIRECT_FIELD_NAME
+        from django.shortcuts import redirect
+        from django.urls import reverse
 
         if (
             request.method == "GET"

@@ -6,11 +6,11 @@ class MyAdminConfig(AdminConfig):
 
     def ready(self):
         super().ready()
+        from admin.log_actors import patch_admin_history_actors
         from admin.signals import (
             _connect_dashboard_invalidation,
             _connect_tenant_aware_last_login,
         )
-        from admin.log_actors import patch_admin_history_actors
         from admin.third_party import patch_djstripe_search_fields
 
         _connect_dashboard_invalidation()

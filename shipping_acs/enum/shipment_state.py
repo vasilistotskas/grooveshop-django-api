@@ -31,8 +31,8 @@ class AcsShipmentState(models.TextChoices):
 
     @classmethod
     def from_tracking_summary(
-        cls, payload: dict[str, Any], *, current: "AcsShipmentState"
-    ) -> "AcsShipmentState":
+        cls, payload: dict[str, Any], *, current: AcsShipmentState
+    ) -> AcsShipmentState:
         """Map a single ``ACS_Trackingsummary`` row to the internal enum.
 
         Inputs (per ACS PDF):

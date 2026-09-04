@@ -19,7 +19,7 @@ class ShippingOptionsQuerySerializer(serializers.Serializer):
         required=False,
         max_digits=11,
         decimal_places=2,
-        default=Decimal("0"),
+        default=Decimal(0),
         help_text=_("Cart subtotal — used for free-shipping threshold checks."),
     )
     currency = serializers.CharField(

@@ -7,7 +7,6 @@ from rest_framework.permissions import AllowAny
 from core.api.permissions import IsPlatformSuperuser
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
     SerializersConfig,
     create_schema_view_config,

@@ -77,8 +77,8 @@ class TenantConfigSerializer(serializers.Serializer):
     product_feeds_enabled = serializers.SerializerMethodField()
 
     def get_agent_commerce_enabled(self, obj) -> bool:
-        from django_tenants.utils import schema_context  # noqa: PLC0415
-        from extra_settings.models import Setting  # noqa: PLC0415
+        from django_tenants.utils import schema_context
+        from extra_settings.models import Setting
 
         if not obj.agent_commerce_enabled:
             return False
@@ -86,8 +86,8 @@ class TenantConfigSerializer(serializers.Serializer):
             return bool(Setting.get("AGENT_COMMERCE_ENABLED", default=True))
 
     def get_product_feeds_enabled(self, obj) -> bool:
-        from django_tenants.utils import schema_context  # noqa: PLC0415
-        from extra_settings.models import Setting  # noqa: PLC0415
+        from django_tenants.utils import schema_context
+        from extra_settings.models import Setting
 
         # Subordinate to the agent-commerce gate.
         if not self.get_agent_commerce_enabled(obj):
@@ -115,8 +115,8 @@ class TenantConfigSerializer(serializers.Serializer):
     agent_hosted_payment_enabled = serializers.SerializerMethodField()
 
     def get_agent_hosted_payment_enabled(self, obj) -> bool:
-        from django_tenants.utils import schema_context  # noqa: PLC0415
-        from extra_settings.models import Setting  # noqa: PLC0415
+        from django_tenants.utils import schema_context
+        from extra_settings.models import Setting
 
         if not self.get_agent_commerce_enabled(obj):
             return False
@@ -130,9 +130,9 @@ class TenantConfigSerializer(serializers.Serializer):
     agent_payment_instruments = serializers.SerializerMethodField()
 
     def get_agent_payment_instruments(self, obj) -> list[str]:
-        from django_tenants.utils import schema_context  # noqa: PLC0415
+        from django_tenants.utils import schema_context
 
-        from pay_way.models import PayWay  # noqa: PLC0415
+        from pay_way.models import PayWay
 
         # Subordinate to the agent-commerce gate: a tenant with the
         # surface off advertises no agent-completable payment at all.
@@ -207,21 +207,21 @@ class TenantConfigSerializer(serializers.Serializer):
         return domain.domain if domain else ""
 
     def get_api_domain(self, obj: Tenant) -> str:
-        from core.utils.tenant_urls import (  # noqa: PLC0415
+        from core.utils.tenant_urls import (
             resolve_tenant_api_domain,
         )
 
         return resolve_tenant_api_domain(obj)
 
     def get_assets_domain(self, obj: Tenant) -> str:
-        from core.utils.tenant_urls import (  # noqa: PLC0415
+        from core.utils.tenant_urls import (
             resolve_tenant_assets_domain,
         )
 
         return resolve_tenant_assets_domain(obj)
 
     def get_static_domain(self, obj: Tenant) -> str:
-        from core.utils.tenant_urls import (  # noqa: PLC0415
+        from core.utils.tenant_urls import (
             resolve_tenant_static_domain,
         )
 

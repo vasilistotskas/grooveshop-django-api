@@ -48,7 +48,7 @@ def make_tenant_key(key: str, key_prefix: str, version: int) -> str:
 @lru_cache(maxsize=1)
 def _tenant_config_shape() -> str:
     """Short fingerprint of ``TenantConfigSerializer``'s field names."""
-    from tenant.serializers import TenantConfigSerializer  # noqa: PLC0415
+    from tenant.serializers import TenantConfigSerializer
 
     names = ",".join(sorted(TenantConfigSerializer().get_fields()))
     return hashlib.blake2s(names.encode(), digest_size=4).hexdigest()

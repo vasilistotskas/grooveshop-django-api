@@ -32,7 +32,7 @@ def build_domains_payload() -> dict:
     """Active tenants' domains + derived api./assets./static. service
     subdomains of each primary domain (the infra TEMPLATE provisions
     those for every tenant)."""
-    from tenant.models import TenantDomain  # noqa: PLC0415
+    from tenant.models import TenantDomain
 
     rows = TenantDomain.objects.filter(
         tenant__is_active=True, tenant__suspended_at__isnull=True

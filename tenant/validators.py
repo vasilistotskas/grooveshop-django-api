@@ -152,7 +152,7 @@ def validate_business_hours_setting(value: object) -> bool:
     null | {"opens": "HH:MM", "closes": "HH:MM"}}}``. All seven day
     keys required; ``null`` = closed. Empty value = feature unset.
     """
-    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # noqa: PLC0415
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
     if value in (None, "", {}):
         return True

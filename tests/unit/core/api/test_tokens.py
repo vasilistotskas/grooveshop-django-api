@@ -155,7 +155,7 @@ class TestBoundedTokenAuthentication:
 
         auth = BoundedTokenAuthentication()
         # encode as bytes to match how authenticate_credentials receives it
-        result_user, result_token = auth.authenticate_credentials(
+        result_user, _result_token = auth.authenticate_credentials(
             raw_token.encode()
         )
         assert result_user == user

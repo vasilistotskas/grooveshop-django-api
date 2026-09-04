@@ -108,8 +108,8 @@ class BuildInvoiceXmlTestCase(TestCase):
         root = fromstring(built.xml_bytes)
         lines = root.findall(_localise("invoice/invoiceDetails"))
         self.assertGreater(len(lines), 0)
-        total_net = Decimal("0")
-        total_vat = Decimal("0")
+        total_net = Decimal(0)
+        total_vat = Decimal(0)
         for row in lines:
             total_net += Decimal(row.find(f"{AADE_NS}netValue").text)
             total_vat += Decimal(row.find(f"{AADE_NS}vatAmount").text)
@@ -196,7 +196,7 @@ class BuildInvoiceXmlTestCase(TestCase):
         cls_ns = "{https://www.aade.gr/myDATA/incomeClassificaton/v1.0}"
         built = self._build(self._issued_invoice())
         root = fromstring(built.xml_bytes)
-        line_total = Decimal("0")
+        line_total = Decimal(0)
         for row in root.findall(_localise("invoice/invoiceDetails")):
             amt = row.find(f"{AADE_NS}incomeClassification/{cls_ns}amount").text
             line_total += Decimal(amt)
@@ -248,7 +248,7 @@ class BuildInvoiceXmlTestCase(TestCase):
         from order.mydata.builder import _vat_category
 
         with self.assertRaises(ValueError):
-            _vat_category(Decimal("11"))
+            _vat_category(Decimal(11))
 
     def test_zero_rate_emits_vat_exemption_category(self):
         """AADE error 217: vatCategory=7 (0%) requires

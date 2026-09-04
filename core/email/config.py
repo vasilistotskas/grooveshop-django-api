@@ -1,8 +1,6 @@
 """Configuration for email template management system."""
 
 from dataclasses import dataclass
-from typing import Optional
-
 
 from order.enum.status import OrderStatus
 
@@ -14,7 +12,7 @@ class TemplateCategory:
     name: str  # Category name for display
     path: str  # Subdirectory path (empty string for root level)
     context_generator: str  # Method name to generate context
-    templates: dict[str, "TemplateConfig"]  # Template configurations
+    templates: dict[str, TemplateConfig]  # Template configurations
 
 
 @dataclass
@@ -161,7 +159,7 @@ class EmailTemplateConfig:
     }
 
     @classmethod
-    def get_category_for_template(cls, template_name: str) -> Optional[str]:
+    def get_category_for_template(cls, template_name: str) -> str | None:
         """
         Get category path for a template name.
 
@@ -175,7 +173,7 @@ class EmailTemplateConfig:
         if template_name in cls.TEMPLATES:
             config = cls.TEMPLATES[template_name]
             # Find category by name
-            for category_key, category in cls.CATEGORIES.items():
+            for category in cls.CATEGORIES.values():
                 if category.name == config.category_name:
                     return category.path if category.path else None
 
@@ -190,7 +188,7 @@ class EmailTemplateConfig:
     @classmethod
     def get_context_generator_for_template(
         cls, template_name: str
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Get context generator method name for a template.
 
@@ -212,9 +210,7 @@ class EmailTemplateConfig:
         return "generate_user_context"
 
     @classmethod
-    def get_template_config(
-        cls, template_name: str
-    ) -> Optional[TemplateConfig]:
+    def get_template_config(cls, template_name: str) -> TemplateConfig | None:
         """
         Get configuration for a template.
 

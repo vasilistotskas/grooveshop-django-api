@@ -192,9 +192,9 @@ class GiftCard(TimeStampMixinModel, UUIDModel):
         """Derived: the signed sum of the ledger, floored at zero."""
         total = self.transactions.aggregate(total=Sum("amount"))[
             "total"
-        ] or Decimal("0")
+        ] or Decimal(0)
         currency = self.initial_value.currency
-        return Money(max(total, Decimal("0")), currency)
+        return Money(max(total, Decimal(0)), currency)
 
     @property
     def is_expired(self) -> bool:

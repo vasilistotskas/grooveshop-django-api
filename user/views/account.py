@@ -7,14 +7,9 @@ from drf_spectacular.openapi import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
-
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
-from user.serializers.account import (
-    UserDetailsSerializer,
-    UserWriteSerializer,
-)
 from blog.filters.comment import BlogCommentFilter
 from blog.filters.post import BlogPostFilter
 from blog.serializers.comment import BlogCommentSerializer
@@ -22,7 +17,6 @@ from blog.serializers.post import BlogPostSerializer
 from core.api.permissions import IsOwnerOrAdmin
 from core.api.serializers import ErrorResponseSerializer
 from core.api.views import BaseModelViewSet
-
 from core.utils.serializers import (
     ActionConfig,
     SerializersConfig,
@@ -37,21 +31,23 @@ from product.filters.favourite import ProductFavouriteFilter
 from product.filters.review import ProductReviewFilter
 from product.serializers.favourite import ProductFavouriteSerializer
 from product.serializers.review import ProductReviewSerializer
+from tenant.membership import is_store_staff
 from user.filters import UserAddressFilter, UserSubscriptionFilter
 from user.filters.account import UserAccountFilter
 from user.models.subscription import SubscriptionTopic, UserSubscription
 from user.serializers.account import (
     DeleteAccountRequestSerializer,
     DeleteAccountResponseSerializer,
+    UserDataExportSerializer,
+    UserDetailsSerializer,
     UsernameUpdateResponseSerializer,
     UsernameUpdateSerializer,
-    UserDataExportSerializer,
     UserSubscriptionSummaryResponseSerializer,
+    UserWriteSerializer,
 )
 from user.serializers.address import UserAddressSerializer
 from user.serializers.subscription import UserSubscriptionSerializer
 from user.utils.subscription import get_user_subscription_summary
-from tenant.membership import is_store_staff
 
 User = get_user_model()
 
@@ -562,14 +558,15 @@ class UserAccountViewSet(BaseModelViewSet):
         Staff users acting on behalf of another account are exempt
         from this check.
         """
-        from allauth.account.internal.flows.reauthentication import (  # noqa: PLC0415
+        from allauth.account.internal.flows.reauthentication import (
             did_recently_authenticate,
         )
-        from user.tasks import delete_user_account_task  # noqa: PLC0415
-        from user.signals import (  # noqa: PLC0415
+
+        from user.signals import (
             _broadcast_force_logout,
             _revoke_knox_tokens,
         )
+        from user.tasks import delete_user_account_task
 
         user = self.get_object()
 

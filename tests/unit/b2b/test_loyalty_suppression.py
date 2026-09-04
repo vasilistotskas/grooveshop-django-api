@@ -35,7 +35,7 @@ def _cart_for(user):
     cart = CartFactory(user=user, num_cart_items=0)
     product = ProductFactory(
         price=Money(Decimal("100.00"), "EUR"),
-        discount_percent=Decimal("0"),
+        discount_percent=Decimal(0),
         stock=50,
         active=True,
     )

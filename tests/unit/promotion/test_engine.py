@@ -48,7 +48,7 @@ class TestAutomaticPromotions:
         cart, _ = make_cart([(40, 1), (10, 2)])  # items total 60
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
         )
 
         result = PromotionEngine.evaluate(cart)
@@ -81,7 +81,7 @@ class TestAutomaticPromotions:
         cart, _ = make_cart([(30, 1)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            min_subtotal=Money(Decimal("50"), "EUR"),
+            min_subtotal=Money(Decimal(50), "EUR"),
         )
 
         assert PromotionEngine.evaluate(cart).applied == []
@@ -131,7 +131,7 @@ class TestCodePromotions:
     def test_attached_code_applies(self, enable_promotions, make_cart):
         cart, _ = make_cart([(100, 1)])
         code = PromotionCodeFactory(
-            promotion=PromotionFactory(benefit_value=Decimal("15"))
+            promotion=PromotionFactory(benefit_value=Decimal(15))
         )
         _attach_code(cart, code)
 
@@ -159,7 +159,7 @@ class TestCodePromotions:
         PromotionRedemption.objects.create(
             promotion=promotion,
             code=code,
-            amount=Money(Decimal("5"), "EUR"),
+            amount=Money(Decimal(5), "EUR"),
         )
         _attach_code(cart, code)
 
@@ -179,7 +179,7 @@ class TestCodePromotions:
             promotion=promotion,
             code=code,
             email="shopper@example.com",
-            amount=Money(Decimal("5"), "EUR"),
+            amount=Money(Decimal(5), "EUR"),
         )
         _attach_code(cart, code)
 
@@ -196,7 +196,7 @@ class TestCodePromotions:
         PromotionRedemption.objects.create(
             promotion=promotion,
             code=code,
-            amount=Money(Decimal("5"), "EUR"),
+            amount=Money(Decimal(5), "EUR"),
         )
         _attach_code(cart, code)
 
@@ -261,7 +261,7 @@ class TestTargetScopes:
         promotion = PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             target_scope=TargetScope.PRODUCTS,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
         )
         promotion.products.add(products[0])
 
@@ -284,7 +284,7 @@ class TestTargetScopes:
         promotion = PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             target_scope=TargetScope.CATEGORIES,
-            benefit_value=Decimal("25"),
+            benefit_value=Decimal(25),
         )
         promotion.categories.add(parent)
 
@@ -301,7 +301,7 @@ class TestBenefits:
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             benefit_type=BenefitType.FIXED_AMOUNT,
-            benefit_value=Decimal("100"),
+            benefit_value=Decimal(100),
         )
 
         assert PromotionEngine.evaluate(cart).discount_total.amount == Decimal(
@@ -312,8 +312,8 @@ class TestBenefits:
         cart, _ = make_cart([(200, 1)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("50"),
-            max_discount_amount=Money(Decimal("20"), "EUR"),
+            benefit_value=Decimal(50),
+            max_discount_amount=Money(Decimal(20), "EUR"),
         )
 
         assert PromotionEngine.evaluate(cart).discount_total.amount == Decimal(
@@ -331,7 +331,7 @@ class TestBenefits:
         )
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
         )
 
         result = PromotionEngine.evaluate(cart)
@@ -348,19 +348,19 @@ class TestStacking:
         cart, _ = make_cart([(100, 1)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("10"),
+            benefit_value=Decimal(10),
             stackable=True,
         )
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             benefit_type=BenefitType.FIXED_AMOUNT,
-            benefit_value=Decimal("8"),
+            benefit_value=Decimal(8),
             stackable=True,
         )
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             benefit_type=BenefitType.FIXED_AMOUNT,
-            benefit_value=Decimal("15"),
+            benefit_value=Decimal(15),
             stackable=False,
         )
 
@@ -376,13 +376,13 @@ class TestStacking:
         cart, _ = make_cart([(100, 1)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("5"),
+            benefit_value=Decimal(5),
             stackable=True,
         )
         winner = PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             benefit_type=BenefitType.FIXED_AMOUNT,
-            benefit_value=Decimal("25"),
+            benefit_value=Decimal(25),
             stackable=False,
         )
 
@@ -397,13 +397,13 @@ class TestStacking:
         cart, _ = make_cart([(100, 1)])
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
-            benefit_value=Decimal("30"),
+            benefit_value=Decimal(30),
             stackable=True,
         )
         code = PromotionCodeFactory(
             promotion=PromotionFactory(
                 benefit_type=BenefitType.FIXED_AMOUNT,
-                benefit_value=Decimal("5"),
+                benefit_value=Decimal(5),
                 stackable=False,
             )
         )
@@ -424,13 +424,13 @@ class TestStacking:
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             benefit_type=BenefitType.FIXED_AMOUNT,
-            benefit_value=Decimal("15"),
+            benefit_value=Decimal(15),
             stackable=True,
         )
         PromotionFactory(
             trigger=PromotionTrigger.AUTOMATIC,
             benefit_type=BenefitType.FIXED_AMOUNT,
-            benefit_value=Decimal("15"),
+            benefit_value=Decimal(15),
             stackable=True,
         )
 
@@ -447,7 +447,7 @@ class TestRecord:
 
         cart, _ = make_cart([(100, 1)])
         code = PromotionCodeFactory(
-            promotion=PromotionFactory(benefit_value=Decimal("10"))
+            promotion=PromotionFactory(benefit_value=Decimal(10))
         )
         _attach_code(cart, code)
         result = PromotionEngine.evaluate(cart)

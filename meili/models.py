@@ -15,6 +15,7 @@ from meilisearch.models.task import Task, TaskInfo
 
 from meili._client import client as _client
 from meili.dataclasses import MeiliIndexSettings
+from meili.exceptions import MeiliSettingsError
 from meili.querysets import IndexQuerySet
 
 logger = logging.getLogger(__name__)
@@ -199,13 +200,21 @@ class IndexMixin(models.Model):
                 if task_uid:
                     finished = _client.wait_for_task(task_uid)
                     if finished.status == "failed":
-                        raise Exception(
+                        raise MeiliSettingsError(
                             f"Failed to update settings: {finished.error}"
                         )
             _client.flush_tasks()
 
-    def __init_subclass__(cls) -> None:
-        """Initialize Meilisearch configuration when a subclass is created."""
+    def __init_subclass__(cls) -> None:  # noqa: DJ012
+        """Initialize Meilisearch configuration when a subclass is created.
+
+        Placed next to the settings code it drives rather than hoisted
+        above the classmethods to satisfy the Django Style Guide ordering
+        (DJ012). That ordering exists to make DOMAIN MODELS scannable;
+        this is an abstract search-integration mixin with no fields, and
+        splitting `__init_subclass__` from `update_meili_settings` would
+        cost more in readability than the convention buys.
+        """
         super().__init_subclass__()
 
         # Skip abstract models
@@ -260,7 +269,14 @@ class IndexMixin(models.Model):
                 objtype = type(obj)
             return IndexQuerySet(objtype)
 
-    meilisearch = _MeilisearchDescriptor()
+    # The suppression below is deliberate. This class also carries a bare
+    # `meilisearch: IndexQuerySet` annotation near the top so type
+    # checkers know what attribute access yields; that annotation binds
+    # no value at runtime. PIE794 reads the pair as a duplicate field and
+    # its fix deletes THIS line — the one that actually installs the
+    # descriptor — which silently removes `Model.meilisearch` entirely
+    # and 500s every search endpoint.
+    meilisearch = _MeilisearchDescriptor()  # noqa: PIE794
 
     @classmethod
     def get_meilisearch_queryset(cls):

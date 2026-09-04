@@ -39,7 +39,7 @@ def _current_tenant_host() -> str | None:
     keys (the SSR cache is shared across every tenant). None on the
     public/platform schema — a platform purge is deliberately global.
     """
-    from django.db import connection  # noqa: PLC0415
+    from django.db import connection
 
     tenant = getattr(connection, "tenant", None)
     domains = getattr(tenant, "domains", None)
@@ -47,7 +47,7 @@ def _current_tenant_host() -> str | None:
         return None
     try:
         primary = domains.filter(is_primary=True).first()
-    except Exception:  # noqa: BLE001 — never fail a purge on host lookup
+    except Exception:
         return None
     return primary.domain if primary else None
 

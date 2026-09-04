@@ -190,8 +190,9 @@ class NotificationUserFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     def filter_recent_notifications(self, queryset, name, value):
         """Filter notifications from the last 7 days."""
         if value is True:
-            from django.utils import timezone
             from datetime import timedelta
+
+            from django.utils import timezone
 
             seven_days_ago = timezone.now() - timedelta(days=7)
             return queryset.filter(notification__created_at__gte=seven_days_ago)
@@ -212,7 +213,7 @@ class NotificationUserFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         if value:
             try:
                 user_ids = [
-                    int(id.strip()) for id in value.split(",") if id.strip()
+                    int(raw.strip()) for raw in value.split(",") if raw.strip()
                 ]
                 return queryset.filter(user__id__in=user_ids)
             except ValueError:
@@ -224,7 +225,7 @@ class NotificationUserFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         if value:
             try:
                 notification_ids = [
-                    int(id.strip()) for id in value.split(",") if id.strip()
+                    int(raw.strip()) for raw in value.split(",") if raw.strip()
                 ]
                 return queryset.filter(notification__id__in=notification_ids)
             except ValueError:

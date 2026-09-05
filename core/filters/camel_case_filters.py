@@ -6,6 +6,7 @@ from drf_spectacular.plumbing import build_parameter_type
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter
 
+from core.filters.core import TimeStampFilterMixin
 from core.utils.string_case import snake_to_camel
 
 
@@ -53,56 +54,19 @@ class CamelCaseFilterMixin:
         return new_data
 
 
-class CamelCaseTimeStampFilterSet(CamelCaseFilterMixin, filters.FilterSet):
-    created_after = filters.DateTimeFilter(
-        field_name="created_at",
-        lookup_expr="gte",
-        help_text="Filter items created after this date",
-    )
-    created_before = filters.DateTimeFilter(
-        field_name="created_at",
-        lookup_expr="lte",
-        help_text="Filter items created before this date",
-    )
-    updated_after = filters.DateTimeFilter(
-        field_name="updated_at",
-        lookup_expr="gte",
-        help_text="Filter items updated after this date",
-    )
-    updated_before = filters.DateTimeFilter(
-        field_name="updated_at",
-        lookup_expr="lte",
-        help_text="Filter items updated before this date",
-    )
-
+class CamelCaseTimeStampFilterSet(CamelCaseFilterMixin, TimeStampFilterMixin):
+    # The four timestamp filters come from ``TimeStampFilterMixin`` rather
+    # than being restated here. They used to be copied into both classes
+    # below, and that copy was load-bearing: the mixin was a plain class,
+    # so django-filter dropped its declarations and only the copies ever
+    # reached a request.
     class Meta:
         abstract = True
 
 
 class CamelCasePublishableTimeStampFilterSet(
-    CamelCaseFilterMixin, filters.FilterSet
+    CamelCaseFilterMixin, TimeStampFilterMixin
 ):
-    created_after = filters.DateTimeFilter(
-        field_name="created_at",
-        lookup_expr="gte",
-        help_text=_("Filter items created after this date"),
-    )
-    created_before = filters.DateTimeFilter(
-        field_name="created_at",
-        lookup_expr="lte",
-        help_text=_("Filter items created before this date"),
-    )
-    updated_after = filters.DateTimeFilter(
-        field_name="updated_at",
-        lookup_expr="gte",
-        help_text=_("Filter items updated after this date"),
-    )
-    updated_before = filters.DateTimeFilter(
-        field_name="updated_at",
-        lookup_expr="lte",
-        help_text=_("Filter items updated before this date"),
-    )
-
     is_published = filters.BooleanFilter(
         field_name="is_published",
         help_text=_("Filter by published status"),

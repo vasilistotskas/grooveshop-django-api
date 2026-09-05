@@ -3,7 +3,6 @@ from django_filters import rest_framework as filters
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import (
     MetaDataFilterMixin,
-    SoftDeleteFilterMixin,
     UUIDFilterMixin,
 )
 from product.models.category import ProductCategory
@@ -12,7 +11,6 @@ from product.models.product import Product
 
 class ProductFilter(
     UUIDFilterMixin,
-    SoftDeleteFilterMixin,
     MetaDataFilterMixin,
     CamelCaseTimeStampFilterSet,
 ):

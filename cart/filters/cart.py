@@ -8,6 +8,7 @@ from django_filters import rest_framework as filters
 
 from cart.managers.cart import abandoned_cutoff
 from cart.models import Cart
+from cart.models.item import CartItem
 from core.filters.camel_case_filters import CamelCaseTimeStampFilterSet
 from core.filters.core import UUIDFilterMixin
 
@@ -68,12 +69,16 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
     is_active = filters.BooleanFilter(
         method="filter_is_active",
         help_text=_(
-            "Filter active/abandoned carts (based on 30-day inactivity)"
+            "Filter active/abandoned carts. The window is the "
+            "CART_ABANDONED_HOURS store setting, not a fixed period."
         ),
     )
     is_abandoned = filters.BooleanFilter(
         method="filter_is_abandoned",
-        help_text=_("Filter abandoned carts (inactive for 30+ days)"),
+        help_text=_(
+            "Filter abandoned carts — idle longer than the "
+            "CART_ABANDONED_HOURS store setting."
+        ),
     )
     days_inactive = filters.NumberFilter(
         method="filter_days_inactive",
@@ -267,10 +272,20 @@ class CartFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
         """
         if value is None:
             return queryset
-        discounted = {
-            "items__product__discount_percent__gt": 0,
-            "items__product__price__gt": 0,
-        }
+        # A subquery, not `exclude(**discounted)`. Django documents that
+        # "the conditions in a single exclude() call will not
+        # necessarily refer to the same item" for a multi-valued
+        # relationship — only `filter()` guarantees that. So a cart with
+        # one item priced 0 at 10% off and another priced 20 at 0% off
+        # satisfied both conditions across DIFFERENT items and was
+        # excluded, though no single item is actually discounted.
+        # Verified: the cart above does not appear in
+        # `?hasDiscounts=false`. `Product.price` defaults to zero and
+        # the pairing is not a database constraint, so the mixed cart is
+        # reachable.
+        discounted_items = CartItem.objects.filter(
+            product__discount_percent__gt=0, product__price__gt=0
+        )
         if value:
-            return queryset.filter(**discounted).distinct()
-        return queryset.exclude(**discounted).distinct()
+            return queryset.filter(items__in=discounted_items).distinct()
+        return queryset.exclude(items__in=discounted_items).distinct()

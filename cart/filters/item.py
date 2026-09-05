@@ -120,11 +120,17 @@ class CartItemFilter(UUIDFilterMixin, CamelCaseTimeStampFilterSet):
 
     in_active_carts = filters.BooleanFilter(
         method="filter_active_carts",
-        help_text=_("Filter items in active carts (24hr)"),
+        help_text=_(
+            "Filter items in active carts — idle no longer than the "
+            "CART_ABANDONED_HOURS store setting."
+        ),
     )
     in_abandoned_carts = filters.BooleanFilter(
         method="filter_abandoned_carts",
-        help_text=_("Filter items in abandoned carts (30+ days)"),
+        help_text=_(
+            "Filter items in abandoned carts — idle longer than the "
+            "CART_ABANDONED_HOURS store setting."
+        ),
     )
     cart_last_activity_after = filters.DateTimeFilter(
         field_name="cart__last_activity",

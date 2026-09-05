@@ -180,17 +180,35 @@ class Command(BaseCommand):
             )
 
         prefix = "[dry-run] " if report.dry_run else ""
+        # ``*_headline``, not ``total_*``: a dry run deletes nothing, so
+        # the deleted totals are always 0 and every dry run printed
+        # "[dry-run] Purged 0 Django".
+        headline = (
+            f"{prefix}Purged {report.django_headline} Django + "
+            f"{report.nuxt_headline} Nuxt + {report.total_gateway} feed "
+            f"keys across {len(report.surfaces)} surface(s)"
+        )
+        # A failed purge must not print in green. The per-surface lines
+        # below carry the error text; this is what a human reads first,
+        # and an exit code is what a cron job reads.
+        failed = report.failed_surfaces
         self.stdout.write(
-            self.style.SUCCESS(
-                f"{prefix}Purged {report.total_django} Django + "
-                f"{report.total_nuxt} Nuxt + {report.total_gateway} feed "
-                f"keys across {len(report.surfaces)} surface(s)"
-            )
+            self.style.ERROR(headline)
+            if failed
+            else self.style.SUCCESS(headline)
         )
         for surface in report.surfaces:
+            django_n = (
+                surface.django_matched
+                if report.dry_run
+                else surface.django_deleted
+            )
+            nuxt_n = (
+                surface.nuxt_matched if report.dry_run else surface.nuxt_deleted
+            )
             line = (
-                f"  {surface.code:25} django={surface.django_deleted}"
-                f" nuxt={surface.nuxt_deleted}"
+                f"  {surface.code:25} django={django_n}"
+                f" nuxt={nuxt_n}"
                 f" blocked={surface.django_blocked + surface.nuxt_blocked}"
             )
             if surface.gateway_removed or surface.gateway_error:
@@ -202,6 +220,16 @@ class Command(BaseCommand):
             if surface.gateway_error:
                 line += f" gateway_error={surface.gateway_error}"
             self.stdout.write(line)
+
+        if failed:
+            # Exit non-zero. This command is run from cron and from
+            # deploy scripts, where a zero exit is the only signal
+            # anything reads — and it used to be zero even when every
+            # surface had failed.
+            raise CommandError(
+                f"Cache purge failed for {len(failed)} surface(s): "
+                + ", ".join(s.code for s in failed)
+            )
 
     def _list_surfaces(self) -> None:
         from core.cache.registry import iter_surfaces

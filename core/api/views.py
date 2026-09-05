@@ -13,7 +13,7 @@ from drf_spectacular.utils import (
     extend_schema_view,
 )
 from redis import Redis, RedisError
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.decorators import (
     action,
     api_view,
@@ -125,6 +125,9 @@ class RequestResponseSerializerMixin:
                 "Ensure the view has a valid action or define serializer_class."
             )
 
+        if current_action == "metadata":
+            return self._metadata_serializer_class()
+
         cfg = self.serializers_config.get(current_action)
         if cfg:
             if cfg.response is not None:
@@ -140,6 +143,57 @@ class RequestResponseSerializerMixin:
             f"Define {self.__class__.__name__}.serializers_config['{current_action}'] or set {self.__class__.__name__}.serializer_class, "
             f"or override {self.__class__.__name__}.get_serializer_class()."
         )
+
+    # OPTIONS. ``ViewSetMixin.initialize_request`` sets ``action`` to
+    # "metadata", which is never a key in ``serializers_config`` — so
+    # the lookup below fell through to ``ImproperlyConfigured`` and every
+    # route this base class serves answered **500** to an authenticated
+    # OPTIONS request. Anonymous callers saw a clean 200 because DRF's
+    # permission check on the cloned request fails first and is caught,
+    # which is why CORS preflights never surfaced it.
+    #
+    # ``SimpleMetadata.determine_actions`` clones the request once per
+    # writable method and calls ``view.get_serializer()`` OUTSIDE its
+    # ``try``, so the cloned method is what the caller is really asking
+    # about — and answering with that method's WRITE serializer is what
+    # OPTIONS is for: the fields you may send.
+    _METADATA_METHOD_ACTIONS = {
+        "POST": "create",
+        "PUT": "update",
+        "PATCH": "partial_update",
+    }
+
+    def _metadata_serializer_class(self):
+        """The serializer OPTIONS should describe. Never raises.
+
+        A 500 is never the right answer to OPTIONS: it is a discovery
+        request, and a viewset with nothing writable simply has no
+        fields to report.
+        """
+        method = getattr(getattr(self, "request", None), "method", None)
+        candidates = [
+            self._METADATA_METHOD_ACTIONS.get(method),
+            "create",
+            "update",
+            "retrieve",
+            "list",
+        ]
+        for candidate in candidates:
+            cfg = self.serializers_config.get(candidate) if candidate else None
+            if cfg is None:
+                continue
+            if cfg.request is not None:
+                return cfg.request
+            if cfg.response is not None:
+                return cfg.response
+
+        if (
+            hasattr(self, "serializer_class")
+            and self.serializer_class is not None
+        ):
+            return self.serializer_class
+
+        return serializers.Serializer
 
     def get_request_serializer(self, *args, **kwargs):
         """

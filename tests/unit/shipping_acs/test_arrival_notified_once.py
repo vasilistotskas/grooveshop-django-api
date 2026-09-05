@@ -130,3 +130,47 @@ def test_the_state_still_follows_acs_backwards(shipment, monkeypatch):
 def test_the_marker_is_not_written_when_nothing_was_sent(shipment):
     """A poll that never reaches OUT_FOR_DELIVERY must leave it null."""
     assert AcsShipment.objects.get(pk=shipment.pk).arrival_notified_at is None
+
+
+def test_a_failed_broker_handoff_leaves_the_notification_retryable(
+    shipment, monkeypatch
+):
+    """The mark must not outlive a publish that never happened.
+
+    A DB write and a broker publish cannot be made atomic without an
+    outbox. Marking first risks a permanent silent miss —
+    `task_publish_retry` is on but spends only ~0.6s, so an outage
+    longer than that loses the message while the committed marker stops
+    every later poll from trying again. Marking second risks at most one
+    duplicate, which `acs_send_arrival_notification` documents as
+    acceptable.
+    """
+    monkeypatch.setattr(
+        services, "AcsClient", _client_returning(["4", "3", "4"])
+    )
+
+    def _broker_down(*args, **kwargs):
+        raise OSError("broker unreachable")
+
+    # `tests/conftest.py` runs on_commit callbacks immediately and
+    # swallows their exceptions, mirroring `on_commit(robust=True)`, so
+    # the OSError is not observable here — the marker is.
+    with patch(
+        "shipping_acs.tasks.acs_send_arrival_notification.delay",
+        side_effect=_broker_down,
+    ):
+        AcsService.poll_shipment_tracking(shipment)
+
+    shipment.refresh_from_db()
+    assert shipment.arrival_notified_at is None, (
+        "the customer was never told, so nothing may claim they were"
+    )
+
+    # The next depot cycle back out for delivery still notifies.
+    with patch(
+        "shipping_acs.tasks.acs_send_arrival_notification.delay"
+    ) as notify:
+        for _ in range(2):
+            AcsService.poll_shipment_tracking(shipment)
+
+    notify.assert_called_once_with(shipment.id)

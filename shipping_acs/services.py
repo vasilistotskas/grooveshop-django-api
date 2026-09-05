@@ -2012,9 +2012,22 @@ class AcsService:
         OUT_FOR_DELIVERY → AT_DESTINATION → OUT_FOR_DELIVERY and
         notified twice. Reproduced with exactly that sequence.
 
-        ``arrival_notified_at`` is written under the caller's lock and
-        the dispatch is registered on commit, so a rolled-back poll
-        neither marks nor sends.
+        The mark is written AFTER the publish succeeds, not before it.
+        A DB write and a broker publish cannot be made atomic without an
+        outbox, so one of two failures has to be chosen. Marking first
+        risks a permanent SILENT MISS: `task_publish_retry` is on but
+        spends only ~0.6s, so a broker outage longer than that loses the
+        message while the committed marker stops every later poll from
+        ever trying again. Marking second risks at most ONE duplicate,
+        if the publish lands and the mark then fails — and
+        `acs_send_arrival_notification` says outright that "both calls
+        are idempotent enough for duplicate delivery to be acceptable".
+        The bug being fixed here was SYSTEMATIC duplication on every
+        depot cycle, which is a different thing from tolerating one.
+
+        Both run in `on_commit`, so a rolled-back poll neither marks nor
+        sends. The `arrival_notified_at__isnull=True` predicate on the
+        update keeps it idempotent.
         """
         if (
             new_state != AcsShipmentState.OUT_FOR_DELIVERY
@@ -2025,11 +2038,15 @@ class AcsService:
 
         from shipping_acs.tasks import acs_send_arrival_notification
 
-        shipment.arrival_notified_at = timezone.now()
-        shipment.save(update_fields=["arrival_notified_at"])
-        transaction.on_commit(
-            lambda: acs_send_arrival_notification.delay(shipment.id)
-        )
+        shipment_pk = shipment.pk
+
+        def _dispatch_then_mark() -> None:
+            acs_send_arrival_notification.delay(shipment_pk)
+            AcsShipment.objects.filter(
+                pk=shipment_pk, arrival_notified_at__isnull=True
+            ).update(arrival_notified_at=timezone.now())
+
+        transaction.on_commit(_dispatch_then_mark)
 
 
 def _to_decimal(value: Any) -> Decimal | None:

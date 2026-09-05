@@ -416,6 +416,8 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     its ``buyer_snapshot`` — that snapshot is a legal document and
     cannot be scrubbed retroactively without invalidating the invoice.
     """
+    from allauth.mfa.models import Authenticator
+    from allauth.usersessions.models import UserSession
     from knox.models import AuthToken
 
     from order.models.order import Order
@@ -473,31 +475,18 @@ def anonymise_and_delete_user(user) -> dict[str, int]:
     except Exception:
         logger.exception("Failed to purge allauth records for user %s", user.pk)
 
-    # Only ImportError is tolerated: it means the optional allauth app is
-    # not installed, so there is nothing of that kind to erase. A failure
-    # of the DELETE itself must NOT be swallowed — this function documents
-    # that "a failure halfway through leaves the user intact", and it goes
-    # on to log "GDPR deletion complete". Swallowing turned that line into
-    # a claim of erasure for records that are still there.
-    try:
-        from allauth.mfa.models import Authenticator
-    except ImportError:
-        logger.debug("allauth.mfa not installed — no authenticators to erase")
-    else:
-        counts["authenticators"] = Authenticator.objects.filter(
-            user=user
-        ).delete()[0]
-
-    try:
-        from allauth.usersessions.models import UserSession
-    except ImportError:
-        logger.debug(
-            "allauth.usersessions not installed — no sessions to erase"
-        )
-    else:
-        counts["user_sessions"] = UserSession.objects.filter(
-            user=user
-        ).delete()[0]
+    # allauth is a declared runtime dependency and all four of its apps
+    # (account, socialaccount, mfa, usersessions) are unconditionally in
+    # INSTALLED_APPS, so these imports cannot fail — the process would
+    # not have started. The ImportError guards that stood here described
+    # a supported configuration that does not exist, and the `else:`
+    # shape hid the deletes one level deeper than the rest of the
+    # function. A DELETE failure still must not be swallowed: it
+    # propagates, the atomic rolls back, and the account stays intact.
+    counts["authenticators"] = Authenticator.objects.filter(user=user).delete()[
+        0
+    ]
+    counts["user_sessions"] = UserSession.objects.filter(user=user).delete()[0]
 
     user_id = user.id
     user.delete()

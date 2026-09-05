@@ -18,10 +18,14 @@ class bodies — the duplication was load-bearing.
 Deleted rather than repaired, because the layer cannot express them:
 
 * ``SoftDeleteFilterMixin`` — ``is_deleted`` / ``include_deleted`` /
-  ``deleted_after`` / ``deleted_before``. The soft-delete managers
-  exclude deleted rows in ``get_queryset()``, so by the time a filter
-  runs the rows are already gone and none of the four can match.
-  ``filter_include_deleted`` tried to widen with
+  ``deleted_after`` / ``deleted_before``. The VIEW has already excluded
+  deleted rows before a filter runs: ``ProductViewSet.get_queryset``
+  goes through ``for_list()`` (which calls ``.active()``) and
+  ``for_detail()`` (which calls ``.exclude_deleted()``), so none of the
+  four can match. Note it is the view and not the manager that does
+  this — ``Product.objects.all()`` emits no WHERE clause at all, and
+  ``ProductManager`` is a ``TranslatableOptimizedManager``, not a
+  ``SoftDeleteManager``. ``filter_include_deleted`` tried to widen with
   ``queryset.model.objects.all_with_deleted()``, which (a) discards
   every filter applied before it and (b) does not exist on
   ``ProductManager`` — the only model that used the mixin — so it would

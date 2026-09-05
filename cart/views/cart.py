@@ -556,9 +556,19 @@ class CartViewSet(BaseModelViewSet):
         if not request_serializer.is_valid():
             # `{"detail": ...}` rather than DRF's field-keyed default,
             # because that is the shape every other error on this action
-            # already returns and the shape the storefront reads.
+            # already returns and the shape the storefront reads. The
+            # message is the serializer's own, not a fixed string: a
+            # list of 101 valid integers is not "a list of integers"
+            # problem, and telling the caller it is sends them looking
+            # in the wrong place.
+            errors = request_serializer.errors.get("reservation_ids") or []
+            detail = (
+                str(errors[0])
+                if errors
+                else "reservation_ids must be a list of integers"
+            )
             return Response(
-                {"detail": "reservation_ids must be a list of integers"},
+                {"detail": detail},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         reservation_ids = request_serializer.validated_data["reservation_ids"]

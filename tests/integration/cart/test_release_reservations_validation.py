@@ -62,9 +62,27 @@ class ReleaseReservationsValidationTest(TestURLFixerMixin, APITestCase):
         assert response.status_code == 400, response.status_code
 
     def test_a_list_at_the_limit_is_still_accepted(self):
+        """200, not merely "not 400".
+
+        `!= 400` would also pass on a 500 or a 403, so it would hide a
+        broken endpoint rather than catch one. Ids matching nothing are
+        not an error here — the action releases what the caller owns and
+        reports the count.
+        """
         response = self.client.post(
             self.url,
             {"reservationIds": list(range(1, MAX_RELEASE_RESERVATION_IDS + 1))},
             format="json",
         )
-        assert response.status_code != 400, response.status_code
+        assert response.status_code == 200, response.status_code
+
+    def test_the_refusal_says_what_was_actually_wrong(self):
+        """A list of 101 valid integers is not "not a list of integers"."""
+        response = self.client.post(
+            self.url,
+            {"reservationIds": list(range(1, MAX_RELEASE_RESERVATION_IDS + 2))},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert "no more than" in response.data["detail"], response.data

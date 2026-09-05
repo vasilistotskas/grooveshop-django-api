@@ -187,6 +187,17 @@ serializers_config: SerializersConfig = {
 }
 
 
+# ``crud_config`` emits a "create" entry because ``write=`` also drives
+# update/partial_update, which ARE routed. Creation is not: accounts are
+# made by allauth's headless signup (``/_allauth/app/v1/auth/signup``),
+# which hashes the password, writes the ``EmailAddress`` row allauth
+# treats as the source of truth for an address, sends the verification
+# mail and applies the signup rate limit. A second create path here did
+# none of that. Dropping the key keeps the OpenAPI schema honest about
+# an endpoint the URLconf does not route.
+del serializers_config["create"]
+
+
 @extend_schema_view(
     **create_schema_view_config(
         model_class=User,

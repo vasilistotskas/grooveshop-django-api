@@ -66,22 +66,23 @@ class UserWriteSerializer(UserSerializer):
             "bio",
             "language_code",
         )
+        # "email" repeats the base class's entry because naming
+        # ``read_only_fields`` here REPLACES it rather than extending it.
+        # Changing the primary address must go through allauth's
+        # email-management flow, which sends a verification link and
+        # updates the ``EmailAddress`` table allauth treats as the
+        # source of truth; a profile PUT/PATCH must not silently change
+        # it. This used to be conditional on ``self.instance is None``
+        # so that the account-create endpoint could set it — that
+        # endpoint is gone (see ``user/views/account.py``), and this
+        # serializer only ever serves update/partial_update, so the
+        # condition could no longer be false.
         read_only_fields = (
+            "email",
             "created_at",
             "updated_at",
             "uuid",
         )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Email is settable at registration (create) but read-only afterwards.
-        # Changing the primary email must go through allauth's email-management
-        # flow, which sends a verification link and updates the EmailAddress
-        # source-of-truth; a plain profile PUT/PATCH must not silently change
-        # it (that would bypass verification and desync allauth's EmailAddress
-        # table).
-        if self.instance is not None and "email" in self.fields:
-            self.fields["email"].read_only = True
 
     def validate_language_code(self, value: str) -> str:
         if not value:

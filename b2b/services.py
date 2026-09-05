@@ -162,15 +162,17 @@ class B2BService:
         an admin decides either way. The check runs BEFORE the row lock
         below so a 5s upstream timeout never holds a transaction open.
         """
+        # An unlocked read, used ONLY to decide whether to spend a VIES
+        # call. Every decision that depends on it is re-derived from the
+        # locked row below, because this read is separated from that
+        # lock by an outbound HTTP request.
         existing = BusinessProfile.objects.filter(user=user).first()
-        previous_status = existing.status if existing else None
-        identity_changed = existing is None or any(
-            getattr(existing, field) != data.get(field, "")
-            for field in cls.IDENTITY_FIELDS
-        )
-
         needs_vies = (
-            identity_changed
+            existing is None
+            or any(
+                getattr(existing, field) != data.get(field, "")
+                for field in cls.IDENTITY_FIELDS
+            )
             or existing.vies_status
             in (ViesStatus.UNCHECKED, ViesStatus.UNAVAILABLE)
             or existing.vies_checked_at is None
@@ -185,7 +187,7 @@ class B2BService:
             # get_or_create + row lock: two concurrent first-time PUTs
             # otherwise both pass a filter().first() check and the loser
             # 500s on the OneToOne constraint.
-            profile, _created = (
+            profile, created = (
                 BusinessProfile.objects.select_for_update().get_or_create(
                     user=user,
                     defaults={
@@ -194,6 +196,23 @@ class B2BService:
                     },
                 )
             )
+
+            # Re-derived from the LOCKED row, not from the read above.
+            # That read happened before a VIES call the docstring
+            # deliberately keeps outside the transaction — up to a
+            # five-second window in which the status can change under
+            # us. Judging on the stale value, a merchant who suspended
+            # this account during the window had the suspension lifted
+            # by the customer's own edit, which is exactly what
+            # "SUSPENDED stays SUSPENDED" is there to prevent; and an
+            # approval landing in the window let an identity change slip
+            # past re-review.
+            previous_status = None if created else profile.status
+            identity_changed = created or any(
+                getattr(profile, field) != data.get(field, "")
+                for field in cls.IDENTITY_FIELDS
+            )
+
             for field in (
                 *cls.IDENTITY_FIELDS,
                 "billing_street",
@@ -454,6 +473,63 @@ class B2BPricingService:
             final=Money(final_amount, currency),
         )
 
+    @staticmethod
+    def _usable_override(item) -> Decimal | None:
+        """The override's amount, or None if the row cannot be honoured.
+
+        Two ways a row cannot be honoured.
+
+        **Wrong currency.** ``resolve`` works entirely in
+        ``DEFAULT_CURRENCY`` — it reads ``product.price.amount`` and
+        stamps that currency on the result — so taking ``.amount`` off a
+        row in another currency would apply it at 1:1. Quietly charging
+        a wholesale customer a dollar figure in euros is worse than
+        falling back to the group's discount percent.
+
+        **Negative amount.** ``resolve`` clamps a final price from above
+        (at retail) and from nowhere else, so a negative net passes
+        straight into the line total and adding the product makes the
+        order cheaper.
+
+        The field's ``currency_choices`` and ``MinMoneyValidator`` close
+        the admin form, but both are form-layer only —
+        ``objects.create`` and ``update_or_create`` bypass validators
+        entirely — and rows written before them are still on disk. This
+        is the enforcement point that every read passes through.
+        """
+        if item is None:
+            return None
+
+        currency = str(item.net_price.currency)
+        if currency != settings.DEFAULT_CURRENCY:
+            logger.error(
+                "b2b: ignoring price override %s (group=%s product=%s) — "
+                "currency %s is not %s and the resolver cannot convert; "
+                "falling back to the group discount",
+                item.pk,
+                item.group_id,
+                item.product_id,
+                currency,
+                settings.DEFAULT_CURRENCY,
+            )
+            return None
+
+        amount = item.net_price.amount
+        if amount < 0:
+            logger.error(
+                "b2b: ignoring price override %s (group=%s product=%s) — "
+                "net price %s is negative, which would make the order "
+                "cheaper for adding the product; falling back to the "
+                "group discount",
+                item.pk,
+                item.group_id,
+                item.product_id,
+                amount,
+            )
+            return None
+
+        return amount
+
     @classmethod
     def resolve_single(cls, product, group: CustomerGroup) -> ResolvedPrice:
         """Resolve ONE product (its own override lookup) — the lazy
@@ -464,7 +540,7 @@ class B2BPricingService:
         return cls.resolve(
             product,
             group,
-            override_net=item.net_price.amount if item else None,
+            override_net=cls._usable_override(item),
         )
 
     @classmethod
@@ -472,12 +548,13 @@ class B2BPricingService:
         cls, products, group: CustomerGroup
     ) -> dict[int, ResolvedPrice]:
         products = list(products)
-        overrides = {
-            item.product_id: item.net_price.amount
-            for item in PriceListItem.objects.filter(
-                group=group, product_id__in=[p.pk for p in products]
-            )
-        }
+        overrides = {}
+        for item in PriceListItem.objects.filter(
+            group=group, product_id__in=[p.pk for p in products]
+        ):
+            amount = cls._usable_override(item)
+            if amount is not None:
+                overrides[item.product_id] = amount
         return {
             product.pk: cls.resolve(
                 product, group, override_net=overrides.get(product.pk)

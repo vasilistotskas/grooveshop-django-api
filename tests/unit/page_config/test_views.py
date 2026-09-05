@@ -112,18 +112,24 @@ class TestPageLayoutAdminViewSet(TestCase):
             is_active=True,
         )
 
-        # Bind the tenant to the active connection so
-        # ``HasTenantAccess`` sees it via ``get_current_tenant``. We
-        # restore the previous value in ``tearDown`` so other tests
-        # in the same module aren't affected.
+        # `set_tenant()`, NOT `connection.tenant = ...`.
+        # `connection.tenant` and `connection.schema_name` are two
+        # independent attributes on django-tenants' DatabaseWrapper, kept
+        # in step only by `set_tenant()`. Assigning the first directly
+        # restores `tenant` on teardown while `schema_name` stays pointed
+        # at THIS test's tenant for the rest of the worker's session — so
+        # a later test in that worker reads and writes a different
+        # schema's tables than it thinks. `tests/unit/agent/
+        # test_agent_api.py` documents the same trap and the ten errors
+        # it caused there.
         self._previous_tenant = getattr(connection, "tenant", None)
-        connection.tenant = self.tenant
+        connection.set_tenant(self.tenant)
 
     def tearDown(self):
-        try:
-            connection.tenant = self._previous_tenant
-        except AttributeError:
-            pass
+        if self._previous_tenant is not None:
+            connection.set_tenant(self._previous_tenant)
+        else:
+            connection.set_schema_to_public()
 
     def test_list(self):
         PageLayout.objects.create(page_type="home", title="Homepage")

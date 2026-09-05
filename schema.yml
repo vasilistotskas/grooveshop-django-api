@@ -16233,8 +16233,8 @@ paths:
         αυτές τις παραμέτρους στο UUID της παραγγελίας ώστε το κατάστημα να μπορεί
         να προωθήσει τον πελάτη στη διαδρομή ``/checkout/success/{uuid}``. Το ``t``
         επιλύεται μέσω του ``payment_id`` (ορίζεται από το webhook, ενδέχεται να καθυστερεί
-        σε σχέση με την ανακατεύθυνση)· το ``s`` επιλύεται μέσω του ``viva_order_code``
-        που αποθηκεύεται κατά τη δημιουργία της συνεδρίας, οπότε λειτουργεί και κατά
+        σε σχέση με την ανακατεύθυνση)· το ``s`` επιλύεται μέσω των ``viva_order_codes``
+        που αποθηκεύονται κατά τη δημιουργία της συνεδρίας, οπότε λειτουργεί και κατά
         τη διάρκεια της κούρσας με το webhook. Η πρόσβαση είναι ανοιχτή επειδή και
         τα δύο κλειδιά είναι μη μαντέψιμα αναγνωριστικά που παράγει το Viva και η
         απόκριση δεν φέρει προσωπικά δεδομένα — μόνο το UUID, το δημόσιο id, την κατάσταση
@@ -40898,7 +40898,7 @@ components:
         username:
           nullable: true
           title: Όνομα χρήστη
-          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+          description: Required. 30 characters or fewer. Letters, digits and @/./+/-/_
             only.
           oneOf:
           - type: string
@@ -43977,7 +43977,8 @@ components:
           type: array
           items:
             type: integer
-          description: Λίστα ID δεσμεύσεων προς απελευθέρωση
+          description: List of reservation IDs to release (at most 100)
+          maxItems: 100
       required:
       - reservationIds
     ReleaseReservationsResponse:
@@ -45620,7 +45621,7 @@ components:
         username:
           nullable: true
           title: Όνομα χρήστη
-          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+          description: Required. 30 characters or fewer. Letters, digits and @/./+/-/_
             only.
           oneOf:
           - type: string
@@ -45895,7 +45896,7 @@ components:
         username:
           nullable: true
           title: Όνομα χρήστη
-          description: Required. 30 characters or fewer.Letters, digits and @/./+/-/_
+          description: Required. 30 characters or fewer. Letters, digits and @/./+/-/_
             only.
           oneOf:
           - type: string

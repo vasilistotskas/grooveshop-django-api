@@ -13,7 +13,7 @@ import logging
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -202,6 +202,26 @@ class GiftCardService:
                         "(inactive, expired or empty)."
                     )
                     % {"code": card.code},
+                )
+            # A card's balance is denominated in its OWN currency, and
+            # the plan below compares raw Decimals. Without this, a $100
+            # card settled a EUR 100 order one-for-one and extinguished
+            # EUR 100 of liability against roughly EUR 92 of instrument.
+            # There is no FX rate anywhere in this codebase to convert
+            # with, and inventing 1:1 silently is the worst of the
+            # options — so refuse, and say which card.
+            if card.balance.currency != currency:
+                raise GiftCardError(
+                    "gift_card_currency_mismatch",
+                    _(
+                        "Gift card %(code)s is in %(card_currency)s and "
+                        "cannot pay for a %(order_currency)s order."
+                    )
+                    % {
+                        "code": card.code,
+                        "card_currency": card.balance.currency,
+                        "order_currency": currency,
+                    },
                 )
 
         due = Decimal(amount_due.amount)
@@ -394,12 +414,28 @@ class GiftCardService:
     # ── refunds ────────────────────────────────────────────────────
 
     @classmethod
-    def credit_refund(cls, order) -> Decimal:
-        """Return the gift-card-settled portion of a refunded order to
-        the source card(s). Idempotent per order: the partial unique
-        constraint on (gift_card, order) for REFUND_CREDIT rows makes
-        a racing duplicate insert impossible — the loser skips the
-        card instead of double-crediting it."""
+    def credit_refund(cls, order, amount: Decimal | None = None) -> Decimal:
+        """Return the refunded gift-card value to the source card(s).
+
+        *amount* is how much was actually refunded. ``None`` means a FULL
+        refund and credits the whole redeemed value — which is what this
+        method used to do unconditionally, for partial refunds too. A
+        €100 order settled with a €60 gift card and then refunded €5 put
+        the entire €60 back on the card, immediately spendable, while the
+        shopper kept the goods. Money out of nothing, once per order.
+
+        A partial refund is shared across the order's cards in proportion
+        to what each contributed, so no card is credited more than it
+        gave and the total never exceeds *amount*. Rounding is absorbed
+        by the last card, so the parts always sum to the whole.
+
+        Idempotent per order: the partial unique constraint on
+        (gift_card, order) for REFUND_CREDIT rows makes a racing
+        duplicate insert impossible — the loser skips the card instead of
+        double-crediting it. That also means a LATER, larger refund on
+        the same order cannot top up a card already credited; an operator
+        adjusts the balance directly for that.
+        """
         from django.db import IntegrityError, transaction
 
         redeems = GiftCardTransaction.objects.filter(
@@ -410,24 +446,96 @@ class GiftCardService:
                 order=order, kind=GiftCardTransactionKind.REFUND_CREDIT
             ).values_list("gift_card_id", flat=True)
         )
+        # `redeem.amount` is negative (a debit), so this is what each
+        # card actually contributed.
+        contributions = [(r, -r.amount) for r in redeems]
+        redeemed_total = sum((c for _, c in contributions), Decimal(0))
+
+        if amount is None or amount >= redeemed_total:
+            shares = dict(contributions)
+        else:
+            shares = cls._split_refund(contributions, max(amount, Decimal(0)))
+
         credited = Decimal(0)
-        for redeem in redeems:
+        remaining_cards = [r for r, _ in contributions]
+        for redeem in remaining_cards:
             if redeem.gift_card_id in already:
+                continue
+            share = shares.get(redeem, Decimal(0))
+            if share <= 0:
                 continue
             try:
                 with transaction.atomic():
                     GiftCardTransaction.objects.create(
                         gift_card=redeem.gift_card,
                         kind=GiftCardTransactionKind.REFUND_CREDIT,
-                        amount=-redeem.amount,  # redeem rows are negative
+                        amount=share,
                         order=order,
                         description=f"Refund of order #{order.id}",
                     )
+                    cls._keep_refund_spendable(redeem.gift_card)
             except IntegrityError:
                 # A concurrent refund task credited this card first.
                 continue
-            credited += -redeem.amount
+            credited += share
         return credited
+
+    @classmethod
+    def _keep_refund_spendable(cls, card) -> None:
+        """Give a lapsed card a fresh window when money returns to it.
+
+        A card can expire while its value is sitting on an order that is
+        refunded later. The credit then landed on a card that
+        `plan_redemption` refuses (`is_redeemable` is False) and that
+        `expire_cards` reclaims on its next run — matching ACTIVE,
+        past-`expires_at`, balance now positive. The customer's refund
+        was destroyed within a day, and the only trace was
+        "Expired N gift cards" while the refund task had reported
+        success.
+
+        Refunding money and then confiscating it is not a defensible
+        outcome under any expiry policy, so the card gets the same
+        window a newly issued one gets, counted from now.
+        """
+        if card.expires_at is None or card.expires_at > timezone.now():
+            return
+        fresh = cls.default_expiry()
+        if fresh is None:
+            return
+        previous = card.expires_at
+        card.expires_at = fresh
+        card.save(update_fields=["expires_at"])
+        logger.info(
+            "Gift card %s had expired at %s; extended to %s so the "
+            "refund credited to it stays spendable",
+            card.code,
+            previous,
+            fresh,
+        )
+
+    @staticmethod
+    def _split_refund(contributions, amount: Decimal) -> dict:
+        """Share *amount* across cards in proportion to what each gave.
+
+        The last card absorbs the rounding remainder, so the shares
+        always sum to *amount* exactly rather than to a cent less.
+        """
+        total = sum((c for _, c in contributions), Decimal(0))
+        if total <= 0:
+            return {}
+
+        cent = Decimal("0.01")
+        shares: dict = {}
+        allocated = Decimal(0)
+        for redeem, contributed in contributions[:-1]:
+            share = (amount * contributed / total).quantize(
+                cent, rounding=ROUND_HALF_UP
+            )
+            shares[redeem] = share
+            allocated += share
+        last_redeem, _ = contributions[-1]
+        shares[last_redeem] = amount - allocated
+        return shares
 
     # ── expiry ─────────────────────────────────────────────────────
 

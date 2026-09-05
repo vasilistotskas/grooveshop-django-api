@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.db import models
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import extend_schema_view
 from rest_framework import status
@@ -19,7 +18,6 @@ from core.utils.serializers import (
 )
 from order.enum.status import OrderStatus
 from order.models.item import OrderItem
-from product.enum.review import ReviewStatus
 from product.filters.review import ProductReviewFilter
 from product.models.review import ProductReview
 from product.serializers.product import ProductSerializer
@@ -28,7 +26,6 @@ from product.serializers.review import (
     ProductReviewSerializer,
     ProductReviewWriteSerializer,
 )
-from tenant.membership import is_store_staff
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -96,16 +93,7 @@ class ProductReviewViewSet(BaseModelViewSet):
         else:
             queryset = ProductReview.objects.for_detail()
 
-        if is_store_staff(self.request.user):
-            return queryset
-
-        if self.request.user.is_authenticated:
-            return queryset.filter(
-                models.Q(status=ReviewStatus.TRUE)
-                | models.Q(user=self.request.user)
-            )
-        else:
-            return queryset.filter(status=ReviewStatus.TRUE)
+        return queryset.visible_to(self.request.user)
 
     def get_permissions(self):
         from tenant.permissions import (

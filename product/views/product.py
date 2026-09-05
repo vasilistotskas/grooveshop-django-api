@@ -24,6 +24,7 @@ from core.utils.serializers import (
 )
 from product.filters.product import ProductFilter
 from product.models.product import Product
+from product.models.review import ProductReview
 from product.serializers.image import ProductImageSerializer
 from product.serializers.product import (
     ProductDetailSerializer,
@@ -33,6 +34,7 @@ from product.serializers.product import (
 from product.serializers.review import ProductReviewSerializer
 from product.serializers.variant import ProductVariantsResponseSerializer
 from tag.serializers.tag import TagSerializer
+from tenant.membership import is_store_staff
 
 serializers_config: SerializersConfig = {
     **crud_config(
@@ -219,11 +221,17 @@ class ProductViewSet(BaseModelViewSet):
         """
         if self.action == "list":
             queryset = Product.objects.for_list()
-        elif self.action in ["reviews", "images", "tags", "variants"]:
-            # For action endpoints, we just need the product itself
-            queryset = Product.objects.for_detail()
         else:
+            # ``for_detail()`` deliberately does not filter on ``active``
+            # — its docstring says so, because staff must be able to open
+            # any product by id. This view is ``AllowAny``, so without
+            # the scoping below that made every unreleased draft
+            # readable: name, price and SEO copy, at a sequential id.
+            # ``for_list()`` has always applied ``.active()``; only the
+            # detail path was open.
             queryset = Product.objects.for_detail()
+            if not is_store_staff(self.request.user):
+                queryset = queryset.active()
 
         # Add availability priority annotation for ordering
         queryset = queryset.annotate(
@@ -264,15 +272,24 @@ class ProductViewSet(BaseModelViewSet):
         methods=["GET"],
     )
     def reviews(self, request, pk=None):
-        product = get_object_or_404(Product, pk=pk)
-        # select_related("user") avoids N+1 for UserDetailsSerializer.
+        # ``self.get_object()``, not ``get_object_or_404(Product, pk=pk)``:
+        # the latter bypasses ``get_queryset`` and so served the reviews
+        # of soft-deleted and inactive products too.
+        product = self.get_object()
+        # ``visible_to`` is the same rule ProductReviewViewSet applies —
+        # shared rather than restated, because this action used to do
+        # ``.all()`` and quietly published reviews an admin had rejected
+        # as spam, plus reviews never approved, to anonymous callers.
+        #
+        # select_related("user") avoids N+1 for the user serializer.
         # prefetch_related("translations") avoids N+1 for the parler
         # TranslatableModelSerializer (one extra query per review
         # otherwise, as parler fetches the translation row lazily).
         reviews = (
-            product.reviews.select_related("user")
+            ProductReview.objects.filter(product=product)
+            .visible_to(request.user)
+            .select_related("user")
             .prefetch_related("translations")
-            .all()
         )
 
         response_serializer_class = self.get_response_serializer()

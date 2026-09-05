@@ -221,6 +221,20 @@ class AcsShipment(UUIDModel, TimeStampMixinModel):
     cancel_requested_at = models.DateTimeField(
         _("Cancel requested at"), null=True, blank=True
     )
+    arrival_notified_at = models.DateTimeField(
+        _("Arrival notified at"),
+        null=True,
+        blank=True,
+        help_text=_(
+            "When the customer was told the parcel is out for delivery. "
+            "ACS's shipment_status is a snapshot of the parcel's current "
+            "leg, not a monotonic sequence: a parcel loaded on a vehicle "
+            "(4), returned to the depot at end of shift (3) and loaded "
+            "again next morning (4) re-enters OUT_FOR_DELIVERY, and the "
+            "notification fired on every edge. Set once, under the same "
+            "lock as the state change."
+        ),
+    )
     stale_alert_sent = models.BooleanField(
         _("Stale alert sent"),
         default=False,

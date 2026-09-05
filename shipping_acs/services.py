@@ -1223,8 +1223,16 @@ class AcsService:
 
         Calls ``ACS_Trackingsummary`` for the snapshot and
         ``ACS_TrackingDetails`` for the history; idempotent via
-        ``event_fingerprint``.  Always updates ``last_polled_at``;
-        only updates ``shipment_state`` on forward transitions.
+        ``event_fingerprint``.  Always updates ``last_polled_at``.
+
+        ``shipment_state`` follows ACS, which reports the parcel's
+        CURRENT leg rather than a monotonic sequence — only the terminal
+        states (DELIVERED / RETURNED / CANCELED / LOST) are one-way, and
+        a non-terminal state can legitimately move backwards when a
+        delivery attempt fails. This docstring used to claim "forward
+        transitions only", which was never true and is the reason the
+        arrival notification was written as an edge trigger; see
+        ``_maybe_notify_arrival``.
 
         The two ACS HTTP calls happen with **no DB transaction open
         and no row lock held** — under
@@ -1993,16 +2001,52 @@ class AcsService:
         new_state: AcsShipmentState,
         old_state: AcsShipmentState,
     ) -> None:
-        """Trigger the arrival notification on the OUT_FOR_DELIVERY transition."""
-        if (
-            new_state == AcsShipmentState.OUT_FOR_DELIVERY
-            and old_state != AcsShipmentState.OUT_FOR_DELIVERY
-        ):
-            from shipping_acs.tasks import acs_send_arrival_notification
+        """Tell the customer once, on the first OUT_FOR_DELIVERY.
 
-            transaction.on_commit(
-                lambda: acs_send_arrival_notification.delay(shipment.id)
-            )
+        Firing on the edge alone sent it again every time the parcel
+        re-entered the state. ACS's ``shipment_status`` is a snapshot of
+        the parcel's current leg, not a monotonic sequence, and only
+        terminal states are protected from moving backwards — so a
+        parcel loaded on a vehicle (4), returned to the depot at end of
+        shift (3) and loaded again next morning (4) walked
+        OUT_FOR_DELIVERY → AT_DESTINATION → OUT_FOR_DELIVERY and
+        notified twice. Reproduced with exactly that sequence.
+
+        The mark is written AFTER the publish succeeds, not before it.
+        A DB write and a broker publish cannot be made atomic without an
+        outbox, so one of two failures has to be chosen. Marking first
+        risks a permanent SILENT MISS: `task_publish_retry` is on but
+        spends only ~0.6s, so a broker outage longer than that loses the
+        message while the committed marker stops every later poll from
+        ever trying again. Marking second risks at most ONE duplicate,
+        if the publish lands and the mark then fails — and
+        `acs_send_arrival_notification` says outright that "both calls
+        are idempotent enough for duplicate delivery to be acceptable".
+        The bug being fixed here was SYSTEMATIC duplication on every
+        depot cycle, which is a different thing from tolerating one.
+
+        Both run in `on_commit`, so a rolled-back poll neither marks nor
+        sends. The `arrival_notified_at__isnull=True` predicate on the
+        update keeps it idempotent.
+        """
+        if (
+            new_state != AcsShipmentState.OUT_FOR_DELIVERY
+            or old_state == AcsShipmentState.OUT_FOR_DELIVERY
+            or shipment.arrival_notified_at is not None
+        ):
+            return
+
+        from shipping_acs.tasks import acs_send_arrival_notification
+
+        shipment_pk = shipment.pk
+
+        def _dispatch_then_mark() -> None:
+            acs_send_arrival_notification.delay(shipment_pk)
+            AcsShipment.objects.filter(
+                pk=shipment_pk, arrival_notified_at__isnull=True
+            ).update(arrival_notified_at=timezone.now())
+
+        transaction.on_commit(_dispatch_then_mark)
 
 
 def _to_decimal(value: Any) -> Decimal | None:

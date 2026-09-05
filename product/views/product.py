@@ -265,7 +265,7 @@ class ProductViewSet(BaseModelViewSet):
     )
     def reviews(self, request, pk=None):
         product = get_object_or_404(Product, pk=pk)
-        # select_related("user") avoids N+1 for UserDetailsSerializer.
+        # select_related("user") avoids N+1 for UserPublicSerializer.
         # prefetch_related("translations") avoids N+1 for the parler
         # TranslatableModelSerializer (one extra query per review
         # otherwise, as parler fetches the translation row lazily).

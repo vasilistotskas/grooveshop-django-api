@@ -698,9 +698,22 @@ class PromotionEngine:
 
     @classmethod
     def _gift_entitlement(cls, promotion: Promotion) -> GiftEntitlement | None:
-        """FREE_GIFT reward: the (single) configured gift product."""
-        gift_product = (
-            promotion.get_products.filter(active=True).order_by("pk").first()
+        """FREE_GIFT reward: the (single) configured gift product.
+
+        Chosen in memory from the prefetched rows. ``_collect_candidates``
+        prefetches ``get_products``, and a FILTERED related-manager query
+        does not use that cache — ``.filter(active=True)`` builds a new
+        queryset and always hits the database, so every eligible
+        FREE_GIFT promotion cost one more query, which is the exact
+        defect this change set removes elsewhere in the same file.
+        ``min`` over the cached rows reproduces
+        ``.filter(active=True).order_by("pk").first()`` exactly: lowest
+        pk among the active ones, or None.
+        """
+        gift_product = min(
+            (p for p in promotion.get_products.all() if p.active),
+            key=lambda p: p.pk,
+            default=None,
         )
         if gift_product is None:
             logger.warning(

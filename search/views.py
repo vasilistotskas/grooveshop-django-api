@@ -24,7 +24,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from blog.models.post import BlogPostTranslation
-from core.api.permissions import IsPlatformSuperuser
+from core.api.permissions import IsStoreStaff
 from core.api.serializers import ErrorResponseSerializer
 from core.api.throttling import SearchClickThrottle, SearchThrottle
 from meili._client import client as meili_client
@@ -851,7 +851,10 @@ def search_click(request):
     ],
 )
 @api_view(["GET"])
-@permission_classes([IsPlatformSuperuser])
+# Per-store data, so the store's own staff may read it. It was
+# gated on IsPlatformSuperuser, which on a tenant host reads
+# is_superuser off a tenant-schema row — see is_platform_superuser.
+@permission_classes([IsStoreStaff])
 def search_analytics(request):
     """
     Aggregate and return search analytics metrics.

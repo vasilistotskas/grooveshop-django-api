@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 from djmoney.contrib.django_rest_framework import MoneyField
 from drf_spectacular.helpers import lazy_serializer
@@ -299,13 +300,29 @@ class CartDetailSerializer(CartSerializer):
         )
 
 
+# A reservation exists per cart line, and this endpoint does database
+# work plus one release attempt per id. Unbounded, that is a cheap way
+# for any caller to buy an arbitrarily long request. A hundred is far
+# above any real cart — `gift_card_codes` in this same file has been
+# capped at 3 all along, so the convention was already here.
+MAX_RELEASE_RESERVATION_IDS = 100
+
+
 class ReleaseReservationsRequestSerializer(serializers.Serializer):
     """Serializer for releasing stock reservations."""
 
     reservation_ids = serializers.ListField(
         child=serializers.IntegerField(),
         required=True,
-        help_text=_("List of reservation IDs to release"),
+        max_length=MAX_RELEASE_RESERVATION_IDS,
+        # `format_lazy`, not an f-string inside `_()`: the f-string is
+        # resolved before `_()` sees it, so the msgid would carry the
+        # actual number and never match the catalogue (INT001, and the
+        # same trap `UserAccount.username`'s help_text documents).
+        help_text=format_lazy(
+            _("List of reservation IDs to release (at most {max})"),
+            max=MAX_RELEASE_RESERVATION_IDS,
+        ),
     )
 
 

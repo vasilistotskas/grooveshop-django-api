@@ -231,7 +231,18 @@ class StockManager:
                 f"Reservation {reservation_id} not found"
             )
 
-        Product.objects.select_for_update().get(id=product_id)
+        try:
+            Product.objects.select_for_update().get(id=product_id)
+        except Product.DoesNotExist:
+            # `StockReservation.product` is CASCADE, so a product hard-
+            # deleted between the unlocked read above and this lock takes
+            # the reservation with it. The caller
+            # (`CartViewSet.release_reservations`) catches only
+            # `StockReservationError`, so letting this through answers
+            # 500 for what is really "the reservation is gone".
+            raise StockReservationError(
+                f"Reservation {reservation_id} not found"
+            ) from None
 
         try:
             reservation = (
@@ -748,7 +759,6 @@ class StockManager:
         return available_stock
 
     @classmethod
-    @transaction.atomic
     def cleanup_expired_reservations(cls) -> int:
         """
         Remove expired reservations and restore available stock.
@@ -770,8 +780,16 @@ class StockManager:
         don't actually decrement stock - they only reserve it. The stock_after
         in the log will equal stock_before since no physical stock change occurs.
 
-        The operation is atomic - all expired reservations are processed within
-        a single database transaction to ensure consistency.
+        Each BATCH is its own transaction; the method as a whole is not
+        one. It carried a ``@transaction.atomic`` decorator, which made
+        that false: Django opens a transaction at the OUTERMOST atomic
+        block and inner blocks only create savepoints
+        (``Atomic.__exit__`` releases a savepoint when
+        ``connection.in_atomic_block``, and calls ``connection.commit()``
+        only when it is not). So no batch committed on its own, every
+        row lock was held until the method returned, and a failure in
+        the last batch rolled back all the earlier ones — which is
+        precisely the behaviour the batching below exists to avoid.
 
         Returns:
             int: Count of expired reservations that were cleaned up
@@ -830,14 +848,26 @@ class StockManager:
                     .order_by("id")
                 )
 
-                reservation_ids = [r.id for r in batch]
-                # ``consumed=False`` here as well as in the SELECT: a
-                # reservation converted to a sale in between must not be
-                # re-marked. (A converted one can still get a RELEASE
-                # audit row below — a spurious log line in a narrow race,
-                # not a stock error, since neither moves physical stock.)
+                # Re-read the batch under the product locks, keeping
+                # only what is still unconsumed, and lock those rows too.
+                # A reservation converted to a sale between the unlocked
+                # SELECT above and here must be released by nobody — and
+                # must not appear in the audit log or the returned count
+                # either, which is what reusing the stale `batch` did.
+                # products-then-reservations is the same lock order
+                # `reserve_stock` uses, so adding the second lock cannot
+                # deadlock against it.
+                releasable = list(
+                    StockReservation.objects.select_for_update()
+                    .select_related("product")
+                    .filter(id__in=[r.id for r in batch], consumed=False)
+                    .order_by("id")
+                )
+                if not releasable:
+                    continue
+
                 StockReservation.objects.filter(
-                    id__in=reservation_ids, consumed=False
+                    id__in=[r.id for r in releasable]
                 ).update(consumed=True, updated_at=now)
 
                 # Releasing a reservation does not change physical stock,
@@ -858,9 +888,9 @@ class StockManager:
                             ),
                             performed_by=reservation.reserved_by,
                         )
-                        for reservation in batch
+                        for reservation in releasable
                     ]
                 )
-                total += len(batch)
+                total += len(releasable)
 
         return total

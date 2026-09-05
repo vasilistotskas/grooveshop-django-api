@@ -453,11 +453,18 @@ class UserAccountViewSet(BaseModelViewSet):
         user = self.get_object()
 
         request_serializer_class = self.get_request_serializer()
-        request_serializer = request_serializer_class(data=request.data)
+        # ``instance=user`` so the uniqueness check excludes the caller's
+        # own row — re-submitting your current username is a no-op, not
+        # a collision with yourself.
+        request_serializer = request_serializer_class(
+            instance=user, data=request.data
+        )
         request_serializer.is_valid(raise_exception=True)
 
         new_username = request_serializer.validated_data["username"]
 
+        # The serializer's uniqueness check is not a lock: two requests
+        # can both pass it and then race on the DB constraint.
         try:
             user.username = new_username
             user.save(update_fields=["username"])

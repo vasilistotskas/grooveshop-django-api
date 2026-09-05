@@ -234,11 +234,43 @@ class UserDetailsSerializer(UserSerializer):
         )
 
 
-class UsernameUpdateSerializer(serializers.Serializer):
+# Comments rather than a docstring: drf-spectacular publishes a
+# serializer's docstring as the schema component's description, and the
+# storefront's generated types would carry this rationale.
+#
+# This was a bare ``Serializer`` with ``CharField(max_length=150)`` —
+# five times the model's ``ACCOUNT_USERNAME_MAX_LENGTH``, and carrying
+# none of the field's validators. The view assigns straight onto the
+# instance and calls ``save(update_fields=[...])``, which runs no model
+# validation, so anything the serializer let through was written: 31 to
+# 150 characters reached a ``varchar(30)`` column and came back as a
+# 500, and ``<script>alert(1)</script>`` was simply stored with a 200.
+#
+# Deriving from ``UserSerializer`` picks up the model field's
+# ``max_length``, its ``ExtendedUnicodeUsernameValidator`` and its
+# uniqueness check, plus the inherited ``validate_username`` that runs
+# allauth's ``clean_username`` (blocklist, minimum length) — the same
+# rules a profile update has always been held to.
+class UsernameUpdateSerializer(UserSerializer):
     username = serializers.CharField(
-        max_length=150,
+        max_length=User._meta.get_field("username").max_length,
+        validators=User._meta.get_field("username").validators,
         help_text=_("New username"),
     )
+
+    class Meta(UserSerializer.Meta):
+        fields = ("username",)
+        read_only_fields = ()
+
+    def validate_username(self, username: str) -> str:
+        # allauth's ``clean_username`` ends in a uniqueness lookup that
+        # knows nothing about the row being edited, so submitting the
+        # name you already hold matched yourself and came back "already
+        # taken". A form that posts every field unchanged should be a
+        # no-op, not an error.
+        if self.instance is not None and self.instance.username == username:
+            return username
+        return super().validate_username(username)
 
 
 class UsernameUpdateResponseSerializer(serializers.Serializer):

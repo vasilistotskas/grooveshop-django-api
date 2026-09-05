@@ -285,6 +285,7 @@ def cleanup_expired_data_exports(self) -> dict:
     )
 
     expired = 0
+    stranded = 0
     for export in stale:
         if export.file_path:
             abs_path = os.path.join(location, export.file_path)
@@ -292,11 +293,22 @@ def cleanup_expired_data_exports(self) -> dict:
                 if os.path.exists(abs_path):
                     os.remove(abs_path)
             except OSError:
-                logger.warning(
-                    "cleanup_expired_data_exports: could not remove %s",
+                # Clearing file_path here would be the last reference to
+                # a bundle holding the subject's complete personal data,
+                # past its TTL, with nothing left that could ever find
+                # it again. Leave the row pending so the next run
+                # retries, and log at ERROR: an undeleted export past
+                # expiry is a retention breach, not a warning.
+                logger.exception(
+                    "cleanup_expired_data_exports: could not remove %s for "
+                    "export %s — the bundle is still on disk past its "
+                    "expiry; leaving the row pending for the next run",
                     abs_path,
-                    exc_info=True,
+                    export.pk,
                 )
+                stranded += 1
+                continue
+
         export.status = UserDataExport.Status.EXPIRED
         export.file_path = ""
         export.file_size = 0
@@ -310,5 +322,9 @@ def cleanup_expired_data_exports(self) -> dict:
         )
         expired += 1
 
-    logger.info("cleanup_expired_data_exports: expired %s export(s)", expired)
-    return {"status": "success", "expired": expired}
+    logger.info(
+        "cleanup_expired_data_exports: expired %s export(s), %s stranded",
+        expired,
+        stranded,
+    )
+    return {"status": "success", "expired": expired, "stranded": stranded}

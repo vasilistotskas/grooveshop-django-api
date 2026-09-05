@@ -17,7 +17,7 @@ this was written and verified against real tenant schemas first.
 from __future__ import annotations
 
 from django.db.migrations.operations.base import Operation
-from django.db.migrations.operations.models import AddIndex, RemoveIndex
+from django.db.migrations.operations.models import AddIndex
 
 
 class AddIndexAdaptively(Operation):
@@ -111,7 +111,15 @@ class AddIndexAdaptively(Operation):
             return
 
         if connection.vendor != "postgresql":
-            RemoveIndex(self.model_name, self.index.name).database_backwards(
+            # ``AddIndex.database_backwards``, mirroring the
+            # ``AddIndex.database_forwards`` delegation above. NOT
+            # ``RemoveIndex.database_backwards``, which is what stood
+            # here: reversing a REMOVAL means adding, so that method
+            # calls ``schema_editor.add_index()`` — the reverse of this
+            # operation would have created the index it is supposed to
+            # drop, and failed on a duplicate name where it already
+            # existed.
+            AddIndex(self.model_name, self.index).database_backwards(
                 app_label, schema_editor, from_state, to_state
             )
             return

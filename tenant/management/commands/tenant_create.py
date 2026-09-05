@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from django_tenants.utils import get_public_schema_name
 
 
@@ -102,72 +103,107 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Creating tenant '{options['name']}'...")
 
-        # A trial gets a real term end so the billing dunning cycle
-        # covers it from day one; 0 keeps the legacy never-expiring
-        # behaviour. Paid plans start with no term — paid_until is
-        # recorded by platform staff when the first payment lands.
-        paid_until = None
-        if options["plan"] == TenantPlan.TRIAL and options["trial_days"] > 0:
-            from django.utils import timezone
+        # ONE transaction around the whole sequence. `Tenant.objects
+        # .create()` has `auto_create_schema=True`, so it creates the
+        # Postgres schema and replays every migration inline — and until
+        # now nothing wrapped what followed. A duplicate `domain` (a typo,
+        # or one left behind by an earlier failed run) raised
+        # `IntegrityError` from the very next statement, leaving a
+        # committed tenant with a fully migrated schema, no domain, no
+        # owner and no seed data. Worse, the guard above then REFUSED the
+        # obvious retry, so the operator had to clean up by hand before
+        # they could try again.
+        #
+        # Postgres DDL is transactional, so the schema and its migration
+        # history roll back with everything else and a failed run leaves
+        # nothing behind. The admin path already had this property for
+        # free — Django wraps changeform POSTs in `atomic` — which is why
+        # it defers provisioning to `transaction.on_commit`.
+        with transaction.atomic():
+            # A trial gets a real term end so the billing dunning cycle
+            # covers it from day one; 0 keeps the legacy never-expiring
+            # behaviour. Paid plans start with no term — paid_until is
+            # recorded by platform staff when the first payment lands.
+            paid_until = None
+            if (
+                options["plan"] == TenantPlan.TRIAL
+                and options["trial_days"] > 0
+            ):
+                from django.utils import timezone
 
-            paid_until = timezone.localdate() + timedelta(
-                days=options["trial_days"]
+                paid_until = timezone.localdate() + timedelta(
+                    days=options["trial_days"]
+                )
+
+            tenant = Tenant.objects.create(
+                schema_name=schema_name,
+                name=options["name"],
+                slug=slug,
+                owner_email=options["owner_email"],
+                plan=options["plan"],
+                paid_until=paid_until,
+                store_name=options["store_name"] or options["name"],
+                is_active=True,
+                suspended_at=None,
             )
 
-        tenant = Tenant.objects.create(
-            schema_name=schema_name,
-            name=options["name"],
-            slug=slug,
-            owner_email=options["owner_email"],
-            plan=options["plan"],
-            paid_until=paid_until,
-            store_name=options["store_name"] or options["name"],
-            is_active=True,
-            suspended_at=None,
-        )
-
-        TenantDomain.objects.create(
-            domain=domain,
-            tenant=tenant,
-            is_primary=True,
-        )
-
-        # ``ensure_api_domain`` derives + creates the ``api.<domain>``
-        # row (see tenant/provisioning.py for why it is not optional).
-        # Explicit --extra-domains still win: get_or_create below is a
-        # no-op if the operator already listed it.
-        from tenant.provisioning import (
-            ensure_api_domain,
-            ensure_site,
-        )
-
-        ensure_api_domain(tenant)
-        # The public-schema Site row that per-tenant SocialApp
-        # credentials key on — see tenant/provisioning.py::ensure_site.
-        ensure_site(tenant)
-
-        for extra in options["extra_domains"]:
-            TenantDomain.objects.get_or_create(
-                domain=extra,
+            TenantDomain.objects.create(
+                domain=domain,
                 tenant=tenant,
-                defaults={"is_primary": False},
+                is_primary=True,
             )
 
-        self.stdout.write(
-            f"  Schema '{schema_name}' created with migrations applied."
-        )
+            # ``ensure_api_domain`` derives + creates the ``api.<domain>``
+            # row (see tenant/provisioning.py for why it is not optional).
+            # Explicit --extra-domains still win: get_or_create below is a
+            # no-op if the operator already listed it.
+            from tenant.provisioning import (
+                ensure_api_domain,
+                ensure_site,
+            )
 
-        # Provision an OWNER membership for the tenant owner (creating
-        # the UserAccount row if they don't already exist in the shared
-        # user table). Without this the owner cannot log into the new
-        # tenant — the pre_login adapter would reject the credentials.
-        self._provision_owner_membership(tenant, options["owner_email"])
+            ensure_api_domain(tenant)
+            # The public-schema Site row that per-tenant SocialApp
+            # credentials key on — see tenant/provisioning.py::ensure_site.
+            ensure_site(tenant)
 
-        # Seed default data in tenant schema. ``seed_tenant_defaults``
-        # opens its own ``schema_context`` internally.
-        from tenant.provisioning import seed_tenant_defaults
+            for extra in options["extra_domains"]:
+                TenantDomain.objects.get_or_create(
+                    domain=extra,
+                    tenant=tenant,
+                    defaults={"is_primary": False},
+                )
 
-        seed_tenant_defaults(tenant)
+            self.stdout.write(
+                f"  Schema '{schema_name}' created with migrations applied."
+            )
+
+            # Provision an OWNER membership for the tenant owner (creating
+            # the UserAccount row if they don't already exist in the shared
+            # user table). Without this the owner cannot log into the new
+            # tenant — the pre_login adapter would reject the credentials.
+            self._provision_owner_membership(tenant, options["owner_email"])
+
+            # Seed default data in tenant schema. ``seed_tenant_defaults``
+            # opens its own ``schema_context`` internally.
+            from tenant.provisioning import seed_tenant_defaults
+
+            seeding_failures = seed_tenant_defaults(tenant)
+
+        if seeding_failures:
+            # Not a failure of creation — the store exists and is
+            # usable. But reporting an unqualified success while its
+            # search is broken is how a half-seeded store reaches a
+            # merchant.
+            self.stdout.write(
+                self.style.WARNING(
+                    "These defaults did not seed: "
+                    + ", ".join(seeding_failures)
+                    + ". See the log for each; a missing Meilisearch "
+                    "index makes every search on this store fail until "
+                    "the nightly sync repairs it."
+                )
+            )
 
         self.stdout.write(
             self.style.SUCCESS(

@@ -450,6 +450,20 @@ class TenantAdmin(ModelAdmin):
                 level=messages.WARNING,
             )
 
+        if result["seeding_failures"]:
+            self.message_user(
+                request,
+                _(
+                    "The store was created but these defaults did not "
+                    "seed: %(steps)s. It is usable, but check the server "
+                    "log — a missing Meilisearch index makes EVERY search "
+                    "on this store return an error until the nightly sync "
+                    "repairs it."
+                )
+                % {"steps": ", ".join(result["seeding_failures"])},
+                level=messages.WARNING,
+            )
+
         membership_result = result["membership"]
         if membership_result is None:
             self.message_user(

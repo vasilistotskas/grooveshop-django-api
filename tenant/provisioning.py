@@ -298,7 +298,7 @@ def provision_owner_membership(
     return membership, created
 
 
-def _seed_extra_settings(tenant: Tenant) -> None:
+def _seed_extra_settings(tenant: Tenant) -> bool:
     try:
         from extra_settings.models import Setting
 
@@ -311,39 +311,46 @@ def _seed_extra_settings(tenant: Tenant) -> None:
         # ``description`` through.
         Setting.set_defaults_from_settings()
         logger.info("Seeded extra_settings for %s", tenant.schema_name)
+        return True
     except Exception:
         logger.warning("Could not seed extra_settings", exc_info=True)
+        return False
 
 
-def _seed_page_layouts(tenant: Tenant) -> None:
+def _seed_page_layouts(tenant: Tenant) -> bool:
     try:
         from page_config.defaults import seed_page_layouts
 
         seed_page_layouts()
         logger.info("Seeded page layouts for %s", tenant.schema_name)
+        return True
     except Exception:
         logger.warning("Could not seed page layouts", exc_info=True)
+        return False
 
 
-def _seed_content_pages(tenant: Tenant) -> None:
+def _seed_content_pages(tenant: Tenant) -> bool:
     try:
         from page_config.defaults import seed_content_pages
 
         seed_content_pages()
         logger.info("Seeded content pages for %s", tenant.schema_name)
+        return True
     except Exception:
         logger.warning("Could not seed content pages", exc_info=True)
+        return False
 
 
-def _create_meili_indexes(tenant: Tenant) -> None:
+def _create_meili_indexes(tenant: Tenant) -> bool:
     from django.conf import settings as django_settings
 
     if django_settings.MEILISEARCH.get("OFFLINE"):
-        return
+        return True
 
     # Discover all IndexMixin subclasses
     from meili.models import IndexMixin
 
+    created = True
     for model in IndexMixin.__subclasses__():
         index_name = model.get_meili_index_name()
         try:
@@ -366,27 +373,49 @@ def _create_meili_indexes(tenant: Tenant) -> None:
                 "Created Meilisearch index with settings: %s", index_name
             )
         except Exception:
+            created = False
             logger.warning(
                 "Could not create index %s", index_name, exc_info=True
             )
+    return created
 
 
-def seed_tenant_defaults(tenant: Tenant) -> None:
+def seed_tenant_defaults(tenant: Tenant) -> list[str]:
     """Seed extra_settings, default page layouts/content pages, and
     Meilisearch indexes.
 
     Runs inside ``schema_context(tenant.schema_name)`` — every tenant
-    gets these. Each step is independently best-effort (logged and
-    swallowed): a Meilisearch or page_config hiccup must never block
-    tenant creation.
+    gets these. Each step is independently best-effort: a Meilisearch or
+    page_config hiccup must never block tenant creation, and this still
+    never raises.
+
+    **Returns the steps that FAILED**, so the caller can say so. It used
+    to swallow silently and return None, which meant the admin's "New
+    Store" flow and the CLI both reported unqualified success on a
+    half-seeded store. That is worst for Meilisearch: without its index
+    the engine rejects every filtered query, so search returns HTTP 400
+    for EVERY request on that tenant until the nightly fanout sync
+    repairs it — up to a day later, with nothing having said a word.
     """
     from django_tenants.utils import schema_context
 
+    steps = (
+        ("extra settings", _seed_extra_settings),
+        ("page layouts", _seed_page_layouts),
+        ("content pages", _seed_content_pages),
+        ("Meilisearch indexes", _create_meili_indexes),
+    )
     with schema_context(tenant.schema_name):
-        _seed_extra_settings(tenant)
-        _seed_page_layouts(tenant)
-        _seed_content_pages(tenant)
-        _create_meili_indexes(tenant)
+        failed = [name for name, step in steps if not step(tenant)]
+
+    if failed:
+        logger.error(
+            "Tenant %s seeded with failures: %s. The store is usable but "
+            "incomplete — see the warnings above for each.",
+            tenant.schema_name,
+            ", ".join(failed),
+        )
+    return failed
 
 
 def provision_tenant(
@@ -407,7 +436,12 @@ def provision_tenant(
             "api_domain": str | None,
             "site_domain": str | None,
             "membership": (membership, created) | None,
+            "seeding_failures": list[str],
         }
+
+    ``seeding_failures`` is empty on a clean provision. A caller that
+    ignores it reports success for a store whose search may be returning
+    HTTP 400 on every query.
     """
     if owner_email is None:
         owner_email = tenant.owner_email
@@ -415,10 +449,11 @@ def provision_tenant(
     api_domain = ensure_api_domain(tenant)
     site_domain = ensure_site(tenant)
     membership_result = provision_owner_membership(tenant, owner_email)
-    seed_tenant_defaults(tenant)
+    seeding_failures = seed_tenant_defaults(tenant)
 
     return {
         "api_domain": api_domain,
         "site_domain": site_domain,
         "membership": membership_result,
+        "seeding_failures": seeding_failures,
     }

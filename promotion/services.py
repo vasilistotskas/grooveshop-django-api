@@ -370,9 +370,24 @@ class PromotionEngine:
             cc.code.promotion_id for cc in cart_codes if cc.code.is_active
         ]
 
-        promotions_qs = Promotion.objects.filter(
-            pk__in={*automatic_ids, *code_promotion_ids}
-        ).order_by("pk")
+        # `_matching_items` and `_gift_entitlement` walk these five
+        # relations for EVERY candidate, so without the prefetch the
+        # engine's cost grows with the number of live promotions — and
+        # `evaluate()` runs on every cart read, on the payment-intent
+        # path, and twice more during order creation.
+        promotions_qs = (
+            Promotion.objects.filter(
+                pk__in={*automatic_ids, *code_promotion_ids}
+            )
+            .prefetch_related(
+                "products",
+                "categories",
+                "excluded_products",
+                "excluded_categories",
+                "get_products",
+            )
+            .order_by("pk")
+        )
         if lock:
             promotions_qs = promotions_qs.select_for_update()
         promotions = {p.pk: p for p in promotions_qs}
@@ -546,7 +561,9 @@ class PromotionEngine:
     def _expanded_category_ids(cls, categories_qs) -> set[int]:
         from product.models.category import ProductCategory
 
-        ids = list(categories_qs.values_list("id", flat=True))
+        # Same reason as above — iterate the prefetched rows rather
+        # than issuing a fresh values_list query per promotion.
+        ids = [category.id for category in categories_qs.all()]
         if not ids:
             return set()
         return set(
@@ -568,7 +585,9 @@ class PromotionEngine:
         consistently.
         """
         if promotion.target_scope == TargetScope.PRODUCTS:
-            include_ids = set(promotion.products.values_list("id", flat=True))
+            # `.all()`, not `.values_list()`: values_list builds a
+            # new queryset and always queries, ignoring the prefetch.
+            include_ids = {p.id for p in promotion.products.all()}
             items = [
                 item for item in cart_items if item.product_id in include_ids
             ]
@@ -584,9 +603,7 @@ class PromotionEngine:
         else:
             items = list(cart_items)
 
-        excluded_ids = set(
-            promotion.excluded_products.values_list("id", flat=True)
-        )
+        excluded_ids = {p.id for p in promotion.excluded_products.all()}
         if excluded_ids:
             items = [
                 item for item in items if item.product_id not in excluded_ids
@@ -652,7 +669,7 @@ class PromotionEngine:
             return Money(Decimal(0), currency)
 
         buy_units = cls._unit_prices(cls._matching_items(promotion, cart_items))
-        reward_ids = set(promotion.get_products.values_list("id", flat=True))
+        reward_ids = {p.id for p in promotion.get_products.all()}
 
         if not reward_ids:
             group_size = buy_qty + get_qty

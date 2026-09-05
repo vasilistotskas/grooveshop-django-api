@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework.permissions import BasePermission, DjangoModelPermissions
 
-from tenant.membership import is_store_staff
+from tenant.membership import is_platform_superuser, is_store_staff
 
 User = get_user_model()
 
@@ -38,6 +38,14 @@ class IsPlatformSuperuser(BasePermission):
     never consulted on an API request. This class is the stricter,
     platform-only gate for surfaces that no store operator should
     reach.
+
+    ``is_superuser`` gets the same treatment as ``is_staff``, which it
+    did not used to. It is the same column family on the same copied
+    rows, so the argument above applies to it verbatim: this class
+    rejected ``is_staff`` for being untrustworthy on a tenant-schema row
+    and then trusted ``is_superuser`` on that same row.
+    ``is_platform_superuser`` honours the flag only when the identity
+    provably came from the public schema.
     """
 
     message = _("Only platform superusers may perform this action.")
@@ -48,8 +56,29 @@ class IsPlatformSuperuser(BasePermission):
             user
             and user.is_authenticated
             and user.is_active
-            and user.is_superuser
+            and is_platform_superuser(user)
         )
+
+
+class IsStoreStaff(BasePermission):
+    """Staff of the tenant on this connection — the predicate, not a model.
+
+    ``StoreStaffModelPermissions`` is the right gate for a ViewSet: it
+    maps the HTTP method to a model permission. It cannot be used on a
+    function-based ``@api_view``, which has no queryset for
+    ``DjangoModelPermissions`` to read — that combination raises
+    ``AssertionError`` and answers 500.
+
+    This is the plain predicate for those endpoints: per-store data that
+    a store's own staff have a legitimate claim to, as distinct from
+    ``IsPlatformSuperuser``, which is for surfaces no store operator
+    should reach at all.
+    """
+
+    message = _("Only store staff may perform this action.")
+
+    def has_permission(self, request, view) -> bool:
+        return is_store_staff(getattr(request, "user", None))
 
 
 class StoreStaffModelPermissions(DjangoModelPermissions):
